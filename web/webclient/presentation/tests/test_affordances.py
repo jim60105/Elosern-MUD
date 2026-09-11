@@ -44,7 +44,16 @@ from world.quests.tests._fixtures import (
 )
 from world.rules.combat_session import engage
 from world.rules.party import PARTY_MAX_COMPANIONS, join_party
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import synthetic_registries
 from world.rules.time_skip import DAYPARTS, unsafe_rejection
+from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY, SYNTH_ITEMS
+
+# Kit-authored scripted-dialogue row: the scripted hosts' keywords come from
+# here (inside a dialogue scope).
+T_DIALOGUE_KEY = "t_synth_lodgekeeper"
+_T_KEYWORDS = [response.keyword for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses]
+_T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
 
 
 def _player(key="詞彙測試"):
@@ -245,6 +254,7 @@ class AffordanceContractTests(unittest.TestCase):
         self.assertIn(BASELINE_WAIT_DAYPART, DAYPARTS)
 
 
+@synthetic_registries("dialogue")
 class AffordanceVocabularyTests(VocabularyTestCase):
     def setUp(self):
         self.room = create_object(Room, key="詞彙房")
@@ -285,7 +295,7 @@ class AffordanceVocabularyTests(VocabularyTestCase):
 
         box = create_object(DefaultObject, key="木箱", location=self.room)
         host = create_object(NPC, key="路人", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         self.assertEqual(vocabulary[0].action_id, "explore.move")
         self.assertEqual(vocabulary[0].params["exit_ref"], str(int(exit_obj.id)))
@@ -368,6 +378,7 @@ class AffordanceVocabularyTests(VocabularyTestCase):
             )
 
 
+@synthetic_registries("dialogue", "guild_branches")
 class AffordanceRuleTests(VocabularyTestCase):
     def setUp(self):
         self.room = create_object(Room, key="規則房")
@@ -389,12 +400,12 @@ class AffordanceRuleTests(VocabularyTestCase):
     @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
     def test_scripted_host_emits_one_entry_per_authored_keyword(self):
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         entries = self._entries_for(host)
-        self.assertEqual(len(entries), 6)
+        self.assertEqual(len(entries), len(_T_KEYWORDS))
         self.assertTrue(all(entry.action_id == "explore.talk_scripted" for entry in entries))
         keyword_ids = [entry.params["keyword_id"] for entry in entries]
-        self.assertEqual(keyword_ids, ["註冊", "任務", "公會", "工會", "回報", "再見"])
+        self.assertEqual(keyword_ids, _T_KEYWORDS)
         self.assertTrue(all(entry.enabled for entry in entries))
         self.assertFalse(any(entry.freeform for entry in entries))
 
@@ -447,7 +458,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         )
 
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.room)
         monster = _monster()
         monster.location = self.room
@@ -571,11 +582,11 @@ class AffordanceRuleTests(VocabularyTestCase):
     def test_service_entries_attach_to_the_exact_local_host(self):
         staff = create_object(NPC, key="公會職員", location=self.room)
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY)
         )
-        shop = create_object(NPC, key="商人", location=self.room)
+        shop = create_object(NPC, key="合成商", location=self.room)
         shop.components.add(
-            Merchant.create(shop, service_id="shop", branch_key="guild_branch_altoria")
+            Merchant.create(shop, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
         )
         monster = _monster()
         monster.location = self.room
@@ -611,6 +622,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         self.assertEqual(self._vocabulary(), ())
 
 
+@synthetic_registries("dialogue")
 class SuggestibleFilterTests(VocabularyTestCase):
     def setUp(self):
         self.room = create_object(Room, key="篩選房")
@@ -630,7 +642,7 @@ class SuggestibleFilterTests(VocabularyTestCase):
     @covers_requirement("exploration-affordances::suggestion-eligibility-derives-executable-cards")
     def test_schedule_blocked_host_is_suggestible_excluded_but_vocabulary_present(self):
         host = create_object(NPC, key="忙碌職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         talk_entries = [
             entry
@@ -712,7 +724,7 @@ class SuggestibleFilterTests(VocabularyTestCase):
 
     def test_without_an_actor_talk_entries_are_never_suggestible(self):
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         suggestible = suggestible_candidates(vocabulary)
         self.assertNotIn("explore.talk_scripted", self._action_ids(suggestible))
@@ -725,6 +737,7 @@ class SuggestibleFilterTests(VocabularyTestCase):
         self.assertIn("explore.look", self._action_ids(cards))
 
 
+@synthetic_registries("dialogue")
 class DefaultCardsTests(VocabularyTestCase):
     def setUp(self):
         self.room = create_object(Room, key="卡片房")
@@ -737,7 +750,7 @@ class DefaultCardsTests(VocabularyTestCase):
     @covers_requirement("exploration-affordances::the-deterministic-degradation-fallback-derives-rule-cards")
     def test_cards_are_a_strict_subset_of_the_vocabulary(self):
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.room)
         monster = _monster()
         monster.location = self.room
@@ -758,7 +771,7 @@ class DefaultCardsTests(VocabularyTestCase):
     @covers_requirement("exploration-affordances::the-deterministic-degradation-fallback-derives-rule-cards")
     def test_objective_relevant_actions_rank_first(self):
         host = create_object(NPC, key="目標NPC", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         destination = create_object(Room, key="東邊", location=None)
         create_object(
             "evennia.objects.objects.DefaultExit",
@@ -774,15 +787,15 @@ class DefaultCardsTests(VocabularyTestCase):
         self.assertEqual(first.action_id, "explore.talk_scripted")
         self.assertEqual(first.params["npc_id"], int(host.pk))
         self.assertEqual(
-            [entry.action_id for entry in cards[:3]],
-            ["explore.talk_scripted", "explore.talk_scripted", "explore.talk_scripted"],
+            [entry.action_id for entry in cards[: len(_T_KEYWORDS)]],
+            ["explore.talk_scripted"] * len(_T_KEYWORDS),
         )
         # Every objective-relevant talk entry precedes any move or baseline.
-        seen_talk = 0
-        for entry in cards:
-            if entry.action_id == "explore.talk_scripted":
-                seen_talk += 1
-        self.assertEqual(seen_talk, len(cards))
+        talk_flags = [entry.action_id == "explore.talk_scripted" for entry in cards]
+        self.assertEqual(
+            talk_flags,
+            [True] * len(_T_KEYWORDS) + [False] * (len(cards) - len(_T_KEYWORDS)),
+        )
 
     @covers_requirement("exploration-affordances::the-deterministic-degradation-fallback-derives-rule-cards")
     def test_talk_and_engage_precede_the_baseline_within_the_cap(self):
@@ -801,15 +814,15 @@ class DefaultCardsTests(VocabularyTestCase):
 
     def test_cards_preserve_vocabulary_order_within_a_rank(self):
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         cards = default_cards(vocabulary, actor=self.player)
-        keyword_ids = [entry.params["keyword_id"] for entry in cards]
-        self.assertEqual(
-            keyword_ids,
-            ["註冊", "任務", "公會", "工會", "回報"],
-        )
-        self.assertEqual(len(cards), 5)
+        keyword_ids = [
+            entry.params["keyword_id"]
+            for entry in cards
+            if entry.action_id == "explore.talk_scripted"
+        ]
+        self.assertEqual(keyword_ids, _T_KEYWORDS)
 
     def test_default_cards_are_pure(self):
         vocabulary = self._vocabulary()
@@ -820,7 +833,7 @@ class DefaultCardsTests(VocabularyTestCase):
 
     def test_cap_is_respected_even_with_many_objectives(self):
         host = create_object(NPC, key="公會職員", location=self.room)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         cards = default_cards(
             vocabulary, objective_npc_ids=frozenset({int(host.pk)}), actor=self.player
@@ -977,6 +990,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
     """
 
     def setUp(self):
+        open_synthetic_scope(self, "items")
         super().setUp()
         self.room = create_object(Room, key="交付詞彙房")
         self.player = _player(key="交付持有者")
@@ -991,7 +1005,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         definition = register(
             quest(
                 "deliver_affordance_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_SPRAY, quantity=2)),),
             )
         )
         self.record = accept(self.player, definition)
@@ -1013,14 +1027,17 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
     )
     def test_held_item_offers_one_enabled_normalized_entry(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         (entry,) = self._deliver_entries()
         self.assertTrue(entry.enabled)
         self.assertIsNone(entry.disabled_reason)
         self.assertEqual(
-            entry.params, {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"}
+            entry.params, {"npc_id": int(self.recipient.pk), "item_key": _T_SPRAY}
         )
-        self.assertEqual(entry.label, "交付 治療藥水 給 灰婆婆")
+        self.assertEqual(
+            entry.label,
+            f"交付 {SYNTH_ITEMS['t_ember_spray'].display_name_zh} 給 灰婆婆",
+        )
         self.assertFalse(entry.freeform)
         self.assertIsNone(entry.surface)
 
@@ -1040,7 +1057,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
     )
     def test_no_entry_without_an_active_bound_stage(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         # The bystander is co-located but bound to nothing.
         vocabulary = exploration_affordances(self.player)
         bystander_entries = [
@@ -1062,11 +1079,11 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
     def test_entry_params_survive_the_registered_validator_round_trip(self):
         from web.webclient.actions.exploration_actions import validate_deliver_payload
 
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         (entry,) = self._deliver_entries()
         self.assertEqual(
             validate_deliver_payload(entry.params),
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_SPRAY},
         )
 
     @covers_requirement(
@@ -1079,7 +1096,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         )
         from web.webclient.actions.exploration_actions import validate_deliver_payload
 
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         payload = validate_exploration(
             {
                 "schema_version": 2,
@@ -1116,11 +1133,11 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         # (schema version 2): the dock forwards it byte-for-byte.
         self.assertEqual(
             deliver_rows[0]["params"],
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_SPRAY},
         )
         self.assertEqual(
             validate_deliver_payload(deliver_rows[0]["params"]),
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_SPRAY},
         )
 
 

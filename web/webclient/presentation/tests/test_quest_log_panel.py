@@ -32,7 +32,6 @@ from web.webclient.presentation.registry import (
     UNAVAILABLE_REASON,
     build_production_registry,
 )
-from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -65,9 +64,16 @@ from world.rules.quest_issuance import (
     npc_issuer_key,
     register_quest_issuance,
 )
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import install_synthetic_catalog, synth_catalog
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCHES,
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_ITEMS,
+)
 
 TICK = 1000
-ALTORIA_BRANCH = "guild_branch_altoria"
+T_BRANCH = SYNTH_GUILD_BRANCH_KEY
 UNAVAILABLE_PAYLOAD = {
     "schema_version": QUEST_LOG_SCHEMA_VERSION,
     "available": False,
@@ -97,7 +103,7 @@ ROW_FIELDS = {
 }
 
 
-def _registration(branch_key=ALTORIA_BRANCH):
+def _registration(branch_key=T_BRANCH):
     return {
         "branch_key": branch_key,
         "registered_tick": 0,
@@ -121,6 +127,9 @@ def _register_auto_commission(definition_key: str, content_key: str) -> str:
 
 class QuestLogPresenterTests(EvenniaTest):
     def setUp(self):
+        # Branch identity (staff, offers, issuer labels) resolves through the
+        # live branch registry: run the lifecycle on the kit branch row.
+        open_synthetic_scope(self, "guild_branches")
         super().setUp()
         # The shipped definitions (``introductory_hunt`` et al.) must be
         # registered before the affinity config loads during
@@ -206,7 +215,7 @@ class QuestLogPresenterTests(EvenniaTest):
         set_quest_tracked(self.player, record.quest_id, True)
         self.player.db.wallet = 500
         before_log = json.dumps(self.player.db.quest_log or [], default=self._json_default)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = ["t_ember_spray"]
         before_inventory = json.dumps(list(self.player.db.inventory or []))
 
         first = self._render()
@@ -272,7 +281,7 @@ class QuestLogPresenterTests(EvenniaTest):
     def test_guild_label_uses_branch_registry_with_remainder_fallback(self):
         staff = create_object(NPC, key="guild master", location=self.room)
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=ALTORIA_BRANCH)
+            GuildStaff.create(staff, service_id="staff", branch_key=T_BRANCH)
         )
         definition = register(quest("branch_label_quest"))
         self.player.race = "human"
@@ -280,7 +289,7 @@ class QuestLogPresenterTests(EvenniaTest):
         register_guild_offer(
             GuildQuestOffer(
                 definition_key=definition.key,
-                issuer_branch_key=ALTORIA_BRANCH,
+                issuer_branch_key=T_BRANCH,
                 reward=QuestReward(copper=50, items=(), merit=5),
             )
         )
@@ -289,10 +298,10 @@ class QuestLogPresenterTests(EvenniaTest):
 
         row = self._render()["rows"][0]
         self.assertEqual(row["issuer"]["kind"], "guild")
-        self.assertEqual(row["issuer"]["key"], f"guild:{ALTORIA_BRANCH}")
+        self.assertEqual(row["issuer"]["key"], f"guild:{T_BRANCH}")
         self.assertEqual(
             row["issuer"]["label"],
-            GUILD_BRANCH_REGISTRY[ALTORIA_BRANCH].display_name_zh,
+            SYNTH_GUILD_BRANCHES[T_BRANCH].display_name_zh,
         )
         self.assertEqual(row["settlement"], "counter")
 
@@ -332,9 +341,13 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(quest_log["deadline_line"], objectives["deadline_line"])
 
     def test_quest_book_and_counter_agree_with_a_clerk_present(self):
+        # The services read model validates the shipped guild-economy catalog
+        # against the branch registry; run the surface on a fully synthetic
+        # catalog so the counter board never touches shipped data.
+        install_synthetic_catalog(self, synth_catalog())
         staff = create_object(NPC, key="parity clerk", location=self.room)
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key=ALTORIA_BRANCH)
+            GuildStaff.create(staff, service_id="staff", branch_key=T_BRANCH)
         )
         definition = register(quest("counter_parity"))
         self.player.race = "human"
@@ -342,7 +355,7 @@ class QuestLogPresenterTests(EvenniaTest):
         register_guild_offer(
             GuildQuestOffer(
                 definition_key=definition.key,
-                issuer_branch_key=ALTORIA_BRANCH,
+                issuer_branch_key=T_BRANCH,
                 reward=QuestReward(copper=80, items=(), merit=10),
             )
         )
@@ -375,10 +388,12 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(row["quest_id"], record.quest_id)
         self.assertIsNone(row["reward_line"])
         self.assertIsNone(row["settlement"])
-        # No copper, item, or merit figure appears anywhere in the row.
         serialized = json.dumps(row, ensure_ascii=False)
-        for forbidden in ("銅", "功績", "獎勵", "治療藥水"):
-            self.assertNotIn(forbidden, serialized)
+        forbidden = ("銅", "功績", "獎勵") + tuple(
+            item.display_name_zh for item in SYNTH_ITEMS.values()
+        )
+        for word in forbidden:
+            self.assertNotIn(word, serialized)
 
     @covers_requirement(
         "webclient-quest-log-panel::a-corrupt-quest-log-degrades-the-whole-panel-never-a-partial-list"
@@ -499,8 +514,8 @@ class QuestLogValidatorTests(unittest.TestCase):
             "tracked": False,
             "issuer": {
                 "kind": "guild",
-                "key": "guild:guild_branch_altoria",
-                "label": "埃洛西恩冒險者公會 阿爾托利亞分會",
+                "key": f"guild:{T_BRANCH}",
+                "label": "合成公會分會",
             },
             "settlement": "counter",
             "reward_line": "獎勵：銅 50、功績 25",
@@ -637,7 +652,7 @@ class QuestLogValidatorTests(unittest.TestCase):
         # A grammar-valid key under the wrong declared kind rejects.
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(
-                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "kind": "npc", "key": f"guild:{ALTORIA_BRANCH}"})])
+                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "kind": "npc", "key": f"guild:{T_BRANCH}"})])
             )
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(
@@ -645,7 +660,7 @@ class QuestLogValidatorTests(unittest.TestCase):
             )
         # Every valid form passes: guild, authored npc, and pk npc.
         for kind, key in (
-            ("guild", f"guild:{ALTORIA_BRANCH}"),
+            ("guild", f"guild:{T_BRANCH}"),
             ("npc", "npc:grey_granny"),
             ("npc", "npc:#1234"),
         ):

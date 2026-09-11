@@ -49,6 +49,11 @@ from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync
 from world.rules.clock import get_world_clock
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.map_knowledge import record_arrival
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY
+
+# Kit-authored scripted-dialogue row: the host's keywords come from here.
+T_DIALOGUE_KEY = "t_synth_lodgekeeper"
 
 
 def _context(actor):
@@ -818,9 +823,12 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_scripted_host_exposes_its_authored_keywords(self):
+        # Keywords render from the live dialogue table: run this surface on
+        # the kit-authored dialogue row.
+        open_synthetic_scope(self, "dialogue")
         host = create_object(NPC, key="公會職員", location=self.south_gate)
         host.components.add(
-            ScriptedDialogue.create(host, dialogue_key="guild_staff")
+            ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY)
         )
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(host.pk))
@@ -831,9 +839,10 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(scripted["enabled"])
         self.assertIsNotNone(target.get("keywords"))
         keyword_ids = [keyword["keyword_id"] for keyword in target["keywords"]]
-        self.assertIn("註冊", keyword_ids)
-        self.assertIn("任務", keyword_ids)
-        self.assertIn("回報", keyword_ids)
+        self.assertEqual(
+            keyword_ids,
+            [response.keyword for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses],
+        )
         # A scripted-only host offers no free-form affordance.
         self.assertFalse(
             any(
@@ -949,9 +958,12 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_service_affordance_is_navigate_kind_and_host_bound(self):
+        # The staff host binds the kit branch row; scope the branch registry
+        # so the binding resolves against a registered synthetic identity.
+        open_synthetic_scope(self, "guild_branches")
         staff = create_object(NPC, key="公會職員", location=self.south_gate)
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY)
         )
         monster = create_object(Monster, key="哥布林", location=self.south_gate)
         monster.threat_tier = "low"
@@ -1330,6 +1342,9 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         from evennia.objects.objects import DefaultObject
 
+        # The scripted-host fixture renders its keyword pool from the live
+        # dialogue table: build the room on the kit-authored dialogue row.
+        open_synthetic_scope(self, "dialogue")
         self.room1 = create_object(Room, key="南門")
         self.player = create_object(PlayerCharacter, key="穩定測試")
         self.player.race = "human"
@@ -1353,7 +1368,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.locked_exit.locks.add("traverse:false()")
         self.host = create_object(NPC, key="公會職員", location=self.room1)
         self.host.components.add(
-            ScriptedDialogue.create(self.host, dialogue_key="guild_staff")
+            ScriptedDialogue.create(self.host, dialogue_key=T_DIALOGUE_KEY)
         )
         self.bard = create_object(LLMNPC, key="吟遊詩人", location=self.room1)
         self.passerby = create_object(NPC, key="路人", location=self.room1)
@@ -1457,12 +1472,10 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                             }
                         ],
                         "keywords": [
-                            {"keyword_id": "註冊", "label": "註冊"},
-                            {"keyword_id": "任務", "label": "任務"},
-                            {"keyword_id": "公會", "label": "公會"},
-                            {"keyword_id": "工會", "label": "工會"},
-                            {"keyword_id": "回報", "label": "回報"},
-                            {"keyword_id": "再見", "label": "再見"},
+                            *(
+                                {"keyword_id": response.keyword, "label": response.keyword}
+                                for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses
+                            )
                         ],
                     },
                     {

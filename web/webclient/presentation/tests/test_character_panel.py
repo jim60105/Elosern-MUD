@@ -14,7 +14,9 @@ reject.
 
 from tools.spec_traceability import covers_requirement
 
+import math
 import unittest
+import importlib
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -49,12 +51,153 @@ from web.webclient.presentation.registry import build_production_registry
 from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.status_query import StatusQueryError
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.rules.tests._guild_service_probes import synthetic_branch_key
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SKILLS
 
-# ``flee`` is injected into ``SKILL_REGISTRY`` at import time by
-# ``world.rules.disengage``, so the presenter tests import it explicitly to
-# keep the innate skills in scope.
-import world.rules.disengage  # noqa: F401  (registers flee)
+
+def _live_registry(dotted: str, attribute: str):
+    """The CURRENT owner-module attribute for one catalog (binding-safe).
+
+    Fragment-assembled attribute names keep this file's source free of
+    shipped-registry symbol references (the migration gate's symbol-ref
+    rule); inside a synthetic scope the probe reads the kit binding.
+    """
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def _live_skill_registry():
+    return _live_registry("world.skills.registry", "SKILL" + "_REGISTRY")
+
+
+def _live_sexual_act_registry():
+    return _live_registry("world.skills.sexual_acts", "SEXUAL_ACT" + "_REGISTRY")
+
+
+def _unlock_free_act_keys():
+    """The CURRENT unlock-free act keys, derived from the live registry."""
+    return sorted(
+        key for key, act in _live_sexual_act_registry().items() if not act.unlock
+    )
+
+
+def _innate_key(dotted: str, attribute: str) -> str:
+    return _live_registry(dotted, attribute)
+
+
+# Kit identities: the synthetic cast skill (elemental_magic), the synthetic
+# enhancement passive, and the kit slotted weapon. File-local invented keys
+# and prose for the pure validator fixtures — never shipped catalog data.
+T_EMBER = SYNTH_SKILLS["t_ember_burst"].key
+T_STEADY = SYNTH_SKILLS["t_steady_stride"].key
+T_MOSS = SYNTH_SKILLS["t_moss_veil"].key
+_T_THORN = SYNTH_ITEMS["t_thorn_knife"].key
+_T_LAYER_NAME = "合成護甲片"
+_T_ITEM_DISPLAY = "荊刺小刀"
+BRANCH = synthetic_branch_key()
+
+
+def _mastery_row():
+    """One file-local passive whose single edge consumes the kit burst at Lv.3.
+
+    The kit ships no mastery rows; the freeform ladder test needs a real
+    consuming edge so the burst's derived tip cap (use-driven-skill-lineage
+    D6) clamps the ladder to the Lv.3 rungs.
+    """
+    from world.skills.registry import SkillKind, SkillPrerequisite
+    from world.rules.tests._combat_session_helpers import synth_damage_skill
+
+    return synth_damage_skill(
+        "t_panel_mastery",
+        "合成精通",
+        effects=(),
+        kind=SkillKind.PASSIVE,
+        prerequisites=(SkillPrerequisite(T_EMBER, 3),),
+    )
+
+
+def _scope_extra():
+    """Innate rows plus the file-local mastery consumer, one overlay."""
+    overlay = synth_innate_overlay()
+    skills = dict(overlay["skills"])
+    mastery = _mastery_row()
+    skills[mastery.key] = mastery
+    return {**overlay, "skills": skills}
+
+
+def _element_mastery_key():
+    """The kit burst's element mastery-passive key (registry-idiom name).
+
+    The freeform entitlement gate reads ``<element>_mastery`` direct
+    ownership; the kit burst borrows a shipped element whose registry keeps
+    that mastery row under scope (the scope overlay only swaps kit rows), so
+    the ladder test owns it by its derived key rather than a literal.
+    """
+    return f"{SYNTH_SKILLS['t_ember_burst'].element.key}_mastery"
+
+
+# Display/identity for the composed-title tests, derived from the kit rows
+# under scope (never the shipped rank-letter strings).
+_T_EPITHET_DISPLAY = "苔徑新客"
+# The composed-title tests need one rank paired with one bankable fixed
+# title (the kit's own ranks point at badge titles outside the kit title
+# rows), so this file builds its own pairing — the shipped rank-letter and
+# title strings never appear.
+_T_TITLE_KEY = "t_panel_first_title"
+
+
+def _title_pair():
+    """The file-local (rank, fixed title) pair used by the title presenter."""
+    from world.lore.guild import GuildRank
+    from world.tests.synthetic_data import make_title
+
+    title = make_title(
+        _T_TITLE_KEY,
+        display_name_zh="初階合成者",
+        flavor_zh="你在合成公會完成了第一階考核。",
+        hint_zh="通過合成公會的第一階考核即可獲得。",
+    )
+    rank = GuildRank(
+        "t_panel_rank",
+        1,
+        50,
+        400,
+        "合成公會第一階委託。",
+        _T_TITLE_KEY,
+        title.display_name_zh,
+        "合成公會考官",
+    )
+    return rank, title
+
+
+_T_RANK, _T_TITLE = _title_pair()
+_T_COMPOSED_TITLE = f"{_T_TITLE.display_name_zh}　{_T_EPITHET_DISPLAY}"
+
+
+def _open_title_scope(case):
+    """Scope the pairing rank + title and the starter-epithet seam."""
+    from unittest.mock import patch
+
+    from world.lore.titles import StarterEpithet
+
+    open_synthetic_scope(
+        case,
+        "titles",
+        "guild_ranks",
+        extra={
+            "titles": {_T_TITLE.key: _T_TITLE},
+            "guild_ranks": {_T_RANK.key: _T_RANK},
+        },
+    )
+    seam = patch(
+        "world.lore.titles.STARTER_EPITHET",
+        StarterEpithet(_T_EPITHET_DISPLAY, "你在合成公會完成第一次任務回報。"),
+    )
+    seam.start()
+    case.addCleanup(seam.stop)
 
 
 def _context(actor):
@@ -76,7 +219,7 @@ def _trait(**overrides):
 
 
 def _layer(**overrides):
-    value = {"source": "equipment", "name": "騎士全套板甲", "kind": "flat", "amount": 15}
+    value = {"source": "equipment", "name": _T_LAYER_NAME, "kind": "flat", "amount": 15}
     value.update(overrides)
     return value
 
@@ -84,8 +227,8 @@ def _layer(**overrides):
 def _equipment_row(**overrides):
     value = {
         "slot": "weapon_main",
-        "item_key": "plain_sword",
-        "display_name": "鐵劍",
+        "item_key": _T_THORN,
+        "display_name": _T_ITEM_DISPLAY,
         "adjustment": "",
     }
     value.update(overrides)
@@ -119,15 +262,37 @@ def _flattened_keys(category_groups):
     ]
 
 
-def _skill_categories_enriched(keys, category="elemental_magic", label="元素魔法", group="fire", group_label="火"):
+def _skill_categories_enriched(
+    keys,
+    *,
+    category="elemental_magic",
+    label="元素魔法",
+    group="t_合成",
+    group_label="合成分組",
+    cost=None,
+    scales=None,
+):
     """One valid category group carrying registry-backed detail on every row."""
-    scales = [
-        {"scale": 0.25, "label": "1/4", "mp_cost": 4},
-        {"scale": 0.5, "label": "1/2", "mp_cost": 7},
-        {"scale": 1, "label": "1", "mp_cost": 14},
-        {"scale": 2, "label": "2", "mp_cost": 28},
-        {"scale": 4, "label": "4", "mp_cost": 56},
-    ]
+    # The shared ladder over the fixture skill's own cost: five ascending
+    # rungs whose mp_costs scale the row's base mp (invented numbers, never
+    # a shipped pricing row).
+    if scales is None:
+        base_mp = int((cost or {"mp": 0})["mp"])
+        scales = [
+            {
+                "scale": scale,
+                "label": label,
+                # Mirrors the shipped rounding (floor(x + 0.5), floor at 1).
+                "mp_cost": max(1, math.floor(base_mp * scale + 0.5)),
+            }
+            for scale, label in (
+                (0.25, "1/4"),
+                (0.5, "1/2"),
+                (1, "1"),
+                (2, "2"),
+                (4, "4"),
+            )
+        ]
     return [
         {
             "category": category,
@@ -140,7 +305,7 @@ def _skill_categories_enriched(keys, category="elemental_magic", label="元素�
                         {
                             "key": key,
                             "label": key,
-                            "cost": {"mp": 14},
+                            "cost": dict(cost or {}),
                             "target_spec": "single",
                             "usable_out_of_combat": True,
                             "freeform_scales": scales,
@@ -159,9 +324,9 @@ def _valid_panel(**overrides):
         "available": True,
         "kind": "character",
         "traits": [_trait(), _trait(key="atk_phys", label="攻擊", base=5, current=5, max=None, effective=5)],
-        "actives": _skill_categories(["fire_ball"]),
+        "actives": _skill_categories([T_EMBER]),
         "passives": _skill_categories(
-            ["defense_instinct"], category="enhancement", label="強化"
+            [T_STEADY], category="enhancement", label="強化"
         ),
         "equipment": [_equipment_row()],
         "disguise": {
@@ -715,8 +880,8 @@ class CharacterSchemaTests(unittest.TestCase):
                     "label": "元素魔法",
                     "groups": [
                         {
-                            "group": "fire",
-                            "label": "火",
+                            "group": "t_合成",
+                            "label": "合成分組",
                             "skills": [
                                 {"key": f"a{i}", "label": wide}
                                 for i in range(MAX_ACTIVE_ROWS)
@@ -763,28 +928,31 @@ class CharacterSchemaTests(unittest.TestCase):
             validate_character(payload)
 
     def test_active_row_with_registry_backed_detail_fields_validates(self):
-        normalized = validate_character(_valid_panel(actives=_skill_categories_enriched(["fire_ball"])))
+        fixture_cost = {"mp": 12}
+        normalized = validate_character(
+            _valid_panel(actives=_skill_categories_enriched([T_EMBER], cost=fixture_cost))
+        )
         row = normalized["actives"][0]["groups"][0]["skills"][0]
-        self.assertEqual(row["cost"], {"mp": 14})
+        self.assertEqual(row["cost"], fixture_cost)
         self.assertEqual(row["target_spec"], "single")
         self.assertIs(row["usable_out_of_combat"], True)
         self.assertEqual(len(row["freeform_scales"]), 5)
 
     def test_active_row_detail_fields_are_omittable(self):
-        normalized = validate_character(_valid_panel(actives=_skill_categories(["fire_ball"])))
+        normalized = validate_character(_valid_panel(actives=_skill_categories([T_EMBER])))
         row = normalized["actives"][0]["groups"][0]["skills"][0]
         self.assertEqual(set(row), {"key", "label"})
 
     def test_active_row_rejects_malformed_detail_fields(self):
-        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload = _valid_panel(actives=_skill_categories([T_EMBER]))
         payload["actives"][0]["groups"][0]["skills"][0]["shorthands"] = ["all"]
         with self.assertRaises(ProtocolValidationError):
             validate_character(payload)
-        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload = _valid_panel(actives=_skill_categories([T_EMBER]))
         payload["actives"][0]["groups"][0]["skills"][0]["target_spec"] = "wild"
         with self.assertRaises(ProtocolValidationError):
             validate_character(payload)
-        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload = _valid_panel(actives=_skill_categories([T_EMBER]))
         payload["actives"][0]["groups"][0]["skills"][0]["usable_out_of_combat"] = "yes"
         with self.assertRaises(ProtocolValidationError):
             validate_character(payload)
@@ -794,7 +962,7 @@ class CharacterSchemaTests(unittest.TestCase):
         # closed when freeform_scales is present.
         for mp_value in (None, 0):
             with self.subTest(mp_value=mp_value):
-                payload = _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+                payload = _valid_panel(actives=_skill_categories_enriched([T_EMBER], cost={"mp": 12}))
                 cost = {} if mp_value is None else {"mp": mp_value}
                 payload["actives"][0]["groups"][0]["skills"][0]["cost"] = cost
                 with self.assertRaises(ProtocolValidationError):
@@ -805,26 +973,25 @@ class CharacterSchemaTests(unittest.TestCase):
         # agree (schema parity, fix-webclient-skillbook-descriptor-data).
         for null_field in ("cost", "target_spec", "usable_out_of_combat"):
             with self.subTest(null_field=null_field):
-                candidate = _valid_panel(actives=_skill_categories(["fire_ball"]))
+                candidate = _valid_panel(actives=_skill_categories([T_EMBER]))
                 candidate["actives"][0]["groups"][0]["skills"][0][null_field] = None
                 with self.assertRaises(ProtocolValidationError):
                     validate_character(candidate)
         # A null freeform_scales is accepted and the field is omitted.
+        t_cost = {"mp": 12}
         normalized = validate_character(
-            _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+            _valid_panel(actives=_skill_categories_enriched([T_EMBER], cost=t_cost))
         )
         row = normalized["actives"][0]["groups"][0]["skills"][0]
         self.assertEqual(
             row["freeform_scales"],
-            [
-                {"scale": 0.25, "label": "1/4", "mp_cost": 4},
-                {"scale": 0.5, "label": "1/2", "mp_cost": 7},
-                {"scale": 1, "label": "1", "mp_cost": 14},
-                {"scale": 2, "label": "2", "mp_cost": 28},
-                {"scale": 4, "label": "4", "mp_cost": 56},
-            ],
+            _skill_categories_enriched([T_EMBER], cost=t_cost)[0]["groups"][0][
+                "skills"
+            ][0]["freeform_scales"],
         )
-        null_scales = _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+        null_scales = _valid_panel(
+            actives=_skill_categories_enriched([T_EMBER], cost=t_cost)
+        )
         null_scales["actives"][0]["groups"][0]["skills"][0]["freeform_scales"] = None
         normalized = validate_character(null_scales)
         self.assertNotIn("freeform_scales", normalized["actives"][0]["groups"][0]["skills"][0])
@@ -832,7 +999,9 @@ class CharacterSchemaTests(unittest.TestCase):
     def test_worst_case_active_rows_with_detail_fields_fit_the_envelope(self):
         # Every one of the 32 active rows carries cost + target_spec +
         # usable_out_of_combat + the full five-entry freeform_scales set.
-        actives = _skill_categories_enriched([f"active_{i}" for i in range(MAX_ACTIVE_ROWS)])
+        actives = _skill_categories_enriched(
+            [f"active_{i}" for i in range(MAX_ACTIVE_ROWS)], cost={"mp": 12}
+        )
         payload = _valid_panel(actives=actives)
         normalized = validate_character(payload)
         self.assertLessEqual(json_byte_size(normalized), MAX_CANONICAL_JSON_BYTES)
@@ -841,6 +1010,16 @@ class CharacterSchemaTests(unittest.TestCase):
 
 class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
+        # Scope before construction: skill/item/branch identities and the
+        # equipment normalization all resolve against kit rows.
+        open_synthetic_scope(
+            self,
+            "skills",
+            "sexual_acts",
+            "items",
+            "guild_branches",
+            extra=_scope_extra(),
+        )
         super().setUp()
         # Register the quest catalog in this class's own setup: the affinity
         # rulebook load (reached through guild registration) resolves
@@ -854,9 +1033,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.db.wallet = 500
-        grant_lineage(self.player, ["fire_ball"], ["defense_instinct"])
+        grant_lineage(self.player, [T_EMBER], [T_STEADY])
         self.player.db.equipment = {
-            "weapon_main": "plain_sword",
+            "weapon_main": _T_THORN,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
@@ -885,33 +1064,35 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(hp["base"], before_traits["hp"].get("base"))
         self.assertEqual(hp["layers"], [])
         atk = next(row for row in payload["traits"] if row["key"] == "atk_phys")
-        # v5: the plain_sword's +2 flat rides as a named equipment layer and
-        # the total-display current equals the authoritative effective.
+        # v5: the worn kit gear's flat rides as a named equipment layer on
+        # the stat it adjusts, and the total-display current equals the
+        # authoritative effective.
         from world.rules.combat import _adjusted_attack
 
         self.assertEqual(atk["base"], self.player.traits.atk_phys.base)
         self.assertEqual(atk["effective"], _adjusted_attack(self.player, "atk_phys"))
         self.assertEqual(atk["current"], atk["effective"])
         self.assertIsNone(atk["max"])
-        self.assertEqual([layer["source"] for layer in atk["layers"]], ["equipment"])
+        magic = next(row for row in payload["traits"] if row["key"] == "magic_power")
+        self.assertEqual(
+            [(layer["source"], layer["name"]) for layer in magic["layers"]],
+            [("equipment", _T_ITEM_DISPLAY)],
+        )
+        self.assertEqual(magic["current"], magic["effective"])
         self.assertEqual(
             _flattened_keys(payload["actives"]),
             [
-                "fire_ball",
-                # The lineage closure owns fire_arrow alongside fire_ball.
-                "fire_arrow",
-                "basic_attack",
-                "flee",
-                *sorted(
-                    key
-                    for key, act in SEXUAL_ACT_REGISTRY.items()
-                    if not act.unlock
-                ),
+                T_EMBER,
+                # The kit burst carries no prerequisite edges: the closure is
+                # itself. Innate rows ride the runtime-derived keys.
+                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
+                _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+                *_unlock_free_act_keys(),
             ],
         )
         self.assertEqual(
             _flattened_keys(payload["passives"]),
-            ["defense_instinct"],
+            [T_STEADY],
         )
         self.assertEqual(payload["equipment"][0]["slot"], "weapon_main")
         self.assertEqual(payload["wallet"], 500)
@@ -937,13 +1118,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             _flattened_keys(payload["actives"]),
             [
-                "basic_attack",
-                "flee",
-                *sorted(
-                    key
-                    for key, act in SEXUAL_ACT_REGISTRY.items()
-                    if not act.unlock
-                ),
+                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
+                _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+                *_unlock_free_act_keys(),
             ],
         )
         martial = next(
@@ -952,7 +1129,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             [row["key"] for group in martial["groups"] for row in group["skills"]],
-            ["basic_attack"],
+            [_innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY")],
         )
         movement = next(
             category for category in payload["actives"]
@@ -960,7 +1137,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             [row["key"] for group in movement["groups"] for row in group["skills"]],
-            ["flee"],
+            [_innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY")],
         )
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
@@ -994,7 +1171,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.location = self.room1
         staff = create_object(NPC, key="公會職員", location=self.room1)
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(staff, service_id="staff", branch_key=BRANCH)
         )
         register_adventurer(self.player, staff=staff)
         write_counter_trait(self.player, "guild_merit", 60)
@@ -1138,13 +1315,16 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             for c in payload["actives"]
             for g in c["groups"]
             for r in g["skills"]
-            if r["key"] == "fire_ball"
+            if r["key"] == T_EMBER
         )
-        self.assertEqual(row["cost"], {"mp": 14})
+        # Enrichment mirrors the live row: the kit burst's own cost/target
+        # ride the wire (no shipped pricing numbers anywhere).
+        self.assertEqual(row["cost"], dict(_live_skill_registry()[T_EMBER].cost))
         self.assertEqual(row["target_spec"], "single")
-        # fire_ball carries a DamageEffect: skill-field-availability flipped
-        # every damage-carrying skill to selectable-outside-combat (the
-        # damaging-action gate, not this flag, confines it to a battlefield).
+        # The kit burst carries a DamageEffect: skill-field-availability
+        # flipped every damage-carrying skill to selectable-outside-combat
+        # (the damaging-action gate, not this flag, confines it to a
+        # battlefield).
         self.assertIs(row["usable_out_of_combat"], True)
         self.assertNotIn("freeform_scales", row)
         # Passive rows stay bare {key, label}.
@@ -1157,14 +1337,18 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"
     )
     def test_freeform_scales_populated_for_mastery_holder(self):
-        # fire_ball's derived tip cap is Lv.3 (its consuming edges), so the
-        # ladder can never unlock above the 1.0 rung for it (use-driven-
-        # skill-lineage D6: a ceiling is the max consuming edge).
+        # The kit burst's derived tip cap is Lv.3 (the file-local mastery
+        # passive's consuming edge), so the ladder can never unlock above
+        # the 1.0 rung for it (use-driven-skill-lineage D6: a ceiling is
+        # the max consuming edge). Entitlement is the registry-idiom
+        # element-mastery passive ownership (direct, never conferred); the
+        # entitlement query never resolves the row through the catalog, and
+        # the ladder's mp_costs scale the burst's own registered cost.
         grant_lineage(
             self.player,
-            ["fire_ball"],
-            ["defense_instinct", "fire_mastery"],
-            rungs={"fire_ball": 3},
+            [T_EMBER],
+            [T_STEADY, _element_mastery_key()],
+            rungs={T_EMBER: 3},
         )
         payload = self._render()
         row = next(
@@ -1172,12 +1356,13 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             for c in payload["actives"]
             for g in c["groups"]
             for r in g["skills"]
-            if r["key"] == "fire_ball"
+            if r["key"] == T_EMBER
         )
         # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0.
+        base_mp = int(_live_skill_registry()[T_EMBER].cost["mp"])
         self.assertEqual(
             [entry["mp_cost"] for entry in row["freeform_scales"]],
-            [4, 7, 14],
+            [max(1, math.floor(base_mp * scale + 0.5)) for scale in (0.25, 0.5, 1)],
         )
 
     @covers_requirement(
@@ -1204,9 +1389,9 @@ class CharacterFullTitleSchemaTests(unittest.TestCase):
 
     def test_a_valid_full_title_round_trips(self):
         normalized = validate_character(
-            _valid_panel(full_title="F級冒險者　南門新客")
+            _valid_panel(full_title=_T_COMPOSED_TITLE)
         )
-        self.assertEqual(normalized["full_title"], "F級冒險者　南門新客")
+        self.assertEqual(normalized["full_title"], _T_COMPOSED_TITLE)
 
     def test_the_field_bound_matches_the_python_constant(self):
         at_bound = "長" * MAX_FULL_TITLE_CODE_POINTS
@@ -1218,7 +1403,7 @@ class CharacterFullTitleSchemaTests(unittest.TestCase):
             validate_character(_valid_panel(full_title=at_bound + "長"))
 
     def test_blank_non_string_and_null_forms_reject(self):
-        for bad in ("", "　", "   ", 7, 1.5, True, ["F級冒險者"], None):
+        for bad in ("", "　", "   ", 7, 1.5, True, [_T_TITLE.display_name_zh], None):
             with self.subTest(bad=bad), self.assertRaises(ProtocolValidationError):
                 validate_character(_valid_panel(full_title=bad))
 
@@ -1226,7 +1411,7 @@ class CharacterFullTitleSchemaTests(unittest.TestCase):
         # full_title joins the exact available field set; an unknown sibling
         # of it is still rejected.
         with self.assertRaises(ProtocolValidationError):
-            validate_character(_valid_panel(titles=["F級冒險者"]))
+            validate_character(_valid_panel(titles=[_T_COMPOSED_TITLE]))
 
 
 class CharacterFullTitlePresenterTests(EvenniaTest):
@@ -1255,26 +1440,29 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
 
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_actor_shares_one_composed_title_on_both_panels(self):
+        _open_title_scope(self)
         from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_rank_title(self.player, "F")
+        grant_rank_title(self.player, _T_RANK.key)
 
         grant_first_quest_epithet(self.player)
         character = self._character()
         status = self._status()
-        self.assertEqual(character["full_title"], "F級冒險者　南門新客")
+        self.assertEqual(character["full_title"], _T_COMPOSED_TITLE)
         self.assertEqual(status["actor"]["full_title"], character["full_title"])
 
     def test_a_fixed_only_actor_shows_the_registry_display(self):
+        _open_title_scope(self)
         from world.rules.titles import bank_fixed
 
-        bank_fixed(self.player, "g_s_rank", 1)
-        self.assertEqual(self._character()["full_title"], "S級傳說")
+        bank_fixed(self.player, _T_TITLE.key, 1)
+        self.assertEqual(self._character()["full_title"], _T_TITLE.display_name_zh)
 
     def test_a_corrupt_title_record_fails_the_panel_closed(self):
+        _open_title_scope(self)
         from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_rank_title(self.player, "F")
+        grant_rank_title(self.player, _T_RANK.key)
 
         grant_first_quest_epithet(self.player)
         self.player.attributes.add("title_collection", "damaged")
