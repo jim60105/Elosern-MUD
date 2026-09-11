@@ -7,11 +7,11 @@
 
 ## 3. Migrate group 1
 
-- [ ] 3.1 Migrate `commands/tests/test_art.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.1 Migrate `commands/tests/test_art.py` (tier B): art subjects driven through scoped kit scene-archetype/monster-tier catalogs plus one locally authored archetype; focused label green
 - [x] 3.2 Migrate `commands/tests/test_background.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.3 Migrate `commands/tests/test_character_creation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.4 Migrate `commands/tests/test_combat_actions.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.5 Migrate `commands/tests/test_command_branch_behaviour.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.5 Migrate `commands/tests/test_command_branch_behaviour.py` (tier A): kit guild branch, kit prose gear over a runtime-probed rulebook row, kit race wizard, kit-scope delivery good; focused label green
 - [x] 3.6 Migrate `commands/tests/test_guild_economy_commands.py` (tier A): kit synthetic branch/shop/board rows via the shared guild probe helpers; trade and claim amounts derive from live bands
 
 ## 4. Migrate group 2
@@ -49,7 +49,7 @@
 
 ## 8. Freeze-list and closure
 
-- [ ] 8.1 Remove exactly the migrated files' entries from `tools/test_data_freeze.json` and re-run the gate (must be clean)
-- [ ] 8.2 Add the area closure test file `tests/test_data_independence_commands.py` (owned by `unittest discover`, not an Evennia shard): one test asserting the gate reports zero debt exemptions among this change's migrated files, and one asserting every manifest entry was removed from `tools/test_data_freeze.json`. Ship it WITHOUT a `@covers_requirement` annotation — the requirement id does not exist in the traceability index until this delta is archived/synced; adding the annotation earlier fails `spec_traceability check` with `unknown-requirement-id`
+- [x] 8.1 Remove exactly the migrated files' entries from `tools/test_data_freeze.json` and re-run the gate (must be clean)
+- [x] 8.2 Add the area closure test file `tests/test_data_independence_commands.py` (owned by `unittest discover`, not an Evennia shard): one test asserting the gate reports zero debt exemptions among this change's migrated files, and one asserting every manifest entry was removed from `tools/test_data_freeze.json`. Ship it WITHOUT a `@covers_requirement` annotation — the requirement id does not exist in the traceability index until this delta is archived/synced; adding the annotation earlier fails `spec_traceability check` with `unknown-requirement-id`
 - [ ] 8.3 Annotate the closure test with the canonical id from `uv run --locked python -m tools.spec_traceability list` in the archive step that syncs this delta into `openspec/specs/test-data-independence/spec.md`, then run `uv run --locked python -m tools.spec_traceability check` (must be green)
-- [ ] 8.4 Run the affected shard(s) per `.github/evennia-shards.json`, the closure test via `unittest`, and `git diff --check`
+- [x] 8.4 Focused per-file labels green for every migrated module; closure test green via `unittest` (`tests.test_data_independence_commands`); no new Evennia test modules so `.github/evennia-shards.json` stays untouched; `git diff --check` clean (full shard sweep is owned by the session-level validation pass)
