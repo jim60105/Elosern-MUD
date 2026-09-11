@@ -52,6 +52,29 @@ def _install_synthetic_catalogs_if_flagged() -> None:
 
     _quest_catalog.QUEST_CATALOG = tuple(SYNTH_QUESTS.values())
 
+    # Production's register_adventurer seam hardcodes the "F" entry rank; the
+    # server registers/accepts guild offers at runtime, so graft the harness
+    # row into the live registry right after the install too.
+    from web.browser_support.browser_fixtures_data import graft_synth_entry_rank
+
+    graft_synth_entry_rank()
+
+    # The shipped guild-catalog YAML cannot resolve against t_-only
+    # registries, so the server installs the shared harness catalog directly
+    # (same builder as the seed process) and registers its board offers —
+    # the services view and runtime accepts answer from this catalog.
+    from web.browser_support.browser_fixtures_data import (
+        install_synth_affinity_config,
+        install_synth_services_catalog,
+    )
+
+    install_synth_services_catalog()
+
+    # The affinity rulebook validates its cap-break quest keys against the
+    # quest registry; pre-load it against a kit-quest copy so the first
+    # affinity gain does not fail closed on the shipped intro quest key.
+    install_synth_affinity_config()
+
 
 def _production(name):
     import importlib

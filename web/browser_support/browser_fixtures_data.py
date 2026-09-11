@@ -109,6 +109,23 @@ def graft_synth_entry_rank() -> None:
     GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, SYNTH_ENTRY_RANK_ROW)
 
 
+def synth_next_entry_rank_key() -> str:
+    """The rank key exactly one order above the grafted entry rank.
+
+    Mirrors ``service_view._next_rank_and_threshold``'s exact-order+1
+    derivation against the live registry, so the exam/next-rank fixtures name
+    the promotion target without hardcoding a kit rank key.
+    """
+    from world.lore.guild import GUILD_RANK_REGISTRY
+
+    entry = GUILD_RANK_REGISTRY[SYNTH_ENTRY_RANK_KEY]
+    return next(
+        member.key
+        for member in GUILD_RANK_REGISTRY.values()
+        if member.order == entry.order + 1
+    )
+
+
 # ---------------------------------------------------------------------------
 # Runtime catalog probes (shared by the synthetic-aware seed fixtures).
 #
@@ -131,6 +148,117 @@ def first_live_monster_tier_key() -> str:
     from world.lore.monsters import MONSTER_TIER_REGISTRY
 
     return next(iter(MONSTER_TIER_REGISTRY))
+
+
+def scene_archetype_registered(key: str) -> bool:
+    """Whether one scene archetype resolves in the CURRENT live registry."""
+    from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+
+    return key in SCENE_ARCHETYPE_REGISTRY
+
+
+# ---------------------------------------------------------------------------
+# The shared synthetic guild-economy catalog.
+#
+# The seed process and the managed server must agree on ONE catalog (same
+# shop, offers, thresholds, exam profiles): the seed builds DB state against
+# it and the server answers the services view from it. Both flagged
+# processes call ``install_synth_services_catalog()`` right after the kit
+# install — direct process-global assignment, because the shipped
+# YAML-validated loader (``load_catalog_into_cache``) cannot resolve t_-only
+# registries.
+# ---------------------------------------------------------------------------
+
+#: Offered kit items on the synthetic stall (fixed order drives offer rules).
+SYNTH_SHOP_OFFERED_ITEM_KEYS = (
+    "t_ember_spray",
+    "t_huskapple",
+    "t_thorn_knife",
+    "t_iron_fang",
+)
+
+
+def build_synth_services_catalog():
+    """One fully synthetic guild-economy catalog for the harness processes."""
+    from world.rules.tests._guild_service_probes import (
+        synth_catalog,
+        synth_exam_profile,
+        synth_exam_profiles,
+        synth_merit_thresholds,
+        synth_shop_config,
+    )
+
+    # The grafted F entry rank promotes to the kit's second rank; the exam
+    # section needs a threshold + profile keyed by THAT rank key, derived
+    # from the live registry (never a hardcoded rank key).
+    next_rank = synth_next_entry_rank_key()
+    return synth_catalog(
+        shop_configs={
+            SYNTH_SHOP_KEY: synth_shop_config(
+                SYNTH_SHOP_KEY, SYNTH_SHOP_OFFERED_ITEM_KEYS
+            )
+        },
+        merit_thresholds={**synth_merit_thresholds(), next_rank: 40},
+        exam_profiles={
+            **synth_exam_profiles(),
+            next_rank: synth_exam_profile(next_rank),
+        },
+    )
+
+
+def install_synth_services_catalog():
+    """Assign the shared catalog process-globally and register its offers."""
+    from world.rules import guild_config
+    from world.rules.guild_config import register_catalog_offers
+
+    catalog = build_synth_services_catalog()
+    guild_config.CATALOG = catalog
+    register_catalog_offers(catalog)
+    return catalog
+
+
+def install_synth_affinity_config() -> None:
+    """Pre-load the affinity rulebook with a registry-resolvable quest key.
+
+    ``world.rules.affinity_config.load_config`` validates every
+    ``cap_breaks[].quest_key`` against the live quest-definition registry,
+    and the shipped rulebook names the shipped intro quest — unknown under
+    the t_-only install, so the first affinity gain would fail closed. The
+    harness pre-assigns ``_CONFIG`` from a copy of the shipped rulebook whose
+    cap-break quest keys are rewritten to a kit quest; every numeric rule
+    (caps, decay, daily limits) stays the shipped rulebook's.
+    """
+    import tempfile
+    from pathlib import Path
+
+    import yaml
+
+    from world.rules import affinity_config
+
+    if affinity_config._CONFIG is not None:
+        return
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+    from world.tests.synthetic_data import SYNTH_QUESTS
+
+    rulebook = Path(affinity_config.__file__).parent / "rulebook" / "affinity.yaml"
+    raw = yaml.safe_load(rulebook.read_text(encoding="utf-8"))
+    for entry in raw.get("cap_breaks", []):
+        if isinstance(entry, dict) and "quest_key" in entry:
+            # Every cap-break quest key collapses onto one kit quest; the
+            # validator only checks registry membership, and the kit quests
+            # are the only definitions the install carries.
+            entry["quest_key"] = next(iter(SYNTH_QUESTS))
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".yaml", delete=False, encoding="utf-8"
+    ) as handle:
+        yaml.safe_dump(raw, handle, allow_unicode=True)
+        temp_path = Path(handle.name)
+    try:
+        affinity_config._CONFIG = affinity_config.load_config(
+            path=temp_path, definition_registry=QUEST_DEFINITION_REGISTRY
+        )
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------

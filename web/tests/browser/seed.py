@@ -111,10 +111,12 @@ def _minimap_fixture(character) -> None:
     if north_gate is not None:
         from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
         from typeclasses.rooms import TerrainRoom
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from web.browser_support.browser_fixtures_data import (
+            first_live_wilderness_entry,
+        )
         from world.maps.wilderness_provider import WILDERNESS_NAME
 
-        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        entry = first_live_wilderness_entry()
         entered = enter_wilderness(
             character,
             coordinates=entry.approach_cell(entry.gate_for("s")),
@@ -169,14 +171,24 @@ def _art_fixture(character, room) -> None:
     if not mode or os.environ.get("ELOSERN_BROWSER_SERVICES"):
         return
 
-    from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_ART_ARCHETYPE,
+        SHIPPED_DIALOGUE_KEY,
+        SHIPPED_MONSTER_TIER_KEY,
+        SYNTH_ART_ARCHETYPE,
+        SYNTH_DIALOGUE_HOST_KEY,
+        SYNTH_DIALOGUE_TABLE_KEY,
+        first_live_monster_tier_key,
+        scene_archetype_registered,
+    )
 
-    archetype = "tavern_interior"
-    if archetype not in SCENE_ARCHETYPE_REGISTRY:
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    archetype = SYNTH_ART_ARCHETYPE if synth else SHIPPED_ART_ARCHETYPE
+    if not scene_archetype_registered(archetype):
         raise AssertionError("art fixture archetype must be a registered scene")
 
     art_room = create_object(
-        GridRoom, key="art 酒館場景", nohome=True, location=None
+        GridRoom, key="art 合成場景" if synth else "art 酒館場景", nohome=True, location=None
     )
     art_room.scene_archetype = archetype
     character.location = art_room
@@ -188,11 +200,16 @@ def _art_fixture(character, room) -> None:
     # have both a dialogue host and a generic monster in the room.
     from typeclasses.npcs import NPC, ensure_npc_canonical_age
 
-    host = create_object(NPC, key="酒館老闆", location=art_room)
+    host = create_object(
+        NPC, key=SYNTH_DIALOGUE_HOST_KEY if synth else "酒館老闆", location=art_room
+    )
     from typeclasses.components import ScriptedDialogue
-    from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 
-    host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+    host.components.add(
+        ScriptedDialogue.create(
+            host, dialogue_key=SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
+        )
+    )
     # A named portrait policy on the dialogue host: the actor is excluded from
     # its own exploration-mode portrait catalog (art_view), so the focusable
     # catalog entry is the host's; settling it done gives the ArtPanel's
@@ -206,9 +223,17 @@ def _art_fixture(character, room) -> None:
     # even when its art record is done.
     ensure_npc_canonical_age(host)
     host.save()
-    monster = create_object(Monster, key="酒館灰狼", location=art_room, nohome=True)
-    monster.threat_tier = "low"
-    monster.apply_monster_tier("floor")
+    monster = create_object(
+        Monster,
+        key="合成燼殼蟲" if synth else "酒館灰狼",
+        location=art_room,
+        nohome=True,
+    )
+    monster.threat_tier = (
+        first_live_monster_tier_key() if synth else SHIPPED_MONSTER_TIER_ATTR
+    )
+    # Band position (not a registry key): free-form in either mode.
+    monster.apply_monster_tier(SHIPPED_MONSTER_TIER_KEY)
     character.save()
 
     art_root = os.environ.get("ELOSERN_BROWSER_ART_ROOT")
@@ -220,7 +245,7 @@ def _art_fixture(character, room) -> None:
     scene = ArtSubject(ArtSubjectKind.SCENE, archetype)
     ensure(scene, "desc")
     if mode == "done":
-        identity = "scene/tavern_interior.png"
+        identity = f"scene/{archetype}.png"
         (root / identity).write_bytes(FIXTURE_VALID_PNG)
         from world.art.queue import claim, record_key
         from world.art.store import ArtAssetRecord
@@ -312,6 +337,12 @@ def _services_fixture(character) -> None:
 
     from evennia.utils.search import search_object_by_tag
     from typeclasses.components import GuildStaff, Merchant
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_GUILD_OFFER_KEY,
+        SHIPPED_MEAL_KEY,
+        SHIPPED_POTION_KEY,
+        SHIPPED_WEAPON_KEY,
+    )
     from world.maps.bootstrap import (
         GENERAL_STORE_TAG,
         GUILD_HALL_TAG,
@@ -328,6 +359,10 @@ def _services_fixture(character) -> None:
 
     mode = os.environ.get("ELOSERN_BROWSER_SERVICES", "")
     if not mode:
+        return
+
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
+        _services_fixture_synth(character, mode)
         return
 
     register_catalog()
@@ -376,19 +411,19 @@ def _services_fixture(character) -> None:
         place(hall)
         register_adventurer(character, staff=staff)
         character.db.wallet = 1000
-        character.db.inventory = ["healing_potion"]
+        character.db.inventory = [SHIPPED_POTION_KEY]
         character.save()
     elif mode == "guild_active_quest":
         place(hall)
         register_adventurer(character, staff=staff)
         character.db.wallet = 1000
-        accept_guild_offer(character, staff, "introductory_hunt")
+        accept_guild_offer(character, staff, SHIPPED_GUILD_OFFER_KEY)
         character.save()
     elif mode == "guild_completed_quest":
         place(hall)
         register_adventurer(character, staff=staff)
         character.db.wallet = 1000
-        accept_guild_offer(character, staff, "introductory_hunt")
+        accept_guild_offer(character, staff, SHIPPED_GUILD_OFFER_KEY)
         from world.quests.runtime import (
             definition_for,
             fulfill_record,
@@ -414,35 +449,217 @@ def _services_fixture(character) -> None:
         place(hall)
         register_adventurer(character, staff=staff)
         character.db.wallet = 1000
-        accept_guild_offer(character, staff, "introductory_hunt")
+        accept_guild_offer(character, staff, SHIPPED_GUILD_OFFER_KEY)
         place(original_room)
         character.save()
     elif mode == "store_open":
         place(store)
         character.db.wallet = 1000
-        character.db.inventory = ["meal", "meal", "healing_potion"]
+        character.db.inventory = [
+            SHIPPED_MEAL_KEY,
+            SHIPPED_MEAL_KEY,
+            SHIPPED_POTION_KEY,
+        ]
         get_world_clock()._persist(12 * 3600)
         character.save()
     elif mode == "store_closed":
         place(store)
         character.db.wallet = 1000
-        character.db.inventory = ["meal"]
+        character.db.inventory = [SHIPPED_MEAL_KEY]
         get_world_clock()._persist(3 * 3600)
         character.save()
     elif mode == "inventory_only":
         character.db.wallet = 42
-        character.db.inventory = ["meal", "meal", "plain_sword", "healing_potion"]
+        character.db.inventory = [
+            SHIPPED_MEAL_KEY,
+            SHIPPED_MEAL_KEY,
+            SHIPPED_WEAPON_KEY,
+            SHIPPED_POTION_KEY,
+        ]
         character.save()
     elif mode == "inventory_actions":
         # add-inventory-item-actions browser journeys: one injured holder of
         # two healing potions and one sword — use is enabled until the first
         # use closes the HP gap, then the stable hp_full refusal governs.
         character.db.wallet = 42
-        character.db.inventory = ["healing_potion", "healing_potion", "plain_sword"]
+        character.db.inventory = [
+            SHIPPED_POTION_KEY,
+            SHIPPED_POTION_KEY,
+            SHIPPED_WEAPON_KEY,
+        ]
         maximum = int(character.traits.hp.max)
         character.traits.hp.current = maximum - 20
         character.save()
     print(f"seeded services fixture: {mode}")
+
+
+def _services_fixture_synth(character, mode: str) -> None:
+    """Synthetic-install variant of the services fixture.
+
+    Under ``install_synthetic_catalogs()`` every shipped guild-economy seam
+    (``load_catalog_into_cache``/``register_catalog_offers``/
+    ``sync_guild_economy``) resolves shipped YAML keys the t_-only registries
+    reject, and the server-side ``sync_guild_economy`` boot step is degraded.
+    So this fixture installs the process-global catalog directly from the
+    probe helpers, registers the board offer explicitly, and creates the hall
+    clerk / store merchant / exam examiner hosts manually through the same
+    component seams the roster sync would use. Every key is a kit ``t_`` row
+    or authored fixture identity.
+    """
+    from evennia.utils.create import create_object
+    from evennia.utils.search import search_object_by_tag
+    from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+    from typeclasses.npcs import NPC, ensure_npc_canonical_age
+    from world.rules.clock import get_world_clock
+    from world.rules.guild import register_adventurer
+    from world.rules.guild_offers import accept_guild_offer
+    from world.rules.surfaces import write_counter_trait
+    from web.browser_support.browser_fixtures_data import (
+        SYNTH_INVENTORY_BY_MODE,
+        SYNTH_SHOP_KEY,
+    )
+    from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
+
+    from world.maps.bootstrap import (
+        GENERAL_STORE_TAG,
+        GUILD_HALL_TAG,
+        sync_grid,
+        sync_service_interiors,
+    )
+
+    # The shared catalog was assigned process-globally by the harness install
+    # (same builder the server calls), so the board offer and shop rows are
+    # already registered when the seed reaches this fixture.
+    from world.rules import guild_config
+
+    catalog = guild_config.get_catalog()
+
+    sync_grid()
+    sync_service_interiors()
+
+    halls = search_object_by_tag(GUILD_HALL_TAG)
+    stores = search_object_by_tag(GENERAL_STORE_TAG)
+    hall = halls[0] if halls else None
+    store = stores[0] if stores else None
+    if hall is None or store is None:
+        raise AssertionError("services fixture: service interiors missing")
+
+    def _make_host(key: str, room) -> NPC:
+        host = next(
+            (obj for obj in room.contents if obj.key == key),
+            None,
+        )
+        if host is None:
+            host = create_object(NPC, key=key, location=room)
+            ensure_npc_canonical_age(host)
+            host.save()
+        return host
+
+    def _ensure_component(host, component_cls, **fields):
+        slot = component_cls.get_component_slot()
+        if not host.components.has(component_cls.name):
+            host.components.add(component_cls.create(host, **fields))
+        return host.components.get(slot)
+
+    # Authored host names are free-form fixture identity; the branch/shop
+    # identity is the kit rows. service_binding stays unset (co-presence).
+    staff = _make_host("合成公會職員", hall)
+    _ensure_component(staff, GuildStaff, branch_key=SYNTH_GUILD_BRANCH_KEY)
+    merchant_host = _make_host("合成商店店員", store)
+    _ensure_component(
+        merchant_host,
+        Merchant,
+        shop_key=SYNTH_SHOP_KEY,
+        merchant_stock={
+            rule.item_key: rule.initial_stock
+            for rule in catalog.shop_configs[SYNTH_SHOP_KEY].offers
+        },
+    )
+    examiner = _make_host("合成公會考官", hall)
+    _ensure_component(examiner, GuildExaminer, branch_key=SYNTH_GUILD_BRANCH_KEY)
+
+    def place(room):
+        character.location = room
+        character.save()
+
+    inventory = SYNTH_INVENTORY_BY_MODE.get(mode)
+    if mode == "guild_hall":
+        place(hall)
+        character.db.wallet = 1000
+        character.save()
+    elif mode == "guild_registered_board":
+        place(hall)
+        register_adventurer(character, staff=staff)
+        character.db.wallet = 1000
+        character.db.inventory = list(inventory)
+        character.save()
+    elif mode == "guild_active_quest":
+        place(hall)
+        register_adventurer(character, staff=staff)
+        character.db.wallet = 1000
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_GUILD_OFFER_QUEST_KEY,
+        )
+
+        accept_guild_offer(character, staff, SYNTH_GUILD_OFFER_QUEST_KEY)
+        character.save()
+    elif mode == "guild_completed_quest":
+        place(hall)
+        register_adventurer(character, staff=staff)
+        character.db.wallet = 1000
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_GUILD_OFFER_QUEST_KEY,
+        )
+
+        accept_guild_offer(character, staff, SYNTH_GUILD_OFFER_QUEST_KEY)
+        from world.quests.runtime import (
+            definition_for,
+            fulfill_record,
+            read_records,
+            to_storage,
+        )
+
+        record = read_records(character)[0]
+        completed = fulfill_record(record, definition_for(record))
+        character.db.quest_log = [to_storage(completed)]
+        character.save()
+    elif mode == "guild_exam":
+        place(hall)
+        register_adventurer(character, staff=staff)
+        write_counter_trait(character, "guild_merit", 50)
+        character.db.wallet = 1000
+        character.save()
+    elif mode == "quest_away_from_clerk":
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_GUILD_OFFER_QUEST_KEY,
+        )
+
+        original_room = character.location
+        place(hall)
+        register_adventurer(character, staff=staff)
+        character.db.wallet = 1000
+        accept_guild_offer(character, staff, SYNTH_GUILD_OFFER_QUEST_KEY)
+        place(original_room)
+        character.save()
+    elif mode in ("store_open", "store_closed"):
+        place(store)
+        character.db.wallet = 1000
+        character.db.inventory = list(inventory)
+        get_world_clock()._persist(
+            12 * 3600 if mode == "store_open" else 3 * 3600
+        )
+        character.save()
+    elif mode == "inventory_only":
+        character.db.wallet = 42
+        character.db.inventory = list(inventory)
+        character.save()
+    elif mode == "inventory_actions":
+        character.db.wallet = 42
+        character.db.inventory = list(inventory)
+        maximum = int(character.traits.hp.max)
+        character.traits.hp.current = maximum - 20
+        character.save()
+    print(f"seeded services fixture (synth): {mode}")
 
 
 def _exploration_fixture(character) -> None:
@@ -478,30 +695,57 @@ def _exploration_fixture(character) -> None:
     character.location = south_gate
     record_arrival(character)
 
-    # The scripted-talk host: an ordinary NPC carrying the guild_staff
-    # ScriptedDialogue table (created before the bard so it is the first
-    # present interact/look entity), affinity-seeded so a look renders the
-    # stage line.
-    host = create_object(NPC, key="公會職員", location=south_gate)
-    host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+    # The scripted-talk host: an ordinary NPC carrying the synthetic (or
+    # shipped) ScriptedDialogue table (created before the bard so it is the
+    # first present interact/look entity), affinity-seeded so a look renders
+    # the stage line.
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_DIALOGUE_KEY,
+        SYNTH_DIALOGUE_HOST_KEY,
+        SYNTH_DIALOGUE_TABLE_KEY,
+        SYNTH_BARD_KEY,
+        SYNTH_DEFEATED_MONSTER_KEY,
+        SYNTH_HOSTILE_MONSTER_KEY,
+        first_live_monster_tier_key,
+    )
+
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    host = create_object(
+        NPC,
+        key=SYNTH_DIALOGUE_HOST_KEY if synth else "公會職員",
+        location=south_gate,
+    )
+    host.components.add(
+        ScriptedDialogue.create(
+            host, dialogue_key=SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
+        )
+    )
     from world.rules.affinity import AffinitySource, apply_affinity_change
 
     apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
 
-    bard = create_object(LLMNPC, key="吟遊詩人", location=south_gate)
+    bard = create_object(LLMNPC, key=SYNTH_BARD_KEY if synth else "吟遊詩人", location=south_gate)
     bard.components.add(
-        ScriptedDialogue.create(bard, dialogue_key="guild_staff")
+        ScriptedDialogue.create(
+            bard, dialogue_key=SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
+        )
     )
 
-    goblin = create_object(Monster, key="哥布林", location=south_gate)
-    goblin.threat_tier = "low"
-    goblin.apply_monster_tier("floor")
+    hostile = create_object(
+        Monster, key=SYNTH_HOSTILE_MONSTER_KEY if synth else "哥布林", location=south_gate
+    )
+    hostile.threat_tier = first_live_monster_tier_key()
+    hostile.apply_monster_tier("floor")
 
     # A second, defeated monster in the same room renders as a disabled
     # affordance row in the action dock (webclient-pointer-activation):
     # the explore.engage affordance is disabled with the target_dead reason.
-    defeated_wolf = create_object(Monster, key="狼", location=south_gate)
-    defeated_wolf.threat_tier = "low"
+    defeated_wolf = create_object(
+        Monster,
+        key=SYNTH_DEFEATED_MONSTER_KEY if synth else "狼",
+        location=south_gate,
+    )
+    defeated_wolf.threat_tier = first_live_monster_tier_key()
     defeated_wolf.apply_monster_tier("floor")
     defeated_wolf.traits.hp.base = 0
     defeated_wolf.traits.hp.current = 0
@@ -561,9 +805,21 @@ def _options_surface_fixture(character) -> None:
     if south_gate is None:
         return
 
+    from web.browser_support.browser_fixtures_data import (
+        SYNTH_BPLAZA_PARTNER_KEY,
+        SYNTH_EMPTY_GROUND_KEY,
+        SYNTH_PLAZA_MONSTER_KEY,
+        SYNTH_PLAZA_ROOM_KEY,
+        first_live_monster_tier_key,
+    )
+
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    plaza_key = SYNTH_PLAZA_ROOM_KEY if synth else "選項測試廣場"
+    empty_key = SYNTH_EMPTY_GROUND_KEY if synth else "選項測試空地"
+
     plaza = create_object(
         Room,
-        key="選項測試廣場",
+        key=plaza_key,
         nohome=True,
         location=None,
     )
@@ -574,7 +830,7 @@ def _options_surface_fixture(character) -> None:
 
     empty_ground = create_object(
         Room,
-        key="選項測試空地",
+        key=empty_key,
         nohome=True,
         location=None,
     )
@@ -583,10 +839,14 @@ def _options_surface_fixture(character) -> None:
     create_object(Exit, key="前往測試空地", location=plaza, destination=empty_ground)
     create_object(Exit, key="回到廣場", location=empty_ground, destination=plaza)
 
-    create_object(LLMNPC, key="廣場夥伴", location=plaza)
+    create_object(
+        LLMNPC, key=SYNTH_BPLAZA_PARTNER_KEY if synth else "廣場夥伴", location=plaza
+    )
 
-    wolf = create_object(Monster, key="廣場野狼", location=plaza)
-    wolf.threat_tier = "low"
+    wolf = create_object(
+        Monster, key=SYNTH_PLAZA_MONSTER_KEY if synth else "廣場野狼", location=plaza
+    )
+    wolf.threat_tier = first_live_monster_tier_key()
     wolf.apply_monster_tier("floor")
 
     character.location = plaza
@@ -617,10 +877,16 @@ def _titles_fixture(character) -> None:
         bank_fixed,
         persist_nomination_ballot,
     )
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_TITLE_RANK_E_KEY,
+        SHIPPED_TITLE_RANK_F_KEY,
+        SYNTH_TITLE_BANKED_KEYS,
+    )
 
     tick = get_world_clock().tick
-    bank_fixed(character, "g_f_rank", tick)
-    bank_fixed(character, "g_e_rank", tick)
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    for banked in (SYNTH_TITLE_BANKED_KEYS if synth else (SHIPPED_TITLE_RANK_F_KEY, SHIPPED_TITLE_RANK_E_KEY)):
+        bank_fixed(character, banked, tick)
     bank_epithet(character, "南門新客", "初入南門。", tick)
     bank_epithet(character, "破城先鋒", "率先破門。", tick + 1)
     persist_nomination_ballot(
@@ -645,12 +911,14 @@ def main() -> None:
 
     # Synthetic-catalog process install (kit design D2b): the kit imports
     # Evennia contrib code that needs evennia._init() first, so the flag
-    # check lives here rather than in settings load. The server process
-    # installs through the AT_SERVER_STARTSTOP wrapper instead.
-    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
-        from world.tests.synthetic_data import install_synthetic_catalogs
+    # check lives here rather than in settings load. The harness shares ONE
+    # install path with the server process (``browser_startstop``): import the
+    # shipped-rulebook cross-validators BEFORE the swap, install the kit,
+    # redirect the boot quest catalog, graft the entry rank, and assign the
+    # shared synthetic guild-economy catalog.
+    from web.tests.browser.browser_startstop import _install_synthetic_catalogs_if_flagged
 
-        install_synthetic_catalogs()
+    _install_synthetic_catalogs_if_flagged()
 
     from evennia.utils.create import create_account, create_object
 
@@ -725,18 +993,25 @@ def main() -> None:
         if os.environ.get("ELOSERN_BROWSER_CREATION_PRESET_DRAFT") == "1":
             from world.rules.creation_wizard import save_preset_draft
 
+            from web.browser_support.browser_fixtures_data import SHIPPED_PRESET_KEY
+
             save_preset_draft(
                 creator,
                 pending,
                 "t_pale_wren"
                 if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
-                else "elysa_snow",
+                else SHIPPED_PRESET_KEY,
             )
             pending.save()
         elif os.environ.get("ELOSERN_BROWSER_CREATION_DRAFT") == "1":
             from world.rules.creation_wizard import save_custom_draft
 
             _synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+            from web.browser_support.browser_fixtures_data import (
+                SHIPPED_DRAFT_RACE,
+                SHIPPED_DRAFT_SUBRACE,
+            )
+
             save_custom_draft(
                 creator,
                 pending,
@@ -745,11 +1020,11 @@ def main() -> None:
                     display_name="草稿角色",
                     age=21,
                     apparent_age=21,
-                    race="t_duskmari" if _synth else "beastfolk",
-                    subrace="t_duskmari_evensong" if _synth else "foxkin",
+                    race="t_duskmari" if _synth else SHIPPED_DRAFT_RACE,
+                    subrace="t_duskmari_evensong" if _synth else SHIPPED_DRAFT_SUBRACE,
                     allocations=balanced_allocations(
-                        "t_duskmari" if _synth else "beastfolk",
-                        "t_duskmari_evensong" if _synth else "foxkin",
+                        "t_duskmari" if _synth else SHIPPED_DRAFT_RACE,
+                        "t_duskmari_evensong" if _synth else SHIPPED_DRAFT_SUBRACE,
                     ),
                 ),
             )
@@ -781,14 +1056,19 @@ def main() -> None:
             skip_portrait=True,
         )
     else:
+        from web.browser_support.browser_fixtures_data import (
+            SHIPPED_BASE_RACE,
+            SHIPPED_BASE_SUBRACE,
+        )
+
         request = CharacterCreationRequest(
             mode="custom",
             display_name=BROWSER_CHARACTER_NAME,
             age=20,
             apparent_age=20,
-            race="human",
-            subrace="human_commoner",
-            allocations=balanced_allocations("human", "human_commoner"),
+            race=SHIPPED_BASE_RACE,
+            subrace=SHIPPED_BASE_SUBRACE,
+            allocations=balanced_allocations(SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE),
             # The art fixture below settles classic records deterministically;
             # the automatic gallery request (gallery-autogen-retrofit) must never
             # race it, so the seeded activation carries the explicit skip flag.
@@ -809,41 +1089,62 @@ def main() -> None:
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
     # start room so browser tests can ``engage`` one through the real server.
-    # wind_mastery additionally activates the freeform scale step for
-    # wind_blade (element-mastery-freeform-casting), exercised by the scaled
-    # cast acceptance test.  ``grant_lineage`` closes the skill lineage and
-    # seeds prerequisite proficiency so every requested ACTIVE skill is
-    # actually castable under the lineage gate (fire_ball pulls fire_arrow).
-    # ``rungs`` raises wind_blade's OWN proficiency to the ladder's top level
-    # (use-driven-skill-lineage DC5: the skill-anchored ladder unlocks
-    # 0.25/0.5/1/2/4 at its own levels 0/1/3/6/10; wind_blade has no
-    # consuming edges, so its derived tip cap is the full 10).
-    # Skipped under the synthetic install: these grant shipped skill/buff/
-    # monster-tier keys the t_-only catalogs do not carry.
-    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") != "1":
-        from world.rules.tests.combat_fixtures import grant_lineage
+    # The mastery passive additionally activates the freeform scale step for
+    # the ladder skill (element-mastery-freeform-casting), exercised by the
+    # scaled cast acceptance test.  ``grant_lineage`` closes the skill lineage
+    # and seeds prerequisite proficiency so every requested ACTIVE skill is
+    # actually castable under the lineage gate.  ``rungs`` raises the ladder
+    # skill's OWN proficiency to the ladder's top level
+    # (use-driven-skill-lineage DC5).  The grant set is mode-derived: the kit
+    # rows under the synthetic install, the shipped rows otherwise.
+    from world.rules.tests.combat_fixtures import grant_lineage
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_COMBAT_ACTIVE_SKILLS,
+        SHIPPED_COMBAT_DEBUFF_KEY,
+        SHIPPED_COMBAT_LADDER_LEVEL,
+        SHIPPED_COMBAT_LADDER_SKILL,
+        SHIPPED_COMBAT_MONSTERS,
+        SHIPPED_COMBAT_PASSIVE_SKILLS,
+        SHIPPED_MONSTER_TIER_ATTR,
+        SHIPPED_MONSTER_TIER_KEY,
+        SYNTH_COMBAT_ACTIVE_SKILLS,
+        SYNTH_COMBAT_DEBUFF_KEY,
+        SYNTH_COMBAT_LADDER_LEVEL,
+        SYNTH_COMBAT_LADDER_SKILL,
+        SYNTH_COMBAT_MONSTERS,
+        SYNTH_COMBAT_PASSIVE_SKILLS,
+        first_live_monster_tier_key,
+    )
 
-        grant_lineage(
-            character,
-            ["fire_ball", "wind_blade", "status_disguise", "concentration"],
-            ["defense_instinct", "wind_mastery"],
-            rungs={"wind_blade": 10},
-        )
-        # A persistent poisoned buff gives the status panel a deterministic
-        # applied-modifier condition (agility -10%) for viewport assertions.
-        from world.rules.buffs import _add_buff
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    grant_lineage(
+        character,
+        list(SYNTH_COMBAT_ACTIVE_SKILLS if synth else SHIPPED_COMBAT_ACTIVE_SKILLS),
+        list(SYNTH_COMBAT_PASSIVE_SKILLS if synth else SHIPPED_COMBAT_PASSIVE_SKILLS),
+        rungs={
+            (SYNTH_COMBAT_LADDER_SKILL if synth else SHIPPED_COMBAT_LADDER_SKILL): (
+                SYNTH_COMBAT_LADDER_LEVEL if synth else SHIPPED_COMBAT_LADDER_LEVEL
+            )
+        },
+    )
+    # A persistent buff gives the status panel a deterministic
+    # applied-modifier condition for viewport assertions.
+    from world.rules.buffs import _add_buff
 
-        _add_buff(character, "poisoned")
-        for index, (monster_key, hp) in enumerate(
-            (("goblin", 200), ("wolf", 200)), start=1
-        ):
-            monster = create_object(Monster, key=monster_key, nohome=True)
-            monster.threat_tier = "low"
-            monster.apply_monster_tier("floor")
-            monster.traits.hp.base = hp
-            monster.traits.hp.current = hp
-            monster.location = room
-            monster.save()
+    if synth:
+        # The kit debuff stacks unique_per_source; a fixture source key names
+        # the seed itself (free-form data, never a catalog key).
+        _add_buff(character, SYNTH_COMBAT_DEBUFF_KEY, source_key="browser-seed")
+    else:
+        _add_buff(character, SHIPPED_COMBAT_DEBUFF_KEY)
+    for monster_key, hp in (SYNTH_COMBAT_MONSTERS if synth else SHIPPED_COMBAT_MONSTERS):
+        monster = create_object(Monster, key=monster_key, nohome=True)
+        monster.threat_tier = first_live_monster_tier_key() if synth else SHIPPED_MONSTER_TIER_ATTR
+        monster.apply_monster_tier(SHIPPED_MONSTER_TIER_KEY)
+        monster.traits.hp.base = hp
+        monster.traits.hp.current = hp
+        monster.location = room
+        monster.save()
     print(
         f"seeded account={account.key} character={result.display_name} "
         f"race={result.race} magic_power={result.magic_power}"
