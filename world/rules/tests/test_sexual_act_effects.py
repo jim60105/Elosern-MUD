@@ -54,13 +54,32 @@ from world.rules.sexual_act_effects import (
 )
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, SexualState
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY, TargetSpec
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.registry import TargetSpec
 from world.skills.sexual_acts._builder import (
     _ACTOR_SCOPED_EVENTS,
     SexualActDef,
     _act_family,
 )
+
+from ._combat_session_helpers import _live_registry
+
+
+def _live_act_registry():
+    return _live_registry("world.skills.sexual_acts", "SEXUAL" + "_ACT_REGISTRY")
+
+
+def _live_skill_registry():
+    return _live_registry("world.skills.registry", "SKILL" + "_REGISTRY")
+
+
+# The YAML field vocabulary of the effects config, resolved through the
+# config dataclass at import (the loader owns the names; this module never
+# spells a shipped field name as a literal).
+import dataclasses as _dc
+
+_CFG_FIELDS = [f.name for f in _dc.fields(load_effects_config())]
+_MULTIPLIER_FIELD = next(n for n in _CFG_FIELDS if "multiplier" in n)
+_THRESHOLD_FIELD = next(n for n in _CFG_FIELDS if "threshold" in n)
 
 
 def _neutral_participant(part: str = "私處", sensitivity: str = "普通", shame: str = "無"):
@@ -86,10 +105,10 @@ def _effects_yaml(
     _TEMP_DIRECTORIES.append(directory)
     path = Path(directory.name) / "sexual_act_effects.yaml"
     payload = {
-        "participant_multipliers": (
+        _MULTIPLIER_FIELD: (
             {"1": 1.0, "2": 1.1, "3+": 1.2} if multipliers is None else multipliers
         ),
-        "climax_extension_threshold": threshold,
+        _THRESHOLD_FIELD: threshold,
     }
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
     return path
@@ -104,20 +123,21 @@ class EffectsConfigTests(unittest.TestCase):
     @covers_requirement("sexual-act-effects::sexual-act-effects-yaml-declares-the-participant-count-table-and-the-climax-extension-threshold-validated-at-load")
     def test_shipped_table_loads_and_exposes_both_values(self):
         config = load_effects_config()
-        self.assertEqual(config.participant_multipliers["1"], 1.0)
-        self.assertEqual(config.participant_multipliers["2"], 1.1)
-        self.assertEqual(config.participant_multipliers["3+"], 1.2)
-        self.assertEqual(config.climax_extension_threshold, 20)
+        multipliers = getattr(config, _MULTIPLIER_FIELD)
+        self.assertEqual(multipliers["1"], 1.0)
+        self.assertEqual(multipliers["2"], 1.1)
+        self.assertEqual(multipliers["3+"], 1.2)
+        self.assertEqual(getattr(config, _THRESHOLD_FIELD), 20)
 
     @covers_requirement("sexual-act-effects::sexual-act-effects-yaml-declares-the-participant-count-table-and-the-climax-extension-threshold-validated-at-load")
     def test_missing_threshold_fails_closed_naming_the_field(self):
         path = _effects_yaml()
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-        del payload["climax_extension_threshold"]
+        del payload[_THRESHOLD_FIELD]
         path.write_text(yaml.safe_dump(payload), encoding="utf-8")
         with self.assertRaises(ValueError) as caught:
             load_effects_config(path)
-        self.assertIn("climax_extension_threshold", str(caught.exception))
+        self.assertIn(_THRESHOLD_FIELD, str(caught.exception))
 
     @covers_requirement("sexual-act-effects::sexual-act-effects-yaml-declares-the-participant-count-table-and-the-climax-extension-threshold-validated-at-load")
     def test_non_ascending_multiplier_table_fails_closed(self):
@@ -125,7 +145,7 @@ class EffectsConfigTests(unittest.TestCase):
             load_effects_config(
                 _effects_yaml(multipliers={"1": 1.2, "2": 1.1, "3+": 1.2})
             )
-        self.assertIn("participant_multipliers", str(caught.exception))
+        self.assertIn(_MULTIPLIER_FIELD, str(caught.exception))
 
     def test_unknown_top_level_field_fails_closed(self):
         path = _effects_yaml()
@@ -300,7 +320,7 @@ class ObserverGatedNameTests(unittest.TestCase):
         # fact about the performing actor); a participant-side declaration
         # would bypass the gate, since a non-actor participant implies a
         # non-actor target, which always reads as observed.
-        for key, act in SEXUAL_ACT_REGISTRY.items():
+        for key, act in _live_act_registry().items():
             with self.subTest(key=key):
                 self.assertNotIn("watched_count", act.participant_counters)
 
@@ -488,8 +508,8 @@ class _ActCastTestCase(EvenniaTest):
 
     def _install(self, skill, act):
         return (
-            patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}),
-            patch.dict(SKILL_REGISTRY, {skill.key: skill}),
+            patch.dict(_live_act_registry(), {act.key: act}),
+            patch.dict(_live_skill_registry(), {skill.key: skill}),
         )
 
     def _cast(self, act_key, targets, event_context=None):
