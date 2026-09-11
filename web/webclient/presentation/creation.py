@@ -37,6 +37,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.races import RACE_REGISTRY
 from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
     MAX_PERSONA_FIELD_LENGTH,
@@ -404,10 +405,17 @@ def _validate_race_affinity(value: Any, race_key: str) -> dict[str, Any]:
 def _validate_affinity(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ProtocolValidationError("affinity must be an object")
-    if set(value) != set(("human", "beastfolk", "elf")):
-        raise ProtocolValidationError("affinity must map human, beastfolk, and elf")
+    # The wizard builds one descriptor entry per live race-registry key, so
+    # the validator mirrors the same registry at call time instead of a
+    # hardcoded trio that would strand a future race (and pin the panel's
+    # tests to shipped race keys).
+    race_keys = tuple(RACE_REGISTRY)
+    if set(value) != set(race_keys):
+        raise ProtocolValidationError(
+            "affinity must map the registered races: " + ", ".join(race_keys)
+        )
     normalized: dict[str, Any] = {}
-    for race_key in ("human", "beastfolk", "elf"):
+    for race_key in race_keys:
         normalized[race_key] = _validate_race_affinity(value[race_key], race_key)
     return normalized
 

@@ -13,6 +13,9 @@ from tools.spec_traceability import covers_requirement
 from copy import deepcopy
 import unittest
 
+from dataclasses import replace
+from unittest.mock import patch
+
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -56,6 +59,8 @@ from web.webclient.presentation.registry import (
     build_production_registry,
 )
 from world.rules.character_creation import resolve_starting_profile
+from world.rules.character_creation import max_affinity_elements
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.creation_wizard import (
     ALLOCATABLE_AXES,
     CreationView,
@@ -63,6 +68,77 @@ from world.rules.creation_wizard import (
     build_preset_cards,
     read_draft,
 )
+from world.tests.synthetic_data import (
+    SYNTH_PRESETS,
+    SYNTH_RACES,
+    SYNTH_SUBRACES,
+)
+
+# Kit identities: the wizard and the panel both build from the patched race/
+# subrace/preset catalogs, so every expectation here is derived from these
+# kit rows — never from shipped preset, race, or subrace keys.
+_T_RACE = "t_duskmari"
+_T_SUBRACE = "t_duskmari_evensong"
+_T_PRESET = "t_pale_wren"
+# The creation-scope set the wizard builds its forms from. The element
+# registry stays shipped: the panel validator's affinity element set is
+# captured from it at import time (AFFINITY_ELEMENT_KEYS), so scoping it
+# would only mask the element-mirror claim this file makes.
+_T_CREATION_SCOPE = (
+    "races",
+    "subraces",
+    "static_tiers",
+    "starting_kits",
+    "presets",
+)
+# The affinity input bound is a deterministic race-keyed mapping outside the
+# registries; under the kit scope the kit race needs its own entry (mirrors
+# the world/rules/tests character-creation suite).
+_T_AFFINITY_BOUNDS = {_T_RACE: 2}
+# Kit cards with a filled persona background: the wizard card blurb derives
+# from persona.background and the read model pins every card's blurb
+# non-empty. The kit rows carry no background prose, so the scope merges
+# background-filled copies (world/rules/tests/test_creation_wizard idiom).
+_T_CARD_PRESETS = {
+    key: replace(preset, persona=replace(preset.persona, background=f"合成卡 {key} 的背景。"))
+    for key, preset in SYNTH_PRESETS.items()
+}
+
+
+def _open_t_creation_scope(case, *extra_logicals):
+    """Enter the kit creation scope covering one test's full lifecycle."""
+    open_synthetic_scope(
+        case,
+        *_T_CREATION_SCOPE,
+        *extra_logicals,
+        extra={"presets": _T_CARD_PRESETS},
+    )
+    _patch_t_affinity_bounds(case)
+
+
+def _t_profile_pairs():
+    """The expected (race, subrace) profile order under the kit scope."""
+    return [
+        (race_key, subrace_key)
+        for race_key in SYNTH_RACES
+        for subrace_key in SYNTH_SUBRACES
+        if SYNTH_SUBRACES[subrace_key].race_key == race_key
+    ]
+
+
+def _t_spend():
+    """Allocations exactly at the kit profile budget (kit preset spends)."""
+    return dict(SYNTH_PRESETS[_T_PRESET].allocations)
+
+
+def _patch_t_affinity_bounds(case):
+    handle = patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        _T_AFFINITY_BOUNDS,
+        clear=True,
+    )
+    handle.start()
+    case.addCleanup(handle.stop)
 
 
 def _valid_payload(draft=None, custom=None, presets=None, proposal=None):
@@ -93,6 +169,9 @@ def _set_presets_count(count):
 class CreationPanelValidationTests(unittest.TestCase):
     """Pure payload-validation tests for every bound in D2."""
 
+    def setUp(self):
+        _open_t_creation_scope(self)
+
     def test_valid_realistic_payload_round_trips(self):
         payload = _valid_payload()
         validated = validate_creation(payload)
@@ -100,19 +179,10 @@ class CreationPanelValidationTests(unittest.TestCase):
         self.assertTrue(validated["available"])
         self.assertEqual(validated["kind"], "creation")
         self.assertIsNone(validated["draft"])
-        self.assertEqual(len(validated["presets"]), 8)
+        self.assertEqual(len(validated["presets"]), len(SYNTH_PRESETS))
         self.assertEqual(
             [card["key"] for card in validated["presets"]],
-            [
-                "elysa_snow",
-                "nazka_bloodfang",
-                "sylwen_stillwater",
-                "violet_altoria",
-                "lidzia_rosenthal",
-                "yuka_darknight",
-                "yuna_darknight",
-                "elosia_shadowmoon",
-            ],
+            list(SYNTH_PRESETS),
         )
 
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
@@ -120,21 +190,10 @@ class CreationPanelValidationTests(unittest.TestCase):
         payload = validate_creation(_valid_payload())
         self.assertEqual(
             [card["key"] for card in payload["presets"]],
-            [
-                "elysa_snow",
-                "nazka_bloodfang",
-                "sylwen_stillwater",
-                "violet_altoria",
-                "lidzia_rosenthal",
-                "yuka_darknight",
-                "yuna_darknight",
-                "elosia_shadowmoon",
-            ],
+            list(SYNTH_PRESETS),
         )
         profile_keys = [(p["race"], p["subrace"]) for p in payload["custom"]["profiles"]]
-        self.assertEqual(profile_keys[0], ("human", "human_royal"))
-        self.assertEqual(profile_keys[1], ("human", "human_noble"))
-        self.assertIn(("elf", "fionnen"), profile_keys)
+        self.assertEqual(profile_keys, _t_profile_pairs())
         self.assertEqual(
             [axis["axis"] for axis in payload["custom"]["profiles"][0]["axes"]],
             list(ALLOCATABLE_AXES),
@@ -208,21 +267,22 @@ class CreationPanelValidationTests(unittest.TestCase):
         base = _valid_payload()
         base["presets"] = base["presets"][:1]
         card = base["presets"][0]
+        original = dict(card)
         with self.subTest("key"):
             card["key"] = "x" * (MAX_PRESET_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
-        card["key"] = "elysa_snow"
+        card["key"] = original["key"]
         with self.subTest("display_name"):
             card["display_name"] = "x" * (MAX_DISPLAY_NAME_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
-        card["display_name"] = "艾莉莎"
+        card["display_name"] = original["display_name"]
         with self.subTest("race"):
             card["race"] = "x" * (MAX_RACE_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
-        card["race"] = "human"
+        card["race"] = original["race"]
         with self.subTest("race_description"):
             card["race_description"] = "x" * (MAX_DESCRIPTION_CODE_POINTS + 1)
             with self.assertRaises(Exception):
@@ -248,12 +308,13 @@ class CreationPanelValidationTests(unittest.TestCase):
         base = _valid_payload()
         base["presets"] = base["presets"][:1]
         card = base["presets"][0]
+        original = dict(card)
         for field in ("display_name", "race_description", "emphasis", "background"):
             with self.subTest(field=field):
                 card[field] = "   "
                 with self.assertRaises(Exception):
                     validate_creation(deepcopy(base))
-        card["display_name"] = "艾莉莎"
+        card["display_name"] = original["display_name"]
         card["race_description"] = "描述"
         card["emphasis"] = "配點"
         card["background"] = "背景"
@@ -299,21 +360,23 @@ class CreationPanelValidationTests(unittest.TestCase):
                 validate_creation(payload)
         payload = _valid_payload()
         race = payload["custom"]["races"][0]
+        original = dict(race)
+        subrace_key = next(iter(payload["custom"]["subraces"]))
         with self.subTest("key"):
             race["key"] = "x" * (MAX_RACE_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
-        race["key"] = "human"
+        race["key"] = original["key"]
         with self.subTest("description"):
             race["description"] = "x" * (MAX_DESCRIPTION_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
         race["description"] = "描述"
         with self.subTest("subraces-not-list"):
-            race["subraces"] = "fionnen"
+            race["subraces"] = "t_not-a-list"
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
-        race["subraces"] = ["fionnen", "x" * (MAX_SUBRACE_KEY_CODE_POINTS + 1)]
+        race["subraces"] = [subrace_key, "x" * (MAX_SUBRACE_KEY_CODE_POINTS + 1)]
         with self.subTest("subrace-key-bound"):
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
@@ -329,12 +392,13 @@ class CreationPanelValidationTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_creation(payload)
         payload = _valid_payload()
-        entry = payload["custom"]["subraces"]["fionnen"]
+        entry = payload["custom"]["subraces"][next(iter(payload["custom"]["subraces"]))]
+        original = dict(entry)
         with self.subTest("display_name_zh"):
             entry["display_name_zh"] = "x" * (MAX_SPECIALTY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
-        entry["display_name_zh"] = "斐歐恩族"
+        entry["display_name_zh"] = original["display_name_zh"]
         with self.subTest("specialty"):
             entry["specialty"] = "x" * (MAX_SPECIALTY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
@@ -351,11 +415,12 @@ class CreationPanelValidationTests(unittest.TestCase):
                 validate_creation(payload)
         payload = _valid_payload()
         profile = payload["custom"]["profiles"][0]
+        original = dict(profile)
         with self.subTest("race"):
             profile["race"] = "x" * (MAX_RACE_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
-        profile["race"] = "human"
+        profile["race"] = original["race"]
         with self.subTest("subrace"):
             profile["subrace"] = "x" * (MAX_SUBRACE_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
@@ -397,10 +462,10 @@ class CreationPanelValidationTests(unittest.TestCase):
                 self.assertEqual((axis["minimum"], axis["maximum"]), (0, bound[1] - bound[0]))
 
     def test_draft_preset_stage_shape(self):
-        draft = {"mode": "preset", "stage": "preset_selected", "preset_key": "elysa_snow"}
+        draft = {"mode": "preset", "stage": "preset_selected", "preset_key": _T_PRESET}
         payload = _valid_payload(draft=draft)
         validated = validate_creation(payload)
-        self.assertEqual(validated["draft"]["preset_key"], "elysa_snow")
+        self.assertEqual(validated["draft"]["preset_key"], _T_PRESET)
         bad = deepcopy(payload)
         bad["draft"]["stage"] = "custom_filled"
         with self.assertRaises(Exception):
@@ -417,8 +482,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             "display_name": "新角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "sex": "other",
         }
@@ -458,8 +523,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             "display_name": "新角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "sex": "other",
             "persona": {
@@ -505,8 +570,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             "display_name": "新角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "persona": None,
             "sex": "male",
@@ -526,8 +591,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             "display_name": "新角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "persona": None,
             "sex": "other",
@@ -593,12 +658,12 @@ class CreationPanelValidationTests(unittest.TestCase):
             "axes": axes(),
         }
         affinity_element = {
-            "key": "fire",
+            "key": AFFINITY_ELEMENT_KEYS[0],
             "label": "l" * MAX_LABEL_CODE_POINTS,
         }
         affinity_elements = [
             dict(affinity_element, key=key)
-            for key in ("fire", "water", "wind", "earth", "lightning", "ice", "light", "dark")
+            for key in AFFINITY_ELEMENT_KEYS
         ]
         payload = {
             "schema_version": CREATION_SCHEMA_VERSION,
@@ -620,9 +685,11 @@ class CreationPanelValidationTests(unittest.TestCase):
                 },
                 "profiles": [dict(profile) for _ in range(MAX_PROFILES)],
                 "affinity": {
-                    "human": {"maximum": 2, "elements": list(affinity_elements)},
-                    "beastfolk": {"maximum": 1, "elements": list(affinity_elements)},
-                    "elf": {"maximum": 0, "elements": list(affinity_elements)},
+                    race_key: {
+                        "maximum": max_affinity_elements(race_key),
+                        "elements": list(affinity_elements),
+                    }
+                    for race_key in SYNTH_RACES
                 },
                 "sex": [
                     {"key": key, "label": "x" * MAX_LABEL_CODE_POINTS}
@@ -662,31 +729,29 @@ class CreationPanelValidationTests(unittest.TestCase):
 
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_affinity_descriptor_advertises_race_bounded_maxima_and_eight_elements(self):
-        from world.lore.elements import ELEMENT_REGISTRY
-        from world.rules.character_creation import max_affinity_elements
-
         payload = validate_creation(_valid_payload())
         affinity = payload["custom"]["affinity"]
-        self.assertEqual(set(affinity), {"human", "beastfolk", "elf"})
+        self.assertEqual(set(affinity), set(SYNTH_RACES))
         for race_key, entry in affinity.items():
             self.assertEqual(entry["maximum"], max_affinity_elements(race_key))
             keys = [element["key"] for element in entry["elements"]]
-            self.assertEqual(set(keys), set(ELEMENT_REGISTRY))
+            self.assertEqual(set(keys), set(AFFINITY_ELEMENT_KEYS))
             for element in entry["elements"]:
-                self.assertIn(element["key"], ELEMENT_REGISTRY)
+                self.assertIn(element["key"], AFFINITY_ELEMENT_KEYS)
                 self.assertTrue(element["label"])
 
     def test_affinity_descriptor_rejects_wrong_bounds_and_unknown_elements(self):
         payload = _valid_payload()
         affinity = payload["custom"]["affinity"]
+        first_race = next(iter(affinity))
         bad = deepcopy(affinity)
-        bad["human"]["maximum"] = 99
+        bad[first_race]["maximum"] = 99
         bad_payload = deepcopy(payload)
         bad_payload["custom"]["affinity"] = bad
         with self.assertRaises(Exception):
             validate_creation(bad_payload)
         bad = deepcopy(affinity)
-        bad["human"]["elements"] = bad["human"]["elements"][:-1]
+        bad[first_race]["elements"] = bad[first_race]["elements"][:-1]
         bad_payload = deepcopy(payload)
         bad_payload["custom"]["affinity"] = bad
         with self.assertRaises(Exception):
@@ -697,12 +762,10 @@ def _proposal_wire(**overrides):
     """A valid base proposal wire object carrying the given transient fill."""
     proposal = {
         "revision": 2,
-        "race": "human",
-        "subrace": "human_commoner",
+        "race": _T_RACE,
+        "subrace": _T_SUBRACE,
         "allocations": {
-            "hp": 50, "mp": 50, "sp": 50,
-            "atk_phys": 10, "agility": 10, "defense": 11,
-            "magic_power": 43,
+            **_t_spend(),
         },
         "persona": {
             "personality": "沉穩",
@@ -721,6 +784,9 @@ class ProposalTransientFillValidationTests(unittest.TestCase):
     key stays absent (never a null-valued copy), and every bound violation or
     null is a structural rejection (bump-creation-panel-proposal-v3 D1).
     """
+
+    def setUp(self):
+        _open_t_creation_scope(self)
 
     def _validate(self, proposal):
         return validate_creation(_valid_payload(proposal=proposal))["proposal"]
@@ -816,6 +882,12 @@ class ProposalTransientFillValidationTests(unittest.TestCase):
 
 class CreationPanelPresenterTests(EvenniaTest):
     def setUp(self):
+        # The wizard build, draft preflight, and activation all resolve
+        # through the patched catalogs. Elements stay shipped: the panel
+        # validator's affinity element set is captured at import time and
+        # custom-mode affinity is an explicit empty set here, so the element
+        # mirror claim keeps running against real lore.
+        _open_t_creation_scope(self, "skills", "items", "prices")
         super().setUp()
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
@@ -835,8 +907,8 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(payload["kind"], "creation")
         self.assertEqual(payload["schema_version"], CREATION_SCHEMA_VERSION)
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 8)
-        self.assertEqual(len(payload["custom"]["profiles"]), 15)
+        self.assertEqual(len(payload["presets"]), len(SYNTH_PRESETS))
+        self.assertEqual(len(payload["custom"]["profiles"]), len(_t_profile_pairs()))
         # The read model is side-effect free: canonical state is unchanged.
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
@@ -864,13 +936,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 display_name="性選角色",
                 age=20,
                 apparent_age=20,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
                 sex="female",
             ),
         )
@@ -895,13 +963,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 display_name="已啟用角色",
                 age=20,
                 apparent_age=20,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
             ),
         )
         activate_player_character(
@@ -911,13 +975,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 display_name="已啟用角色",
                 age=20,
                 apparent_age=20,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
             ),
         )
         payload = self._render()
@@ -954,8 +1014,8 @@ class CreationPanelPresenterTests(EvenniaTest):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 8)
-        self.assertEqual(len(payload["custom"]["profiles"]), 15)
+        self.assertEqual(len(payload["presets"]), len(SYNTH_PRESETS))
+        self.assertEqual(len(payload["custom"]["profiles"]), len(_t_profile_pairs()))
         # The whole panel remains schema-valid.
         validate_creation(payload)
 
@@ -970,15 +1030,15 @@ class CreationPanelPresenterTests(EvenniaTest):
             "display_name": "年輕角色",
             "age": -1,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "persona": None,
         }
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 8)
+        self.assertEqual(len(payload["presets"]), len(SYNTH_PRESETS))
         validate_creation(payload)
 
     def test_saved_draft_round_trips_through_the_presenter(self):
@@ -993,13 +1053,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 display_name="  新角色  ",
                 age=20,
                 apparent_age=20,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
             ),
         )
         payload = self._render()
@@ -1023,13 +1079,9 @@ class CreationPanelPresenterTests(EvenniaTest):
             protocol_version=1,
             proposal=ProposalSnapshot(
                 revision=3,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
                 persona={
                     "personality": "沉穩",
                     "life_story": "來自邊境的小村，靠磨劍維生",
@@ -1058,13 +1110,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 protocol_version=1,
                 proposal=ProposalSnapshot(
                     revision=4,
-                    race="beastfolk",
-                    subrace="catkin",
-                    allocations={
-                        "hp": 50, "mp": 50, "sp": 50,
-                        "atk_phys": 10, "agility": 10, "defense": 11,
-                        "magic_power": 43,
-                    },
+                    race=_T_RACE,
+                    subrace=_T_SUBRACE,
+                    allocations=_t_spend(),
                     persona={
                         "personality": "好奇",
                         "life_story": "貓人少女",
@@ -1107,13 +1155,9 @@ class CreationPanelPresenterTests(EvenniaTest):
         slot = {
             "owner_actor_id": "1",
             "revision": 1,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": {
-                "hp": 50, "mp": 50, "sp": 50,
-                "atk_phys": 10, "agility": 10, "defense": 11,
-                "magic_power": 43,
-            },
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
+            "allocations": _t_spend(),
             "persona": {
                 "personality": "沉穩",
                 "life_story": "來自邊境的小村",
@@ -1141,13 +1185,9 @@ class CreationPanelPresenterTests(EvenniaTest):
             protocol_version=1,
             proposal=ProposalSnapshot(
                 revision=9,
-                race="human",
-                subrace="human_commoner",
-                allocations={
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
+                race=_T_RACE,
+                subrace=_T_SUBRACE,
+                allocations=_t_spend(),
                 persona={
                     "personality": "😀" * 600,
                     "life_story": "😀" * 600,
