@@ -43,6 +43,18 @@ from world.rules.character_creation import (
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_PRESETS
+
+# Kit item key used as an invented transfer token in intent tests (the
+# dialogue seam moves whatever key the intent carries; no shipped item
+# registry content is required for the inventory bookkeeping under test).
+_GIFT_KEY = "t_ember_spray"
+assert _GIFT_KEY in SYNTH_ITEMS
+# Invented dialogue-contact name (the shipped-name token class is off-limits).
+_CONTACT = "霖瑘"
+# Kit preset card exercised by the persona-activation tests.
+_PRESET_KEY = "t_pale_wren"
+assert _PRESET_KEY in SYNTH_PRESETS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -117,17 +129,17 @@ class DialogueExchangeHelperTests(EvenniaTest):
             lambda d: True,
             _reply_text(
                 speech="我會考慮看看。",
-                intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
             ),
         )
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [_GIFT_KEY]
         result = await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
         self.assertFalse(result.degraded)
         self.assertEqual(result.reply.speech, "我會考慮看看。")
         self.assertEqual(result.reply.intent["kind"], "give_item")
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
         lines = self.npc._chat_lines(self.player)
         self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我會考慮看看。"])
 
@@ -180,13 +192,13 @@ class LLMNPCSeamTests(EvenniaTest):
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
     def test_valid_reply_is_presented_and_verified_intent_applied(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [_GIFT_KEY]
         client = FakeLLMClient()
         client.add_response(
             lambda d: True,
             _reply_text(
                 speech="我給你一瓶藥水。",
-                intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
             ),
         )
         with patch.object(self.player, "msg") as msg:
@@ -194,7 +206,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(len(client.calls), 1)
         texts = _msg_texts(msg)
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
-        self.assertEqual(_inventory(self.player), ["healing_potion"])
+        self.assertEqual(_inventory(self.player), [_GIFT_KEY])
         self.assertEqual(_inventory(self.npc), [])
         lines = self.npc._chat_lines(self.player)
         self.assertEqual(lines, ["dialogue player: 你好", "對話精靈: 我給你一瓶藥水。"])
@@ -256,7 +268,7 @@ class LLMNPCSeamTests(EvenniaTest):
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_player_leaving_mid_exchange_shows_the_note_and_drops_the_intent(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [_GIFT_KEY]
         client = _HeldClient()
         with patch.object(self.player, "msg") as msg:
             d = self.npc.at_talked_to("你好", self.player, client)
@@ -264,7 +276,7 @@ class LLMNPCSeamTests(EvenniaTest):
             client.deferred.callback(
                 _reply_text(
                     speech="我給你一瓶藥水。",
-                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                    intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
                 )
             )
             outcome = await_result(d)
@@ -274,12 +286,12 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("離開" in text for text in texts))
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
         self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_npc_leaving_mid_exchange_shows_the_note_and_drops_the_intent(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [_GIFT_KEY]
         client = _HeldClient()
         with patch.object(self.player, "msg") as msg:
             d = self.npc.at_talked_to("你好", self.player, client)
@@ -287,7 +299,7 @@ class LLMNPCSeamTests(EvenniaTest):
             client.deferred.callback(
                 _reply_text(
                     speech="我給你一瓶藥水。",
-                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                    intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
                 )
             )
             outcome = await_result(d)
@@ -296,12 +308,12 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("離開" in text for text in texts))
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
         self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_busy_transition_mid_exchange_shows_the_note_and_drops_the_intent(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [_GIFT_KEY]
         client = _HeldClient()
         with patch.object(self.player, "msg") as msg:
             d = self.npc.at_talked_to("你好", self.player, client)
@@ -309,7 +321,7 @@ class LLMNPCSeamTests(EvenniaTest):
             client.deferred.callback(
                 _reply_text(
                     speech="我給你一瓶藥水。",
-                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                    intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
                 )
             )
             outcome = await_result(d)
@@ -318,7 +330,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("無法交談" in text for text in texts))
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
     def test_thinking_feedback_sends_one_message_after_timeout_and_cancels(self):
@@ -405,7 +417,7 @@ class LLMNPCSeamTests(EvenniaTest):
             "habit": "清晨練劍",
             "identity": {"public": "邊境退役騎士", "hidden": "叛逃的貴族私生子"},
             "appearance": {"height": "185cm", "feature": ["左臉疤痕"]},
-            "social_connection": {"悠奈": {"relationship": "舊識"}},
+            "social_connection": {_CONTACT: {"relationship": "舊識"}},
         }
         self.player.db.persona = {
             "personality": "溫柔",
@@ -433,7 +445,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("外觀：", system)
         self.assertIn("height：185cm", system)
         self.assertIn("人脈：", system)
-        self.assertIn("悠奈：{'relationship': '舊識'}", system)
+        self.assertIn(_CONTACT + "：{'relationship': '舊識'}", system)
         # The player block is the public depth view only: the hidden identity
         # layer, the prose fields, and background never reach the NPC prompt.
         persona_block = parsed["player"]["persona"]
@@ -648,8 +660,8 @@ class PresetPersonaDialogueTests(EvenniaTest):
     Every shipped card now declares dialogue-visible persona fields. The
     resolves-a-block scenario activates a card directly; the companion test
     pins the documented exclusion policy with a background-only variant of a
-    shipped card, which the dialogue policy keeps out of the player block in
-    BOTH modes.
+    kit card, which the dialogue policy keeps out of the player block in BOTH
+    modes.
     """
 
     def setUp(self):
@@ -672,11 +684,29 @@ class PresetPersonaDialogueTests(EvenniaTest):
         _reset_all()
         super().tearDown()
 
-    def _activate_preset(self, preset_key):
-        activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key=preset_key),
-        )
+    def _activate_preset(self, preset):
+        from world.tests.synthetic_data import synthetic_registries
+
+        with synthetic_registries(
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+            extra={"presets": {preset.key: preset}},
+        ):
+            activate_player_character(
+                self.account,
+                self.character,
+                CharacterCreationRequest(mode="preset", preset_key=preset.key),
+            )
+            # The activation stores the kit race; the baseline read needs the
+            # same scoped race chain to resolve it.
+            self.character.apply_race_baseline()
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
@@ -684,14 +714,9 @@ class PresetPersonaDialogueTests(EvenniaTest):
     def test_preset_declaring_public_fields_resolves_the_player_block(self):
         from dataclasses import replace
 
-        from world.lore.player_presets import (
-            PLAYER_PRESET_REGISTRY,
-            PresetAppearance,
-            PresetIdentity,
-            PresetPersona,
-        )
+        from world.lore.player_presets import PresetAppearance, PresetIdentity
 
-        base = PLAYER_PRESET_REGISTRY["elysa_snow"]
+        base = SYNTH_PRESETS[_PRESET_KEY]
         declared = replace(
             base,
             persona=replace(
@@ -701,12 +726,7 @@ class PresetPersonaDialogueTests(EvenniaTest):
                 social_connection=(("艾莉莎之父", "失散的家人"),),
             ),
         )
-        with patch.dict(
-            "world.lore.player_presets.PLAYER_PRESET_REGISTRY",
-            {"elysa_snow": declared},
-        ):
-            self._activate_preset("elysa_snow")
-        self.character.apply_race_baseline()
+        self._activate_preset(declared)
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text(speech="久等了。"))
         with patch.object(self.character, "msg"):
@@ -732,27 +752,20 @@ class PresetPersonaDialogueTests(EvenniaTest):
         # persona_edit and look.
         from dataclasses import replace
 
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
         from world.lore.player_presets import PresetIdentity, PresetPersona
 
-        base = PLAYER_PRESET_REGISTRY["elysa_snow"]
+        base = SYNTH_PRESETS[_PRESET_KEY]
         background_only = replace(
             base,
             persona=PresetPersona(
                 identity=PresetIdentity(),
-                background=base.persona.background,
+                background="出身邊境村落的流浪藥草師學徒。",
             ),
         )
         preset = background_only
-        with patch.dict(
-            "world.lore.player_presets.PLAYER_PRESET_REGISTRY",
-            {"elysa_snow": background_only},
-        ):
-            self._activate_preset("elysa_snow")
+        self._activate_preset(preset)
         self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
         self.assertTrue(self.character.db.persona["background"])
-        self.character.apply_race_baseline()
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text(speech="幸會。"))
         with patch.object(self.character, "msg"):

@@ -11,6 +11,39 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 
+_PRESET_KEY = "t_pale_wren"  # kit preset card
+_PRESET_SCOPE = (
+    "races",
+    "static_tiers",
+    "subraces",
+    "starting_kits",
+    "presets",
+    "skills",
+    "items",
+    "prices",
+    "elements",
+)
+
+
+def _activate_preset(account, character):
+    """Activate one shell on the synthetic kit (no shipped catalog chain)."""
+    from world.rules.character_creation import (
+        CharacterCreationRequest,
+        activate_player_character,
+    )
+    from world.tests.synthetic_data import synthetic_registries
+
+    with synthetic_registries(*_PRESET_SCOPE):
+        activate_player_character(
+            account,
+            character,
+            CharacterCreationRequest(mode="preset", preset_key=_PRESET_KEY),
+        )
+
+# Preimport the import-time-validated equipment rulebook before the kit is
+# ever scoped (see commands/tests/test_background.py for the rationale).
+import world.rules.equipment_effects  # noqa: F401
+
 
 class LoginIntroductionTests(EvenniaTest):
     account_typeclass = Account
@@ -41,32 +74,14 @@ class LoginIntroductionTests(EvenniaTest):
 
     @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
     def test_activated_account_sees_neither_introduction_nor_start_screen(self):
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-            activate_player_character,
-        )
-
-        activate_player_character(
-            self.account,
-            self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        _activate_preset(self.account, self.char1)
         messages = self._messages_on_login()
         self.assertNotIn("伊洛瑟恩大陸", messages)
         self.assertNotIn("你站在伊洛瑟恩大陸的門口", messages)
 
     @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
     def test_abandoned_pending_sibling_does_not_retrigger_introduction(self):
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-            activate_player_character,
-        )
-
-        activate_player_character(
-            self.account,
-            self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        _activate_preset(self.account, self.char1)
         char2, _ = self.account.create_character(key="Char2Pending")
         self.assertTrue(char2.creation_pending)
         self.assertFalse(self.char1.creation_pending)
@@ -79,16 +94,7 @@ class LoginIntroductionTests(EvenniaTest):
 
     @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
     def test_pending_sibling_login_sees_introduction_and_creation_screen(self):
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-            activate_player_character,
-        )
-
-        activate_player_character(
-            self.account,
-            self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        _activate_preset(self.account, self.char1)
         char2, _ = self.account.create_character(key="Char2Pending")
 
         self.account.unpuppet_object(self.session)
@@ -139,16 +145,7 @@ class LoginIntroductionTests(EvenniaTest):
         an activated character must leave it exactly where it persisted --
         no relocation, no teleport.
         """
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-            activate_player_character,
-        )
-
-        activate_player_character(
-            self.account,
-            self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        _activate_preset(self.account, self.char1)
         elsewhere = create_object(Room, key="重連測試房", location=None)
         self.char1.location = elsewhere
         self.char1.save()

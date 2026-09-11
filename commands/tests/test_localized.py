@@ -58,6 +58,18 @@ from world.rules.combat_session import engage
 from world.rules.quest_delivery import active_deliveries_for_recipient
 from world.rules.tests._combat_session_helpers import _monster
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.synthetic_data import make_item, synthetic_registries
+
+# Kit item keys used as opaque registry keys in the inventory/give paths: the
+# localized commands move whatever key the caller carries, so invented rows
+# exercise the same seams as the shipped catalogue.
+_POTION = "t_ember_spray"
+_FLASK = "t_huskapple"
+# The kit slotted weapon row for the equipped-item refusal.
+_BLADE = "t_thorn_knife"
+# A kit consumable row carried through the containment/key-list sync seams.
+_MEAL = make_item("t_packed_meal")
+_MEAL_KEY = _MEAL.key
 
 
 class LocalizedGiveDeliveryTests(
@@ -70,23 +82,27 @@ class LocalizedGiveDeliveryTests(
     """
 
     def setUp(self):
+        # The monster fixture and race baselines build against the catalogs.
+        scope = synthetic_registries("races", "static_tiers", "subraces", "items")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
         self.room1.key = "測試房間"
         self.room1.save()
         self.holder = create_object(PlayerCharacter, key="持有人", location=self.room1)
-        self.holder.race = "human"
+        self.holder.race = "t_duskmari"
         self.holder.apply_race_baseline()
         self.recipient = create_object(NPC, key="灰婆婆", location=self.room1)
-        self.recipient.race = "human"
+        self.recipient.race = "t_duskmari"
         self.recipient.apply_race_baseline()
         self.bystander = create_object(NPC, key="旁觀者", location=self.room1)
-        self.bystander.race = "human"
+        self.bystander.race = "t_duskmari"
         self.bystander.apply_race_baseline()
 
         self.definition = register(
             quest(
                 "give_delivery_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_POTION, quantity=2)),),
             )
         )
         self.record = accept(self.holder, self.definition.key)
@@ -101,24 +117,24 @@ class LocalizedGiveDeliveryTests(
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_giving_the_objective_key_to_the_bound_recipient_advances(self):
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
 
-        output = self._give("healing_potion = 灰婆婆")
+        output = self._give(f"{_POTION} = 灰婆婆")
 
-        self.assertIn("你把healing_potion交給了", output)
+        self.assertIn(f"你把{_POTION}交給了", output)
         self.assertEqual(self.holder.db.inventory, [])
-        self.assertEqual(self.recipient.db.inventory, ["healing_potion"])
+        self.assertEqual(self.recipient.db.inventory, [_POTION])
         self.assertEqual(read_records(self.holder)[0].stage_progress, 1)
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_a_numbered_partial_give_leaves_the_stage_with_the_remainder(self):
-        self.holder.db.inventory = ["healing_potion", "healing_potion"]
+        self.holder.db.inventory = [_POTION, _POTION]
 
-        output = self._give("1 個 healing_potion = 灰婆婆")
+        output = self._give(f"1 個 {_POTION} = 灰婆婆")
 
-        self.assertIn("你把healing_potion交給了", output)
+        self.assertIn(f"你把{_POTION}交給了", output)
         self.assertEqual(read_records(self.holder)[0].stage_progress, 1)
-        self.assertEqual(self.holder.db.inventory, ["healing_potion"])
+        self.assertEqual(self.holder.db.inventory, [_POTION])
         # The exploration affordance keeps advertising the remaining quantity.
         views = active_deliveries_for_recipient(self.holder, self.recipient)
         self.assertEqual(len(views), 1)
@@ -127,30 +143,30 @@ class LocalizedGiveDeliveryTests(
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_a_numbered_completing_give_completes_the_stage(self):
-        self.holder.db.inventory = ["healing_potion", "healing_potion"]
+        self.holder.db.inventory = [_POTION, _POTION]
 
-        output = self._give("2 個 healing_potion = 灰婆婆")
+        output = self._give(f"2 個 {_POTION} = 灰婆婆")
 
-        self.assertIn("你把2 個 healing_potion交給了", output)
+        self.assertIn(f"你把2 個 {_POTION}交給了", output)
         advanced = read_records(self.holder)[0]
         self.assertEqual(advanced.stage_progress, 2)
         self.assertEqual(advanced.state, QuestState.COMPLETED)
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_giving_a_materialized_object_advances(self):
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
         create_object(
             "typeclasses.objects.Object",
-            key="healing_potion",
-            attributes=[("registry_key", "healing_potion")],
+            key=_POTION,
+            attributes=[("registry_key", _POTION)],
             location=self.holder,
         )
 
-        output = self._give("healing_potion = 灰婆婆")
+        output = self._give(f"{_POTION} = 灰婆婆")
 
-        self.assertIn("你把healing_potion交給了", output)
+        self.assertIn(f"你把{_POTION}交給了", output)
         self.assertEqual(self.holder.db.inventory, [])
-        self.assertEqual(self.recipient.db.inventory, ["healing_potion"])
+        self.assertEqual(self.recipient.db.inventory, [_POTION])
         self.assertEqual(read_records(self.holder)[0].stage_progress, 1)
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
@@ -158,7 +174,7 @@ class LocalizedGiveDeliveryTests(
         mana_definition = register(
             quest(
                 "give_delivery_quest_two",
-                stages=(QuestStage(0, deliver("mana_potion", quantity=1)),),
+                stages=(QuestStage(0, deliver(_FLASK, quantity=1)),),
             )
         )
         mana_record = accept(self.holder, mana_definition.key)
@@ -167,17 +183,17 @@ class LocalizedGiveDeliveryTests(
             mana_record.quest_id,
             objective_targets=(self.recipient,),
         )
-        self.holder.db.inventory = ["healing_potion", "mana_potion"]
+        self.holder.db.inventory = [_POTION, _FLASK]
         create_object(
             "typeclasses.objects.Object",
             key="藥水",
-            attributes=[("registry_key", "healing_potion")],
+            attributes=[("registry_key", _POTION)],
             location=self.holder,
         )
         create_object(
             "typeclasses.objects.Object",
             key="藥水",
-            attributes=[("registry_key", "mana_potion")],
+            attributes=[("registry_key", _FLASK)],
             location=self.holder,
         )
 
@@ -191,24 +207,24 @@ class LocalizedGiveDeliveryTests(
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_giving_to_an_unbound_recipient_advances_nothing(self):
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
 
-        output = self._give("healing_potion = 旁觀者")
+        output = self._give(f"{_POTION} = 旁觀者")
 
-        self.assertIn("你把healing_potion交給了", output)
-        self.assertEqual(self.bystander.db.inventory, ["healing_potion"])
+        self.assertIn(f"你把{_POTION}交給了", output)
+        self.assertEqual(self.bystander.db.inventory, [_POTION])
         self.assertEqual(read_records(self.holder)[0].stage_progress, 0)
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_a_mid_combat_give_advances_the_delivery(self):
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
         monster = _monster("give goblin")
         monster.location = self.room1
         engage(self.holder, monster)
 
-        output = self._give("healing_potion = 灰婆婆")
+        output = self._give(f"{_POTION} = 灰婆婆")
 
-        self.assertIn("你把healing_potion交給了", output)
+        self.assertIn(f"你把{_POTION}交給了", output)
         self.assertEqual(read_records(self.holder)[0].stage_progress, 1)
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
@@ -217,7 +233,7 @@ class LocalizedGiveDeliveryTests(
         receiver_quest = register(
             quest(
                 "give_receiver_acquire",
-                stages=(QuestStage(0, acquire("healing_potion", quantity=1)),),
+                stages=(QuestStage(0, acquire(_POTION, quantity=1)),),
             )
         )
         receiver_record = accept(self.recipient, receiver_quest.key)
@@ -225,7 +241,7 @@ class LocalizedGiveDeliveryTests(
         pinned_reason = f"quest:{self.recipient.pk}:{receiver_record.quest_id}:stage:0"
         self.assertEqual(instance_room.db.pin_reasons, [pinned_reason])
 
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
         # Populate the recipient's contents cache so the rollback must evict
         # the mirror materialized inside the aborted transaction.
         list(self.recipient.contents)
@@ -234,7 +250,7 @@ class LocalizedGiveDeliveryTests(
             "world.rules.npc_intents.advance_deliveries_for_transfer",
             side_effect=RuntimeError("injected advance failure"),
         ) as injected, patch("commands.localized.general.log_warn") as mock_warn:
-            output = self._give("healing_potion = 灰婆婆")
+            output = self._give(f"{_POTION} = 灰婆婆")
 
         self.assertIn("物品交接失敗，什麼都沒有發生。", output)
         mock_warn.assert_called_once_with(
@@ -244,10 +260,10 @@ class LocalizedGiveDeliveryTests(
                 "char": str(self.holder.pk),
                 "target": str(self.recipient.pk),
                 "branch": "canonical_key",
-                "item": "healing_potion",
+                "item": _POTION,
             },
         )
-        self.assertEqual(self.holder.db.inventory, ["healing_potion"])
+        self.assertEqual(self.holder.db.inventory, [_POTION])
         # The recipient's inventory attribute was unset before the give; the
         # rollback restores that exact pre-state.
         self.assertIsNone(self.recipient.db.inventory)
@@ -260,27 +276,27 @@ class LocalizedGiveDeliveryTests(
         self.assertEqual(receiver_after.stage_progress, 0)
         self.assertEqual(instance_room.db.pin_reasons, [pinned_reason])
         self.assertEqual(
-            [o for o in self.recipient.contents if o.db.registry_key == "healing_potion"],
+            [o for o in self.recipient.contents if o.db.registry_key == _POTION],
             [],
         )
 
     @covers_requirement("quest-delivery::the-general-give-advances-the-delivery")
     def test_a_failed_advance_rolls_the_whole_object_give_back(self):
-        self.holder.db.inventory = ["healing_potion"]
+        self.holder.db.inventory = [_POTION]
         create_object(
             "typeclasses.objects.Object",
-            key="healing_potion",
-            attributes=[("registry_key", "healing_potion")],
+            key=_POTION,
+            attributes=[("registry_key", _POTION)],
             location=self.holder,
         )
-        held = [o for o in self.holder.contents if o.db.registry_key == "healing_potion"]
+        held = [o for o in self.holder.contents if o.db.registry_key == _POTION]
         self.assertEqual(len(held), 1)
 
         with patch(
             "world.rules.npc_intents.advance_deliveries_for_transfer",
             side_effect=RuntimeError("injected advance failure"),
         ) as injected, patch("commands.localized.general.log_warn") as mock_warn:
-            output = self._give("healing_potion = 灰婆婆")
+            output = self._give(f"{_POTION} = 灰婆婆")
 
         self.assertIn("物品交接失敗，什麼都沒有發生。", output)
         mock_warn.assert_called_once_with(
@@ -290,35 +306,35 @@ class LocalizedGiveDeliveryTests(
                 "char": str(self.holder.pk),
                 "target": str(self.recipient.pk),
                 "branch": "materialized",
-                "item": "healing_potion",
+                "item": _POTION,
             },
         )
-        self.assertEqual(self.holder.db.inventory, ["healing_potion"])
+        self.assertEqual(self.holder.db.inventory, [_POTION])
         self.assertIsNone(self.recipient.db.inventory)
         self.assertEqual(read_records(self.holder)[0].stage_progress, 0)
         self.assertEqual(
-            [o for o in self.holder.contents if o.db.registry_key == "healing_potion"],
+            [o for o in self.holder.contents if o.db.registry_key == _POTION],
             held,
         )
         self.assertEqual(
-            [o for o in self.recipient.contents if o.db.registry_key == "healing_potion"],
+            [o for o in self.recipient.contents if o.db.registry_key == _POTION],
             [],
         )
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
     def test_giving_an_equipped_item_keeps_its_refusal(self):
-        self.holder.db.inventory = ["plain_sword"]
+        self.holder.db.inventory = [_BLADE]
         self.holder.db.equipment = {
-            "weapon_main": "plain_sword",
+            "weapon_main": _BLADE,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
         }
 
-        output = self._give("plain_sword = 灰婆婆")
+        output = self._give(f"{_BLADE} = 灰婆婆")
 
         self.assertIn("你無法給予已裝備的物品。", output)
-        self.assertEqual(self.holder.db.inventory, ["plain_sword"])
+        self.assertEqual(self.holder.db.inventory, [_BLADE])
 
 
 class LocalizedCommandSurfaceTests(EvenniaTestCase):
@@ -409,6 +425,11 @@ class QuickbarLetterPinningTests(EvenniaTestCase):
 
 class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        # The registry-object give/get/drop paths carry kit item keys through
+        # the canonical-key seams.
+        scope = synthetic_registries("items", extra={"items": {_MEAL.key: _MEAL}})
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
         self.room1.key = "測試房間"
         self.char1.key = "測試者"
@@ -610,77 +631,77 @@ class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_get_registry_object_records_the_canonical_key(self):
         create_object(
             "typeclasses.objects.Object",
-            key="healing_potion",
-            attributes=[("registry_key", "healing_potion")],
+            key=_POTION,
+            attributes=[("registry_key", _POTION)],
             location=self.room1,
         )
-        output = self.call(CmdGet(), "healing_potion")
-        self.assertIn("你撿起了healing_potion。", output)
-        self.assertEqual(self.char1.db.inventory, ["healing_potion"])
+        output = self.call(CmdGet(), _POTION)
+        self.assertIn(f"你撿起了{_POTION}。", output)
+        self.assertEqual(self.char1.db.inventory, [_POTION])
         self.assertEqual(
-            len([o for o in self.char1.contents if o.key == "healing_potion"]), 1
+            len([o for o in self.char1.contents if o.key == _POTION]), 1
         )
 
     def test_get_registry_object_by_key_attribute_only(self):
         create_object(
             "typeclasses.objects.Object",
             key="藥水",
-            attributes=[("registry_key", "healing_potion")],
+            attributes=[("registry_key", _POTION)],
             location=self.room1,
         )
         output = self.call(CmdGet(), "藥水")
         self.assertIn("你撿起了藥水。", output)
-        self.assertEqual(self.char1.db.inventory, ["healing_potion"])
+        self.assertEqual(self.char1.db.inventory, [_POTION])
 
     def test_get_stacked_registry_objects_add_one_key_per_object(self):
         create_object(
             "typeclasses.objects.Object",
-            key="healing_potion",
-            attributes=[("registry_key", "healing_potion")],
+            key=_POTION,
+            attributes=[("registry_key", _POTION)],
             location=self.room1,
         )
         create_object(
             "typeclasses.objects.Object",
-            key="healing_potion",
-            attributes=[("registry_key", "healing_potion")],
+            key=_POTION,
+            attributes=[("registry_key", _POTION)],
             location=self.room1,
         )
-        output = self.call(CmdGet(), "2 個 healing_potion")
-        self.assertIn("你撿起了2 個 healing_potion。", output)
+        output = self.call(CmdGet(), f"2 個 {_POTION}")
+        self.assertIn(f"你撿起了2 個 {_POTION}。", output)
         self.assertEqual(
-            self.char1.db.inventory, ["healing_potion", "healing_potion"]
+            self.char1.db.inventory, [_POTION, _POTION]
         )
 
     def test_drop_stacked_registry_objects_remove_one_key_per_object(self):
-        self.char1.db.inventory = ["meal", "meal"]
+        self.char1.db.inventory = [_MEAL_KEY, _MEAL_KEY]
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
-        output = self.call(CmdDrop(), "2 個 meal")
-        self.assertIn("你丟下了2 個 meal。", output)
+        output = self.call(CmdDrop(), f"2 個 {_MEAL_KEY}")
+        self.assertIn(f"你丟下了2 個 {_MEAL_KEY}。", output)
         self.assertEqual(self.char1.db.inventory, [])
-        self.assertEqual(len([o for o in self.room1.contents if o.key == "meal"]), 2)
+        self.assertEqual(len([o for o in self.room1.contents if o.key == _MEAL_KEY]), 2)
 
     def test_drop_registry_object_without_canonical_key_is_refused(self):
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
-        output = self.call(CmdDrop(), "meal")
-        self.assertIn("你沒有帶著 meal。", output)
+        output = self.call(CmdDrop(), _MEAL_KEY)
+        self.assertIn(f"你沒有帶著 {_MEAL_KEY}。", output)
         self.assertIsNone(self.char1.db.inventory)
-        self.assertEqual(len([o for o in self.char1.contents if o.key == "meal"]), 1)
+        self.assertEqual(len([o for o in self.char1.contents if o.key == _MEAL_KEY]), 1)
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
     def test_get_non_registry_object_keeps_inventory_unchanged(self):
@@ -697,74 +718,74 @@ class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
     def test_drop_registry_object_removes_the_canonical_key(self):
-        self.char1.db.inventory = ["meal"]
+        self.char1.db.inventory = [_MEAL_KEY]
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
-        output = self.call(CmdDrop(), "meal")
-        self.assertIn("你丟下了meal。", output)
+        output = self.call(CmdDrop(), _MEAL_KEY)
+        self.assertIn(f"你丟下了{_MEAL_KEY}。", output)
         self.assertEqual(self.char1.db.inventory, [])
-        self.assertEqual(len([o for o in self.room1.contents if o.key == "meal"]), 1)
+        self.assertEqual(len([o for o in self.room1.contents if o.key == _MEAL_KEY]), 1)
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
     def test_give_registry_object_transfers_the_canonical_key(self):
-        self.char1.db.inventory = ["meal"]
+        self.char1.db.inventory = [_MEAL_KEY]
         self.char2.location = self.room1
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
-        output = self.call(CmdGive(), "meal = 路人")
-        self.assertIn("你把meal交給了", output)
+        output = self.call(CmdGive(), f"{_MEAL_KEY} = 路人")
+        self.assertIn(f"你把{_MEAL_KEY}交給了", output)
         self.assertEqual(self.char1.db.inventory, [])
-        self.assertEqual(self.char2.db.inventory, ["meal"])
-        self.assertEqual(len([o for o in self.char2.contents if o.key == "meal"]), 1)
+        self.assertEqual(self.char2.db.inventory, [_MEAL_KEY])
+        self.assertEqual(len([o for o in self.char2.contents if o.key == _MEAL_KEY]), 1)
 
     def test_give_registry_object_to_npc_adds_the_canonical_key(self):
-        self.char1.db.inventory = ["meal"]
+        self.char1.db.inventory = [_MEAL_KEY]
         npc = create_object(NPC, key="阿諾", location=self.room1)
         create_object(
             "typeclasses.objects.Object",
-            key="meal",
-            attributes=[("registry_key", "meal")],
+            key=_MEAL_KEY,
+            attributes=[("registry_key", _MEAL_KEY)],
             location=self.char1,
         )
-        output = self.call(CmdGive(), "meal = 阿諾")
-        self.assertIn("你把meal交給了", output)
+        output = self.call(CmdGive(), f"{_MEAL_KEY} = 阿諾")
+        self.assertIn(f"你把{_MEAL_KEY}交給了", output)
         self.assertEqual(self.char1.db.inventory, [])
-        self.assertEqual(npc.db.inventory, ["meal"])
-        self.assertEqual(len([o for o in npc.contents if o.key == "meal"]), 1)
+        self.assertEqual(npc.db.inventory, [_MEAL_KEY])
+        self.assertEqual(len([o for o in npc.contents if o.key == _MEAL_KEY]), 1)
 
     def test_drop_canonical_key_without_object_materializes_the_mirror(self):
-        self.char1.db.inventory = ["meal"]
-        output = self.call(CmdDrop(), "meal")
-        self.assertIn("你丟下了meal。", output)
+        self.char1.db.inventory = [_MEAL_KEY]
+        output = self.call(CmdDrop(), _MEAL_KEY)
+        self.assertIn(f"你丟下了{_MEAL_KEY}。", output)
         self.assertEqual(self.char1.db.inventory, [])
-        mirrored = [o for o in self.room1.contents if o.key == "meal"]
+        mirrored = [o for o in self.room1.contents if o.key == _MEAL_KEY]
         self.assertEqual(len(mirrored), 1)
-        self.assertEqual(mirrored[0].db.registry_key, "meal")
+        self.assertEqual(mirrored[0].db.registry_key, _MEAL_KEY)
 
     def test_give_canonical_key_without_object_materializes_at_target(self):
-        self.char1.db.inventory = ["meal"]
+        self.char1.db.inventory = [_MEAL_KEY]
         self.char2.location = self.room1
-        output = self.call(CmdGive(), "meal = 路人")
-        self.assertIn("你把meal交給了", output)
+        output = self.call(CmdGive(), f"{_MEAL_KEY} = 路人")
+        self.assertIn(f"你把{_MEAL_KEY}交給了", output)
         self.assertEqual(self.char1.db.inventory, [])
-        self.assertEqual(self.char2.db.inventory, ["meal"])
-        mirrored = [o for o in self.char2.contents if o.key == "meal"]
+        self.assertEqual(self.char2.db.inventory, [_MEAL_KEY])
+        mirrored = [o for o in self.char2.contents if o.key == _MEAL_KEY]
         self.assertEqual(len(mirrored), 1)
-        self.assertEqual(mirrored[0].db.registry_key, "meal")
+        self.assertEqual(mirrored[0].db.registry_key, _MEAL_KEY)
 
     def test_give_to_self_with_canonical_key_keeps_it(self):
-        self.char1.db.inventory = ["meal"]
-        output = self.call(CmdGive(), "meal = 測試者")
+        self.char1.db.inventory = [_MEAL_KEY]
+        output = self.call(CmdGive(), f"{_MEAL_KEY} = 測試者")
         self.assertIn("留給了", output)
-        self.assertEqual(self.char1.db.inventory, ["meal"])
+        self.assertEqual(self.char1.db.inventory, [_MEAL_KEY])
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
     def test_get_failed_move_aborts_the_batch_and_changes_nothing(self):
@@ -1052,7 +1073,9 @@ class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         sync_grid()
         from typeclasses.rooms import GridRoom
 
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=(2, 0, "capital_altoria")).first()
+        from world.maps.bootstrap import SOUTH_GATE_XYZ
+
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = self.south_gate
 
     def test_map_command_off_grid_zh_tw(self):

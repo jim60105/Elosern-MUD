@@ -2,7 +2,10 @@
 
 These EvenniaCommandTestMixin cases drive ``talk <npc> 回報`` and
 ``talk <npc> 回報 <quest_id>`` end to end against a local guild-staff host
-carrying the authored ``guild_staff`` dialogue table.
+carrying the authored ``guild_staff`` dialogue table. The branch identity is
+the kit synthetic branch (test-data-independence); the reported quest, its
+issuance (resolved from the board offer), and its offer are locally
+registered rows restored by the shared quest-registry isolation.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -18,20 +21,63 @@ from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
+from world.quests.definitions import (
+    QUEST_DEFINITION_REGISTRY,
+    QuestDefinition,
+    QuestStage,
+    QuestType,
+    register_quest_definition,
+)
 from world.quests.catalog import register_catalog
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import fulfill_record, read_records
-from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.quests.tests._fixtures import QuestRegistryIsolation, defeat
 from world.quests.transitions import apply_quest_log_replacement
-from world.rules.guild_config import CATALOG, load_catalog_into_cache
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+    register_guild_offer,
+)
+from world.rules.quest_issuance import (
+    guild_issuer_key,
+)
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
+
+# Locally authored quest surface: one bronze-keyed defeat quest, its guild
+# commission, and its board offer. Reward copper is this fixture's number.
+BRANCH = SYNTH_GUILD_BRANCH_KEY
+_QUEST_KEY = "alpha_report"
+_REWARD = QuestReward(copper=50, items=(), merit=25)
+
+
+def _install_reportable_quest() -> None:
+    """Register the local definition and board offer (guild issuance seam)."""
+    if _QUEST_KEY not in QUEST_DEFINITION_REGISTRY:
+        register_quest_definition(
+            QuestDefinition(
+                key=_QUEST_KEY,
+                display_name="測試回報委託",
+                quest_type=QuestType.DEFEAT,
+                rank="F",
+                stages=(QuestStage(0, defeat()),),
+            )
+        )
+    register_guild_offer(
+        GuildQuestOffer(
+            definition_key=_QUEST_KEY,
+            issuer_branch_key=BRANCH,
+            reward=_REWARD,
+        )
+    )
 
 
 class TalkTurnInCommandIsolation(QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
+        # The affinity rulebook validates its cap-break quest key against the
+        # live definition registry whenever it (re)loads.
         register_catalog()
-        load_catalog_into_cache()
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
 
     def tearDown(self):
@@ -42,7 +88,11 @@ class TalkTurnInCommandIsolation(QuestRegistryIsolation):
 
 class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, "guild_branches")
         super().setUp()
+        from world.rules.guild import register_adventurer
+
+        _install_reportable_quest()
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
         self.char1.race = "human"
@@ -50,24 +100,19 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         self.staff = create_object(NPC, key="公會職員", location=self.hall)
         self.staff.components.add(
             GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
+                self.staff, service_id="staff", branch_key=BRANCH
             )
         )
         self.staff.components.add(
             ScriptedDialogue.create(self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
-        from world.rules.guild_config import register_catalog_offers
-
-        register_catalog_offers(load_catalog_into_cache())
-        from world.rules.guild import register_adventurer
-
         register_adventurer(self.char1, self.staff)
 
-    def _complete_intro_hunt(self) -> str:
+    def _complete_quest(self) -> str:
         record = next(
-            r for r in read_records(self.char1) if r.definition_key == "introductory_hunt"
+            r for r in read_records(self.char1) if r.definition_key == _QUEST_KEY
         )
-        completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY["introductory_hunt"])
+        completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY[_QUEST_KEY])
         records = read_records(self.char1)
         apply_quest_log_replacement(
             self.char1,
@@ -79,8 +124,8 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_talk_turnin_keyword_lists_reportable_quests(self):
         from commands.guild import CmdGuildAccept
 
-        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
-        quest_id = self._complete_intro_hunt()
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}")
         self.assertIn(quest_id, output)
         self.assertIn("可以交回", output)
@@ -91,24 +136,24 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_talk_turnin_with_quest_id_settles_once(self):
         from commands.guild import CmdGuildAccept
 
-        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
-        quest_id = self._complete_intro_hunt()
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("你回報了任務", output)
         # First-ever claim echoes the starter-epithet grant on this surface.
         self.assertIn("獲得異名：南門新客", output)
         self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
-        self.assertEqual(self.char1.db.wallet, 50)
+        self.assertEqual(self.char1.db.wallet, _REWARD.copper)
         second = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("無法回報任務", second)
-        self.assertEqual(self.char1.db.wallet, 50)
+        self.assertEqual(self.char1.db.wallet, _REWARD.copper)
 
     @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
     def test_talk_turnin_later_claims_stay_title_silent(self):
         from commands.guild import CmdGuildAccept
 
-        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
-        quest_id = self._complete_intro_hunt()
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         first = self.call(
             CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}"
         )
@@ -117,10 +162,10 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         from world.rules.quest_issuance import guild_issuer_key
 
         second_record = accept_quest(
-            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+            self.char1, _QUEST_KEY, guild_issuer_key(BRANCH)
         )
         completed = fulfill_record(
-            second_record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
+            second_record, QUEST_DEFINITION_REGISTRY[_QUEST_KEY]
         )
         records = read_records(self.char1)
         apply_quest_log_replacement(
@@ -153,9 +198,7 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_turnin_with_ambiguous_staff_is_rejected(self):
         second = create_object(NPC, key="second clerk", location=self.hall)
         second.components.add(
-            GuildStaff.create(
-                second, service_id="second", branch_key="guild_branch_altoria"
-            )
+            GuildStaff.create(second, service_id="second", branch_key=BRANCH)
         )
         second.components.add(
             ScriptedDialogue.create(second, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
@@ -167,13 +210,11 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_turnin_with_quest_id_and_ambiguous_staff_uses_the_standard_line(self):
         from commands.guild import CmdGuildAccept
 
-        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
-        quest_id = self._complete_intro_hunt()
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         second = create_object(NPC, key="second clerk", location=self.hall)
         second.components.add(
-            GuildStaff.create(
-                second, service_id="second", branch_key="guild_branch_altoria"
-            )
+            GuildStaff.create(second, service_id="second", branch_key=BRANCH)
         )
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("這裡沒有公會服務人員", output)
@@ -208,8 +249,8 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_busy_host_blocks_the_turnin_keyword_without_a_claim(self):
         from commands.guild import CmdGuildAccept
 
-        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
-        quest_id = self._complete_intro_hunt()
+        self.call(CmdGuildAccept(), _QUEST_KEY, "你接取了任務")
+        quest_id = self._complete_quest()
         self.staff.db.schedule_state = "resting"
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("她現在正忙著，沒有理會你。", output)

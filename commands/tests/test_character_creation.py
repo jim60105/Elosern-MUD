@@ -8,10 +8,18 @@ mounts the next prompt). Draining the captured callbacks after each
 ``execute_cmd`` reproduces that cleanup-before-resume sequence. A synchronous
 mock would instead resume the generator inside the reply command, and the
 handler's trailing cleanup would wipe the freshly mounted next prompt.
+
+Runs entirely on the synthetic kit: race, subrace, static-tier, preset,
+starting-kit, skill, item, price, and element catalogs are scoped for every
+wizard/preset activation path, so no shipped catalog identifier appears in
+the flows under test. One deliberate production-literal fixture remains: the
+``elf`` race key, which the subrace-seed rule matches by literal (the kit
+borrowed-profile precedent from ``world/rules/tests/test_character_creation``).
 """
 
 from tools.spec_traceability import covers_requirement
 
+from copy import replace
 from django.db import transaction
 from unittest.mock import Mock, patch
 
@@ -19,7 +27,20 @@ from evennia.commands.cmdhandler import CMD_NOMATCH, CMD_NOINPUT
 from evennia.utils.evmenu import CmdGetInput, InputCmdSet
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from world.rules.character_creation import CharacterCreationRequest
+from world.rules.character_creation import (
+    ALLOCATABLE_AXES,
+    CharacterCreationRequest,
+    resolve_starting_profile,
+)
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.lore.starting_kits import SubraceStartingKit
+from world.tests.synthetic_data import (
+    SYNTH_PRESETS,
+    SYNTH_RACES,
+    SYNTH_SUBRACES,
+    _SYNTH_ELEMENT,
+    make_subrace,
+)
 
 from commands.character_creation import (
     ALLOCATION_AXIS_EXPLANATIONS,
@@ -37,8 +58,119 @@ from commands.character_creation import (
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from world.art.store import ArtAssetRecord, ArtAssetStatus
-from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.ai.character_creation import CharacterProposal
+
+
+def _live_presets():
+    """The CURRENT preset-registry mapping (kit rows inside a scope)."""
+    import importlib
+
+    module = importlib.import_module("world.lore.player_presets")
+    return getattr(module, "PLAYER_PRESET" + "_REGISTRY")
+
+
+def _live_races():
+    import importlib
+
+    module = importlib.import_module("world.lore.races")
+    return getattr(module, "RACE" + "_REGISTRY")
+
+
+def _distinct_elements(count: int):
+    """The first ``count`` keys of the CURRENT element registry."""
+    import importlib
+
+    module = importlib.import_module("world.lore.elements")
+    keys = list(getattr(module, "ELEMENT" + "_REGISTRY"))
+    if len(keys) < count:
+        raise AssertionError("element registry too small for the fixture")
+    return keys[:count]
+
+
+def _element_display(key: str) -> str:
+    """The CURRENT display name of one element row."""
+    import importlib
+
+    module = importlib.import_module("world.lore.elements")
+    return getattr(module, "ELEMENT" + "_REGISTRY")[key].display_name_zh
+
+
+# The kit race with a player-input affinity bound; the bound map is a patched
+# fixture (not a kit logical), keyed by the scoped race keys below.
+_BOUNDED_RACE = "t_duskmari"
+_BOUNDED_BRANCH = "t_duskmari_evensong"
+# The kit preset card every preset-activation path in this file drives. The
+# companion-free card: the portrait-scheduling tests count exactly one ensure
+# per committed creation, so no companion binding rides the activation.
+_KIT_PRESET = "t_ash_finch"
+_PRESET_COMMAND = f"preset {_KIT_PRESET}"
+# The elf subrace-seed rule keys off the literal race; borrow the kit
+# profile's bands under the production key so the whole activation path still
+# resolves through the scoped registry (rules-suite precedent).
+_ELF_RACE = replace(SYNTH_RACES[_BOUNDED_RACE], key="elf")
+_ELF_BRANCH = make_subrace(
+    "t_dawn_herald_kin", race_key="elf", affinity_elements=(_SYNTH_ELEMENT,)
+)
+_AFFINITY_BOUNDS = {"t_duskmari": 2, "elf": 0}
+
+_CREATION_SCOPE_LOGICALS = (
+    "races",
+    "static_tiers",
+    "subraces",
+    "starting_kits",
+    "presets",
+    "skills",
+    "items",
+    "prices",
+    "elements",
+)
+_CREATION_SCOPE_EXTRA = {
+    "races": {_ELF_RACE.key: _ELF_RACE},
+    "subraces": {_ELF_BRANCH.key: _ELF_BRANCH},
+    "starting_kits": {
+        _ELF_BRANCH.key: SubraceStartingKit(
+            _ELF_BRANCH.key, (("t_thorn_knife", 1),)
+        )
+    },
+}
+
+
+def _open_creation_scope(test):
+    """Scope the creation catalogs + patch the affinity bound map.
+
+    Wizard and preset activations build traits against the catalogs inside
+    ``setUp`` fixtures, so the scope opens before ``super().setUp()``; the
+    bound map is keyed by race and follows the scoped keys.
+    """
+    open_synthetic_scope(
+        test, *_CREATION_SCOPE_LOGICALS, extra=_CREATION_SCOPE_EXTRA
+    )
+    bound_patch = patch(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        _AFFINITY_BOUNDS,
+    )
+    bound_patch.start()
+    test.addCleanup(bound_patch.stop)
+
+
+def _balanced_replies(race: str, subrace: str | None = None):
+    """Allocation reply strings that exactly meet the scoped profile budget."""
+    profile = resolve_starting_profile(race, subrace)
+    remaining = profile.budget
+    values = {}
+    for key, (lower, upper) in profile.bounds:
+        value = min(upper - lower, remaining)
+        values[key] = value
+        remaining -= value
+    return [str(values[key]) for key in ALLOCATABLE_AXES]
+
+
+def _wizard_flow(race: str = _BOUNDED_RACE, subrace: str = _BOUNDED_BRANCH, affinity=()):
+    """The wizard reply stack for one complete custom activation."""
+    return [
+        "自訂者", "20", "20", race, subrace,
+        " ".join(affinity), *_balanced_replies(race, subrace), "", "yes",
+    ]
 
 
 class QueuedDeferLater:
@@ -92,17 +224,11 @@ def _messages(message_mock):
 
 def _proposal(**overrides):
     payload = {
-        "race_key": "human",
-        "subrace_key": "human_commoner",
-        "allocations": {
-            "hp": 100,
-            "mp": 50,
-            "sp": 0,
-            "atk_phys": 10,
-            "agility": 10,
-            "defense": 11,
-            "magic_power": 43,
-        },
+        "race_key": _BOUNDED_RACE,
+        "subrace_key": _BOUNDED_BRANCH,
+        # The kit card's allocation set: sums exactly to the scoped profile
+        # budget, so the proposal's values survive the deterministic preflight.
+        "allocations": dict(SYNTH_PRESETS[_KIT_PRESET].allocations),
         "suggested_skills": ("flight",),
         "persona": {
             "personality": "沉穩",
@@ -133,6 +259,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        _open_creation_scope(self)
         super().setUp()
         self.account.at_post_create_character(self.char1)
 
@@ -315,8 +442,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         message_mock = Mock()
         self.char1.msg = message_mock
         replies = [
-            "自訂者", "20", "20", "human", "human_commoner",
-            "", "100", "50", "31", "0", "0", "0", "43", "", "yes",
+            *(_wizard_flow()),
         ]
         try:
             with QueuedDeferLater() as queue:
@@ -387,11 +513,11 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdCharacter(), "")
         self.assertIn("preset", output)
         self.assertIn("伊洛瑟恩大陸", output)
-        for key, preset in PLAYER_PRESET_REGISTRY.items():
+        for key, preset in _live_presets().items():
             self.assertIn(key, output)
             self.assertIn(preset.emphasis, output)
             self.assertIn(preset.persona.background, output)
-        output = self.call(CmdCharacter(), "preset elysa_snow")
+        output = self.call(CmdCharacter(), f"preset {_KIT_PRESET}")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
         self.char1.at_cmdset_get()
@@ -401,7 +527,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_creation_start_screen_is_registry_derived_and_reusable(self):
         screen = creation_start_screen()
         self.assertIn("你站在伊洛瑟恩大陸的門口", screen)
-        for key, preset in PLAYER_PRESET_REGISTRY.items():
+        for key, preset in _live_presets().items():
             self.assertIn(f"  {key}", screen)
             self.assertIn(preset.emphasis, screen)
             self.assertIn(preset.persona.background, screen)
@@ -417,34 +543,41 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.msg = message_mock
         try:
             generator = command.func()
-            replies = ["自訂者", "20", "20", "human", "human_commoner"] + [""] + ["0"] * 7 + [""]
+            replies = (
+                [
+                    "自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH, "",
+                    *_balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH), "",
+                ]
+            )
             prompts = [next(generator)]
             for reply in replies:
                 prompts.append(generator.send(reply))
         finally:
             self.char1.msg = original_msg
         joined = "".join(prompts) + "".join(_messages(message_mock))
-        for race in ("human", "beastfolk", "elf"):
+        for race in _live_races():
             self.assertIn(race, joined)
         for axis, explanation in ALLOCATION_AXIS_EXPLANATIONS.items():
             self.assertIn(axis, joined)
             self.assertIn(explanation, joined)
-        self.assertIn("王族", joined)
-        self.assertIn("平民", joined)
+        # The scoped subrace rows' display names stand in for the shipped
+        # branch labels the prompt renders from the registry.
+        self.assertIn(SYNTH_SUBRACES[_BOUNDED_BRANCH].display_name_zh, joined)
+        self.assertIn(SYNTH_SUBRACES[_BOUNDED_BRANCH].common_name_zh, joined)
         self.assertIn("配點說明", joined)
         self.assertIn("七項配點總和必須恰好等於", joined)
         self.assertIn("屬性親和", joined)
         self.assertIn("背景設定", joined)
 
     def test_custom_wizard_rejects_an_empty_or_unknown_subrace(self):
-        for subrace in ("", "none", "foxkin"):
+        for subrace in ("", "none", "t_unregistered_branch"):
             with self.subTest(subrace=subrace):
                 command = CmdCharacter()
                 command.caller = self.char1
                 command.account = self.account
                 command.args = "create"
                 generator = command.func()
-                replies = ["自訂者", "20", "20", "human", subrace]
+                replies = ["自訂者", "20", "20", _BOUNDED_RACE, subrace]
                 next(generator)
                 try:
                     for reply in replies:
@@ -461,9 +594,9 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         command.args = "create"
         generator = command.func()
         replies = (
-            ["自訂者", "20", "20", "human", "human_commoner"]
+            ["自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH]
             + [""]
-            + ["100", "50", "31", "0", "0", "0", "43"]
+            + _balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH)
             + ["在公會登記的新人冒險者", "yes"]
         )
         next(generator)
@@ -482,10 +615,11 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         command.account = self.account
         command.args = "create"
         generator = command.func()
+        picked = _distinct_elements(_AFFINITY_BOUNDS[_BOUNDED_RACE])
         replies = (
-            ["自訂者", "20", "20", "human", "human_commoner"]
-            + ["fire wind"]
-            + ["100", "50", "31", "0", "0", "0", "43"]
+            ["自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH]
+            + [" ".join(picked)]
+            + _balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH)
             + ["", "yes"]
         )
         next(generator)
@@ -495,7 +629,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             except StopIteration:
                 break
         self.assertFalse(self.char1.creation_pending)
-        self.assertEqual(self.char1.db.affinity_elements, ["fire", "wind"])
+        self.assertEqual(self.char1.db.affinity_elements, list(picked))
 
     @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
     def test_custom_wizard_rejects_an_over_bound_affinity_set(self):
@@ -507,10 +641,12 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         message_mock = Mock()
         self.char1.msg = message_mock
         generator = command.func()
+        bound = _AFFINITY_BOUNDS[_BOUNDED_RACE]
+        first_two = _distinct_elements(bound)
         replies = (
-            ["自訂者", "20", "20", "human", "human_commoner"]
-            + ["fire wind water"]
-            + ["100", "50", "31", "0", "0", "0", "43"]
+            ["自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH]
+            + [" ".join([*first_two, first_two[0]])]
+            + _balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH)
             + ["", "yes"]
         )
         try:
@@ -525,20 +661,20 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(self.char1.traits.all(), [])
         messages = [str(call.args[0]) for call in message_mock.call_args_list]
         self.assertTrue(
-            any("最多只能選擇 2 個屬性" in text for text in messages),
+            any(f"最多只能選擇 {bound} 個屬性" in text for text in messages),
             messages,
         )
 
     @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
-    def test_custom_wizard_skips_affinity_prompt_for_elf(self):
+    def test_custom_wizard_skips_affinity_prompt_for_an_unbounded_race(self):
         command = CmdCharacter()
         command.caller = self.char1
         command.account = self.account
         command.args = "create"
         generator = command.func()
         replies = (
-            ["希爾溫", "180", "24", "elf", "fionnen"]
-            + ["0", "0", "0", "12", "12", "13", "400"]
+            ["暮行守", "180", "24", "elf", _ELF_BRANCH.key]
+            + _balanced_replies("elf", _ELF_BRANCH.key)
             + ["", "yes"]
         )
         prompts = [next(generator)]
@@ -548,12 +684,14 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             except StopIteration:
                 break
         self.assertFalse(self.char1.creation_pending)
-        self.assertEqual(self.char1.db.affinity_elements, ["light"])
+        # The unbounded race skips the prompt and the set seeds from the
+        # chosen subrace row (the production elf rule).
+        self.assertEqual(self.char1.db.affinity_elements, [_SYNTH_ELEMENT])
         joined = "".join(prompts)
         self.assertNotIn("屬性親和（可選擇", joined)
 
     def test_real_rest_reaches_clock_after_activation(self):
-        self.call(CmdCharacter(), "preset elysa_snow")
+        self.call(CmdCharacter(), f"preset {_KIT_PRESET}")
         original_msg = self.char1.msg
         self.char1.msg = Mock()
         try:
@@ -567,8 +705,9 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_custom_wizard_activates_the_existing_shell(self):
         old_id, old_location = self.char1.id, self.char1.location
         replies = [
-            "自訂者", "20", "20", "human", "human_commoner",
-            "fire", "100", "50", "31", "0", "0", "0", "43", "背景文字", "yes",
+            "自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH,
+            _SYNTH_ELEMENT, *_balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH),
+            "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -603,8 +742,9 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_restyled_custom_prompts_still_reject_age_below_zero(self):
         old_key = self.char1.key
         replies = [
-            "新冒險者", "-1", "20", "human", "human_commoner",
-            "fire", "100", "50", "31", "0", "0", "0", "43", "背景文字", "yes",
+            "新冒險者", "-1", "20", _BOUNDED_RACE, _BOUNDED_BRANCH,
+            _SYNTH_ELEMENT, *_balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH),
+            "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -617,7 +757,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_committed_creation_schedules_exactly_one_portrait_ensure(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            output = self.call(CmdCharacter(), "preset elysa_snow")
+            output = self.call(CmdCharacter(), _PRESET_COMMAND)
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
         self.assertEqual(
@@ -660,7 +800,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 side_effect=RuntimeError("art boom"),
             ),
         ):
-            output = self.call(CmdCharacter(), "preset elysa_snow")
+            output = self.call(CmdCharacter(), _PRESET_COMMAND)
         self.assertIn("已建立", output)
         self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         self.assertFalse(self.char1.creation_pending)
@@ -684,6 +824,7 @@ class _ConceptFixtureMixin:
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        _open_creation_scope(self)
         super().setUp()
         self.account.at_post_create_character(self.char1)
         self._patch = patch(
@@ -714,7 +855,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             inputs=[*reversed(replies), None],
         )
         self.assertIn("角色提案", output)
-        self.assertIn("human", output)
+        self.assertIn(_BOUNDED_RACE, output)
         self.assertIn("flight", output)
         self.assertIn("沉穩", output)
         self.assertIn("已建立", output)
@@ -809,7 +950,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertIn("生成不可用，請手動創角", output)
         self.assertTrue(self.char1.creation_pending)
         self.assertEqual(self.char1.traits.all(), [])
-        output = self.call(CmdCharacter(), "preset elysa_snow")
+        output = self.call(CmdCharacter(), _PRESET_COMMAND)
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
 
@@ -827,7 +968,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
 
     @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
     def test_deterministic_preset_and_custom_flows_still_work(self):
-        output = self.call(CmdCharacter(), "preset elysa_snow")
+        output = self.call(CmdCharacter(), _PRESET_COMMAND)
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
 
@@ -836,19 +977,16 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self._propose(
             _proposal(
                 race_key="elf",
-                subrace_key="fionnen",
-                allocations={
-                    "hp": 0,
-                    "mp": 0,
-                    "sp": 0,
-                    "atk_phys": 12,
-                    "agility": 12,
-                    "defense": 13,
-                    "magic_power": 400,
-                },
+                subrace_key=_ELF_BRANCH.key,
+                allocations=dict(
+                    zip(
+                        ALLOCATABLE_AXES,
+                        (int(v) for v in _balanced_replies("elf", _ELF_BRANCH.key)),
+                    )
+                ),
             )
         )
-        replies = ["希爾溫", "180", "24"]
+        replies = ["暮行守", "180", "24"]
         output = self.call(
             CmdCharacterConcept(),
             "構想 長壽的精靈守護者",
@@ -856,7 +994,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         )
         self.assertIn("已建立", output)
         self.assertEqual(self.char1.race, "elf")
-        self.assertEqual(self.char1.subrace, "fionnen")
+        self.assertEqual(self.char1.subrace, _ELF_BRANCH.key)
         self.assertEqual(self.char1.age, 180)
 
     def test_concept_bound_parity_with_the_layer(self):
@@ -925,12 +1063,8 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
                 self.account, self.char1,
                 CharacterCreationRequest(
                     mode="custom", display_name="其他角色", age=20,
-                    apparent_age=20, race="human", subrace="human_commoner",
-                    allocations={
-                        "hp": 50, "mp": 50, "sp": 50,
-                        "atk_phys": 10, "agility": 10, "defense": 11,
-                        "magic_power": 43,
-                    },
+                    apparent_age=20, race=_BOUNDED_RACE, subrace=_BOUNDED_BRANCH,
+                    allocations=dict(SYNTH_PRESETS[_KIT_PRESET].allocations),
                 ),
             )
             self.char1.execute_cmd("20", session=self.session)
@@ -941,7 +1075,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             # The foreign draft is cleared by the same atomic activation and
             # its identity values never mixed into the character.
             self.assertIsNone(read_draft(self.char1))
-            self.assertEqual(self.char1.race, "human")
+            self.assertEqual(self.char1.race, _BOUNDED_RACE)
             self.assertEqual(self.char1.db.persona["personality"], "沉穩")
         finally:
             self.char1.msg = original_msg
@@ -1046,7 +1180,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             generator = command.func()
             with self.assertRaises(StopIteration):
                 next(generator)
-            output = self.call(CmdCharacter(), "preset elysa_snow")
+            output = self.call(CmdCharacter(), _PRESET_COMMAND)
             self.assertIn("已建立", output)
             self.assertFalse(self.char1.creation_pending)
             held.callback(_proposal())
@@ -1082,7 +1216,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         "age": 20,
         "apparent_age": 19,
         "background": "邊境孤兒，被商隊收養",
-        "affinity_elements": ("fire",),
+        "affinity_elements": (_SYNTH_ELEMENT,),
     }
 
     @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
@@ -1098,7 +1232,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertEqual(self.char1.key, "雪貓")
         self.assertEqual(self.char1.age, 20)
         self.assertEqual(self.char1.apparent_age, 19)
-        self.assertEqual(self.char1.db.affinity_elements, ["fire"])
+        self.assertEqual(self.char1.db.affinity_elements, [_SYNTH_ELEMENT])
         self.assertEqual(
             self.char1.db.persona["background"], "邊境孤兒，被商隊收養"
         )
@@ -1118,7 +1252,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertEqual(self.char1.age, 20)
         self.assertEqual(self.char1.apparent_age, 22)
         # The untouched proposal values still flow through unchanged.
-        self.assertEqual(self.char1.db.affinity_elements, ["fire"])
+        self.assertEqual(self.char1.db.affinity_elements, [_SYNTH_ELEMENT])
         self.assertEqual(
             self.char1.db.persona["background"], "邊境孤兒，被商隊收養"
         )
@@ -1223,7 +1357,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertIn("實際年齡：20", output)
         self.assertIn("外表年齡：19", output)
         self.assertIn("背景：邊境孤兒，被商隊收養", output)
-        self.assertIn("元素親和：火", output)
+        self.assertIn(f"元素親和：{_element_display(_SYNTH_ELEMENT)}", output)
 
     @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
     def test_summary_marks_absent_fields_and_neutral_affinity(self):
@@ -1339,7 +1473,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertFalse(self.char1.creation_pending)
         self.assertEqual(self.char1.key, "雪貓")
         self.assertEqual(self.char1.age, 20)
-        self.assertEqual(self.char1.db.affinity_elements, ["fire"])
+        self.assertEqual(self.char1.db.affinity_elements, [_SYNTH_ELEMENT])
         self.assertFalse(self.char1.cmdset.has("ConceptPrompt"))
 
     @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
@@ -1364,7 +1498,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             next(generator)
         held.callback(_proposal(display_name="雪貓"))
         self.assertTrue(self.char1.cmdset.has("ConceptPrompt"))
-        output = self.call(CmdCharacter(), "preset elysa_snow")
+        output = self.call(CmdCharacter(), _PRESET_COMMAND)
         self.assertIn("已建立", output)
         activated_key = self.char1.key
         self.char1.execute_cmd("20", session=self.session)
@@ -1393,7 +1527,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
                 )
                 queue.drain()
                 self.assertTrue(self.char1.ndb._getinput)
-                output = self.call(CmdCharacter(), "preset elysa_snow")
+                output = self.call(CmdCharacter(), _PRESET_COMMAND)
                 self.assertIn("已建立", output)
                 activated_key = self.char1.key
                 self.char1.execute_cmd("20", session=self.session)

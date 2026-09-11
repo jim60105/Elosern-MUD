@@ -19,6 +19,17 @@ from commands.guild import (
 )
 from commands.quest_delivery import CmdDeliver
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
+from dataclasses import replace
+from world.lore.items import EquipmentSlot
+from world.rules import equipment_effects
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._equipment_rulebook_probes import unique_rule
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_ITEMS,
+    make_item,
+    synthetic_registries,
+)
 from world.quests.runtime import QuestNotFound, QuestState
 from world.rules.clock import AdvanceSource, DaypartError
 from world.rules.combat_session import CombatSessionError, SessionReason
@@ -166,13 +177,13 @@ class GuildCommandBranchTests(TestCase):
 
         command = _command(CmdGuildRequest, "護衛")
         staff = Mock()
-        staff.components.get.return_value.branch_key = "guild_branch_altoria"
+        staff.components.get.return_value.branch_key = SYNTH_GUILD_BRANCH_KEY
         command.resolve_staff = Mock(return_value=staff)
         command.caller.ndb = SimpleNamespace(guild_request_pending=None)
         command.caller.guild_rank = "F"
         with patch(
             "commands.guild.parse_guild_registration",
-            return_value={"branch_key": "guild_branch_altoria"},
+            return_value={"branch_key": SYNTH_GUILD_BRANCH_KEY},
         ), patch(
             "commands.guild.request_generated_quest",
             side_effect=EscortUnavailableError("no binding flow"),
@@ -394,17 +405,39 @@ class EconomyCommandBranchTests(TestCase):
         self.assertEqual(command.caller.msg.call_args_list[0].args[0], "錢包：7 銅")
         self.assertEqual(command.caller.msg.call_args_list[1].args[0], "  meal ×2\n  sword ×1")
     def test_inventory_equipment_rows_carry_adjustment_prose(self):
+        # Kit gear bound to a runtime-probed rulebook row whose rule is
+        # replaced with locally authored numbers: the row renders the prose
+        # suffix, the plain consumable row stays bare (prose-free path).
+        modifier, rule = unique_rule(
+            "attached_buffs", lambda candidate: bool(candidate.attached_buffs)
+        )
+        gear = make_item(
+            "t_branch_prose_blade",
+            display_name_zh="韻文合成刃",
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=modifier,
+        )
+        authored = replace(
+            rule,
+            adjustments={"atk_phys": -2, "defense": 8, "agility": "-10%"},
+            gauge_caps={"hp": 15},
+            immune=(),
+            attached_buffs=(),
+        )
         command = _command(CmdInventory)
         command.caller.db.wallet = 0
+        scope = synthetic_registries("items", extra={"items": {gear.key: gear}})
         with patch(
             "commands.economy.list_items",
-            return_value=["knight_platemail", "healing_potion"],
+            return_value=[gear.key, "t_ember_spray"],
+        ), scope, patch.dict(
+            equipment_effects.EQUIPMENT_EFFECT_RULES, {modifier: authored}
         ):
             command.func()
         self.assertEqual(
             command.caller.msg.call_args_list[1].args[0],
-            "  healing_potion ×1\n"
-            "  knight_platemail ×1——攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15",
+            f"  {gear.key} ×1——攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15\n"
+            "  t_ember_spray ×1",
         )
 
     def test_stock_reports_missing_configuration_and_invalid_stock(self):
@@ -494,14 +527,17 @@ class CharacterCreationCommandBranchTests(TestCase):
     def test_wizard_non_yes_confirmation_cancels(self):
         command = _command(CmdCharacter, "create")
         profile = SimpleNamespace(bounds=(), budget=0)
-        with patch("commands.character_creation.resolve_starting_profile", return_value=profile):
+        open_synthetic_scope(self, "races", "subraces")
+        with patch("commands.character_creation.resolve_starting_profile", return_value=profile), patch(
+            "commands.character_creation.max_affinity_elements", return_value=1
+        ):
             generator = command.func()
             next(generator)
             generator.send("name")
             generator.send("20")
             generator.send("20")
-            generator.send("human")
-            generator.send("human_commoner")
+            generator.send("t_duskmari")
+            generator.send("t_duskmari_evensong")
             generator.send("")
             generator.send("")
             with self.assertRaises(StopIteration):
@@ -676,8 +712,8 @@ class DeliveryCommandBranchTests(TestCase):
 
     def test_recipient_resolution_failures_render_their_messages(self):
         for args, candidates, expected in (
-            ("灰婆婆 治療藥水", [], "這裡沒有這個對象。"),
-            ("治療藥水 治療藥水", [], "這裡沒有這個對象。"),
+            ("灰婆婆 熾焰噴射劑", [], "這裡沒有這個對象。"),
+            ("熾焰噴射劑 熾焰噴射劑", [], "這裡沒有這個對象。"),
         ):
             command = _command(CmdDeliver, args)
             command.caller.search.return_value = candidates
@@ -689,7 +725,7 @@ class DeliveryCommandBranchTests(TestCase):
             deliver_rule.assert_not_called()
 
     def test_ambiguous_recipient_never_delegates(self):
-        command = _command(CmdDeliver, "灰婆婆 治療藥水")
+        command = _command(CmdDeliver, "灰婆婆 熾焰噴射劑")
         command.caller.search.return_value = [object(), object()]
         with patch("commands.quest_delivery.deliver_quest_item") as deliver_rule:
             command.func()
@@ -699,43 +735,41 @@ class DeliveryCommandBranchTests(TestCase):
     def test_unknown_item_never_delegates(self):
         command = _command(CmdDeliver, "灰婆婆 不存在的物品")
         command.caller.search.return_value = [object()]
-        with patch("commands.quest_delivery.deliver_quest_item") as deliver_rule, patch(
-            "commands.quest_delivery.ITEM_REGISTRY", {}
-        ):
+        with patch(
+            "commands.quest_delivery.deliver_quest_item"
+        ) as deliver_rule, synthetic_registries("items"):
             command.func()
         command.caller.msg.assert_called_with("你沒有帶著這種物品。")
         deliver_rule.assert_not_called()
 
     def test_display_name_and_raw_key_both_delegate(self):
-        for raw in ("治療藥水", "healing_potion"):
+        spray = SYNTH_ITEMS["t_ember_spray"]
+        for raw in (spray.display_name_zh, spray.key):
             command = _command(CmdDeliver, f"灰婆婆 {raw}")
             recipient = object()
             command.caller.search.return_value = [recipient]
             outcome = DeliveryOutcome(False, "no_active_delivery", "這裡沒有需要交付的任務物品。")
+            scope = synthetic_registries("items")
             with patch(
                 "commands.quest_delivery.deliver_quest_item", return_value=outcome
-            ) as deliver_rule, patch(
-                "commands.quest_delivery.ITEM_REGISTRY",
-                {"healing_potion": SimpleNamespace(display_name_zh="治療藥水")},
-            ):
+            ) as deliver_rule, scope:
                 command.func()
             deliver_rule.assert_called_once_with(
-                command.caller, recipient, "healing_potion"
+                command.caller, recipient, spray.key
             )
             command.caller.msg.assert_called_with(outcome.message)
 
     def test_outcome_message_is_rendered_verbatim(self):
-        command = _command(CmdDeliver, "灰婆婆 治療藥水")
+        spray = SYNTH_ITEMS["t_ember_spray"]
+        command = _command(CmdDeliver, f"灰婆婆 {spray.display_name_zh}")
         command.caller.search.return_value = [object()]
-        outcome = DeliveryOutcome(True, None, "你把治療藥水交給了灰婆婆。")
+        outcome = DeliveryOutcome(True, None, "你把熾焰噴射劑交給了灰婆婆。")
+        scope = synthetic_registries("items")
         with patch(
             "commands.quest_delivery.deliver_quest_item", return_value=outcome
-        ), patch(
-            "commands.quest_delivery.ITEM_REGISTRY",
-            {"healing_potion": SimpleNamespace(display_name_zh="治療藥水")},
-        ):
+        ), scope:
             command.func()
-        command.caller.msg.assert_called_with("你把治療藥水交給了灰婆婆。")
+        command.caller.msg.assert_called_with("你把熾焰噴射劑交給了灰婆婆。")
 
     def test_command_is_mounted_without_the_given_key(self):
         from commands.default_cmdsets import CharacterCmdSet

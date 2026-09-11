@@ -20,6 +20,7 @@ from world.rules.guild import (
     RewardClaimError,
 )
 from world.rules.dialogue import ScriptedTalkResult
+from world.tests.synthetic_data import SYNTH_ITEMS
 
 _NO_RESPONSE = "對方沒有理會你。"
 
@@ -50,7 +51,7 @@ class TalkTurnInBranchTests(TestCase):
                 "quest_id": "quest-1",
                 "copper": 50,
                 "merit": 25,
-                "items": ["healing_potion"],
+                "items": [SYNTH_ITEMS["t_ember_spray"].key],
             },
         ) as turnin, patch("commands.talk.run_scripted_talk") as response:
             command.func()

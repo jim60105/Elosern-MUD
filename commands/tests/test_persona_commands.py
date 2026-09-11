@@ -8,6 +8,13 @@ deterministic ``world.rules.persona_edit`` writer. The existing
 shared ``CmdPersonaFieldBase`` extraction.
 """
 
+# Preimport the import-time-validated equipment rulebook BEFORE the synthetic
+# catalogs below can be scoped (world.rules.equipment_effects validates the
+# shipped item registry once at first import; importing it at module import —
+# the established idiom in world/rules/tests — keeps that validation on the
+# shipped rulebook instead of the scoped kit rows).
+import world.rules.equipment_effects  # noqa: F401
+
 import unittest
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
@@ -26,6 +33,11 @@ from world.rules.character_creation import (
     activate_player_character,
 )
 from world.rules.character_creation import resolve_starting_profile
+from world.tests.synthetic_data import (
+    SYNTH_RACES,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
 
 
 def _balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -44,8 +56,19 @@ class PersonaCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        # Activation builds traits and a starting kit against the catalogs,
+        # so the scope opens before super().setUp() (the class decorator
+        # would only wrap the test* methods).
+        scope = synthetic_registries(
+            "races", "static_tiers", "subraces", "starting_kits", "items",
+            "prices", "elements",
+        )
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
         self.account.at_post_create_character(self.char1)
+        race_key = next(iter(SYNTH_RACES))
+        subrace_key = next(iter(SYNTH_SUBRACES))
         activate_player_character(
             self.account,
             self.char1,
@@ -54,9 +77,9 @@ class PersonaCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 display_name="人格角色",
                 age=20,
                 apparent_age=20,
-                race="human",
-                subrace="human_commoner",
-                allocations=_balanced_allocations("human", "human_commoner"),
+                race=race_key,
+                subrace=subrace_key,
+                allocations=_balanced_allocations(race_key, subrace_key),
             ),
         )
 

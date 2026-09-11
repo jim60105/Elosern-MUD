@@ -23,7 +23,30 @@ from world.art.queue import enqueue_gallery_job, is_gallery_job
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind, monster_subject_for
-from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.scene_archetypes import SceneArchetype
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    synthetic_registries,
+)
+
+# Scope every class over the synthetic scene-archetype and monster-tier
+# catalogs: the art layer keys subjects through those registries, so the
+# suite drives real validation against kit rows only. A third locally
+# authored archetype covers the three-scene queue case.
+_EXTRA_ARCHETYPE = SceneArchetype(
+    "t_synth_ridge",
+    "苔脊小徑",
+    "合成的小徑沿著長滿苔蘚的岩脊攀升，燈籠光在霧裡暈開。",
+)
+_ART_SCOPE = synthetic_registries(
+    "archetypes",
+    "monster_tiers",
+    extra={"archetypes": {_EXTRA_ARCHETYPE.key: _EXTRA_ARCHETYPE}},
+)
+_SCENE_KEY = next(iter(SYNTH_ARCHETYPES))
+_ALT_SCENE_KEY = "t_synth_ridge"
+_MONSTER_TIER = next(iter(SYNTH_MONSTER_TIERS))
 
 from tools.spec_traceability import covers_requirement
 
@@ -43,24 +66,25 @@ def _sync_defer_to_thread(inline_callback, *args, **kwargs):
     return deferred
 
 
-def _scene(key="forest_path"):
+def _scene(key=_SCENE_KEY):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
+@_ART_SCOPE
 class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_staff_can_list_scene_records_without_persona_or_paths(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         claimed = claim(10)
         settle(
-            _scene("forest_path"),
+            _scene(_SCENE_KEY),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
         output = self.call(CmdArtStatus(), "scene")
-        self.assertIn("scene:forest_path", output)
+        self.assertIn(f"scene:{_SCENE_KEY}", output)
         self.assertIn("[done]", output)
         self.assertNotIn("/app", output)
         self.assertNotIn(".art", output)
@@ -68,12 +92,12 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_portrait_filter_lists_portrait_records(self):
-        subject = ArtSubject(ArtSubjectKind.MONSTER, "low")
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_TIER)
         ensure(subject, "desc")
         output = self.call(CmdArtStatus(), "portrait")
-        self.assertIn("portrait:monster:low", output)
+        self.assertIn(f"portrait:monster:{_MONSTER_TIER}", output)
         scene_output = self.call(CmdArtStatus(), "scene")
-        self.assertNotIn("portrait:monster:low", scene_output)
+        self.assertNotIn(f"portrait:monster:{_MONSTER_TIER}", scene_output)
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
@@ -83,7 +107,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             (CmdArtStatus(), ""),
             (CmdArtRun(), "--limit 1"),
             (CmdArtRetry(), ""),
-            (CmdArtRequeue(), "scene:forest_path"),
+            (CmdArtRequeue(), f"scene:{_SCENE_KEY}"),
         ):
             with self.subTest(cmd=cmd.key):
                 output = self.call(cmd, args, caller=self.char2)
@@ -91,9 +115,9 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-run-drains-the-shared-queue-now-with-an-optional-limit")
     def test_bounded_drain_dispatches_pending_jobs(self):
-        ensure(_scene("forest_path"), "a")
-        ensure(_scene("tavern_interior"), "b")
-        ensure(_scene("city_street"), "c")
+        ensure(_scene(_SCENE_KEY), "a")
+        ensure(_scene("t_synth_lodge"), "b")
+        ensure(_scene(_ALT_SCENE_KEY), "c")
         with patch("world.art.worker.drain", return_value=2) as drain:
             output = self.call(CmdArtRun(), "--limit 2")
         drain.assert_called_once_with(2)
@@ -101,7 +125,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_reenqueues_failed_records(self):
-        subject = _scene("forest_path")
+        subject = _scene(_SCENE_KEY)
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
@@ -113,36 +137,36 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         with patch("world.art.worker.drain"):
             output = self.call(CmdArtRetry(), "")
-        record = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        record = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
         self.assertIn("1", output)
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_valid_key_forces_regeneration_preserving_prior_output(self):
-        subject = _scene("forest_path")
+        subject = _scene(_SCENE_KEY)
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
-        output = self.call(CmdArtRequeue(), "scene:forest_path")
-        record = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        output = self.call(CmdArtRequeue(), f"scene:{_SCENE_KEY}")
+        record = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(record.db.prior_output_identity, "scene/forest_path.png")
-        self.assertIn("scene:forest_path", output)
+        self.assertEqual(record.db.prior_output_identity, f"scene/{_SCENE_KEY}.png")
+        self.assertIn(f"scene:{_SCENE_KEY}", output)
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_invalid_key_is_rejected_with_no_record_change(self):
-        ensure(_scene("forest_path"), "desc")
-        before = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        ensure(_scene(_SCENE_KEY), "desc")
+        before = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
         before_status = before.db.status
         output = self.call(CmdArtRequeue(), "not_a_subject")
         self.assertIn("無效", output)
-        after = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        after = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
         self.assertEqual(after.db.status, before_status)
         self.assertEqual(ArtAssetRecord.objects.count(), 1)
 
@@ -282,7 +306,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # record's status and prior output stay untouched (no classic reset).
         from world.art import gallery as gallery_api
 
-        tier = next(iter(MONSTER_TIER_REGISTRY))
+        tier = _MONSTER_TIER
         subject = monster_subject_for(tier)
         ensure(subject, "desc")
         claimed = claim(10)
@@ -320,7 +344,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = next(iter(MONSTER_TIER_REGISTRY))
+        tier = _MONSTER_TIER
         subject = monster_subject_for(tier)
         kept = str(uuid.uuid4())
         tempdir = tempfile.TemporaryDirectory()
@@ -379,7 +403,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = next(iter(MONSTER_TIER_REGISTRY))
+        tier = _MONSTER_TIER
         subject = monster_subject_for(tier)
         gallery_api.record_error(subject, "sd_connection_error")
         output = self.call(CmdArtRetry(), "")
@@ -403,7 +427,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = next(iter(MONSTER_TIER_REGISTRY))
+        tier = _MONSTER_TIER
         subject = monster_subject_for(tier)
         gallery_api.record_error(subject, "sd_connection_error")
         image_id = str(uuid.uuid4())
@@ -455,7 +479,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # same store still re-enqueues.
         ghost = ArtSubject(ArtSubjectKind.CHARACTER, "999999")
         gallery_api.record_error(ghost, "sd_connection_error")
-        scene = _scene("forest_path")
+        scene = _scene(_SCENE_KEY)
         ensure(scene, "desc")
         claimed = claim(10)
         settle(
@@ -528,7 +552,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # gallery-bearing kind, so a legacy failed monster record is left
         # exactly as found (failed, output untouched, never re-ensqueued)
         # while a healthy scene failed record still re-enqueues normally.
-        tier = next(iter(MONSTER_TIER_REGISTRY))
+        tier = _MONSTER_TIER
         subject = monster_subject_for(tier)
         ensure(subject, "desc")
         claimed = claim(10)
@@ -539,7 +563,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             output_identity=None,
             error="legacy boom",
         )
-        scene = _scene("forest_path")
+        scene = _scene(_SCENE_KEY)
         ensure(scene, "desc")
         claimed = claim(10)
         settle(
@@ -557,7 +581,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         ).first()
         self.assertEqual(monster_record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first().db.status,
+            ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first().db.status,
             ArtAssetStatus.PENDING,
         )
         self.assertFalse(
@@ -565,6 +589,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
 
 
+@_ART_SCOPE
 class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     """``@art options`` with the thread dispatch replaced by a sync seam."""
 
@@ -630,33 +655,34 @@ class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("Basic ", output)
 
 
+@_ART_SCOPE
 class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_done_record_shows_its_persisted_seed(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         claimed = claim(10)
         settle(
-            _scene("forest_path"),
+            _scene(_SCENE_KEY),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
-        record = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        record = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
         record.db.seed = 42
         output = self.call(CmdArtStatus(), "")
         self.assertIn(" seed=42", output)
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_seedless_record_shows_no_seed_field(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         output = self.call(CmdArtStatus(), "")
-        self.assertIn("scene:forest_path", output)
+        self.assertIn(f"scene:{_SCENE_KEY}", output)
         self.assertNotIn("seed=", output)
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_gallery_job_records_are_invisible_to_the_status_listing(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         enqueue_gallery_job(
             ArtSubject(ArtSubjectKind.CHARACTER, "42"),
             "desc",
@@ -666,7 +692,7 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
         )
         output = self.call(CmdArtStatus(), "")
-        self.assertIn("scene:forest_path", output)
+        self.assertIn(f"scene:{_SCENE_KEY}", output)
         self.assertNotIn(":gen:", output)
         portrait_output = self.call(CmdArtStatus(), "portrait")
         self.assertNotIn(":gen:", portrait_output)
@@ -750,12 +776,13 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         # A bare ``portrait``-prefixed classic record matches the startswith
         # filter — the pre-existing classic behaviour this change must not
         # alter.
-        subject = ArtSubject(ArtSubjectKind.MONSTER, "low")
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_TIER)
         ensure(subject, "desc")
         output = self.call(CmdArtStatus(), "portrait")
-        self.assertIn("portrait:monster:low", output)
+        self.assertIn(f"portrait:monster:{_MONSTER_TIER}", output)
 
 
+@_ART_SCOPE
 class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     """``@art health`` with the thread dispatch replaced by a sync seam."""
 
@@ -785,19 +812,19 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
     )
     def test_reachable_dashboard_shows_all_five_sections(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         claimed = claim(10)
         settle(
-            _scene("forest_path"),
+            _scene(_SCENE_KEY),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
-        ensure(_scene("old_ruins"), "desc")
+        ensure(_scene(_ALT_SCENE_KEY), "desc")
         claimed = claim(10)
         settle(
-            _scene("old_ruins"),
+            _scene(_ALT_SCENE_KEY),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
@@ -858,7 +885,7 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
     )
     def test_queue_counts_exclude_gallery_job_records(self):
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         enqueue_gallery_job(
             ArtSubject(ArtSubjectKind.CHARACTER, "42"),
             "desc",
@@ -879,7 +906,7 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        ensure(_scene("forest_path"), "desc")
+        ensure(_scene(_SCENE_KEY), "desc")
         claim(1)
         # Gallery state must survive untouched too: one card, one error.
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
