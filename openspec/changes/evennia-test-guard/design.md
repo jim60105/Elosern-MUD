@@ -46,7 +46,7 @@ The count subprocess is launched with `pi.exec("bash", ["-lc", script], { cwd, t
 - unterminated quote or trailing escape.
 
 `analyzeCommand()` then classifies:
-1. No `evennia test` text anywhere (`/\bevennia[ \t]+test(?:[ \t]|$)/`) → `not-evennia-test` → pass through.
+1. No `evennia test` text anywhere (`/\bevennia[ \t]+test(?![A-Za-z0-9_])/`, corrected per Amendment A3) → `not-evennia-test` → pass through.
 2. Scan failed → `unsupported` → block.
 3. Segments matching `^(?:(?:uv|poetry)[ \t]+run(?:[ \t]+--[^ \t]+)*[ \t]+)?evennia[ \t]+test(?:[ \t]|$)` (runner flags such as `--locked` allowed between `run` and `evennia`; see Amendment A1):
    - zero matches but the text exists somewhere (e.g. `bash -lc 'evennia test'`) → block ("wrapped in an unsupported shell command") — fail closed rather than allow an easy bypass;
@@ -92,7 +92,7 @@ The original command is never rewritten for execution — the count run is disco
 
 ### D5 — Environment/cwd preservation
 - cwd: `ctx.cwd` with the Bash input's `cwd` resolved (`~`, `~/…`, absolute, relative-to-session-cwd).
-- env: only string-valued, identifier-shaped keys from the Bash input's `env` are forwarded as `export KEY='…'` lines (values single-quoted with `'` → `'\''` escaping). `PYTHONPATH` prefers the Bash-call value, else the OMP process `PYTHONPATH`, and the extension directory is prepended so `omp_evennia_count_runner` is importable. This means discovery runs under the same environment as the original call (e.g. `MUD_TEST_SETTINGS=1`).
+- env: only string-valued, identifier-shaped keys from the Bash input's `env` are forwarded as `export KEY='…'` lines (values single-quoted with `'` → `'\''` escaping). `PYTHONPATH` prefers the Bash-call value, else the OMP process `PYTHONPATH`, and a `.` absorber plus the extension directory are prepended so `omp_evennia_count_runner` is importable (see Amendment A4). This means discovery runs under the same environment as the original call (e.g. `MUD_TEST_SETTINGS=1`).
 
 ### D6 — Count-only runner semantics
 `CountOnlyRunner` subclasses the configured `TEST_RUNNER` (import-string resolution; defensive fallback to `DiscoverRunner` if someone permanently configures this runner as `TEST_RUNNER`) and overrides `run_tests`:
@@ -142,7 +142,7 @@ Purely additive: drop two files under `.omp/extensions/evennia-test-guard/`, res
 
 ## Amendments to the reference plan
 
-The reference plan's listings are the implementation source of truth, with these two recorded deviations (rubber-duck review findings, both verified against the plan's own text):
+The reference plan's listings are the implementation source of truth, with these recorded deviations (rubber-duck review findings A1/A2, plus A3 found during implementation against the delta spec's own scenarios):
 
 ### A1 — `uv run --locked` must be a supported form (grammar amendment)
 
@@ -155,6 +155,14 @@ Related: an inline env-assignment prefix (`MUD_TEST_SETTINGS=1 evennia test ...`
 1. `shellQuote` is missing its closing quote: ``return `'${value.replaceAll("'", "'\\''")}`;`` emits `'foo` for `foo`, so every generated `export KEY='…'` line (PYTHONPATH is always injected) leaves an unterminated quote and the discovery script always fails — which would block even the ≤100 allow path. Corrected: ``return `'${value.replaceAll("'", "'\\''")}'`;`` (matching D5's prose).
 2. In `scanShell`'s final empty-segment branch, `reason: "invalid empty shell segment";` uses `;` where object-literal syntax requires `,` — a TypeScript SyntaxError if transcribed verbatim. Corrected to `,`.
 
+### A3 — Detection regex must fire on quoted test text (fix when implementing)
+
+Discovered during implementation. The plan's `EVENNIA_TEST_ANYWHERE` (`/\bevennia[ \t]+test(?:[ \t]|$)/`) only recognizes `evennia test` when followed by whitespace or end-of-string, so `bash -lc 'evennia test'` (closing quote immediately after `test`) is classified `not-evennia-test` and passes through — contradicting this change's own scenario "Shell wrapping is blocked" (the plan's own D3 blocked-example list even names this command). Corrected detection-only regex: `/\bevennia[ \t]+test(?![A-Za-z0-9_])/` — a strict superset of the original matches (word-character continuations such as `evennia testrunner-config` stay unmatched), keeping the guard fail-closed without changing any policy decision. D3's step-1 regex description is updated accordingly.
+
+### A4 — Evennia's launcher destroys the first PYTHONPATH entry (fix when implementing)
+
+Discovered during implementation. `evennia/server/evennia_launcher.py` executes `sys.path[1] = EVENNIA_ROOT` at import time: `sys.path[1]` is exactly the first PYTHONPATH entry, and CPython de-duplicates PYTHONPATH, so the plan's `PYTHONPATH = EXTENSION_DIR:<existing>` injection is overwritten before Django resolves `--testrunner=omp_evennia_count_runner` — the count subprocess fails with `ModuleNotFoundError: No Module named 'omp_evennia_count_runner'` even though the plain env var is preserved (verified against Evennia 6.1.0: a second PYTHONPATH entry survives, a doubled single entry is de-duplicated away). Corrected D5 injection: `PYTHONPATH = .:<EXTENSION_DIR>:<existing>` — the leading `.` absorbs the launcher's overwrite with a harmless entry (the game dir is inserted at `sys.path[0]` by `init_game_directory` anyway), keeping the extension dir importable. The count-only discovery command therefore needs the absorber when run manually as well.
+
 ## Open Questions
 
-None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution); the two recorded deviations are A1/A2 above.
+None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution); the recorded deviations are A1/A2/A3/A4 above.
