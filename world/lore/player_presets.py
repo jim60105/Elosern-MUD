@@ -19,7 +19,7 @@ from world.lore.sexual_vocab import (
     SHAME_LEVELS,
     WETNESS_LEVELS,
 )
-from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
+from world.lore.starting_kits import validate_wearable_loadout
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 # The persona prose values the lore-side validator requires to be strings; the
@@ -1035,11 +1035,16 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
     because ``world/rules/equipment.py::toggle_equipment`` TOGGLES rather than
     equips (a repeated key would equip then unequip), silently replaces a
     singleton occupant, and rejects a sixth accessory at runtime. So the
-    subset rule, the equipment-slot rule, duplicates, singleton-slot
-    collisions, and accessory overflow all raise at import instead of
-    mid-activation. The singleton/accessory arithmetic reads
-    ``world/skills/equipment.py`` (lore already depends on
-    ``world/skills/``), never ``world.rules``.
+    subset rule and the wearable-set arithmetic (duplicates, the
+    equipment-slot rule, singleton-slot collisions, accessory overflow) all
+    raise at import instead of mid-activation. The wearable-set rules are the
+    shared helper's (custom-kit-worn-at-activation D3) — the same arithmetic
+    ``_validate_starting_kit`` runs on subrace kits once custom activation
+    wears them — keeping the five-rule contract this validator declares
+    observable through identical stable messages. The subset rule stays here
+    (it is preset-specific) and runs first, preserving the observable error
+    precedence: a bad key absent from ``starting_items`` still names the
+    subset rule.
     """
     for preset in registry.values():
         # Defensive shape check: the starting-items validator already rejects
@@ -1052,9 +1057,6 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
                     f"preset {preset.key!r} declares a malformed starting-item entry"
                 )
             carried.add(entry[0])
-        seen: set[str] = set()
-        singleton_owner: dict[EquipmentSlot, str] = {}
-        accessory_count = 0
         for item_key in preset.starting_equipment:
             if not isinstance(item_key, str) or not item_key:
                 raise ValueError(
@@ -1065,35 +1067,11 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
                     f"preset {preset.key!r} declares starting equipment {item_key!r} "
                     "absent from its starting_items"
                 )
-            if item_key in seen:
-                raise ValueError(
-                    f"preset {preset.key!r} declares duplicate starting "
-                    f"equipment {item_key!r}"
-                )
-            seen.add(item_key)
-            definition = ITEM_REGISTRY.get(item_key)
-            if definition is None or definition.equipment_slot is None:
-                raise ValueError(
-                    f"preset {preset.key!r} declares starting equipment {item_key!r} "
-                    "that is not equipment"
-                )
-            slot = definition.equipment_slot
-            if slot is EquipmentSlot.ACCESSORY:
-                accessory_count += 1
-                if accessory_count > ACCESSORY_MAX_SLOTS:
-                    raise ValueError(
-                        f"preset {preset.key!r} declares more than "
-                        f"{ACCESSORY_MAX_SLOTS} starting accessories"
-                    )
-            else:
-                prior = singleton_owner.get(slot)
-                if prior is not None:
-                    raise ValueError(
-                        f"preset {preset.key!r} declares starting equipment "
-                        f"{item_key!r} and {prior!r} claiming the same "
-                        f"{slot.value} slot"
-                    )
-                singleton_owner[slot] = item_key
+        validate_wearable_loadout(
+            preset.starting_equipment,
+            owner=f"preset {preset.key!r}",
+            declaration="starting equipment",
+        )
 
 
 def _validate_preset_sex(registry: dict[str, PlayerPreset]) -> None:
