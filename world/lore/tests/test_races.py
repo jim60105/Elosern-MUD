@@ -3,6 +3,7 @@ Self-consistency checks for race, tier, and subrace registries."""
 
 from tools.spec_traceability import covers_requirement
 
+import re
 import unittest
 from pathlib import Path
 
@@ -229,6 +230,47 @@ class RaceRegistryTests(unittest.TestCase):
         for key, subrace in SUBRACE_REGISTRY.items():
             if key not in ("foxkin", "human_royal"):
                 self.assertIsNone(subrace.vital_overrides)
+
+    @covers_requirement("lore-registries::subrace-specialty-prose-is-server-owned-traditional-chinese-for-every-entry")
+    def test_specialty_prose_is_traditional_chinese_for_every_entry(self):
+        # The creation surfaces print ``specialty`` verbatim beside a Chinese
+        # subrace name (CLI prompt and WebClient menu description), so the
+        # field is server-owned zh-TW label text: at least one CJK ideograph
+        # and zero ASCII letters, with no parenthetical-exception mechanism.
+        # The count guard keeps any sixteenth entry from entering the registry
+        # without confronting the same rule.
+        from web.webclient.presentation.creation import MAX_SPECIALTY_CODE_POINTS
+
+        self.assertEqual(len(SUBRACE_REGISTRY), 15)
+        for key, subrace in SUBRACE_REGISTRY.items():
+            with self.subTest(subrace=key):
+                self.assertIsNotNone(re.search(r"[\u4e00-\u9fff]", subrace.specialty), key)
+                self.assertIsNone(re.search(r"[A-Za-z]", subrace.specialty), key)
+                self.assertLessEqual(len(subrace.specialty), MAX_SPECIALTY_CODE_POINTS, key)
+
+    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-bloodline-subraces-with-stat-modifiers")
+    def test_elf_branch_specialty_prose_is_pinned_verbatim(self):
+        expected = {
+            "fionnen": "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。",
+            "ciaran": "暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。",
+            "eolas": "幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。",
+        }
+        for key, specialty in expected.items():
+            self.assertEqual(SUBRACE_REGISTRY[key].specialty, specialty)
+
+    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-bloodline-subraces-with-stat-modifiers")
+    def test_beastfolk_specialty_prose_is_pinned_verbatim(self):
+        expected = {
+            "wolfkin": "群居狩獵的狼人，體格均衡而耐力出眾，慣於配合同伴作戰，無突出短板亦無驚人天賦。",
+            "catkin": "身形輕盈、舉步無聲的貓人，敏捷遠出同族之上，代價是肌骨纖薄，難以吃下正面重創。",
+            "bearkin": "骨架厚重、力大無窮的熊人，慣用重型武器，卻因轉身遲鈍而追不上靈活的對手。",
+            "rabbitkin": "奔躍如風的兔人，為獸人之中最快的亞種，擅長遊走遠射，卻經不起近身的一擊。",
+            "bovinekin": "身軀如山、皮糙肉厚的牛人，防禦最厚而善於陣地戰，只因其行動緩慢而難以追擊機動的敵人。",
+            "tigerkin": "爆發力驚人、攻速兼備的虎人，出擊凌厲而防禦為全亞種最弱，講求一擊制敵而非持久消耗。",
+            "foxkin": "體格在獸人之中不突出的狐人，以體力換來同族最深厚的魔力底蘊，是最接近施法者的亞種。",
+        }
+        for key, specialty in expected.items():
+            self.assertEqual(SUBRACE_REGISTRY[key].specialty, specialty)
 
 
 if __name__ == "__main__":
