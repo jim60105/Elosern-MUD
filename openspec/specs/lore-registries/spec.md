@@ -104,15 +104,15 @@ subset of the owning race's `static_baseline.magic_power` band.
   owning race's `static_baseline.magic_power` band
 - **THEN** registry load raises a named error rather than accepting the deviating tier
 
-### Requirement: Subrace registry covers elf branches, beastfolk subspecies, and human social classes with stat modifiers
+### Requirement: Subrace registry covers elf branches, beastfolk subspecies, and human bloodline subraces with stat modifiers
 `world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`,
 `agility`, and `defense` (each a `float` fractional delta, default `0.0`), a frozen `Subrace`
 dataclass with fields `key`, `race_key`, `display_name_zh`, `common_name_zh`, `population`,
 `home_anchor_key`, `affinity_elements`, `specialty`, `static_modifiers`, and `vital_overrides`, and
 a module-level `SUBRACE_REGISTRY: dict[str, Subrace]` containing the three elf branches
 (`fionnen`, `ciaran`, `eolas`), the seven named beastfolk subspecies (`wolfkin`, `catkin`,
-`bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`), and the five named human social
-classes (`human_royal`, `human_noble`, `human_wealthy`, `human_commoner`, `human_laborer`), so
+`bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`), and the five named human bloodline
+subraces (`human_royal`, `human_noble`, `human_wealthy`, `human_commoner`, `human_laborer`), so
 that every race in `RACE_REGISTRY` has at least one subrace and no player-facing subrace selection
 ever needs a "none" option.
 
@@ -146,11 +146,11 @@ ever needs a "none" option.
   block exactly (e.g. `catkin.static_modifiers == StatModifiers(atk_phys=-0.10, agility=0.40,
   defense=-0.30)`), and `wolfkin.static_modifiers == StatModifiers()` (balanced, all zero)
 
-#### Scenario: Human social classes carry zero-sum stat-distribution skew
+#### Scenario: Human bloodline subraces carry zero-sum stat-distribution skew
 - **WHEN** every one of the five human `SUBRACE_REGISTRY` entries' `static_modifiers` is inspected
-- **THEN** `abs(atk_phys + agility + defense) <= 1e-12` for every entry, so a social class skews the
-  three physical axes without shifting aggregate physical power, and each entry's
-  `display_name_zh`/`common_name_zh`/`specialty` follows the social ladder in
+- **THEN** `abs(atk_phys + agility + defense) <= 1e-12` for every entry, so a bloodline subrace skews
+  the three physical axes without shifting aggregate physical power, and each entry's
+  `display_name_zh`/`common_name_zh`/`specialty` follows the bloodline ordering in
   `world_info.md` (皇族與大貴族 / 中小貴族 / 富裕平民 / 普通平民 / 底層平民)
 
 #### Scenario: Every beastfolk subspecies' static_modifiers sum to zero
@@ -169,7 +169,7 @@ ever needs a "none" option.
   can override a vital bound, not only a static one
 
 #### Scenario: Every other subrace leaves vital_overrides unset
-- **WHEN** every `SUBRACE_REGISTRY` entry other than `"foxkin"` and any human social class that
+- **WHEN** every `SUBRACE_REGISTRY` entry other than `"foxkin"` and any human bloodline subrace that
   documents a `vital_overrides` band is inspected
 - **THEN** `vital_overrides is None` for that entry, meaning it uses `RaceProfile.vital_baseline`
   unmodified
