@@ -104,6 +104,11 @@ _T_CREATION_SCOPE = (
     "static_tiers",
     "starting_kits",
     "presets",
+    # Custom activation now wears the subrace kit (custom-kit-worn-at-
+    # activation): the toggle writer resolves every kit item against
+    # ITEM_REGISTRY, so the synthetic item catalog must be in scope for
+    # activation to complete (kit item t_thorn_knife).
+    "items",
 )
 # The affinity input bound is a deterministic race-keyed mapping outside the
 # registries; under the kit scope the kit race needs its own entry (mirrors

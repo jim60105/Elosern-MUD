@@ -42,7 +42,14 @@ _READY_POLL_SECONDS = 1.0
 
 @dataclass
 class BrowserRuntime:
-    """One isolated runtime: temporary roots, dynamic ports, and its env."""
+    """One isolated runtime: temporary roots, (deferred) dynamic ports, env.
+
+    Port allocation is deliberately deferred: dynamic ports are released by
+    the allocator and rebound by the Evennia launcher, and a sibling harness
+    process can grab a port inside that window. The harness therefore
+    allocates ports only inside its runner-local startup lock (``allocate``
+    below), never at construction time.
+    """
 
     root_dir: Path
     database_path: Path
@@ -50,24 +57,39 @@ class BrowserRuntime:
     media_dir: Path
     static_dir: Path
     cache_dir: Path
-    ports: list[int]
+    ports: list[int] | None = None
     env: dict[str, str] = field(default_factory=dict)
 
     @property
     def telnet_port(self) -> int:
+        assert self.ports is not None, "runtime ports not allocated"
         return self.ports[TELNET_PORT]
 
     @property
     def http_port(self) -> int:
+        assert self.ports is not None, "runtime ports not allocated"
         return self.ports[HTTP_PORT]
 
     @property
     def websocket_port(self) -> int:
+        assert self.ports is not None, "runtime ports not allocated"
         return self.ports[WS_PORT]
 
     @property
     def webclient_url(self) -> str:
         return f"http://127.0.0.1:{self.http_port}/webclient/"
+
+    def allocate_ports(self) -> None:
+        """Allocate the dynamic port set and wire it into the env.
+
+        Idempotent. MUST be called while the harness startup lock is held so
+        the release-then-bind window never overlaps a sibling harness
+        process's own allocation or boot.
+        """
+        if self.ports is not None:
+            return
+        self.ports = allocate_ports()
+        self.env.update(port_env(self.ports))
 
     def cleanup(self) -> None:
         """Remove every temporary root created for this instance."""
@@ -115,7 +137,12 @@ RUNTIME_ENV_KEYS = frozenset(
 
 
 def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
-    """Create one isolated runtime and its complete environment."""
+    """Create one isolated runtime WITHOUT dynamic ports.
+
+    Ports are deliberately not allocated here: the harness allocates them
+    under its runner-local startup lock (``BrowserRuntime.allocate_ports``),
+    closing the release-then-bind race against sibling harness processes.
+    """
     root_dir = Path(tempfile.mkdtemp(prefix=prefix))
     log_dir = root_dir / "logs"
     media_dir = root_dir / "media"
@@ -125,7 +152,6 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
     for directory in (log_dir, media_dir, static_dir, cache_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
-    ports = allocate_ports()
     env = {
         "ELOSERN_BROWSER_DB": str(database_path),
         "ELOSERN_BROWSER_LOG_DIR": str(log_dir),
@@ -133,13 +159,6 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         "ELOSERN_BROWSER_STATIC_ROOT": str(static_dir),
         "ELOSERN_BROWSER_CACHE_DIR": str(cache_dir),
         "ELOSERN_BROWSER_ART_ROOT": str(cache_dir / "art"),
-        "ELOSERN_BROWSER_TELNET_PORT": str(ports[TELNET_PORT]),
-        "ELOSERN_BROWSER_HTTP_PORT": str(ports[HTTP_PORT]),
-        "ELOSERN_BROWSER_INTERNAL_PORT": str(ports[INTERNAL_PORT]),
-        "ELOSERN_BROWSER_WS_PORT": str(ports[WS_PORT]),
-        "ELOSERN_BROWSER_AMP_PORT": str(ports[AMP_PORT]),
-        # WebSocket port encoded into the webclient page matches the listener.
-        "WEBSOCKET_CLIENT_PROXY_PORT": str(ports[WS_PORT]),
         # Managed browser runtimes boot against the synthetic catalogs (kit
         # ``world.tests.synthetic_data``): the seed process installs them
         # before mirroring, and the server process installs them at
@@ -155,16 +174,29 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         media_dir=media_dir,
         static_dir=static_dir,
         cache_dir=cache_dir,
-        ports=ports,
         env=env,
     )
+
+
+def port_env(ports: list[int]) -> dict[str, str]:
+    """The runtime env entries pinning the allocated port set."""
+    return {
+        "ELOSERN_BROWSER_TELNET_PORT": str(ports[TELNET_PORT]),
+        "ELOSERN_BROWSER_HTTP_PORT": str(ports[HTTP_PORT]),
+        "ELOSERN_BROWSER_INTERNAL_PORT": str(ports[INTERNAL_PORT]),
+        "ELOSERN_BROWSER_WS_PORT": str(ports[WS_PORT]),
+        "ELOSERN_BROWSER_AMP_PORT": str(ports[AMP_PORT]),
+        # WebSocket port encoded into the webclient page matches the listener.
+        "WEBSOCKET_CLIENT_PROXY_PORT": str(ports[WS_PORT]),
+    }
 
 
 def recreate_runtime(previous: BrowserRuntime | None = None) -> BrowserRuntime:
     """Create a fresh runtime, carrying over caller-set env from ``previous``.
 
-    Used by the harness port-conflict retry: a new runtime gets new ports and
-    temporary roots, but keeps caller-configured mode variables (creation,
+    Used by the harness port-conflict retry: a new runtime gets fresh
+    temporary roots (and, when the harness allocates them under its startup
+    lock, fresh ports), but keeps caller-configured mode variables (creation,
     services, exploration, minimap) that are not runtime-owned.
     """
     runtime = create_runtime()

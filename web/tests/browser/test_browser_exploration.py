@@ -1009,15 +1009,29 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 identities[0],
             )
             self.assertFalse(target_menu.get("unresolvable", False))
-        # Purity: a second resolve deep-equals the first and the committed
-        # state is byte-identical across the resolution storm.
-        state_before_json = json.dumps(store_state(page), sort_keys=True)
-        first = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
-        second = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
-        self.assertEqual(first, second, "double resolution against one committed state differs")
+        # Purity: a second resolve deep-equals the first, and the committed
+        # state is byte-identical across the resolution storm. The capture and
+        # both resolutions must share ONE evaluate round-trip: the live server
+        # pushes legitimate ui_update snapshots between separate CDP calls, so
+        # any before/after pair taken across round-trips races the transport
+        # itself. Inside one synchronous evaluate the store cannot commit an
+        # unrelated update, so a byte diff here can only be resolver mutation.
+        purity = page.evaluate(
+            """() => {
+              const bridge = window.__elosernBridge;
+              const before = JSON.stringify(bridge.store.view);
+              const first = bridge.resolveFrame({ source: 'exploration.root' });
+              const second = bridge.resolveFrame({ source: 'exploration.root' });
+              const after = JSON.stringify(bridge.store.view);
+              return { before, first, second, after };
+            }"""
+        )
         self.assertEqual(
-            json.dumps(store_state(page), sort_keys=True),
-            state_before_json,
+            purity["first"], purity["second"],
+            "double resolution against one committed state differs",
+        )
+        self.assertEqual(
+            purity["after"], purity["before"],
             "resolution mutated committed state",
         )
         # Degradation is data: an unregistered source and a lost identity
