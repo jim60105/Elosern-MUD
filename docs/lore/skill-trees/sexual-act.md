@@ -10,11 +10,11 @@
 | 技能形態 | 絕大多數招式為 ACTIVE、零消耗（`cost={}`）、可戰外施展、無屬性歸屬；每招同時登記進 `SKILL_REGISTRY`（技能面）與 `SEXUAL_ACT_REGISTRY`（行為面 sidecar） |
 | 資源與判定 | 不耗 MP、不進熟練度曲線；門檻是存在於 `SexualState`（`world/rules/sexual_state.py`）的**終身行為計數器**與施法時的**抗性判定** |
 | 解鎖階梯 | 由每招自帶的 `unlock` 計數器門檻表把關（全部條件為 AND，空表＝人人可使）；統一入口 `unlocked_act_keys_for()` |
-| 神性門檻 | 神之秘法線與頂點被動「性魔法主宰」（`divine_sexual_mastery`）、Legacy 主動技「神之秘法：性愛系統」（`divine_sexual_arts`）共用 `requires_divine_arts` 閘門，規則上唯精靈可及 |
+| 神性門檻 | 神之秘法線與頂點被動「性魔法主宰」（`divine_sexual_mastery`）、悠奈簽名技「神之秘法：性愛系統」（`divine_sexual_arts`）共用 `requires_divine_arts` 閘門，規則上唯精靈可及 |
 
 ## 六條路線（`group` 欄）
 
-目錄由六個路線模組構成，共 65 個行為（`divine_sexual_mastery` 與 `divine_sexual_arts` 另有登記於主冊）：
+目錄由六個路線模組構成，共 66 個行為（`divine_sexual_mastery` 另有登記於主冊）：
 
 | 路線 | 模組 | 行為數 | 定位 | 主計數器軸 |
 | --- | --- | --- | --- | --- |
@@ -23,7 +23,7 @@
 | 羞恥 | `shame.py` | 10 | 露出與觀看：衣襬到無恥宣言 | `exposure_act_count`、`watched_count` |
 | 戰鬥 | `combat.py` | 9 | 對敵施為：挑逗到絕頂支配 | `hostile_act_count`、`climax_count`、`climax_extension_count` |
 | 異種 | `interspecies.py` | 7 | 對魔獸施為／承受 | `hostile_act_count`、`interspecies_act_count`、`climax_count` |
-| 神之秘法 | `divine.py` | 7 | 刻意打破前五條線平衡的神之律令 | 無（計數器門檻不適用） |
+| 神之秘法 | `divine.py` | 8 | 刻意打破前五條線平衡的神之律令 | 無（計數器門檻不適用；簽名技走持有門檻） |
 
 ### 解鎖階梯一覽（實作門檻）
 
@@ -34,7 +34,7 @@
 | 羞恥 | 撩起衣襬無門檻 → 半露群 `露出≥5` → 全露出 `露出≥20` → 公開自慰 `露出≥20 且 自慰≥25`；觀看軸：挑釁凝視 `被看≥10`、公開表演 `被看≥10 且 露出≥20`、獻身姿態 `露出≥50`、無恥宣言 `露出≥50 且 被看≥30` |
 | 戰鬥 | 挑逗無門檻 → 耳語／觸碰 `敵對≥5` → 魅惑／束縛愛撫／強制快感 `敵對≥20` → 強制絕頂／連續責め `敵對≥40 且 高潮≥30` → 絕頂支配（範圍）`敵對≥80 且 延長≥30` |
 | 異種 | 觸碰／愛撫 `敵對≥10` → 纏繞／承受 `敵對≥30` → 異種交合 `敵對≥30 且 高潮≥20` → 支配／共鳴 `異種≥20` |
-| 神之秘法 | 全線 `unlock={}`——計數器永不把關，守門的是施法當下的血統閘門（見下） |
+| 神之秘法 | 全線 `unlock={}`——計數器永不把關，守門的是施法當下的血統閘門（見下）；唯悠奈簽名技 `divine_sexual_arts` 為 `ownership_gated`，只認實際持有，計數器與主宰全解都繞過它 |
 
 階梯的敘事邏輯：每條線都是一部**身體史**。解鎖不是研讀，是經歷——目錄本身就是「性經歷即修行」這條世界觀機制的直接體現，也是 [光屬性系譜樹](/lore/skill-trees/light) 聖禮路線刻意與之分離（走熟練度）、只在狀態層共享興奮／高潮系統的原因。
 
@@ -84,7 +84,7 @@
 ## 頂點：神性門檻與主宰解鎖
 
 - **性魔法主宰**（`divine_sexual_mastery`，PASSIVE）：效果 `sexual_magic_mastery` 是一條**全面解鎖**——持有者無需計數器即可使出前五條線的全部行為；但它明確**不涵蓋神之秘法線**（主宰與神性兩條取得途徑互不相干），且只認持有者本身的直接擁有，轉授不生效。
-- **神之秘法：性愛系統**（`divine_sexual_arts`，ACTIVE）：Legacy 單招，效果僅一條 `sexual_event:stimulus_applied`，保留舊式「僅目標受效」語意，是光屬性 [`holy_kiss_heal`](/lore/skill-trees/light) 借用刺激幅度時的詞彙源頭。
+- **神之秘法：性愛系統**（`divine_sexual_arts`，ACTIVE）：悠奈簽名技，目錄第八對 hand-built 行。效果僅一條 `sexual_event_target:stimulus_applied`——「僅目標受效」的接收範圍由 `sexual_event_target:` 前綴 statically（施法當下之前、按字面前綴）決定，施法者永不吃到自己的刺激事件；它是光屬性 [`holy_kiss_heal`](/lore/skill-trees/light) 借用刺激幅度時的詞彙源頭。它也是全目錄唯一 `ownership_gated=True` 的行：血統閘門只擋血統，這招 additionally（除血統之外）只認實際持有——authored 資料面唯 `yuna_darknight` 一張卡宣稱它，計數器派生與主宰全解都繞過它，轉授更不是取得途徑。
 - **神之秘法線 7 招**（皆 `requires_divine_arts=True`、無計數器門檻、無部位、可抵抗）：每招一條專屬效果字首——`divine_pleasure_max`（絕頂律令：無視加乘直接把 pleasure 推至封頂，雙邊前進）、`divine_climax_extension_stage:3`（時姦：一次施放堆 3 段延長）、`divine_drain`（神域搾取：目標快感轉為施法者 MP/SP/HP）、`divine_saturate_sensitivity`（感度創世：全部位敏感異常）、`divine_clamp_shame`（恥辱剝奪：羞恥永久釘在成癮；魔獸目標直接拒絕）、`divine_mark_submission`（絕對從屬：以施法者資料庫 id 植入永久自動順從印記）、`divine_restore_purity`（無垢回歸：逆轉 `virgin` 旗標）。封鎖由施法當下的 `_step1_divine_arts_gate` ＋ `RaceProfile.can_use_divine_arts` 承擔——血統就是守門員，目錄本身對所有人開放。
 
 這七招是目錄中唯一**刻意打破平衡**的群：比例、門檻、可逆性全被神性豁免，呼應世界觀裡「神之秘法直接干涉世界之理」的定位，也解釋為何精靈把這批技法藏得比任何禁咒都深。

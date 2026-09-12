@@ -94,9 +94,8 @@
   var MAX_PARTICIPANTS = 16;
   // Flattened active-skill descriptor bound. Raised from 32 to clear the
   // current theoretical maximum of 157 obtainable active skills (91 base
-  // active skills including innate, plus the 65 registered sexual acts and
-  // the pre-existing divine_sexual_arts); a multiple of 16 like the other
-  // presentation bounds.
+  // active skills including innate, plus the 66 registered sexual acts of
+  // the catalogue); a multiple of 16 like the other presentation bounds.
   var MAX_SKILLS = 192;
   var MAX_DISPLAY_NAME = 64;
   var MAX_LABEL = 128;
