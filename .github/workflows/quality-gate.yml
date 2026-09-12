@@ -234,9 +234,12 @@ jobs:
         run: |
           status1=0
           status2=0
-          (cd w-a && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p1" OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p1.jsonl" uv run --locked coverage run -m unittest ${{ join(matrix.files_a, ' ') }}) &
+          # The driver primes Django/Evennia (like seed.main) before unittest
+          # loads the labels: journey bodies lazy-import rules-chain modules
+          # that read django settings at import time.
+          (cd w-a && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p1" OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p1.jsonl" uv run --locked coverage run -m web.tests.browser.unittest_driver ${{ join(matrix.files_a, ' ') }}) &
           pid1=$!
-          (cd w-b && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p2" OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p2.jsonl" uv run --locked coverage run -m unittest ${{ join(matrix.files_b, ' ') }}) &
+          (cd w-b && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p2" OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p2.jsonl" uv run --locked coverage run -m web.tests.browser.unittest_driver ${{ join(matrix.files_b, ' ') }}) &
           pid2=$!
           wait "$pid1" || status1=$?
           wait "$pid2" || status2=$?
