@@ -51,6 +51,12 @@ class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
 
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
+        # Boot mode: SHIPPED catalogs (explicit override of the harness
+        # synthetic default, per the frozen-wire-vocabulary precedent in
+        # test_browser_creation). These journeys wait on the creation panel
+        # presenting; the t_-only install cannot present it (internal_unavailable),
+        # and the rejection journey dispatches the shipped wire vocabulary.
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
         runtime.env["ELOSERN_BROWSER_CREATION"] = "1"
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
