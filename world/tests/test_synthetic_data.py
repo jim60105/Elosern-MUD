@@ -235,6 +235,27 @@ class PatchRestoreTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-patches-and-restores-registries-exactly"
     )
+    def test_reentering_an_open_scope_is_rejected_and_the_first_entry_still_restores(self):
+        # The CI leak this guards: re-entering the same scope object used to
+        # replace the live patch stack, orphaning the shipped-catalog restore
+        # callbacks and leaking synthetic registries into later tests.
+        original = self._original("skills")
+        snapshot = dict(original)
+        scope = kit.synthetic_registries("skills")
+        with scope:
+            scoped = self._original("skills")
+            self.assertTrue(scoped)
+            self.assertTrue(all(str(k).startswith("t_") for k in scoped))
+            with self.assertRaises(RuntimeError):
+                scope.__enter__()
+            # The rejected re-entry leaves the first (live) entry untouched.
+            self.assertIs(self._original("skills"), scoped)
+        self.assertIs(self._original("skills"), original)
+        self.assertEqual(dict(self._original("skills")), snapshot)
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_frozen_target_swaps_owner_and_every_discovered_binding(self):
         logical = "npc_tiers"
         original = self._original(logical)

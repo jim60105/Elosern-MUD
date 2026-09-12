@@ -1245,13 +1245,35 @@ class synthetic_registries(ContextDecorator):
     # -- scope lifecycle -----------------------------------------------------
 
     def __enter__(self) -> "synthetic_registries":
-        self._stack = ExitStack()
-        for logical in _dependency_order(self._logicals):
-            _apply_target(self._stack, logical, self._extra)
+        if getattr(self, "_open", False):
+            raise RuntimeError(
+                "this synthetic_registries scope is already open: re-entering "
+                "the same object replaces the live patch stack with a fresh "
+                "one, orphaning the shipped-catalog restore callbacks and "
+                "leaking the synthetic registries into later tests; build a "
+                "new scope instead"
+            )
+        stack = ExitStack()
+        self._open = True
+        try:
+            for logical in _dependency_order(self._logicals):
+                _apply_target(stack, logical, self._extra)
+        except Exception:
+            # A failed __enter__ never reaches __exit__; unwind the partial
+            # stack here so the scope leaves no patches behind.
+            stack.close()
+            self._open = False
+            raise
+        self._stack = stack
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        self._stack.__exit__(exc_type, exc, tb)
+        stack = self.__dict__.pop("_stack", None)
+        try:
+            if stack is not None:
+                stack.__exit__(exc_type, exc, tb)
+        finally:
+            self._open = False
         return False
 
     def _recreate_cm(self) -> "synthetic_registries":
