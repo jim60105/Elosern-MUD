@@ -32,7 +32,11 @@ synthetic fixture with invented names 竈生民).
 - [ ] 2.1 Update `world/lore/tests/test_races.py`: the `HUMAN_SUBRACES` tuple (27-33) to the
       five new keys, and `test_human_subraces_exist_with_bloodline_names` (159-166) to the
       new bloodline naming; keep the `human_commoner` StaticTier assertion at line 118
-      untouched. Verify: targeted run of `world.lore.tests.test_races` passes.
+      untouched; add one test asserting the retired subrace keys resolve nowhere in shipped
+      registries (SUBRACE_REGISTRY, kit registry keys, preset subraces) and decorate it
+      `@covers_requirement("lore-registries::human-lineage-renames-ship-without-a-save-data-compatibility-layer")`
+      — the new requirement gets coverage or `tools.spec_traceability check` fails it as
+      uncovered. Verify: targeted run of `world.lore.tests.test_races` passes.
 - [ ] 2.2 Update the 12 `subrace="human_commoner"` fixture sites in
       `world/lore/tests/test_player_presets.py` (lines 117, 146, 236, 261, 300, 343, 369,
       394, 419, 519, 558, 706) to `human_plains`. Verify: targeted run of
@@ -40,8 +44,9 @@ synthetic fixture with invented names 竈生民).
 - [ ] 2.3 Update the 16 `human_commoner` subrace-key sites in
       `world/lore/tests/test_starting_kits.py` (lines 76, 81, 86, 91, 96, 101, 106, 112,
       119, 124, 129, 136, 138, 140, 151, 164) to `human_plains`, and assert the new §3.4
-      human kit table (three COMMON triads; no `wooden_club` anywhere). Verify: targeted
-      run of `world.lore.tests.test_starting_kits` passes.
+      human kit table (three COMMON triads; no `wooden_club` anywhere), decorating that
+      assertion `@covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")`.
+      Verify: targeted run of `world.lore.tests.test_starting_kits` passes.
 
 ## 3. Data and fixtures
 
@@ -66,6 +71,9 @@ synthetic fixture with invented names 竈生民).
       王都王室重統御學識 / 領地貴族自幼習劍術馬術 / 港市海岸船上作業練就輕捷 /
       東部平原農耕與工坊並重 / 西部丘陵谷地礦坑與工坊重勞動). Verify: the five modifier
       rows in the block match `races.py` exactly.
+      NOTE: `tmp/` is gitignored (`.gitignore:87`) and NOT present in the worktree — edit
+      `tmp/story_settings/world_info.md` in the main checkout (`/var/home/jim60105/repos/MUD`);
+      the edit is invisible to git by design and must be verified by reading the file back.
 
 ## 5. Verification
 

@@ -112,8 +112,12 @@ ever needs a "none" option.
 ## ADDED Requirements
 
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
-The starting-kit registry SHALL map the five human bloodline subraces to exactly the approved
-lineage kits, keyed by the renamed subrace keys: `human_royal` → 鍍金軍刀 + 鎖子甲 +
+This requirement fixes only the concrete human selections in the starting-kit registry; the
+general kit-existence/equipment-only/load-time-validation contract stays owned by the
+`player-character-creation` capability's kit requirements, which deliberately leave
+per-subrace selections to registry data. The starting-kit registry SHALL map the five human
+bloodline subraces to exactly the approved lineage kits, keyed by the renamed subrace keys:
+`human_royal` → 鍍金軍刀 + 鎖子甲 +
 銀髮簪 (`gilded_saber`, `chainmail`, `silver_hairpin` — UNCOMMON, UNCOMMON, COMMON);
 `human_noble` → 騎士制式長劍 + 皮甲 + 銀髮簪 (`knight_blade`, `leather_armor`,
 `silver_hairpin` — UNCOMMON, COMMON, COMMON); `human_coastal` → 普通劍 + 皮甲 + 鐵短刀
