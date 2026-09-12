@@ -63,6 +63,9 @@ def payload():
 
 
 class GalleryWireTests(unittest.TestCase):
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-payload-is-exactly-version-mirrored-across-server-and-client"
+    )
     def test_bidirectional_boundary_parity(self):
         cases = [("valid", payload(), True)]
         def add(name, modify, accepted=False):
@@ -216,6 +219,9 @@ class GalleryPresenterTests(EvenniaTest):
         attach_coordinator(session, self.registry)
         return session
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_empty_available_and_mode_gate(self):
         before = api.GalleryRecord.objects.count()
         value = gallery_presenter(self.context)
@@ -226,6 +232,9 @@ class GalleryPresenterTests(EvenniaTest):
         self.actor.creation_pending = True
         self.assertEqual(self.registry.render("gallery", self.context)["reason"]["code"], "gallery_unavailable")
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-subject-rail-names-every-gallery-bearing-subject-with-companion-first-ordering"
+    )
     def test_rail_prioritizes_companions_reserves_monsters_and_skips_corruption(self):
         other = create_object(NPC, key="其他角色")
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_other"}
@@ -240,6 +249,10 @@ class GalleryPresenterTests(EvenniaTest):
         with patch("web.webclient.presentation.gallery.GALLERY_MAX_SUBJECTS", 3):
             self.assertEqual([row[0]["subject_key"] for row in gallery_subjects(self.actor)], [self.subject.full(), "portrait:character:t_companion", "portrait:monster:t_beast"])
 
+    @covers_requirement(
+        "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media",
+        "webclient-gallery-panel::filter-counts-and-the-equipment-summary-are-server-computed",
+    )
     def test_card_chips_order_counts_and_overlap_are_server_facts(self):
         self.actor.db.equipment = {"weapon_main": "t_sword", "armor": "t_coat", "accessories": ["t_ring_b", "t_ring_a"]}
         bound = {"mask": ["weapon_main", "armor"], "snapshot": {"weapon_main": "t_sword", "armor": "t_coat"}}
@@ -256,6 +269,9 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(value["filters"], {"all": 3, "defaults": 1, "bound": 3, "pending": 0, "failed": 0})
 
     @covers_requirement("webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only")
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_repeated_render_preserves_duplicate_records_cards_jobs_and_files(self):
         self.card(1)
         duplicate = create_script(api.GalleryRecord, key=api.record_key(self.subject), persistent=True, interval=0)
@@ -271,6 +287,9 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual({path.relative_to(self.root): path.read_bytes() for path in self.root.rglob("*") if path.is_file()}, before_files)
         self.assertEqual(job.db.status, "pending")
 
+    @covers_requirement(
+        "webclient-gallery-panel::binding-overlap-warnings-are-computed-only-in-the-presenter"
+    )
     def test_accessory_match_requires_exact_equipment_and_warnings_keep_newest_five(self):
         self.actor.db.equipment = {"accessories": ["t_ring_b", "t_ring_a"]}
         binding = {"mask": ["accessories"], "snapshot": {"accessories": ["t_ring_a", "t_ring_b"]}}
@@ -286,6 +305,9 @@ class GalleryPresenterTests(EvenniaTest):
         with patch("world.art.queue._prompt_digest_or_empty", return_value=""), patch("world.art.queue.time.time", return_value=300 + number):
             return enqueue_gallery_job(self.subject, "synthetic portrait", image_id=image_id(number), binding=None, face_rect=None, requested_fields=[])
 
+    @covers_requirement(
+        "webclient-gallery-panel::pending-jobs-and-the-recorded-error-render-as-truthful-synthetic-rows"
+    )
     def test_pending_bound_dedupe_and_offline_failed_settlement(self):
         for number in range(1, 11):
             self.job(number)
@@ -308,6 +330,9 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(value, gallery_presenter(self.context))
         self.assertEqual(len(api.cards_for(self.subject)), 1)
 
+    @covers_requirement(
+        "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media"
+    )
     def test_missing_and_symlink_files_are_omitted(self):
         first = self.card(1)
         second = self.card(2)
@@ -319,6 +344,9 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(value["cards"], [])
         self.assertEqual(value["filters"]["all"], 0)
 
+    @covers_requirement(
+        "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
+    )
     def test_selection_is_transport_owned_and_retired_by_real_unpuppet_signal(self):
         a, b = self.make_session(), self.make_session()
         selected = "portrait:monster:t_beast"
@@ -346,6 +374,9 @@ class GalleryPresenterTests(EvenniaTest):
         _coordinator_for(a, other)
         self.assertIsNone(a.ndb.gallery_selection)
 
+    @covers_requirement(
+        "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
+    )
     def test_deleted_selected_character_falls_back_without_writing(self):
         other = create_object(NPC, key="待刪角色")
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_deleted"}
