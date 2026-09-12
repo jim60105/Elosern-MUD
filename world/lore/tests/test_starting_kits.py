@@ -159,6 +159,42 @@ class SubraceStartingKitTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown subrace"):
             _validate_starting_kit_coverage(unknown)
 
+    @covers_requirement(
+        "player-character-creation::custom-activation-grants-the-chosen-subrace-s-basic-starting-kit"
+    )
+    def test_colliding_or_accessory_overflowing_kit_fails_at_registry_load(self):
+        # Scenario "A colliding or accessory-overflowing kit fails at registry
+        # load" (custom-kit-worn-at-activation): once custom activation wears
+        # every kit item, an unwearable kit is a failed player activation, so
+        # the wearable-set rules run at load. Pinning the coverage validator is
+        # pinning the import: _validate_starting_kit_coverage is the module-
+        # level call that makes importing world.lore.starting_kits raise.
+        colliding = SubraceStartingKit(
+            # plain_sword and hunters_longbow are both weapon_main items.
+            "human_plains",
+            (("plain_sword", 1), ("hunters_longbow", 1)),
+        )
+        overflowing = SubraceStartingKit(
+            # Six carried accessories exceed ACCESSORY_MAX_SLOTS (5).
+            "human_plains",
+            (
+                ("wolf_fang_necklace", 1),
+                ("pilgrim_medallion", 1),
+                ("protective_ring", 1),
+                ("prism_charm", 1),
+                ("storage_pouch", 1),
+                ("gliding_cloak", 1),
+            ),
+        )
+        for name, kit in (("colliding", colliding), ("overflowing", overflowing)):
+            with self.subTest(kit=name):
+                with self.assertRaisesRegex(ValueError, "starting kit"):
+                    _validate_starting_kit("human_plains", kit)
+                registry = dict(SUBRACE_STARTING_KIT_REGISTRY)
+                registry["human_plains"] = kit
+                with self.assertRaisesRegex(ValueError, "starting kit"):
+                    _validate_starting_kit_coverage(registry)
+
     def test_inventory_list_flattens_by_quantity_in_declared_order(self):
         kit = SubraceStartingKit(
             "human_plains",

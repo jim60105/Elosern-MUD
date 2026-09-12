@@ -641,9 +641,6 @@ def activate_player_character(
         )
     else:
         skills_value, proficiency_value = {"active": [], "passive": []}, {}
-        # Custom mode never declares worn gear: the subrace kit stays
-        # entirely unequipped (preset-starting-equipment non-goal).
-        starting_equipment: tuple[str, ...] = ()
         # Custom mode hands out the chosen subrace's basic starting kit
         # (add-subrace-starting-kits D2). Load-time coverage guarantees the
         # lookup succeeds; the guarded get keeps even a future registry bug
@@ -652,6 +649,15 @@ def activate_player_character(
         if kit is None:
             raise CharacterCreationError("subrace has no registered starting kit")
         inventory_value = kit.inventory_list()
+        # Every kit item is worn at activation (custom-kit-worn-at-activation
+        # D2): the derived starting_equipment is the kit's own keys, so the
+        # shared toggle loop below wears them exactly like a preset loadout —
+        # same position, same all-or-nothing transaction, same buff and
+        # gauge-ceiling machinery. The guarded lookup above fired first, so
+        # the derivation only sees a resolved kit, and both still precede
+        # every write. Load-time kit validation guarantees the set is fully
+        # wearable (no singleton collision, no accessory overflow).
+        starting_equipment = tuple(key for key, _ in kit.items)
     attribute_values = {
         "age": validated.age,
         "apparent_age": validated.apparent_age,

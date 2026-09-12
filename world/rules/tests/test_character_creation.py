@@ -246,6 +246,16 @@ _PACK_TRINKET = make_item(
     modifier_key=_PLAIN_MODIFIER_KEY,
 )
 
+# The custom worn-kit fixture pair: a subrace whose scoped kit spans one
+# row per slot role (main/offhand/armor/accessory) so the whole-kit
+# activation test exercises every wearing branch at once.
+_WORN_KIT_SUBRACE = make_subrace("t_clad_folk_kin")
+_OFFHAND_ROW = make_item(
+    "t_hush_fang",
+    equipment_slot=EquipmentSlot.WEAPON_OFF,
+    modifier_key=_PLAIN_MODIFIER_KEY,
+)
+
 # The deep preset card: a kit preset declaring the tree's crown, so
 # activation closes the chain and seeds each unsatisfied edge.
 _DEEP_PRESET = replace(
@@ -790,17 +800,92 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(character.traits.all(), [])
 
     @covers_requirement("player-character-creation::custom-activation-grants-the-chosen-subrace-s-basic-starting-kit")
-    def test_custom_activation_leaves_every_equipment_slot_empty(self):
-        activate_player_character(self.account, self.character, self.request())
+    def test_custom_activation_wears_the_whole_subrace_kit(self):
+        # Scenario "A custom character wakes with its subrace kit" as
+        # reversed by custom-kit-worn-at-activation: every kit item lands in
+        # the slot its ItemDefinition.equipment_slot resolves to, through the
+        # same toggle loop presets use. The fixture kit is deliberately
+        # multi-item (weapon_main + weapon_off + buffed accessory + capped
+        # armor — one collision-clean row per slot) because custom
+        # activations exercise toggle_equipment, its buff attachment, and the
+        # gauge-ceiling recompute for the first time (design D2).
+        kit = SubraceStartingKit(
+            _WORN_KIT_SUBRACE.key,
+            (
+                (_NEUTRAL_WEAPON.key, 1),
+                # Quantity 2 pins the derivation: starting_equipment comes
+                # from the kit's one entry per key, never from the flattened
+                # inventory (a repeated key would toggle the item on and off).
+                (_OFFHAND_ROW.key, 2),
+                (_BEADS_ROW.key, 1),
+                (_PLATEMAIL_ROW.key, 1),
+            ),
+        )
+        with synthetic_registries(
+            "races",
+            "subraces",
+            "starting_kits",
+            "items",
+            extra={
+                "subraces": {_WORN_KIT_SUBRACE.key: _WORN_KIT_SUBRACE},
+                "starting_kits": {_WORN_KIT_SUBRACE.key: kit},
+                "items": {
+                    _OFFHAND_ROW.key: _OFFHAND_ROW,
+                    _NEUTRAL_WEAPON.key: _NEUTRAL_WEAPON,
+                    _PLATEMAIL_ROW.key: _PLATEMAIL_ROW,
+                    _BEADS_ROW.key: _BEADS_ROW,
+                },
+            },
+        ):
+            allocations = balanced_allocations(_race_key(), _WORN_KIT_SUBRACE.key)
+            observed: list[str] = []
+            activate_player_character(
+                self.account, self.character,
+                self.request(
+                    subrace=_WORN_KIT_SUBRACE.key, allocations=allocations
+                ),
+                write_observer=observed.append,
+            )
+        # Every kit item occupies its registry-resolved slot.
         self.assertEqual(
             dict(self.character.db.equipment),
             {
-                _SLOT_MAIN: None,
-                _SLOT_OFF: None,
-                _SLOT_ARMOR: None,
-                _SLOT_ACCESSORIES: [],
+                _SLOT_MAIN: _NEUTRAL_WEAPON.key,
+                _SLOT_OFF: _OFFHAND_ROW.key,
+                _SLOT_ARMOR: _PLATEMAIL_ROW.key,
+                _SLOT_ACCESSORIES: [_BEADS_ROW.key],
             },
         )
+        # Worn items remain in canonical inventory, exactly at kit quantities.
+        self.assertEqual(
+            self.character.db.inventory,
+            [
+                key
+                for key, qty in kit.items
+                for _ in range(qty)
+            ],
+        )
+        # The beads' attached buff is present EXACTLY once for the multi-item
+        # kit: one instance key with one stack and the definition the
+        # rulebook row attaches (the idempotence surface a consumer reads).
+        instance_key = f"{_BUFF_ENTRY.attached_buffs[0]}:{_BEADS_ROW.key}"
+        self.assertIn(instance_key, self.character.db.buffs)
+        self.assertEqual(len(self.character.db.buffs), 1)
+        self.assertEqual(self.character.db.buffs[instance_key]["stacks"], 1)
+        self.assertEqual(
+            self.character.db.buffs[instance_key]["definition_key"],
+            _BUFF_ENTRY.attached_buffs[0],
+        )
+        # The capped armor's gauge ceiling applies from activation: the sole
+        # writer recomputes the hp ceiling's mod from scratch as exactly the
+        # worn set's cap against the final traits.
+        self.assertEqual(self.character.traits.hp.mod, _CAP_ENTRY.gauge_caps["hp"])
+        # The shared stage fired exactly once, AFTER the inventory write the
+        # toggle preflight depends on (an observed stage means a real
+        # completed toggle sequence).
+        self.assertEqual(observed.count("starting_equipment"), 1)
+        self.assertLess(observed.index("inventory"), observed.index("starting_equipment"))
+        self.assertFalse(self.character.creation_pending)
 
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):
         self.character.db.guild_rank = "preserve-me"
