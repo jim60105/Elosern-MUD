@@ -38,10 +38,10 @@
 
 ## 5. 資料測試（目錄結構與宣稱資料）
 
-- [ ] 5.1 同 `test_registry_structure.py`：持有面唯一性案——展平 `PLAYER_PRESET_REGISTRY` 每個 preset 的 `active_skills` ＋ `passive_skills`（掃描完整性計數校驗），斷言宣稱該 key 者恰為 `yuna_darknight`；`patch.dict` 注入假設性第二宣稱者證明邏輯具名失敗。措辭與 spec 同：僅宣稱**authored preset** 面。
-- [ ] 5.2 同模組：半移籍負向案——只在 `SKILL_REGISTRY` 存在該 key 而目錄缺行時，比對失敗並具名 `divine_sexual_arts`。
-- [ ] 5.3 `world/lore/tests/test_player_presets.py`：悠奈 kit 展平後含該 key 且其精靈血統通過 `can_use_divine_arts` 校驗（該 key 改由目錄安裝後 kind／divine 閘門路徑不變）。
-- [ ] 5.4 確認 `.github/evennia-shards.json` 零變動（全部擴充既有已註冊模組），跑 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`。
+- [x] 5.1 同 `test_registry_structure.py`：持有面唯一性案——展平 `PLAYER_PRESET_REGISTRY` 每個 preset 的 `active_skills` ＋ `passive_skills`（掃描完整性計數校驗），斷言宣稱該 key 者恰為 `yuna_darknight`；`patch.dict` 注入假設性第二宣稱者證明邏輯具名失敗。措辭與 spec 同：僅宣稱**authored preset** 面。
+- [x] 5.2 同模組：半移籍負向案——只在 `SKILL_REGISTRY` 存在該 key 而目錄缺行時，比對失敗並具名 `divine_sexual_arts`。
+- [x] 5.3 `world/lore/tests/test_player_presets.py`：悠奈 kit 展平後含該 key 且其精靈血統通過 `can_use_divine_arts` 校驗（該 key 改由目錄安裝後 kind／divine 閘門路徑不變）。
+- [x] 5.4 確認 `.github/evennia-shards.json` 零變動（全部擴充既有已註冊模組），跑 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`。
 
 ## 6. 文件、驗證與 sync 尾步
 

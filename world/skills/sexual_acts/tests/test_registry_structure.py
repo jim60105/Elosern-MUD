@@ -22,6 +22,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS, GENERIC_BODY_PART
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.rules.rulebook.schema import load_rules
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
 from world.skills import handler
@@ -1058,3 +1059,72 @@ class OwnershipDriftGuardTests(EvenniaTestCase):
             entity.attributes.get("sexual_traits", default=None, category="traits"),
             "owned_keys() must not materialize the sexual handler",
         )
+
+
+class HalfMigrationAgreementTests(unittest.TestCase):
+    """The exclusion set no longer hides a half-migrated registry (tasks 5.2)."""
+
+    def test_registry_missing_the_catalog_row_fails_the_agreement_check(self):
+        # The pre-integration exclusion for divine_sexual_arts is gone: with
+        # only the catalogue row removed (SKILL_REGISTRY still categorising
+        # the key SEXUAL_ACT), the comparison fails naming the key.
+        removed = SEXUAL_ACT_REGISTRY.pop("divine_sexual_arts")
+        try:
+            with self.assertRaises(AssertionError) as caught:
+                check_registries_agree(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
+        finally:
+            SEXUAL_ACT_REGISTRY["divine_sexual_arts"] = removed
+        self.assertIn("divine_sexual_arts", str(caught.exception))
+
+
+class SoleDivineArtsClaimantTests(unittest.TestCase):
+    """Only Yuna's authored preset claims the signature act (tasks 5.1).
+
+    The scan covers the authored preset surface only — the sole shipped
+    authored skill-kit surface today, since shipped NPC companions build from
+    preset cards. It makes no claim about arbitrary runtime ``db.skills``
+    writes.
+    """
+
+    _CLAIMED_KEY = "divine_sexual_arts"
+
+    def _claimants(self, registry) -> list[str]:
+        return sorted(
+            preset.key
+            for preset in registry.values()
+            if self._CLAIMED_KEY in (*preset.active_skills, *preset.passive_skills)
+        )
+
+    def test_yuna_is_the_sole_claimant(self):
+        self.assertEqual(self._claimants(PLAYER_PRESET_REGISTRY), ["yuna_darknight"])
+
+    def test_a_second_hypothetical_claimant_fails_the_uniqueness(self):
+        intruder = replace(
+            PLAYER_PRESET_REGISTRY["elysa_snow"],
+            key="hypothetical_claimant",
+            active_skills=(self._CLAIMED_KEY,),
+            passive_skills=(),
+        )
+        with patch.dict(PLAYER_PRESET_REGISTRY, {"hypothetical_claimant": intruder}):
+            claimants = self._claimants(PLAYER_PRESET_REGISTRY)
+        self.assertEqual(claimants, ["hypothetical_claimant", "yuna_darknight"])
+
+    def test_the_scan_input_resolves_against_the_live_registry(self):
+        # Count-check: every name the uniqueness scan reads (each preset's
+        # full active+passive kit) is a live SKILL_REGISTRY key, so the
+        # flattened claim list cannot silently be scanning stale names.
+        claimed = [
+            (preset.key, key)
+            for preset in PLAYER_PRESET_REGISTRY.values()
+            for key in (*preset.active_skills, *preset.passive_skills)
+        ]
+        # The flattening itself loses nothing: one entry per declared name.
+        self.assertEqual(
+            len(claimed),
+            sum(
+                len(preset.active_skills) + len(preset.passive_skills)
+                for preset in PLAYER_PRESET_REGISTRY.values()
+            ),
+        )
+        for _preset_key, key in claimed:
+            self.assertIn(key, SKILL_REGISTRY)
