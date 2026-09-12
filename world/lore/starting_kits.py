@@ -31,9 +31,9 @@ SUBRACE_STARTING_KIT_REGISTRY: dict[str, SubraceStartingKit] = {
     for kit in (
         _kit("human_royal", "gilded_saber", "chainmail", "silver_hairpin"),
         _kit("human_noble", "knight_blade", "leather_armor", "silver_hairpin"),
-        _kit("human_wealthy", "knight_blade", "chainmail", "silver_hairpin"),
-        _kit("human_commoner", "plain_sword", "leather_armor"),
-        _kit("human_laborer", "wooden_club", "leather_armor"),
+        _kit("human_coastal", "plain_sword", "leather_armor", "iron_dagger"),
+        _kit("human_plains", "plain_sword", "leather_armor", "silver_hairpin"),
+        _kit("human_highland", "plain_sword", "leather_armor", "hunting_throwing_axe"),
         _kit("fionnen", "hunters_longbow", "leather_armor"),
         _kit("ciaran", "ashen_scimitar", "leather_armor"),
         _kit("eolas", "apprentice_focus_staff", "mage_robe", "prism_charm"),

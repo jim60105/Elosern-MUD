@@ -114,7 +114,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -143,7 +143,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
                 starting_items=(("plain_sword", 1), ("hunters_longbow", 1),
                                 ("leather_armor", 1), ("healing_potion", 2),
@@ -233,7 +233,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -258,7 +258,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -297,7 +297,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -340,7 +340,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -366,7 +366,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -391,7 +391,7 @@ class PlayerPresetTests(unittest.TestCase):
         # instead of silently inheriting DEFAULT_SEX.
         with self.assertRaisesRegex(TypeError, "sex"):
             PlayerPreset(
-                "x", "x", 18, 18, "human", "human_commoner", (), "e"
+                "x", "x", 18, 18, "human", "human_plains", (), "e"
             )
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
@@ -416,7 +416,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -516,7 +516,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -555,7 +555,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -703,7 +703,7 @@ class StartingCompanionDeclarationTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e",
+                subrace="human_plains", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
