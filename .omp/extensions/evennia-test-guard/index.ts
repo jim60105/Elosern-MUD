@@ -41,12 +41,19 @@ const TESTRUNNER_FLAG =
  * only. Shell quoting such as `evennia 'test'` still runs the real
  * `evennia test`, so literal-text detection must not be evadable with
  * quotes or escapes. Stripping them is a conservative
- * over-approximation: it can only make more commands enter the
- * fail-closed classification below, never fewer. Classification of the
- * executed text always uses the raw segments.
+ * over-approximation, and the detection gate tests BOTH the raw and the
+ * neutralized view (union), so detection is a strict superset of
+ * raw-text detection. Classification of the executed text always uses
+ * the raw segments.
+ *
+ * A `$` directly before a quote is stripped first so ANSI-C quoting
+ * (`evennia $'test'`) is neutralized too — at argv level `$'test'`
+ * tokenizes to the `test` subcommand.
  */
 function neutralizeQuoting(command: string): string {
-  return command.replace(/["'\\]/g, "");
+  return command
+    .replace(/\$(?=['"])/g, "")
+    .replace(/["'\\]/g, "");
 }
 
 type ShellScanResult =
@@ -233,7 +240,10 @@ function scanShell(command: string): ShellScanResult {
 function analyzeCommand(command: string): CommandAnalysis {
   const neutralized = neutralizeQuoting(command);
 
-  if (!EVENNIA_TEST_ANYWHERE.test(neutralized)) {
+  if (
+    !EVENNIA_TEST_ANYWHERE.test(neutralized) &&
+    !EVENNIA_TEST_ANYWHERE.test(command)
+  ) {
     return {
       kind: "not-evennia-test",
     };
