@@ -18,6 +18,14 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC
+from typeclasses.rooms import Room
+from world.skills.handler import ConferredSkillGrant
+from world.rules.affinity import AffinitySource, apply_affinity_change
+from world.rules.affinity_config import load_config
+from world.rules.cast_settlement import settle_out_of_combat_cast
+from world.rules.clock import WorldClock, _EVENT_SOURCES
+from world.rules.event_log import EventEntry
 from world.quests.catalog import register_catalog
 from world.rules.action import (
     ActionRequest,
@@ -29,13 +37,26 @@ from world.rules.action import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.sexual_resist import ResistVerdict
-from world.rules.sexual_state import climax_settlement_action
+from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, climax_settlement_action
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY, unlocked_act_keys_for
 from world.skills.sexual_acts.divine import DIVINE_ACTS
 
 _DIVINE_KEYS = ("divine_extreme_climax_command", "divine_timed_copulation", "divine_realm_drain")
+
+# The integrated eighth row's key (integrate-divine-sexual-arts-catalog).
+_GATED_KEY = "divine_sexual_arts"
+# The seven 神之秘法 acts that shipped ungated before the integration.
+_UNLOCKED_DIVINE_KEYS = (
+    "divine_extreme_climax_command",
+    "divine_timed_copulation",
+    "divine_realm_drain",
+    "divine_sensitivity_creation",
+    "divine_shame_deprivation",
+    "divine_absolute_submission",
+    "divine_purity_restoration",
+)
 
 
 def _verdict(resisted: bool) -> ResistVerdict:
@@ -518,3 +539,192 @@ class DivineHandlerDirectTests(EvenniaTest):
         )
         self.assertFalse(fake_skill.requires_divine_arts)
         self.assertEqual(fake_skill.parsed_effects[0].__class__.__name__, "DivinePleasureMaxEffect")
+
+
+class DivineSexualArtsOwnershipTests(EvenniaTest):
+    """Only base ownership grants the integrated eighth row (D6).
+
+    Covers the ownership-exclusion trio (tasks 4.2): a fresh holder-less elf,
+    both derivation branches at their strongest, and a confer-only entity.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+
+    def test_fresh_divine_capable_elf_does_not_own_the_gated_act(self):
+        elf = _entity("gated non-holder", race="elf")
+        owned = elf.skills.owned_keys()
+        self.assertNotIn(_GATED_KEY, owned)
+        for key in _UNLOCKED_DIVINE_KEYS:
+            with self.subTest(key=key):
+                self.assertIn(key, owned)
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = ActionResolver.resolve(
+                ActionRequest(
+                    elf, _GATED_KEY, [elf], RoomActionContext(None, {})
+                )
+            )
+        self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
+
+    def test_both_derivation_branches_skip_the_gated_row(self):
+        # Counter branch at full saturation: every LIFETIME counter maxed.
+        saturated = {counter: 9_999_999 for counter in _LIFETIME_COUNTER_KEYS}
+        derived = unlocked_act_keys_for(frozenset({"other_holder"}), saturated)
+        self.assertNotIn(_GATED_KEY, derived)
+        # Mastery blanket branch: the blanket covers counter-gated rows only.
+        mastery_holder = _entity("blanket holder", race="elf")
+        mastery_holder.db.skills = {"active": ["divine_sexual_mastery"], "passive": []}
+        owned = set(mastery_holder.skills.owned_keys())
+        self.assertIn("shame_full_expose", owned)
+        self.assertNotIn(_GATED_KEY, owned)
+
+    def test_confer_is_never_an_acquisition_path(self):
+        # The negative scenario (round-2 blocker): a grant-only entity stays
+        # rejected. conferred_grants() feeds effective_value only;
+        # _step1_ownership reads owned_keys(), which is base + derived.
+        holder = _entity("granted-only caster", race="elf")
+        holder.db.skill_grants = [
+            ConferredSkillGrant(
+                source_key="someone", skill_key=_GATED_KEY, scale=1.0
+            )
+        ]
+        self.assertNotIn(_GATED_KEY, holder.skills.owned_keys())
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = ActionResolver.resolve(
+                ActionRequest(
+                    holder, _GATED_KEY, [holder], RoomActionContext(None, {})
+                )
+            )
+        self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
+
+
+class DivineSexualArtsCastTests(EvenniaTest):
+    """The eighth row through the full resolver: gate, target scope, resist."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.actor = _entity("gated caster", race="elf")
+        self.actor.db.skills = {"active": [_GATED_KEY], "passive": []}
+        self.actor.location = self.room1
+        self.target = _entity("gated target")
+        self.target.location = self.room1
+
+    def _cast(self, targets):
+        return ActionResolver.resolve(
+            ActionRequest(
+                self.actor,
+                _GATED_KEY,
+                targets,
+                RoomActionContext(self.actor.location, {}),
+            )
+        )
+
+    def _resist_entries(self, result):
+        return [
+            entry for entry in result.event_log.entries if entry.kind == "sexual_resist"
+        ]
+
+    def test_owner_cast_complies_and_applies_the_event_to_the_target_only(self):
+        # Deterministic lower bound of stimulus_applied's +8..+14 delta.
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast([self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertGreaterEqual(self.target.sexual.pleasure.base, 8)
+        self.assertEqual(self.actor.sexual.pleasure.base, 0)
+
+    def test_complied_cast_logs_exactly_one_resist_entry(self):
+        # The resist gate fires now that the act is cataloged (intended fix
+        # D3): a compliant outcome is recorded, not skipped.
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast([self.target])
+        entries = self._resist_entries(result)
+        self.assertEqual(len(entries), 1)
+        self.assertIs(entries[0].data["resisted"], False)
+        self.assertEqual(entries[0].target, str(self.target.key))
+
+    def test_resisted_cast_succeeds_with_no_event_applied(self):
+        with patch(
+            "world.rules.sexual_resist.resist_verdict",
+            return_value=_verdict(True),
+        ):
+            result = self._cast([self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.target.sexual.pleasure.base, 0)
+        entries = self._resist_entries(result)
+        self.assertEqual(len(entries), 1)
+        self.assertIs(entries[0].data["resisted"], True)
+
+    def test_divine_gate_rejects_before_the_resist_verdict(self):
+        # Race gate is checked first: the resist dice never roll for an
+        # ineligible bloodline, even one carrying the key in base skills.
+        human = _entity("human holder")
+        human.db.skills = {"active": [_GATED_KEY], "passive": []}
+        human.location = self.room1
+        with patch("world.rules.sexual_resist.resist_verdict") as spy:
+            result = ActionResolver.resolve(
+                ActionRequest(
+                    human,
+                    _GATED_KEY,
+                    [self.target],
+                    RoomActionContext(self.room1, {}),
+                )
+            )
+        self.assertIs(result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+        spy.assert_not_called()
+
+
+class DivineSexualArtsCoercionSettlementTests(EvenniaTest):
+    """The cataloged row reaches the out-of-combat coercion scan (tasks 4.4).
+
+    The scan keys on the ``sexual_resist`` entry contract, not a skill
+    allowlist — before the integration the row was invisible to the gate, so
+    a forced divine_sexual_arts cast could never penalize. This is the new
+    coverage the catalog row unlocks, run against the real shipped registry.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.penalty = load_config().sexual_forced_penalty
+        self.room = create_object(Room, key="gated chamber")
+        self.actor = create_object(
+            PlayerCharacter, key="gated yuna", location=self.room
+        )
+        self.actor.race = "elf"
+        self.actor.apply_race_baseline()
+        # Yuna's signature kit, read straight from the authored card.
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        self.actor.db.skills = PLAYER_PRESET_REGISTRY["yuna_darknight"].skill_lists()
+        self.npc = create_object(NPC, key="gated npc", location=self.room)
+        self.npc.race = "elf"
+        self.npc.apply_race_baseline()
+        self.npc.traits.hp.base = 100
+        self.npc.traits.hp.current = 100
+        apply_affinity_change(
+            self.npc, self.actor, AffinitySource.QUEST_COMPLETION, 73
+        )
+        self.clock = WorldClock()
+
+    def test_forced_gated_cast_penalizes_npc_affinity(self):
+        request = ActionRequest(
+            self.actor, _GATED_KEY, [self.npc], RoomActionContext(self.room, {})
+        )
+        # roll=1: the resist contest fails -> resisted=False, auto_comply=False
+        # (the companion is not party-bound here), the forced-outcome shape.
+        with patch("world.rules.action.roll_d100", return_value=1):
+            settlement = settle_out_of_combat_cast(request, clock=self.clock)
+        self.assertEqual(settlement.result.outcome, "success")
+        entries = [
+            entry
+            for entry in settlement.result.event_log.entries
+            if entry.kind == "sexual_resist"
+        ]
+        self.assertEqual(len(entries), 1)
+        self.assertIs(entries[0].data["resisted"], False)
+        self.assertIs(entries[0].data["auto_comply"], False)
+        self.assertEqual(
+            self.npc.relations.affinity_for(self.actor), 73 - self.penalty
+        )

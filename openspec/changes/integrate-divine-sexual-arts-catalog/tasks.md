@@ -31,10 +31,10 @@
 
 ## 4. 行為測試（綠色基線上新增）
 
-- [ ] 4.1 `world/rules/tests/test_sexual_act_effects.py`：target 通道邊界案——(a) 唯一目標抵抗成功 → cast 成功、事件未發射、無 `RejectedAction`；(b) 假設性 `sexual_event_target:` AREA 對三個非 actor 目標 → 呼叫三次且不含 actor。
-- [ ] 4.2 同模組或 cast-wiring 模組：ownership 排他三案——(a) 新建非悠奈精靈：`owned_keys()` 無該 key、cast → `_step1_ownership` 拒；(b) 計數器飽和者與注入 `SexualMasteryEffect` 持有者的兩條派生分支仍不含它；(c) **負向**：`patch` 使該 key 只出現在 `conferred_grants()` → `owned_keys()` 仍無它、cast 仍被拒（confer 永遠不是取得途徑）。
-- [ ] 4.3 抵抗閘案：(a) `divine_sexual_arts` 的 cast 產生一條 `sexual_resist` EventLog entry（閘門開火）；(b) 非神性血統持有者施放 → `_step1_divine_arts_gate` 先拒、抵抗擲骰未發生（patch `resist_verdict` 斷言未被呼叫）。
-- [ ] 4.4 `world/rules/tests/test_cast_settlement_sexual_coercion.py` 面：用 preset 建構的悠奈當 actor（非假設性合成列）跑 `resisted=False`、`auto_comply=False` 結算，照既有規則扣 NPC 親和（該招進冊後才可能發生，屬新覆蓋）。
+- [x] 4.1 `world/rules/tests/test_sexual_act_effects.py`：target 通道邊界案——(a) 唯一目標抵抗成功 → cast 成功、事件未發射、無 `RejectedAction`；(b) 假設性 `sexual_event_target:` AREA 對三個非 actor 目標 → 呼叫三次且不含 actor。
+- [x] 4.2 同模組或 cast-wiring 模組：ownership 排他三案——(a) 新建非悠奈精靈：`owned_keys()` 無該 key、cast → `_step1_ownership` 拒；(b) 計數器飽和者與注入 `SexualMasteryEffect` 持有者的兩條派生分支仍不含它；(c) **負向**：`patch` 使該 key 只出現在 `conferred_grants()` → `owned_keys()` 仍無它、cast 仍被拒（confer 永遠不是取得途徑）。
+- [x] 4.3 抵抗閘案：(a) `divine_sexual_arts` 的 cast 產生一條 `sexual_resist` EventLog entry（閘門開火）；(b) 非神性血統持有者施放 → `_step1_divine_arts_gate` 先拒、抵抗擲骰未發生（patch `resist_verdict` 斷言未被呼叫）。
+- [x] 4.4 `world/rules/tests/test_cast_settlement_sexual_coercion.py` 面：用 preset 建構的悠奈當 actor（非假設性合成列）跑 `resisted=False`、`auto_comply=False` 結算，照既有規則扣 NPC 親和（該招進冊後才可能發生，屬新覆蓋）。
 
 ## 5. 資料測試（目錄結構與宣稱資料）
 
