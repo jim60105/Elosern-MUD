@@ -32,6 +32,9 @@ module-level mapping keys plus complete display-field values, add rulebook YAML
 catalog keys, then subtract ``tools/test_data_lint_deny.json`` (rule-bound entries,
 each with a reason and scanner regression). Display tokens are complete harvested
 field values, never substrings.
+Derivation runs in a fresh subprocess so the universe is the cold-process one in
+every host process, independent of what the caller (e.g. a warm test suite)
+already imported.
 """
 
 from __future__ import annotations
@@ -249,12 +252,45 @@ def _rulebook_keys(root: Path) -> set[str]:
     return keys
 
 
+#: Wire schema version for the cold-derivation subprocess payload.
+UNIVERSE_WIRE_VERSION = 1
+UNIVERSE_WIRE_FIELDS = (
+    "version",
+    "tokens",
+    "symbols",
+    "denied",
+    "raw_tokens",
+    "skipped_modules",
+)
+
+
 def derive_universe(root: Path) -> Universe:
-    """Derive the shipped-content token universe + catalog symbols (design D1)."""
-    # Evennia's bootstrap and catalog imports print operator warnings to stdout;
-    # swallow the chatter so ``--json``/``report`` output stays machine-clean.
-    with contextlib.redirect_stdout(io.StringIO()):
-        universe = _derive_universe(root)
+    """Derive the shipped-content token universe + catalog symbols (design D1).
+
+    Derivation executes in a FRESH interpreter, not the calling process. The
+    harvest imports every catalog module and reads live mapping contents, so a
+    warm host process (the evennia/top-level test suite imports modules that
+    register shipped-mutation rows into catalogs at import, e.g.
+    ``world.rules.disengage`` filling ``SKILL_REGISTRY``) would silently widen
+    the universe beyond the cold-process semantics the freeze ledger was
+    classified against. A cold child makes the derivation deterministic in
+    every host process order.
+    """
+    child = subprocess.run(
+        [sys.executable, "-m", "tools.test_data_lint", "derive-json"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if child.returncode != 0:
+        sys.stderr.write(child.stderr)
+        raise SystemExit(
+            f"test_data_lint: cold universe derivation failed "
+            f"(child exit {child.returncode})"
+        )
+    if child.stderr:
+        sys.stderr.write(child.stderr)
+    universe = _universe_from_wire(child.stdout)
     if universe.skipped_modules:
         print(
             "test_data_lint: catalog-data modules skipped at import (need runtime state): "
@@ -262,6 +298,65 @@ def derive_universe(root: Path) -> Universe:
             file=sys.stderr,
         )
     return universe
+
+
+def _universe_from_wire(payload: str) -> Universe:
+    """Validate the child's strict JSON wire payload and rebuild ``Universe``.
+
+    The child's stdout carries exactly this one JSON object (catalog-import
+    chatter is redirected inside the child); any deviation is a derivation
+    failure, never a silent universe change.
+    """
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"test_data_lint: derivation payload is not JSON: {error}") from error
+    if not isinstance(parsed, dict) or tuple(sorted(parsed)) != tuple(sorted(UNIVERSE_WIRE_FIELDS)):
+        raise SystemExit(
+            "test_data_lint: derivation payload fields malformed "
+            f"(expected exactly {list(UNIVERSE_WIRE_FIELDS)})"
+        )
+    if parsed["version"] != UNIVERSE_WIRE_VERSION:
+        raise SystemExit(
+            f"test_data_lint: derivation wire version {parsed['version']!r} "
+            f"!= {UNIVERSE_WIRE_VERSION}"
+        )
+    for field_name in ("tokens", "symbols", "denied", "raw_tokens"):
+        value = parsed[field_name]
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise SystemExit(f"test_data_lint: derivation field {field_name} is not a list of strings")
+    skipped = parsed["skipped_modules"]
+    if not isinstance(skipped, list) or not all(isinstance(item, str) for item in skipped):
+        raise SystemExit("test_data_lint: derivation field skipped_modules is not a list of strings")
+    return Universe(
+        tokens=frozenset(parsed["tokens"]),
+        symbols=frozenset(parsed["symbols"]),
+        denied=frozenset(parsed["denied"]),
+        raw_tokens=frozenset(parsed["raw_tokens"]),
+        skipped_modules=tuple(skipped),
+    )
+
+
+def _derive_universe_main(root: Path) -> None:
+    """Child entrypoint: cold-derive, then print the single JSON wire payload.
+
+    Catalog/Django bootstrap prints operator warnings to stdout; redirect it
+    away BEFORE deriving so the payload is the only thing the parent reads,
+    and keep stderr (skip reports) as the human channel.
+    """
+    with contextlib.redirect_stdout(io.StringIO()):
+        universe = _derive_universe(root)
+    json.dump(
+        {
+            "version": UNIVERSE_WIRE_VERSION,
+            "tokens": sorted(universe.tokens),
+            "symbols": sorted(universe.symbols),
+            "denied": sorted(universe.denied),
+            "raw_tokens": sorted(universe.raw_tokens),
+            "skipped_modules": list(universe.skipped_modules),
+        },
+        sys.stdout,
+    )
 
 
 def _derive_universe(root: Path) -> Universe:
@@ -693,8 +788,18 @@ def main(argv: list[str] | None = None) -> int:
         sub.add_parser(name, help=help_text).add_argument("--json", action="store_true")
     seed_parser = sub.add_parser("seed", help="write the ledger from the carried classification (one-time)")
     seed_parser.add_argument("--dry-run", action="store_true")
+    sub.add_parser(
+        "derive-json",
+        help=argparse.SUPPRESS,
+        description="private child entrypoint: cold-derive the universe and "
+        "print the single JSON wire payload (used by derive_universe)",
+    )
     args = parser.parse_args(argv)
     root = args.root.resolve()
+
+    if args.command == "derive-json":
+        _derive_universe_main(root)
+        return 0
 
     if args.command == "seed":
         freeze = seed_freeze(root)
