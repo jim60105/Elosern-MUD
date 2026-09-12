@@ -84,6 +84,9 @@ synthetic fixture with invented names 竈生民).
       `sync_all` is out of scope).
 - [ ] 5.4 Grep sweep to zero — each of `human_wealthy`, `human_laborer`, `底層平民`,
       `富裕平民`, `農民與勞工`, `中小貴族`, `皇族與大貴族`, `普通平民` has no match outside
-      `.worktrees/` and `openspec/changes/archive/` (retirees of `human_commoner` outside
-      the §3.6 static-tier sites are covered by tasks 1–4 and verified by the targeted test
-      runs; the string itself legitimately survives at the §3.6 sites).
+      `.worktrees/` and `openspec/changes/archive/`. Also sweep the overview.md fullwidth
+      variant `皇族／大貴族` of §8's 皇族與大貴族 term (it is the form actually present at
+      `docs/lore/overview.md:39`), and `商人與高階冒險者` / `工匠、商人、冒險者` (the retired
+      `common_name_zh` occupation lists). Retirees of `human_commoner` outside the §3.6
+      static-tier sites are covered by tasks 1–4 and verified by the targeted test runs;
+      the string itself legitimately survives at the §3.6 sites.
