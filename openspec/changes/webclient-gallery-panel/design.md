@@ -22,8 +22,10 @@ The rail entries are derived, never stored:
    one card and no bindings.
 
 Scene-kind subjects are never listed (`art-gallery-kind-capabilities`: no
-gallery). The rail is capped (design task fixes the bound; 24 rows named in the
-validator) and truncated by these precedence groups, never mid-group.
+gallery). Reserve room for the puppet and every bestiary entry within the
+24-row bound, then fill remaining places with characters, companions first and
+numeric entity primary key as the tiebreaker. Deduplicate full subject keys.
+This is a puppet-subject world gallery, not an account roster.
 
 ## D3 — Session-scoped selection is presentation state, not game state
 
@@ -45,8 +47,7 @@ there), the presenter-side URL builder discipline of
 extension set), and chip derivation:
 
 - binding chips: one per masked slot id — `weapon_main`→主手,
-  `weapon_off`→副手, `armor`→防具, `accessories`→飾品 (server-authored labels;
-  a bound card also carries a 已綁定 chip fact).
+  `weapon_off`→副手, `armor`→防具, `accessories`→飾品 (server-authored labels).
 - face chip: 自訂臉框 when `face_rect != DEFAULT_FACE_RECT`, else 預設臉框.
 - crown fact: `is_default` from `default_image_id`.
 
@@ -105,9 +106,51 @@ unavailable.
 Cards carry no name in the stored contract, so each row's zh-TW display line is
 derived server-side (timestamp-anchored label; pending rows suffix 「生成中」).
 規則重疊提醒 travels as `binding_warnings`: the presenter takes the current
-snapshot once and lists (≤5, newest-first) every OTHER bound card of the
+snapshot once and lists (≤5, newest-first) every visible bound card of the
 subject — including the default card when it is bound — whose masked slots all
 evaluate equal to that snapshot — cards that could win display
 for the equipment being worn right now, so saving an overlapping binding risks a
 priority surprise. Condition lines are server-authored (accessories carry the
 「任一」 phrasing). No client ever evaluates a match.
+
+## D10 — Exact wire details and lifecycle
+
+The panel is available only in exploration mode. `kind` on subject rows is the
+full declared kind value (`portrait:character` or `portrait:monster`); `selected`
+and `subject_key` are full typed subject keys. A puppet lacking a named policy
+uses its reserved numeric character identity without persisting a policy.
+Malformed other candidates are skipped. Characters with a named policy are
+eligible without an existing record; account characters without a named policy
+are eligible only when their numeric subject has a record.
+
+`created_at` is a finite epoch number; labels are UTC timestamp-derived strings
+of at most 128 code points. Synthetic rows have null URL/rectangle, false
+default/binding flags, and empty chips/provenance. `error_state` is exactly
+`{code, at}` or null, with a stable 1..64-code-point identifier and finite epoch.
+`equipment_summary` is exactly the four slot keys. Single slots contain
+`{value, display_name}` (null value means no equipment); accessories contain
+`{value, display_names, equipped_count}`, with sorted keys and corresponding
+names, at most five. Names/keys are bounded to 64 code points. Warning
+`conditions` is a list of at most four nonempty strings of at most 512 code
+points. Slot matching remains exact normalized equality, including accessories;
+the requested 「任一」 display wording does not change matching semantics.
+
+The immutable selection lives on the transport's `ndb`, bound to puppet and
+coordinator epoch. The context factory copies only the selected string.
+Reset/unpuppet/switch retire it; disconnected transports are not readable, and a
+replacement transport never inherits it. The selection writer returns result
+data and never publishes; its future action adapter owns publication.
+
+`record_for(create=False)` must not consolidate records. Consolidation belongs
+to gallery writers under the existing lock. This closes a pre-existing hidden
+write in `cards_for` and the resolution chain.
+
+Unbounded character galleries retain all presentable rows. A payload exceeding
+the existing 65,536-byte limit fails closed; pagination/card caps are not silently
+introduced here. The gallery UI change must not assume unlimited payload size.
+
+Subject discovery streams live objects in primary-key order until the character
+places are filled. Sparse galleries can therefore scan the whole object table.
+This intentionally preserves custom LivingEntity subclasses and fresh membership
+instead of introducing a fixed typeclass whitelist or a stale rail cache.
+The rail bounds output, not discovery cost.

@@ -132,6 +132,7 @@ class PresentationContext:
     options_state: OptionsSnapshot | None = field(default=None)
     options_fingerprint: str | None = field(default=None)
     proposal: ProposalSnapshot | None = field(default=None)
+    gallery_subject: str | None = field(default=None)
 
 
 __all__ = [

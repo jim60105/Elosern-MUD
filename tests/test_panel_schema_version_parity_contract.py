@@ -35,6 +35,7 @@ _VUE_STORE = REPO_ROOT / "web/webclient-app/stores/elosern.js"
 # order; the coverage test below fails if the registry ever grows a panel that
 # is absent from this table.
 _PANEL_MODULES = (
+    ("gallery", "gallery.py"),
     ("art", "art.py"),
     ("status", "status.py"),
     ("context_actions", "combat_panel.py"),

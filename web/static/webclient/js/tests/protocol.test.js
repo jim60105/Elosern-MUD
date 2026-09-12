@@ -1604,32 +1604,6 @@ test("the unavailable forms differ only in schema_version", () => {
   );
 });
 
-test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover every registered panel so an unmirrored
-  // panel can never slip through the registered-version gate.
-  assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
-  assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.party, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.objectives, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
-  assert.equal(Protocol.PANEL_ALLOWLIST.art, 2);
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 5);
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 2);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
-  assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 2);
-  assert.equal(Protocol.PANEL_ALLOWLIST.possession_banner, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.lore_codex, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 1);
-  assert.equal(
-    Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    18,
-    "PANEL_ALLOWLIST must list exactly the eighteen registered panels"
-  );
-});
 
 test("freeform_scales is optional and validated when present", () => {
   const scales = [

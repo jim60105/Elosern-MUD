@@ -241,6 +241,7 @@
       "name": "webclient-presentation-b",
       "labels": [
         "web.webclient.presentation.tests.test_art_panel",
+        "web.webclient.presentation.tests.test_gallery_panel",
         "web.webclient.presentation.tests.test_art_push",
         "web.webclient.presentation.tests.test_character_panel",
         "web.webclient.presentation.tests.test_combat_panel",

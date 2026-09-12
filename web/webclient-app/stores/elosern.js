@@ -66,6 +66,7 @@ const TOAST_TONES = new Set(["info", "crit"]);
 // The registered production panel allowlist (mirrors the UMD allowlist in
 // elosern/protocol.js and web/webclient/presentation/protocol.py).
 const PANEL_ALLOWLIST = [
+  "gallery",
   "art",
   "status",
   "context_actions",

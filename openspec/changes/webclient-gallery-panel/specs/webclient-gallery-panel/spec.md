@@ -34,6 +34,14 @@ resolved through the monster kind's typed producer. Subjects of a kind whose
 capability declaration grants no gallery (the scene kind) SHALL never appear.
 `selected` SHALL name one entry of `subjects`.
 
+The bounded rail SHALL reserve space for the puppet and all bestiary entries,
+truncating only the character candidate list in companion-first, numeric entity
+primary-key order. Full subject keys SHALL be unique. This world gallery is not
+an account-subject roster. Malformed candidates SHALL be skipped independently.
+Named character policies SHALL be eligible even without a gallery record;
+account characters without a named policy SHALL require an existing numeric
+subject record, except the puppet whose numeric identity is always eligible.
+
 #### Scenario: Active party companions precede other characters
 
 - **WHEN** the puppet's account owns a live companion in the puppet's active party and another live character not in the party
@@ -166,6 +174,15 @@ SHALL mirror the subject kind's declaration fields the management surface needs
 `max_cards` or null). `error_state` SHALL be the record's last error code and
 timestamp or null.
 
+The exact equipment summary SHALL have `weapon_main`, `weapon_off`, `armor`,
+and `accessories`. A single slot SHALL contain exactly `{value, display_name}`,
+with a null value for no equipment. Accessories SHALL contain exactly
+`{value, display_names, equipped_count}`, sorted by Unicode code point with
+corresponding names and at most five values. Keys and display names SHALL be
+nonempty strings of at most 64 code points. `error_state` SHALL be exactly
+`{code, at}` or null; the code SHALL match `[a-z0-9_]{1,64}` and the timestamp
+SHALL be a finite epoch number within the safe JSON numeric range.
+
 #### Scenario: Monster subjects carry no binding affordances
 
 - **WHEN** the selected subject is a monster-tier subject
@@ -184,6 +201,19 @@ SHALL register `gallery: 1` in `PANEL_ALLOWLIST` and mirror every bound in an
 exact per-panel validator, and the dual-direction parity tests SHALL reject a
 payload accepted on one side and rejected on the other. Adding the panel SHALL
 be additive: no existing panel's schema or envelope changes.
+
+Both validators SHALL enforce unique canonical UUID image IDs, unique full
+subject keys, selected membership, puppet-first ordering, positive confined
+face rectangles, gallery URLs bound to the selected subject and image with the
+closed store extensions, coherent status/flags/chips/provenance, and exact
+nonnegative filter counts. Pending rows SHALL be bounded to eight and failed
+rows to one; synthetic rows SHALL have null URL/rectangle, false flags, and empty
+chips/provenance. Defaults SHALL be at most one. Labels SHALL be at most 128
+code points, chips at most 16, URLs at most 129, and warning conditions at most
+four nonempty lines of at most 512 code points. Warnings SHALL name unique
+visible bound cards in newest-first order. Lone surrogates and unsafe numbers
+SHALL be rejected. The existing 65,536-byte canonical JSON limit SHALL apply;
+an oversized character gallery SHALL fail closed, not silently truncate cards.
 
 #### Scenario: A stale client rejects rather than renders
 
