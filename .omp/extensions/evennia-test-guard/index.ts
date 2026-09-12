@@ -56,6 +56,127 @@ function neutralizeQuoting(command: string): string {
     .replace(/["'\\]/g, "");
 }
 
+/*
+ * Commands that can only display or search text. A segment led by one of
+ * these, whose "evennia test" text lives entirely inside quotes, can never
+ * execute an Evennia test, so it is inert and must not trip the guard
+ * (e.g. a commit message or grep pattern merely mentioning the words).
+ */
+const INERT_LEAD_COMMANDS = new Set([
+  "git",
+  "echo",
+  "printf",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "cat",
+  "sort",
+  "uniq",
+  "wc",
+  "head",
+  "tail",
+  "diff",
+  "cmp",
+  "comm",
+  "stat",
+]);
+
+/**
+ * Strip every quoted span (and every escape) from a segment, leaving only
+ * text the shell would treat as unquoted command structure.
+ */
+function unquotedView(segment: string): string {
+  let out = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (const ch of segment) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (quote === "'") {
+      if (ch === "'") {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (quote === '"') {
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
+/**
+ * Lead word of a segment with inline environment assignments removed,
+ * e.g. `FOO=1 git commit -m '...'` leads with `git`.
+ */
+function leadCommand(unquoted: string): string {
+  const tokens = unquoted.trim().split(/[ \t]+/);
+
+  while (
+    tokens.length > 0 &&
+    /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[0])
+  ) {
+    tokens.shift();
+  }
+
+  return tokens[0] ?? "";
+}
+
+/*
+ * A segment is an inert mention when its unquoted structure (after
+ * quote/escape stripping) mentions an Evennia test — so the real text is
+ * present — but every actual occurrence of the words sits inside quotes
+ * and the segment is led by a display/search command. Detection uses the
+ * same raw ∪ neutralized union as the gate itself, so a segment like
+ * `echo "evennia" 'test' x` whose neutralized form reads as an unquoted
+ * mention stays guarded.
+ */
+function isInertMentionSegment(segment: string): boolean {
+  const unquoted = unquotedView(segment);
+
+  if (
+    !EVENNIA_TEST_ANYWHERE.test(segment) &&
+    !EVENNIA_TEST_ANYWHERE.test(unquoted)
+  ) {
+    return false;
+  }
+
+  if (
+    EVENNIA_TEST_ANYWHERE.test(unquoted) ||
+    EVENNIA_TEST_ANYWHERE.test(neutralizeQuoting(unquoted))
+  ) {
+    return false;
+  }
+
+  return INERT_LEAD_COMMANDS.has(leadCommand(unquoted));
+}
+
 type ShellScanResult =
   | {
       ok: true;
@@ -255,6 +376,34 @@ function analyzeCommand(command: string): CommandAnalysis {
     return {
       kind: "unsupported",
       reason: scan.reason,
+    };
+  }
+
+  /*
+   * A command that merely *mentions* the words "evennia test" inside
+   * quoted arguments of a display/search command (a commit message, a
+   * grep pattern, an echo line) can never execute a test. Only treat it
+   * as inert when no segment even resembles a real or quoted test
+   * invocation, so any execution-capable context such as
+   * `bash -lc 'evennia test' && git commit -m 'evennia test'' keeps the
+   * guard.
+   */
+  if (
+    scan.segments.every(
+      (segment) =>
+        !EVENNIA_TEST_START.test(segment) &&
+        !EVENNIA_TEST_START.test(neutralizeQuoting(segment)),
+    ) &&
+    scan.segments.every(
+      (segment) =>
+        !(
+          EVENNIA_TEST_ANYWHERE.test(segment) ||
+          EVENNIA_TEST_ANYWHERE.test(neutralizeQuoting(segment))
+        ) || isInertMentionSegment(segment),
+    )
+  ) {
+    return {
+      kind: "not-evennia-test",
     };
   }
 
