@@ -51,6 +51,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
         runtime.env["ELOSERN_BROWSER_EXPLORATION"] = "1"
+        # Boot mode: SHIPPED catalogs (explicit override of the harness
+        # synthetic default, per the creation/action-feedback precedent).
+        # These journeys assert shipped fixture identity end to end and were
+        # never migrated to kit seams.
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"

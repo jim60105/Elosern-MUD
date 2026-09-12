@@ -59,6 +59,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def setUpClass(cls) -> None:
         runtime = fixtures.create_runtime(prefix="elosern-options-")
         runtime.env["ELOSERN_BROWSER_OPTIONS_SURFACE"] = "1"
+        # Boot mode: SHIPPED catalogs (explicit override of the harness
+        # synthetic default, per the creation/action-feedback precedent).
+        # These journeys assert shipped fixture identity end to end and were
+        # never migrated to kit seams.
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+
         cls.server = ManagedServer(runtime=runtime)
         cls.server.start()
         cls.base_url = f"http://127.0.0.1:{cls.server.runtime.http_port}"
