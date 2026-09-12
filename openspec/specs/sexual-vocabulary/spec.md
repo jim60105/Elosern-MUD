@@ -1,7 +1,7 @@
 # sexual-vocabulary Specification
 
 ## Purpose
-TBD - created by archiving change import-contract. Update Purpose after archive.
+Defines world/lore/sexual_vocab.py as the single canonical source of the six ordered Traditional Chinese level vocabularies (arousal, wetness, shame, exposure, climax phase, sensitivity) that SexualState is built from, matching design doc section 6.4 exactly, plus the unordered 10-member BODY_PARTS vocabulary with its GENERIC_BODY_PART sentinel and a strict no-behavior, no-dependency module boundary.
 
 ## Requirements
 

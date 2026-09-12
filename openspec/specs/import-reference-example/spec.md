@@ -1,7 +1,7 @@
 # import-reference-example Specification
 
 ## Purpose
-TBD - created by archiving change import-contract. Update Purpose after archive.
+Maintains one valid reference character card that satisfies CHARACTER_SCHEMA_V1 and every semantic rule with zero rejections, exercised by a permanent test. Requires the example to exercise every major schema branch, the persona block with a background, and the base-value stats convention.
 ## Requirements
 ### Requirement: One valid reference character card exists and stays valid
 `world/imports/examples/example_character.json` SHALL be a single character record with

@@ -1,7 +1,7 @@
 # art-gallery-kind-capabilities Specification
 
 ## Purpose
-TBD - created by archiving change gallery-kind-capabilities. Update Purpose after archive.
+Declares exactly one immutable capability record per art subject kind — gallery presence, directory segment, card maximum, equipment bindings, canonical-age precondition, and prompt-field support — as the single origin of every per-kind gallery rule. Requires the declaration to cover every kind exhaustively, import nothing, and be read by gallery enforcement instead of kind comparisons.
 ## Requirements
 ### Requirement: One closed declaration states what every subject kind's gallery may do
 `world/art/gallery_kinds.py` SHALL declare exactly one immutable capability record per art subject

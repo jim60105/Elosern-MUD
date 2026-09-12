@@ -1,7 +1,7 @@
 # import-validation Specification
 
 ## Purpose
-TBD - created by archiving change import-contract. Update Purpose after archive.
+Defines the validate.py CLI that classifies, schema-validates, and semantic-validates record files, reporting every issue by record, field, and reason with a prominent degraded-mode banner. Covers race/subrace registry resolution, plausible stat bands, sexual_baseline rejections, the pluggable skill registry, all-or-nothing batch semantics, duplicate-key rejection, key-charset checks, and race-aware affinity enforcement.
 ## Requirements
 ### Requirement: validate.py provides a CLI that validates one or more record files
 `world/imports/validate.py` SHALL be runnable as

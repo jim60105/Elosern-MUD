@@ -1,7 +1,7 @@
 # internal-art-worker Specification
 
 ## Purpose
-TBD - created by archiving change internal-art-worker. Update Purpose after archive.
+Defines the in-process SDWebUIClient that generates one image per art subject through a bounded /sdapi/v1/txt2img request driven by settings, degrading failures to bounded named error codes that carry the swallowed exception in the log. Requires prompts to be stored in the prompt library and the client to be injectable so tests never open a socket.
 ## Requirements
 ### Requirement: The internal sd-webui client generates images through txt2img with bounded validation
 `world/art/sd_worker.py` SHALL provide an in-process `SDWebUIClient` that generates one image per

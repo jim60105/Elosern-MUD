@@ -1,7 +1,7 @@
 # buff-handler-integration Specification
 
 ## Purpose
-TBD - created by archiving change buffs-rulebook. Update Purpose after archive.
+Mounts Evennia's BuffHandler on LivingEntity as a read-only entity.buffs property, replacing change 3's stand-in, and defines the buff model around it: definitions configuring rate of change, clamped bounds, and decay; conferred rate-of-change buffs consumed by pure query; a declared unbuilt seam for buff-forbidden actions; and validated effect-source identities for damaging rate buffs.
 ## Requirements
 
 ### Requirement: entity.buffs is mounted as the real BuffHandler, replacing the change-3 placeholder

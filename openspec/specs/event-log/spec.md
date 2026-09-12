@@ -1,7 +1,7 @@
 # event-log Specification
 
 ## Purpose
-TBD - created by archiving change action-resolver. Update Purpose after archive.
+Defines EventLog and EventEntry as frozen, JSON-serializable, entity-key-only records that are only exposed after a committed resolution, with an open convention for entry kinds, a deterministic plain-text renderer with no LLM involvement, and a structure suited to combat compression and pure-function narration.
 ## Requirements
 ### Requirement: EventLog and EventEntry are frozen, serializable, entity-key-only records
 `world/rules/event_log.py` SHALL define `EventEntry` and `EventLog` as frozen dataclasses whose fields

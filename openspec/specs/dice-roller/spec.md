@@ -1,7 +1,7 @@
 # dice-roller Specification
 
 ## Purpose
-TBD - created by archiving change dice-combat. Update Purpose after archive.
+Provides roll_d100() as a thin, in-range wrapper over evennia.contrib.rpg.dice, reproducible under a fixed seed, so no module under world/rules/ implements its own percentile-die logic.
 ## Requirements
 ### Requirement: d100 roller wraps evennia.contrib.rpg.dice directly
 `world/rules/dice.py` SHALL provide `roll_d100() -> int`, returning a single integer in `[1, 100]`,

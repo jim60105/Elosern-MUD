@@ -1,7 +1,7 @@
 # combat-resolution Specification
 
 ## Purpose
-TBD - created by archiving change dice-combat. Update Purpose after archive.
+Defines the dice-combat resolution formulas: to-hit against the recalibrated defender constant of 51, damage multipliers banded by margin of success with a magnitude-only critical, effective_power combining four effective stats multiplied by max HP, and agility-dominant initiative with d100 jitter. Covers the round-based turn loop's time accounting and upkeep, the actions_per_turn skip, the first-actor override, and golden fixed-seed exchange tests.
 ## Requirements
 ### Requirement: To-hit uses a recalibrated defender constant of 51, not the design doc's original 60
 `world/rules/rulebook/combat.yaml` SHALL declare `to_hit.defender_constant: 51`. A hit SHALL occur when

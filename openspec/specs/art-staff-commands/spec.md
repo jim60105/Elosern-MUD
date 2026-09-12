@@ -1,7 +1,7 @@
 # art-staff-commands Specification
 
 ## Purpose
-TBD - created by archiving change art-assets. Update Purpose after archive.
+Defines the staff-only @art command surface — status listing with filters and gallery state, run to drain the queue, retry and requeue for regeneration, options, and health reporting — each bounded so output never leaks persona text, prompt content, absolute paths, or the store root. Guarantees players have no access to any art control.
 ## Requirements
 ### Requirement: @art status lists and filters records without leaking sensitive data
 `commands/art.py::CmdArtStatus` (`@art status [scene|portrait]`) SHALL list asset records filtered by

@@ -1,7 +1,7 @@
 # skill-category-registry Specification
 
 ## Purpose
-TBD - created by archiving change skill-category-registry. Update Purpose after archive.
+Declares SkillCategory as a StrEnum of exactly eight presentation categories in fixed order, requires every SkillDef to carry a required category and optional group, and pins SKILL_REGISTRY's exact partition across the categories with group expectations per category. Classifying a skill must change no other field.
 ## Requirements
 ### Requirement: SkillCategory enumerates exactly eight presentation categories
 `world/skills/registry.py` SHALL declare `SkillCategory`, a `StrEnum` with exactly eight members in

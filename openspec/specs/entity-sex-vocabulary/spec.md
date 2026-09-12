@@ -2,8 +2,6 @@
 
 ## Purpose
 
-TBD - created by syncing change entity-sex-field. Update Purpose after archive.
-
 Defines the canonical sex vocabulary (`SEX_VALUES`/`DEFAULT_SEX`) shared between character import
 validation (`CHARACTER_SCHEMA_V1`), the living-entity typeclass attribute default
 (`LivingEntity.sex`), and the player preset registry (`PlayerPreset.sex`), so the value set has
