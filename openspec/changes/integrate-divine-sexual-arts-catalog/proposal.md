@@ -9,12 +9,12 @@
 ## What Changes
 
 - 把 `divine_sexual_arts` 從 `world/skills/registry.py` 主冊移入 `world/skills/sexual_acts/divine.py` 的 `DIVINE_ACTS`，成為第八個 hand-built `(SkillDef, SexualActDef)` 對（`requires_divine_arts=True`、`unlock={}`、`resistible=True`、無部位、無計數器）。
-- `SexualActDef` 新增 `ownership_gated: bool = False` 欄位；`unlocked_act_keys_for` 的計數分支跳過標記 `ownership_gated=True` 的行。既有 65 行全部保持 `False`，行為零變動；此欄位同時成為「簽名技」的長期可複用原語。
+- `SexualActDef`（`_builder.py`）新增 `ownership_gated: bool = False` 欄位；`unlocked_act_keys_for`（`world/skills/sexual_acts/__init__.py`）的計數與 mastery 兩分支都跳過標記 `ownership_gated=True` 的行。取得面只認 **base 持有**——`_step1_ownership` 讀 `owned_keys()`（＝base＋派生），`conferred_grants()` 本來就不是任何招式的取得途徑，本變更不擴展它。既有 65 行全部保持 `False`，行為零變動；此欄位同時成為「簽名技」的長期可複用原語。
 - 新增 `sexual_event_target:<name>` 效果字首與 `TargetSexualEventEffect`（`ActorSexualEventEffect` 的鏡像），把「僅目標受效」升格為三種事件範圍通道之一（actor／target／participant）；`divine_sexual_arts` 的 effects 改宣告 `sexual_event_target:stimulus_applied`。
 - **BREAKING**（機制面，無玩家可見資料損傷）：刪除 `_builder.py` 的 `_LEGACY_TARGET_SCOPED_EVENTS` 與 `action.py` `_handle_sexual_event` 對它的分支。三種範圍改由字首靜態決定，不再按事件名查特例表。`_FORBIDDEN_SEXUAL_EVENTS`（對 `_act_family()` 行的宣告黑名單）不動。
 - **行為變更（刻意）**：移籍後該招進入 `SEXUAL_ACT_REGISTRY`，`_step4b_sexual_resist_gate` 從此對它開火（今日因未進冊而完全跳過抵抗判定）——它的目標現在和其他七招神性技法一樣可以抵抗；抵抗成功的目標不受刺激。這是與神性線對齊的修正，以測試釘住。
 - `sexual-act-registry` 雙冊一致性結構測試的具名排除集合從 `{divine_sexual_arts, divine_sexual_mastery, reincarnation_boon_yuna}` 縮為 `{divine_sexual_mastery, reincarnation_boon_yuna}`；同時新增持有面結構測試：`PLAYER_PRESET_REGISTRY` 全部 preset 的 skill 清單中宣告 `divine_sexual_arts` 的只有悠奈（`yuna_darknight`）——「只有她持有」由 CI 防漂移。
-- 文件同步：`docs/lore/skill-trees/sexual-act.md` 頂點節將「Legacy 單招」改寫為「悠奈簽名技」定位；`world/skills/sexual_acts/divine.py` 模組 docstring 補第八招的 hand-built 理由。
+- 文件同步：`docs/lore/skill-trees/sexual-act.md` 頂點節將「Legacy 單招」改寫為「悠奈簽名技」定位；`docs/game/command-reference.md` 的該招取得描述同步（不再是泛發給血統合格角色）；`world/skills/sexual_acts/divine.py` 模組 docstring 補第八招的 hand-built 理由；`combat_view.py`／`protocol.js` 的「65 招目錄＋pre-existing divine_sexual_arts」鏡面註解改「66 招目錄」（`MAX_SKILLS = 192` 不動）。
 
 ## Capabilities
 
@@ -24,9 +24,9 @@
 
 ### Modified Capabilities
 
-- `sexual-act-registry`：`SexualActDef` 欄位清單新增 `ownership_gated`；雙冊一致性排除集合縮編為兩項（requirement 標題的「three named」改「two named」——RENAMED）；新增第八行結構、持有面唯一宣稱、效果字首解析三條 ADDED 要求。
-- `sexual-state-handler`：`unlocked_act_keys()` 派生要求補 ownership-gated 排除（計數分支與 mastery 分支皆然）——只有實際持有才授予；既有的「空 unlock 必定在場」場景加「非 ownership-gated」限定詞（requirement 標題不動）。
-- `sexual-act-effects`：`sexual_event` handler 的事件範圍解析從「participant 預設＋`_LEGACY_TARGET_SCOPED_EVENTS` 按名特例」改為「三通道字首靜態決定」（新增 `sexual_event_target:`）；legacy target-scoped 場景改寫為新字首場景（原標題的「unchanged」已假——RENAMED）。
+- `sexual-act-registry`：`SexualActDef` 欄位清單新增 `ownership_gated`；雙冊一致性排除集合縮編為兩項（requirement 標題的「three named」改「two named」——RENAMED）；新增第八行結構、持有面排他（含「confer 非取得途徑」負向案）、宣稱面唯一（限定 authored preset 面）三條 ADDED 要求。解析器契約**不**掛本 capability——歸 `sexual-act-effects`（`parse_effect` 的家）。
+- `sexual-state-handler`：`unlocked_act_keys()` 派生要求補 ownership-gated 排除（計數分支與 mastery 分支皆然）——只有 base 持有才授予；既有的「空 unlock 必定在場」場景加「非 ownership-gated」限定詞（requirement 標題不動）。
+- `sexual-act-effects`：`sexual_event` handler 的事件範圍解析從「participant 預設＋`_LEGACY_TARGET_SCOPED_EVENTS` 按名特例」改為「三通道字首靜態決定」（新增 `sexual_event_target:`，解析走既有 `_parse_single_arg`——空／雙 payload 在**解析期** `ValueError`，與 actor 前綴同款 fail-closed）；legacy target-scoped 場景改寫為新字首場景（原標題的「unchanged」已假——RENAMED）。
 - `skill-registry`：`divine_sexual_arts` 的存在性要求改寫——effects 從 `["sexual_event:stimulus_applied"]` 改為 `["sexual_event_target:stimulus_applied"]`，並註明其冊籍已遷入 `SEXUAL_ACT_REGISTRY`（`divine.py`）。
 - `divine-mystery`：血統閘門要求的措辭更新——`divine_sexual_arts` 現在同時受 `_step4b_sexual_resist_gate` 管轄（與 `divine.py` 七招一致）；`can_use_divine_arts` 閘門本身不變。
 - `sexual-catalog-divine-mutators`：條目數釘選場景更新為「恰好八對且前七對逐對不變」（requirement 標題主語仍是四招 C7b，標題不動；正文承認第八對為 ownership-gated 的 `divine_sexual_arts`）。
@@ -34,8 +34,9 @@
 
 ## Impact
 
-- **程式碼**：`world/skills/sexual_acts/divine.py`（＋第八對）、`world/skills/sexual_acts/_builder.py`（刪 `_LEGACY_TARGET_SCOPED_EVENTS`）、`world/skills/sexual_acts/registry.py`（`SexualActDef` ＋`ownership_gated` 欄位）、`world/skills/registry.py`（移除該 SkillDef）、`world/skills/effects.py`（新增 `TargetSexualEventEffect`）、`world/rules/action.py`（新 handler＋`_EFFECT_HANDLERS` 註冊、刪 legacy 分支）、`world/rules/sexual_state.py`（派生分支跳過 ownership-gated 行）。
-- **測試**：`world/skills/sexual_acts/tests/`（目錄結構測擴為八對、排除集合縮編、持有面掃描測、`OwnershipDriftGuardTests` 的派生集合**排除** ownership-gated 行——歸入**資料測試**組）、`world/rules/tests/` 與 `world/skills/tests/` 相關模組（target 字首行為案、未持有不可派生行為案、移籍後抵抗閘行為案——歸入**行為測試**組）。既有 `test_legacy_stimulus_event_stays_target_scoped` 與 `LegacyTargetScopedEventTests` 改寫為新字首路徑的等值斷言。新測試一律擴充既有已註冊模組，`.github/evennia-shards.json` 零變動。
+- **程式碼**：`world/skills/sexual_acts/divine.py`（＋第八對）、`world/skills/sexual_acts/_builder.py`（刪 `_LEGACY_TARGET_SCOPED_EVENTS`、`SexualActDef` ＋`ownership_gated` 欄位）、`world/skills/sexual_acts/__init__.py`（`unlocked_act_keys_for` 兩分支跳過 ownership-gated 行）、`world/skills/registry.py`（移除該 SkillDef）、`world/skills/effects.py`（新增 `TargetSexualEventEffect`＋解析分支）、`world/rules/action.py`（新 handler＋`_EFFECT_HANDLERS` 註冊、刪 legacy 分支）。
+- **批次紅面紀律**：第八對新增與主冊條目移除**必須同批**——`_register_rows` 對「key 已在 `SKILL_REGISTRY`」的目錄行直接 `ValueError`；同理 legacy 分支刪除與其行為測改寫必須同批。實作計畫（tasks.md）以任務群 3 為唯一原子切換點，群 1、2 純增量無紅面。
+- **測試**：`world/skills/tests/test_effects.py`（target 前綴解析案，順接既有 actor 前綴兩案的形制）、`world/rules/tests/test_sexual_act_effects.py`（target 通道、ownership 排他、confer 負向、抵抗閘——**路徑在 `world/rules/tests/`，非 `world/skills/tests/`**）、`world/skills/sexual_acts/tests/`（目錄結構測擴為八對、排除集合縮編、**兩處** seed 推導（`_SEED_KEYS` 與 no-materialization 案的條列 comprehension）都改「非 ownership_gated」、持有面掃描測——歸入**資料測試**組）。既有 `test_legacy_stimulus_event_stays_target_scoped` 與 `LegacyTargetScopedEventTests` 改寫為新字首路徑的等值斷言。新測試一律擴充既有已註冊模組，`.github/evennia-shards.json` 零變動。
 - **資料**：零遷移（未發布專案、無使用者）。`player_presets.py` 的悠奈卡不改——她的清單引用 key，key 不變。
 - **副作用（修正性）**：該招從所有人類（及所有非悠奈角色）的 `owned_keys()`／戰鬥選單消失——舊主冊時代它對人類可見但 cast 必拒；移籍加 ownership 閘門後它只對持有者可見，消除幽靈条目。
-- **不動**：`_FORBIDDEN_SEXUAL_EVENTS`、`SexualMasteryEffect` 的全解語意（對神性七招的排除照舊）、`cast-settlement-atomicity` 快照面（該招照舊寫入快照超集內實體）、`combat_view.MAX_SKILLS`（192，技能總數不變）、webclient 呈現面（悠奈清單同 key）、`sexual-act-seeds`（七顆 seed 全非 ownership-gated，其要求逐字仍真）。
+- **不動**：`_FORBIDDEN_SEXUAL_EVENTS`、`SexualMasteryEffect` 的全解語意（對神性七招的排除照舊）、`SkillHandler` 的 confer 契約（不為任何招式開放授予取得）、`cast-settlement-atomicity` 快照面（該招照舊寫入快照超集內實體）、`combat_view.MAX_SKILLS`（192，技能總數不變）、webclient 呈現面（悠奈清單同 key）、`sexual-act-seeds`（七顆 seed 全非 ownership-gated，其要求逐字仍真）。

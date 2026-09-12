@@ -62,7 +62,7 @@
 - [`_handle_sexual_event` 刪分支誤傷 65 招的 participant 預設路徑] → 分支刪除僅剩 `targets if False else participants(...)` 等值重寫；既有 `test_*_calls_apply_event_for_every_participant` 族全數保留當回歸網。
 - [持有面掃描測的掃描域停滯] → 掃描域是模組內顯式常數；新增授予通道未入域時，配套的「註冊表通道清單」斷言（列舉全部宣稱型 registry）先炸，把擴充強制成顯式動作。
 - [`divine_sexual_arts` 的 `SexualActDef` 佔位欄位被誤讀] → 沿用七招的文件化慣例：docstring＋欄位註解標明「無 `pleasure:` 效果，無碼路徑讀取」；結構測順帶釘該對的 `base_pleasure` 不被任何 effect 字串引用。
-- [traceability：RENAMED 使 canonical slug 變動、既有 `@covers_requirement` 孤兒化] → 僅兩條 requirement 走 RENAMED（排除集合「three→two named」、effects 標題的「unchanged」已假），其餘全部 MODIFIED 保留原標题（ID 不動）；兩條 RENAMED 的 5 處既有 annotation（`test_sexual_act_effects.py` 4 處、`test_registry_structure.py` 1 處）在 archive+sync 落地的同一變更尾步 re-point 到新 slug 並跑綠 `spec_traceability check`（先例：`magic-power-static-rename` P.1、repo 26 個 archived RENAMED）。
+- [traceability：RENAMED 使 canonical slug 變動、既有 `@covers_requirement` 孤兒化] → 僅兩條 requirement 走 RENAMED（排除集合「three→two named」、effects 標題的「unchanged」已假），其餘全部 MODIFIED 保留原標題（ID 不動）；兩條 RENAMED 的 5 處既有 annotation（`test_sexual_act_effects.py` 4 處、`test_registry_structure.py` 1 處）在 archive+sync 落地的同一變更尾步 re-point 到新 slug 並跑綠 `spec_traceability check`（先例：`magic-power-static-rename` P.1、repo 26 個 archived RENAMED）。
 
 ## Migration Plan
 

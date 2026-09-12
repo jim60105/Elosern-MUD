@@ -41,12 +41,15 @@ unrelated to recipient scope and remains the act-catalog emission prohibition al
 ## ADDED Requirements
 
 ### Requirement: sexual_event_target:<name> applies the named event to the resolved targets only
-`world/rules/action.py` SHALL register the `sexual_event_target:<name>` prefix (surfaces
-`frozenset({"sexual"})`, no required event context), parsed by `world/skills/effects.py`'s
-`TargetSexualEventEffect(event_name)`. The handler SHALL stage one `PendingEffect` calling
+`world/skills/effects.py`'s `parse_effect()` SHALL classify the `sexual_event_target:<name>` prefix
+into the new frozen `TargetSexualEventEffect(event_name)` dataclass via the existing
+`_parse_single_arg` helper — a missing or double payload raises `ValueError` at parse time, exactly
+like `sexual_event_actor:` (registry-construction fail-closed, never a silent use-time no-op) — and
+`world/rules/action.py` SHALL register the prefix (surfaces `frozenset({"sexual"})`, no required
+event context). The handler SHALL stage one `PendingEffect` calling
 `apply_event(target, event_name, ...)` per resolved target and SHALL never apply the event to the
 acting entity, mirroring `sexual_event_actor:<name>` with the roles exchanged. A missing or empty
-event name SHALL be rejected the same way the actor-scoped handler rejects it. An empty `targets`
+event name never reaches the handler — it fails at `SkillDef` construction. An empty `targets`
 list (a fully resisted cast) SHALL be an ordinary no-op outcome, never a rejection. The prefix SHALL
 not carry observer gating: `watched_during_activity` remains reachable only through the actor-scoped
 channel's gated vocabulary.
@@ -68,7 +71,8 @@ channel's gated vocabulary.
   AREA whose resolved targets are three entities besides the actor
 - **THEN** `apply_event` is invoked once for each of the three targets and never for the actor
 
-#### Scenario: An empty event name is rejected
-- **WHEN** a skill declaring `effects=["sexual_event_target:"]` is cast
-- **THEN** the cast is rejected with `RejectReason.EFFECT_RESOLUTION_FAILED`, mirroring the
-  actor-scoped handler's rejection
+#### Scenario: A missing event name fails closed at parse time
+- **WHEN** `parse_effect("sexual_event_target:")` or `parse_effect("sexual_event_target:a:b")` is
+  called
+- **THEN** each raises `ValueError`, matching the `sexual_event_actor:` prefix's existing
+  `_parse_single_arg` behaviour

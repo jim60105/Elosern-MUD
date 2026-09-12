@@ -86,6 +86,11 @@ applies to it exactly as it applies to the seven existing divine acts.
   `SKILL_REGISTRY["divine_sexual_arts"]` is the same `SkillDef` object surfaced by the catalogue
   import rather than a main-registry definition
 
+#### Scenario: The shipped row's parsed effect is the target-scoped event effect
+- **WHEN** `SKILL_REGISTRY["divine_sexual_arts"].parsed_effects` is inspected
+- **THEN** it equals one `TargetSexualEventEffect(event_name="stimulus_applied")` — the prefix's
+  parse contract is owned by the `sexual-act-effects` capability's parser requirement, not this one
+
 #### Scenario: The eighth act is subject to the resist gate
 - **WHEN** `divine_sexual_arts` is cast by its sole owner at a target whose resist contest resolves
   `resisted=True`
@@ -105,7 +110,10 @@ A structural-plus-behavior pair SHALL pin that an entity whose `base_owned_keys(
 `unlocked_act_keys()`/`owned_keys()` nor casts it (the `_step1_ownership` step rejects), while the
 `yuna_darknight` preset's actual ownership grants the cast. The seven shipped divine acts'
 counter-derivation behavior SHALL NOT change: only `ownership_gated=True` rows are excluded from the
-counter branch.
+counter branch. The confer/grant surface (`conferred_grants()`) SHALL NOT become an acquisition path
+for this row: `SkillHandler.owned_keys()` is base keys plus derived act keys and `_step1_ownership`
+consults it alone — the shipped ownership-only contract, restated here because the row's entire
+exclusivity rests on it.
 
 #### Scenario: A fresh elf does not derive or cast the signature act
 - **WHEN** `owned_keys()` is read for a fresh elf entity that owns no skill kits beyond innates, and
@@ -117,11 +125,11 @@ counter branch.
 - **THEN** ownership and the divine-arts race gate both pass, and the cast resolves against the
   target
 
-#### Scenario: Conferred ownership grants the act too
-- **WHEN** a divine-capable entity receives `divine_sexual_arts` through the existing confer/grant
-  surface (`conferred_grants()`) without owning it directly
-- **THEN** the entity's effective skill set includes the key and the cast passes ownership, because
-  the gate checks actual ownership rather than derivation
+#### Scenario: A conferred grant alone does not reach the act
+- **WHEN** a divine-capable entity carries `divine_sexual_arts` only in `conferred_grants()` and not
+  in its base keys
+- **THEN** the key is absent from `owned_keys()` and a cast is rejected at `_step1_ownership` —
+  conferral is not an ownership path for any skill, ownership-gated or not
 
 #### Scenario: The seven shipped divine acts keep deriving through counters
 - **WHEN** `unlocked_act_keys()` is read on a fresh entity of any race
@@ -129,9 +137,11 @@ counter branch.
 
 ### Requirement: The only claim of divine_sexual_arts in shipped data is Yuna's preset
 A structural test SHALL flatten the `active_skills` plus `passive_skills` lists of every
-`PLAYER_PRESET_REGISTRY` entry — the sole shipped skill-kit claiming surface today, since shipped
-NPC companions are built from preset cards — and assert that exactly one claimant, the
-`yuna_darknight` preset, declares the key `divine_sexual_arts`. The scan SHALL read the live registry
+`PLAYER_PRESET_REGISTRY` entry — the sole shipped **authored** skill-kit surface today, since shipped
+NPC companions are built from preset cards (the claim covers authored content, not arbitrary
+runtime `db.skills` writes, for which no shipped catalog scan exists) — and assert that exactly one
+claimant, the `yuna_darknight` preset, declares the key `divine_sexual_arts`. The scan SHALL read
+the live registry
 rather than a hardcoded preset list, so any new preset is covered automatically.
 
 #### Scenario: Yuna is the sole claimant
@@ -149,19 +159,3 @@ rather than a hardcoded preset list, so any new preset is covered automatically.
   `passive_skills` (count-checked against the live registry), so no kit escapes the uniqueness
   assertion
 
-### Requirement: The effect parser resolves the sexual_event_target prefix
-`world/skills/effects.py`'s `parse_effect()` SHALL resolve a string beginning with
-`sexual_event_target:` (followed by a non-empty event name) to a `TargetSexualEventEffect` carrying
-that event name, the same way it resolves `sexual_event_actor:` to `ActorSexualEventEffect`;
-`SkillDef.parsed_effects` SHALL accept the prefix on any skill, including the shipped
-`divine_sexual_arts`. An empty event name after the colon SHALL parse to a
-`TargetSexualEventEffect("")` whose cast-time rejection is pinned by the `sexual-act-effects`
-capability.
-
-#### Scenario: The shipped skill's effect parses to a target-scoped event effect
-- **WHEN** `SKILL_REGISTRY["divine_sexual_arts"].parsed_effects` is inspected
-- **THEN** it equals one `TargetSexualEventEffect(event_name="stimulus_applied")`
-
-#### Scenario: A hand-written target-scoped string parses independently of any registry entry
-- **WHEN** the parser resolves `"sexual_event_target:sustained_stimulus_applied"`
-- **THEN** it returns `TargetSexualEventEffect(event_name="sustained_stimulus_applied")`

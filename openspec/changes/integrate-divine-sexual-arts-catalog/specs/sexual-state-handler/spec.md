@@ -8,8 +8,9 @@ counters **and which does not declare `SexualActDef.ownership_gated=True`**, **o
 `requires_divine_arts=True` and minus every `ownership_gated=True` row** when the entity directly
 owns any skill whose parsed effects include a `SexualMasteryEffect`. The mastery check SHALL consult
 `entity.skills.base_owned_keys()`, never `entity.skills.owned_keys()` and never
-`entity.skills.conferred_grants()`. Ownership-gated rows are reachable only through actual skill
-ownership — directly or via conferred grants — which the derivation path never supplies; the shipped
+`entity.skills.conferred_grants()`. Ownership-gated rows are reachable only through actual base
+ownership (`base_owned_keys()` — the sole input `_step1_ownership` effectively sees through
+`owned_keys()`), which the derivation path never supplies; the shipped
 `divine_sexual_arts` row is the only ownership-gated act, and it is excluded from both branches by
 both of its markers simultaneously, so no shipped entity's derived set changes beyond gaining that
 one key's exclusion.
