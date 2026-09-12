@@ -93,6 +93,15 @@ class SexualActDef:
     blocks field reassignment, so the mapping is copied into a read-only
     ``MappingProxyType`` to keep the registry's unlock thresholds immutable
     even when a consumer holds the caller's original mapping.
+
+    ``ownership_gated`` marks a signature-skill row: its unlocked state is
+    supplied only by actual base ownership, never by the counter-derivation
+    branch or the mastery blanket (``unlocked_act_keys_for`` skips such rows
+    in both branches). Conferral is not an acquisition path for any skill —
+    ``SkillHandler.owned_keys()`` is base keys plus derived act keys and
+    ``_step1_ownership`` consults it alone — so gating the derivation is the
+    whole exclusion. ``_act_family()`` deliberately exposes no knob: only
+    hand-built rows may be ownership-gated.
     """
 
     key: str
@@ -106,6 +115,7 @@ class SexualActDef:
     sexual_events: tuple[str, ...]
     resistible: bool
     pair_events: tuple[tuple[tuple[str, str], str], ...] = ()
+    ownership_gated: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "unlock", MappingProxyType(dict(self.unlock)))
