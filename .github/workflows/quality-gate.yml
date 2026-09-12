@@ -25,7 +25,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install OpenSpec
-        run: npm install --global @fission-ai/openspec@1.6.0
+        run: npm install --global @fission-ai/openspec@1.13.0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.0

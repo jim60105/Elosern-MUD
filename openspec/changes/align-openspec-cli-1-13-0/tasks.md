@@ -2,12 +2,12 @@
 
 ## 1. CI pin
 
-- [ ] 1.1 Edit `.github/workflows/quality-gate.yml` "Install OpenSpec" step to `npm install --global @fission-ai/openspec@1.13.0`; verify the step YAML parses (`uv run --locked python -c "import yaml; yaml.safe_load(open('.github/workflows/quality-gate.yml'))"`) and no other CLI version literal remains in the workflow.
+- [x] 1.1 Edit `.github/workflows/quality-gate.yml` "Install OpenSpec" step to `npm install --global @fission-ai/openspec@1.13.0`; verify the step YAML parses (`uv run --locked python -c "import yaml; yaml.safe_load(open('.github/workflows/quality-gate.yml'))"`) and no other CLI version literal remains in the workflow.
 
 ## 2. Contract-test pin
 
-- [ ] 2.1 In `tests/test_quality_gate_contract.py`, add one test method (or extend the existing preflight assertions) asserting the "Install OpenSpec" step's `run` text equals exactly `npm install --global @fission-ai/openspec@1.13.0`, annotated `@covers_requirement("openspec-cli-version-pinning::the-quality-gate-workflow-installs-the-pinned-openspec-cli-version")` (copy the exact slug from the delta heading at implementation time). Scope the assertion to that step's `run` text only — other steps legitimately contain other `@vMAJOR.MINOR.PATCH` action pins. No new test module, no `.github/evennia-shards.json` change.
-- [ ] 2.2 Confirm the workflow contract tests pass: `uv run --locked python -m unittest tests.test_quality_gate_contract tests.test_browser_verification_contract -v`.
+- [x] 2.1 In `tests/test_quality_gate_contract.py`, add one test method (or extend the existing preflight assertions) asserting the "Install OpenSpec" step's `run` text equals exactly `npm install --global @fission-ai/openspec@1.13.0`, annotated `@covers_requirement("openspec-cli-version-pinning::the-quality-gate-workflow-installs-the-pinned-openspec-cli-version")` (copy the exact slug from the delta heading at implementation time). Scope the assertion to that step's `run` text only — other steps legitimately contain other `@vMAJOR.MINOR.PATCH` action pins. No new test module, no `.github/evennia-shards.json` change.
+- [x] 2.2 Confirm the workflow contract tests pass: `uv run --locked python -m unittest tests.test_quality_gate_contract tests.test_browser_verification_contract -v`.
 
 ## 3. Purpose backfill (30 specs, Purpose-prose-only edits)
 

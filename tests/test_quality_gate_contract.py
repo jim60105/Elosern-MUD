@@ -225,6 +225,21 @@ class QualityGateContractTests(unittest.TestCase):
         self.assertNotIn("CODECOV_TOKEN", readme)
         self.assertNotIn("secrets.", readme)
 
+    @covers_requirement(
+        "openspec-cli-version-pinning::the-quality-gate-workflow-installs-the-pinned-openspec-cli-version"
+    )
+    def test_preflight_installs_the_pinned_openspec_cli_version(self):
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
+        )
+        steps = {step["name"]: step for step in workflow["jobs"]["preflight"]["steps"]}
+        self.assertIn("Install OpenSpec", steps)
+        self.assertEqual(
+            steps["Install OpenSpec"]["run"],
+            "npm install --global @fission-ai/openspec@1.13.0",
+            msg="quality-gate.yml 'Install OpenSpec' drifted from the pinned OpenSpec CLI version",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
