@@ -138,7 +138,9 @@
       ],
       "files_b": [
         "web.tests.browser.test_browser_actions.ActionLockingTest",
-        "web.tests.browser.test_harness.ManagedServerFastTests"
+        "web.tests.browser.test_harness.ManagedServerFastTests",
+        "web.tests.browser.test_harness.StartupLockTests",
+        "web.tests.browser.test_harness.StartupSerializationTests"
       ]
     },
     {
