@@ -46,15 +46,16 @@ The count subprocess is launched with `pi.exec("bash", ["-lc", script], { cwd, t
 - unterminated quote or trailing escape.
 
 `analyzeCommand()` then classifies:
-1. No `evennia test` text anywhere (`/\bevennia[ \t]+test(?![A-Za-z0-9_])/`, corrected per Amendment A3) → `not-evennia-test` → pass through.
+1. No `evennia test` text anywhere — detection runs on the quote/backslash-neutralized command (`/\bevennia[ \t]+test(?![A-Za-z0-9_])/`, corrected per Amendments A3/A5) → `not-evennia-test` → pass through.
 2. Scan failed → `unsupported` → block.
-3. Segments matching `^(?:(?:uv|poetry)[ \t]+run(?:[ \t]+--[^ \t]+)*[ \t]+)?evennia[ \t]+test(?:[ \t]|$)` (runner flags such as `--locked` allowed between `run` and `evennia`; see Amendment A1):
-   - zero matches but the text exists somewhere (e.g. `bash -lc 'evennia test'`) → block ("wrapped in an unsupported shell command") — fail closed rather than allow an easy bypass;
+3. Segments matching `^(?:(?:uv|poetry)[ \t]+run(?:[ \t]+--[^ \t]+)*[ \t]+)?evennia[ \t]+test(?:[ \t]|$)` (runner flags such as `--locked` allowed between `run` and `evennia`; see Amendment A1) on the raw segment text:
+   - zero raw matches but the neutralized scan's final segment matches (e.g. `evennia 'test'`) → block, naming quoting/escapes as obscuring the test command (Amendment A5);
+   - zero matches otherwise but the text exists somewhere (e.g. `bash -lc 'evennia test'`) → block ("wrapped in an unsupported shell command") — fail closed rather than allow an easy bypass;
    - more than one match → block;
    - the match is not the final segment (e.g. `evennia test && do-something`) → block, because after a successful count the guard would otherwise be unable to replay only the test part without also executing trailing commands;
    - any earlier segment not starting with `cd` (`/^cd(?:[ \t]|$)/`) → block (only `cd ... && evennia test ...` prefixes are supported).
    - a test segment starting with an inline environment assignment (`/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]/`, e.g. `MUD_TEST_SETTINGS=1 evennia test ...`) → block with a dedicated reason naming the env-assignment prefix (pass env via the Bash tool's `env` input) rather than the generic wrapper message; still recognized as an Evennia test so it fails closed (see Amendment A1).
-4. The test segment already contains `--testrunner` (`(?:^|[ \t])--testrunner(?:=|[ \t]|$)`) → block; the flag is reserved by the guard.
+4. The test segment already contains `--testrunner` (`(?:^|[ \t])--testrunner(?:=|[ \t]|$)`, checked on both the raw and the neutralized segment per Amendment A5) → block; the flag is reserved by the guard.
 
 Supported forms:
 
@@ -128,9 +129,9 @@ count-only discovery
 
 ## Risks / Trade-offs
 
-- **Amendments to the reference plan's literal listings** (see A1/A2 below): both were reviewed and recorded deliberately; the rest of the plan is implemented verbatim.
+- **Amendments to the reference plan's literal listings** (see A1/A2/A3/A4/A5 below): all were reviewed and recorded deliberately; the rest of the plan is implemented verbatim.
 
-- **Static analysis can be fooled in principle** (e.g. `evennia\ttest` variants are covered, but exotic aliasing like `alias` files or `$VENV/bin/evennia test` is treated as unsupported text and fails closed — blocked, not silently allowed). Accepted: fail-closed errs toward visible friction, not silent long runs.
+- **Static analysis can be fooled in principle.** `evennia\ttest` and quoted/escaped spellings (`evennia 'test'`, `e''vennia test`, …) are detected and fail closed (Amendment A5). Residual gaps where no literal `evennia test` text exists at all — shell `alias`/function indirection, `$VENV/bin/evennia test` (the `$VENV/bin/` prefix means the literal text never matches detection, so it silently passes through), and `${VAR}` word indirection — are NOT blocked; detection is text-based by design and a general shell parser is a non-goal. Accepted: these require deliberately indirect commands; every plainly spellable invocation (the realistic agent output) is covered.
 - **Double counting cost**: every allowed `evennia test` pays one bounded (60 s) discovery subprocess. Accepted: discovery dominates even the count run, and it prevents far more expensive wasted full-suite runs.
 - **`setup_test_environment()` side effects** (`evennia._init()`): identical to a real test run's first phase, no DB, no server; matches Evennia semantics by design (D6).
 - **Only guards the Bash tool within OMP.** Manual terminal use remains governed by AGENTS.md. Out of scope by design.
@@ -163,6 +164,10 @@ Discovered during implementation. The plan's `EVENNIA_TEST_ANYWHERE` (`/\bevenni
 
 Discovered during implementation. `evennia/server/evennia_launcher.py` executes `sys.path[1] = EVENNIA_ROOT` at import time: `sys.path[1]` is exactly the first PYTHONPATH entry, and CPython de-duplicates PYTHONPATH, so the plan's `PYTHONPATH = EXTENSION_DIR:<existing>` injection is overwritten before Django resolves `--testrunner=omp_evennia_count_runner` — the count subprocess fails with `ModuleNotFoundError: No Module named 'omp_evennia_count_runner'` even though the plain env var is preserved (verified against Evennia 6.1.0: a second PYTHONPATH entry survives, a doubled single entry is de-duplicated away). Corrected D5 injection: `PYTHONPATH = .:<EXTENSION_DIR>:<existing>` — the leading `.` absorbs the launcher's overwrite with a harmless entry (the game dir is inserted at `sys.path[0]` by `init_game_directory` anyway), keeping the extension dir importable. The count-only discovery command therefore needs the absorber when run manually as well.
 
+### A5 — Detection must survive shell quoting/escapes (fix when implementing)
+
+Found by post-implementation review. The plan (and the A3-corrected) detection regexes run on the raw command text, so `evennia 'test'`, `evennia "test"`, `'evennia' test`, `evennia \test`, `e''vennia test` — all of which bash tokenizes into a real `evennia test` invocation (the first, with no label, is the full 8032-test suite) — were classified `not-evennia-test` and passed through completely unguarded, violating spec Requirement 1 ("inspects every Bash-tool invocation whose command mentions `evennia test`"). The `--testrunner` reservation check had the same hole (`--testrunner="x"` evaded it; Django's `store` semantics let the caller's last flag win inside the count subprocess, redirecting "count-only" discovery into a real DB-creating run). Corrected: classification runs on the raw segments, but the detection gate, the quoting-obscured fallback reason, and the `--testrunner` check additionally evaluate a conservative quote/backslash-neutralized view (stripping `"` `'` `\`), which can only route more commands into the fail-closed path, never fewer. Supported commands still execute/replay only the raw segment text.
+
 ## Open Questions
 
-None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution); the recorded deviations are A1/A2/A3/A4 above.
+None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution); the recorded deviations are A1/A2/A3/A4/A5 above.

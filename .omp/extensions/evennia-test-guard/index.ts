@@ -33,6 +33,22 @@ const EVENNIA_TEST_ANYWHERE =
 const ENV_ASSIGNMENT_PREFIX =
   /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]/;
 
+const TESTRUNNER_FLAG =
+  /(?:^|[ \t])--testrunner(?:=|[ \t]|$)/;
+
+/*
+ * Quote/backslash-neutralized view of the command, used for DETECTION
+ * only. Shell quoting such as `evennia 'test'` still runs the real
+ * `evennia test`, so literal-text detection must not be evadable with
+ * quotes or escapes. Stripping them is a conservative
+ * over-approximation: it can only make more commands enter the
+ * fail-closed classification below, never fewer. Classification of the
+ * executed text always uses the raw segments.
+ */
+function neutralizeQuoting(command: string): string {
+  return command.replace(/["'\\]/g, "");
+}
+
 type ShellScanResult =
   | {
       ok: true;
@@ -215,7 +231,9 @@ function scanShell(command: string): ShellScanResult {
  * Tests must be the final command. Prefix commands may only be `cd`.
  */
 function analyzeCommand(command: string): CommandAnalysis {
-  if (!EVENNIA_TEST_ANYWHERE.test(command)) {
+  const neutralized = neutralizeQuoting(command);
+
+  if (!EVENNIA_TEST_ANYWHERE.test(neutralized)) {
     return {
       kind: "not-evennia-test",
     };
@@ -236,6 +254,31 @@ function analyzeCommand(command: string): CommandAnalysis {
     )
     .filter((index) => index >= 0);
 
+  /*
+   * The neutralized view mentions an Evennia test command but no raw
+   * segment starts with one (e.g. `evennia 'test' world.tests`). The
+   * real invocation is unambiguous but its quoting cannot be proven
+   * replay-safe, so it is blocked fail-closed with a specific reason
+   * instead of passing through unguarded.
+   */
+  if (testIndexes.length === 0) {
+    const neutralizedSegments = scanShell(neutralized);
+
+    if (
+      neutralizedSegments.ok &&
+      neutralizedSegments.segments.some((segment, index) =>
+        EVENNIA_TEST_START.test(segment) &&
+        index === neutralizedSegments.segments.length - 1,
+      )
+    ) {
+      return {
+        kind: "unsupported",
+        reason:
+          "the Evennia test command is obscured by shell quoting or escapes; run it as a plain standalone command",
+      };
+    }
+  }
+
   if (testIndexes.length === 0) {
     /*
      * A segment that mentions `evennia test` but starts with an inline
@@ -246,7 +289,8 @@ function analyzeCommand(command: string): CommandAnalysis {
      */
     for (const segment of scan.segments) {
       if (
-        EVENNIA_TEST_ANYWHERE.test(segment) &&
+        (EVENNIA_TEST_ANYWHERE.test(segment) ||
+          EVENNIA_TEST_ANYWHERE.test(neutralizeQuoting(segment))) &&
         ENV_ASSIGNMENT_PREFIX.test(segment)
       ) {
         return {
@@ -306,7 +350,10 @@ function analyzeCommand(command: string): CommandAnalysis {
    * Don't permit callers to supply their own runner. The guard owns
    * --testrunner while performing discovery.
    */
-  if (/(?:^|[ \t])--testrunner(?:=|[ \t]|$)/.test(testCommand)) {
+  if (
+    TESTRUNNER_FLAG.test(testCommand) ||
+    TESTRUNNER_FLAG.test(neutralizeQuoting(testCommand))
+  ) {
     return {
       kind: "unsupported",
       reason:
