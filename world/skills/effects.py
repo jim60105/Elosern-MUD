@@ -142,6 +142,22 @@ class ActorSexualEventEffect:
 
 
 @dataclass(frozen=True)
+class TargetSexualEventEffect:
+    """Resolve one rule-driven sexual transition on the cast's targets only.
+
+    The target-scoped sibling of ``SexualEventEffect`` and
+    ``ActorSexualEventEffect``: a hand-built row declaring a target-only
+    event (the shipped ``divine_sexual_arts`` skill's ``stimulus_applied``)
+    emits it through the ``sexual_event_target:<name>`` string, and the
+    cast-side handler applies the named event to every resolved target,
+    never to the acting entity. Recipient scope is decided statically by the
+    effect prefix — never by an event-name lookup.
+    """
+
+    event_name: str
+
+
+@dataclass(frozen=True)
 class PleasureEffect:
     """Apply one sexual act's pleasure to every participant of its cast.
 
@@ -389,6 +405,8 @@ def parse_effect(effect_id: str) -> object:
         return SexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_event_actor":
         return ActorSexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
+    if prefix == "sexual_event_target":
+        return TargetSexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
     if prefix == "pleasure":
         return PleasureEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_counter":

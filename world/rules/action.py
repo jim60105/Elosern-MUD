@@ -799,6 +799,59 @@ def _handle_actor_sexual_event(
     ]
 
 
+def _handle_target_sexual_event(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Apply one target-scoped event to the cast's resolved targets only.
+
+    The target-scoped twin of ``_handle_sexual_event`` and
+    ``_handle_actor_sexual_event``: a hand-built row declaring a target-only
+    event (``divine_sexual_arts``'s ``stimulus_applied``) emits it through
+    the ``sexual_event_target:<name>`` prefix so the resolved event lands on
+    every surviving target and never on the acting entity — the divine-arts
+    exemption from self-pleasure (D-9) is carried by the prefix, not by an
+    event-name exception table. Resisted targets were already excluded from
+    ``targets`` by ``_step4b_sexual_resist_gate``, so a fully resisted cast
+    stages nothing and stays an ordinary success. A missing event name never
+    reaches this handler: the prefix fails closed at ``SkillDef``
+    construction through ``_parse_single_arg``. No observer gating applies —
+    ``watched_during_activity`` remains reachable only through the
+    actor-scoped channel's gated vocabulary.
+    """
+    del scale
+    event_name = effect_id.partition(":")[2]
+    if not event_name:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual_event_target requires an event name",
+        )
+    try:
+        from world.rules.sexual_transitions import apply_event
+    except ImportError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual-transition rules are unavailable (change 7b)",
+        ) from error
+    sexual_context = dict(context.get("sexual", {}))
+    return [
+        PendingEffect(
+            target,
+            f"sexual_transition|{_entity_key(target)}|{event_name}",
+            frozenset(),
+            lambda target=target: apply_event(
+                target,
+                event_name,
+                **sexual_context,
+            ),
+        )
+        for target in targets
+    ]
+
+
 def _handle_act_pair_event(
     actor: Any,
     targets: list[Any],
@@ -1368,6 +1421,12 @@ register_effect_handler(
 register_effect_handler(
     "sexual_event_actor",
     _handle_actor_sexual_event,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "sexual_event_target",
+    _handle_target_sexual_event,
     frozenset({"sexual"}),
     requires_event_context=frozenset(),
 )
