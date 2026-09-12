@@ -16,11 +16,15 @@ The guard SHALL register a pre-execution `tool_call` handler that inspects every
 - **THEN** the guard performs count-only discovery first and only allows the original command to run after the count is known to be within the limit
 
 ### Requirement: Recognized invocation forms
-The guard SHALL treat a command as a supported Evennia test invocation when, after splitting on top-level `&&` only, the final segment starts with `evennia test` optionally preceded by `uv run ` or `poetry run `, and every earlier segment starts with `cd`. Commands in the supported grammar — `evennia test ...`, `uv run evennia test ...`, `poetry run evennia test ...`, `cd foo && evennia test ...`, `cd projects && cd mygame && evennia test ...` (single line) — SHALL proceed to count-only discovery.
+The guard SHALL treat a command as a supported Evennia test invocation when, after splitting on top-level `&&` only, the final segment starts with `evennia test` optionally preceded by `uv run ` or `poetry run ` (zero or more flag tokens such as `--locked` allowed between `run` and `evennia`), and every earlier segment starts with `cd`. Commands in the supported grammar — `evennia test ...`, `uv run evennia test ...`, `uv run --locked evennia test ...`, `poetry run evennia test ...`, `cd foo && evennia test ...`, `cd projects && cd mygame && evennia test ...` (single line) — SHALL proceed to count-only discovery, with discovery wrapped by the same runner prefix as the original command.
 
 #### Scenario: Wrapped runner prefixes are recognized
 - **WHEN** the command is `uv run evennia test world.tests` or `poetry run evennia test world.tests`
 - **THEN** the guard treats it as an Evennia test invocation and counts before allowing
+
+#### Scenario: Runner flags are recognized
+- **WHEN** the command is `uv run --locked evennia test world.tests` (the repository's canonical invocation)
+- **THEN** the guard treats it as a supported Evennia test invocation and counts before allowing, running discovery with the same `uv run --locked` wrapper
 
 #### Scenario: cd prefixes are recognized
 - **WHEN** the command is `cd mygame && evennia test world.tests`
@@ -67,7 +71,7 @@ When discovery reports more than 100 tests, the guard SHALL block the original c
 - **THEN** the original command does not run and the reason contains the count (480), the maximum (100), the phrase "Run Focus Test", and narrowed-label examples
 
 ### Requirement: Fail-closed policy for unsupported shell composition
-The guard SHALL NOT attempt to reason about shell semantics beyond the supported grammar. Any Bash command that mentions `evennia test` but cannot be proven to be a single supported test invocation SHALL be blocked with a reason explaining the unsupported construct and a pointer to a standalone supported focused-test command. This includes at minimum: `;`, `|`, `<`, `>` operators; multi-line commands; background `&`; command substitution (`` ` `` or `$(`, including inside double quotes); unterminated quotes or trailing escapes; `evennia test` not being the final `&&` segment (e.g. `evennia test && do-something`); non-`cd` prefix segments (e.g. `foo && evennia test`); wrapping in another shell (e.g. `bash -lc 'evennia test'`); more than one `evennia test` segment; and a caller-supplied `--testrunner` flag (reserved by the guard).
+The guard SHALL NOT attempt to reason about shell semantics beyond the supported grammar. Any Bash command that mentions `evennia test` but cannot be proven to be a single supported test invocation SHALL be blocked with a reason explaining the unsupported construct and a pointer to a standalone supported focused-test command. This includes at minimum: `;`, `|`, `<`, `>` operators; multi-line commands; background `&`; command substitution (backtick or `$(`, including inside double quotes); unterminated quotes, trailing escapes, or empty `&&` segments; `evennia test` not being the final `&&` segment (e.g. `evennia test && do-something`); non-`cd` prefix segments (e.g. `foo && evennia test`); inline environment-assignment prefixes (e.g. `MUD_TEST_SETTINGS=1 evennia test ...` — caller environment must be supplied through the Bash tool's `env` input instead); wrapping in another shell (e.g. `bash -lc 'evennia test'`); more than one `evennia test` segment; and a caller-supplied `--testrunner` flag (reserved by the guard). The reason SHALL name the specific unsupported construct rather than reporting a generic wrapper failure where the guard can distinguish one.
 
 #### Scenario: Chained post-command is blocked
 - **WHEN** the command is `evennia test world.tests && do-something`
@@ -76,6 +80,10 @@ The guard SHALL NOT attempt to reason about shell semantics beyond the supported
 #### Scenario: Shell wrapping is blocked
 - **WHEN** the command is `bash -lc 'evennia test'`
 - **THEN** the guard blocks it as an unsupported wrapper instead of letting a bypassing form through
+
+#### Scenario: Inline environment prefix is blocked
+- **WHEN** the command is `MUD_TEST_SETTINGS=1 evennia test world.tests`
+- **THEN** the guard blocks it and names the environment-assignment prefix as the unsupported construct, pointing the caller to the Bash tool's env input
 
 #### Scenario: Caller-supplied testrunner is rejected
 - **WHEN** the command includes `--testrunner=some.OtherRunner` alongside `evennia test`

@@ -48,11 +48,12 @@ The count subprocess is launched with `pi.exec("bash", ["-lc", script], { cwd, t
 `analyzeCommand()` then classifies:
 1. No `evennia test` text anywhere (`/\bevennia[ \t]+test(?:[ \t]|$)/`) → `not-evennia-test` → pass through.
 2. Scan failed → `unsupported` → block.
-3. Segments matching `^(?:(?:uv|poetry)[ \t]+run[ \t]+)?evennia[ \t]+test(?:[ \t]|$)`:
+3. Segments matching `^(?:(?:uv|poetry)[ \t]+run(?:[ \t]+--[^ \t]+)*[ \t]+)?evennia[ \t]+test(?:[ \t]|$)` (runner flags such as `--locked` allowed between `run` and `evennia`; see Amendment A1):
    - zero matches but the text exists somewhere (e.g. `bash -lc 'evennia test'`) → block ("wrapped in an unsupported shell command") — fail closed rather than allow an easy bypass;
    - more than one match → block;
    - the match is not the final segment (e.g. `evennia test && do-something`) → block, because after a successful count the guard would otherwise be unable to replay only the test part without also executing trailing commands;
    - any earlier segment not starting with `cd` (`/^cd(?:[ \t]|$)/`) → block (only `cd ... && evennia test ...` prefixes are supported).
+   - a test segment starting with an inline environment assignment (`/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]/`, e.g. `MUD_TEST_SETTINGS=1 evennia test ...`) → block with a dedicated reason naming the env-assignment prefix (pass env via the Bash tool's `env` input) rather than the generic wrapper message; still recognized as an Evennia test so it fails closed (see Amendment A1).
 4. The test segment already contains `--testrunner` (`(?:^|[ \t])--testrunner(?:=|[ \t]|$)`) → block; the flag is reserved by the guard.
 
 Supported forms:
@@ -60,6 +61,7 @@ Supported forms:
 ```bash
 evennia test world.tests
 uv run evennia test world.tests
+uv run --locked evennia test world.tests   # repo-canonical
 poetry run evennia test world.tests
 cd mygame && evennia test world.tests
 cd projects && cd mygame && evennia test world.tests   # single line only
@@ -72,6 +74,7 @@ evennia test && do-something
 evennia test | tee test.log
 evennia test > test.log
 foo && evennia test
+MUD_TEST_SETTINGS=1 evennia test world.tests   # env via the Bash tool's env input instead
 bash -lc 'evennia test'
 evennia test --testrunner=some.OtherRunner
 ```
@@ -100,7 +103,7 @@ The original command is never rewritten for execution — the count run is disco
 4. `finally: self.teardown_test_environment()`.
 
 ### D7 — Count marker protocol
-`__OMP_EVENNIA_TEST_COUNT_V1__=<n>` printed on stdout (captured with stderr). The guard takes the LAST match of `__OMP_EVENNIA_TEST_COUNT_V1__(\d+)` over combined output (later project logging cannot shadow it with an earlier partial line; versioned tag allows future protocol changes). No match, or a value that is not a non-negative safe integer → block (fail closed).
+`__OMP_EVENNIA_TEST_COUNT_V1__=<n>` printed on stdout (captured with stderr). The guard takes the LAST match of `__OMP_EVENNIA_TEST_COUNT_V1__=(\d+)` over combined output (later project logging cannot shadow it with an earlier partial line; versioned tag allows future protocol changes). No match, or a value that is not a non-negative safe integer → block (fail closed).
 
 ### D8 — Decision outcomes
 - `count ≤ 100` → return `undefined` (allow original); if `ctx.hasUI`, `ctx.ui.notify("Evennia test guard: <n>/100 tests — allowed", "info")`.
@@ -125,6 +128,8 @@ count-only discovery
 
 ## Risks / Trade-offs
 
+- **Amendments to the reference plan's literal listings** (see A1/A2 below): both were reviewed and recorded deliberately; the rest of the plan is implemented verbatim.
+
 - **Static analysis can be fooled in principle** (e.g. `evennia\ttest` variants are covered, but exotic aliasing like `alias` files or `$VENV/bin/evennia test` is treated as unsupported text and fails closed — blocked, not silently allowed). Accepted: fail-closed errs toward visible friction, not silent long runs.
 - **Double counting cost**: every allowed `evennia test` pays one bounded (60 s) discovery subprocess. Accepted: discovery dominates even the count run, and it prevents far more expensive wasted full-suite runs.
 - **`setup_test_environment()` side effects** (`evennia._init()`): identical to a real test run's first phase, no DB, no server; matches Evennia semantics by design (D6).
@@ -135,6 +140,21 @@ count-only discovery
 
 Purely additive: drop two files under `.omp/extensions/evennia-test-guard/`, restart `omp` from repo root. Rollback = delete the directory.
 
+## Amendments to the reference plan
+
+The reference plan's listings are the implementation source of truth, with these two recorded deviations (rubber-duck review findings, both verified against the plan's own text):
+
+### A1 — `uv run --locked` must be a supported form (grammar amendment)
+
+The plan's `EVENNIA_TEST_START` (`^(?:(?:uv|poetry)[ \t]+run[ \t]+)?evennia[ \t]+test(?:[ \t]|$)`) rejects flag tokens between `run` and `evennia`, which would block this repo's canonical `uv run --locked evennia test ...` — defeating the guard's purpose (it would block the AGENTS.md-prescribed workflow instead of auditing it). Amendment: allow zero or more `--flag` tokens after `run` — `^(?:(?:uv|poetry)[ \t]+run(?:[ \t]+--[^ \t]+)*[ \t]+)?evennia[ \t]+test(?:[ \t]|$)` — and keep the full `uv run --locked ...` wrapper in the count command. Non-`--` tokens between `run` and `evennia` stay unsupported (fail closed). This is within the plan's settled intent ("Extension must work with `uv run evennia test ...` prefix"; canonical form carries `--locked`).
+
+Related: an inline env-assignment prefix (`MUD_TEST_SETTINGS=1 evennia test ...`) is still blocked fail-closed (it is outside the supported grammar) but is given a dedicated reason naming the env-assignment prefix and pointing to the Bash tool's `env` input, instead of the misleading "wrapped in an unsupported shell command" message.
+
+### A2 — Two transcription defects in the plan listings (fix when implementing)
+
+1. `shellQuote` is missing its closing quote: ``return `'${value.replaceAll("'", "'\\''")}`;`` emits `'foo` for `foo`, so every generated `export KEY='…'` line (PYTHONPATH is always injected) leaves an unterminated quote and the discovery script always fails — which would block even the ≤100 allow path. Corrected: ``return `'${value.replaceAll("'", "'\\''")}'`;`` (matching D5's prose).
+2. In `scanShell`'s final empty-segment branch, `reason: "invalid empty shell segment";` uses `;` where object-literal syntax requires `,` — a TypeScript SyntaxError if transcribed verbatim. Corrected to `,`.
+
 ## Open Questions
 
-None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution).
+None — the reference plan settled all policy decisions (fail-closed set, marker protocol, timeout, MAX_TESTS, runner base-class resolution); the two recorded deviations are A1/A2 above.
