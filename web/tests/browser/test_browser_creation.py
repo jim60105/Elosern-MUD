@@ -74,6 +74,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         runtime = fixtures.create_runtime()
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
         runtime.env["ELOSERN_BROWSER_CREATION"] = "1"
+        runtime.env["ELOSERN_DEBUG_UIACTION"] = "/tmp/uiaction_dbg.log"
         if self.CREATION_DRAFT:
             runtime.env["ELOSERN_BROWSER_CREATION_DRAFT"] = "1"
         if self.CREATION_PRESET_DRAFT:
@@ -554,7 +555,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                 payload,
               }], {});
             }""",
-            self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=-1),
+            {"payload": self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=-1)},
         )
         result = self._wait_result(
             page,
@@ -598,7 +599,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                 payload,
               }], {});
             }""",
-            self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=24, apparent_age=-1),
+            {"payload": self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=24, apparent_age=-1)},
         )
         result = self._wait_result(
             page,
