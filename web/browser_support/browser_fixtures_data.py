@@ -58,7 +58,7 @@ SHIPPED_PRESET_KEY = "elysa_snow"
 SHIPPED_DRAFT_RACE = "beastfolk"
 SHIPPED_DRAFT_SUBRACE = "foxkin"
 SHIPPED_BASE_RACE = "human"
-SHIPPED_BASE_SUBRACE = "human_commoner"
+SHIPPED_BASE_SUBRACE = "human_plains"
 
 #: Monster tier attribute value / registry key the combat fixtures apply.
 SHIPPED_MONSTER_TIER_ATTR = "low"
