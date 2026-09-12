@@ -693,6 +693,108 @@ def set_default(subject: ArtSubject, image_id: str) -> None:
         )
 
 
+def _update_card_field(subject: ArtSubject, image_id: str, field: str, value) -> dict:
+    """Commit one validated field of one existing card under the lock.
+
+    The shared body of the two in-place card writers
+    (``gallery-card-update-api``). The entry is located through the same
+    tolerant per-entry validation ``cards_for`` performs — a malformed entry
+    matching the id is reported once and stays un-updatable, because
+    rewriting it would launder corruption into a valid card — and a missing
+    match raises the same typed miss ``remove_card`` raises. The FIRST valid
+    entry matching the id is the one updated; a duplicate valid id is
+    corruption the sole writer cannot produce, and its copies stay untouched.
+    The already
+    canonical validated form of the located entry is rebuilt with exactly the
+    one updated field; every other entry, the card order, and
+    ``default_image_id`` are committed unchanged. Files are never touched:
+    this seam writes placement/binding metadata only.
+    """
+    with gallery_lock:
+        record = record_for(subject)
+        if record is None:
+            raise GalleryRecordError("this subject has no gallery record")
+        entries = list(record.db.cards or [])
+        located_index = None
+        located: dict | None = None
+        for index, entry in enumerate(entries):
+            try:
+                validated = validate_card(entry, subject, api_defaults=False)
+            except GalleryRecordError:  # observability: ignore R2: tolerant locate reports the malformed entry and refuses to update it
+                log_warn(
+                    "gallery_card_invalid",
+                    context={
+                        "subject": subject.full(),
+                        "image_id": (
+                            entry.get("image_id")
+                            if isinstance(entry, Mapping)
+                            else None
+                        ),
+                    },
+                )
+                continue
+            if located_index is None and validated["image_id"] == image_id:
+                located_index = index
+                located = validated
+        if located_index is None or located is None:
+            raise GalleryRecordError(f"no card with image_id {image_id!r} exists")
+        updated = dict(located)
+        updated[field] = value
+        record.db.cards = [
+            updated if index == located_index else entry
+            for index, entry in enumerate(entries)
+        ]
+        log_info(
+            "gallery_card_updated",
+            context={
+                "subject": subject.full(),
+                "image_id": image_id,
+                "kind": subject.kind.value,
+                "field": field,
+            },
+        )
+        return dict(updated)
+
+
+def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict:
+    """Re-mark one existing card's face rectangle, stored verbatim.
+
+    The placement-only in-place writer (``gallery-card-update-api``, D9):
+    the incoming rectangle passes the shared ``validate_face_rect`` before
+    any write and is stored unaltered — no crop, no second image, no file
+    write. A malformed or missing entry match is the ``remove_card`` miss
+    form, and one ``gallery_card_updated`` facade event closes a successful
+    update. Returns the updated stored card.
+    """
+    return _update_card_field(
+        subject, image_id, "face_rect", validate_face_rect(face_rect)
+    )
+
+
+def update_card_binding(subject: ArtSubject, image_id: str, binding) -> dict:
+    """Re-save one existing card's equipment binding, stored verbatim.
+
+    The binding-only in-place writer (``gallery-card-update-api``): the
+    incoming binding passes the shared ``validate_binding`` (mask/snapshot
+    coherence) and an explicit ``None`` unbinds (``binding`` is nullable).
+    The kind capability gate runs BEFORE any record read — the refusal is
+    unconditional, so a kind declaring no binding support is refused with
+    the capability-naming typed error even when it holds no record. The
+    message is deliberately identical to the service seam's refusal
+    (``world/art/service.py::request_gallery_image``); gallery.py may not
+    import service.py, so the alignment is by text, not by call. Files are
+    never touched, and one ``gallery_card_updated`` event closes a
+    successful update. Returns the updated stored card.
+    """
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.supports_bindings and binding is not None:
+        raise GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no binding support; "
+            "a binding argument is rejected"
+        )
+    return _update_card_field(subject, image_id, "binding", validate_binding(binding))
+
+
 def cards_for(subject: ArtSubject) -> list[dict]:
     """The subject's valid cards in append order, tolerant of corruption.
 
