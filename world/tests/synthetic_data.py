@@ -830,7 +830,13 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         starting_items=(("t_ember_spray", 2), ("t_iron_fang", 1)),
         sex="female",
         skill_proficiency=(("t_ember_burst", 10.0),),
-        persona=PresetPersona(personality="安靜而警覺。"),
+        # The creation presenter validates every preset card's background as
+        # non-empty (every shipped card authors one), so the kit cards carry
+        # synthetic persona prose of their own.
+        persona=PresetPersona(
+            personality="安靜而警覺。",
+            background="Synthetic wanderer preset persona background.",
+        ),
     ),
     "t_ash_finch": PlayerPreset(
         key="t_ash_finch",
@@ -853,7 +859,10 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         passive_skills=("t_steady_stride",),
         starting_items=(("t_huskapple", 3),),
         sex="male",
-        persona=PresetPersona(personality="寡言的搬運工。"),
+        persona=PresetPersona(
+            personality="寡言的搬運工。",
+            background="Synthetic porter preset persona background.",
+        ),
     ),
 }
 
