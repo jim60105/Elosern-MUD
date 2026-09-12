@@ -61,7 +61,6 @@ from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.sexual_acts._builder import _LEGACY_TARGET_SCOPED_EVENTS
 
 
 class RejectReason(StrEnum):
@@ -703,10 +702,10 @@ def _handle_sexual_event(
 
     The event fires for **every participant** of the cast —
     ``participants(actor, targets)`` — mirroring the pleasure and counter
-    handlers, except that an event name in ``_LEGACY_TARGET_SCOPED_EVENTS``
-    (exactly the legacy ``divine_sexual_arts`` skill's ``stimulus_applied``)
-    keeps the historic target-scoped iteration so the divine-arts exemption
-    from self-pleasure (D-9) holds. Resisted targets were already excluded
+    handlers, with no name-based recipient exception: recipient scope is
+    decided statically by the effect prefix (``sexual_event:`` participant-,
+    ``sexual_event_actor:`` actor-, ``sexual_event_target:`` target-scoped),
+    never by an event-name lookup. Resisted targets were already excluded
     from ``targets`` by ``_step4b_sexual_resist_gate``, so a partially
     resisted cast reaches only its surviving participants.
     """
@@ -725,11 +724,7 @@ def _handle_sexual_event(
             "sexual-transition rules are unavailable (change 7b)",
         ) from error
     sexual_context = dict(context.get("sexual", {}))
-    recipients = (
-        targets
-        if event_name in _LEGACY_TARGET_SCOPED_EVENTS
-        else participants(actor, targets)
-    )
+    recipients = participants(actor, targets)
     return [
         PendingEffect(
             target,
@@ -820,7 +815,11 @@ def _handle_target_sexual_event(
     reaches this handler: the prefix fails closed at ``SkillDef``
     construction through ``_parse_single_arg``. No observer gating applies —
     ``watched_during_activity`` remains reachable only through the
-    actor-scoped channel's gated vocabulary.
+    actor-scoped channel's gated vocabulary. The self-exclusion is explicit:
+    AREA resolution's ``"all"`` shorthand has no self-exclusion (see
+    ``_step4b_sexual_resist_gate``'s actor guard for the same route), so a
+    future AREA target-scoped row could otherwise deliver its event to the
+    caster — matching the divine target-only handlers' per-target skip.
     """
     del scale
     event_name = effect_id.partition(":")[2]
@@ -849,6 +848,7 @@ def _handle_target_sexual_event(
             ),
         )
         for target in targets
+        if target is not actor
     ]
 
 

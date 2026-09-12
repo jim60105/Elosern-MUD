@@ -24,3 +24,10 @@ the `divine-mystery` capability's requirement. `divine_sexual_arts` SHALL be reg
 - **WHEN** `SKILL_REGISTRY["divine_sexual_arts"].effects` is inspected
 - **THEN** it equals `["sexual_event_target:stimulus_applied"]` and its parsed effects resolve to a
   single `TargetSexualEventEffect`
+
+#### Scenario: every world.skills import installs the catalogue rows
+- **WHEN** a fresh process imports `world.skills.registry` (or any module under `world.skills`)
+  before any other game module
+- **THEN** `SKILL_REGISTRY` already contains every `SEXUAL_ACT_REGISTRY` key, including
+  `divine_sexual_arts`, because `world/skills/__init__.py` installs the sexual-act catalogue as its
+  final bootstrap edge — registry assembly never depends on which module the host imports first

@@ -39,6 +39,10 @@ _PARLESS_LINES = ("異種", "神之秘法")
 # against the act's own scaled ``pleasure:`` effect, and the last two are
 # owned exclusively by the climax-settlement mechanism (combat/clock upkeep
 # calls), never by an individual act's cast.
+# This emission prohibition is unrelated to recipient scope: which entity an
+# event reaches is decided statically by the effect prefix
+# (``sexual_event:`` / ``sexual_event_actor:`` / ``sexual_event_target:``),
+# never by a name table here.
 _FORBIDDEN_SEXUAL_EVENTS = frozenset(
     {
         "stimulus_applied",
@@ -48,16 +52,6 @@ _FORBIDDEN_SEXUAL_EVENTS = frozenset(
         "climax_extended",
     }
 )
-
-# Event names that keep the historic target-scoped recipient semantics when
-# ``_handle_sexual_event`` resolves them (design D-3): the set names exactly
-# the legacy ``divine_sexual_arts`` skill's declared event, so the divine-arts
-# exemption from self-pleasure (D-9) survives the participant-expanded
-# default. It is deliberately distinct from ``_FORBIDDEN_SEXUAL_EVENTS``,
-# which remains solely the act-catalog emission prohibition: a future
-# addition to the forbidden set can never silently change a legacy skill's
-# recipient semantics.
-_LEGACY_TARGET_SCOPED_EVENTS = frozenset({"stimulus_applied"})
 
 # Event names whose semantics are inherently performer-scoped: the state the
 # rule applies to belongs to the acting entity (its own exposure, its own

@@ -40,6 +40,7 @@ from world.rules.action import (
     _handle_sexual_event,
     _handle_pleasure_effect,
     _handle_sexual_counter_effect,
+    _handle_target_sexual_event,
 )
 from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
@@ -753,7 +754,8 @@ class MissingActRejectionTests(_ActCastTestCase):
 
 
 class SexualEventReuseTests(_ActCastTestCase):
-    """sexual_event:<name> entries reuse the existing handler; recipients follow D-3."""
+    """sexual_event:<name> entries reuse the existing handler; recipient scope
+    follows the effect prefix statically — no name-based exception table."""
 
     @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
     def test_declared_event_calls_apply_event_for_every_participant(self):
@@ -771,12 +773,31 @@ class SexualEventReuseTests(_ActCastTestCase):
     @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
     def test_no_new_handler_is_registered_for_sexual_event(self):
         self.assertIs(_EFFECT_HANDLERS["sexual_event"], _handle_sexual_event)
+        # The target-scoped channel is the only dispatch-table addition, and it
+        # is a distinct handler — the participant handler carries no scope fork.
+        self.assertIs(
+            _EFFECT_HANDLERS["sexual_event_target"], _handle_target_sexual_event
+        )
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
-    def test_legacy_stimulus_event_stays_target_scoped(self):
-        # D-9: _LEGACY_TARGET_SCOPED_EVENTS keeps the divine skill's declared
-        # event on the cast's targets only — the acting entity is never a
-        # recipient, so the divine-arts exemption from self-pleasure holds.
+    def test_target_prefixed_stimulus_event_fires_on_targets_only(self):
+        # The divine_sexual_arts cast semantics, carried by the prefix: the
+        # acting entity is never a recipient of its own target-scoped event,
+        # so the divine-arts exemption from self-pleasure (D-9) holds without
+        # any name-based recipient table.
+        pending = _handle_target_sexual_event(
+            self.actor,
+            [self.target],
+            "sexual_event_target:stimulus_applied",
+            {},
+            1.0,
+        )
+        self.assertEqual(len(pending), 1)
+        self.assertIs(pending[0].entity, self.target)
+
+    def test_the_participant_channel_no_longer_special_cases_stimulus(self):
+        # The exception table is dead: the same event name through the
+        # participant prefix now reaches every participant — scope is decided
+        # by the prefix alone, never by the name.
         pending = _handle_sexual_event(
             self.actor,
             [self.target],
@@ -784,8 +805,8 @@ class SexualEventReuseTests(_ActCastTestCase):
             {},
             1.0,
         )
-        self.assertEqual(len(pending), 1)
-        self.assertIs(pending[0].entity, self.target)
+        entities = {effect.entity for effect in pending}
+        self.assertEqual(entities, {self.actor, self.target})
 
     @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
     def test_self_act_event_reaches_the_actor_exactly_once(self):
