@@ -759,7 +759,7 @@ class SexualEventReuseTests(_ActCastTestCase):
     """sexual_event:<name> entries reuse the existing handler; recipient scope
     follows the effect prefix statically — no name-based exception table."""
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_declared_event_calls_apply_event_for_every_participant(self):
         skill, act = self._build_duo_act(sexual_events=("frequent_stimulation",))
         with self._install(skill, act)[0], self._install(skill, act)[1]:
@@ -772,7 +772,7 @@ class SexualEventReuseTests(_ActCastTestCase):
             self.assertEqual(self.target.sexual.sensitivity["私處"].level, "高")
             self.assertEqual(self.actor.sexual.sensitivity["私處"].level, "高")
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_no_new_handler_is_registered_for_sexual_event(self):
         self.assertIs(_EFFECT_HANDLERS["sexual_event"], _handle_sexual_event)
         # The target-scoped channel is the only dispatch-table addition, and it
@@ -781,6 +781,7 @@ class SexualEventReuseTests(_ActCastTestCase):
             _EFFECT_HANDLERS["sexual_event_target"], _handle_target_sexual_event
         )
 
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
     def test_target_prefixed_stimulus_event_fires_on_targets_only(self):
         # The divine_sexual_arts cast semantics, carried by the prefix: the
         # acting entity is never a recipient of its own target-scoped event,
@@ -796,6 +797,7 @@ class SexualEventReuseTests(_ActCastTestCase):
         self.assertEqual(len(pending), 1)
         self.assertIs(pending[0].entity, self.target)
 
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_the_participant_channel_no_longer_special_cases_stimulus(self):
         # The exception table is dead: the same event name through the
         # participant prefix now reaches every participant — scope is decided
@@ -810,7 +812,7 @@ class SexualEventReuseTests(_ActCastTestCase):
         entities = {effect.entity for effect in pending}
         self.assertEqual(entities, {self.actor, self.target})
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_self_act_event_reaches_the_actor_exactly_once(self):
         (skill, act), = _act_family(
             "獨處線",
@@ -857,6 +859,7 @@ class TargetSexualEventChannelBoundaryTests(_ActCastTestCase):
             resister_score=2.0,
         )
 
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
     def test_sole_target_resisted_cast_succeeds_with_no_event_fired(self):
         # The resist gate excludes the target before effect resolution, so
         # the target-scoped handler stages nothing: an ordinary success with
@@ -876,6 +879,7 @@ class TargetSexualEventChannelBoundaryTests(_ActCastTestCase):
         apply_spy.assert_not_called()
         self.assertEqual(self.target.sexual.pleasure.base, 0)
 
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
     def test_handler_stages_one_effect_per_non_actor_target(self):
         # The hypothetical AREA shape: a resolved target list carrying three
         # non-actor entities plus the actor itself stages exactly three

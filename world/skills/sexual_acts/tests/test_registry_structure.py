@@ -693,11 +693,11 @@ class RegistryAssemblyTests(unittest.TestCase):
         self.assertIn("agree_key", message)
         self.assertIn("other_key", message)
 
-    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-three-named-mastery-mystery-exclusions")
+    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-two-named-mastery-exclusions")
     def test_registries_agree_with_zero_acts_registered(self):
         check_registries_agree(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
 
-    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-three-named-mastery-mystery-exclusions")
+    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-two-named-mastery-exclusions")
     def test_orphan_sexual_act_skill_fails_the_agreement_check(self):
         orphan = SkillDef(
             key="orphan_act",
@@ -889,6 +889,7 @@ class DivineEighthRowStructuralTests(unittest.TestCase):
             (skill, act) for skill, act in DIVINE_ACTS if skill.key == "divine_sexual_arts"
         )
 
+    @covers_requirement("sexual-act-registry::divine-sexual-arts-is-the-eighth-hand-built-神之秘法-row")
     def test_eighth_pair_declares_the_shared_hand_built_fields(self):
         skill, act = self._eighth()
         self.assertEqual(len(DIVINE_ACTS), 8)
@@ -908,6 +909,7 @@ class DivineEighthRowStructuralTests(unittest.TestCase):
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertEqual(skill.effects, ["sexual_event_target:stimulus_applied"])
 
+    @covers_requirement("sexual-act-registry::divine-sexual-arts-is-the-eighth-hand-built-神之秘法-row")
     def test_registry_entry_is_the_catalog_object_not_a_main_registry_row(self):
         skill, _act = self._eighth()
         # Same object identity: the catalogue import installed the pair, and
@@ -1095,9 +1097,11 @@ class SoleDivineArtsClaimantTests(unittest.TestCase):
             if self._CLAIMED_KEY in (*preset.active_skills, *preset.passive_skills)
         )
 
+    @covers_requirement("sexual-act-registry::the-only-claim-of-divine-sexual-arts-in-shipped-data-is-yuna-s-preset")
     def test_yuna_is_the_sole_claimant(self):
         self.assertEqual(self._claimants(PLAYER_PRESET_REGISTRY), ["yuna_darknight"])
 
+    @covers_requirement("sexual-act-registry::the-only-claim-of-divine-sexual-arts-in-shipped-data-is-yuna-s-preset")
     def test_a_second_hypothetical_claimant_fails_the_uniqueness(self):
         intruder = replace(
             PLAYER_PRESET_REGISTRY["elysa_snow"],

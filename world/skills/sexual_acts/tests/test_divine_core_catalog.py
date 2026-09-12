@@ -552,6 +552,7 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
         super().setUp()
         register_catalog()
 
+    @covers_requirement("sexual-act-registry::only-actual-ownership-grants-divine-sexual-arts-to-a-divine-capable-entity")
     def test_fresh_divine_capable_elf_does_not_own_the_gated_act(self):
         elf = _entity("gated non-holder", race="elf")
         owned = elf.skills.owned_keys()
@@ -579,6 +580,7 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
         self.assertIn("shame_full_expose", owned)
         self.assertNotIn(_GATED_KEY, owned)
 
+    @covers_requirement("sexual-act-registry::only-actual-ownership-grants-divine-sexual-arts-to-a-divine-capable-entity")
     def test_confer_is_never_an_acquisition_path(self):
         # The negative scenario (round-2 blocker): a grant-only entity stays
         # rejected. conferred_grants() feeds effective_value only;
