@@ -46,7 +46,21 @@ def _press(page, key, wait_ms=60):
 
 
 class CreationBrowserTest(BrowserAcceptanceTest):
-    """Boots one dedicated isolated server per test with a creation fixture."""
+    """Boots one dedicated isolated server per test with a creation fixture.
+
+    Boot mode: SHIPPED catalogs (explicit per-runtime override of the
+    harness's synthetic default). The creation panel's wire vocabulary is
+    frozen shipped schema: both endpoints of the contract -- the server
+    presenter validator and the production client validator
+    (``web/static/webclient/js/elosern/protocol.js``, the shipped browser
+    itself) -- pin the race affinity trio and the eight lore elements as
+    fixed wire constants (schema v5). The t_-only install therefore cannot
+    present the creation panel at all, and relaxing either endpoint would
+    be a production protocol redesign this change does not own. Every
+    journey stays boot-mode agnostic anyway: races, subraces, budgets,
+    allocations, preset cards, and placeholder values are all re-derived
+    from the panel the running server presents -- never a literal.
+    """
 
     CREATION_DRAFT = False
     CREATION_PRESET_DRAFT = False
@@ -58,6 +72,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
 
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
         runtime.env["ELOSERN_BROWSER_CREATION"] = "1"
         if self.CREATION_DRAFT:
             runtime.env["ELOSERN_BROWSER_CREATION_DRAFT"] = "1"
@@ -656,8 +671,11 @@ class ConceptCreationJourneys(CreationBrowserTest):
         # The expected pre-filled identity follows the placeholder resolver
         # (shipped: the wizard snapshot; synthetic: the first live race pair
         # with a greedy budget spend and empty affinity), re-derived here
-        # from the same panel — never a hardcoded shipped row.
-        placeholder = concept_placeholder_values(panel)
+        # from the same panel — never a hardcoded shipped row. This journey's
+        # runtime boots shipped catalogs (class docstring), so the resolver
+        # forwards the wizard snapshot; the explicit mode keeps the helper in
+        # step with the runtime regardless of the process-wide default.
+        placeholder = concept_placeholder_values(panel, synth=False)
         self.assertEqual(proposal["race"], placeholder["race"])
         self.assertEqual(proposal["subrace"], placeholder["subrace"])
         # The form is only pre-filled, never auto-submitted.

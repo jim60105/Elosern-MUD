@@ -441,7 +441,9 @@ def graft_synth_affinity_bounds() -> None:
         _AFFINITY_INPUT_BOUNDS.setdefault(race_key, SYNTH_RACE_AFFINITY_BOUND)
 
 
-def concept_affinity_checked_testids(expected: tuple[str, ...]) -> tuple[str, ...]:
+def concept_affinity_checked_testids(
+    expected: tuple[str, ...], *, synth: bool | None = None
+) -> tuple[str, ...]:
     """The affinity checkboxes the CONCEPT placeholder journey must find checked.
 
     The shipped proposal names two shipped elements, so the journey pins
@@ -452,12 +454,12 @@ def concept_affinity_checked_testids(expected: tuple[str, ...]) -> tuple[str, ..
     checkboxes are rendered and nothing is checked) — so synthetic mode
     expects no checked box.
     """
-    return () if synth_mode_enabled() else tuple(
+    return () if (synth_mode_enabled() if synth is None else synth) else tuple(
         f"creation-affinity-{key}" for key in expected
     )
 
 
-def concept_placeholder_values(panel: dict) -> dict:
+def concept_placeholder_values(panel: dict, *, synth: bool | None = None) -> dict:
     """The identity the CONCEPT placeholder journey must observe pre-filled.
 
     Re-derives, purely from the panel the server just presented (no Django
@@ -467,16 +469,24 @@ def concept_placeholder_values(panel: dict) -> dict:
     race/subrace pair from the custom block and the greedy span-fill of the
     matching advertised profile (the same rule the server applies against
     the live profile), with the empty affinity the placeholder always carries.
+
+    ``synth`` overrides the process default: a journey whose dedicated
+    runtime boots the shipped catalogs (the creation journeys -- the
+    creation panel's wire contract is fixed shipped schema vocabulary on
+    both endpoints, including the shipped client validator) must forward
+    the wizard's shipped snapshot even though the Playwright-side process
+    itself runs with the harness's synthetic default.
     """
     proposal = panel["proposal"]
-    if not synth_mode_enabled():
+    synth_boot = synth_mode_enabled() if synth is None else synth
+    if not synth_boot:
         return {
             "race": proposal["race"],
             "subrace": proposal["subrace"],
             "allocations": dict(proposal["allocations"]),
             "affinity_elements": list(proposal["affinity_elements"]),
             "affinity_checked": concept_affinity_checked_testids(
-                proposal["affinity_elements"]
+                proposal["affinity_elements"], synth=synth_boot
             ),
         }
     custom = panel["custom"]
