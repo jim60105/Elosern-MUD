@@ -190,6 +190,28 @@ ever needs a "none" option.
   平原民 → 「世居平原與城鎮的血脈。農耕與工坊並重，各項資質最為均衡。」;
   山地民 → 「世居丘陵與谷地的血脈。礦坑與工坊的重勞動造就體魄與耐久，不以靈巧取勝。」
 
+#### Scenario: Elf branch specialty prose names home, affinity, and art
+- **WHEN** the three elf `SUBRACE_REGISTRY` entries' `specialty` fields are inspected
+- **THEN** they are exactly, verbatim:
+  斐歐恩族 → 「翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。」;
+  基亞蘭族 → 「暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。」;
+  伊歐拉斯族 → 「幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。」 —
+  each naming the branch's own village, affinity, and signature art from `world_info.md`'s 三分支
+  block, with no occupational determinism
+
+#### Scenario: Beastfolk specialty prose names a physique, its habit, and its tradeoff
+- **WHEN** the seven beastfolk `SUBRACE_REGISTRY` entries' `specialty` fields are inspected
+- **THEN** they are exactly, verbatim:
+  狼人 → 「群居狩獵的狼人，體格均衡而耐力出眾，慣於配合同伴作戰，無突出短板亦無驚人天賦。」;
+  貓人 → 「身形輕盈、舉步無聲的貓人，敏捷遠出同族之上，代價是肌骨纖薄，難以吃下正面重創。」;
+  熊人 → 「骨架厚重、力大無窮的熊人，慣用重型武器，卻因轉身遲鈍而追不上靈活的對手。」;
+  兔人 → 「奔躍如風的兔人，為獸人之中最快的亞種，擅長遊走遠射，卻經不起近身的一擊。」;
+  牛人 → 「身軀如山、皮糙肉厚的牛人，防禦最厚而善於陣地戰，只因其行動緩慢而難以追擊機動的敵人。」;
+  虎人 → 「爆發力驚人、攻速兼備的虎人，出擊凌厲而防禦為全亞種最弱，講求一擊制敵而非持久消耗。」;
+  狐人 → 「體格在獸人之中不突出的狐人，以體力換來同族最深厚的魔力底蘊，是最接近施法者的亞種。」 —
+  each naming a physique and its habit plus the tradeoff its `static_modifiers` encode, matching
+  `world_info.md`'s 「亞種數值傾向」 block, never an occupation as identity
+
 #### Scenario: Every beastfolk subspecies' static_modifiers sum to zero
 - **WHEN** every one of the seven beastfolk `SUBRACE_REGISTRY` entries' `static_modifiers` is
   inspected
@@ -423,3 +445,37 @@ scope.)
 - **THEN** they still resolve to the 平民與非戰鬥者 physical band ((1, 5)), because that key
   names the unrelated `StaticTier` concept — after the rename it is the only surviving meaning
   of the string
+
+### Requirement: Subrace specialty prose is server-owned Traditional Chinese for every entry
+Every `Subrace.specialty` value in `SUBRACE_REGISTRY` SHALL be Traditional Chinese (zh-TW)
+player-facing prose, derived server-side from the registry and rendered verbatim to the player by
+the character-creation surfaces (`commands/character_creation.py` renders
+`{display_name_zh}（{common_name_zh}）——{specialty}`; the WebClient creation menu uses
+`entry.specialty` as the subrace description). No `specialty` value SHALL contain an English
+sentence: the field is the server-owned label text for a Chinese subrace name, exactly as the
+creation panel's `sex` options are server-owned Traditional Chinese labels
+(`webclient-character-creation-ui`), and no browser-side translation or English fallback exists.
+This contract binds all fifteen entries — the five human bloodlines, the three elf branches, and
+the seven beastfolk subspecies — and every value SHALL stay within the creation protocol's
+`MAX_SPECIALTY_CODE_POINTS` (256) bound so it ships on the same path unchanged.
+
+#### Scenario: Every specialty renders as Chinese beside its Chinese name
+- **WHEN** a player building a custom character is shown a subrace line — the CLI prompt
+  `{display_name_zh}（{common_name_zh}）——{specialty}` or the WebClient menu description — for
+  any of the fifteen subraces
+- **THEN** the whole line is Traditional Chinese with no English sentence embedded in it, since
+  `specialty` is server-owned registry prose derived server-side rather than a client-translated
+  or client-owned string
+
+#### Scenario: Registry inspection finds no English prose in any of the fifteen specialties
+- **WHEN** every one of the fifteen `SUBRACE_REGISTRY` entries' `specialty` values is inspected
+  at test time
+- **THEN** each value contains at least one CJK ideograph and zero ASCII letters (`A-Z`/`a-z`) —
+  none of the fifteen approved strings contains a single ASCII letter, so the rule needs no
+  parenthetical-exception mechanism, and a value such as
+  `The lower class: farmers and laborers.` fails the assertion the moment it is reintroduced
+
+#### Scenario: A localized specialty still fits the creation protocol bound
+- **WHEN** every `specialty` value is measured against `MAX_SPECIALTY_CODE_POINTS`
+- **THEN** each is at most 256 code points, so the WebClient creation panel ships the field
+  through the existing validation path with no protocol change
