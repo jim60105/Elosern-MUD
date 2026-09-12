@@ -144,7 +144,7 @@ keys whose `category` is `SkillCategory.SEXUAL_ACT`, with `{"divine_sexual_maste
 "reincarnation_boon_yuna"}` excluded from that comparison on both sides. `divine_sexual_arts` SHALL
 NOT be a member of the exclusion set: it is registered as a catalogue row (see the added
 requirement) and participates in the agreement comparison on both sides. The shipped structural
-constant `_STRUCTURAL_EXCLUSIONS` is therefore exactly that two-key set once the integration lands.
+constant `_MASTERY_EXCLUSIONS` is therefore exactly that two-key set once the integration lands.
 
 #### Scenario: The two registries agree after the catalogue lands
 - **WHEN** the structural test runs against the assembled registries after every catalog proposal and
