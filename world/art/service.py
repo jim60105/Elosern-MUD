@@ -284,6 +284,52 @@ def _resolve_gallery_subject(subject: ArtSubject) -> tuple[ArtSubject, object]:
     return producer(subject.key), None
 
 
+def resolve_gallery_subject_by_key(subject_key: str) -> tuple[ArtSubject, object | None]:
+    """Resolve a serialized full subject key to its typed subject and entity.
+
+    The ONE public read-only seam of ``gallery-card-update-api``: the
+    webclient gallery presenter rail and the gallery management adapters
+    resolve a rail ``subject_key`` back to its live entity here instead of
+    duplicating the lookup. The key is parsed through the shared typed
+    parser, then dispatched on its OWN kind — never a scan across kinds, so
+    a character stable key legally equal to a scene archetype or monster
+    tier can only ever resolve its own kind's subject:
+
+    * registry-backed kinds re-validate through the kind's typed producer
+      (an unregistered registry entry is the producer's typed rejection —
+      the caller's key alone is never trusted);
+    * character-kind keys resolve through the module's existing stable-key
+      live-entity lookup and the existing typed subject producer;
+    * every other kind (today: scene) has no subject behind a bare key and
+      is the same typed ``ArtSubjectError`` as any unresolvable key.
+
+    The entity is returned only for the character kind and is ``None`` for
+    registry kinds. The resolver checks NO preconditions (age, capability),
+    reads and writes NO gallery record, and publishes NO presentation — the
+    preconditions stay where they already are. The live-entity branch is the
+    existing scan over every living entity, cost for cost.
+    """
+    subject = parse_subject(subject_key)
+    producer = _GALLERY_REGISTRY_PRODUCERS.get(subject.kind.value)
+    if producer is not None:
+        return producer(subject.key), None
+    if subject.kind is ArtSubjectKind.CHARACTER:
+        entity = _living_entity_for_stable_key(subject.key)
+        if entity is None:
+            raise ArtSubjectError(
+                f"no living character carries portrait stable_key {subject.key!r}"
+            )
+        resolved = character_subject_for(entity)
+        if resolved is None:
+            raise ArtSubjectError(
+                f"character carrying stable_key {subject.key!r} no longer yields a portrait subject"
+            )
+        return resolved, entity
+    raise ArtSubjectError(
+        f"no typed producer resolves subject kind {subject.kind.value!r}"
+    )
+
+
 def retry_gallery_subject(subject: ArtSubject) -> bool:
     """Re-attempt one gallery subject through its kind preconditions and the gallery guard.
 

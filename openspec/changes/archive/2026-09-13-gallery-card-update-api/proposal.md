@@ -59,7 +59,9 @@ adapters both need it (companions and other-character subjects cannot reach
 - `world/art/gallery.py` (two writers + events), `world/art/service.py` (one
   published resolver) — this change exclusively owns the batch's `world/art/`
   hunks.
-- New test module registered in `.github/evennia-shards.json` in this change;
+- New test module owned by `.github/evennia-shards.json` through the shard's
+  existing `world.art` prefix label (the exactly-once shard contract forbids
+  an additional explicit label);
   `@covers_requirement` on the new requirements.
 - Unblocks `webclient-gallery-actions` (depends-on).
 
