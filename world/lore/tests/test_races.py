@@ -12,6 +12,8 @@ from world.lore.races import (
     SUBRACE_REGISTRY,
     StatModifiers,
 )
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 
 
 BEASTFOLK_SUBRACES = {
@@ -27,9 +29,9 @@ ELF_BRANCHES = {"fionnen", "ciaran", "eolas"}
 HUMAN_SUBRACES = {
     "human_royal",
     "human_noble",
-    "human_wealthy",
-    "human_commoner",
-    "human_laborer",
+    "human_coastal",
+    "human_plains",
+    "human_highland",
 }
 
 
@@ -158,17 +160,32 @@ class RaceRegistryTests(unittest.TestCase):
 
     def test_human_subraces_exist_with_bloodline_names(self):
         expected_names = {
-            "human_royal": "王族",
-            "human_noble": "貴族",
-            "human_wealthy": "富裕平民",
-            "human_commoner": "平民",
-            "human_laborer": "底層平民",
+            "human_royal": ("王族", "王室血脈"),
+            "human_noble": ("貴族", "貴族血脈"),
+            "human_coastal": ("濱海民", "濱海血脈"),
+            "human_plains": ("平原民", "平原血脈"),
+            "human_highland": ("山地民", "山地血脈"),
         }
-        for key, display_name in expected_names.items():
+        for key, (display_name, common_name) in expected_names.items():
             subrace = SUBRACE_REGISTRY[key]
             self.assertEqual(subrace.display_name_zh, display_name)
+            self.assertEqual(subrace.common_name_zh, common_name)
             self.assertEqual(subrace.race_key, "human")
             self.assertIsNone(subrace.population)
+
+    @covers_requirement("lore-registries::human-lineage-renames-ship-without-a-save-data-compatibility-layer")
+    def test_retired_wealth_ladder_subrace_keys_resolve_nowhere(self):
+        # The rename ships with no alias table: the retired keys must not
+        # resolve in any shipped registry. STATIC_TIER_REGISTRY keeps its
+        # unrelated human_commoner physical band (平民與非戰鬥者), which is
+        # the only surviving meaning of that string.
+        retired = ("human_wealthy", "human_commoner", "human_laborer")
+        for key in retired:
+            self.assertNotIn(key, SUBRACE_REGISTRY)
+            self.assertNotIn(key, SUBRACE_STARTING_KIT_REGISTRY)
+            self.assertNotIn(key, PLAYER_PRESET_REGISTRY)
+            self.assertNotIn(key, {preset.subrace for preset in PLAYER_PRESET_REGISTRY.values()})
+        self.assertIn("human_commoner", STATIC_TIER_REGISTRY)
 
     def test_every_race_has_at_least_one_subrace(self):
         for race_key in RACE_REGISTRY:

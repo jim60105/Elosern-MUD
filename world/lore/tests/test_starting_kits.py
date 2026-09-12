@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 
 import unittest
 
-from world.lore.items import ITEM_REGISTRY
+from world.lore.items import ITEM_REGISTRY, ItemRarity
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.starting_kits import (
     SUBRACE_STARTING_KIT_REGISTRY,
@@ -73,71 +73,71 @@ class SubraceStartingKitTests(unittest.TestCase):
             ),
             (
                 "not-a-kit",
-                ("human_commoner", (("plain_sword", 1),)),
+                ("human_plains", (("plain_sword", 1),)),
                 "must be a SubraceStartingKit",
             ),
             (
                 "empty-kit",
-                SubraceStartingKit("human_commoner", ()),
+                SubraceStartingKit("human_plains", ()),
                 "non-empty",
             ),
             (
                 "items-not-tuple",
-                SubraceStartingKit("human_commoner", ["plain_sword"]),
+                SubraceStartingKit("human_plains", ["plain_sword"]),
                 "non-empty tuple",
             ),
             (
                 "malformed-entry",
-                SubraceStartingKit("human_commoner", (("plain_sword",),)),
+                SubraceStartingKit("human_plains", (("plain_sword",),)),
                 "malformed item entry",
             ),
             (
                 "unknown-item",
-                SubraceStartingKit("human_commoner", (("not_an_item", 1),)),
+                SubraceStartingKit("human_plains", (("not_an_item", 1),)),
                 "unknown item",
             ),
             (
                 "non-string-item",
-                SubraceStartingKit("human_commoner", ((["plain_sword"], 1),)),
+                SubraceStartingKit("human_plains", ((["plain_sword"], 1),)),
                 "unknown item",
             ),
             (
                 "non-equipment-item",
-                SubraceStartingKit("human_commoner", (("meal", 1),)),
+                SubraceStartingKit("human_plains", (("meal", 1),)),
                 "non-equipment item",
             ),
             (
                 "duplicate-item",
                 SubraceStartingKit(
-                    "human_commoner",
+                    "human_plains",
                     (("leather_armor", 1), ("leather_armor", 2)),
                 ),
                 "duplicate item",
             ),
             (
                 "zero-quantity",
-                SubraceStartingKit("human_commoner", (("plain_sword", 0),)),
+                SubraceStartingKit("human_plains", (("plain_sword", 0),)),
                 "non-positive quantity",
             ),
             (
                 "string-quantity",
-                SubraceStartingKit("human_commoner", (("plain_sword", "2"),)),
+                SubraceStartingKit("human_plains", (("plain_sword", "2"),)),
                 "non-positive quantity",
             ),
             (
                 "boolean-quantity",
-                SubraceStartingKit("human_commoner", (("plain_sword", True),)),
+                SubraceStartingKit("human_plains", (("plain_sword", True),)),
                 "non-positive quantity",
             ),
         ]
         for name, kit, message in cases:
             with self.subTest(case=name):
                 with self.assertRaisesRegex(ValueError, message):
-                    _validate_starting_kit("human_commoner", kit)
+                    _validate_starting_kit("human_plains", kit)
         _validate_starting_kit(
-            "human_commoner",
+            "human_plains",
             SubraceStartingKit(
-                "human_commoner", (("leather_armor", 2), ("plain_sword", 1))
+                "human_plains", (("leather_armor", 2), ("plain_sword", 1))
             ),
         )
 
@@ -148,7 +148,7 @@ class SubraceStartingKitTests(unittest.TestCase):
         missing = {
             key: SUBRACE_STARTING_KIT_REGISTRY[key]
             for key in SUBRACE_REGISTRY
-            if key != "human_commoner"
+            if key != "human_plains"
         }
         with self.assertRaisesRegex(ValueError, "missing subrace"):
             _validate_starting_kit_coverage(missing)
@@ -161,13 +161,43 @@ class SubraceStartingKitTests(unittest.TestCase):
 
     def test_inventory_list_flattens_by_quantity_in_declared_order(self):
         kit = SubraceStartingKit(
-            "human_commoner",
+            "human_plains",
             (("leather_armor", 2), ("plain_sword", 1)),
         )
         self.assertEqual(
             kit.inventory_list(),
             ["leather_armor", "leather_armor", "plain_sword"],
         )
+
+    @covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")
+    def test_human_kits_match_the_lineage_table(self):
+        expected = {
+            "human_royal": ("gilded_saber", "chainmail", "silver_hairpin"),
+            "human_noble": ("knight_blade", "leather_armor", "silver_hairpin"),
+            "human_coastal": ("plain_sword", "leather_armor", "iron_dagger"),
+            "human_plains": ("plain_sword", "leather_armor", "silver_hairpin"),
+            "human_highland": ("plain_sword", "leather_armor", "hunting_throwing_axe"),
+        }
+        for subrace_key, item_keys in expected.items():
+            with self.subTest(subrace=subrace_key):
+                kit = SUBRACE_STARTING_KIT_REGISTRY[subrace_key]
+                self.assertEqual(tuple(key for key, _ in kit.items), item_keys)
+        # The three commoner lineages are equipotent: three COMMON items each,
+        # so no commoner lineage starts richer than another.
+        for subrace_key in ("human_coastal", "human_plains", "human_highland"):
+            kit = SUBRACE_STARTING_KIT_REGISTRY[subrace_key]
+            with self.subTest(subrace=subrace_key):
+                self.assertEqual(len(kit.items), 3)
+                for item_key, _ in kit.items:
+                    self.assertEqual(
+                        ITEM_REGISTRY[item_key].presentation.rarity,
+                        ItemRarity.COMMON,
+                        f"{subrace_key} kit item {item_key!r} must be COMMON",
+                    )
+        # 木製棍棒 is retired from every kit.
+        for subrace_key, kit in SUBRACE_STARTING_KIT_REGISTRY.items():
+            with self.subTest(subrace=subrace_key):
+                self.assertNotIn("wooden_club", tuple(key for key, _ in kit.items))
 
 
 if __name__ == "__main__":
