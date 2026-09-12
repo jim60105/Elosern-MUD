@@ -1,7 +1,7 @@
 # rulebook-schema Specification
 
 ## Purpose
-TBD - created by archiving change buffs-rulebook. Update Purpose after archive.
+Defines the shared rulebook schema engine: every rule carries a required, unique ID enforced at load, one evaluate_condition() matcher serves event, field-threshold, and other condition kinds, the then clause stays opaque to the schema module, and equipment-worn condition values are referentially validated at load. The module documents itself as the shared engine for every rulebook table.
 ## Requirements
 ### Requirement: Every rule carries a required, unique ID
 `world/rules/rulebook/schema.py` SHALL define a `Rule` type with a required `id` field, and

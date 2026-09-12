@@ -1,7 +1,7 @@
 # sexual-transition-rulebook Specification
 
 ## Purpose
-TBD - created by archiving change sexual-transition-rules. Update Purpose after archive.
+Defines the sexual transition rules as a sexual.yaml list loaded through change 6's shared rule loader with no second parser, applied through the single apply_event() entry point evaluating every rule to a fixed point. Requires every write to go through the field's own live trait object or the designated earlier-change seam, keeps virgin/experience rules irreversible and append-only, and structurally enforces one test per rule ID and exact FIELD_KINDS coverage of the targeted fields.
 ## Requirements
 ### Requirement: sexual.yaml loads through change 6's shared rule loader with no second parser
 `world/rules/rulebook/sexual.yaml` SHALL be a YAML list of `{id, when, then}` entries loadable by

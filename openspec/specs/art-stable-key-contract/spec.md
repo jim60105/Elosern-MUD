@@ -1,7 +1,7 @@
 # art-stable-key-contract Specification
 
 ## Purpose
-TBD - created by archiving change fix-art-pipeline-contracts. Update Purpose after archive.
+States the single shared validation contract every portrait/scene stable-key producer must apply — forbidden characters, a 64-character and 200-UTF-8-byte ceiling — so worker output identities and queue keys stay within filesystem limits, and reserves the digit-only keyspace of character portraits for player characters.
 ## Requirements
 ### Requirement: Stable keys share one producer contract
 Every producer of a portrait/scene stable key — character import, quest characterization, and any

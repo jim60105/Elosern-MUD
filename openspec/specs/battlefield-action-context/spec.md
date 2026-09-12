@@ -1,7 +1,7 @@
 # battlefield-action-context Specification
 
 ## Purpose
-TBD - created by archiving change dice-combat. Update Purpose after archive.
+Provides Battlefield and BattlefieldActionContext conforming completely to change 8's ActionContext protocol: relation_to derived from two-team membership, is_present checked against canonical roster membership, and is_in_range reduced to fled status with melee-versus-ranged explicitly unbuilt. Requires combat shortcuts to read the two-team roster directly with no separate expansion path.
 ## Requirements
 ### Requirement: BattlefieldActionContext conforms to change 8's ActionContext protocol
 `world/rules/combat.py` SHALL provide `Battlefield` (holding a two-team roster, `teams: dict[str,

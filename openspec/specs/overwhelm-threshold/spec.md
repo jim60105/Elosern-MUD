@@ -1,7 +1,7 @@
 # overwhelm-threshold Specification
 
 ## Purpose
-TBD - created by archiving change overwhelm-resolution. Update Purpose after archive.
+Defines overwhelm classification as a pure, per-round recomputable query: a power-ratio signal summed from team effective_power checked in both directions, a roll-free to-hit saturation signal, and a combined direction verdict further gated by an estimated-round-count bound. Includes the side-effect-free static query answering whether a commanded action damages an enemy.
 ## Requirements
 ### Requirement: The power-ratio signal is computed from team-summed effective_power, checked in both
 directions independently

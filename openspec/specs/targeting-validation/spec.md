@@ -1,7 +1,7 @@
 # targeting-validation Specification
 
 ## Purpose
-TBD - created by archiving change action-resolver. Update Purpose after archive.
+Defines target resolution as four ordered validations — presence, alive, range, faction constraint — each rejecting with its own named reason and short-circuiting for SINGLE specs, with SINGLE and AREA filtering candidates differently. Reads FactionConstraint from SkillDef, gives out-of-combat targeting no hostility model, and treats combat shortcuts as convenience UI over the shared ActionContext protocol with a room-backed implementation.
 ## Requirements
 ### Requirement: Target resolution runs four ordered validations
 `world/rules/targeting.py` SHALL validate every candidate target, in order: (1) presence, (2) alive,

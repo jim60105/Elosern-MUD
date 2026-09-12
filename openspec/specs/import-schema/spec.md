@@ -1,7 +1,7 @@
 # import-schema Specification
 
 ## Purpose
-TBD - created by archiving change import-contract. Update Purpose after archive.
+Defines CHARACTER_SCHEMA_V1 and WORLD_SCHEMA_V1, dispatched solely by an explicit record_type discriminator. Covers the 0-10000 age ranges, documented base-value stats restricted to eight trait keys, typed disguised_stats/persona/sexual_baseline fields, safe-key character sets, optional affinity elements, canonical sex values, and the optional profession/components fields.
 ## Requirements
 ### Requirement: Both schemas require an explicit record_type discriminator, not implicit field sniffing
 `CHARACTER_SCHEMA_V1` SHALL require a `record_type` property constrained to the literal value

@@ -1,7 +1,7 @@
 # art-asset-lifecycle Specification
 
 ## Purpose
-TBD - created by archiving change art-assets. Update Purpose after archive.
+Defines world/art/service.py as the sole writer of art asset and queue records and the lifecycle paths — startup sync and recovery, player creation and activation, validated named-NPC spawn, and room entry — that schedule portrait and scene asset ensures. Guarantees queue failures never roll back gameplay, canonical-age validation runs on every lifecycle path, and rejected prompt content never reaches the presenter or browser.
 ## Requirements
 ### Requirement: world/art/service.py is the sole writer of asset and queue records
 `world/art/service.py` SHALL own every write to asset/queue records. No presenter module, no worker

@@ -1,7 +1,7 @@
 # import-loader Specification
 
 ## Purpose
-TBD - created by archiving change import-contract. Update Purpose after archive.
+Requires loader.py to construct entities only after full batch validation reports zero rejections, within a single database transaction, and to preserve imported data faithfully: literal trait values merged onto the race floor, non-trait fields stored verbatim, and sex assigned from the validated record. Covers targeting PlayerCharacter or NPC and assembling blueprint components for profession-bearing NPC records with explicit precedence.
 ## Requirements
 
 ### Requirement: loader.py instantiates entities only after batch validation reports zero rejections

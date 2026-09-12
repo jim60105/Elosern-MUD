@@ -1,7 +1,7 @@
 # event-log-compression Specification
 
 ## Purpose
-TBD - created by archiving change overwhelm-resolution. Update Purpose after archive.
+Defines compress_event_logs, which preserves every attack record without kind-based filtering, marks the player's commanded action, and prepends a single overwhelm_resolution summary entry while keeping the full who-hit-whom record alongside it. Requires compressed logs to render through render_plain_text with no LLM involvement.
 ## Requirements
 ### Requirement: compress_event_logs preserves every attack record without kind-based filtering
 `compress_event_logs(raw_logs, overwhelming_team, overwhelmed_team, rounds, commanded_actor=None,

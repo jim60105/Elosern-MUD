@@ -1,7 +1,7 @@
 # combat-modifier-table Specification
 
 ## Purpose
-TBD - created by archiving change buffs-rulebook. Update Purpose after archive.
+Keeps combat_modifiers.yaml one table — buff-origin and sexual-origin rules alike — evaluated by the identical shared condition engine with no origin-specific branch, exposed through the pure query evaluate_combat_modifiers(). Defines bundle value semantics (flat defense/atk_phys magnitude adjustments, percentage mp/sp cost adjustments, non-negative adjusted agility), condition kinds such as skill_owned and worn-equipment facts, and the requirement that preview, preflight, and resolve agree on adjusted values.
 ## Requirements
 ### Requirement: combat_modifiers.yaml is one table evaluated by one condition engine, with no
 special-case branch between buff-origin and sexual-origin rows

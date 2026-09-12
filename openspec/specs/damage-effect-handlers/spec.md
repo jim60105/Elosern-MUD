@@ -1,7 +1,7 @@
 # damage-effect-handlers Specification
 
 ## Purpose
-TBD - created by archiving change dice-combat. Update Purpose after archive.
+Registers the damage:* prefix into change 8's effect-handler registry declaring the traits surface, fixes the damage:<element>:<school> naming convention, and requires the to-hit roll and damage number to be computed during effect resolution — never inside handlers — reading every stat through effective_value() with combat modifiers applied uniformly regardless of origin.
 ## Requirements
 ### Requirement: damage:* is registered into change 8's effect-handler registry, declaring the traits
 surface

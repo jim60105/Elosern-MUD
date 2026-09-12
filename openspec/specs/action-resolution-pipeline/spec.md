@@ -1,7 +1,7 @@
 # action-resolution-pipeline Specification
 
 ## Purpose
-TBD - created by archiving change action-resolver. Update Purpose after archive.
+Defines ActionResolver as the sole entry point for every skill invocation, running the design doc's eight resolution steps in fixed order with atomic commit semantics so a failure at any step leaves zero state mutated. Covers the side-effect-free preflight and preview surfaces, the nonlethal policy applied before event-effect planning, the open prefix-keyed effect-handler registry, and the boundary event emitted on successful commits.
 ## Requirements
 
 ### Requirement: ActionResolver exposes side-effect-free preflight for player combat input

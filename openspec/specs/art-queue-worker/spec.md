@@ -1,7 +1,7 @@
 # art-queue-worker Specification
 
 ## Purpose
-TBD - created by archiving change art-assets. Update Purpose after archive.
+Defines the persisted asset-record contract (status, deterministic source hash, same-store output identity, attempt/error metadata, aspect ratio), the subject-keyed idempotent queue, and the shared serialization lock and single worker concurrency slot for scenes and portraits. Covers deterministic sd-webui generation confined to the store, settings-configurable scheduling, same-origin media serving that never exposes the store root, wire-stable in-flight status, and claim/settle boundary events.
 ## Requirements
 
 ### Requirement: Asset records carry the full contract and never a live object reference

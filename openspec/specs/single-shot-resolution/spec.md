@@ -1,7 +1,7 @@
 # single-shot-resolution Specification
 
 ## Purpose
-TBD - created by archiving change overwhelm-resolution. Update Purpose after archive.
+Defines resolve_overwhelm, which resolves overwhelm-classified encounters exclusively by reusing change 9's run_round — never a separate combat algorithm — and is exactly consistent with per-round resolution under the same inputs. Covers stopping when the classification verdict changes, the named finite max_rounds outcome, the identical rounds-times-six-seconds time report, golden fixed-seed evidence, and a first-actor override that influences round-one turn order only.
 ## Requirements
 ### Requirement: resolve_overwhelm resolves an overwhelm-classified encounter by reusing run_round,
 never a separate combat algorithm

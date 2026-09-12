@@ -1,7 +1,7 @@
 # art-subject-model Specification
 
 ## Purpose
-TBD - created by archiving change art-assets. Update Purpose after archive.
+Defines typed, namespaced, pre-validated art subject keys (ArtSubjectKind and frozen ArtSubject with a strict parser) so no queue, store, worker, command, or presenter path ever handles a raw full-key string. Requires scene and generic-monster subjects to resolve from immutable registries, named-character portrait eligibility to be explicit policy, and subject descriptions to be deterministic and physical-truth only.
 ## Requirements
 ### Requirement: Art subject keys are typed, namespaced, and validated before queue access
 `world/art/subjects.py` SHALL define `ArtSubjectKind` (`scene`, `portrait:character`,

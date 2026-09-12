@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD - created by archiving change fix-combat-effect-context-validation. Update Purpose after archive.
+Requires every registered effect handler to declare the event_context keys it needs as part of its registration metadata, making required handler context explicit at registration time.
 
 ## Requirements
 
