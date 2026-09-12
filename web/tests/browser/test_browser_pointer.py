@@ -102,10 +102,6 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]
 
-    def _engage(self, page):
-        page.evaluate("Evennia.msg('text', ['engage goblin'], {})")
-        self._wait_mode(page, "combat")
-
     # -- journeys -------------------------------------------------------------
 
     @covers_requirement(
@@ -144,17 +140,25 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
 
         # The G2 hierarchical exploration dock renders the keyboard-router
         # frames: the root "互動" entry (key ``interact``) opens the interact
-        # submenu (target rows keyed ``target-<identity>``); selecting the goblin
-        # target renders its affordance menu, whose ``engage`` row (key
+        # submenu (target rows keyed ``target-<identity>``); selecting the
+        # live-hostile target (the one whose engage affordance is ENABLED —
+        # the defeated fixture monster's is disabled) renders its affordance
+        # menu, whose ``engage`` row (key
         # ``engage``) dispatches ``explore.engage``.
         self._click_row(page, "interact")
-        goblin = next(
-            (t for t in (panel.get("interact") or [])
-             if "哥布林" in (t.get("display_name") or "")),
+        hostile = next(
+            (
+                t
+                for t in (panel.get("interact") or [])
+                if any(
+                    a.get("action_id") == "explore.engage" and a.get("enabled") is True
+                    for a in (t.get("affordances") or [])
+                )
+            ),
             None,
         )
-        self.assertIsNotNone(goblin, "goblin target not found in the interact panel")
-        target_key = "target-" + str(goblin["identity"])
+        self.assertIsNotNone(hostile, "enabled-engage target not found in the interact panel")
+        target_key = "target-" + str(hostile["identity"])
         page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
         self._click_row(page, target_key)
         page.wait_for_selector('[data-item-key="engage"]', timeout=15000)

@@ -22,6 +22,17 @@ echoes synthetic-fixture content is not a passing conversion.
 - **THEN** every test passes while skills, items, quests, regions, presets, titles, and
   prose resolve exclusively from synthetic catalogs
 
+#### Scenario: Frozen wire-vocabulary panels boot shipped
+- **WHEN** a migrated file's journeys drive a panel whose wire contract pins shipped
+  vocabulary as fixed constants on BOTH endpoints of the protocol (the server presenter
+  validator and the shipped browser's client validator), so the synthetic install cannot
+  present that panel without a production protocol redesign
+- **THEN** that file's dedicated runtimes explicitly boot the shipped catalogs while
+  still re-deriving every observed race, subrace, budget, card, and placeholder value
+  from the panel the running server presents (never a shipped literal in test source),
+  the file stays migration-free under the lint gate, and the boot-mode decision is
+  documented in the file
+
 #### Scenario: Data rework cannot break the area again
 - **WHEN** shipped identifiers, display prose, or catalog sizes change in the game-data
   rework

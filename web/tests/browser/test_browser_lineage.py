@@ -43,7 +43,16 @@ def _lineage_node(
 
 
 def _available_lineage_panel() -> dict:
-    """A schema-valid available lineage payload: one fire chain, three nodes."""
+    """A schema-valid available lineage payload: one chain, three nodes.
+
+    The whole chain is locally authored payload data — the client renders it
+    verbatim and never resolves these keys against a registry — so its
+    identifiers and displays are fixture-authored ``t_`` values, not shipped
+    catalog rows.
+    """
+    root_key, root_name = CHAIN_ROOT
+    mid_key, mid_name = CHAIN_MID
+    leaf_key, leaf_name = CHAIN_LEAF
     return {
         "schema_version": 1,
         "available": True,
@@ -52,14 +61,14 @@ def _available_lineage_panel() -> dict:
         "total_count": 1,
         "chains": [
             {
-                "root_skill_key": "fire_arrow",
-                "element_or_style_zh": "火",
+                "root_skill_key": root_key,
+                "element_or_style_zh": "燼",
                 "consumed": False,
                 "meter": 0.3,
                 "nodes": [
                     _lineage_node(
-                        "fire_arrow",
-                        "火焰箭",
+                        root_key,
+                        root_name,
                         owned=True,
                         usable=True,
                         level=1,
@@ -68,8 +77,8 @@ def _available_lineage_panel() -> dict:
                         capped=False,
                     ),
                     _lineage_node(
-                        "fire_ball",
-                        "火球術",
+                        mid_key,
+                        mid_name,
                         owned=True,
                         usable=True,
                         level=3,
@@ -78,20 +87,26 @@ def _available_lineage_panel() -> dict:
                         capped=True,
                     ),
                     _lineage_node(
-                        "scorching_wave",
-                        "灼熱波動",
+                        leaf_key,
+                        leaf_name,
                         owned=False,
                         usable=False,
                         level=0,
                         xp_into_level=0.0,
                         xp_to_next_level=50.0,
                         capped=False,
-                        prereq_text_zh="需「火球術 Lv.3」",
+                        prereq_text_zh=f"需「{mid_name} Lv.3」",
                     ),
                 ],
             }
         ],
     }
+
+
+#: Authored chain-node identities (key, display) for the injected payload.
+CHAIN_ROOT = ("t_lineage_root_arrow", "燼影箭")
+CHAIN_MID = ("t_lineage_mid_burst", "燼心爆")
+CHAIN_LEAF = ("t_lineage_leaf_wave", "燼浪濤")
 
 
 def _unavailable_lineage_panel() -> dict:
@@ -127,24 +142,27 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
         )
 
         # Collapsed by default: the chain head shows its aggregate meter only.
-        toggle = page.locator('[data-testid="lineage-chain-toggle-fire_arrow"]')
+        root_key = CHAIN_ROOT[0]
+        mid_key = CHAIN_MID[0]
+        leaf_key = CHAIN_LEAF[0]
+        toggle = page.locator(f'[data-testid="lineage-chain-toggle-{root_key}"]')
         self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertEqual(
-            page.locator('[data-testid="lineage-chain-meter-fire_arrow"]').get_attribute(
+            page.locator(f'[data-testid="lineage-chain-meter-{root_key}"]').get_attribute(
                 "aria-label"
             ),
             "進度 30%",
         )
         self.assertEqual(
-            page.locator('[data-testid="lineage-chain-nodes-fire_arrow"]').count(), 0
+            page.locator(f'[data-testid="lineage-chain-nodes-{root_key}"]').count(), 0
         )
 
         # Expanding renders the per-node rows with payload-owned values.
         toggle.click()
-        page.wait_for_selector('[data-testid="lineage-chain-nodes-fire_arrow"]', timeout=15000)
+        page.wait_for_selector(f'[data-testid="lineage-chain-nodes-{root_key}"]', timeout=15000)
         self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
         self.assertEqual(
-            page.locator('[data-testid="lineage-node-meter-fire_arrow"]').inner_text(),
+            page.locator(f'[data-testid="lineage-node-meter-{root_key}"]').inner_text(),
             "23/50 → 下一階",
         )
         self.assertEqual(
@@ -154,11 +172,11 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
         )
         self.assertIn(
             "（見頂）",
-            page.locator('[data-testid="lineage-node-fire_ball"]').inner_text(),
+            page.locator(f'[data-testid="lineage-node-{mid_key}"]').inner_text(),
         )
         self.assertEqual(
-            page.locator('[data-testid="lineage-node-prereq-scorching_wave"]').inner_text(),
-            "需「火球術 Lv.3」",
+            page.locator(f'[data-testid="lineage-node-prereq-{leaf_key}"]').inner_text(),
+            f"需「{CHAIN_MID[1]} Lv.3」",
         )
 
         # Closing the shared overlay host retires the window.

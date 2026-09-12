@@ -104,6 +104,7 @@ from world.skills.registry import (
     SkillCategory,
     SkillDef,
     SkillKind,
+    SkillPrerequisite,
     TargetSpec,
 )
 from world.skills.sexual_acts._builder import SexualActDef
@@ -156,6 +157,13 @@ def _shipped_first_element_row() -> Element:
 _SYNTH_ELEMENT = _shipped_first_element_key()
 _SYNTH_ELEMENT_ROW = _shipped_first_element_row()
 
+# The kit's own invented element, as one shared row instance: skill rows
+# constructed at kit import (pre-patch) cannot name it as a string (the
+# SkillDef constructor resolves string elements through the live registry,
+# which still ships the closed vocabulary at that point), so they carry the
+# Element object directly.
+SYNTH_GLOWMIRE_ELEMENT = Element("t_glowmire", "光沼", "Synthetic element.")
+
 
 def _synth_elements() -> dict[str, Element]:
     """Synthetic element catalog: one invented row plus the borrowed row.
@@ -165,7 +173,7 @@ def _synth_elements() -> dict[str, Element]:
     registries must carry its row alongside the synthetic one.
     """
     return {
-        "t_glowmire": Element("t_glowmire", "光沼", "Synthetic element."),
+        SYNTH_GLOWMIRE_ELEMENT.key: SYNTH_GLOWMIRE_ELEMENT,
         _SYNTH_ELEMENT: _SYNTH_ELEMENT_ROW,
     }
 
@@ -278,6 +286,26 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=_SYNTH_ELEMENT,
     ),
+    # Canopy spell consumed by the browser combat journey's first element
+    # group (the shipped fire tree's deep/shallow shape): the deep cast
+    # declares the shallow burst, so a fixture requesting only the deep
+    # spell gets ``t_ember_burst`` closed in BEHIND it in ownership order.
+    # Kept distinct from ``t_ember_burst`` itself, which the many kit probes
+    # grant prereq-free.
+    "t_ember_comet": SkillDef(
+        key="t_ember_comet",
+        label="燼流星",
+        description="引燃天穹墜落的燼屑，轟擊單一目標。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SINGLE,
+        cost={"mp": 14},
+        usable_out_of_combat=True,
+        element=_SYNTH_ELEMENT,
+        effects=[f"damage:{_SYNTH_ELEMENT}:magic"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=_SYNTH_ELEMENT,
+        prerequisites=(SkillPrerequisite("t_ember_burst", 3),),
+    ),
     "t_hush_mend": SkillDef(
         key="t_hush_mend",
         label="靜謐癒合",
@@ -329,6 +357,72 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         element=None,
         effects=["self_buff_apply:t_moss_veil"],
         category=SkillCategory.ENHANCEMENT,
+    ),
+    # Element-anchored pair for the freeform scale ladder
+    # (use-driven-skill-lineage DC5 / element-mastery-freeform-casting): the
+    # entitlement key is f"{element.key}_mastery", so the mastery passive is
+    # keyed off the kit's OWN invented element and the paired active spell
+    # scales with it. Fully t_-keyed: no shipped mastery row is borrowed (the
+    # borrowed seam is the closed element VOCABULARY, not the skill keys).
+    "t_glowmire_mastery": SkillDef(
+        key="t_glowmire_mastery",
+        label="光沼精通",
+        description="被動提昇光沼系魔法的掌握程度與威力。",
+        kind=SkillKind.PASSIVE,
+        target_spec=TargetSpec.NONE,
+        cost={},
+        usable_out_of_combat=True,
+        element=SYNTH_GLOWMIRE_ELEMENT,
+        # No shipped passive-trait effect string: the freeform entitlement
+        # reads DIRECT OWNERSHIP of the f"{element}_mastery" key, never an
+        # effect layer, and the shipped effect name would collide with the
+        # shipped token universe the kit must stay clear of.
+        effects=[],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=SYNTH_GLOWMIRE_ELEMENT.key,
+    ),
+    "t_glowmire_bloom": SkillDef(
+        key="t_glowmire_bloom",
+        label="光沼花綻",
+        description="讓光沼的魔力在戰場上綻放成覆蓋的魔法波濤。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.AREA,
+        cost={"mp": 14},
+        usable_out_of_combat=True,
+        element=SYNTH_GLOWMIRE_ELEMENT,
+        effects=["damage:t_glowmire:magic"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=SYNTH_GLOWMIRE_ELEMENT.key,
+    ),
+    # Zero-cost NONE utility: the NONE-shape cast carrier (the shipped
+    # concentrate analogue) for the combat-menu acceptance journeys.
+    "t_cinder_breath": SkillDef(
+        key="t_cinder_breath",
+        label="燼息",
+        description="吐出一口溫熱的燼息，安撫自身的傷勢。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.NONE,
+        cost={"mp": 5},
+        usable_out_of_combat=True,
+        element=None,
+        effects=["self_buff_apply:t_moss_veil"],
+        category=SkillCategory.UTILITY,
+    ),
+    # Context-less utility NONE row: mirrors the shipped utility skill whose
+    # effect handler declares a required event_context key the combat session
+    # never supplies, so the combat menu must expose it disabled with the
+    # missing-context explanation (effect-context-validation seam).
+    "t_rock_quietus": SkillDef(
+        key="t_rock_quietus",
+        label="岩中寂語",
+        description="以岩層深處的寂靜偽裝自身的狀態。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SELF,
+        cost={},
+        usable_out_of_combat=True,
+        element=None,
+        effects=["set_disguise"],
+        category=SkillCategory.UTILITY,
     ),
 }
 
@@ -534,6 +628,17 @@ SYNTH_TITLES: MappingProxyType[str, FixedTitleDef] = MappingProxyType(
             "在合成驛站投宿滿一定次數即可獲得。",
             TitlePredicate(family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="t_synthetic_counter", threshold=5),
         ),
+        # A deliberately hard row: the browser title-codex fixture banks the
+        # two easy rows and keeps this one unbanked, so the codex still
+        # renders a locked row under the synthetic install.
+        "t_synth_deep_walker": FixedTitleDef(
+            "t_synth_deep_walker",
+            "深霧行者",
+            TitleCategory.EXPLORE,
+            "苔徑深處的霧只為走得夠久的人讓路。",
+            "在合成荒野深處留下足夠多的到訪紀錄即可獲得。",
+            TitlePredicate(family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="t_synthetic_counter", threshold=99),
+        ),
     }
 )
 
@@ -686,9 +791,14 @@ SYNTH_BUFFS: dict[str, BuffDefinition] = {
     "t_ash_burn": BuffDefinition(
         key="t_ash_burn",
         duration=15,
-        tick_interval=5,
+        # Mirrors the shipped damaging-buff cadence (10s per tick): the
+        # inventory-actions fixture heals a 20-point gap with a 6-second
+        # item-use clock advance, and a sub-6s tick interval would drain the
+        # fresh heal inside the use's own settlement — the hp_full story
+        # would never commit.
+        tick_interval=10,
         stacking="unique_per_source",
-        modifiers={"rate": {"target": "hp", "amount": -4}},
+        modifiers={"rate": {"target": "hp", "delta": -4}},
         polarity="debuff",
     ),
 }
@@ -720,7 +830,13 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         starting_items=(("t_ember_spray", 2), ("t_iron_fang", 1)),
         sex="female",
         skill_proficiency=(("t_ember_burst", 10.0),),
-        persona=PresetPersona(personality="安靜而警覺。"),
+        # The creation presenter validates every preset card's background as
+        # non-empty (every shipped card authors one), so the kit cards carry
+        # synthetic persona prose of their own.
+        persona=PresetPersona(
+            personality="安靜而警覺。",
+            background="Synthetic wanderer preset persona background.",
+        ),
     ),
     "t_ash_finch": PlayerPreset(
         key="t_ash_finch",
@@ -743,7 +859,10 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         passive_skills=("t_steady_stride",),
         starting_items=(("t_huskapple", 3),),
         sex="male",
-        persona=PresetPersona(personality="寡言的搬運工。"),
+        persona=PresetPersona(
+            personality="寡言的搬運工。",
+            background="Synthetic porter preset persona background.",
+        ),
     ),
 }
 

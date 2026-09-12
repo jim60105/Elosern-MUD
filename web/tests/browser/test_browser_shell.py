@@ -570,16 +570,19 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # status panel.
         wilderness_status = valid_status_panel("影行者", "42")
         wilderness_status["actor"]["location"] = {"label": "Wilderness", "identity": "17"}
+        # The whole wilderness payload is injected here; the client renders
+        # its region name verbatim, so the label is authored payload data,
+        # not a registry row.
         wilderness_map = {
             "schema_version": 1,
             "available": True,
             "layer": "wilderness",
             "current_node": "wild:plains:60:107",
-            "title": "西部丘陵與谷地",
+            "title": "苔影濕谷",
             "nodes": [
                 {
                     "id": "wild:plains:60:107",
-                    "label": "西部丘陵與谷地",
+                    "label": "苔影濕谷",
                     "x": 60,
                     "y": 107,
                     "visibility": "current",
@@ -595,7 +598,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         inject_snapshot(page, {"status": wilderness_status, "local_map": wilderness_map})
         page.wait_for_timeout(300)
         loc = page.locator('[data-testid="topbar-location"]').inner_text()
-        self.assertEqual(loc, "西部丘陵與谷地")
+        self.assertEqual(loc, "苔影濕谷")
         self.assertNotIn("Wilderness", loc)
 
     @covers_requirement(
@@ -1237,10 +1240,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         # The rank line is guild-only: the derived magic-rank ladder is
         # retired with the XP system (magic-power-static-rename).
+        # The single guild span is the whole line, spelled exactly — proving
+        # no retired magic-rank word (or anything else) rides it.
         rank_text = page.locator('[data-testid="character-head__rank"]').inner_text()
-        self.assertNotIn("術師", rank_text)
-        self.assertIn("公會 銀牌", rank_text)
-        self.assertIn("功績 120", rank_text)
+        self.assertEqual(rank_text, "公會 銀牌 · 功績 120")
         # The wallet, thousands-grouped integer copper (design D11).
         self.assertEqual(
             page.locator('[data-testid="character-head__wallet"]').inner_text(),

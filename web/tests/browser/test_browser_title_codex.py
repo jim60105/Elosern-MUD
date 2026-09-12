@@ -16,6 +16,9 @@ seeded state; no live LLM, Stable Diffusion, or other network service.
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
+
+from web.browser_support.browser_fixtures_data import title_codex_values
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
@@ -28,6 +31,12 @@ from .harness import ManagedServer
 from . import fixtures
 from .test_browser_contextual_hud import _wait_mode
 from .test_browser_input_narrative import _wait_inp_line
+
+CODEX = title_codex_values()
+#: The fixture's starter epithet is free-form authored identity (the seed
+#: banks the same two epithets in both boot modes), so it is authored test
+#: data, not shipped catalog content.
+STARTER_EPITHET = "南門新客"
 
 
 def _codex_panel(state: dict) -> dict:
@@ -95,7 +104,7 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
         # Header preview + counters come straight from the committed view.
         self.assertEqual(
             page.locator('[data-testid="title-codex-preview"]').inner_text(),
-            "F級冒險者　南門新客",
+            f"{CODEX['banked_displays'][0]}　{STARTER_EPITHET}",
         )
         panel = _codex_panel(store_state(page))
         # The two header spans render on separate DOM lines; join with one
@@ -106,22 +115,34 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
                 .inner_text()
                 .splitlines()
             ),
-            f"F級冒險者　南門新客 已收集 {panel['unlocked']} / {panel['total']}",
+            f"{CODEX['banked_displays'][0]}　{STARTER_EPITHET} "
+            f"已收集 {panel['unlocked']} / {panel['total']}",
         )
 
-        # Guild tab (default): banked rows carry equip affordances.
-        self.assertEqual(
-            page.locator('[data-testid="title-codex-fixed-equip-g_f_rank"]').count(), 1
+        # Fixed rows render per-category: each banked row carries its equip
+        # affordance on its own category tab.
+        for index, category in enumerate(CODEX["banked_categories"]):
+            page.locator(f'[data-testid="title-codex-category-{category}"]').click()
+            self.assertEqual(
+                page.locator(
+                    f'[data-testid="title-codex-fixed-equip-{CODEX["banked_keys"][index]}"]'
+                ).count(),
+                1,
+            )
+        # The locked row carries the authored hint and no equip affordance.
+        page.locator(
+            f'[data-testid="title-codex-category-{CODEX["locked_category"]}"]'
+        ).click()
+        locked = page.locator(
+            f'[data-testid="title-codex-fixed-locked-{CODEX["locked_key"]}"]'
         )
+        self.assertIn(CODEX["locked_display"], locked.inner_text())
+        self.assertIn(CODEX["locked_hint"], locked.inner_text())
         self.assertEqual(
-            page.locator('[data-testid="title-codex-fixed-equip-g_e_rank"]').count(), 1
-        )
-        # Locked rows carry the authored hint and no equip affordance.
-        locked = page.locator('[data-testid="title-codex-fixed-locked-g_s_rank"]')
-        self.assertIn("S級傳說", locked.inner_text())
-        self.assertIn("通過 S 級公會考核即可獲得。", locked.inner_text())
-        self.assertEqual(
-            page.locator('[data-testid="title-codex-fixed-equip-g_s_rank"]').count(), 0
+            page.locator(
+                f'[data-testid="title-codex-fixed-equip-{CODEX["locked_key"]}"]'
+            ).count(),
+            0,
         )
 
         # Epithet block: the server's can_remove flag alone gates the button.
@@ -160,13 +181,20 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
 
         # Fixed path: the card click dispatches exactly one title.equip and
         # echoes the typed command; the preview re-composes from the panel.
-        page.locator('[data-testid="title-codex-fixed-equip-g_e_rank"]').click()
+        second_key = CODEX["banked_keys"][1]
+        second_display = CODEX["banked_displays"][1]
+        page.locator(
+            f'[data-testid="title-codex-category-{CODEX["banked_categories"][1]}"]'
+        ).click()
+        page.locator(f'[data-testid="title-codex-fixed-equip-{second_key}"]').click()
         self.assertEqual(sent_action_count(page, "title.equip"), 1)
-        _wait_inp_line(page, 1, "title equip fixed g_e_rank", exact=True)
-        self._wait_codex(page, lambda p: p["full_title"] == "E級斥候　南門新客")
+        _wait_inp_line(page, 1, f"title equip fixed {second_key}", exact=True)
+        self._wait_codex(
+            page, lambda p: p["full_title"] == f"{second_display}　{STARTER_EPITHET}"
+        )
         self.assertEqual(
             page.locator('[data-testid="title-codex-preview"]').inner_text(),
-            "E級斥候　南門新客",
+            f"{second_display}　{STARTER_EPITHET}",
         )
 
         # Epithet path: the same affordance on a banked row swaps the slot.
@@ -174,7 +202,7 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
         page.locator('[data-testid="title-codex-epithet-equip-0"]').click()
         self.assertEqual(sent_action_count(page, "title.equip"), 2)
         _wait_inp_line(page, 2, "title equip epithet 破城先鋒", exact=True)
-        self._wait_codex(page, lambda p: p["full_title"] == "E級斥候　破城先鋒")
+        self._wait_codex(page, lambda p: p["full_title"] == f"{second_display}　破城先鋒")
         envelopes = [
             args[0]
             for cmdname, args, _kwargs in page.evaluate("window.__elosernSent || []")
@@ -185,7 +213,7 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             [env["payload"] for env in envelopes],
             [
-                {"kind": "fixed", "identifier": "g_e_rank"},
+                {"kind": "fixed", "identifier": second_key},
                 {"kind": "epithet", "identifier": "破城先鋒"},
             ],
         )

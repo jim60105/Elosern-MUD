@@ -26,7 +26,17 @@ _PRODUCTION_MODULE = "server.conf.at_server_startstop"
 _IMPORT_BEFORE_INSTALL = (
     "world.rules.equipment_effects",
     "world.rules.combat_modifiers",
+    # The status-display coverage table validates buff/rule keys against the
+    # live catalogs at import; importing it against shipped data keeps the
+    # presentation registry buildable under the install (the kit's own
+    # condition rows are grafted in afterwards).
+    "world.rules.status_display",
     "world.quests.bootstrap",
+    # The monster-population model binds the shipped capital entry and its
+    # immutable shipped-key region tables at import; importing it here keeps
+    # the module loadable under the install, and the terrain graft rebinds
+    # those tables to live kit rows afterwards.
+    "world.maps.wilderness_population",
 )
 # Module-level bootstrap content validated against catalog registries at
 # RUNTIME (sync_quest_runtime registers the hand-written intro quest, whose
@@ -51,6 +61,71 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     from world.tests.synthetic_data import SYNTH_QUESTS
 
     _quest_catalog.QUEST_CATALOG = tuple(SYNTH_QUESTS.values())
+
+    # Production's register_adventurer seam hardcodes the "F" entry rank; the
+    # server registers/accepts guild offers at runtime, so graft the harness
+    # row into the live registry right after the install too.
+    from web.browser_support.browser_fixtures_data import (
+        graft_synth_entry_rank,
+        graft_synth_innate_skills,
+        graft_synth_status_display,
+    )
+
+    graft_synth_entry_rank()
+    # Production hardcodes the innate attack/flee skill keys the resolver
+    # accepts; the t_-only install leaves no rows under them, so graft the
+    # kit-template seam rows under the runtime seam constants.
+    graft_synth_innate_skills()
+    # The creation descriptor derives one affinity picker per LIVE registry
+    # race while the shipped race-bound mapping knows only the shipped races;
+    # graft one borrowed bound per kit race so the custom form renders.
+    from web.browser_support.browser_fixtures_data import graft_synth_affinity_bounds
+
+    graft_synth_affinity_bounds()
+    # The status presenter resolves every displayable condition code through
+    # the import-built coverage table (shipped rows, via the pre-install
+    # import seam); the kit's own buff rows get authored labels grafted in.
+    graft_synth_status_display()
+    # Production's coordinate terrain partition returns shipped region keys
+    # that the t_-only registry cannot answer — every wilderness room
+    # activation KeyErrors at ``_region_display``/population planning. Graft
+    # one kit-authored row per partition key and point the population tables
+    # at a live threat tier.
+    from web.browser_support.browser_fixtures_data import graft_synth_wilderness_terrain
+
+    graft_synth_wilderness_terrain()
+    # The status panel's matched-condition rows come from the combat-modifier
+    # rule table; the shipped damaging-buff row is keyed to a shipped buff the
+    # synthetic install never mounts. Append one authored rule for the kit
+    # debuff so the seeded condition chip resolves under the synthetic boot.
+    from web.browser_support.browser_fixtures_data import graft_synth_combat_modifier
+
+    graft_synth_combat_modifier()
+    # The defeat-aftermath rulebook validates its marker buffs against the
+    # live buff registry on the FIRST lazy import (inside the first round
+    # submit), and monster behaviour resolves every monster's threat tier
+    # through the frozen shipped-keyed archetype table. Graft the authored
+    # marker buffs and one archetype mapping per live kit tier so the
+    # settlement paths answer instead of raising mid-submit.
+    from web.browser_support.browser_fixtures_data import graft_synth_defeat_rulebook
+
+    graft_synth_defeat_rulebook()
+
+    # The shipped guild-catalog YAML cannot resolve against t_-only
+    # registries, so the server installs the shared harness catalog directly
+    # (same builder as the seed process) and registers its board offers —
+    # the services view and runtime accepts answer from this catalog.
+    from web.browser_support.browser_fixtures_data import (
+        install_synth_affinity_config,
+        install_synth_services_catalog,
+    )
+
+    install_synth_services_catalog()
+
+    # The affinity rulebook validates its cap-break quest keys against the
+    # quest registry; pre-load it against a kit-quest copy so the first
+    # affinity gain does not fail closed on the shipped intro quest key.
+    install_synth_affinity_config()
 
 
 def _production(name):
@@ -79,18 +154,18 @@ def at_server_start():
         return None
     if not synth:
         return hook()
-    # Known shipped-content bootstrap step: the guild-catalog YAML and the
-    # production rank->tier map hardcode shipped lore keys, so
-    # sync_guild_economy cannot resolve against t_-only registries; a
-    # synthetic guild catalog is migrate-browser-tests-off-real-data's scope.
-    # Degrade it through production's own tolerated-step machinery (exactly
-    # one structured startup_step_degraded event) instead of aborting the
-    # boot that every other step completes under the install.
+    # The shipped guild-catalog YAML cannot resolve against t_-only
+    # registries, and its sync would reload the shipped YAML over the
+    # harness catalog installed above — so under the install the step is
+    # skipped outright (the harness catalog and its offers are already
+    # registered by _install_synthetic_catalogs_if_flagged; the seed process
+    # skips the same step in its own fixture). The world clock's shop-hours
+    # and caravan sources come from the installed catalog instead.
     original = module._startup_step
 
     def _synth_startup_step(name, run, **kwargs):
         if name == "sync_guild_economy":
-            return original(name, run, fail_loud=False, tolerant_on=(Exception,))
+            return None
         return original(name, run, **kwargs)
 
     module._startup_step = _synth_startup_step
