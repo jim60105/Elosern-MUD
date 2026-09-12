@@ -472,6 +472,21 @@ class StartupSerializationTests(unittest.TestCase):
         self.assertIsNotNone(observed.get("ports"), "ports unallocated at boot")
         self.assertEqual(lock.acquisitions, 1)
 
+    def test_preallocated_runtime_is_rejected(self):
+        """A runtime with ports already allocated bypasses the startup lock.
+
+        The lock only closes the release-then-bind window when the harness
+        itself allocates; a caller that allocates before construction has the
+        window open before the lock exists, so the harness must refuse it
+        loudly instead of pretending to serialize.
+        """
+        runtime = fixtures.create_runtime(prefix="elosern-prealloc-")
+        self.addCleanup(runtime.cleanup)
+        runtime.allocate_ports()
+        with self.assertRaises(HarnessError) as caught:
+            ManagedServer(runtime=runtime, runner=FakeRunner())
+        self.assertIn("unallocated ports", str(caught.exception))
+
     def test_foreign_portal_boot_fails_fast_and_retries(self):
         """``already running`` from a cleared runtime retries with fresh ports.
 

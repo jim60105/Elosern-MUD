@@ -166,6 +166,15 @@ class ManagedServer:
         # ``create_runtime`` deliberately allocates NO ports: the port set is
         # the only runner-shared resource, and ``_start_once`` takes it under
         # the startup lock for every runtime, caller-provided included.
+        # A runtime whose ports are already allocated bypasses that lock (the
+        # release-then-bind window is already open before we see it), so it is
+        # rejected here rather than silently treated as protected.
+        if runtime is not None and runtime.ports is not None:
+            raise HarnessError(
+                "ManagedServer requires a runtime with unallocated ports; "
+                "allocate_ports() before start() reintroduces the sibling "
+                "release-then-bind race the startup lock exists to close"
+            )
         self.runtime = runtime or fixtures.create_runtime()
         self.boot_timeout = boot_timeout
         self.ready_timeout = ready_timeout
