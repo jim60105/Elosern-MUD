@@ -35,6 +35,7 @@ from world.rules.action import (
     ActionResolver,
     RejectReason,
     _EFFECT_HANDLERS,
+    _EFFECT_HANDLER_SURFACES,
     _apply_pleasure_gain,
     _handle_act_pair_event,
     _handle_actor_sexual_event,
@@ -779,6 +780,14 @@ class SexualEventReuseTests(_ActCastTestCase):
         # is a distinct handler — the participant handler carries no scope fork.
         self.assertIs(
             _EFFECT_HANDLERS["sexual_event_target"], _handle_target_sexual_event
+        )
+        # The general apply_event route can mutate traits for rulebook events
+        # beyond sexual state (post-review fix): the target channel declares
+        # the same restoration surface as the participant channel, or a future
+        # traits-mutating target row would roll back incompletely.
+        self.assertEqual(
+            _EFFECT_HANDLER_SURFACES["sexual_event_target"],
+            _EFFECT_HANDLER_SURFACES["sexual_event"],
         )
 
     @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")

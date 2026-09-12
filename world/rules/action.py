@@ -1427,7 +1427,7 @@ register_effect_handler(
 register_effect_handler(
     "sexual_event_target",
     _handle_target_sexual_event,
-    frozenset({"sexual"}),
+    frozenset({"sexual", "traits"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(

@@ -366,8 +366,10 @@ observer-gating rule for a gated event name. The paired typed effect SHALL exist
 into the new frozen `TargetSexualEventEffect(event_name)` dataclass via the existing
 `_parse_single_arg` helper — a missing or double payload raises `ValueError` at parse time, exactly
 like `sexual_event_actor:` (registry-construction fail-closed, never a silent use-time no-op) — and
-`world/rules/action.py` SHALL register the prefix (surfaces `frozenset({"sexual"})`, no required
-event context). The handler SHALL stage one `PendingEffect` calling
+`world/rules/action.py` SHALL register the prefix (surfaces `frozenset({"sexual", "traits"})` — the
+general `apply_event` route can mutate `traits` for rulebook events beyond sexual state, matching
+the participant channel's declared surface — no required event context). The handler SHALL stage one
+`PendingEffect` calling
 `apply_event(target, event_name, ...)` per resolved target and SHALL never apply the event to the
 acting entity, mirroring `sexual_event_actor:<name>` with the roles exchanged. A missing or empty
 event name never reaches the handler — it fails at `SkillDef` construction. An empty `targets`
