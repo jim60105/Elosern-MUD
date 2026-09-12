@@ -185,27 +185,28 @@ _ALL_ELEMENTS = ("fire", "water", "wind", "earth", "lightning", "ice", "light", 
 
 SUBRACE_REGISTRY: dict[str, Subrace] = {
     "human_royal": Subrace(
-        "human_royal", "human", "王族", "皇族與大貴族", None, None, (),
-        "Royal blood and high-noble upbringing; education over combat.",
+        "human_royal", "human", "王族", "王室血脈", None, None, (),
+        "王都王室的血脈。自幼受統御與學識的教養，長於謀略而非武藝，魔力底蘊高於同族。",
         StatModifiers(-0.05, -0.05, 0.10), {"mp": (120, 220)},
     ),
     "human_noble": Subrace(
-        "human_noble", "human", "貴族", "中小貴族", None, None, (),
-        "Minor nobility such as 侍從貴族 (薇歐蕾特's attendant 莉茲婭).",
+        "human_noble", "human", "貴族", "貴族血脈", None, None, (),
+        "領地貴族的血脈。自幼習劍術與馬術，攻守取捨偏向進取。",
         StatModifiers(0.10, 0.05, -0.15),
     ),
-    "human_wealthy": Subrace(
-        "human_wealthy", "human", "富裕平民", "商人與高階冒險者", None, None, (),
-        "Wealthy commoners: big merchants, senior adventurers, mages.",
+    "human_coastal": Subrace(
+        "human_coastal", "human", "濱海民", "濱海血脈", None, None, (),
+        "世居港市與海岸的血脈。船上作業與碼頭往來練就輕捷身手，慣穿輕裝。",
         StatModifiers(0.05, 0.10, -0.15),
     ),
-    "human_commoner": Subrace(
-        "human_commoner", "human", "平民", "普通平民", None, None, (),
-        "Ordinary commoners: artisans, shopkeepers, adventurers.", StatModifiers(),
+    "human_plains": Subrace(
+        "human_plains", "human", "平原民", "平原血脈", None, None, (),
+        "世居平原與城鎮的血脈。農耕與工坊並重，各項資質最為均衡。", StatModifiers(),
     ),
-    "human_laborer": Subrace(
-        "human_laborer", "human", "底層平民", "農民與勞工", None, None, (),
-        "The lower class: farmers and laborers.", StatModifiers(0.10, -0.15, 0.05),
+    "human_highland": Subrace(
+        "human_highland", "human", "山地民", "山地血脈", None, None, (),
+        "世居丘陵與谷地的血脈。礦坑與工坊的重勞動造就體魄與耐久，不以靈巧取勝。",
+        StatModifiers(0.10, -0.15, 0.05),
     ),
     "fionnen": Subrace(
         "fionnen", "elf", "斐歐恩族", "森林精靈", 120, "village_fionnen",

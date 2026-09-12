@@ -275,7 +275,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         # world.rules.namegen): Elysa + Snow. The display name is the pack's
         # 正體 rendering of the given name; the full name lives in the
         # identity layers.
-        "elysa_snow", "艾莉莎", 24, 24, "human", "human_commoner",
+        "elysa_snow", "艾莉莎", 24, 24, "human", "human_plains",
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
          ("agility", 10), ("defense", 11), ("magic_power", 43)),
         "生命力與魔力均衡的開局配點",
