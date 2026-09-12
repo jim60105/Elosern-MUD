@@ -157,7 +157,7 @@ SCENARIO_TO_TEST = {
         "exams", "ExamStartTests", "test_duplicate_active_exam_is_rejected"
     ),
     "Every rank profile stays inside its lore band": ref(
-        "exams", "ExamProfileValidationTests", "test_every_rank_profile_stays_inside_its_lore_band"
+        "config", "ExamProfileTests", "test_every_profile_stays_inside_its_lore_band"
     ),
     "Disguised candidate receives the same opponent": ref(
         "exams", "ExamProfileValidationTests", "test_spawned_opponent_uses_true_profile_stats"

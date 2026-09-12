@@ -29,7 +29,9 @@ from world.tests.synthetic_data import (
 
 # Synthetic cast fixtures. The damage element is borrowed from the kit's
 # own spell row, so the closed element enum never needs a synthetic name.
-_ELEMENT = SYNTH_SKILLS["t_ember_burst"].element
+# Interpolate the KEY, not the resolved ``Element`` row: the row's repr in an
+# effect string is not a parseable ``damage:<element>:<school>`` id.
+_ELEMENT = SYNTH_SKILLS["t_ember_burst"].element.key
 _T_CLEAVE = make_skill(
     "t_iron_cleave",
     effects=[f"damage:{_ELEMENT}:physical"],

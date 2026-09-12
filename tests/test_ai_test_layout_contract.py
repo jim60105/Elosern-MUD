@@ -121,7 +121,7 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_duplicate_names_reject_and_retry": [
             "npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness"
         ],
-        "test_elven_tier_named_occupant_passes_within_the_elf_band": [
+        "test_long_lived_tier_named_occupant_passes_beyond_the_short_band": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
         "test_malformed_portrait_object_rejects_and_retries": [

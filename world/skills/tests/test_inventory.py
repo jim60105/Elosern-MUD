@@ -14,7 +14,7 @@ from world.skills.equipment import (
     EquipmentSlot,
     list_items,
 )
-from world.tests.synthetic_data import SYNTH_ACTS, synthetic_registries
+from world.tests.synthetic_data import SYNTH_ACTS, SYNTH_SKILLS, synthetic_registries
 
 # The one initially-unlocked synthetic act: the patched catalogue's only
 # row with an empty unlock gate (counter-gated rows never appear here).
@@ -46,9 +46,11 @@ class InventoryTests(EvenniaTestCase):
         with synthetic_registries(
             "races", "subraces", "static_tiers", "skills", "items", "elements", "sexual_acts"
         ):
-            from world.lore.elements import ELEMENT_REGISTRY as PATCHED_ELEMENTS
-
-            record["affinity_elements"] = [next(iter(PATCHED_ELEMENTS))]
+            # The import schema's affinity list is the closed SHIPPED element
+            # enum, so the record must carry the kit's borrowed shipped row's
+            # key, not an arbitrary patched-registry key (the synthetic
+            # element sorts first and is schema-invalid).
+            record["affinity_elements"] = [SYNTH_SKILLS["t_ember_burst"].element.key]
             entity = instantiate_character(record, PlayerCharacter)
             self.assertEqual(list_items(entity), ["t_ember_spray"])
             self.assertEqual(

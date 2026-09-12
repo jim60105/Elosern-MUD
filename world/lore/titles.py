@@ -364,19 +364,35 @@ def validate_fixed_titles(
             )
 
 
-def _live_faces() -> dict[str, set[str]]:
-    """Resolve the current registry faces for the shipped content.
+def _static_faces() -> dict[str, set[str]]:
+    """Resolve the static lore faces (guild ranks, monster tiers, elements).
 
-    Static lore faces (guild ranks, monster tiers, elements) import directly;
-    runtime-populated faces (quest definitions, skill registry, sexual
-    experience types) are imported lazily so this module stays importable
-    before those registries fill (e.g. at server-start lore sync).
+    These are the faces shipped-content validation needs at module-load time
+    and the only ones resolvable without importing the runtime-populated
+    registries: pulling those here (quests, skills, rules) would execute their
+    import chain while ``world.lore`` is still initializing, so importing a
+    consumer first (e.g. ``world.skills.registry`` or
+    ``world.quests.definitions``) crashes on the partially initialized package
+    (circular-import landmine: titles -> SKILL_REGISTRY / quests / evennia
+    contribs in a settings-less process).
     """
-    faces = {
+    return {
         "elements": {element.key for element in ELEMENT_REGISTRY.values()},
         "monster_tiers": set(MONSTER_TIER_REGISTRY),
         "guild_ranks": set(GUILD_RANK_REGISTRY),
     }
+
+
+def _live_faces() -> dict[str, set[str]]:
+    """Resolve the current registry faces for the shipped content.
+
+    Static lore faces (guild ranks, monster tiers, elements) come from
+    ``_static_faces()``; runtime-populated faces (quest definitions, skill
+    registry, sexual experience types) are imported lazily so this module
+    stays importable before those registries fill (e.g. at server-start lore
+    sync) and so module import never drags the runtime packages in.
+    """
+    faces = _static_faces()
     from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 
     faces["quest_keys"] = set(QUEST_DEFINITION_REGISTRY)
@@ -402,9 +418,5 @@ def _live_faces() -> dict[str, set[str]]:
 # row is checked against the real data before anything can observe it.
 validate_fixed_titles(
     list(_FIXED_TITLE_ROWS.values()),
-    **{
-        key: value
-        for key, value in _live_faces().items()
-        if key in ("elements", "monster_tiers", "guild_ranks")
-    },
+    **_static_faces(),
 )

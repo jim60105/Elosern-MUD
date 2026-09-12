@@ -464,6 +464,9 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
 
     _CONTEXTS = {
         "t_face_veil": {"disguise": {"atk_phys": 60}},
+        # The kit's shipped-utility mirror carries the same ``set_disguise``
+        # effect, so the guard must supply its declared context too.
+        "t_rock_quietus": {"disguise": {"atk_phys": 60}},
         "t_grant_echo": {"confer_skill_key": "t_steady_stride", "confer_scale": 0.1},
     }
 
