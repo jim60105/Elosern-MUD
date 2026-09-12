@@ -293,12 +293,15 @@ def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
     combat, creation, or on a malformed actor — and never raising into the
     publication path). It never hands the raw session to a presenter.
     """
+    from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
+
     return PresentationContext(
         actor=actor,
         protocol_version=PROTOCOL_VERSION,
         options_state=options_snapshot(session),
         options_fingerprint=_current_options_fingerprint(actor),
         proposal=proposal_snapshot(session, actor),
+        gallery_subject=gallery_selection_snapshot(session, actor),
     )
 
 

@@ -88,6 +88,9 @@ class PresentationCoordinator:
 
     def reset(self) -> None:
         """Start a fresh presentation sequence (reconnect or puppet change)."""
+        from web.webclient.presentation.gallery_selection import retire_gallery_selection
+
+        retire_gallery_selection(self.session)
         self._epoch = new_presentation_epoch()
         self._revision = 0
 
@@ -289,6 +292,9 @@ def publish_panel_update(
 
 def detach_coordinator(session: Any) -> None:
     """Drop the ephemeral coordinator (transport or puppet change)."""
+    from web.webclient.presentation.gallery_selection import retire_gallery_selection
+
+    retire_gallery_selection(session)
     if getattr(session, "ndb", None) is not None:
         session.ndb.elosern_coordinator = None
 

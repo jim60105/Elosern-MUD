@@ -17,6 +17,7 @@ terminal outcome (card append / error code on the subject's gallery record).
 """
 
 import hashlib
+import math
 import os
 import threading
 import time
@@ -36,6 +37,43 @@ from world.prompts.loader import PromptLibraryError
 
 # The single shared serialization lock for every scene and portrait operation.
 queue_lock = threading.Lock()
+
+MAX_PENDING_GALLERY_JOBS = 8
+
+
+def pending_gallery_jobs(subject: ArtSubject) -> list[dict]:
+    """Read at most eight newest in-flight image identities without settlement."""
+    with queue_lock:
+        rows = {}
+        records = ArtAssetRecord.objects.filter(
+            db_key__startswith=f"{record_key(subject)}:gen:"
+        ).order_by("pk")
+        for record in records.iterator():
+            image_id = record.db.gallery_image_id
+            timestamp = record.db.enqueued_at
+            if (
+                record.db.kind != subject.kind.value
+                or record.db.subject_key != subject.key
+                or record.db.status not in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
+                or gallery_api._canonical_uuid_text(image_id) is None
+                or record.key != gallery_record_key(subject, image_id)
+                or isinstance(timestamp, bool)
+                or not isinstance(timestamp, (int, float))
+                or abs(timestamp) > 2**53 - 1
+                or not math.isfinite(timestamp)
+            ):
+                continue
+            if image_id in rows:
+                continue
+            if len(rows) == MAX_PENDING_GALLERY_JOBS:
+                oldest = min(rows, key=lambda key: rows[key]["enqueued_at"])
+                if timestamp <= rows[oldest]["enqueued_at"]:
+                    continue
+                del rows[oldest]
+            rows[image_id] = {"image_id": image_id, "enqueued_at": timestamp}
+        return sorted(
+            rows.values(), key=lambda row: -row["enqueued_at"]
+        )[:MAX_PENDING_GALLERY_JOBS]
 
 
 def record_key(subject: ArtSubject) -> str:

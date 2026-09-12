@@ -383,3 +383,37 @@ always occupies a tier's gallery before the automatic guard reads it. D8's
 cardinality outcome is unchanged: the monster kind's declaration caps the
 gallery at one card, so each tier still holds one generated image — through
 the gallery now, not the classic table.
+
+### 12.6 Gallery management read model
+
+`webclient-gallery-panel` adds the exploration-only `gallery` v1 presentation
+panel. It does not add the Vue management screen or action registrations;
+those remain owned by `webclient-gallery-ui` and `webclient-gallery-actions`.
+The four `docs/design/elosern-redesign2/角色肖像圖庫管理頁-*.webp` references
+define that future screen's gallery grid, face editor, equipment drawer, and
+generation drawer. This panel supplies their server-authored display facts.
+
+The rail is a world-gallery view bound to the current puppet, not an account
+roster. It reserves space for the puppet and all monster tiers within 24 rows,
+then fills character places companion-first and by numeric entity primary key.
+Selection is immutable session `ndb` state bound to puppet and presentation
+epoch; `select_gallery_subject(session, actor, subject_key)` returns result data
+without sending. The future action adapter owns publication. Disconnect's
+unpuppet signal, explicit unpuppet, coordinator reset, and puppet switch retire
+selection. A deleted selected character falls back to the puppet during render.
+
+Cards require a valid own-subject store identity and an existing confined file.
+The panel derives chips, exact filter counts, one equipment snapshot, and up to
+five current-match warnings. Accessory comparison remains exact normalized
+equality; the design's 「任一」 wording is presentation only. A read-only queue
+accessor supplies up to eight pending rows; a recorded generation failure
+becomes one deterministic synthetic row, without a service probe.
+
+`record_for(create=False)` is now genuinely read-only, including when duplicate
+records exist. Consolidation remains on the locked gallery write paths. Character
+cards are not silently truncated; an oversized payload fails closed at the
+existing 65,536-byte envelope boundary. The UMD validator, its Vue wrapper, and
+the Vue store accept the new panel without introducing a client matching engine.
+`test_gallery_panel.py` covers read-only behavior, lifecycle retirement, missing
+and symlinked media, offline failure settlement, and executable Python/Node
+boundary parity; panel schema enumeration and shard ownership include it.

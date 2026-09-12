@@ -179,6 +179,7 @@ def build_production_registry() -> PresentationRegistry:
         EXPLORATION_SCHEMA_VERSION,
         exploration_presenter,
     )
+    from web.webclient.presentation.gallery import GALLERY_SCHEMA_VERSION, gallery_presenter
     from web.webclient.presentation.lineage import (
         LINEAGE_SCHEMA_VERSION,
         lineage_presenter,
@@ -229,6 +230,14 @@ def build_production_registry() -> PresentationRegistry:
     )
 
     registry = PresentationRegistry("elosern")
+    registry.register(
+        PresenterSpec(
+            name="gallery",
+            schema_version=GALLERY_SCHEMA_VERSION,
+            unavailable_reason=("gallery_unavailable", "肖像圖庫目前無法顯示"),
+            presenter=gallery_presenter,
+        )
+    )
     registry.register(
         PresenterSpec(
             name="art",

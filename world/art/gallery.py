@@ -165,7 +165,10 @@ def record_for(
     subjects — scenes have no gallery (declared, not compared).
     """
     with gallery_lock:
-        record = _consolidate(subject)
+        record = (
+            _consolidate(subject) if create
+            else GalleryRecord.objects.filter(db_key=record_key(subject)).order_by("pk").first()
+        )
         if record is not None or not create:
             return record
         if not gallery_kinds.has_gallery(subject.kind.value):
@@ -586,7 +589,7 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
     typed ``GalleryRecordError`` before any record or file is touched.
     """
     with gallery_lock:
-        record = record_for(subject)
+        record = _consolidate(subject)
         existing_ids = _raw_image_ids(record) if record is not None else frozenset()
         capability = gallery_kinds.capabilities_for(subject.kind.value)
         if (
@@ -646,7 +649,7 @@ def remove_card(subject: ArtSubject, image_id: str) -> None:
     raise.
     """
     with gallery_lock:
-        record = record_for(subject)
+        record = _consolidate(subject)
         if record is None:
             raise GalleryRecordError("this subject has no gallery record")
         entries = list(record.db.cards or [])
@@ -678,7 +681,7 @@ def set_default(subject: ArtSubject, image_id: str) -> None:
     malformed entry the reads themselves would hide.
     """
     with gallery_lock:
-        record = record_for(subject)
+        record = _consolidate(subject)
         if record is None:
             raise GalleryRecordError("this subject has no gallery record")
         known = {card["image_id"] for card in cards_for(subject)}
@@ -849,7 +852,7 @@ def record_error(subject: ArtSubject, code: str) -> None:
 def clear_error(subject: ArtSubject) -> None:
     """Clear the subject's recorded error; a subject with no record no-ops."""
     with gallery_lock:
-        record = record_for(subject)
+        record = _consolidate(subject)
         if record is None:
             return
         record.db.last_error_code = None
