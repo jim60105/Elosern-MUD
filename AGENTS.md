@@ -122,8 +122,6 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 
 ```sh
 uv sync --locked
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands server typeclasses world web.webclient
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 commands server typeclasses world web.webclient
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
@@ -177,8 +175,11 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   `.github/evennia-shards.json`. Adding, renaming, or moving a test module MUST
   update that manifest in the same change, or the CI ownership contract
   (`tests.test_evennia_test_optimization_contract`) fails on every branch after
-  yours. Verify locally with
-  `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
+  yours. Verify locally by running
+  `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
+  with `MUD_TEST_SETTINGS=1` passed through the Bash tool's `env` input (an
+  inline `MUD_TEST_SETTINGS=1 ...` prefix is rejected by the Evennia test
+  guard).
 - The full non-browser Evennia suite is allowed once only when needed, under 10
   minutes, and run with `--parallel 16 --noinput`; never run it serially.
 - The full managed browser suite and `tools.spec_traceability verify --evidence`
