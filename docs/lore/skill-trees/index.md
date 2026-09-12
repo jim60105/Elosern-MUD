@@ -125,7 +125,7 @@
 | 土 | [earth](/lore/skill-trees/earth) | 防禦路線 vs 控制路線 |
 | 雷 | [lightning](/lore/skill-trees/lightning) | 先制(連續行動)路線 vs 過載(麻痺)路線 |
 | 冰 | [ice](/lore/skill-trees/ice) | 遲緩路線 vs 監禁路線 |
-| 光 | [light](/lore/skill-trees/light) | 治療路線 vs 聖裁路線 |
+| 光 | [light](/lore/skill-trees/light) | 恩寵(親密治療)路線 vs 聖裁路線 |
 | 暗 | [dark](/lore/skill-trees/dark) | 詛咒路線 vs 吞噬路線 |
 | 神之秘法 | [divine-mystery](/lore/skill-trees/divine-mystery) | 四項既知秘法各自的深化階梯，及性愛系統、統御術、狀態偽裝在系譜上的定位 |
 
