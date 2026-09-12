@@ -73,7 +73,7 @@ class StatModifiers:
 
 @dataclass(frozen=True)
 class Subrace:
-    """An elf branch or beastfolk subspecies."""
+    """An elf branch, a beastfolk subspecies, or a human bloodline subrace."""
 
     key: str
     race_key: str
