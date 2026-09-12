@@ -813,7 +813,10 @@ class CharacterActivationTests(EvenniaTest):
             _WORN_KIT_SUBRACE.key,
             (
                 (_NEUTRAL_WEAPON.key, 1),
-                (_OFFHAND_ROW.key, 1),
+                # Quantity 2 pins the derivation: starting_equipment comes
+                # from the kit's one entry per key, never from the flattened
+                # inventory (a repeated key would toggle the item on and off).
+                (_OFFHAND_ROW.key, 2),
                 (_BEADS_ROW.key, 1),
                 (_PLATEMAIL_ROW.key, 1),
             ),
@@ -863,8 +866,8 @@ class CharacterActivationTests(EvenniaTest):
             ],
         )
         # The beads' attached buff is present EXACTLY once for the multi-item
-        # kit (design D2 idempotence pin): one instance key, one stack, and
-        # the shared toggle loop's stage fired for this custom activation.
+        # kit: one instance key with one stack and the definition the
+        # rulebook row attaches (the idempotence surface a consumer reads).
         instance_key = f"{_BUFF_ENTRY.attached_buffs[0]}:{_BEADS_ROW.key}"
         self.assertIn(instance_key, self.character.db.buffs)
         self.assertEqual(len(self.character.db.buffs), 1)
@@ -877,7 +880,11 @@ class CharacterActivationTests(EvenniaTest):
         # writer recomputes the hp ceiling's mod from scratch as exactly the
         # worn set's cap against the final traits.
         self.assertEqual(self.character.traits.hp.mod, _CAP_ENTRY.gauge_caps["hp"])
-        self.assertIn("starting_equipment", observed)
+        # The shared stage fired exactly once, AFTER the inventory write the
+        # toggle preflight depends on (an observed stage means a real
+        # completed toggle sequence).
+        self.assertEqual(observed.count("starting_equipment"), 1)
+        self.assertLess(observed.index("inventory"), observed.index("starting_equipment"))
         self.assertFalse(self.character.creation_pending)
 
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):

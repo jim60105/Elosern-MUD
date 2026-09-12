@@ -1,7 +1,7 @@
 """Deterministic per-subrace basic starting equipment kits for custom creation."""
 
 from dataclasses import dataclass
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import SUBRACE_REGISTRY
@@ -29,7 +29,11 @@ def _kit(subrace_key: str, *item_keys: str) -> SubraceStartingKit:
 
 
 def validate_wearable_loadout(
-    item_keys: Sequence[str], *, owner: str, declaration: str
+    item_keys: Sequence[str],
+    *,
+    owner: str,
+    declaration: str,
+    pre_entry: Callable[[str], None] | None = None,
 ) -> None:
     """Reject a declared wearable set the equipment writer could never fully wear.
 
@@ -46,12 +50,19 @@ def validate_wearable_loadout(
     message shapes; the rules themselves are shared so the cap and singleton
     semantics can never drift between the two callers. The singleton/accessory
     arithmetic reads ``world/skills/equipment.py`` (lore already depends on
-    ``world/skills/``), never ``world.rules``.
+    ``world/skills/``), never ``world.rules``. ``pre_entry`` is the caller's
+    per-key guard (the preset validator's malformed-entry and subset rules)
+    invoked before this key's wearable rules, so a mixed-invalid declaration
+    raises exactly the error the caller's original inline loop raised: error
+    precedence stays per-key instead of a full caller pass running before the
+    shared arithmetic.
     """
     seen: set[str] = set()
     singleton_owner: dict[EquipmentSlot, str] = {}
     accessory_count = 0
     for item_key in item_keys:
+        if pre_entry is not None:
+            pre_entry(item_key)
         if item_key in seen:
             raise ValueError(
                 f"{owner} declares duplicate {declaration} {item_key!r}"

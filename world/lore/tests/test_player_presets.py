@@ -197,6 +197,23 @@ class PlayerPresetTests(unittest.TestCase):
         # Every shipped card (empty defaults included) validates clean.
         _validate_preset_starting_equipment(PLAYER_PRESET_REGISTRY)
 
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_mixed_invalid_declarations_keep_per_key_error_precedence(self):
+        # The shared wearable-set helper (custom-kit-worn-at-activation D3)
+        # must not reorder the original inline loop's per-key checks: the
+        # second plain_sword's duplicate error fires BEFORE the third key's
+        # subset error, exactly as the pre-refactor validator raised it.
+        from world.lore.player_presets import _validate_preset_starting_equipment
+
+        preset = PlayerPreset(
+            key="x", display_name="x", age=18, apparent_age=18, race="human",
+            subrace="human_plains", allocations=(), emphasis="e", sex="female",
+            starting_items=(("plain_sword", 1), ("leather_armor", 1)),
+            starting_equipment=("plain_sword", "plain_sword", "knight_blade"),
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate starting equipment"):
+            _validate_preset_starting_equipment({"x": preset})
+
     def test_skill_lists_returns_the_storage_shape_in_declared_order(self):
         preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
         self.assertEqual(

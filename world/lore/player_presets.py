@@ -1041,10 +1041,11 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
     shared helper's (custom-kit-worn-at-activation D3) — the same arithmetic
     ``_validate_starting_kit`` runs on subrace kits once custom activation
     wears them — keeping the five-rule contract this validator declares
-    observable through identical stable messages. The subset rule stays here
-    (it is preset-specific) and runs first, preserving the observable error
-    precedence: a bad key absent from ``starting_items`` still names the
-    subset rule.
+    observable through identical stable messages AND per-key error precedence:
+    the malformed-entry and subset guards stay here (preset-specific) and run
+    as the helper's per-entry guard, so one key's subset error still precedes
+    a later key's duplicate error exactly as the original inline loop ordered
+    them.
     """
     for preset in registry.values():
         # Defensive shape check: the starting-items validator already rejects
@@ -1057,20 +1058,25 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
                     f"preset {preset.key!r} declares a malformed starting-item entry"
                 )
             carried.add(entry[0])
-        for item_key in preset.starting_equipment:
+
+        def check_entry(
+            item_key: str, carried: set[str] = carried, key: str = preset.key
+        ) -> None:
             if not isinstance(item_key, str) or not item_key:
                 raise ValueError(
-                    f"preset {preset.key!r} declares a malformed starting-equipment entry"
+                    f"preset {key!r} declares a malformed starting-equipment entry"
                 )
             if item_key not in carried:
                 raise ValueError(
-                    f"preset {preset.key!r} declares starting equipment {item_key!r} "
+                    f"preset {key!r} declares starting equipment {item_key!r} "
                     "absent from its starting_items"
                 )
+
         validate_wearable_loadout(
             preset.starting_equipment,
             owner=f"preset {preset.key!r}",
             declaration="starting equipment",
+            pre_entry=check_entry,
         )
 
 
