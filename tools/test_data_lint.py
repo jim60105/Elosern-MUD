@@ -275,10 +275,21 @@ def derive_universe(root: Path) -> Universe:
     the universe beyond the cold-process semantics the freeze ledger was
     classified against. A cold child makes the derivation deterministic in
     every host process order.
+
+    The child's ``DJANGO_SETTINGS_MODULE`` is pinned, not inherited: the
+    evennia test shards run under ``server.conf.test_settings`` and export
+    it, and a leaked ``DJANGO_SETTINGS_MODULE=test_settings`` makes the cold
+    child die importing a top-level ``test_settings`` that only resolves as
+    ``server.conf.test_settings`` — the ``SystemExit`` from that failure
+    then kills a ``--parallel`` worker and the shard hangs. Pinning the
+    same value the child-side default picks in a clean host keeps the
+    derivation identical in every process environment.
     """
+    child_env = dict(os.environ, DJANGO_SETTINGS_MODULE="server.conf.settings")
     child = subprocess.run(
         [sys.executable, "-m", "tools.test_data_lint", "derive-json"],
         cwd=root,
+        env=child_env,
         capture_output=True,
         text=True,
     )
