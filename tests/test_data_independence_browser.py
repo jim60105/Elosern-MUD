@@ -20,6 +20,7 @@ from pathlib import Path
 import unittest
 
 from tools import test_data_lint
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,6 +74,11 @@ class BrowserTestDataMigrationContractTests(unittest.TestCase):
             "the manifest names a module the browser area no longer has",
         )
 
+    @covers_requirement(
+        "test-data-independence::"
+        "managed-browser-tests-resolve-game-data-through-"
+        "synthetic-fixtures"
+    )
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
@@ -80,6 +86,11 @@ class BrowserTestDataMigrationContractTests(unittest.TestCase):
             self.assertNotIn(path, debt, f"{path} reintroduced into debt")
             self.assertNotIn(path, contract, f"{path} registered as contract")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "managed-browser-tests-resolve-game-data-through-"
+        "synthetic-fixtures"
+    )
     def test_migrated_files_carry_zero_findings(self):
         universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)
         for path in self._browser_area():
