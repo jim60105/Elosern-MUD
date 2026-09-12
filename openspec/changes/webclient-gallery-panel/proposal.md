@@ -89,12 +89,13 @@ action-list conflict surface. This change ships the selection store it writes.)
 ## Batch:
 
 - depends-on: (none — first of the gallery-UI batch)
-- Code-conflict notes: owns `web/webclient/presentation/gallery.py`,
-  `PANEL_ALLOWLIST`/gallery validator block in `protocol.js`, and the panel
-  registry line. `webclient-gallery-actions` registers into
-  `web/webclient/actions/registry.py` and `protocol.js`'s action-id list only
-  (plus the panel-name registry entry consumed by both — one shared two-line
-  hunk in `registry.py`, resolved by landing order);
-  `webclient-gallery-ui` owns `AppClient.vue`,
+- Code-conflict notes: `web/webclient/presentation/registry.py` and
+  `presentation/gallery.py` are owned EXCLUSIVELY by this change;
+  `web/webclient/actions/registry.py` is owned exclusively by
+  `webclient-gallery-actions`; `protocol.js` is touched by both changes but in
+  disjoint regions (panel validator/allowlist vs action payload validators),
+  resolved by landing order. `webclient-gallery-ui` owns `AppClient.vue`,
   `web/webclient-app/component-manifest.json`, and new components — no overlap
-  with this change.
+  with this change. Scope note: this change is the batch's ceiling workday;
+  its drop-lever if it overruns is deferring the equipment-summary display-name
+  enrichment (raw keys first), never the payload key set.

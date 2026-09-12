@@ -53,9 +53,11 @@ with binding affordances absent when `capabilities.supports_bindings` is false.
 
 ### Requirement: The generate drawer maps checkboxes to the closed catalog and dispatches one request
 
-納入生成的資料 SHALL render exactly the committed field vocabulary —
-角色外貌描述 / 主手武器 / 副手武器 / 防具 / 飾品 — with the 已選 n / 5 counter
-derived from the client-local checkbox set only. 目前裝備摘要 SHALL render the
+納入生成的資料 SHALL render exactly the closed field catalog of
+`art-gallery-prompt-fields` — 角色外貌描述 / 主手武器 / 副手武器 / 防具 / 飾品 —
+rendered ONLY when the committed `capabilities.supports_field_selection` is
+true (monster subjects render the drawer without any checkbox), with the
+已選 n / 5 counter derived from the client-local checkbox set only. 目前裝備摘要 SHALL render the
 committed `equipment_summary` (per-slot equipped display name or 未裝備; the
 accessories count line). 補充提示詞 SHALL be a textarea whose n / 512 counter
 is cosmetic; on submit the surface SHALL dispatch exactly one

@@ -23,12 +23,15 @@
 - [ ] 1.4 Pending rows: add one read-only accessor (bounded, ≤8 entries) to the
   art queue surface returning a subject's in-flight gallery job
   `{image_id, enqueued_at}`; render each as one `status: "pending"` row merged
-  into card order by timestamp.
+  into card order by timestamp; drop pending rows whose `image_id` already
+  appears among the card rows (settle-race dedupe).
 - [ ] 1.5 Failed row: when the record carries `last_error_code`, exactly one
   `status: "failed"` row (bounded message 「暫時無法生成，稍後再試」, stable code,
-  `last_error_at` timestamp, null url/face_rect, no reused image_id).
-- [ ] 1.5b `binding_warnings`: current snapshot once; non-default bound cards
-  whose masked slots all evaluate equal to it, newest-first ≤5, each
+  `last_error_at` timestamp, null url/face_rect, deterministic synthetic
+  `image_id` = uuid5(subject, last_error_at + code) — never a stored card's id).
+- [ ] 1.5b `binding_warnings`: current snapshot once; every OTHER bound card
+  (default card included when bound) whose masked slots all evaluate equal to
+  it, newest-first ≤5, each
   `{image_id, label, conditions}` with per-slot zh-TW condition lines
   (accessories 「任一」); empty list for kinds without binding support.
 - [ ] 1.6 `filters` counts `{all, defaults, bound, pending, failed}` computed
@@ -75,9 +78,12 @@
 - [ ] 5.1 Facade events: `gallery_panel_selected` info on a selection change
   (context `subject`, `kind`); no Evennia logger imports.
 - [ ] 5.2 New test module (`web/webclient/presentation/tests/test_gallery_panel.py`,
-  selection-store lifecycle covered here) registered in
-  `.github/evennia-shards.json` in this change; new main-spec requirements
-  tagged `@covers_requirement`.
+  selection-store lifecycle — write API, render fallback, retirement — covered
+  HERE directly) registered in `.github/evennia-shards.json` in this change;
+  new main-spec requirements tagged `@covers_requirement`. Cross-change test
+  note: the delta scenario whose WHEN dispatches `gallery.subject.select`
+  becomes executable only in `webclient-gallery-actions`' test module (its
+  stated executable home); this change's suite exercises the store directly.
 - [ ] 5.3 Dual-direction Python/JavaScript parity tests cover the new panel
   (accept/accept, reject/reject on every bound); the schema-version parity
   contract includes `gallery`.

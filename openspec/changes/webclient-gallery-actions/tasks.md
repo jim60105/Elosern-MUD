@@ -2,6 +2,10 @@
 
 ## 1. Adapter module
 
+- [ ] 1.0 Shared resolution helper: `resolve_gallery_subject_by_key`
+  (`gallery-card-update-api` ships it; adapters call it for character-kind
+  keys, typed producer for registry kinds) mapped to the stable rejection
+  codes; no re-implementation inside `gallery_actions.py`.
 - [ ] 1.1 New `web/webclient/actions/gallery_actions.py`: shared subject-key
   payload validation (rail grammar), `image_id` uuid-form bound, and the
   typed-error → stable-code table (`unknown_field`, `prompt_too_long`,
@@ -19,13 +23,15 @@
   `{subject_key, image_id}`; call `set_default` / `remove_card`; re-resolve the
   card through `cards_for` first; `unknown_card` on a miss.
 - [ ] 1.5 `gallery.face_rect.update`: exact `{subject_key, image_id,
-  face_rect}`; validate through `gallery.validate_face_rect`; persist verbatim
-  through the gallery API (no crop, no second image, no file write).
+  face_rect}`; persist verbatim through
+  `world/art/gallery.py::update_card_face_rect` (its validator owns the rect
+  bounds; no crop, no second image, no file write).
 - [ ] 1.6 `gallery.binding.save`: exact `{subject_key, image_id, slots}`
   (non-empty distinct slot ids); build `{mask (declared order), snapshot =
   current normalized snapshot over the masked slots}` via the no-create
-  stored-state reader; persist through the gallery API; `binding_unsupported`
-  for kinds declaring no binding support.
+  stored-state reader; persist through
+  `world/art/gallery.py::update_card_binding`; `binding_unsupported` for kinds
+  declaring no binding support.
 
 ## 2. Registration and mirrors
 
@@ -40,7 +46,9 @@
   per action against a real gallery record + faked queue; every stable rejection
   code; monster replace shape; binding captures what is worn now (empty slot →
   null, accessories sorted); item-key smuggling rejected pre-adapter; request
-  dedupe via completed-request cache.
+  dedupe via completed-request cache; companion-subject generate/binding
+  through the public resolver; the panel delta's dispatch-a-selection scenario
+  is exercised HERE (its stated executable home).
 - [ ] 3.2 Register the module in `.github/evennia-shards.json` in this change;
   tag new requirements `@covers_requirement`.
 

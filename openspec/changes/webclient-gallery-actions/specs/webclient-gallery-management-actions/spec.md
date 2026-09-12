@@ -10,16 +10,24 @@ The production action registry SHALL register exactly the six actions
 each bound to one exact payload validator rejecting any missing, extra, or
 wrongly typed field before the adapter runs, and each declaring
 `affected_panels: ("gallery",)`. Every adapter SHALL re-resolve the payload's
-`subject_key` through the subject kind's typed producer and (where an
-`image_id` is named) against the subject's tolerant card read, and SHALL call
-only `world/art/service.py` / `world/art/gallery.py` public APIs — never a
+`subject_key` — character kind through
+`world/art/service.py::resolve_gallery_subject_by_key` (returning the typed
+subject and its live entity), registry kinds through the kind's typed producer
+— and (where an `image_id` is named) against the subject's tolerant card read,
+and SHALL call only `world/art/service.py` / `world/art/gallery.py` public
+APIs (including `update_card_face_rect` / `update_card_binding`) — never a
 direct record write. Payloads SHALL use the shared subject-key grammar and
 uuid-form `image_id` bound.
 
 #### Scenario: A tampered subject key resolves or refuses
 
-- **WHEN** `gallery.default.set` names a subject key no typed producer resolves
+- **WHEN** `gallery.default.set` names a subject key neither resolver resolves (unknown prefix, dead entity, unknown tier)
 - **THEN** the result is `rejected` with a stable code and no gallery record is touched
+
+#### Scenario: A companion subject reaches the entity-gated seams
+
+- **WHEN** `gallery.generate` names a live companion's rail subject key
+- **THEN** the adapter resolves the companion entity through the public resolver, passes it to `request_gallery_image`, and the request validates through the declared age precondition
 
 #### Scenario: Extra payload fields reject before any adapter runs
 
@@ -93,7 +101,8 @@ idempotency-deduplicated by the dispatcher's completed-request cache.
 
 `gallery.face_rect.update` SHALL accept exactly `subject_key`, `image_id`, and
 `face_rect` (`x`, `y`, `w`, `h` reals in [0,1], `x+w ≤ 1`, `y+h ≤ 1`, positive
-`w`/`h`), SHALL persist through the gallery API verbatim, and SHALL NOT crop,
+`w`/`h`), SHALL persist verbatim through
+`world/art/gallery.py::update_card_face_rect`, and SHALL NOT crop,
 resize, or store any second image. The 1:1 crop preview is a client-local
 rendering of the same image; the server stores only the rectangle.
 
@@ -114,7 +123,8 @@ rendering of the same image; the server stores only the rectangle.
 `armor`, `accessories`) — no item key SHALL ever appear in the payload. The
 adapter SHALL build the binding as `{mask: slots in declared order, snapshot:
 the CURRENT normalized equipment snapshot over exactly the masked slots}` from
-the stored-state no-create reader, and persist through the gallery API. An
+the stored-state no-create reader, and persist through
+`world/art/gallery.py::update_card_binding`. An
 enabled slot whose equipment is empty binds `None` (empty list for
 accessories); an all-empty snapshot stays legal. For a kind whose declaration
 supports no bindings the action SHALL refuse with stable code

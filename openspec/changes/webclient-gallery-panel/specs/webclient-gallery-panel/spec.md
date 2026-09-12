@@ -82,8 +82,10 @@ timestamp/sequence by the presenter; a pending row's label carries the
 `chips`, `requested_fields`, `binding_present`, and `created_at`. Card rows come
 only from the tolerant card read; a media URL SHALL be built only from a card's
 stored identity validated against the subject's own gallery prefix, the closed
-extension set, and the store-root confinement check — exactly the
-`art-gallery-resolution` presenter discipline. `chips` SHALL be the
+extension set, the store-root confinement check, and the file-existence check —
+exactly the `art-gallery-resolution` presenter discipline: a card whose stored
+file has vanished SHALL be omitted from `cards`, never emitted with a broken
+URL. `chips` SHALL be the
 server-authored label list derived from the card's binding mask (`weapon_main`
 → 「主手」, `weapon_off` → 「副手」, `armor` → 「防具」, `accessories` → 「飾品」),
 the face fact 「自訂臉框」 when the rect differs from `DEFAULT_FACE_RECT` else
@@ -109,7 +111,10 @@ timestamp. A `GalleryRecord` carrying `last_error_code` SHALL render as exactly
 one `status: "failed"` row whose server-authored message is the bounded
 「暫時無法生成，稍後再試」 line carrying the stable code, placed newest by
 `last_error_at`. A failed row SHALL NOT fabricate a card: `url` and `face_rect`
-are null and no `image_id` of a stored card is reused. With the image server
+are null and its `image_id` SHALL be deterministic synthetic state (uuid5 over
+the subject, the error timestamp, and the code), never a stored card's id. A
+pending row whose `image_id` also names a listed card (same-pass settle race)
+SHALL be dropped. With the image server
 unreachable the panel SHALL still be available: AI-offline generation is a
 surfaced failed row, never a panel degradation and never a broken card.
 
@@ -128,8 +133,8 @@ surfaced failed row, never a panel degradation and never a broken card.
 The panel SHALL carry `binding_warnings`: for the selected subject, the bound
 cards whose masked slots ALL evaluate equal to the current equipment snapshot on
 every slot the card masks (i.e. cards that could satisfy their binding against
-the same equipment right now), excluding the subject's default card, ordered
-newest-first, at most five entries, each exactly `{image_id, label,
+the same equipment right now) — the subject's default card included when it is
+bound — ordered newest-first, at most five entries, each exactly `{image_id, label,
 conditions}` where `conditions` is the card's server-authored per-slot
 condition lines (slot label plus equipped display name; accessories rendered as
 the sorted list with 「任一」 semantics). An empty list SHALL be present, not

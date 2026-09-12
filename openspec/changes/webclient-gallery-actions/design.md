@@ -2,13 +2,19 @@
 
 ## D1 — Adapters are thin, backend is the only authority
 
-Every gallery rule already lives behind
+Every gallery rule lives behind
 `world/art/service.py::request_gallery_image` and the `world/art/gallery.py`
 single-writer boundary (kind capability gates, typed errors, monster one-card
-cap with replace semantics, tolerant reads, the no-create snapshot reader). Each
-adapter therefore: re-resolves `subject_key` through the kind's typed producer
-(never trusting the caller's key alone), re-resolves `image_id` against
-`cards_for`, calls exactly one public API, and maps typed errors
+cap with replace semantics, tolerant reads, the no-create snapshot reader) —
+plus the in-place card writers and public subject-key resolver shipped by the
+dependency change `gallery-card-update-api` (the shipped model has NO card
+update; without those writers face-rect/binding save could only be an
+append-remove replace with a new `image_id` and lost provenance). Each adapter
+therefore: re-resolves `subject_key` — character kind through
+`resolve_gallery_subject_by_key` (yielding subject AND live entity; the age
+precondition and `snapshot_for` need the entity), registry kinds through the
+typed producer, never trusting the caller's key alone — re-resolves `image_id`
+against `cards_for`, calls exactly one public API, and maps typed errors
 (`ArtSubjectError`, `GalleryPromptError`, `GalleryRecordError`,
 protocol-side `malformed_payload` for schema failures) to stable result codes
 with zh-TW messages, following the `character_actions` exemplar. No adapter

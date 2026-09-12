@@ -67,9 +67,13 @@ not stored:
   carried; the message is server-authored.
 
 Filter counts 全部/預設/已綁定/生成中/失敗 are computed server-side over exactly
-these rows (全部 = valid cards + pending + failed-when-no-cards-match? — no:
-全部 counts every row the panel lists). Counts travel as data; the client draws
-tabs verbatim.
+these rows: 全部 counts every row the panel lists. Counts travel as data; the
+client draws tabs verbatim. A pending row whose job settled into a card during
+the same presenter pass is dropped (dedupe by `image_id`), and the failed row's
+synthetic `image_id` is deterministic (uuid5 over subject + error timestamp +
+code) so the unique-id validator never trips nondeterministically. A card whose
+stored file has vanished is omitted by the resolution discipline's file check
+(never a broken-URL row).
 
 ## D6 — Equipment summary and capability flags
 
@@ -101,8 +105,9 @@ unavailable.
 Cards carry no name in the stored contract, so each row's zh-TW display line is
 derived server-side (timestamp-anchored label; pending rows suffix 「生成中」).
 規則重疊提醒 travels as `binding_warnings`: the presenter takes the current
-snapshot once and lists (≤5, newest-first) every non-default bound card whose
-masked slots all evaluate equal to that snapshot — cards that could win display
+snapshot once and lists (≤5, newest-first) every OTHER bound card of the
+subject — including the default card when it is bound — whose masked slots all
+evaluate equal to that snapshot — cards that could win display
 for the equipment being worn right now, so saving an overlapping binding risks a
 priority surprise. Condition lines are server-authored (accessories carry the
 「任一」 phrasing). No client ever evaluates a match.

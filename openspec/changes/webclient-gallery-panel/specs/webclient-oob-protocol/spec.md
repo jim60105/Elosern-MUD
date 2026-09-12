@@ -13,7 +13,14 @@ context, SHALL return JSON-safe panel data without invoking mutation APIs, and
 SHALL execute independently so one presenter failure cannot suppress other
 panels or narrative output. A presenter whose subject is the account owning the
 rendered puppet, rather than the puppet itself, SHALL derive that account from
-the rendered puppet's own account only.
+the rendered actor's own ownership link and SHALL be held to the identical
+read-only, isolation, and availability-discriminator contract as every
+puppet-subject presenter; it SHALL NOT widen the read context to the transport
+session and SHALL NOT read any account the rendered actor does not belong to.
+The registry SHALL derive each panel's registered schema version from the panel
+schema's single server-side constant in its presenter module, and the client's
+panel allowlist and per-panel schema-version re-checks SHALL mirror the same
+value under a dual-direction parity contract so the two never diverge.
 
 #### Scenario: Duplicate presenter registration fails
 

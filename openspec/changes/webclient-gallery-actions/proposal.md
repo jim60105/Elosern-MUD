@@ -7,9 +7,11 @@ show five mutations: generate a new image (生成新圖 drawer), set a card as
 default (設為預設), delete a card (刪除), re-mark the face rectangle (儲存框選),
 and save the binding editor (儲存綁定) — plus the subject-rail selection the
 gallery panel reads. The backend service/gallery API already enforces every
-domain rule (`request_gallery_image`, `set_default`, `remove_card`, card
-updates via the gallery single-writer boundary, typed errors, the kind
-capability gates, the monster one-card 替換 semantics), and the panel presenter
+domain rule (`request_gallery_image`, `set_default`, `remove_card`, typed
+errors, the kind capability gates, the monster one-card 替換 semantics), and
+the companion backend change `gallery-card-update-api` adds the two missing
+in-place card writers (`update_card_face_rect`, `update_card_binding`) plus the
+public subject-key resolver this change consumes; the panel presenter
 (`webclient-gallery-panel`) already renders the read side — but there is no
 `ui_action` path for any of it, so design §8.4's "management ops run through
 the service API seam" still holds in the worst sense: the player can't reach
@@ -46,10 +48,15 @@ that seam from the webclient.
 - Observability: one facade event per management mutation (`gallery_generate`
   already exists at the service seam; the webclient layer adds
   `gallery_action` info/warn with `subject`, `image_id`, `kind`, action id).
-- All mutations re-resolve every client-referenced identity (subject via the
-  kind's typed producer, card via the tolerant read) and go ONLY through
-  `world/art/service.py` / `world/art/gallery.py` — no direct record writes
-  (dispatcher ownership contract).
+- All mutations re-resolve every client-referenced identity — character-kind
+  subject keys through the new public
+  `world/art/service.py::resolve_gallery_subject_by_key` (the entity-derived
+  kind needs its live entity for the age precondition and the equipment
+  snapshot; the bare key alone is never trusted), registry kinds through the
+  typed producer, cards through the tolerant read — and go ONLY through
+  `world/art/service.py` / `world/art/gallery.py` public APIs (including the
+  `gallery-card-update-api` writers). No direct record writes (dispatcher
+  ownership contract).
 
 ## Capabilities
 
@@ -69,6 +76,11 @@ that seam from the webclient.
 
 - New `web/webclient/actions/gallery_actions.py` + registration in
   `web/webclient/actions/registry.py`.
+- Consumes (does not own) the backend writers/resolver shipped by
+  `gallery-card-update-api`. Scope note: six adapters + six mirrored payload
+  validators + typed-error table is this batch's heaviest change; its
+  drop-lever is shipping face-rect/binding save with shared test fixtures
+  rather than per-action bespoke suites — never a missing validator.
 - `web/static/webclient/js/elosern/protocol.js` action-payload validators for
   the six ids; pinned production action-set test extended.
 - New test module registered in `.github/evennia-shards.json` in the same
@@ -77,9 +89,13 @@ that seam from the webclient.
 
 ## Batch:
 
-- depends-on: webclient-gallery-panel
+- depends-on: webclient-gallery-panel, gallery-card-update-api
 - Code-conflict notes: owns `web/webclient/actions/gallery_actions.py`,
-  `web/webclient/actions/registry.py` hunks, and the protocol.js action block.
+  `web/webclient/actions/registry.py` hunks, and the protocol.js action block
+  (disjoint from the panel change's validator region; resolved by landing
+  order). `web/webclient/presentation/registry.py` is owned exclusively by
+  `webclient-gallery-panel` — this change touches no panel registration;
+  `world/art/` writer hunks belong exclusively to `gallery-card-update-api`.
   Shares `web/webclient/presentation/registry.py` (panel registration is the
   panel change's; this change touches no panel registration). Depends on the
   panel change's selection store and rail vocabulary — land strictly AFTER it.
