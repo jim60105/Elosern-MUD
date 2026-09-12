@@ -4,6 +4,7 @@ Self-consistency checks for race, tier, and subrace registries."""
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from pathlib import Path
 
 from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
 from world.lore.races import (
@@ -186,6 +187,16 @@ class RaceRegistryTests(unittest.TestCase):
             self.assertNotIn(key, PLAYER_PRESET_REGISTRY)
             self.assertNotIn(key, {preset.subrace for preset in PLAYER_PRESET_REGISTRY.values()})
         self.assertIn("human_commoner", STATIC_TIER_REGISTRY)
+        # The import example and browser fixtures are shipped data too: read
+        # them as text so a retired key cannot hide in either loader input.
+        repo_root = Path(__file__).resolve().parents[3]
+        for rel in (
+            "world/imports/examples/example_character.json",
+            "web/browser_support/browser_fixtures_data.py",
+        ):
+            source = (repo_root / rel).read_text(encoding="utf-8")
+            for key in retired:
+                self.assertNotIn(key, source, rel)
 
     def test_every_race_has_at_least_one_subrace(self):
         for race_key in RACE_REGISTRY:
