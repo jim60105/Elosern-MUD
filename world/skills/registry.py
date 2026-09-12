@@ -952,18 +952,6 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             group="精通",
         ),
         _skill(
-            "divine_sexual_arts",
-            "神之秘法：性愛系統",
-            "以神之秘法引導的性愛技法，直接刺激目標的感官與慾望。",
-            SkillKind.ACTIVE,
-            TargetSpec.SINGLE,
-            usable_out_of_combat=True,
-            requires_divine_arts=True,
-            effects=["sexual_event:stimulus_applied"],
-            category=SkillCategory.SEXUAL_ACT,
-            group="神之秘法",
-        ),
-        _skill(
             "divine_time_dilation",
             "神之秘法：時間加速",
             "以神性加速或減緩時間流動的秘法。",

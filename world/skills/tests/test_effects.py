@@ -26,6 +26,7 @@ from world.skills.effects import (
     SexualEventEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
+    TargetSexualEventEffect,
     WeaponStyleEffect,
     parse_effect,
 )
@@ -145,6 +146,18 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_sexual_event_actor_rejects_missing_or_double_payload(self):
         for effect in ("sexual_event_actor", "sexual_event_actor:a:b"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
+
+    def test_sexual_event_target_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("sexual_event_target:t_target_event"),
+            TargetSexualEventEffect(event_name="t_target_event"),
+        )
+
+    def test_sexual_event_target_rejects_missing_or_double_payload(self):
+        for effect in ("sexual_event_target:", "sexual_event_target:a:b"):
             with self.subTest(effect=effect):
                 with self.assertRaises(ValueError):
                     parse_effect(effect)

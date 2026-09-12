@@ -20,9 +20,15 @@ consumers gated by the already-landed field.
   `RACE_REGISTRY["beastfolk"].can_use_divine_arts` are both `False`
 
 #### Scenario: An elf can cast divine_sexual_arts at no MP/SP cost
-- **WHEN** an elf entity owning `divine_sexual_arts` casts it at a valid target
+- **WHEN** an elf entity owning `divine_sexual_arts` casts it at a valid target whose resist contest
+  resolves `resisted=False`
 - **THEN** the cast is not rejected for insufficient MP or SP (the skill's `cost` is empty), and it
-  resolves via the existing `sexual_event` effect handler
+  resolves via the `sexual_event_target:` effect handler against the surviving target
+
+#### Scenario: The integrated act's gate order is race first, then resist
+- **WHEN** a non-divine-capable actor owning `divine_sexual_arts` casts it at a valid target
+- **THEN** `_step1_divine_arts_gate` rejects the cast before any resist contest runs, exactly as for
+  the `divine.py` acts
 
 ### Requirement: Unmechanized Divine Mysteries are explicitly declared, not silently missing
 `SKILL_REGISTRY` SHALL contain four entries for 時間加速/減速, 空間扭曲, 物質轉換, and 生命延續, each

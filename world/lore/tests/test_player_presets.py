@@ -211,6 +211,21 @@ class PlayerPresetTests(unittest.TestCase):
             ["divine_sexual_arts", "status_disguise"],
         )
 
+    def test_yunas_catalog_installed_signature_act_passes_the_divine_gate(self):
+        # The key now installs from the sexual-act catalogue, not the main
+        # registry's inline rows: the kit still flattens to it, the installed
+        # row is still an ACTIVE divine-arts skill, and Yuna's bloodline
+        # still satisfies the race gate the kit validator enforces.
+        preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
+        self.assertIn(
+            "divine_sexual_arts",
+            [*preset.active_skills, *preset.passive_skills],
+        )
+        skill = SKILL_REGISTRY["divine_sexual_arts"]
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertTrue(skill.requires_divine_arts)
+        self.assertTrue(RACE_REGISTRY[preset.race].can_use_divine_arts)
+
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_kit_validation_rejects_unknown_kind_mismatch_and_divine_gate(self):
         from world.lore.player_presets import _validate_preset_skill_kits

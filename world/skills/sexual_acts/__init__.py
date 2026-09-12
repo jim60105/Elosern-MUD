@@ -94,7 +94,12 @@ def unlocked_act_keys_for(
     catalogue only; mastery and divine arts are two unrelated acquisition
     paths. The counter-driven branch below keeps the shipped empty-unlock
     semantics unchanged — a divine act declaring ``unlock={}`` stays owned by
-    everyone, and the race gate at cast time is the line's containment.
+    everyone, and the race gate at cast time is the line's containment — with
+    one exception: rows declaring ``ownership_gated=True`` (signature skills)
+    are skipped by BOTH branches regardless of their ``unlock`` mapping, so
+    their unlocked state is supplied only by actual base ownership. The
+    shipped ``divine_sexual_arts`` row carries both markers, so the shipped
+    derived sets are identical either way.
     """
     mastery = any(
         isinstance(effect, SexualMasteryEffect)
@@ -107,11 +112,13 @@ def unlocked_act_keys_for(
             key
             for key, act in SEXUAL_ACT_REGISTRY.items()
             if not SKILL_REGISTRY[key].requires_divine_arts
+            and not act.ownership_gated
         )
     return frozenset(
         key
         for key, act in SEXUAL_ACT_REGISTRY.items()
-        if all(
+        if not act.ownership_gated
+        and all(
             counter_values.get(counter, 0) >= threshold
             for counter, threshold in act.unlock.items()
         )

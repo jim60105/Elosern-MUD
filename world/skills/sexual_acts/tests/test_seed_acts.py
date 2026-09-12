@@ -55,9 +55,10 @@ class SeedActOwnershipTests(EvenniaTest):
         # is filled by its own catalog changes (sexual-catalog-divine-core and
         # sexual-catalog-divine-mutators), so its acts are not seeds — they are
         # owned by everyone through the empty-unlock mapping, but casting is
-        # race-gated.
+        # race-gated. The eighth (ownership-gated) divine row is owned by no
+        # one through derivation at all, so the seed set still excludes it.
         self.assertEqual(len(INTERSPECIES_ACTS), 7)
-        self.assertEqual(len(DIVINE_ACTS), 7)
+        self.assertEqual(len(DIVINE_ACTS), 8)
 
     def test_seed_rows_are_registered_under_the_same_key_in_both_registries(self):
         for key in (*_SELF_SEEDS, *_SINGLE_SEEDS):

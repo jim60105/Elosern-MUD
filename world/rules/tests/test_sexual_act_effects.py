@@ -13,6 +13,7 @@ from tools.spec_traceability import covers_requirement
 
 import ast
 import inspect
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -34,12 +35,14 @@ from world.rules.action import (
     ActionResolver,
     RejectReason,
     _EFFECT_HANDLERS,
+    _EFFECT_HANDLER_SURFACES,
     _apply_pleasure_gain,
     _handle_act_pair_event,
     _handle_actor_sexual_event,
     _handle_sexual_event,
     _handle_pleasure_effect,
     _handle_sexual_counter_effect,
+    _handle_target_sexual_event,
 )
 from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
@@ -53,6 +56,7 @@ from world.rules.sexual_act_effects import (
     resolve_part,
 )
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, SexualState
+from world.rules.sexual_resist import ResistVerdict
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import TargetSpec
 from world.skills.sexual_acts._builder import (
@@ -753,9 +757,10 @@ class MissingActRejectionTests(_ActCastTestCase):
 
 
 class SexualEventReuseTests(_ActCastTestCase):
-    """sexual_event:<name> entries reuse the existing handler; recipients follow D-3."""
+    """sexual_event:<name> entries reuse the existing handler; recipient scope
+    follows the effect prefix statically — no name-based exception table."""
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_declared_event_calls_apply_event_for_every_participant(self):
         skill, act = self._build_duo_act(sexual_events=("frequent_stimulation",))
         with self._install(skill, act)[0], self._install(skill, act)[1]:
@@ -768,15 +773,44 @@ class SexualEventReuseTests(_ActCastTestCase):
             self.assertEqual(self.target.sexual.sensitivity["私處"].level, "高")
             self.assertEqual(self.actor.sexual.sensitivity["私處"].level, "高")
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_no_new_handler_is_registered_for_sexual_event(self):
         self.assertIs(_EFFECT_HANDLERS["sexual_event"], _handle_sexual_event)
+        # The target-scoped channel is the only dispatch-table addition, and it
+        # is a distinct handler — the participant handler carries no scope fork.
+        self.assertIs(
+            _EFFECT_HANDLERS["sexual_event_target"], _handle_target_sexual_event
+        )
+        # The general apply_event route can mutate traits for rulebook events
+        # beyond sexual state (post-review fix): the target channel declares
+        # the same restoration surface as the participant channel, or a future
+        # traits-mutating target row would roll back incompletely.
+        self.assertEqual(
+            _EFFECT_HANDLER_SURFACES["sexual_event_target"],
+            _EFFECT_HANDLER_SURFACES["sexual_event"],
+        )
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
-    def test_legacy_stimulus_event_stays_target_scoped(self):
-        # D-9: _LEGACY_TARGET_SCOPED_EVENTS keeps the divine skill's declared
-        # event on the cast's targets only — the acting entity is never a
-        # recipient, so the divine-arts exemption from self-pleasure holds.
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
+    def test_target_prefixed_stimulus_event_fires_on_targets_only(self):
+        # The divine_sexual_arts cast semantics, carried by the prefix: the
+        # acting entity is never a recipient of its own target-scoped event,
+        # so the divine-arts exemption from self-pleasure (D-9) holds without
+        # any name-based recipient table.
+        pending = _handle_target_sexual_event(
+            self.actor,
+            [self.target],
+            "sexual_event_target:stimulus_applied",
+            {},
+            1.0,
+        )
+        self.assertEqual(len(pending), 1)
+        self.assertIs(pending[0].entity, self.target)
+
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
+    def test_the_participant_channel_no_longer_special_cases_stimulus(self):
+        # The exception table is dead: the same event name through the
+        # participant prefix now reaches every participant — scope is decided
+        # by the prefix alone, never by the name.
         pending = _handle_sexual_event(
             self.actor,
             [self.target],
@@ -784,10 +818,10 @@ class SexualEventReuseTests(_ActCastTestCase):
             {},
             1.0,
         )
-        self.assertEqual(len(pending), 1)
-        self.assertIs(pending[0].entity, self.target)
+        entities = {effect.entity for effect in pending}
+        self.assertEqual(entities, {self.actor, self.target})
 
-    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-resolve-through-the-participant-scoped-handler-with-no-name-based-exception-table")
     def test_self_act_event_reaches_the_actor_exactly_once(self):
         (skill, act), = _act_family(
             "獨處線",
@@ -811,6 +845,73 @@ class SexualEventReuseTests(_ActCastTestCase):
             result = self._cast(act.key, [])
         self.assertEqual(result.outcome, "success")
         self.assertIn("自慰", self.actor.sexual.experience_types)
+
+
+class TargetSexualEventChannelBoundaryTests(_ActCastTestCase):
+    """The sexual_event_target: channel's edges: full resist, AREA fan-out."""
+
+    def _build_target_event_act(self, key: str = "test_target_event"):
+        # A resistible synthetic duo act whose only effect is the target
+        # channel — the divine_sexual_arts shape without naming the shipped
+        # key (the shipped row itself is exercised in the divine catalog
+        # module's cast tests).
+        skill, act = self._build_duo_act(key, sexual_events=())
+        skill = replace(skill, effects=["sexual_event_target:stimulus_applied"])
+        return skill, act
+
+    def _verdict(self, resisted: bool) -> ResistVerdict:
+        return ResistVerdict(
+            resisted=resisted,
+            auto_comply=not resisted,
+            roll=None if not resisted else 99,
+            actor_score=1.0,
+            resister_score=2.0,
+        )
+
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
+    def test_sole_target_resisted_cast_succeeds_with_no_event_fired(self):
+        # The resist gate excludes the target before effect resolution, so
+        # the target-scoped handler stages nothing: an ordinary success with
+        # no event, no RejectedAction, and no target state change.
+        skill, act = self._build_target_event_act()
+        with (
+            self._install(skill, act)[0],
+            self._install(skill, act)[1],
+            patch(
+                "world.rules.sexual_resist.resist_verdict",
+                return_value=self._verdict(True),
+            ),
+            patch("world.rules.sexual_transitions.apply_event") as apply_spy,
+        ):
+            result = self._cast(act.key, [self.target])
+        self.assertEqual(result.outcome, "success")
+        apply_spy.assert_not_called()
+        self.assertEqual(self.target.sexual.pleasure.base, 0)
+
+    @covers_requirement("sexual-act-effects::sexual-event-target-name-applies-the-named-event-to-the-resolved-targets-only")
+    def test_handler_stages_one_effect_per_non_actor_target(self):
+        # The hypothetical AREA shape: a resolved target list carrying three
+        # non-actor entities plus the actor itself stages exactly three
+        # effects, and applying each routes apply_event to that target only.
+        extras = [
+            create_object(
+                PlayerCharacter, key=f"act-extra-{index}", location=self.room1
+            )
+            for index in range(2)
+        ]
+        targets = [self.target, *extras, self.actor]
+        with patch("world.rules.sexual_transitions.apply_event") as apply_spy:
+            pending = _handle_target_sexual_event(
+                self.actor, targets, "sexual_event_target:stimulus_applied", {}, 1.0
+            )
+            self.assertEqual(len(pending), 3)
+            self.assertNotIn(self.actor, [effect.entity for effect in pending])
+            for effect in pending:
+                effect.apply()
+        self.assertEqual(apply_spy.call_count, 3)
+        recipients = [call.args[0] for call in apply_spy.call_args_list]
+        self.assertEqual(recipients, [self.target, *extras])
+        self.assertNotIn(self.actor, recipients)
 
 
 class ActorSexualEventHandlerTests(_ActCastTestCase):

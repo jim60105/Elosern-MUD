@@ -1,5 +1,5 @@
 """神之秘法線 (divine arts line): acts that deliberately break the balance
-the other five lines rely on.
+the other five lines rely on, plus one ownership-gated signature act.
 
 The three `C7a` acts are hand-built directly as `(SkillDef, SexualActDef)`
 pairs — not via `_act_family()` — because none of them wants the ordinary
@@ -28,16 +28,29 @@ its own new general-purpose effect prefix
   → ``SexualState.restore_purity()``, bypassing the one-way public setter
   without weakening its shipped guarantee (design D-4).
 
+The eighth pair is ``divine_sexual_arts`` (神之秘法：性愛系統), the legacy
+main-registry skill integrated into the catalogue by
+``integrate-divine-sexual-arts-catalog``. It is hand-built for the same
+structural reason (no pleasure/counter/event triad: its single effect is a
+target-scoped ``sexual_event_target:stimulus_applied`` string) and carries
+``ownership_gated=True`` on its ``SexualActDef``: unlike the seven counter-free
+divine acts above, its unlock state is supplied only by actual base ownership
+(a signature skill — shipped data names exactly one owner, the
+``yuna_darknight`` preset), so neither the counter branch nor the mastery
+blanket of ``unlocked_act_keys_for`` may derive it. It has no counters and no
+``pleasure:`` effect of its own, which is why it could not ride the
+``_act_family()`` row format even before the gating decision.
+
 Every row declares `requires_divine_arts=True` (so the shipped
 ``_step1_divine_arts_gate`` and ``RaceProfile.can_use_divine_arts`` are the
 line's containment), `unlock={}` (counter thresholds do not apply — design doc
 §1.1), `target_part=None` (神之秘法 is one of `_builder.py`'s two
 `_PARLESS_LINES`), `resistible=True` (ordinary hostile-act convention — design
 D-6), and no counters (design doc §1.1: "Counter thresholds do not apply").
-All seven are `TargetSpec.SINGLE` except 絕頂律令, which is `TargetSpec.AREA`.
+All eight are `TargetSpec.SINGLE` except 絕頂律令, which is `TargetSpec.AREA`.
 
 The `SexualActDef` pleasure fields are populated with clearly-documented
-placeholder values: none of the seven acts declares a `pleasure:` effect, so
+placeholder values: none of the eight acts declares a `pleasure:` effect, so
 no code path ever reads `base_pleasure`, `actor_part`, or
 `actor_pleasure_ratio` for these rows.
 """
@@ -245,6 +258,44 @@ DIVINE_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = (
             participant_counters=(),
             sexual_events=(),
             resistible=True,
+        ),
+    ),
+    (
+        # The integrated legacy signature act (integrate-divine-sexual-arts-
+        # catalog design D-1/D-6): hand-built like the other seven, but
+        # ownership_gated so no derivation branch ever unlocks it — only a
+        # kit that actually names the key (the yuna_darknight preset) owns it.
+        SkillDef(
+            key="divine_sexual_arts",
+            label="神之秘法：性愛系統",
+            description="以神之秘法引導的性愛技法，直接刺激目標的感官與慾望。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            # Target-scoped stimulus (D-9 semantics now carried by the prefix):
+            # the acting entity is never a recipient of its own cast.
+            effects=["sexual_event_target:stimulus_applied"],
+            category=SkillCategory.SEXUAL_ACT,
+            group="神之秘法",
+            requires_divine_arts=True,
+        ),
+        SexualActDef(
+            key="divine_sexual_arts",
+            unlock={},
+            # Placeholder (same discipline as the other seven rows): this act
+            # declares no pleasure: effect, so no code path reads this field.
+            base_pleasure=1,
+            actor_part=None,
+            target_part=None,
+            actor_pleasure_ratio=0.0,
+            actor_counters=(),
+            participant_counters=(),
+            sexual_events=(),
+            resistible=True,
+            # Signature-skill gate: derivation branches skip this row.
+            ownership_gated=True,
         ),
     ),
 )

@@ -526,7 +526,7 @@ class DivineMysteryRegistryTests(unittest.TestCase):
         self.assertIs(arts.target_spec, TargetSpec.SINGLE)
         self.assertTrue(arts.usable_out_of_combat)
         self.assertEqual(arts.cost, {})
-        self.assertEqual(arts.effects, ["sexual_event:stimulus_applied"])
+        self.assertEqual(arts.effects, ["sexual_event_target:stimulus_applied"])
 
         disguised = SKILL_REGISTRY["status_disguise"]
         self.assertIn("神之秘法", disguised.label)
@@ -874,7 +874,11 @@ class SkillCategoryClassificationTests(unittest.TestCase):
     def test_divine_sexual_arts_keeps_its_mechanics_after_reclassification(self):
         skill = SKILL_REGISTRY["divine_sexual_arts"]
         self.assertTrue(skill.requires_divine_arts)
-        self.assertEqual(skill.effects, ["sexual_event:stimulus_applied"])
+        # The one authorised post-classification effects rewrite: the
+        # integrate-divine-sexual-arts-catalog prefix migration of the same
+        # declared event (sexual_event: -> sexual_event_target:). No other
+        # field of the entry changed.
+        self.assertEqual(skill.effects, ["sexual_event_target:stimulus_applied"])
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertEqual(skill.cost, {})
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)

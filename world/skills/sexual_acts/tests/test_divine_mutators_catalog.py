@@ -95,8 +95,13 @@ class DivineMutatorRegistrationTests(unittest.TestCase):
     """The four rows extend DIVINE_ACTS to seven without altering the first three."""
 
     @covers_requirement("sexual-catalog-divine-mutators::four-hand-built-acts-extend-divine-acts-gated-exclusively-by-requires-divine-arts-with-no-counter-unlock")
-    def test_divine_acts_grow_to_seven_with_first_three_unchanged(self):
-        self.assertEqual(len(DIVINE_ACTS), 7)
+    def test_divine_acts_grow_to_eight_with_first_seven_unchanged(self):
+        # Post-integration pin (integrate-divine-sexual-arts-catalog): the
+        # tuple reaches exactly eight entries only through the eighth pair,
+        # and the first seven pairs — ordering included — are unchanged.
+        self.assertEqual(len(DIVINE_ACTS), 8)
+        self.assertEqual(DIVINE_ACTS[7][0].key, "divine_sexual_arts")
+        self.assertTrue(DIVINE_ACTS[7][1].ownership_gated)
         for key in _C7A_KEYS:
             skill, act = _pairs_by_key(_C7A_KEYS)[key]
             with self.subTest(key=key):
