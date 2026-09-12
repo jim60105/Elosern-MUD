@@ -60,7 +60,7 @@
 
 ```python
 from world.rules.character_creation import resolve_starting_profile
-profile = resolve_starting_profile("human", "human_commoner")
+profile = resolve_starting_profile("human", "human_plains")
 print(profile.budget)   # 目前人類為 224
 print(profile.bounds)   # 七軸各 (下界, 上界)
 ```
@@ -73,7 +73,7 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 ```python
 "new_hero": PlayerPreset(
-    "new_hero", "新英雄", 20, 20, "human", "human_commoner",
+    "new_hero", "新英雄", 20, 20, "human", "human_plains",
     (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
      ("agility", 10), ("defense", 11), ("magic_power", 43)),
     "生命力與魔力均衡的開局配點",
