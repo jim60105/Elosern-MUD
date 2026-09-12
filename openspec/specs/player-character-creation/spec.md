@@ -232,9 +232,8 @@ the same key twice, two keys claiming the same singleton slot, or more accessory
 `ACCESSORY_MAX_SLOTS`. Each of these is an authoring mistake with no useful runtime meaning:
 `toggle_equipment` toggles rather than equips, and it silently replaces a singleton occupant.
 
-Items a preset carries but does not declare as `starting_equipment` are granted unequipped, and
-custom-mode subrace kits are granted entirely unequipped; the player equips those through the
-ordinary equipment surface.
+Items a preset carries but does not declare as `starting_equipment` are granted unequipped; the
+player equips those through the ordinary equipment surface.
 
 #### Scenario: A preset activation grants the declared starting items
 - **WHEN** a pending player activates a shipped preset that declares `starting_items`
@@ -261,7 +260,7 @@ ordinary equipment surface.
 #### Scenario: Custom activation starts with its subrace kit
 - **WHEN** a pending player completes the custom creation flow with a registered subrace
 - **THEN** the activated character's `db.inventory` equals that subrace's basic starting kit
-  flattened by quantity, never the empty list, and every equipment slot is empty
+  flattened by quantity, never the empty list
 
 #### Scenario: A preset kit with a registry-invalid item is rejected at load
 - **WHEN** a preset declares an item key absent from `ITEM_REGISTRY`, a non-positive or
@@ -315,16 +314,33 @@ and leaves the character pending. This applies only to player-shell creation act
 characters keep their record-owned inventory unchanged and SHALL NOT receive a subrace kit.
 Preset-mode activation SHALL keep granting only the preset's own declared inventory.
 
+Every item of the chosen subrace's kit SHALL additionally be worn at activation: the derived
+`starting_equipment` is the kit's own keys, so each kit item lands in the slot resolved from its
+`ItemDefinition.equipment_slot` through `world/rules/equipment.py::toggle_equipment` — the same
+wearing machinery, running in the same position of the same all-or-nothing transaction, that
+preset activation uses, together with its attached buffs and gauge-ceiling recomputation. A kit
+whose items cannot all be worn — two items claiming the same singleton slot, or more accessories
+than `ACCESSORY_MAX_SLOTS` — SHALL fail at registry load, never at player activation.
+
 #### Scenario: A custom character wakes with its subrace kit
 - **WHEN** custom creation activates with a registered subrace whose kit declares item keys K1 and
   K2
 - **THEN** the activated character's `inventory` contains exactly one entry per declared quantity
-  of K1 and K2, unequipped, and the gear is visible through the normal inventory surface
+  of K1 and K2, the gear is visible through the normal inventory surface, and every kit item is
+  worn: `db.equipment` names each key in the slot its `ItemDefinition.equipment_slot` resolves to,
+  the corresponding attached buffs are present, and the gauge ceilings reflect the worn set
 
 #### Scenario: Kit coverage holds for every subrace at activation
 - **WHEN** custom activation runs once for each registered subrace
 - **THEN** each activated character's `inventory` equals that subrace's kit expanded by quantity,
   with no subrace activated into an empty starting inventory
+
+#### Scenario: A colliding or accessory-overflowing kit fails at registry load
+- **WHEN** a starting-kit registry under construction declares one kit whose items claim the same
+  singleton slot (for example two `weapon_main` keys), or declares more accessory items than
+  `ACCESSORY_MAX_SLOTS`
+- **THEN** importing the starting-kit registry raises at load time instead of the unwearable kit
+  ever reaching a player's activation
 
 #### Scenario: An activation write failure grants no kit items
 - **WHEN** a test injects a failure at any activation write position after the kit was resolved
