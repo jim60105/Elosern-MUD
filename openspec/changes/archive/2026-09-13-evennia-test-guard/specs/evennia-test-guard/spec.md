@@ -15,6 +15,14 @@ The guard SHALL register a pre-execution `tool_call` handler that inspects every
 - **WHEN** the Bash tool is called with `evennia test world.tests`
 - **THEN** the guard performs count-only discovery first and only allows the original command to run after the count is known to be within the limit
 
+#### Scenario: Inert quoted mentions are ignored
+- **WHEN** the Bash tool is called with a command whose `evennia test` text occurs only inside quoted arguments of a display or search command and no segment starts a real or quoting-obscured test invocation (e.g. `git commit -m "docs: align evennia test examples"`, `grep -rn "evennia test" docs/`)
+- **THEN** the guard returns no decision and the command runs normally with no discovery subprocess
+
+#### Scenario: Mentions alongside real invocations stay guarded
+- **WHEN** the Bash tool is called with a composite whose inert quoted mention is combined with a segment that starts an Evennia test invocation (e.g. `git commit -m 'evennia test docs' && evennia test world.tests`)
+- **THEN** the guard treats the command as an Evennia test invocation and counts (or blocks it as unsupported) before anything runs
+
 ### Requirement: Recognized invocation forms
 The guard SHALL treat a command as a supported Evennia test invocation when, after splitting on top-level `&&` only, the final segment starts with `evennia test` optionally preceded by `uv run ` or `poetry run ` (zero or more flag tokens such as `--locked` allowed between `run` and `evennia`), and every earlier segment starts with `cd`. Commands in the supported grammar — `evennia test ...`, `uv run evennia test ...`, `uv run --locked evennia test ...`, `poetry run evennia test ...`, `cd foo && evennia test ...`, `cd projects && cd mygame && evennia test ...` (single line) — SHALL proceed to count-only discovery, with discovery wrapped by the same runner prefix as the original command.
 
