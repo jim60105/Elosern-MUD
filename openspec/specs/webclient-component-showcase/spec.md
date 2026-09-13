@@ -1,7 +1,9 @@
 ## Purpose
 
 Establishes the component-showcase contract for the Vue migration: every UI component named in the required-component manifest is implemented as a Vue single-file component with at least one documented Storybook story, and every story is driven only by fixed, deterministic offline mock data. The showcase is completed before the application is wired to the live WebSocket transport, and the quality gate makes it a mandatory step by building Storybook and running a deterministic component-coverage check.
+
 ## Requirements
+
 ### Requirement: Every required UI component is a Vue SFC with a documented Storybook story
 Every UI component named in the required-component manifest SHALL be implemented as a Vue
 single-file component and SHALL have at least one Storybook story that documents its props, the
@@ -242,7 +244,6 @@ The showcase required-set manifest SHALL include deterministic offline stories a
 - **WHEN** the services OOB channel is unavailable
 - **THEN** shop, quest, lore, and inventory stories render only the registered reason with no fabricated values or controls
 
-
 ### Requirement: The full overlays are complete, the deferred surfaces are absent, and the manifest is frozen
 The full overlays `MapOverlay`, `SettingsOverlay`, `HelpOverlay`, and `CreationOverlay` SHALL be complete,
 and SHALL each have a live mount path in the running application — a built, tested,
@@ -353,30 +354,45 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 - **THEN** the required-component manifest is re-frozen at the complete redesign set and the component-coverage gate enforces it
 
 ### Requirement: The frozen component set grows only through a governed redesign wave
+
 The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
 through a change that names the growth as part of its own scope: a change in the WebClient
 Contextual HUD Redesign roadmap's delivery table, or a feature change that introduces a component
-backed by a committed presentation panel. A change that adds a component SHALL, in the same change,
-add its title to the manifest, ship its Storybook story with deterministic offline args, and extend
-this capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
-committed backing read model SHALL NOT be added under either route; it belongs on the deferred list
-instead. A component SHALL NOT be wired into the live application before its story exists. On
-completion of the redesign the manifest SHALL be re-frozen at the complete set then current, and
-each later growth SHALL re-freeze it at its new complete set.
+backed by a committed presentation panel — the portrait-gallery family
+(`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
+`Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) joins the frozen set under
+exactly this route. A change that adds a component SHALL, in the same change, add its title to
+the manifest, ship its Storybook story with deterministic offline args, and extend this
+capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
+committed backing read model SHALL NOT be added under either route; it belongs on the deferred
+list instead. A component SHALL NOT be wired into the live application before its story exists.
+On completion of the redesign the manifest SHALL be re-frozen at the complete set then current,
+and each later growth SHALL re-freeze it at its new complete set.
 
 #### Scenario: A wave adds a component with its story in the same change
+
 - **WHEN** a roadmap wave introduces a new component
 - **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
 
 #### Scenario: A feature change adds a backed component under the same obligations
+
 - **WHEN** a feature change outside the redesign roadmap introduces a component rendered entirely from a committed presentation panel
 - **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
 
+#### Scenario: The gallery family joins the frozen set in its own change
+
+- **WHEN** the gallery-UI change lands its five gallery components
+- **THEN** the same change's manifest append, story files, and spec entry keep the component-coverage gate green, and no gallery component is mounted in the live application before its story exists
+- **AND** `Data/GalleryPanel` includes an offline interactive storyboard for the
+  complete management journey, with a documented frame guide
+
 #### Scenario: A manifest edit without a story fails the gate
+
 - **WHEN** a manifest title is added without a matching registered story
 - **THEN** the component-coverage gate fails and the change cannot land
 
 #### Scenario: A story without a manifest entry fails the gate
+
 - **WHEN** a story is registered whose title is absent from the manifest
 - **THEN** the component-coverage gate fails, so the frozen set cannot grow silently
 
@@ -402,4 +418,3 @@ against the UNCHANGED frozen required-set manifest.
 - **WHEN** `pnpm run showcase-coverage` runs after the change
 - **THEN** the frozen required-set manifest is unchanged and coverage
   passes
-
