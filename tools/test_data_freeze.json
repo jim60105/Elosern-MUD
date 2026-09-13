@@ -173,6 +173,10 @@
       "reason": "rulebook schema contract"
     },
     {
+      "path": "world/rules/tests/test_shipped_item_use_regression.py",
+      "reason": "shipped usable-item regression contract"
+    },
+    {
       "path": "world/skills/sexual_acts/tests/test_acceptance.py",
       "reason": "sexual act acceptance catalog contract"
     },
