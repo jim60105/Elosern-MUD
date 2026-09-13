@@ -78,8 +78,14 @@ class CmdUseItem(Command):
         # use silently ignoring a reach the rulebook never granted.
         target: Any = None
         if target_token:
-            target = self.caller.search(target_token)
-            if target is None:
+            matches = self.caller.search(target_token, quiet=True)
+            if len(matches) == 1:
+                target = matches[0]
+            else:
+                # No match or ambiguous token: the raw token reaches preflight
+                # as a non-entity and fails closed with the stable
+                # TARGET_INVALID rejection; the command never guesses among
+                # multiple candidates.
                 target = target_token
         if is_in_active_session(self.caller):
             self._use_in_session(item_key, target)
