@@ -979,29 +979,56 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # The finite table: every exploration source resolves against the live
         # committed snapshot (suggestions degrade iff its envelope status is
         # `unavailable`, the no-pane rule), and resolution is pure: two calls
-        # agree deeply and nothing else in the committed state moved.
-        state = store_state(page)
-        status = ((state["panels"].get("context_actions") or {}).get("suggestions") or {}).get("status")
-        sources = [
-            "exploration.root",
-            "exploration.move",
-            "exploration.look",
-            "exploration.interact",
-            "exploration.wait",
-            "exploration.suggestions",
-        ]
-        for source in sources:
-            menu = page.evaluate(
-                "(source) => window.__elosernBridge.resolveFrame({ source })", source
-            )
-            if source == "exploration.suggestions" and status == "unavailable":
-                self.assertTrue(menu.get("unresolvable", False))
+        # agree deeply and nothing else in the committed state moved. The
+        # status read and every resolve must share ONE evaluate round-trip: a
+        # ui_update committing between separate CDP calls can flip the
+        # suggestions envelope to `unavailable` after its status was sampled,
+        # routing the iff below through the wrong branch (the same transport
+        # race the purity check documents underneath). Inside one synchronous
+        # evaluate the store cannot commit, so each verdict pairs with the
+        # exact committed state its resolver saw.
+        table = page.evaluate(
+            """() => {
+              const bridge = window.__elosernBridge;
+              const state = bridge.store.view;
+              const suggestions =
+                ((state.panels.context_actions || {}).suggestions) || {};
+              return {
+                status: suggestions.status,
+                explorationAvailable: Boolean(
+                  (state.panels.exploration || {}).available
+                ),
+                identities: ((state.panels.exploration || {}).interact) || [],
+                menus: [
+                  "exploration.root",
+                  "exploration.move",
+                  "exploration.look",
+                  "exploration.interact",
+                  "exploration.wait",
+                  "exploration.suggestions",
+                ].map(
+                  (source) =>
+                    [source, bridge.resolveFrame({ source })]
+                ),
+              };
+            }"""
+        )
+        status = table["status"]
+        for source, menu in table["menus"]:
+            if source == "exploration.suggestions" and (
+                status == "unavailable" or not table["explorationAvailable"]
+            ):
+                self.assertTrue(
+                    menu.get("unresolvable", False),
+                    f"{source} resolved despite the no-pane condition",
+                )
             else:
                 self.assertFalse(
-                    menu.get("unresolvable", False), f"{source} did not resolve: {menu}"
+                    menu.get("unresolvable", False),
+                    f"{source} (status {status}) did not resolve: {menu}",
                 )
                 self.assertTrue(isinstance(menu.get("items"), list) and menu["items"])
-        identities = [row["identity"] for row in state["panels"]["exploration"]["interact"]]
+        identities = [row["identity"] for row in table["identities"]]
         if identities:
             target_menu = page.evaluate(
                 "(id) => window.__elosernBridge.resolveFrame("
