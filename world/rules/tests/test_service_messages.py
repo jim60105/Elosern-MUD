@@ -14,6 +14,7 @@ from world.quests.runtime import (
     QuestTransitionError,
 )
 from world.rules.economy import TradeError, TradeReason
+from tools.spec_traceability import covers_requirement
 from world.rules.items import ItemUseReason
 from world.rules.guild import (
     GuildDataError,
@@ -68,6 +69,9 @@ class ServiceMessagesTests(unittest.TestCase):
             self.assertIn(code, SERVICE_REASON_MESSAGES)
             self.assertTrue(rejection_message(reason))
 
+    @covers_requirement(
+        "item-use-resolution::every-effect-family-names-its-own-ineffective-reason"
+    )
     def test_every_item_use_reason_has_a_code_and_message(self):
         for reason in ItemUseReason:
             code = rejection_code(reason)

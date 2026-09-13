@@ -726,7 +726,7 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
     """Delta requirement: multi-effect item use settlement."""
 
     @covers_requirement(
-        "item-use-resolution::blessed-cleansing-consumes-holy-water-to-purge-debuffs"
+        "item-use-resolution::受洗聖水-purges-debuffs-through-an-ordinary-status-removal-effect"
     )
     def test_effects_execute_in_profile_order_with_one_entry_each(self):
         self.hurt(50)
@@ -780,7 +780,8 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual([entry.target for entry in entries], [self.actor.key] * 4)
 
     @covers_requirement(
-        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically",
+        "item-use-resolution::an-ineffective-effect-is-skipped-silently-rather-than-failing-the-use"
     )
     def test_ineligible_effects_are_skipped_eligible_ones_still_execute(self):
         # HP already full: the heal step is ineligible; the grant still fires.
@@ -795,7 +796,8 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual(list_items(self.actor), [])
 
     @covers_requirement(
-        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically",
+        "item-use-resolution::every-effect-family-names-its-own-ineffective-reason"
     )
     def test_all_ineligible_steps_reject_with_no_effect_not_a_bound_code(self):
         # Delta scenario "All-ineligible rejection uses the generic
@@ -833,7 +835,8 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertNotIn("effect_key", entry.data)
 
     @covers_requirement(
-        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically",
+        "item-use-resolution::every-effect-family-names-its-own-ineffective-reason"
     )
     def test_status_apply_immunity_blocks_before_consumption(self):
         # The shipped immunity predicate's debuff-polarity rule, reached
@@ -850,7 +853,7 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual(list_items(self.actor), [_POISON_DRAFT_KEY])
 
     @covers_requirement(
-        "item-use-resolution::blessed-cleansing-consumes-holy-water-to-purge-debuffs"
+        "item-use-resolution::受洗聖水-purges-debuffs-through-an-ordinary-status-removal-effect"
     )
     def test_per_item_source_keys_keep_distinct_instances(self):
         # Delta scenario: two different items granting the same
@@ -964,6 +967,9 @@ class RemovalSelectorSettlementTests(_MultiEffectTestCase):
         self.assertEqual(entry.data["status_keys"], ["focus", "poisoned"])
         self.assertEqual(entry.data["count"], 2)
 
+    @covers_requirement(
+        "item-use-resolution::every-effect-family-names-its-own-ineffective-reason"
+    )
     def test_concrete_selector_with_no_match_rejects(self):
         self.actor.db.inventory = [_FOCUS_DROP_KEY]
         before = self.canonical_state()

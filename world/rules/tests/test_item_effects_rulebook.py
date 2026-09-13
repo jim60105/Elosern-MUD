@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+from tools.spec_traceability import covers_requirement
 from world.lore.items import ITEM_REGISTRY
 from world.rules.item_effects import (
     GaugeAdjustEffect,
@@ -56,11 +57,18 @@ def _load_via_validate(document: dict):
 class CanonicalRulebookTests(unittest.TestCase):
     """The shipped rulebook loads, aligns, and stays self-scoped."""
 
+    @covers_requirement(
+        "item-effect-rulebook::a-usable-item-s-effects-are-an-ordered-list-bound-by-item-key"
+    )
     def test_canonical_rulebook_validates(self):
         loaded = load_item_effect_rules()
         self.assertEqual(loaded["item_use_seconds"], ITEM_USE_SECONDS)
         self.assertGreaterEqual(ITEM_USE_SECONDS, 1)
 
+    @covers_requirement(
+        "item-effect-rulebook::a-usable-item-s-effects-are-an-ordered-list-bound-by-item-key",
+        "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"
+    )
     def test_profiles_align_with_the_usable_registry_keys(self):
         loaded = load_item_effect_rules()
         usable = {
@@ -71,6 +79,9 @@ class CanonicalRulebookTests(unittest.TestCase):
         self.assertEqual(set(loaded["profiles"]), usable)
         self.assertEqual(set(ITEM_EFFECT_PROFILES), usable)
 
+    @covers_requirement(
+        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
+    )
     def test_every_shipped_effect_is_self_scoped(self):
         # Delta scenario: "Every shipped item is self-scoped".
         for profile in load_item_effect_rules()["profiles"].values():
@@ -126,14 +137,23 @@ class CanonicalRulebookTests(unittest.TestCase):
 class EffectVerbShapeTests(unittest.TestCase):
     """Delta: each effect declares exactly one verb."""
 
+    @covers_requirement(
+        "item-effect-rulebook::each-effect-declares-exactly-one-verb"
+    )
     def test_two_verb_entry_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"stat": "hp", "amount": 5, "apply_status": "t_test_buff"}))
 
+    @covers_requirement(
+        "item-effect-rulebook::each-effect-declares-exactly-one-verb"
+    )
     def test_verbless_entry_with_only_a_scope_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"scope": "self"}))
 
+    @covers_requirement(
+        "item-effect-rulebook::each-effect-declares-exactly-one-verb"
+    )
     def test_entry_with_no_scope_defaults_to_self(self):
         profile = _load_via_validate(_document({"stat": "hp", "amount": 5}))["profiles"][
             "t_test_item"
@@ -144,6 +164,9 @@ class EffectVerbShapeTests(unittest.TestCase):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"stat": "hp", "amount": 5, "cleanse": True}))
 
+    @covers_requirement(
+        "item-use-resolution::受洗聖水-purges-debuffs-through-an-ordinary-status-removal-effect"
+    )
     def test_removal_entry_cannot_carry_an_amount(self):
         # The delta's "Cleanse entry shape is validated" scenario: the
         # removal verb accepts no magnitude.
@@ -154,12 +177,18 @@ class EffectVerbShapeTests(unittest.TestCase):
 class StatAdjustmentTests(unittest.TestCase):
     """Delta: closed stat vocabulary, signed bounded amounts."""
 
+    @covers_requirement(
+        "item-effect-rulebook::stat-adjustments-name-a-closed-stat-vocabulary-and-carry-a-signed-bounded-amount"
+    )
     def test_negative_amount_is_a_valid_declaration(self):
         profile = _load_via_validate(_document({"stat": "sp", "amount": -12}))["profiles"][
             "t_test_item"
         ]
         self.assertEqual(profile.effects[0], GaugeAdjustEffect(stat=ItemStat.SP, amount=-12))
 
+    @covers_requirement(
+        "item-effect-rulebook::stat-adjustments-name-a-closed-stat-vocabulary-and-carry-a-signed-bounded-amount"
+    )
     def test_zero_amount_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"stat": "hp", "amount": 0}))
@@ -168,6 +197,9 @@ class StatAdjustmentTests(unittest.TestCase):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"stat": "hp", "amount": True}))
 
+    @covers_requirement(
+        "item-effect-rulebook::stat-adjustments-name-a-closed-stat-vocabulary-and-carry-a-signed-bounded-amount"
+    )
     def test_out_of_bound_magnitude_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(
@@ -178,6 +210,9 @@ class StatAdjustmentTests(unittest.TestCase):
                 _document({"stat": "hp", "amount": -(MAX_EFFECT_AMOUNT + 1)})
             )
 
+    @covers_requirement(
+        "item-effect-rulebook::stat-adjustments-name-a-closed-stat-vocabulary-and-carry-a-signed-bounded-amount"
+    )
     def test_unknown_stat_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"stat": "luck", "amount": 5}))
@@ -186,12 +221,18 @@ class StatAdjustmentTests(unittest.TestCase):
 class StatusVerbTests(unittest.TestCase):
     """Delta: application names a concrete key; removal accepts selectors."""
 
+    @covers_requirement(
+        "item-effect-rulebook::status-application-names-a-concrete-definition-status-removal-accepts-selectors"
+    )
     def test_selector_under_the_application_verb_fails(self):
         for selector in ("all", "positive", "negative"):
             with self.subTest(selector=selector):
                 with self.assertRaises(ItemEffectsRulebookError):
                     _load_via_validate(_document({"apply_status": selector}))
 
+    @covers_requirement(
+        "item-effect-rulebook::status-application-names-a-concrete-definition-status-removal-accepts-selectors"
+    )
     def test_each_removal_selector_is_accepted(self):
         for selector in ("negative", "positive", "all"):
             with self.subTest(selector=selector):
@@ -202,6 +243,9 @@ class StatusVerbTests(unittest.TestCase):
                     profile.effects[0], StatusRemoveEffect(selector=selector)
                 )
 
+    @covers_requirement(
+        "item-effect-rulebook::status-application-names-a-concrete-definition-status-removal-accepts-selectors"
+    )
     def test_concrete_removal_key_is_accepted(self):
         profile = _load_via_validate(_document({"remove_status": "t_test_buff"}))[
             "profiles"
@@ -210,6 +254,9 @@ class StatusVerbTests(unittest.TestCase):
             profile.effects[0], StatusRemoveEffect(selector="t_test_buff")
         )
 
+    @covers_requirement(
+        "item-effect-rulebook::status-application-names-a-concrete-definition-status-removal-accepts-selectors"
+    )
     def test_unknown_status_key_fails_in_either_position(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document({"apply_status": "t_no_such_buff"}))
@@ -220,6 +267,9 @@ class StatusVerbTests(unittest.TestCase):
 class RegistryAlignmentTests(unittest.TestCase):
     """Delta: rulebook and registry align exactly at startup."""
 
+    @covers_requirement(
+        "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"
+    )
     def test_orphan_rulebook_entry_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(
@@ -232,10 +282,16 @@ class RegistryAlignmentTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"
+    )
     def test_usable_item_without_an_entry_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document(items={}))
 
+    @covers_requirement(
+        "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"
+    )
     def test_empty_effect_list_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):
             _load_via_validate(_document(items={"t_test_item": {"effects": []}}))
@@ -252,6 +308,9 @@ class RegistryAlignmentTests(unittest.TestCase):
 class ScopeVocabularyTests(unittest.TestCase):
     """Delta: only the acting entity is accepted until targeting ships."""
 
+    @covers_requirement(
+        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
+    )
     def test_every_non_self_scope_is_refused_naming_its_owner(self):
         for scope in ("single", "all-allies", "all-enemies", "all"):
             with self.subTest(scope=scope):
@@ -284,6 +343,9 @@ class ProfileShapeTests(unittest.TestCase):
             )
         self.assertIn("hp", str(caught.exception))
 
+    @covers_requirement(
+        "item-effect-rulebook::a-usable-item-s-effects-are-an-ordered-list-bound-by-item-key"
+    )
     def test_distinct_stats_and_status_verbs_coexist_in_order(self):
         profile = _load_via_validate(
             _document(

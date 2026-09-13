@@ -80,7 +80,7 @@ class StatusRemovalCleanseTests(EvenniaTest):
             apply_buff(self.actor, key)
 
     @covers_requirement(
-        "item-use-resolution::blessed-cleansing-consumes-holy-water-to-purge-debuffs"
+        "item-use-resolution::受洗聖水-purges-debuffs-through-an-ordinary-status-removal-effect"
     )
     def test_removal_clears_debuffs_consumes_and_logs_stable_event(self):
         self._afflict("poisoned", "fear")
@@ -110,6 +110,10 @@ class StatusRemovalCleanseTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
         self.assertEqual(entity_active_buffs(self.actor), {"focus"})
 
+    @covers_requirement(
+        "item-use-resolution::受洗聖水-purges-debuffs-through-an-ordinary-status-removal-effect",
+        "item-use-resolution::every-effect-family-names-its-own-ineffective-reason"
+    )
     def test_no_debuffs_rejects_consuming_nothing_and_advancing_no_clock(self):
         clock = WorldClock()
         self.assertEqual(clock.tick, 0)
