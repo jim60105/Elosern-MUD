@@ -20,7 +20,6 @@ from typing import Any
 from world.rules.action import (
     DEFAULT_CAST_SECONDS,
     SKILL_TIME_OVERRIDES,
-    ActionRequest,
     RejectReason,
     RejectedAction,
     _EFFECT_HANDLERS,
@@ -29,6 +28,7 @@ from world.rules.action import (
     _step1_divine_arts_gate,
     _stored_trait_value,
 )
+from world.rules.action_gates import damage_requires_battlefield
 from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage
 from world.rules.combat_modifiers import (
     apply_cost_modifier,
@@ -45,7 +45,6 @@ from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
     candidate_rejection,
-    damage_requires_battlefield,
     expand_target_shorthand,
 )
 from world.skills.cost_tiers import is_freeform_eligible
@@ -184,14 +183,8 @@ def _skill_wide_failure(
     return None
 
 
-def _request_for(actor: Any, skill_key: str, context: Any) -> ActionRequest:
-    """Build a lightweight frozen request for candidate validation."""
-    return ActionRequest(actor=actor, skill_key=skill_key, targets=[], context=context)
-
-
 def _valid_candidates(
     actor: Any,
-    skill_key: str,
     context: Any,
     skill: Any,
     candidates: list[Any],
@@ -202,7 +195,6 @@ def _valid_candidates(
     SELF binds the actor; SINGLE keeps passing candidates for the menu; AREA
     keeps passing candidates and reports a failure only when none survive.
     """
-    request = _request_for(actor, skill_key, context)
     if skill.target_spec is TargetSpec.NONE:
         # A NONE skill never accepts targets: the panel passes the whole roster
         # as a candidate pool, so preview must ignore it rather than treat it
@@ -212,14 +204,18 @@ def _valid_candidates(
     if skill.target_spec is TargetSpec.SELF:
         # SELF binds the actor regardless of the menu candidate pool; the
         # player-facing facade and wire schema accept no SELF target field.
-        failure = candidate_rejection(request, actor, skill)
+        failure = candidate_rejection(
+            actor, context, skill.target_requirement, actor
+        )
         if failure is not None:
             return (), failure
         return (actor,), None
     valid: list[Any] = []
     first_failure: tuple[RejectReason, str] | None = None
     for target in candidates:
-        failure = candidate_rejection(request, target, skill)
+        failure = candidate_rejection(
+            actor, context, skill.target_requirement, target
+        )
         if failure is None:
             valid.append(target)
         elif first_failure is None:
@@ -245,7 +241,7 @@ def _applicable_shorthands(
         except RejectedAction:
             continue
         valid, _ = _valid_candidates(
-            actor, skill_key, context, skill, list(expanded)
+            actor, context, skill, list(expanded)
         )
         if valid:
             applicable.append(shorthand)
@@ -275,7 +271,7 @@ def preview_skill(
         shorthands = _applicable_shorthands(actor, skill_key, context, skill)
         return ActionPreview(skill_key, True, None, None, (), shorthands)
     valid, target_failure = _valid_candidates(
-        actor, skill_key, context, skill, list(candidates)
+        actor, context, skill, list(candidates)
     )
     if target_failure is not None:
         return _disabled(skill_key, *target_failure)
@@ -309,7 +305,6 @@ def revalidate_submission(
     if failure is not None:
         return _disabled(skill_key, *failure)
     skill = SKILL_REGISTRY[skill_key]
-    request = _request_for(actor, skill_key, context)
     try:
         if skill.target_spec is TargetSpec.NONE:
             if isinstance(targets, str) or targets:
@@ -324,7 +319,9 @@ def revalidate_submission(
                 raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
             if len(targets) != 1:
                 raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
-            failure = candidate_rejection(request, targets[0], skill)
+            failure = candidate_rejection(
+                actor, context, skill.target_requirement, targets[0]
+            )
             if failure is not None:
                 raise RejectedAction(*failure)
             resolved = list(targets)
@@ -332,7 +329,7 @@ def revalidate_submission(
             if isinstance(targets, str):
                 expanded = expand_target_shorthand(actor, context, targets)
                 resolved, _ = _valid_candidates(
-                    actor, skill_key, context, skill, list(expanded)
+                    actor, context, skill, list(expanded)
                 )
                 if not resolved:
                     raise RejectedAction(
@@ -352,7 +349,7 @@ def revalidate_submission(
                         )
                     seen.add(identity)
                 resolved, _ = _valid_candidates(
-                    actor, skill_key, context, skill, list(targets)
+                    actor, context, skill, list(targets)
                 )
                 if not resolved:
                     raise RejectedAction(

@@ -172,6 +172,37 @@ class SkillRegistryTests(unittest.TestCase):
                 effects=[],
             )
 
+    @covers_requirement("sexual-act-seeds::a-single-target-sexual-act-cannot-be-self-cast")
+    def test_every_skill_produces_its_own_target_requirement(self):
+        # The shared resolver consumes SkillDef.target_requirement, so the
+        # definition must state all three targeting rules itself: shape and
+        # faction mirror the declared fields, and the self-target prohibition
+        # is carried by exactly the sexual-act category (their SINGLE-target
+        # acts are two-participant by construction). Non-SINGLE sexual acts
+        # legitimately carry forbid_self without ever exercising it — the
+        # resolver reads the flag only in its SINGLE arm.
+        import world.skills.sexual_acts  # noqa: F401  (import side effect registers the full catalog)
+
+        single_sexual_count = 0
+        for key, skill in SKILL_REGISTRY.items():
+            requirement = skill.target_requirement
+            with self.subTest(key=key):
+                self.assertIs(requirement.spec, skill.target_spec)
+                self.assertIs(requirement.faction, skill.faction_constraint)
+                self.assertIs(
+                    requirement.forbid_self,
+                    skill.category is SkillCategory.SEXUAL_ACT,
+                )
+                if (
+                    skill.category is SkillCategory.SEXUAL_ACT
+                    and skill.target_spec is TargetSpec.SINGLE
+                ):
+                    single_sexual_count += 1
+                    self.assertTrue(requirement.forbid_self)
+        # Non-vacuity: the three seed acts alone guarantee three SINGLE-target
+        # sexual acts; an empty loop here would pass every assertion above.
+        self.assertGreaterEqual(single_sexual_count, 3)
+
     def test_metadata_bounds_reject_empty_and_oversized_values(self):
         from world.skills.registry import _validate_metadata
 

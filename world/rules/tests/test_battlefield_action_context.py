@@ -29,12 +29,12 @@ class BattlefieldActionContextTests(unittest.TestCase):
         self.assertIs(self.context.relation_to(self.actor, self.ally), Relation.ALLY)
         self.assertIs(self.context.relation_to(self.actor, self.enemy), Relation.ENEMY)
 
-    @covers_requirement("battlefield-action-context::is-in-range-checks-fled-status-melee-versus-ranged-is-explicitly-not-built", "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership")
+    @covers_requirement("battlefield-action-context::is-in-range-checks-fled-status-alone-melee-versus-ranged-is-structurally-unreachable", "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership")
     @covers_requirement("disengage-action::a-fled-entity-is-immediately-excluded-from-targeting-turn-order-and-team-power")
     def test_fled_entity_is_absent_and_out_of_range(self):
         self.battlefield.fled.add("enemy")
         self.assertTrue(self.context.is_present(self.actor, self.enemy))
-        self.assertFalse(self.context.is_in_range(self.actor, self.enemy, object()))
+        self.assertFalse(self.context.is_in_range(self.actor, self.enemy))
 
     @covers_requirement("battlefield-action-context::relation-to-is-derived-from-two-team-membership-not-a-stored-relation-field")
     def test_event_context_cannot_reference_a_different_battlefield(self):

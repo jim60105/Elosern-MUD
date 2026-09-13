@@ -1,19 +1,46 @@
-"""Combat-agnostic target validation for deterministic actions."""
+"""Combat-agnostic target validation for deterministic actions.
 
+The resolver consumes a definition-owned ``TargetRequirement`` value — the
+target shape, the faction constraint, and the forbid-self rule — and knows
+nothing about what produced it. Skills reach the pipeline through
+``SkillDef.target_requirement``; any other definition that can describe the
+same three rules (for example a usable item's declared scope) constructs a
+requirement directly and reuses the identical presence/alive/range/faction
+pipeline without owning or fabricating a skill. No validator, resolver, or
+context method in this module inspects the identity, category, or effect list
+of whatever produced the requirement.
+"""
+
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
-from world.skills.registry import (
-    FactionConstraint,
-    SkillCategory,
-    SkillDef,
-    TargetSpec,
-)
-from world.skills.effects import DamageEffect
+from world.skills.registry import FactionConstraint, TargetSpec
 
 
 # The approved deterministic AREA shorthands accepted in combat.
 AREA_SHORTHANDS = ("all-enemies", "all-allies", "all")
+
+
+@dataclass(frozen=True)
+class TargetRequirement:
+    """The definition-supplied targeting rule the shared resolver consumes.
+
+    One frozen value object carries the three rules that always travel
+    together: the target shape (``spec``), the faction constraint
+    (``faction``, default ``ANY``), and the self-target prohibition
+    (``forbid_self``, default ``False``). The definition being acted on
+    produces it — ``SkillDef.target_requirement`` for skills, direct
+    construction for any other caller — never the calling request. The item
+    scopes of the approved item-effect model map onto the four distinct
+    shapes covering five scopes: ``SELF``/``SELF_ONLY``, ``SINGLE``/``ANY``,
+    ``SINGLE``/``ANY`` with ``forbid_self``, and the three group scopes'
+    shared ``AREA``/``ANY``.
+    """
+
+    spec: TargetSpec
+    faction: FactionConstraint = FactionConstraint.ANY
+    forbid_self: bool = False
 
 
 class Relation(StrEnum):
@@ -35,7 +62,7 @@ class ActionContext(Protocol):
 
     def relation_to(self, actor: Any, target: Any) -> Relation: ...
 
-    def is_in_range(self, actor: Any, target: Any, skill: SkillDef) -> bool: ...
+    def is_in_range(self, actor: Any, target: Any) -> bool: ...
 
 
 class BattlefieldActionContext(ActionContext, Protocol):
@@ -75,7 +102,7 @@ class RoomActionContext:
     def relation_to(self, actor: Any, target: Any) -> Relation:
         return Relation.SELF if target is actor else Relation.ALLY
 
-    def is_in_range(self, actor: Any, target: Any, skill: SkillDef) -> bool:
+    def is_in_range(self, actor: Any, target: Any) -> bool:
         return True
 
 
@@ -96,44 +123,28 @@ def validate_faction(
     return True
 
 
-def damage_requires_battlefield(skill: SkillDef, context: Any) -> bool:
-    """Return whether a damaging skill is being attempted without a battlefield.
-
-    The ONE shared expression of the damaging-action gate's condition
-    (sanctioned combat-state gate body, gate 2 of 2): true when the resolved
-    skill's typed ``parsed_effects`` carry at least one
-    ``world.skills.effects.DamageEffect`` **and** the caller's context carries
-    no battlefield. Consumed by ``ActionResolver``'s step 1 and by the shared
-    preview, so resolution, preview, and combat-session submission
-    revalidation can never disagree. Computed per request from the skill
-    definition's own effects — never from a registry-key enumeration.
-
-    Indirect hp movement is deliberately NOT damage for this gate: a
-    ``SexualDrainEffect`` moves the target's pleasure into the caster's own
-    pools, never subtracting hp, matching ``overwhelm-threshold``'s
-    ``commanded_damage_reaches_enemy()`` so both damage-shaped questions in
-    the codebase read the same definition.
-    """
-    # Sanctioned combat-state gate body (damaging-action gate): the reason at
-    # each call site names the player-facing rule; this condition tests for
-    # the battlefield's absence.
-    if context.battlefield is None:
-        return any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects)
-    return False
-
-
 def _rejection(reason: str, detail: str):
     from world.rules.action import RejectReason, RejectedAction
 
     raise RejectedAction(RejectReason(reason), detail)
 
 
-def _validate_presence(request: Any, target: Any, skill: SkillDef) -> None:
-    if not request.context.is_present(request.actor, target):
+def _validate_presence(
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
+    target: Any,
+) -> None:
+    if not context.is_present(actor, target):
         _rejection("target_not_present", getattr(target, "key", repr(target)))
 
 
-def _validate_alive(request: Any, target: Any, skill: SkillDef) -> None:
+def _validate_alive(
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
+    target: Any,
+) -> None:
     try:
         from world.rules.action import _stored_trait_value
 
@@ -144,14 +155,24 @@ def _validate_alive(request: Any, target: Any, skill: SkillDef) -> None:
         _rejection("target_dead", getattr(target, "key", repr(target)))
 
 
-def _validate_range(request: Any, target: Any, skill: SkillDef) -> None:
-    if not request.context.is_in_range(request.actor, target, skill):
+def _validate_range(
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
+    target: Any,
+) -> None:
+    if not context.is_in_range(actor, target):
         _rejection("target_out_of_range", getattr(target, "key", repr(target)))
 
 
-def _validate_faction(request: Any, target: Any, skill: SkillDef) -> None:
-    relation = request.context.relation_to(request.actor, target)
-    if not validate_faction(relation, skill.faction_constraint):
+def _validate_faction(
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
+    target: Any,
+) -> None:
+    relation = context.relation_to(actor, target)
+    if not validate_faction(relation, requirement.faction):
         _rejection("target_faction_forbidden", getattr(target, "key", repr(target)))
 
 
@@ -163,15 +184,21 @@ _VALIDATORS = (
 )
 
 
-def _validate_candidate(request: Any, target: Any, skill: SkillDef) -> None:
+def _validate_candidate(
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
+    target: Any,
+) -> None:
     for validator in _VALIDATORS:
-        validator(request, target, skill)
+        validator(actor, context, requirement, target)
 
 
 def candidate_rejection(
-    request: Any,
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
     target: Any,
-    skill: SkillDef,
 ) -> tuple[Any, str] | None:
     """Return the first ordered validation failure for one target, or ``None``.
 
@@ -183,7 +210,7 @@ def candidate_rejection(
 
     for validator in _VALIDATORS:
         try:
-            validator(request, target, skill)
+            validator(actor, context, requirement, target)
         except RejectedAction as rejection:
             return rejection.reason, rejection.detail
     return None
@@ -198,8 +225,9 @@ def _target_identity(target: Any) -> tuple[str, int]:
 
 
 def resolve_targets(
-    request: Any,
-    skill: SkillDef,
+    actor: Any,
+    context: ActionContext,
+    requirement: TargetRequirement,
     candidates: list[Any],
 ) -> list[Any]:
     """Validate target cardinality and candidates in the required order.
@@ -209,31 +237,29 @@ def resolve_targets(
     SINGLE requires exactly one explicit candidate; AREA requires a nonempty
     unique list (empty or duplicate explicit input is malformed).
     """
-    if skill.target_spec is TargetSpec.NONE:
+    if requirement.spec is TargetSpec.NONE:
         if candidates:
             _rejection("target_spec_mismatch", "none-target skill accepts no targets")
         return []
-    if skill.target_spec is TargetSpec.SELF:
+    if requirement.spec is TargetSpec.SELF:
         if not candidates:
-            candidates = [request.actor]
-        if len(candidates) != 1 or candidates[0] is not request.actor:
+            candidates = [actor]
+        if len(candidates) != 1 or candidates[0] is not actor:
             _rejection("target_spec_mismatch", "self-target skill requires the actor")
-    elif skill.target_spec is TargetSpec.SINGLE:
+    elif requirement.spec is TargetSpec.SINGLE:
         if len(candidates) != 1:
             _rejection("target_spec_mismatch", "single-target skill requires one target")
-        if (
-            skill.category is SkillCategory.SEXUAL_ACT
-            and candidates[0] is request.actor
-        ):
-            # A SINGLE-target sex act is a two-participant act by construction:
-            # its participant counters and resist contest assume a second
-            # party, so self-casting would credit lifetime counters (e.g.
-            # duo_act_count, hostile_act_count) with no partner present.
+        if requirement.forbid_self and candidates[0] is actor:
+            # A requirement that forbids the actor as its own SINGLE target
+            # states the prohibition itself (every sexual-act skill's
+            # requirement does: a two-participant act credited with no
+            # partner present would skew lifetime counters). The resolver
+            # only enforces the flag it was given.
             _rejection(
                 "target_spec_mismatch",
                 "a sexual act targeting another entity requires a target other than the actor",
             )
-    elif skill.target_spec is TargetSpec.AREA:
+    elif requirement.spec is TargetSpec.AREA:
         if not candidates:
             _rejection("no_valid_targets_in_area", "area skill has no candidates")
         seen: set[tuple[str, int]] = set()
@@ -246,15 +272,15 @@ def resolve_targets(
                 )
             seen.add(identity)
 
-    if skill.target_spec is not TargetSpec.AREA:
+    if requirement.spec is not TargetSpec.AREA:
         for target in candidates:
-            _validate_candidate(request, target, skill)
+            _validate_candidate(actor, context, requirement, target)
         return list(candidates)
 
     valid = []
     for target in candidates:
         try:
-            _validate_candidate(request, target, skill)
+            _validate_candidate(actor, context, requirement, target)
         except Exception as error:
             from world.rules.action import RejectedAction
 

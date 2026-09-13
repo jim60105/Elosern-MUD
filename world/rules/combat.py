@@ -120,7 +120,7 @@ class BattlefieldActionContext:
             else Relation.ENEMY
         )
 
-    def is_in_range(self, actor: Any, target: Any, skill: Any) -> bool:
+    def is_in_range(self, actor: Any, target: Any) -> bool:
         """Treat every active roster member as engaged until positions exist."""
         return target.key not in self.battlefield.fled
 
