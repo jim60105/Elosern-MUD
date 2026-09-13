@@ -36,40 +36,40 @@ Design decisions referenced below live in `design.md` (D1–D5).
 
 ## 2. Publish the buff-application entry point
 
-- [ ] 2.1 Rename `buffs._add_buff` to `buffs.apply_buff` and update its in-module callers. Verify both
+- [x] 2.1 Rename `buffs._add_buff` to `buffs.apply_buff` and update its in-module callers. Verify both
   grant-time guards are untouched: the equipment-immunity early return and the `unique_per_source`
   source-key raise (D-note in design; the guards are the reason the function is published at all).
-- [ ] 2.2 Add tests for both guards reached through the public name: an immunized debuff writes
+- [x] 2.2 Add tests for both guards reached through the public name: an immunized debuff writes
   nothing and leaves the active set unchanged; a `unique_per_source` definition with no `source_key`
   raises. These are the `buff-handler-integration` delta's first two scenarios.
-- [ ] 2.3 Add the structural test that no module outside `world/rules/buffs.py` calls
+- [x] 2.3 Add the structural test that no module outside `world/rules/buffs.py` calls
   `entity.buffs.add(...)` directly. Verify it passes against the current tree.
 
 ## 3. Add selector-driven status removal
 
-- [ ] 3.1 Implement `buffs.remove_by_selector(entity, selector) -> int` accepting a concrete
+- [x] 3.1 Implement `buffs.remove_by_selector(entity, selector) -> int` accepting a concrete
   definition key or `all` / `positive` / `negative`, resolving against live buff **instances**
   (`buff.buffkey`) exactly as `cleanse_debuffs` does today, removing through the existing
   `dispel=True` path, and returning the count (D3). Verify it fails closed on an unrecognized
   selector.
-- [ ] 3.2 Re-express `cleanse_debuffs()` as `remove_by_selector(entity, "negative")` (D3). Verify
+- [x] 3.2 Re-express `cleanse_debuffs()` as `remove_by_selector(entity, "negative")` (D3). Verify
   `world/rules/tests/test_holy_water_cleanse.py` and the cleanse-handler tests pass unchanged — the
   shipped `cleanse_debuffs` call sites are not edited. Route `_handle_cleanse`'s staged `apply()`
   through `remove_by_selector(target, "negative")` (the stage-time selection stays solely for the
   effect description and emptiness check) so the cleanse effect and every other debuff-clearing
   caller reach the same shared removal, per the `cleanse-effect-handler` delta's trace scenario.
-- [ ] 3.3 Add tests for all five scenarios in the `cleanse-effect-handler` delta's ADDED requirement:
+- [x] 3.3 Add tests for all five scenarios in the `cleanse-effect-handler` delta's ADDED requirement:
   `negative`, `positive`, `all`, a concrete key with two live instances of one definition, and an
   empty match returning `0`.
-- [ ] 3.4 Add a startup assertion that no `buffs.yaml` definition key collides with a selector word
+- [x] 3.4 Add a startup assertion that no `buffs.yaml` definition key collides with a selector word
   (`all`, `positive`, `negative`), so the ambiguity can never be introduced later (design Risks).
   Verify by temporarily adding such a key and confirming the load fails.
 
 ## 4. Verification
 
-- [ ] 4.1 Run the deterministic suite — `test_effect_handlers.py`, `test_sexual_act_effects.py`,
+- [x] 4.1 Run the deterministic suite — `test_effect_handlers.py`, `test_sexual_act_effects.py`,
   `test_climax_settlement.py`, `test_sexual_transitions.py`, `test_buffs.py`,
   `test_holy_water_cleanse.py`, `test_divine_mystery_gate.py`, and the defeat-aftermath suites — and
   verify every assertion passes with no assertion text changed. An assertion that needed editing means behavior moved.
-- [ ] 4.2 Run `openspec validate extract-shared-effect-appliers` and the repository's
+- [x] 4.2 Run `openspec validate extract-shared-effect-appliers` and the repository's
   lint/observability gate; verify both pass.
