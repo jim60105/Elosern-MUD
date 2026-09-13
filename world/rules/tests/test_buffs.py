@@ -28,10 +28,12 @@ from world.rules.buffs import (
     _apply_rate_modifier,
     active_buff_keys_from_storage,
     blocks_action,
+    cleanse_debuffs,
     entity_active_buffs,
     grant_conferred_growth_rate,
     growth_rate_multiplier,
     load_buff_definitions,
+    remove_by_selector,
     tick_buffs,
 )
 
@@ -81,6 +83,14 @@ class BuffDefinitionValidationTests(unittest.TestCase):
         path = _write_yaml("- key: a\n  polarity: wrong\n")
         with self.assertRaises(ValueError):
             load_buff_definitions(path)
+
+    def test_selector_word_definition_key_is_rejected(self):
+        """A buffs.yaml key may never collide with a remove_by_selector word."""
+        for selector in ("all", "positive", "negative"):
+            with self.subTest(selector=selector):
+                path = _write_yaml(f"- key: {selector}\n")
+                with self.assertRaises(ValueError):
+                    load_buff_definitions(path)
 
     def test_noop_rate_target_tick_does_nothing(self):
         entity = SimpleNamespace(traits=SimpleNamespace())
@@ -705,6 +715,83 @@ class BuffIntegrationTests(_BuffFixtureMixin):
         self.assertTrue(
             all(isinstance(buff, RulebookBuff) for buff in entity.buffs.all.values())
         )
+
+
+class RemoveBySelectorTests(_BuffFixtureMixin):
+    """The selector-driven removal (item-effect-model design §5.6, D3)."""
+
+    def _polarities(self, entity):
+        return {
+            buff.definition_key
+            for buff in entity.buffs.all.values()
+            if buff.stacks > 0
+        }
+
+    def test_negative_removes_every_debuff_and_nothing_else(self):
+        entity = self._entity()
+        debuff_one = self._synth_buff(key="t_neg_one", polarity="debuff")
+        debuff_two = self._synth_buff(key="t_neg_two", polarity="debuff")
+        apply_buff(entity, debuff_one.key)
+        apply_buff(entity, debuff_two.key)
+        apply_buff(entity, "focus")
+        self.assertEqual(remove_by_selector(entity, "negative"), 2)
+        self.assertEqual(self._polarities(entity), {"focus"})
+
+    def test_positive_removes_beneficial_buffs_only(self):
+        entity = self._entity()
+        debuff = self._synth_buff(key="t_pos_debuff", polarity="debuff")
+        apply_buff(entity, debuff.key)
+        apply_buff(entity, "focus")
+        self.assertEqual(remove_by_selector(entity, "positive"), 1)
+        self.assertEqual(self._polarities(entity), {debuff.key})
+
+    def test_all_removes_both_polarities(self):
+        entity = self._entity()
+        debuff = self._synth_buff(key="t_all_debuff", polarity="debuff")
+        apply_buff(entity, debuff.key)
+        apply_buff(entity, "focus")
+        self.assertEqual(remove_by_selector(entity, "all"), 2)
+        self.assertEqual(self._polarities(entity), set())
+
+    def test_concrete_key_removes_every_live_instance_of_the_definition(self):
+        entity = self._entity()
+        definition = self._synth_buff(key="t_multi", polarity="debuff")
+        apply_buff(entity, definition.key, instance_key="t_multi:first")
+        apply_buff(entity, definition.key, instance_key="t_multi:second")
+        apply_buff(entity, "focus")
+        self.assertEqual(remove_by_selector(entity, definition.key), 2)
+        self.assertEqual(self._polarities(entity), {"focus"})
+
+    def test_selector_matching_nothing_writes_nothing_and_returns_zero(self):
+        entity = self._entity()
+        apply_buff(entity, "focus")
+        before = set(entity.buffs.all)
+        self.assertEqual(remove_by_selector(entity, "negative"), 0)
+        self.assertEqual(set(entity.buffs.all), before)
+
+    def test_paused_and_expired_instances_are_not_removed(self):
+        entity = self._entity()
+        apply_buff(entity, "poisoned")
+        apply_buff(entity, "paralysis")
+        entity.buffs.all["poisoned"].paused = True
+        entity.buffs.all["paralysis"].remaining_seconds = 0
+        self.assertEqual(remove_by_selector(entity, "negative"), 0)
+        self.assertIn("poisoned", entity.buffs.all)
+        self.assertIn("paralysis", entity.buffs.all)
+
+    def test_unrecognized_selector_fails_closed(self):
+        entity = self._entity()
+        apply_buff(entity, "poisoned")
+        with self.assertRaises(ValueError):
+            remove_by_selector(entity, "everything")
+        self.assertIn("poisoned", self._polarities(entity))
+
+    def test_cleanse_debuffs_is_the_negative_alias(self):
+        entity = self._entity()
+        apply_buff(entity, "poisoned")
+        apply_buff(entity, "focus")
+        self.assertEqual(cleanse_debuffs(entity), 1)
+        self.assertEqual(self._polarities(entity), {"focus"})
 
 
 class BuffEntryPointStructuralTests(unittest.TestCase):
