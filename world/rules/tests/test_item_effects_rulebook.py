@@ -102,6 +102,26 @@ class CanonicalRulebookTests(unittest.TestCase):
         profile = loaded["profiles"]["t_test_item"]
         self.assertEqual(profile.effects[0].amount, 5)
 
+    def test_duplicate_mapping_keys_fail_loud(self):
+        # Fail-loud contract (mirrors equipment_effects.py): the loaded data
+        # must never silently diverge from the reviewed file.
+        text = yaml.safe_dump(
+            _document({"stat": "hp", "amount": 5}), allow_unicode=True
+        )
+        text += "  t_test_item:\n    effects:\n      - stat: hp\n        amount: 9999\n"
+        handle = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        )
+        try:
+            handle.write(text)
+            handle.close()
+            with self.assertRaises(ItemEffectsRulebookError):
+                load_item_effect_rules(
+                    Path(handle.name), registry=_REGISTRY, buff_definitions=_BUFFS
+                )
+        finally:
+            Path(handle.name).unlink(missing_ok=True)
+
 
 class EffectVerbShapeTests(unittest.TestCase):
     """Delta: each effect declares exactly one verb."""

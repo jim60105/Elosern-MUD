@@ -45,6 +45,15 @@ def apply_pleasure_gain(entity: Any, gain: int) -> None:
     post-clamp delta were the gate. ``_apply_climax_phase_set`` no-ops on any
     edge outside ``_VALID_CLIMAX_TRANSITIONS``, so both transition calls are
     unconditionally safe to attempt.
+
+    A negative gain (a pleasure-reduction effect, item-effect-model design
+    §5.6) mutates only the gauge: the climax-phase edges are skipped, because
+    the ``was_at_critical_point`` branch as written fires on any call — a
+    reduction landing on a participant at 接近 must not walk that participant
+    into 進行中 (design D2b: suppressing arousal must not advance the climax
+    state machine). ``gain == 0`` keeps the full path; the shipped
+    divine-sexual-arts two-call trick deliberately re-runs the pre/post-mutation
+    check with a zero gain to walk a second edge.
     """
     pre_arousal_ordinal = entity.sexual.arousal.value
     was_at_critical_point = entity.sexual.climax_phase.level == "接近"
@@ -52,13 +61,13 @@ def apply_pleasure_gain(entity: Any, gain: int) -> None:
 
     entity.sexual.pleasure.base += gain
 
-    if entity.sexual.arousal.value > pre_arousal_ordinal:
-        entity.sexual.wetness.value += 1
-    if entity.sexual.arousal.level == "極限":
-        _apply_climax_phase_set(entity, "接近")
-    if was_at_critical_point:
-        _apply_climax_phase_set(entity, "進行中")
-
+    if gain >= 0:
+        if entity.sexual.arousal.value > pre_arousal_ordinal:
+            entity.sexual.wetness.value += 1
+        if entity.sexual.arousal.level == "極限":
+            _apply_climax_phase_set(entity, "接近")
+        if was_at_critical_point:
+            _apply_climax_phase_set(entity, "進行中")
     if was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
         entity.sexual.stage_climax_extension()
 

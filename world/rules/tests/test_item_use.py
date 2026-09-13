@@ -1008,6 +1008,20 @@ class NegativeGaugeDrainTests(_MultiEffectTestCase):
         (entry,) = result.event_log.entries
         self.assertEqual(entry.data["amount"], -12)
 
+    def test_pleasure_reduction_at_critical_point_does_not_advance_climax(self):
+        # Design D2b: a participant sitting at 接近 who has pleasure drained
+        # must stay at 接近. Before the negative-gain guard the shared gain
+        # writer's was_at_critical_point branch walked it into 進行中.
+        self.set_pleasure(80)
+        self.actor.sexual.climax_phase.value = "接近"
+        self.actor.db.inventory = [_PLEASURE_DOWN_KEY]
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, _PLEASURE_DOWN_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.pleasure(), 55)
+        self.assertEqual(self.actor.sexual.climax_phase.level, "接近")
+
     def test_pleasure_drain_does_not_fire_the_gain_cascade(self):
         # A reduction must never bump wetness or advance the climax phase the
         # way the shared gain writer's arousal-coupled cascade does (design
@@ -1044,6 +1058,22 @@ class SettlementScopeSeamTests(_MultiEffectTestCase):
         )
         live_item_effect_profiles()[_APPLY_KEY] = injected
         self.hurt(50)
+        self.actor.db.inventory = [_APPLY_KEY]
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, _APPLY_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "rejected")
+        self.assertIs(result.reason, ItemUseReason.UNKNOWN_EFFECT)
+        self.assertEqual(list_items(self.actor), [_APPLY_KEY])
+
+    def test_unknown_status_profile_rejects_as_unknown_effect(self):
+        # The loader refuses undefined status keys at startup; an injected
+        # profile past it must fail closed with a stable reason, never an
+        # unhandled KeyError at the command/web boundary.
+        injected = ItemEffectProfile(
+            effects=(StatusApplyEffect(status="not_a_buff"),)
+        )
+        live_item_effect_profiles()[_APPLY_KEY] = injected
         self.actor.db.inventory = [_APPLY_KEY]
         result = resolve_item_use(
             ItemUseRequest(self.actor, _APPLY_KEY), in_combat=False

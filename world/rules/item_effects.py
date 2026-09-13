@@ -330,6 +330,28 @@ def validate_item_effect_rules(
     return {"item_use_seconds": seconds, "profiles": profiles}
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that refuses duplicate mapping keys at any nesting level.
+
+    PyYAML's default mapping constructor silently keeps the LAST duplicate,
+    so a rulebook reviewed by a human and the data actually loaded could
+    disagree. Fail-loud contract (mirroring ``equipment_effects.py``):
+    duplicates are malformed data.
+    """
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> Any:
+        seen: set[Any] = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                raise ItemEffectsRulebookError(
+                    "duplicate YAML mapping key "
+                    f"{key!r} at line {key_node.start_mark.line + 1}"
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def load_item_effect_rules(
     path: Path | None = None,
     registry: Mapping[str, Any] | None = None,
@@ -341,8 +363,9 @@ def load_item_effect_rules(
     the live buff definitions; every parameter is injectable so loader tests
     run against fabricated catalogs without touching shipped content.
     """
-    document = yaml.safe_load(
-        (path or _RULEBOOK_PATH).read_text(encoding="utf-8")
+    document = yaml.load(
+        (path or _RULEBOOK_PATH).read_text(encoding="utf-8"),
+        Loader=_UniqueKeyLoader,
     )
     if registry is None:
         from world.lore.items import ITEM_REGISTRY
@@ -371,7 +394,12 @@ def reload_item_effect_rules(
     registry: Mapping[str, Any] | None = None,
     buff_definitions: Mapping[str, Any] | None = None,
 ) -> None:
-    """Re-validate and refresh the live profile map in place (idempotent sync)."""
+    """Re-validate and refresh the live profile map in place (idempotent sync).
+
+    Reload outside any open synthetic scope: it refills the live dict with
+    production rows, so profiles a still-open ``items`` scope patched in are
+    dropped mid-test (the scope's restore closure then reverts them).
+    """
     global ITEM_USE_SECONDS
     loaded = load_item_effect_rules(path, registry, buff_definitions)
     ITEM_USE_SECONDS = loaded["item_use_seconds"]

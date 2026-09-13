@@ -455,7 +455,12 @@ def _plan_status_step(
     if isinstance(effect, StatusApplyEffect):
         from world.rules.equipment_effects import equipment_immune_buff_keys
 
-        definition = BUFF_DEFINITIONS[effect.status]
+        definition = BUFF_DEFINITIONS.get(effect.status)
+        if definition is None:
+            # A profile injected past the loader naming an undefined status
+            # fails closed like the scope seam, never as an unhandled
+            # KeyError at the command/web boundary.
+            return ItemUseReason.UNKNOWN_EFFECT
         if (
             definition.polarity == "debuff"
             and effect.status in equipment_immune_buff_keys(target)
@@ -582,8 +587,12 @@ def _item_used_event_log(
     Every entry carries the item key, the consumable flag, and the per-family
     payload: the signed gauge delta actually applied, or the matched status
     keys plus the count actually applied/removed (settlement truth, never the
-    preflight estimate). The shipped single-effect wording is reproduced
-    byte-for-byte: a restored gauge renders the shipped 恢復 sentence.
+    preflight estimate). ``status_keys`` are the distinct definition keys
+    involved; ``count`` counts buff **instances**, so a multi-instance
+    ``unique_per_source`` removal (the same status from several items) reports
+    the instance count over deduplicated keys by design. The shipped
+    single-effect wording is reproduced byte-for-byte: a restored gauge
+    renders the shipped 恢復 sentence.
     """
     definition = ITEM_REGISTRY[plan.item_key]
     display_name = definition.display_name_zh.replace("{", "{{").replace("}", "}}")
