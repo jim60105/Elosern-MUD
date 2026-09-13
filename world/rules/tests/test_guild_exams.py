@@ -657,9 +657,9 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         # entry simulated, and grants no kill XP or quest credit.
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        from world.rules.buffs import _add_buff
+        from world.rules.buffs import apply_buff
 
-        _add_buff(opponent, "fire_scorch", source_pk=int(self.player.pk))
+        apply_buff(opponent, "fire_scorch", source_pk=int(self.player.pk))
         opponent.traits.hp.base = 3
         opponent.traits.hp.current = 3
         opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10

@@ -110,13 +110,32 @@ alternative couples the item vocabulary to the buff module's import graph.
 the API now and half later — means the selector vocabulary is defined across two changes and reviewed
 in neither as a whole. Their tests land here, so the seam is exercised rather than merely declared.
 
+### D6 — The rulebook engine and clock decay stay sanctioned pleasure writers; `_handle_cleanse` applies through the selector
+
+*Why the pleasure invariant names a closed writer set, not one module:* two shipped deterministic
+writers cannot route through `apply_pleasure_gain`/`zero_pleasure` without a behavior change this
+behavior-preserving change must not make: `sexual_transitions._apply_then`'s `bounded_counter`
+branch writes rulebook-declared delta/set effects (and reads the arousal-ordinal direction around
+its own write), and `sexual_state.decay_tick` is a floor-relative decay step. The ADDED requirement
+and its first scenario are therefore phrased as a closed set of sanctioned writers — the shared
+module's two functions plus those two engine branches — and the structural test scans for exactly
+that set (alias-aware, since both engine writers assign through a local `trait` binding, not
+through a literal `entity.sexual.pleasure.` chain).
+
+*Why the cleanse handler's `apply()` changes:* the `cleanse-effect-handler` delta's trace scenario
+requires the `cleanse:status` effect to reach the same shared removal as every other clearing path.
+`_handle_cleanse` keeps its stage-time selection (it owns the effect description and the
+skip-when-empty check) but its staged `apply()` calls `remove_by_selector(target, "negative")`
+instead of replaying a snapshot key tuple, so the polarity filter lives in one function. Every
+shipped cleanse test passes unchanged.
+
 ## Risks / Trade-offs
 
 - **The pleasure move silently reorders the pre-mutation captures** → move the body with no edits at
   all; the existing source-inspection scenario in `sexual-act-effects` is the automated guard, and it
   must be pointed at the new location as part of the same task.
 - **A missed `_apply_pleasure_gain` call site** → there are six in production: three in `action.py`
-  (`:962`, `:1101`, `:1102`) and three in `world/rules/defeat_aftermath.py` (`:926`, `:928`, `:1499`),
+  (`:964`, `:1103`, `:1104`) and three in `world/rules/defeat_aftermath.py` (`:926`, `:928`, `:1499`),
   plus nine in `test_sexual_act_effects.py`. After the move, `grep` for the old private name must
   return zero hits anywhere.
 - **Circular import between `pleasure.py` and `action.py`** → the moved bodies reach only

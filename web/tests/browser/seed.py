@@ -1179,14 +1179,14 @@ def main() -> None:
     )
     # A persistent buff gives the status panel a deterministic
     # applied-modifier condition for viewport assertions.
-    from world.rules.buffs import _add_buff
+    from world.rules.buffs import apply_buff
 
     if synth:
         # The kit debuff stacks unique_per_source; a fixture source key names
         # the seed itself (free-form data, never a catalog key).
-        _add_buff(character, SYNTH_COMBAT_DEBUFF_KEY, source_key="browser-seed")
+        apply_buff(character, SYNTH_COMBAT_DEBUFF_KEY, source_key="browser-seed")
     else:
-        _add_buff(character, SHIPPED_COMBAT_DEBUFF_KEY)
+        apply_buff(character, SHIPPED_COMBAT_DEBUFF_KEY)
     for monster_key, hp in (SYNTH_COMBAT_MONSTERS if synth else SHIPPED_COMBAT_MONSTERS):
         monster = create_object(Monster, key=monster_key, nohome=True)
         monster.threat_tier = first_live_monster_tier_key() if synth else SHIPPED_MONSTER_TIER_ATTR

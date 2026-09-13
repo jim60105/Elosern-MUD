@@ -10,6 +10,11 @@ from evennia.contrib.rpg.buffs import BaseBuff
 
 from world.rules.traits import GAUGE_KEYS
 
+#: The polarity-wide words :func:`remove_by_selector` understands beyond a
+#: concrete definition key. Forward-declared seam (design D5): ``positive``
+#: and ``all`` ship tested but caller-less until the item-effect change.
+_REMOVE_SELECTORS = frozenset({"all", "positive", "negative"})
+
 
 @dataclass(frozen=True)
 class BuffDefinition:
@@ -39,7 +44,12 @@ class TickRecord:
 
 
 def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
-    """Load uniquely keyed buff definitions from YAML."""
+    """Load uniquely keyed buff definitions from YAML.
+
+    A definition key may never collide with a :func:`remove_by_selector`
+    selector word — one bare word must never mean both "remove everything of
+    this polarity" and "remove this one status" (design Risks).
+    """
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, list):
         raise ValueError(f"{path}: expected a YAML list")
@@ -50,6 +60,10 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
         key = entry["key"]
         if key in definitions:
             raise ValueError(f"{path}: duplicate buff key {key!r}")
+        if key in _REMOVE_SELECTORS:
+            raise ValueError(
+                f"{path}: buff key {key!r} collides with a remove_by_selector selector"
+            )
         modifiers = entry.get("modifiers", {})
         if not isinstance(modifiers, dict) or set(modifiers) - {"rate", "bounds", "decay"}:
             raise ValueError(f"{path}: buff {key!r} has invalid modifiers")
@@ -135,7 +149,7 @@ def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
     trait.current = trait.current + rate_mod["delta"]
 
 
-def _add_buff(
+def apply_buff(
     entity, definition_key: str, *, instance_key: str | None = None, **data
 ) -> None:
     from world.rules.equipment_effects import equipment_immune_buff_keys
@@ -231,7 +245,7 @@ def grant_conferred_growth_rate(entity, source_key: str, scale: float) -> None:
         raise ValueError("growth-rate scale must be a finite non-negative number")
     if not isfinite(scale) or scale < 0:
         raise ValueError("growth-rate scale must be a finite non-negative number")
-    _add_buff(
+    apply_buff(
         entity,
         "conferred_growth_rate",
         instance_key=f"conferred_growth_rate:{source_key}",
@@ -261,21 +275,50 @@ def _remove_buff_keys(entity, keys: tuple[str, ...]) -> None:
     for key in keys:
         entity.buffs.remove(key, dispel=True)
 
+def remove_by_selector(entity, selector: str) -> int:
+    """Remove every live buff instance one selector names; return the count.
+
+    The selector vocabulary is exactly a concrete ``buffs.yaml`` definition
+    key or one of the polarity-wide words ``all`` / ``positive`` /
+    ``negative`` (``_REMOVE_SELECTORS``); an unrecognized selector fails
+    closed rather than silently removing nothing. Selection resolves against
+    live buff **instances**, so a definition with several live instances
+    (distinct instance keys) loses all of them, and every removal routes
+    through the same ``dispel=True`` external-removal path the cleanse
+    handler already uses. A selector matching nothing writes nothing and
+    returns ``0``. An empty result is a legitimate outcome, not an error.
+    """
+    if selector not in _REMOVE_SELECTORS and selector not in BUFF_DEFINITIONS:
+        raise ValueError(f"unknown buff removal selector {selector!r}")
+
+    def _matches(definition_key: str) -> bool:
+        if selector == "all":
+            return True
+        if selector == "negative":
+            return BUFF_DEFINITIONS[definition_key].polarity == "debuff"
+        if selector == "positive":
+            return BUFF_DEFINITIONS[definition_key].polarity == "buff"
+        return definition_key == selector
+
+    keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if _matches(buff.definition_key)
+    )
+    if not keys:
+        return 0
+    _remove_buff_keys(entity, keys)
+    return len(keys)
+
+
 def cleanse_debuffs(entity) -> int:
     """Remove every active debuff-polarity buff and return the count removed.
 
-    Reuses the shipped ``cleanse:status`` removal path so holy-water
-    settlement and the cleanse effect handler share one semantics. Returns 0
-    when nothing is active (and writes nothing).
+    The shipped ``negative`` alias of :func:`remove_by_selector`, so
+    holy-water settlement and the cleanse effect handler share one
+    semantics. Returns 0 when nothing is active (and writes nothing).
     """
-    debuff_keys = tuple(
-        buff.buffkey
-        for buff in _active_buff_instances(entity)
-        if BUFF_DEFINITIONS[buff.definition_key].polarity == "debuff"
-    )
-    if debuff_keys:
-        _remove_buff_keys(entity, debuff_keys)
-    return len(debuff_keys)
+    return remove_by_selector(entity, "negative")
 
 
 def _handle_cleanse(
@@ -311,9 +354,12 @@ def _handle_cleanse(
                 entity=target,
                 description=f"buffs_cleansed|{target.key}|{len(keys)}",
                 surfaces=frozenset(),
-                apply=lambda target=target, keys=keys: _remove_buff_keys(
-                    target, keys
-                ),
+                # The stage-time selection above exists only for the effect
+                # description and the skip-when-empty check; applying through
+                # the shared selector keeps the cleanse effect and every
+                # other debuff-clearing caller on one removal (delta trace
+                # scenario) instead of replaying a snapshot key tuple.
+                apply=lambda target=target: remove_by_selector(target, "negative"),
             )
         )
     return pending

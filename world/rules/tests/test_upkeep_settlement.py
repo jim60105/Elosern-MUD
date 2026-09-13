@@ -28,7 +28,7 @@ from world.rules.action import (
     _commit,
     register_event_effect_planner,
 )
-from world.rules.buffs import TickRecord, _add_buff, tick_buffs
+from world.rules.buffs import TickRecord, apply_buff, tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.party import join_party
 from world.rules.upkeep import UPKEEP_SKILL_KEY, settle_upkeep
@@ -96,7 +96,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::damaging-rate-ticks-settle-through-a-deterministic-event-producing-boundary-within-the-combat-round")
     def test_lethal_tick_emits_one_defeat_and_damage_entry(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         self.assertEqual(self.monster.traits.hp.current, 0)
         logs = self._logs(records)
@@ -108,7 +108,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::damaging-rate-ticks-settle-through-a-deterministic-event-producing-boundary-within-the-combat-round")
     def test_damage_entry_reports_clamped_applied_amount(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         logs = self._logs(records)
         damage = next(
@@ -122,8 +122,8 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::damaging-rate-ticks-settle-through-a-deterministic-event-producing-boundary-within-the-combat-round")
     def test_multiple_dots_in_one_tick_emit_one_defeat(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
-        _add_buff(self.monster, "fire_scorch", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "fire_scorch", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         logs = self._logs(records)
         kinds = self._kinds(logs)
@@ -143,7 +143,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
         # action already killed never ticks again and can never double-settle.
         from world.rules.combat import _end_of_round_upkeep
 
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         self.monster.traits.hp.current = 0
         field = _field(self.actor, self.monster)
         records_by_key = _end_of_round_upkeep(field)
@@ -153,7 +153,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
     def test_attributed_lethal_tick_credits_one_defeat_entry_once(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         logs = self._logs(records)
         defeated = [
@@ -170,7 +170,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
     def test_deleted_or_absent_source_grants_no_credit(self):
-        _add_buff(self.monster, "poisoned")
+        apply_buff(self.monster, "poisoned")
         records = _tick_records(self.monster)
         self.assertEqual(self.monster.traits.hp.current, 0)
         logs = self._logs(records)
@@ -179,7 +179,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     def test_source_outside_the_roster_resolves_from_the_database(self):
         bystander = _player("bystander")
-        _add_buff(self.monster, "poisoned", source_pk=int(bystander.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(bystander.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         logs = settle_upkeep(field, records)
@@ -194,8 +194,8 @@ class UpkeepSettlementTests(EvenniaTestCase):
         first = _player("twin caster")
         second = _player("twin caster")
         victim = _monster("same-key victim", hp=8)
-        _add_buff(victim, "poisoned", source_pk=int(first.pk))
-        _add_buff(victim, "fire_scorch", source_pk=int(second.pk))
+        apply_buff(victim, "poisoned", source_pk=int(first.pk))
+        apply_buff(victim, "fire_scorch", source_pk=int(second.pk))
         records = _tick_records(victim)
         field = _field(self.actor, victim)
         observed_actors = []
@@ -215,7 +215,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
     def test_non_monster_target_grants_no_monster_tier_credit(self):
         npc = _npc(hp=3)
-        _add_buff(npc, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(npc, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(npc)
         field = _field(self.actor, npc)
         logs = settle_upkeep(field, records)
@@ -232,7 +232,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
     def test_untiered_monster_writes_no_progression(self):
         untiered = _monster(hp=3)
         untiered.threat_tier = "bogus"
-        _add_buff(untiered, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(untiered, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(untiered)
         field = _field(self.actor, untiered)
         settle_upkeep(field, records)
@@ -240,7 +240,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
 
     @covers_requirement("combat-upkeep-settlement::upkeep-settlement-honors-simulated-and-nonlethal-combat-policy")
     def test_simulated_tick_tags_defeat_and_grants_no_xp(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         logs = self._logs(records, simulated=True)
         defeated = next(
@@ -255,7 +255,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
     @covers_requirement("combat-upkeep-settlement::upkeep-settlement-honors-simulated-and-nonlethal-combat-policy")
     def test_nonlethal_companion_crossing_floors_and_marks_knocked_out(self):
         companion = _npc("upkeep companion", hp=3)
-        _add_buff(companion, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(companion, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(companion)
         field = _field(self.actor, companion)
         logs = settle_upkeep(
@@ -273,7 +273,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
     @covers_requirement("combat-upkeep-settlement::upkeep-settlement-honors-simulated-and-nonlethal-combat-policy")
     def test_non_crossing_tick_on_protected_target_changes_nothing(self):
         companion = _npc("upkeep healthy companion", hp=100)
-        _add_buff(companion, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(companion, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(companion)
         field = _field(self.actor, companion)
         logs = settle_upkeep(
@@ -288,7 +288,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
     @covers_requirement("combat-upkeep-settlement::upkeep-tick-damage-outside-combat-rounds-produces-no-events-or-credit")
     def test_clock_path_ignoring_records_changes_hp_only(self):
         entity = _player("clock entity")
-        _add_buff(entity, "poisoned", source_pk=int(entity.pk))
+        apply_buff(entity, "poisoned", source_pk=int(entity.pk))
         before = entity.traits.hp.current
         tick_buffs(entity, 10)
         self.assertEqual(entity.traits.hp.current, before - 5)
@@ -319,7 +319,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_upkeep_defeat_advances_the_matching_objective(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         settle_upkeep(field, records)
@@ -329,7 +329,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_simulated_upkeep_kill_grants_no_quest_progress(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         settle_upkeep(field, records, simulated=True)
@@ -339,7 +339,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_unattributed_upkeep_kill_grants_no_quest_progress(self):
-        _add_buff(self.monster, "poisoned")
+        apply_buff(self.monster, "poisoned")
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         settle_upkeep(field, records)
@@ -355,7 +355,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
         with patch.dict(_EVENT_EFFECT_PLANNERS, {"spy": spy_planner}):
             near_dead = _monster("near-dead", hp=100)
-            _add_buff(near_dead, "poisoned", source_pk=int(self.actor.pk))
+            apply_buff(near_dead, "poisoned", source_pk=int(self.actor.pk))
             records = _tick_records(near_dead)
             field = _field(self.actor, near_dead)
             settle_upkeep(field, records)
@@ -367,7 +367,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
         with patch.dict(_EVENT_EFFECT_PLANNERS, {"boom": boom}):
             with self.assertRaises(RuntimeError):
-                _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+                apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
                 records = _tick_records(self.monster)
                 field = _field(self.actor, self.monster)
                 settle_upkeep(field, records)
@@ -406,7 +406,7 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_knocked_out_companion_tick_earns_defeat_credit_but_no_owner_progress(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.companion.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.companion.pk))
         records = _tick_records(self.monster)
         field = Battlefield(
             {
@@ -437,7 +437,7 @@ class UpkeepCommitFailureTests(EvenniaTestCase):
         self.monster = _monster(hp=3)
 
     def test_commit_failure_aborts_the_settlement_without_writing(self):
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         from world.rules import upkeep as upkeep_module
@@ -470,7 +470,7 @@ class UpkeepCommitFailureTests(EvenniaTestCase):
         # ``_commit``. The commit's snapshot/restore must roll the
         # already-applied effect back with the failed one (the session outer
         # transaction covers the tick HP separately).
-        _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
+        apply_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
         with patch.dict(

@@ -16,7 +16,7 @@ from world.rules.action_preview import (
     preview_skill,
     revalidate_submission,
 )
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.sexual_state import AROUSAL_LEVELS

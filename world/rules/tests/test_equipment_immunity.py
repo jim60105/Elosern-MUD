@@ -1,6 +1,6 @@
 """Worn-equipment immunity tests (P2, tasks 2.4/2.5/2.6).
 
-Covers the pure predicate, the ``_add_buff`` no-write backstop, and the
+Covers the pure predicate, the ``apply_buff`` no-write backstop, and the
 action-staging gate that emits the neutralization event.
 
 Data-independent (migrate-rules-equipment-item-tests-off-real-data): the
@@ -25,7 +25,7 @@ from world.rules.action import (
     _handle_buff_apply,
     _handle_self_buff_apply,
 )
-from world.rules.buffs import _add_buff, entity_active_buffs, tick_buffs
+from world.rules.buffs import apply_buff, entity_active_buffs, tick_buffs
 from world.rules.equipment_effects import equipment_immune_buff_keys
 from world.tests.synthetic_data import make_item
 
@@ -148,7 +148,7 @@ class EquipmentImmunityPredicateTests(_ImmunityScope):
 
 
 class EquipmentImmunityBackstopTests(_ImmunityScope):
-    """The `_add_buff` no-write gate protects every direct caller."""
+    """The `apply_buff` no-write gate protects every direct caller."""
 
     @covers_requirement(
         "equipment-effects::equipment-immunity-predicate-is-pure-and-fail-closed"
@@ -156,18 +156,18 @@ class EquipmentImmunityBackstopTests(_ImmunityScope):
     def test_immune_debuff_write_is_refused(self):
         entity = _entity()
         _wear(entity, _PENDANT.key)
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         self.assertEqual(entity_active_buffs(entity), set())
 
     def test_buff_polarity_grant_is_unaffected(self):
         entity = _entity()
         _wear(entity, _PENDANT.key)
-        _add_buff(entity, "focus")
+        apply_buff(entity, "focus")
         self.assertIn("focus", entity_active_buffs(entity))
 
     def test_existing_poison_keeps_ticking_after_equipping(self):
         entity = _entity()
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         _wear(entity, _PENDANT.key)
         before = entity.traits.hp.value
         tick_buffs(entity)
@@ -179,20 +179,20 @@ class EquipmentImmunityBackstopTests(_ImmunityScope):
 
     def test_equipment_less_entity_is_unaffected(self):
         entity = _entity()
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         self.assertIn("poisoned", entity_active_buffs(entity))
 
     def test_malformed_storage_confers_no_immunity(self):
         entity = _entity()
         entity.db.equipment = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": 7}
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         self.assertIn("poisoned", entity_active_buffs(entity))
 
     def test_repeated_direct_grant_attempts_write_nothing(self):
         entity = _entity()
         _wear(entity, _PENDANT.key)
         for _ in range(3):
-            _add_buff(entity, "poisoned")
+            apply_buff(entity, "poisoned")
         self.assertEqual(entity_active_buffs(entity), set())
 
 

@@ -26,7 +26,7 @@ from typeclasses.characters import PlayerCharacter
 from world.skills.equipment import EquipmentSlot
 from world.lore.items import EquipmentModifierKey
 from world.rules import combat
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.equipment import toggle_equipment
 from world.rules.equipment_effects import (
@@ -380,7 +380,7 @@ class BreakdownShapeTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_layer_alphabets_are_closed(self):
         player = _player("breakdown alphabet")
-        _add_buff(player, _THORN_FEVER.key)
+        apply_buff(player, _THORN_FEVER.key)
         _wear(player, _BULWARK_SHIELD.key, _FANG_BLADE.key)
         player.db.skills = {"active": [_BODY_PULSE.key], "passive": []}
         for row in build_stat_breakdown(player):
@@ -465,7 +465,7 @@ class ConditionLayerTests(EvenniaTestCase):
     def test_poison_agility_layer_is_named_and_signed(self):
         player = _player("breakdown poison")
         player.traits.agility.base = 100
-        _add_buff(player, _THORN_FEVER.key)
+        apply_buff(player, _THORN_FEVER.key)
         base = _stored_trait(player, "agility")
         row = _rows(player)["agility"]
         self.assertEqual(
@@ -483,7 +483,7 @@ class ConditionLayerTests(EvenniaTestCase):
         # it here made the whole character panel unavailable).
         player = _player("breakdown fraction")
         player.traits.agility.base = 1
-        _add_buff(player, _THORN_FEVER.key)
+        apply_buff(player, _THORN_FEVER.key)
         row = _rows(player)["agility"]
         self.assertEqual(row.effective, 0.9)
         self.assertEqual(row.current, 0.9)
@@ -535,7 +535,7 @@ class ConditionLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_buff_rule_sorts_before_plain_rule(self):
         player = _player("breakdown buff order")
-        _add_buff(player, _THORN_FEVER.key)
+        apply_buff(player, _THORN_FEVER.key)
         player.db.skills = {"active": [_WARD_TRAINING.key], "passive": []}
         rows = _rows(player)
         # The fever row exists and carries the buff-classified condition
@@ -566,7 +566,7 @@ class ConditionLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_panel_agility_matches_live_consumers(self):
         player = _player("breakdown live parity")
-        _add_buff(player, _THORN_FEVER.key)
+        apply_buff(player, _THORN_FEVER.key)
         _wear(player, _BULWARK_SHIELD.key, _GLINT_FOCUS.key)
         player.db.skills = {"active": [_BODY_PULSE.key], "passive": []}
         bundle = evaluate_combat_modifiers(player)

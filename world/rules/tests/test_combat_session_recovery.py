@@ -435,9 +435,9 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         grant_lineage(self.player, [_T_CAST])
         self.monster = _monster("upkeep tick goblin", hp=100)
         self.monster.location = self.room
-        from world.rules.buffs import _add_buff
+        from world.rules.buffs import apply_buff
 
-        _add_buff(self.monster, "fire_scorch", source_pk=int(self.player.pk))
+        apply_buff(self.monster, "fire_scorch", source_pk=int(self.player.pk))
         self.monster.traits.hp.base = 3
         self.monster.traits.hp.current = 3
         # The 10-second rate tick fires on the first upkeep accumulation

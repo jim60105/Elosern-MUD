@@ -18,7 +18,7 @@ from world.lore.sexual_vocab import (
     SHAME_LEVELS,
     WETNESS_LEVELS,
 )
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.combat_session import engage
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
 from world.rules.status_query import (
@@ -217,7 +217,7 @@ class StatusReadModelTests(EvenniaTest):
         "webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers"
     )
     def test_poisoned_buff_reports_duration_and_exact_adjustment(self):
-        _add_buff(self.actor, "poisoned")
+        apply_buff(self.actor, "poisoned")
         # poison remaining_seconds defaults to definition duration 300.
         model = build_status_read_model(self.actor)
         poisoned = next(

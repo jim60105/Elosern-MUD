@@ -6,26 +6,35 @@
 ## ADDED Requirements
 
 ### Requirement: Every deterministic pleasure write lives in one shared module
-Every deterministic writer of an entity's pleasure — the sexual-act pleasure handler, the divine
-maximum handler, the drain handler's forced reset, the defeat-aftermath settlements, and any future
-non-skill caller — SHALL apply its change through a function in the one shared pleasure module,
-never by assigning `entity.sexual.pleasure` from anywhere else. That module SHALL NOT import the cast
+Every deterministic caller that mutates an entity's pleasure — the sexual-act pleasure handler, the
+divine maximum handler, the drain handler's forced reset, the defeat-aftermath settlements, and any
+future non-skill caller — SHALL apply its change by calling a function in the one shared pleasure
+module, never by assigning `entity.sexual.pleasure` directly. That module SHALL NOT import the cast
 pipeline, so a caller that is not a cast can use it without depending on skill resolution.
 
-The module SHALL expose exactly two writers, because two genuinely different semantics exist: a
-signed gain carrying the arousal-coupled cascade, and a forced reset to zero carrying none. A reset
-SHALL NOT be expressed as a negative gain: doing so would run the gain path's
+The rulebook transition engine and the clock decay are the only other sanctioned deterministic
+writers: `sexual_transitions._apply_then` SHALL write the pleasure trait only for an effect its
+`sexual.yaml` rulebook declares (the `bounded_counter` kind), and `sexual_state.decay_tick` SHALL
+keep its own floor-relative decay step. Neither is an effect-applier entry point; neither SHALL gain
+callers beyond its existing rulebook- and clock-driven paths.
+
+The module SHALL expose exactly two writer functions, because two genuinely different semantics
+exist: a signed gain carrying the arousal-coupled cascade, and a forced reset to zero carrying none.
+A reset SHALL NOT be expressed as a negative gain: doing so would run the gain path's
 already-at-接近 branch and advance the target's climax phase, which draining a target to zero must
 never do.
 
-#### Scenario: No deterministic module outside the shared module writes pleasure
-- **WHEN** the deterministic core is inspected for assignments to `entity.sexual.pleasure.base` or
-  `entity.sexual.pleasure.value`
-- **THEN** every one of them is inside the shared pleasure module
+#### Scenario: No production code outside the sanctioned writers assigns pleasure
+- **WHEN** the deterministic production core is inspected for assignments to a pleasure trait — an
+  assignment to the `base` or `value` attribute of `entity.sexual.pleasure`, of a local bound to it,
+  or of a `getattr(entity.sexual, ...)` field-dispatched trait in a function whose dispatch covers
+  `pleasure`
+- **THEN** every one of them is one of the shared module's two writer functions, the rulebook
+  engine's `_apply_then` `bounded_counter` branch, or `decay_tick`'s pleasure branch — and no other
+  production module assigns the trait directly
 
 #### Scenario: A forced reset does not advance the climax phase
-- **WHEN** a target whose `climax_phase.level` is `"接近"` has their pleasure forcibly zeroed by the
-  drain path
+- **WHEN** a target whose `climax_phase.level` is `"接近"` has their pleasure forcibly zeroed by the drain path
 - **THEN** their pleasure is `0` and their `climax_phase.level` is still `"接近"` — the reset carries
   no cascade
 
