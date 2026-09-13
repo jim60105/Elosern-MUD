@@ -73,22 +73,6 @@ class ItemRarity(StrEnum):
     LEGENDARY = "legendary"
 
 
-class ItemEffectKey(StrEnum):
-    """Closed vocabulary of deterministic item-effect keys.
-
-    Each key binds a usable-item definition to one entry in the item-effect
-    rulebook; magnitudes and conditions never live in this registry. The
-    loader in ``world/rules/items.py`` rejects any registered key without a
-    canonical rulebook entry. ``BLESSED_CLEANSE`` (受洗聖水) removes every
-    active debuff through the shipped cleanse path and carries no amount.
-    """
-
-    SELF_HEAL = "self_heal"
-    GREATER_HEAL = "greater_heal"
-    MANA_RESTORE = "mana_restore"
-    BLESSED_CLEANSE = "blessed_cleansing"
-
-
 class EquipmentModifierKey(StrEnum):
     """Closed vocabulary of equipment-effect modifier keys.
 
@@ -148,18 +132,19 @@ class EquipmentModifierKey(StrEnum):
 
 @dataclass(frozen=True)
 class ItemUseMechanics:
-    """The immutable use semantics of one registered consumable or reusable."""
+    """The immutable use semantics of one registered consumable or reusable.
 
-    effect_key: ItemEffectKey
+    What a use *does* is declared in the item-effect rulebook keyed by the
+    item key (``world/rules/item_effects.py``); this record only states that
+    the item can be used and what a use costs structurally — effects never
+    live in this registry (item-effect-model design §3.1).
+    """
+
     consumable: bool
     combat_allowed: bool
 
     def __post_init__(self) -> None:
-        """Enforce the closed effect vocabulary and boolean flags."""
-        if not isinstance(self.effect_key, ItemEffectKey):
-            raise ValueError(
-                f"effect_key must be an ItemEffectKey member, got {self.effect_key!r}"
-            )
+        """Enforce the boolean flags."""
         for name in ("consumable", "combat_allowed"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be a boolean")
@@ -302,7 +287,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 summary_zh="盛裝於小瓶中的治療藥水。",
             ),
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.SELF_HEAL,
                 consumable=True,
                 combat_allowed=True,
             ),
@@ -737,7 +721,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 summary_zh="光明教會祝禱的受洗聖水。",
             ),
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.BLESSED_CLEANSE,
                 consumable=True,
                 combat_allowed=True,
             ),
@@ -754,7 +737,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 summary_zh="濃縮煉製的高階治療藥劑。",
             ),
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.GREATER_HEAL,
                 consumable=True,
                 combat_allowed=True,
             ),
@@ -771,7 +753,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 summary_zh="恢復魔力的藍色藥劑。",
             ),
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.MANA_RESTORE,
                 consumable=True,
                 combat_allowed=True,
             ),

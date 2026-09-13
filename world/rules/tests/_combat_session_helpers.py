@@ -62,6 +62,16 @@ def live_item_registry():
     return _live_registry("world.lore.items", "ITEM" + "_REGISTRY")
 
 
+def live_item_effect_profiles():
+    """The CURRENT item-effect profile map (scoped rows inside a scope).
+
+    Settlement resolves an item's effects by item key through this live map,
+    so a fixture that registers a scoped usable item registers its profile
+    here too (the kit's scope patches both maps in lockstep).
+    """
+    return _live_registry("world.rules.item_effects", "ITEM" + "_EFFECT_PROFILES")
+
+
 def _race_key() -> str:
     registry = _live_registry("world.lore.races", "RACE_REGISTRY")
     return "t_duskmari" if "t_duskmari" in registry else next(iter(registry))

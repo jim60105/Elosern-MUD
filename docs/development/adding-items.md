@@ -19,14 +19,14 @@
 | 身份＋外觀＋機制宣告 | `world/lore/items.py::ITEM_REGISTRY` | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
 | 商店成交值 | `world/rules/rulebook/guild_economy.yaml` | 各店 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨 |
-| 效果量級 | `world/rules/rulebook/item_effects.yaml` | 每個 `ItemEffectKey` 的正整數 `amount`（上限 9999），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
+| 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（目前僅接受 `self`），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
 `ItemDefinition` 是 frozen dataclass，`__post_init__` 在構造時驗證 presentation 與機制的形狀及互斥關係（`key`、名稱、`price_table_key`、`sellable` 本身不做驗證），壞定義會讓 registry 載入直接失敗，不會拖到運行時才爆。機制部分是**唯一的行為縫隙**，三選一：
 
 | 形狀 | 宣告 | 結果 |
 |---|---|---|
-| 可使用（藥水、食物） | `use_mechanics=ItemUseMechanics(effect_key, consumable, combat_allowed)` | 玩家可用 `使用`／介面「使用」；`consumable` 決定是否消耗 |
+| 可使用（藥水、食物） | `use_mechanics=ItemUseMechanics(consumable, combat_allowed)`，效果由 `item_effects.yaml` 依物品 `key` 宣告 | 玩家可用 `使用`／介面「使用」；`consumable` 決定是否消耗；做什麼見 Step 2 |
 | 可裝備（武器、護甲、飾品） | `equipment_slot=EquipmentSlot.X` 加上 `modifier_key=EquipmentModifierKey.X` | 玩家可用 `裝備`／介面切換；單例槽互換、`ACCESSORY` 上限 5 件；效果數值由裝備效果 rulebook 提供 |
 | 純觀察 | 兩者都不給 | 只能持有、檢視、買賣，沒有行前驗證可用的動作 |
 
@@ -39,10 +39,10 @@
 
 新增前先回答四個問題，它們決定你要碰哪幾個檔案：
 
-1. 它會被「使用」嗎？是 → 需要 `ItemEffectKey` 與 `item_effects.yaml` 條目。
+1. 它會被「使用」嗎？是 → 需要 `use_mechanics` 旗標與 `item_effects.yaml` 的一筆效果條目（見 Step 2）。
 2. 它能裝備嗎？是 → 選 `EquipmentSlot`（`weapon_main`／`weapon_off`／`armor`／`accessory`），飾品共用 5 件上限，並要為它註冊 `EquipmentModifierKey` 與 `equipment_effects.yaml` 條目（見 Step 2b）。
 3. 它能買賣嗎？是 → 需要 `PRICE_TABLE` 價格帶與至少一家店的 offer。
-4. 現有的 effect key（`self_heal`／`greater_heal`／`mana_restore`）能描述它的效果嗎？不能 → 這不只是加資料，見 §5。
+4. 三個現成動詞（`stat`＋`amount` 計量條調整、`apply_status` 施加狀態、`remove_status` 移除狀態）加上既有狀態鍵，能描述它的效果嗎？不能（例如需要新的目標範圍）→ 這不只是加資料，見 §5。
 
 ---
 
@@ -81,7 +81,7 @@ ItemDefinition(
 |---|---|
 | kind／icon／rarity 必須是封閉列舉成員 | `presentation` |
 | 摘要非空、不超過 128 字元、單行純文字、不含 `<`、不含 URL、不含 emoji | `summary_zh` |
-| `effect_key` 必須是 `ItemEffectKey` 成員，旗標必須是真 bool | `use_mechanics` |
+| `consumable`、`combat_allowed` 必須是真 bool | `use_mechanics` |
 | `equipment_slot` 必須是 `EquipmentSlot` 成員 | `equipment_slot` |
 | `modifier_key` 必須是 `EquipmentModifierKey` 成員 | `modifier_key` |
 | `equipment_slot` 與 `modifier_key` 必須成對出現（有槽沒鍵、有鍵沒槽都拋錯） | `ItemDefinition` |
@@ -91,21 +91,23 @@ icon 只存 key，SVG 由 Vue 端自行映射，registry 不接受任何圖片�
 
 ### Step 2 — 可使用物品：接上效果 rulebook
 
-在 `item_effects.yaml` 確認該 `effect_key` 有條目：
+在 `item_effects.yaml` 的 `items:` 以物品 `key` 為鍵寫一筆，`effects` 是至少一個條目的有序列表；每個條目恰好聲明一個動詞欄位：
 
 ```yaml
-effects:
-  self_heal:
-    amount: 40
-  greater_heal:
-    amount: 120
-  mana_restore:
-    amount: 40
+items:
+  healing_potion:
+    effects:
+      - stat: hp        # 計量條調整：hp／mp／sp／pleasure，帶號非零整數，abs ≤ 9999
+        amount: 40
+  antidote_tonic:       # 假設的可使用物品：多個效果依宣告順序執行
+    effects:
+      - remove_status: poisoned
+      - apply_status: focus
 ```
 
-載入器 `world/rules/items.py` 做**雙向封閉檢查**：每個 `ItemEffectKey` 成員必須恰好對應一條正整數、不超過 9999 的規則；rulebook 裡也不能出現 registry 沒註冊的 key。任何一邊缺條目，載入即拋 `ItemEffectsRulebookError`。
+載入器 `world/rules/item_effects.py` 做**雙向封閉檢查**：每件已註冊可使用物品恰好一筆條目、rulebook 裡不能出現非可使用物品的 key、每筆至少一個效果。條目級驗證：動詞欄位互斥（恰好一個）、`stat` 是封閉計量條、`amount` 非零且絕對值不超過 9999、`apply_status` 只收 `buffs.yaml` 的具體狀態鍵、`remove_status` 收具體鍵或 `all`／`positive`／`negative` 選擇器、同一件物品不得對同一計量條宣告兩筆調整、`scope` 詞彙已定義但僅接受 `self`（其餘要到 `add-item-effect-targeting` 開放，拒絕訊息會點名該 change）。任何違規，載入即拋 `ItemEffectsRulebookError`。
 
-使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items.py` 與 `world/rules/equipment.py` 的共同寫入路徑處理，新增資料不需要寫新的狀態變更程式碼。
+使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items.py` 與 `world/rules/equipment.py` 的共同寫入路徑處理：結算依宣告順序逐條執行，單獨無效的步驟被跳過，全部步驟都無效才拒絕並退還物品。新增資料不需要寫新的狀態變更程式碼，也**不需要任何效果鍵列舉擴充**——既有動詞（含負值、快感計量條、具體狀態、移除選擇器）就是全部詞彙。
 
 ### Step 2b — 可裝備物品：接上裝備效果 rulebook
 
@@ -165,7 +167,7 @@ ShopDefinition(
 
 ### Step 5 — 檢查受影響的消費端（既有數值通常零程式碼）
 
-這些模組都是讀 registry 取值，用**既有**列舉值與 effect key 新增的物品會自動出現在對應表面：
+這些模組都是讀 registry 取值，用**既有**列舉值與現成效果動詞新增的物品會自動出現在對應表面：
 
 - 規則端：`world/rules/items.py`、`equipment.py`、`economy.py`、`service_view.py`（背包列的可行動作與停用原因由 preflight 推導）
 - 指令端：`使用`（`use`）、`裝備`（`equip`）在 `commands/items.py`；`丟`（`drop`）、`給`（`give`）在 `commands/localized/general.py`；商店為 `shop stock`（別名 `商店庫存`）、`buy`（`購買`）、`sell`（`販賣`），見 `commands/economy.py`
@@ -203,7 +205,7 @@ uv run --locked python -m tools.spec_traceability check
 |---|---|
 | 把治療量、價格寫進 `ItemDefinition` | 違反「身份與數值分離」，consumer 端會開始複製常數；registry 驗證與規格稽核都會擋下 |
 | 用 `kind` 或名稱推測行為 | 行為只認 `use_mechanics`／`equipment_slot`，前端與規則都有對應測試釘住 |
-| 新 effect 只加 YAML 不擴 `ItemEffectKey`（或反之） | 載入器雙向封閉檢查直接失敗 |
+| 可使用物品只加 registry 沒加 `item_effects.yaml` 條目（或反之） | 載入器雙向封閉檢查直接失敗，啟動即爆 |
 | 新裝備只加 registry 沒加 `equipment_effects.yaml` 條目（或反之） | `EquipmentEffectsRulebookError`，啟動即爆；`modifier_key` 三處對齊見 Step 2b |
 | 百分比欄寫成裸數字或平值欄寫成字串 | 數值種類由欄位決定，`agility` 以外不容許另一種形態；`bool` 也不算整數 |
 | 商店 `buy_copper` 超出價格帶 | `guild_config` 載入失敗，啟動即爆；注意 `sell_copper` 不受價格帶約束 |
@@ -218,7 +220,7 @@ uv run --locked python -m tools.spec_traceability check
 
 新增一筆資料（新藥水、新飾品、新商店 offer）照上面的流程做即可。但有兩類例外超出「加資料」的範圍：
 
-1. **新行為**，例如新的效果類型（中毒、綁定屬性、消耗品以外的冷卻）、新的裝備槽、或改變使用耗時的規則，會擴及 `ItemEffectKey` 封閉列舉、規則解析與既有規格需求。
+1. **新行為**，例如新的目標範圍（效果條目的 `scope` 詞彙目前僅接受 `self`，開放其他範圍是 `add-item-effect-targeting` 的範圍）、新的裝備槽、消耗品以外的冷卻、或改變使用耗時的規則，會擴及規則解析與既有規格需求。「給現有動詞加新效果」（新藥水回 SP、施加既有狀態鍵、用負值扣計量條）已不是新行為，是 YAML 資料。
 2. **新視覺詞彙**，即新的 `ItemKind`、`ItemIconKey` 或 `ItemRarity` 值，會擴及三個封閉列舉、前端圖示對應與展示層。
 
 兩者都屬於規格驅動變更，請走 OpenSpec 流程（`openspec-propose`），並同步 `equipment-inventory`、`item-use-resolution`、`inventory-item-actions` 相關主規格。

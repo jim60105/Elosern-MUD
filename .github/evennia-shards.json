@@ -149,6 +149,7 @@
         "world.rules.tests.test_sexual_state",
         "world.rules.tests.test_sexual_transitions",
         "world.rules.tests.test_sexual_unlock",
+        "world.rules.tests.test_shipped_item_use_regression",
         "world.rules.tests.test_shop_clock_sources",
         "world.rules.tests.test_shop_economy",
         "world.rules.tests.test_skill_lineage",

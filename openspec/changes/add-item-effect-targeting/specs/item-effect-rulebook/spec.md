@@ -1,9 +1,14 @@
-## RENAMED Requirements
+## REMOVED Requirements
 
-- FROM: `### Requirement: Only the acting entity is an accepted scope until item targeting ships`
-- TO: `### Requirement: An effect's scope is fixed by the rulebook and maps to one targeting requirement`
+### Requirement: Only the acting entity is an accepted scope until item targeting ships
+**Reason**: the self-only acceptance seam was a forward-declared transitional guard that exists only
+until the change resolving item targets ships; this change is that change. Its refusal scenario —
+"A non-self scope is refused with a message naming its owner" — is retired with the seam it
+enforces, so the replacement is declared as an ADDED requirement rather than a MODIFIED block that
+would have to keep a scenario the implementation removes (precedent: REMOVED-with-reason in
+`2026-08-13-overwhelm-log-attribution`).
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: An effect's scope is fixed by the rulebook and maps to one targeting requirement
 Every effect SHALL declare one scope from the closed vocabulary: the acting entity, one other entity,

@@ -43,13 +43,17 @@ from world.rules.equipment_effects import (
     equipment_gauge_caps,
 )
 from world.rules.items import (
-    ITEM_EFFECT_RULES,
     ItemUseRequest,
     preflight_item_use,
 )
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+)
 from world.rules.overwhelm import _required_roll
 from world.rules.sexual_resist import _blended_score
-from world.lore.items import EquipmentSlot, ItemEffectKey, ItemUseMechanics
+from world.lore.items import EquipmentSlot, ItemUseMechanics
 from world.rules.tests.combat_fixtures import (
     BattlefieldIsolation,
     FakeEntity,
@@ -180,15 +184,16 @@ _SP_SKILL = make_skill(
     cost={"sp": 20},
 )
 
-# --- synthetic consumable bound to the shipped self-heal effect row --------
+# --- synthetic consumable with its own scoped hp-adjustment profile --------
 _TONIC = make_item(
     "t_wiring_tonic",
     display_name_zh="合成苔汁",
-    use_mechanics=ItemUseMechanics(
-        effect_key=ItemEffectKey.SELF_HEAL, consumable=True, combat_allowed=True
-    ),
+    use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
 )
-_HEAL_AMOUNT = ITEM_EFFECT_RULES[ItemEffectKey.SELF_HEAL].amount
+_TONIC_PROFILE = ItemEffectProfile(
+    effects=(GaugeAdjustEffect(stat=ItemStat.HP, amount=40),)
+)
+_HEAL_AMOUNT = _TONIC_PROFILE.effects[0].amount
 
 # --- synthetic gear bound to the probed rows -------------------------------
 _SABER = make_item(
@@ -292,6 +297,7 @@ class _WearerCase(EvenniaTestCase):
             extra={
                 "items": _SCOPE_ITEMS,
                 "skills": {_MP_SKILL.key: _MP_SKILL, _SP_SKILL.key: _SP_SKILL},
+                "item_effect_profiles": {_TONIC.key: _TONIC_PROFILE},
             },
         )
 
@@ -690,8 +696,9 @@ class HealWiringTests(_WearerCase):
         self.assertTrue(preflight.allowed)
         # Potion heals stay the flat effect-row amount; heal-gear percent
         # never scales them, and the restore plan equals current + amount.
-        self.assertEqual(preflight.plan.amount, _HEAL_AMOUNT)
-        self.assertEqual(preflight.plan.gauge_restored, 10 + _HEAL_AMOUNT)
+        (step,) = preflight.plan.steps
+        self.assertEqual(step.amount, _HEAL_AMOUNT)
+        self.assertEqual(step.target.traits.hp.current + step.amount, 10 + _HEAL_AMOUNT)
 
     def test_fractional_heal_gain_percent_is_tolerated(self):
         with patch(

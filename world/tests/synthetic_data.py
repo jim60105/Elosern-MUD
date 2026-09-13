@@ -51,7 +51,6 @@ from world.lore.items import (
     ItemDefinition,
     EquipmentModifierKey,
     EquipmentSlot,
-    ItemEffectKey,
     ItemIconKey,
     ItemKind,
     ItemPresentation,
@@ -96,6 +95,11 @@ from world.quests.definitions import (
     RoomLocator,
 )
 from world.rules.buffs import BuffDefinition
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+)
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 from world.rules.guild_offers import ItemQuantity, QuestReward
 from world.rules.quest_issuance import QuestIssuance, Settlement
@@ -210,7 +214,6 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             summary_zh="噴灑時散發橘紅霧氣的合成藥劑。",
         ),
         use_mechanics=ItemUseMechanics(
-            effect_key=ItemEffectKey.SELF_HEAL,
             consumable=True,
             combat_allowed=True,
         ),
@@ -269,6 +272,17 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             rarity=ItemRarity.COMMON,
             summary_zh="外殼如冷燼的合成素材果實。",
         ),
+    ),
+}
+
+# The rulebook-side half of every usable kit row: settlement resolves an
+# item's effects by ITEM key through the live profile map, so a scoped item
+# registry without scoped profiles would leave the kit's one usable row with
+# no declared effect. Local fixtures that add their own usable items register
+# their own profiles through the same logical target via ``extra=``.
+SYNTH_ITEM_EFFECT_PROFILES: dict[str, ItemEffectProfile] = {
+    "t_ember_spray": ItemEffectProfile(
+        effects=(GaugeAdjustEffect(stat=ItemStat.HP, amount=40),)
     ),
 }
 
@@ -1002,6 +1016,7 @@ SYNTH_JS_PAYLOADS: dict[str, dict[str, object]] = {
 def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
     return {
         "items": lambda: SYNTH_ITEMS,
+        "item_effect_profiles": lambda: SYNTH_ITEM_EFFECT_PROFILES,
         "skills": lambda: SYNTH_SKILLS,
         "races": lambda: SYNTH_RACES,
         "static_tiers": lambda: SYNTH_STATIC_TIERS,
@@ -1065,6 +1080,7 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
 # from fragments so this source never carries a catalog symbol literally.
 REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "items": ("world.lore.items", "ITEM" + "_REGISTRY"),
+    "item_effect_profiles": ("world.rules.item_effects", "ITEM" + "_EFFECT_PROFILES"),
     "skills": ("world.skills.registry", "SKILL" + "_REGISTRY"),
     "races": ("world.lore.races", "RACE" + "_REGISTRY"),
     "static_tiers": ("world.lore.races", "STATIC_TIER" + "_REGISTRY"),
@@ -1106,6 +1122,9 @@ _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()
 # items against the (patched) item registry.
 _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "quest_issuances": ("quest_definitions", "items"),
+    # The rulebook-side profiles belong to the same usable-item closure: a
+    # scoped item registry must carry its scoped profiles with it.
+    "item_effect_profiles": ("items",),
     # The sync capture's content factories read module-level catalogs, so no
     # target must be patched before the capture dict itself is swapped.
     "lore_sync": (),
@@ -1228,6 +1247,11 @@ class synthetic_registries(ContextDecorator):
             for dependency in _TARGET_DEPENDENCIES.get(logical, ()):
                 if dependency not in names:
                     names.append(dependency)
+        # Usable-item closure: settlement resolves an item's effects by item
+        # key through the live profile map, so every scoped item registry
+        # carries its rulebook-side profiles automatically.
+        if "items" in names and "item_effect_profiles" not in names:
+            names.append("item_effect_profiles")
         if include_sync_capture:
             if "lore_sync" not in names:
                 names.append("lore_sync")

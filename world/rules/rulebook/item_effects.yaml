@@ -1,19 +1,32 @@
-# Deterministic item-effect rulebook (add-inventory-item-actions D1).
-# Item mechanics identity lives in the immutable lore registry; every tunable
-# magnitude and the canonical out-of-combat item-use time cost live here and
-# are read only through the validated loader in world/rules/items.py.
-# Amounts are positive integers bounded by the loader; the world clock settles
-# item_use_seconds through the same command-source advance path as casts.
+# Declarative item-effect rulebook (add-declarative-item-effects).
+# Item mechanics identity (can it be used, is it consumable, may it be used
+# in combat) lives in the immutable lore registry; what a use DOES — the
+# ordered, typed effect entries — lives here keyed by the ITEM key and is
+# read only through the validated loader in world/rules/item_effects.py
+# (item-effect-model design §3). The loader aligns this file's item key set
+# bi-directionally with the registry's usable items at startup.
+# Stat amounts are signed non-zero integers bounded by the loader; every
+# entry accepts an optional target scope, and only `self` is accepted until
+# add-item-effect-targeting lands.
 
 item_use_seconds: 6
 
-effects:
-  self_heal:
-    amount: 40
-  greater_heal:
-    amount: 120
-  mana_restore:
-    amount: 40
-  # Cleansing (add-equipment-immunity-and-attached-buffs D3): no amount — the
-  # loader requires an empty entry for cleanse-family keys.
-  blessed_cleansing: {}
+items:
+  healing_potion:
+    effects:
+      - stat: hp
+        amount: 40
+  greater_healing_potion:
+    effects:
+      - stat: hp
+        amount: 120
+  mana_potion:
+    effects:
+      - stat: mp
+        amount: 40
+  # Cleansing (add-equipment-immunity-and-attached-buffs D3): the negative
+  # removal selector clears every active debuff-polarity instance; a status
+  # removal carries no amount by construction.
+  baptismal_holy_water:
+    effects:
+      - remove_status: negative
