@@ -538,3 +538,64 @@ item still consumes exactly one round.
 | The targeting refactor touches the skill pipeline, which items do not otherwise need | Behavior-preserving by construction (dropped parameters are unread); the existing suite is the regression net |
 | Extracting `_apply_pleasure_gain` moves code the sexual-act pipeline depends on | Pure move plus import; the function body is unchanged and its existing tests cover it |
 | Negative pleasure is a new direction through a function written for gains | Explicit tests that the arousal/climax cascade does not fire on a reduction |
+
+---
+
+## 9. Decomposition into OpenSpec Changes
+
+This design is delivered as four OpenSpec changes, each sized for roughly one
+workday. The seams are chosen so no change ships a half-wired path: the
+targeting refactor is behavior-preserving on its own, the applier extraction is
+behavior-preserving on its own, the model change lands with every shipped item
+self-scoped, and only the last change opens the other scopes.
+
+| Change | Covers | Rough size |
+| --- | --- | --- |
+| `refactor-target-resolution-srp` | §4 | 4–6h |
+| `extract-shared-effect-appliers` | §5.6's four entry points | ~3h |
+| `add-declarative-item-effects` | §3 and §5, self scope only | ~7h |
+| `add-item-effect-targeting` | §5.1, §5.2, §5.8 — the other four scopes | ~7h |
+
+### Dependencies
+
+```
+refactor-target-resolution-srp  ──────────────────────┐
+                                                      ├──> add-item-effect-targeting
+extract-shared-effect-appliers ──> add-declarative-item-effects
+```
+
+- `add-declarative-item-effects` needs `extract-shared-effect-appliers` because
+  it binds the three effect verbs to the entry points that change publishes.
+- `add-item-effect-targeting` needs both predecessors: the requirement-based
+  resolver, and the effect model whose scope restriction it lifts.
+- `refactor-target-resolution-srp` and `add-declarative-item-effects` are
+  independent of each other.
+
+### Suggested batches
+
+1. **Batch A (parallelizable):** `refactor-target-resolution-srp` and
+   `extract-shared-effect-appliers`. Both edit `world/rules/action.py`'s import
+   preamble (`:48-58`) — a textual adjacency, not a logical conflict — so run
+   them in separate working trees or sequence them.
+2. **Batch B:** `add-declarative-item-effects`.
+3. **Batch C:** `add-item-effect-targeting`.
+
+### Archive ordering
+
+`add-item-effect-targeting`'s `item-effect-rulebook` delta modifies a spec that
+`add-declarative-item-effects` creates, so the latter must be archived first.
+`openspec validate` reports this as an informational notice until then.
+
+### Forward-declared seams
+
+Two seams are deliberately declared before their consumer exists, in the sense
+`AGENTS.md` sanctions ("a deliberate skip is preferable to a fake
+implementation"):
+
+- `extract-shared-effect-appliers` ships the `positive` and `all` removal
+  selectors and concrete-key removal with tests but no caller. Splitting the
+  selector vocabulary across two changes would mean neither reviewed it whole.
+- `add-declarative-item-effects` defines and validates the full scope
+  vocabulary but accepts only `self`, rejecting the rest with a message naming
+  `add-item-effect-targeting`. The alternative is a scope that reaches
+  settlement and does something undefined.
