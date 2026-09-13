@@ -174,6 +174,12 @@ class RegistryTests(unittest.TestCase):
                     "title.equip",
                     "title.remove",
                     "character.persona.update",
+                    "gallery.subject.select",
+                    "gallery.generate",
+                    "gallery.default.set",
+                    "gallery.card.delete",
+                    "gallery.face_rect.update",
+                    "gallery.binding.save",
                 }
             ),
         )

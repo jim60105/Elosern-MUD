@@ -48,7 +48,7 @@ that seam from the webclient.
 - Observability: one facade event per management mutation (`gallery_generate`
   already exists at the service seam; the webclient layer adds
   `gallery_action` info/warn with `subject`, `image_id`, `kind`, action id).
-- All mutations re-resolve every client-referenced identity — character-kind
+- All persistent mutations re-resolve every client-referenced identity — character-kind
   subject keys through the new public
   `world/art/service.py::resolve_gallery_subject_by_key` (the entity-derived
   kind needs its live entity for the age precondition and the equipment
@@ -57,6 +57,8 @@ that seam from the webclient.
   `world/art/service.py` / `world/art/gallery.py` public APIs (including the
   `gallery-card-update-api` writers). No direct record writes (dispatcher
   ownership contract).
+  Subject selection instead validates current rail membership through the
+  session-only panel selection store.
 
 ## Capabilities
 
@@ -83,8 +85,8 @@ that seam from the webclient.
   rather than per-action bespoke suites — never a missing validator.
 - `web/static/webclient/js/elosern/protocol.js` action-payload validators for
   the six ids; pinned production action-set test extended.
-- New test module registered in `.github/evennia-shards.json` in the same
-  change; deterministic tests only (fake queue settles — no live SD/LLM).
+- New test module covered by the existing recursive `web.webclient.actions`
+  shard label; deterministic tests only (fake queue settles — no live SD/LLM).
 - `docs/game/commands.md` untouched (D14 stands: management is webclient-only).
 
 ## Batch:

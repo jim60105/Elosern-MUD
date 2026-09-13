@@ -9,7 +9,8 @@ The production action registry SHALL register exactly the six actions
 `gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`,
 each bound to one exact payload validator rejecting any missing, extra, or
 wrongly typed field before the adapter runs, and each declaring
-`affected_panels: ("gallery",)`. Every adapter SHALL re-resolve the payload's
+`affected_panels: ("gallery",)` on success and domain rejection. Every
+persistent-mutation adapter SHALL re-resolve the payload's
 `subject_key` — character kind through
 `world/art/service.py::resolve_gallery_subject_by_key` (returning the typed
 subject and its live entity), registry kinds through the kind's typed producer
@@ -18,6 +19,10 @@ and SHALL call only `world/art/service.py` / `world/art/gallery.py` public
 APIs (including `update_card_face_rect` / `update_card_binding`) — never a
 direct record write. Payloads SHALL use the shared subject-key grammar and
 uuid-form `image_id` bound.
+
+Selection SHALL instead use `select_gallery_subject(session, actor, subject_key)`
+to validate current rail membership and return its result through the dispatcher.
+Image IDs SHALL be canonical lowercase UUID text (8-4-4-4-12 hexadecimal).
 
 #### Scenario: A tampered subject key resolves or refuses
 
@@ -53,7 +58,14 @@ card, or job, and its completion SHALL publish one `gallery` panel update.
 empty list of distinct ids from the closed catalog `appearance`,
 `weapon_main`, `weapon_off`, `armor`, `accessories`), and `custom_prompt` (text
 of at most 512 code points, control-character-free; whitespace-only is legal
-and normalizes to empty). A successful adapter call SHALL invoke
+and normalizes to empty). Printable text SHALL follow the shared backend
+validator: every Unicode C or Z category except ASCII space is rejected.
+Unknown or duplicated field ids and oversized/non-printable prompts SHALL
+fail the kind-neutral payload schema with `malformed_payload`, without invoking
+the adapter. The `unknown_field`, `prompt_too_long`, and `invalid_prompt` domain
+codes SHALL remain the defensive mapping of typed service errors when an
+adapter is invoked directly or the service adds a stricter refusal.
+A successful adapter call SHALL invoke
 `request_gallery_image` exactly once and SHALL return outcome `success` with the
 minted `image_id` in the result's bounded `data` slot. Typed rejections SHALL
 map to stable codes with bounded zh-TW messages — at minimum `unknown_field`,
@@ -129,6 +141,11 @@ enabled slot whose equipment is empty binds `None` (empty list for
 accessories); an all-empty snapshot stays legal. For a kind whose declaration
 supports no bindings the action SHALL refuse with stable code
 `binding_unsupported`.
+
+The declared mask order SHALL be the backend `SLOT_ORDER`, independent of
+the client's slot-list permutation. A resolved kind without binding support
+SHALL return `binding_unsupported` before card lookup, including when no card
+exists.
 
 #### Scenario: Saving binds what is worn right now
 

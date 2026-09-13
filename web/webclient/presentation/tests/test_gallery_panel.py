@@ -19,7 +19,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.gallery import gallery_presenter, gallery_subjects, validate_gallery
+from web.webclient.presentation.gallery import SLOT_LABELS, gallery_presenter, gallery_subjects, validate_gallery
 from web.webclient.presentation.gallery_selection import gallery_selection_snapshot, select_gallery_subject
 from web.webclient.presentation.ingress import build_presentation_context, reset_client_sequence, _coordinator_for
 from web.webclient.presentation.protocol import ProtocolValidationError
@@ -137,7 +137,7 @@ class GalleryWireTests(unittest.TestCase):
         add("pending over cap", lambda p: pending_rows(p, 9))
         def warning_rows(p, count, condition_length=12):
             first = p["cards"][0]
-            first.update(is_default=False, binding_present=True, chips=["防具", "預設臉框"])
+            first.update(is_default=False, binding_present=True, chips=[SLOT_LABELS["armor"], "預設臉框"])
             p["cards"] = []
             for i in range(count):
                 row = dict(first, image_id=image_id(i + 1), url=f"/art/gallery/character/t_gallery/{image_id(i + 1)}.png")
@@ -262,7 +262,7 @@ class GalleryPresenterTests(EvenniaTest):
         with patch("web.webclient.presentation.gallery.ITEM_REGISTRY", {"t_sword": SimpleNamespace(display_name_zh="測試長劍"), "t_coat": SimpleNamespace(display_name_zh="測試外套")}):
             value = gallery_presenter(self.context)
         self.assertEqual([row["image_id"] for row in value["cards"]], [image_id(2), image_id(3), image_id(1)])
-        self.assertEqual(value["cards"][-1]["chips"], ["主手", "防具", "自訂臉框", "目前預設"])
+        self.assertEqual(value["cards"][-1]["chips"], [SLOT_LABELS["weapon_main"], SLOT_LABELS["armor"], "自訂臉框", "目前預設"])
         self.assertEqual([row["image_id"] for row in value["binding_warnings"]], [image_id(2), image_id(1)])
         self.assertEqual(value["binding_warnings"][-1]["conditions"], ["主手：測試長劍", "防具：測試外套"])
         self.assertEqual(value["equipment_summary"]["accessories"]["value"], ["t_ring_a", "t_ring_b"])

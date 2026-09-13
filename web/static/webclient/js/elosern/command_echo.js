@@ -111,6 +111,13 @@
     // success line is the player-facing outcome, delivered as narrative by the
     // commit itself (webclient-align-11).
     "explore.dialogue_leave",
+    // Gallery management is webclient-only (D14); no fabricated text commands.
+    "gallery.subject.select",
+    "gallery.generate",
+    "gallery.default.set",
+    "gallery.card.delete",
+    "gallery.face_rect.update",
+    "gallery.binding.save",
     "options.dismiss",
   ];
 

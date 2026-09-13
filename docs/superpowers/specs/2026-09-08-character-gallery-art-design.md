@@ -417,3 +417,60 @@ the Vue store accept the new panel without introducing a client matching engine.
 `test_gallery_panel.py` covers read-only behavior, lifecycle retirement, missing
 and symlinked media, offline failure settlement, and executable Python/Node
 boundary parity; panel schema enumeration and shard ownership include it.
+
+### 12.7 Gallery management actions
+
+`webclient-gallery-actions` exposes six exact `ui_action` adapters:
+`gallery.subject.select`, `gallery.generate`, `gallery.default.set`,
+`gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`.
+These are webclient-only controls with explicit silence in the command-echo
+catalog, not new text commands (D14). The separate gallery UI change owns
+buttons, drawers, and local face previews; no Vue component ships here.
+
+Selection calls the panel's rail store and changes only transport/puppet/epoch
+presentation state. The dispatcher publishes one gallery update before its
+result. Mutations re-resolve live character objects or typed monster tiers and
+use only the public art APIs. Named cards must survive `cards_for`'s tolerant
+read. Binding captures currently worn equipment at save time, sorts accessories,
+retains enabled empty slots, and orders the mask by backend `SLOT_ORDER`;
+client payloads carry only slot ids, never item keys. Face saves preserve the
+rectangle and the card's image identity/provenance without touching files.
+Generation returns the minted image ID after enqueue; offline failure and
+monster replacement are still worker-settlement outcomes.
+
+The Python schemas and exported JS `validateGalleryActionPayload` mirror exact
+keys, the rail grammar, canonical lowercase UUIDs, catalog/slot bounds, and
+positive finite unit-square rectangles (booleans are not numbers). Prompt
+limits count Unicode code points before normalization. The shared backend
+validator rejects every Unicode C/Z category except ASCII space, including
+non-breaking spaces and line separators. Only the service normalizes accepted
+prompt whitespace and catalog order.
+
+Schema violations return `malformed_payload` without entering an adapter or
+emitting `gallery_action`. Domain results have bounded zh-TW messages and the
+following stable codes:
+
+| Code | Meaning |
+|---|---|
+| `unknown_subject` | The current rail selection or live/typed subject resolution failed. |
+| `unknown_card` | The named card is absent or unreadable through the tolerant read. |
+| `field_selection_unsupported` | Valid prompt fields were supplied to a kind without field selection. |
+| `free_text_unsupported` | Nonempty printable prompt text was supplied to a kind without free text. |
+| `binding_unsupported` | The resolved kind has no binding support; this precedes card lookup. |
+| `subject_ineligible` | A resolved subject failed a generation precondition, such as missing canonical ages. |
+| `unknown_field`, `prompt_too_long`, `invalid_prompt` | Defensive service-error mappings for direct adapter calls; wire-invalid values normally fail the earlier schema. |
+| `gallery_rejected` | Other typed card-contract refusals, including invalid direct-call face coordinates. |
+
+Each completed adapter emits one facade `gallery_action` event (info on
+success, warn on domain rejection), with subject/action/kind/image identifiers
+and exception context where present. Public service events remain separate.
+Success and domain rejection target only gallery; replayed completed request
+IDs execute neither the adapter nor its event again. Stale and busy handling
+remain dispatcher-owned.
+
+The deterministic action module tests exercise real records, public offline
+queue settlement, dispatcher selection publication and retirement, and
+Python/Node payload parity. Its shard owner is the existing recursive
+`web.webclient.actions` label; adding a second module label would duplicate
+ownership. New requirement annotations belong to archive-time main-spec sync;
+apply annotates only existing matching requirements and leaves main specs alone.
