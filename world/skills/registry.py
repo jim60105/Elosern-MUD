@@ -13,7 +13,11 @@ registry load and caches the reverse-edge map the tip-cap derivation reads.
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from world.rules.targeting import TargetRequirement
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import HealEffect, parse_effect
@@ -245,6 +249,30 @@ class SkillDef:
                     f"heal:area requires an AREA skill, "
                     f"{self.key!r} declares {self.target_spec.value!r}"
                 )
+
+    @cached_property
+    def target_requirement(self) -> "TargetRequirement":
+        """The targeting rule this skill's definition owns.
+
+        The shared resolver consumes this value instead of the definition,
+        so ``world.rules.targeting`` never needs to know what a ``SkillDef``
+        is. ``forbid_self`` states this definition's own prohibition on
+        targeting the actor — every ``SEXUAL_ACT`` skill declares it (their
+        SINGLE-target acts are two-participant by construction), and the
+        resolver merely enforces the flag it is given. Computed once via
+        ``cached_property``: the write lands in the instance ``__dict__``
+        bypassing the frozen ``__setattr__``, which is a pure cache (never a
+        mutable definition attribute; ``dataclasses.replace`` rebuilds a
+        fresh instance with an empty cache). The import is function-level so
+        the registry never depends on the rules package at load time.
+        """
+        from world.rules.targeting import TargetRequirement
+
+        return TargetRequirement(
+            self.target_spec,
+            self.faction_constraint,
+            forbid_self=self.category is SkillCategory.SEXUAL_ACT,
+        )
 
 
 def _validate_metadata(label: str, description: str) -> None:

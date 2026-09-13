@@ -11,6 +11,7 @@ from django.db import transaction
 from typeclasses.monsters import Monster
 from world.observability import log_info, log_warn
 from world.lore.races import RACE_REGISTRY
+from world.rules.action_gates import damage_requires_battlefield
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     _add_buff,
@@ -53,7 +54,6 @@ from world.rules.skill_effects import (
 )
 from world.rules.targeting import (
     ActionContext,
-    damage_requires_battlefield,
     expand_target_shorthand,
     resolve_targets,
 )
@@ -318,7 +318,7 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     # Sanctioned combat-state gate site 2 of 2 (damaging-action gate): the
     # reason names the player-facing rule (a damaging skill must be aimed at a
     # co-located monster), while the shared condition in
-    # targeting.damage_requires_battlefield tests for the battlefield's
+    # action_gates.damage_requires_battlefield tests for the battlefield's
     # absence — the only way to obtain one is to open combat on a monster.
     # Fires before step 2, so nothing is deducted, rolled, staged, or timed.
     if damage_requires_battlefield(skill, request.context):
@@ -391,7 +391,9 @@ def _step3_targeting(
         candidates = list(request.targets)
     if skill.target_spec is TargetSpec.SELF and not candidates:
         candidates = [request.actor]
-    return resolve_targets(request, skill, candidates)
+    return resolve_targets(
+        request.actor, request.context, skill.target_requirement, candidates
+    )
 
 
 def _step4_capability(actor: Any) -> None:

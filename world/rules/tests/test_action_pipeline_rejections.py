@@ -22,8 +22,9 @@ from world.rules.action import (
     SKILL_TIME_OVERRIDES,
 )
 from world.rules.action_preview import preview_skill
+from world.rules.action_gates import damage_requires_battlefield
 from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.rules.targeting import RoomActionContext, damage_requires_battlefield
+from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 
 from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay

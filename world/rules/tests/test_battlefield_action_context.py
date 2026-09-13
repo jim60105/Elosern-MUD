@@ -34,7 +34,7 @@ class BattlefieldActionContextTests(unittest.TestCase):
     def test_fled_entity_is_absent_and_out_of_range(self):
         self.battlefield.fled.add("enemy")
         self.assertTrue(self.context.is_present(self.actor, self.enemy))
-        self.assertFalse(self.context.is_in_range(self.actor, self.enemy, object()))
+        self.assertFalse(self.context.is_in_range(self.actor, self.enemy))
 
     @covers_requirement("battlefield-action-context::relation-to-is-derived-from-two-team-membership-not-a-stored-relation-field")
     def test_event_context_cannot_reference_a_different_battlefield(self):
