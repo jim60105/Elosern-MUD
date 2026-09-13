@@ -83,7 +83,7 @@ RULEBOOK_CATALOG_KEYS = {
     "clock.yaml": ("periods",),
     "npc_schedules.yaml": ("schedules",),
     "monster_behaviour.yaml": ("behaviours",),
-    "item_effects.yaml": ("effects",),
+    "item_effects.yaml": ("items",),
     "equipment_effects.yaml": ("effects",),
     "sexual_pleasure.yaml": ("tiers",),
     "sexual_resist.yaml": ("stages",),
