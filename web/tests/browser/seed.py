@@ -1093,6 +1093,18 @@ def main() -> None:
         )
     result = activate_player_character(account, character, request)
 
+    # Deterministic MP for the exact-cost cast journeys: gauge regen accrues
+    # only inside player-driven clock advances (world/rules.clock settles it
+    # on every advance source, combat included), so any advance between the
+    # test's before-sample and the deduction commit shifts the pool and
+    # breaks the exact-delta pins. Zero the seeded character's mp rate so the
+    # pool moves only through casts (world.rules.tests.test_combat_party's
+    # `hp.rate = 0` precedent, applied at the shared seed). Fill the pool to
+    # the cap so every advertised scale stays castable from a settled start.
+    character.traits.mp.rate = 0
+    character.traits.mp.current = int(character.traits.mp.max)
+    character.save()
+
     if os.environ.get("ELOSERN_BROWSER_MINIMAP") == "1":
         _minimap_fixture(character)
 
