@@ -6,10 +6,8 @@ Every gallery rule lives behind
 `world/art/service.py::request_gallery_image` and the `world/art/gallery.py`
 single-writer boundary (kind capability gates, typed errors, monster one-card
 cap with replace semantics, tolerant reads, the no-create snapshot reader) —
-plus the in-place card writers and public subject-key resolver shipped by the
-dependency change `gallery-card-update-api` (the shipped model has NO card
-update; without those writers face-rect/binding save could only be an
-append-remove replace with a new `image_id` and lost provenance). Each adapter
+plus the in-place card writers and public subject-key resolver now shipped by
+the dependency change `gallery-card-update-api`. Each persistent-mutation adapter
 therefore: re-resolves `subject_key` — character kind through
 `resolve_gallery_subject_by_key` (yielding subject AND live entity; the age
 precondition and `snapshot_for` need the entity), registry kinds through the
@@ -65,3 +63,30 @@ card (`gallery_card_replaced`). The adapter reports success with the new
 `image_id`; the panel then shows one card and no pending ghost after settle. The
 binding/default affordances for monsters are absent because the panel's
 capability flags say so, not because actions hide them.
+
+## D7 — Wire validation and domain refusal are separate layers
+
+Exact payload validation is kind-neutral. Unknown/duplicate catalog ids,
+prompts over 512 code points, non-printable text, malformed UUIDs, invalid
+rectangles, and unknown/duplicate/empty slot selections return the dispatcher's
+`malformed_payload` before any adapter or `gallery_action` event runs.
+Valid catalog fields on a monster reach the service and return
+`field_selection_unsupported`; nonempty printable free text returns
+`free_text_unsupported`. The defensive service-error mapping retains
+`unknown_field`, `prompt_too_long`, and `invalid_prompt` (including duplicate
+field errors) for direct adapter calls or future service-side refusals.
+Python's shared prompt validator rejects all Unicode C and Z categories except
+ASCII space; the JS mirror follows that actual contract. The original accepted
+payload is preserved; only the service normalizes fields and prompt text.
+
+Binding refusal precedes card lookup for a kind without bindings, matching the
+public writer. Otherwise each card is looked up through `cards_for`. Binding
+mask order is the backend's declared `SLOT_ORDER`, not client list order.
+Every completed result targets only `gallery`, including domain rejections.
+Selection is the explicit exception to D1's mutation resolver: the rail store
+validates current membership and owns the session-only write.
+
+The JS export `validateGalleryActionPayload` is the exact six-action mirror
+for the subsequent gallery UI; this change does not add a transport or Vue
+component. All six actions are explicitly silent in the command-echo catalog
+because D14 adds no text commands.

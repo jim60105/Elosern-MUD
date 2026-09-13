@@ -11,12 +11,14 @@
   typed-error → stable-code table (`unknown_field`, `prompt_too_long`,
   `binding_unsupported`, `unknown_card`, `unknown_subject`, plus the
   capability-naming refusals) with bounded zh-TW messages following the
-  `character_actions` exemplar.
+  `character_actions` exemplar. Every completed result targets only gallery.
+  Schema failures remain `malformed_payload`; D7 defines defensive domain codes.
 - [ ] 1.2 `gallery.subject.select`: exact `{subject_key}` validator; adapter
   writes the panel change's session selection store only;
   `affected_panels=("gallery",)`; `unknown_subject` rejection.
 - [ ] 1.3 `gallery.generate`: exact `{subject_key, fields, custom_prompt}`
-  validator (distinct catalog ids; prompt ≤512 code points, control-free);
+  kind-neutral validator (distinct catalog ids; prompt ≤512 code points,
+  printable with ASCII spaces only);
   adapter calls `request_gallery_image` once and returns `data:
   {"image_id": …}`; no connectivity import.
 - [ ] 1.4 `gallery.default.set` / `gallery.card.delete`: exact
@@ -27,7 +29,7 @@
   `world/art/gallery.py::update_card_face_rect` (its validator owns the rect
   bounds; no crop, no second image, no file write).
 - [ ] 1.6 `gallery.binding.save`: exact `{subject_key, image_id, slots}`
-  (non-empty distinct slot ids); build `{mask (declared order), snapshot =
+  (non-empty distinct slot ids); build `{mask (backend SLOT_ORDER), snapshot =
   current normalized snapshot over the masked slots}` via the no-create
   stored-state reader; persist through
   `world/art/gallery.py::update_card_binding`; `binding_unsupported` for kinds
@@ -49,8 +51,11 @@
   dedupe via completed-request cache; companion-subject generate/binding
   through the public resolver; the panel delta's dispatch-a-selection scenario
   is exercised HERE (its stated executable home).
-- [ ] 3.2 Register the module in `.github/evennia-shards.json` in this change;
-  tag new requirements `@covers_requirement`.
+- [ ] 3.2 Verify the module is owned by the existing recursive
+  `web.webclient.actions` label in `.github/evennia-shards.json` (adding an
+  explicit module label would duplicate ownership). Annotate substantively
+  covered existing main requirements; defer new requirement IDs until archive
+  sync creates them. Keep main specs unchanged during apply.
 
 ## 4. Observability
 
