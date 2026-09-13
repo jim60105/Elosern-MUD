@@ -56,6 +56,7 @@ from world.rules.guild_offers import (
     list_guild_offers,
 )
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
+from world.rules.targeting import RoomActionContext
 from world.skills.equipment import list_items
 from world.rules.equipment import normalized_equipment, preflight_equipment_toggle
 from world.rules.items import ItemUseRequest, preflight_item_use
@@ -767,8 +768,16 @@ def _inventory_row_action(
     if definition is None:
         return None
     if definition.use_mechanics is not None:
+        # The descriptor rides the same target-aware preflight as a real
+        # use (add-item-effect-targeting): a single-scope row shows the
+        # stable no-target reason because the row carries no chosen
+        # target, and the room context resolves every other scope without
+        # touching state. The settlement re-validates against the live
+        # battlefield context, so descriptor enablement never over-grants.
         preflight = preflight_item_use(
-            ItemUseRequest(actor=actor, item_key=item_key), in_combat=in_combat
+            ItemUseRequest(actor=actor, item_key=item_key),
+            in_combat=in_combat,
+            context=RoomActionContext(actor.location),
         )
         reason = None if preflight.allowed else str(preflight.reason.value)
         return _descriptor(ACTION_USE, "使用", reason)

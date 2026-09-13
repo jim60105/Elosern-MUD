@@ -9,6 +9,8 @@ never consumes a round). Stable rejections render the same Traditional
 Chinese reason semantics as UI actions through ``service_messages``.
 """
 
+from typing import Any
+
 from commands.command import Command
 
 from world.lore.items import ITEM_REGISTRY
@@ -62,23 +64,36 @@ class CmdUseItem(Command):
     help_category = "General"
 
     def func(self) -> None:
-        item_key = self.args.strip().partition(" ")[0]
+        item_key, _, target_token = self.args.strip().partition(" ")
+        target_token = target_token.strip()
         if not item_key:
-            self.caller.msg("用法：使用 <item_key>")
+            self.caller.msg("用法：使用 <item_key> [target]")
             return
+        # The target token names *whom* an effect reaches, never what the
+        # item does (add-item-effect-targeting D1): it resolves to a present
+        # entity here, and an unresolvable token — including a group
+        # shorthand the player typed by hand — travels to the deterministic
+        # preflight as the raw string, where the fail-closed target guard
+        # rejects it with the stable invalid-target reason instead of the
+        # use silently ignoring a reach the rulebook never granted.
+        target: Any = None
+        if target_token:
+            target = self.caller.search(target_token)
+            if target is None:
+                target = target_token
         if is_in_active_session(self.caller):
-            self._use_in_session(item_key)
+            self._use_in_session(item_key, target)
             return
-        settlement = use_item(self.caller, item_key)
+        settlement = use_item(self.caller, item_key, target=target)
         result = settlement.result
         if result.outcome != "success":
             self.caller.msg(rejection_message(result.reason))
             return
         self.caller.msg(render_plain_text(result.event_log))
 
-    def _use_in_session(self, item_key: str) -> None:
+    def _use_in_session(self, item_key: str, target=None) -> None:
         try:
-            result = submit_player_item_use(self.caller, item_key)
+            result = submit_player_item_use(self.caller, item_key, target=target)
         except CombatSessionError as error:
             self.caller.msg(session_reason_message(str(error.args[0])))
             return

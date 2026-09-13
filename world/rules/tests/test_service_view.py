@@ -167,6 +167,28 @@ class FakeRoom:
         self.contents = list(contents)
 
 
+class FakeTraitSurface:
+    """Handler-surface double of one gauge trait.
+
+    The shared target resolver's aliveness validator reads ``entity.traits.hp``
+    (the same stored-gauge reader every skill cast consults), so an actor
+    fake that passes the target-aware item preflight must carry that surface.
+    It wraps the very dict the storage accessor reads — no second copy, no
+    write surface.
+    """
+
+    trait_type = "gauge"
+
+    def __init__(self, data):
+        self._data = data
+
+
+class FakeTraits:
+    def __init__(self, hp_data=None):
+        if hp_data is not None:
+            self.hp = FakeTraitSurface(hp_data)
+
+
 class FakeAttributes:
     def __init__(self, traits=None):
         self._store = {}
@@ -232,6 +254,7 @@ def actor(
         key=key,
         location=location,
         guild_rank=guild_rank,
+        traits=FakeTraits(traits.get("hp")),
         attributes=FakeAttributes(traits=traits),
         db=SimpleNamespace(
             wallet=wallet,
