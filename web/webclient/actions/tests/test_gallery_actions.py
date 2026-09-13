@@ -84,6 +84,9 @@ def wire_cases():
 
 
 class GalleryActionWireTests(unittest.TestCase):
+    @covers_requirement(
+        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
     def test_python_node_bidirectional_boundaries(self):
         registry = build_production_action_registry()
         cases = wire_cases()
@@ -210,7 +213,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         return queue.settle_gallery_generated(job.key, generation_token=job.db.generation_token,
             output_identity=identity, tmp_path=str(tmp), prompt={"positive": "settled", "negative": "negative"}, seed=42, checkpoint=None)
 
-    @covers_requirement("webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer")
+    @covers_requirement(
+        "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer",
+        "webclient-gallery-management-actions::subject-selection-writes-only-session-presentation-state",
+    )
     def test_selection_publishes_once_without_art_mutation_and_retires_on_unpuppet(self):
         self.card()
         self.generate(self.companion_subject)
@@ -240,7 +246,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(result["code"], "unknown_subject")
         self.assertEqual(self.panel()["selected"], self.companion_subject.full())
 
-    @covers_requirement("webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache")
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache",
+        "webclient-gallery-management-actions::generation-routes-one-request-through-the-service-seam",
+    )
     def test_generation_pending_and_completed_request_dedupe(self):
         payload = dict(PAYLOADS["gallery.generate"])
         envelope = self.envelope("gallery.generate", payload)
@@ -272,7 +281,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(queue.pending_gallery_jobs(self.companion_subject), [])
         self.assertIsNone(api.record_for(self.subject))
 
-    @covers_requirement("art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer")
+    @covers_requirement(
+        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer",
+        "webclient-gallery-management-actions::face-rect-save-stores-the-validated-rect-verbatim",
+    )
     def test_face_rect_changes_only_placement_and_never_file_or_provenance(self):
         first = self.card()
         second = self.card(2)
@@ -287,7 +299,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(len(list(self.root.rglob("*.png"))), 2)
         self.assertEqual(next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])["face_rect"], rect)
 
-    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
+    @covers_requirement(
+        "art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots",
+        "webclient-gallery-management-actions::binding-save-captures-the-current-snapshot-and-never-accepts-item-keys",
+    )
     def test_binding_uses_companion_current_equipment_and_declared_order(self):
         card = self.card(subject=self.companion_subject)
         self.actor.db.equipment = {"armor": "t_actor_coat"}
@@ -303,7 +318,10 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(api.cards_for(self.companion_subject)[0]["binding"]["snapshot"], {"weapon_off": None, "armor": None, "accessories": []})
         self.assertFalse(self.companion.attributes.has("equipment"))
 
-    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
+    @covers_requirement(
+        "art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles",
+        "webclient-gallery-management-actions::default-set-and-card-delete-follow-the-shipped-delete-never-dangles-contract",
+    )
     def test_default_delete_never_dangles_and_fresh_delete_refuses(self):
         first, second = self.card(), self.card(2)
         pair = {"subject_key": SUBJECT, "image_id": second["image_id"]}
@@ -362,6 +380,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 self.assertEqual(self.dispatch("gallery.default.set", {"subject_key": key, "image_id": card["image_id"]})["code"], "unknown_subject")
         self.assertEqual(api.cards_for(self.companion_subject), [card])
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
     def test_malformed_payloads_never_reach_adapter_or_create_state(self):
         before = (api.GalleryRecord.objects.count(), ArtAssetRecord.objects.count())
         for name, action, payload, accepted in wire_cases():
@@ -411,6 +432,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
             state.in_flight = False
         self.assertEqual(queue.pending_gallery_jobs(self.subject), [])
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::every-management-mutation-emits-one-facade-event"
+    )
     def test_each_completed_adapter_emits_one_gallery_event(self):
         card = self.card()
         pair = {"subject_key": SUBJECT, "image_id": card["image_id"]}
