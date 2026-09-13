@@ -1239,6 +1239,9 @@ class TargetResolutionScenarioTests(_MultiEffectTestCase):
             )
         )
 
+    @covers_requirement(
+        "item-use-resolution::item-preflight-resolves-each-effect-s-targets-through-the-shared-resolver"
+    )
     def test_dead_single_target_carries_the_resolver_own_reason(self):
         # Delta: "An invalid target reports the resolver's own reason" — the
         # item layer maps to TARGET_INVALID and passes target_dead through as

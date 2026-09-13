@@ -81,7 +81,7 @@ class CanonicalRulebookTests(unittest.TestCase):
         self.assertEqual(set(ITEM_EFFECT_PROFILES), usable)
 
     @covers_requirement(
-        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
+        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
     )
     def test_every_shipped_effect_is_self_scoped(self):
         # Delta scenario: "Every shipped item is self-scoped".

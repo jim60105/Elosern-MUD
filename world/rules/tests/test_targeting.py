@@ -535,6 +535,9 @@ class RoomActionContextEventContextTests(unittest.TestCase):
 class ItemSkillResolverParityTests(unittest.TestCase):
     """Delta (item-effect-rulebook): "Item and skill targets validate identically"."""
 
+    @covers_requirement(
+        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
+    )
     def test_item_scope_and_single_target_skill_reject_the_same_dead_candidate(self):
         # Task 2.2: the requirement an item scope maps to and the requirement
         # a single-target skill produces are consumed by one resolver, so one
