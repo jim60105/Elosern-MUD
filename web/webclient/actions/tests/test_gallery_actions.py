@@ -347,6 +347,12 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual([(row["image_id"], row["status"]) for row in panel["cards"]], [(new["image_id"], "card")])
         self.assertFalse(panel["capabilities"]["supports_bindings"])
         self.assertEqual(panel["filters"]["pending"], 0)
+        pair = {"subject_key": self.monster_subject.full(), "image_id": new["image_id"]}
+        self.assertEqual(self.dispatch("gallery.default.set", pair)["outcome"], "success")
+        self.assertEqual(api.record_for(self.monster_subject).db.default_image_id, new["image_id"])
+        self.assertEqual(self.dispatch("gallery.card.delete", pair)["outcome"], "success")
+        self.assertEqual(self.panel()["cards"], [])
+        self.assertIsNone(api.record_for(self.monster_subject).db.default_image_id)
 
     def test_missing_and_deleted_subjects_never_mutate_cards(self):
         card = self.card(subject=self.companion_subject)

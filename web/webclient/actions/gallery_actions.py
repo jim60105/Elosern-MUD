@@ -113,6 +113,10 @@ def _error_code(error, *, resolved):
     production dispatcher rejects those earlier as malformed_payload. Other
     prompt errors (including duplicates) share invalid_prompt. Unknown future
     record refusals stay bounded instead of inventing a capability or success.
+    Diagnostic sources are gallery_prompt.validate_fields/validate_custom_prompt,
+    service.request_gallery_image, and gallery's public card writers. Those
+    exceptions expose text, not structured codes; the real-service rejection
+    tests protect this translation when their diagnostics change.
     """
     if isinstance(error, ArtSubjectError):
         return "subject_ineligible" if resolved else "unknown_subject"
@@ -160,8 +164,10 @@ def _mutate(action_id, payload):
         parsed = validate_gallery_subject_key(payload["subject_key"])
         if parsed.kind is ArtSubjectKind.CHARACTER:
             subject, entity = resolve_gallery_subject_by_key(payload["subject_key"])
-        else:
+        elif parsed.kind is ArtSubjectKind.MONSTER:
             subject, entity = monster_subject_for(parsed.key), None
+        else:
+            raise ArtSubjectError("no typed producer resolves this gallery kind")
         image_id = payload.get("image_id")
         if action_id == "gallery.binding.save" and not capabilities_for(subject.kind.value).supports_bindings:
             log_warn("gallery_action", context=context)

@@ -80,3 +80,12 @@ seven results (including a duplicate generation replay with no second update).
 It observed companion selection, one pending row, the verbatim rectangle,
 current-equipment binding, and an empty gallery after default deletion.
 Unpuppet retired the selection; no live SD/LLM service was used.
+
+Both synchronous Rubber Duck critiques found no blocking issues. The plan
+review clarified kind-neutral schemas, binding-refusal precedence, strict
+rectangle/Unicode mirrors, rejection publication, and recursive shard ownership.
+The final review's maintenance suggestions were adopted as an explicit monster
+resolution branch and source-site documentation for typed-error translation;
+the existing monster test also verifies default/delete actions. Selection keeps
+the store's returned prose verbatim rather than introducing a reverse dependency
+merely to align punctuation. No archive or main-spec sync was performed.
