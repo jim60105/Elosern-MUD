@@ -28,7 +28,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from world.lore.items import EquipmentSlot
 from world.rules import buffs as buff_rules
-from world.rules.buffs import _add_buff, entity_active_buffs, tick_buffs
+from world.rules.buffs import apply_buff, entity_active_buffs, tick_buffs
 from world.rules.equipment import toggle_equipment
 from world.tests.synthetic_data import make_item
 
@@ -139,7 +139,7 @@ class AttachedBuffLifecycleTests(_AttachedBuffScope):
 
     def test_unequipping_removes_exactly_its_instance(self):
         toggle_equipment(self.entity, _ACCESSORY.key)
-        _add_buff(self.entity, "focus")
+        apply_buff(self.entity, "focus")
         result = toggle_equipment(self.entity, _ACCESSORY.key)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self._regen_instance_keys(), set())
@@ -193,7 +193,7 @@ class AttachedBuffLifecycleTests(_AttachedBuffScope):
 
     def test_failed_apply_restores_equipment_and_buffs(self):
         with patch(
-            "world.rules.buffs._add_buff",
+            "world.rules.buffs.apply_buff",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):

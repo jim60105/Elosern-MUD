@@ -48,7 +48,7 @@ from world.rules.action import (
     _restore_attribute,
     _stored_trait_value,
 )
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.clock import (
     MAX_ADVANCE_SECONDS,
     AdvanceSource,
@@ -1303,7 +1303,7 @@ def _run_digest_phase(
                     _restore_attribute(entity, "buffs", snapshot)
 
                 restores.append(_restore_digest_buffs)
-            _add_buff(entity, row.buff)
+            apply_buff(entity, row.buff)
         if entity is actor:
             if row.outcome != "none":
                 _rewrite_wake_line(
@@ -1683,7 +1683,7 @@ def run_defeat_aftermath(
             _depart_violators(actor, session, battlefield, restores, departed)
         )
         # Phase 4: the weak debuff (design D-C2).
-        _add_buff(actor, DEFEAT_AFTERMATH_RULEBOOK.weak_debuff_buff_key)
+        apply_buff(actor, DEFEAT_AFTERMATH_RULEBOOK.weak_debuff_buff_key)
         entries.append(
             EventEntry(
                 kind="weak_granted",

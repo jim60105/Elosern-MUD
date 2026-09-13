@@ -8,7 +8,7 @@ from evennia.utils.create import create_object, create_script
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.clock import (
     WorldClockScript,
     get_world_clock,
@@ -64,7 +64,7 @@ class MutationBoundaryTests(EvenniaTest):
         self.actor.apply_race_baseline()
         self.actor.location = self.room1
         self.actor.db.disguised_stats = {"hp": 999}
-        _add_buff(self.actor, "poisoned")
+        apply_buff(self.actor, "poisoned")
         self.actor.sexual.pleasure.base = 60
 
     def _snapshot(self):

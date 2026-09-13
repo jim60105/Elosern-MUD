@@ -14,7 +14,7 @@ from world.lore.races import RACE_REGISTRY
 from world.rules.action_gates import damage_requires_battlefield
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
-    _add_buff,
+    apply_buff,
     _handle_cleanse,
     _is_damaging_rate,
     blocks_action,
@@ -573,7 +573,7 @@ def _handle_buff_apply(
             # tag is fixed here, in the ordinary replayable-entry path: a
             # neutralized roll is never silently lied about (P3 design D1).
             # Like ``_resist_pending_effect``, the staged effect is
-            # non-mutating; ``_add_buff`` still carries an independent
+            # non-mutating; ``apply_buff`` still carries an independent
             # no-write backstop for every direct caller.
             pending.append(
                 PendingEffect(
@@ -589,7 +589,7 @@ def _handle_buff_apply(
                 target,
                 f"buff_applied|{_entity_key(target)}|{key}",
                 frozenset(),
-                lambda target=target: _add_buff(target, key, **kwargs),
+                lambda target=target: apply_buff(target, key, **kwargs),
             )
         )
     return pending
@@ -638,7 +638,7 @@ def _handle_self_buff_apply(
             actor,
             f"self_buff_applied|{_entity_key(actor)}|{key}",
             frozenset({"buffs"}),
-            lambda: _add_buff(actor, key),
+            lambda: apply_buff(actor, key),
         )
     ]
 

@@ -10,7 +10,6 @@ from evennia.contrib.rpg.buffs import BaseBuff
 
 from world.rules.traits import GAUGE_KEYS
 
-
 @dataclass(frozen=True)
 class BuffDefinition:
     """Validated setting data for one logical buff."""
@@ -135,7 +134,7 @@ def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
     trait.current = trait.current + rate_mod["delta"]
 
 
-def _add_buff(
+def apply_buff(
     entity, definition_key: str, *, instance_key: str | None = None, **data
 ) -> None:
     from world.rules.equipment_effects import equipment_immune_buff_keys
@@ -231,7 +230,7 @@ def grant_conferred_growth_rate(entity, source_key: str, scale: float) -> None:
         raise ValueError("growth-rate scale must be a finite non-negative number")
     if not isfinite(scale) or scale < 0:
         raise ValueError("growth-rate scale must be a finite non-negative number")
-    _add_buff(
+    apply_buff(
         entity,
         "conferred_growth_rate",
         instance_key=f"conferred_growth_rate:{source_key}",

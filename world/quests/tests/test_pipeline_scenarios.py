@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
 from world.tests.synthetic_data import make_skill, synthetic_registries
@@ -43,7 +43,7 @@ class ActionForbiddenStepTests(EvenniaTest):
         actor.subrace = "t_duskmari_evensong"
         actor.apply_race_baseline()
         actor.db.skills = {"active": [_T_DISGUISE.key], "passive": []}
-        _add_buff(actor, "paralysis")
+        apply_buff(actor, "paralysis")
         request = ActionRequest(
             actor,
             _T_DISGUISE.key,

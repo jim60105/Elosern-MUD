@@ -11,7 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers,
@@ -37,24 +37,24 @@ class CombatModifierTests(EvenniaTestCase):
 
     def test_rule_poison_agility_penalty(self):
         entity = self._entity()
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         self.assertEqual(evaluate_combat_modifiers(entity), {"agility": "-10%"})
 
     def test_rule_paralysis_locks_actions(self):
         entity = self._entity()
-        _add_buff(entity, "paralysis")
+        apply_buff(entity, "paralysis")
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
     def test_rule_fear_agility_and_accuracy_penalty(self):
         entity = self._entity()
-        _add_buff(entity, "fear")
+        apply_buff(entity, "fear")
         self.assertEqual(
             evaluate_combat_modifiers(entity), {"agility": "-15%", "accuracy": -10}
         )
 
     def test_rule_focus_accuracy_boost(self):
         entity = self._entity()
-        _add_buff(entity, "focus")
+        apply_buff(entity, "focus")
         self.assertEqual(evaluate_combat_modifiers(entity), {"accuracy": 10})
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no", "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module")
@@ -101,7 +101,7 @@ class CombatModifierTests(EvenniaTestCase):
     def test_rule_high_exposure_defense_penalty_merges_with_other_origins(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         entity.sexual.exposure.value = "高"
         self.assertEqual(
             evaluate_combat_modifiers(entity),
@@ -404,7 +404,7 @@ class CombatModifierTests(EvenniaTestCase):
         entity.db.skill_grants = [
             ConferredSkillGrant("elosia", "reincarnation_boon_yuka", 0.5)
         ]
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
             {"agility": "-7.5%"},
@@ -414,7 +414,7 @@ class CombatModifierTests(EvenniaTestCase):
     def test_skill_owned_rows_merge_with_buff_and_sexual_origin_rows(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         entity.sexual.pleasure.base = 60
         self.assertEqual(
             evaluate_combat_modifiers(entity),
@@ -440,8 +440,8 @@ class CombatModifierTests(EvenniaTestCase):
     @covers_requirement("combat-modifier-table::evaluate-combat-modifiers-is-a-pure-query-that-never-writes-to-entity-state")
     def test_multiple_rules_merge_and_query_is_pure(self):
         entity = self._entity()
-        _add_buff(entity, "poisoned")
-        _add_buff(entity, "fear")
+        apply_buff(entity, "poisoned")
+        apply_buff(entity, "fear")
         before = {key: getattr(entity.traits, key).value for key in entity.traits.all()}
         active = set(entity.buffs.all)
         self.assertEqual(

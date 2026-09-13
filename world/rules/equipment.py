@@ -548,7 +548,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
     Snapshots are captured before the one outer transaction and every surface
     is restored in snapshot order.
     """
-    from world.rules.buffs import _add_buff, _remove_buff_keys
+    from world.rules.buffs import apply_buff, _remove_buff_keys
     from world.rules.equipment_effects import attached_buff_instances
 
     preflight = preflight_equipment_toggle(entity, item_key)
@@ -572,7 +572,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
                 _remove_buff_keys(entity, removed)
             for instance_key in added:
                 buff_key, item_key = after_attached[instance_key]
-                _add_buff(
+                apply_buff(
                     entity,
                     buff_key,
                     instance_key=instance_key,

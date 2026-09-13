@@ -22,7 +22,7 @@ import yaml
 from evennia.utils.test_resources import EvenniaTest
 
 from world.lore.items import ItemUseMechanics
-from world.rules.buffs import _add_buff, entity_active_buffs
+from world.rules.buffs import apply_buff, entity_active_buffs
 from world.rules.clock import WorldClock
 from world.rules.items import (
     ItemEffectKey,
@@ -68,7 +68,7 @@ class HolyWaterCleanseTests(EvenniaTest):
 
     def _afflict(self, *keys: str) -> None:
         for key in keys:
-            _add_buff(self.actor, key)
+            apply_buff(self.actor, key)
 
     def test_cleanse_removes_debuffs_consumes_and_logs_stable_event(self):
         self._afflict("poisoned", "fear")

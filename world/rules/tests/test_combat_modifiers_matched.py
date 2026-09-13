@@ -7,7 +7,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import _add_buff
+from world.rules.buffs import apply_buff
 from world.rules.combat_modifiers import evaluate_combat_modifiers, matched_combat_modifiers
 from world.rules.rulebook.schema import load_rules
 
@@ -26,7 +26,7 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
 
     def test_matched_sequence_matches_merged_evaluation_for_each_rule(self):
         entity = self._entity()
-        _add_buff(entity, "poisoned")
+        apply_buff(entity, "poisoned")
         matches = dict(matched_combat_modifiers(entity))
         self.assertEqual(matches["poison_agility_penalty"], {"agility": "-10%"})
         merged = evaluate_combat_modifiers(entity)
@@ -48,8 +48,8 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
 
     def test_merged_combination_identical_to_evaluate(self):
         entity = self._entity()
-        _add_buff(entity, "poisoned")
-        _add_buff(entity, "fear")
+        apply_buff(entity, "poisoned")
+        apply_buff(entity, "fear")
         entity.sexual.pleasure.base = 60
         matches = matched_combat_modifiers(entity)
         ids = [rule_id for rule_id, _ in matches]
@@ -70,7 +70,7 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
 
     def test_query_is_pure(self):
         entity = self._entity()
-        _add_buff(entity, "fear")
+        apply_buff(entity, "fear")
         before = {key: getattr(entity.traits, key).value for key in entity.traits.all()}
         active = set(entity.buffs.all)
         matched_combat_modifiers(entity)

@@ -10,7 +10,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import _add_buff, _handle_cleanse, growth_rate_multiplier
+from world.rules.buffs import apply_buff, _handle_cleanse, growth_rate_multiplier
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -298,8 +298,8 @@ class DamagingBuffSourceIdentityTests(EvenniaTestCase):
         )
         self.assertNotIn("fire_scorch", self.target.buffs.all)
 
-    def test_direct_add_buff_omits_source_pk_for_unattributed_ticks(self):
-        _add_buff(self.target, "poisoned")
+    def test_direct_apply_buff_omits_source_pk_for_unattributed_ticks(self):
+        apply_buff(self.target, "poisoned")
         buff = self.target.buffs.all["poisoned"]
         self.assertIsNone(getattr(buff, "source_pk", None))
 
@@ -338,7 +338,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTestCase):
                 1.0,
             )
         )
-        _add_buff(self.target, "fire_scorch")
+        apply_buff(self.target, "fire_scorch")
         buff = self.target.buffs.all["fire_scorch"]
         self.assertEqual(buff.source_pk, int(self.caster.pk))
 
@@ -373,7 +373,7 @@ class CleanseHandlerTests(EvenniaTest):
 
     @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
     def test_cleanse_removes_an_active_debuff(self):
-        _add_buff(self.entity, "poisoned")
+        apply_buff(self.entity, "poisoned")
         effects = self._stage_and_commit(
             _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
@@ -385,15 +385,15 @@ class CleanseHandlerTests(EvenniaTest):
 
     @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
     def test_cleanse_does_not_remove_a_beneficial_buff(self):
-        _add_buff(self.entity, "focus")
+        apply_buff(self.entity, "focus")
         effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         self.assertEqual(effects, [])
         self._stage_and_commit(effects)
         self.assertIn("focus", self.entity.buffs.all)
 
     def test_cleanse_removes_only_debuffs_when_both_are_active(self):
-        _add_buff(self.entity, "poisoned")
-        _add_buff(self.entity, "focus")
+        apply_buff(self.entity, "poisoned")
+        apply_buff(self.entity, "focus")
         self._stage_and_commit(
             _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
@@ -410,7 +410,7 @@ class CleanseHandlerTests(EvenniaTest):
         other.race = "human"
         other.apply_race_baseline()
         for entity in (self.entity, other):
-            _add_buff(entity, "poisoned")
+            apply_buff(entity, "poisoned")
         effects = self._stage_and_commit(
             _handle_cleanse(
                 self.entity,
@@ -425,9 +425,9 @@ class CleanseHandlerTests(EvenniaTest):
         self.assertEqual(len(effects), 2)
 
     def test_cleanse_ignores_paused_and_expired_debuffs(self):
-        _add_buff(self.entity, "poisoned")
-        _add_buff(self.entity, "paralysis")
-        _add_buff(self.entity, "fear")
+        apply_buff(self.entity, "poisoned")
+        apply_buff(self.entity, "paralysis")
+        apply_buff(self.entity, "fear")
         self.entity.buffs.all["poisoned"].remaining_seconds = 0
         self.entity.buffs.all["paralysis"].paused = True
         effects = self._stage_and_commit(
@@ -439,7 +439,7 @@ class CleanseHandlerTests(EvenniaTest):
         self.assertEqual(effects[0].description, "buffs_cleansed|cleanse-target|1")
 
     def test_cleanse_commit_failure_restores_the_debuff(self):
-        _add_buff(self.entity, "poisoned")
+        apply_buff(self.entity, "poisoned")
         effects = [
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in _handle_cleanse(
@@ -465,7 +465,7 @@ class CleanseHandlerTests(EvenniaTest):
                 "active": [PURIFY_TEST_SKILL.key],
                 "passive": [],
             }
-            _add_buff(self.entity, "poisoned")
+            apply_buff(self.entity, "poisoned")
             request = ActionRequest(
                 self.entity,
                 PURIFY_TEST_SKILL.key,
@@ -490,8 +490,8 @@ class CleanseHandlerTests(EvenniaTest):
         class Actor:
             key = "cleanse-caster"
 
-        _add_buff(self.entity, "poisoned")
-        _add_buff(self.entity, "paralysis")
+        apply_buff(self.entity, "poisoned")
+        apply_buff(self.entity, "paralysis")
         effects = self._stage_and_commit(
             _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
