@@ -37,6 +37,23 @@ describe("gallery panel facts and request settlement", () => {
     expect(wrapper.find(".gallery-card").exists()).toBe(false);
   });
 
+  it("marks crown, pending, and failed rows with explicit state text, not color alone", () => {
+    // The never-color-only clause: the default crown, the in-flight row, and
+    // the failed row each carry human-readable state text in the caption or
+    // overlay, so every state survives grayscale and screen readers alike.
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
+    const rows = wrapper.findAll(".gallery-card");
+    const defaultRow = rows.find((row) => row.classes().includes("gallery-card--card"));
+    expect(defaultRow.get(".gallery-card__crown").text()).toContain("目前預設");
+    const pendingRow = rows[6];
+    expect(pendingRow.classes()).toContain("gallery-card--pending");
+    expect(pendingRow.text()).toContain("生成中");
+    expect(pendingRow.find("img").exists()).toBe(false);
+    const failedRow = rows[7];
+    expect(failedRow.classes()).toContain("gallery-card--failed");
+    expect(failedRow.text()).toContain("暫時無法生成，稍後再試");
+  });
+
   it("waits for subject publication rather than optimistically switching cards", async () => {
     const dispatch = vi.fn(() => "request:1");
     const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
