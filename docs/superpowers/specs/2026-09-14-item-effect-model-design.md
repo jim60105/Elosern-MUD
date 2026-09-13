@@ -420,16 +420,33 @@ increment path.
 | Family | Entry point | Current state |
 | --- | --- | --- |
 | hp / mp / sp | `_write_gauge` (the trait handler clamps) | exists |
-| pleasure | `_apply_pleasure_gain` | **private to `action.py`** — extract to `world/rules/pleasure.py`, `action.py` imports it |
+| pleasure | `_apply_pleasure_gain` | **private to `action.py`, yet already imported across modules** by `world/rules/defeat_aftermath.py:47` — extract to `world/rules/pleasure.py`, both callers import it |
 | `apply_status` | `buffs._add_buff` | **private** — publish as `apply_buff()`; its equipment-immunity no-write backstop already guards it |
 | `remove_status` | one new `buffs.remove_by_selector()` over the existing `_remove_buff_keys` | `cleanse_debuffs` is re-expressed as `remove_by_selector(entity, "negative")` so both callers keep one semantics |
 
 A buff whose definition declares `stacking: unique_per_source` requires a
-`source_key`. Item-applied statuses pass `source_key=f"item:{item_key}"`, so
-two different items granting the same status stack independently while
-re-using one item refreshes its own instance.
+`source_key`. Note that `source_key` alone does **not** produce independent
+instances: `_add_buff` keys the handler entry on `instance_key or
+definition_key` and carries `source_key` only as opaque cache data. Per-source
+stacking therefore needs an explicit instance key, exactly as
+`grant_conferred_growth_rate` already does
+(`instance_key=f"conferred_growth_rate:{source_key}"`). Item-applied statuses
+pass `source_key=f"item:{item_key}"` **and**
+`instance_key=f"{status}:item:{item_key}"` for a `unique_per_source`
+definition, so two different items granting the same status stack
+independently while re-using one item refreshes its own instance.
 
-A negative pleasure amount goes through the same `_apply_pleasure_gain`
+`world/rules/action.py:1380`'s `_zero_pleasure` is a **second** direct writer
+of `entity.sexual.pleasure.base`, used by the drain handler. It must stay
+separate rather than being folded into the gain entry: routing a zeroing
+through `apply_pleasure_gain(entity, -current)` would trip that function's
+`was_at_critical_point` branch and push a target sitting at 接近 into 進行中 —
+the opposite of what draining someone's pleasure to zero means. It moves into
+`world/rules/pleasure.py` alongside the gain entry, so the checkable invariant
+is "every pleasure write lives in this one module", not "every pleasure write
+is one function".
+
+A negative pleasure amount goes through the same `apply_pleasure_gain`
 entry, clamped at zero. The arousal / wetness / climax cascade inside that
 function is gated on an *increase* and therefore does not fire on a
 reduction, which is the intended reading: suppressing arousal must not walk
@@ -455,7 +472,15 @@ multiple targets:
 - inventory and quest log remain actor-only (only the actor consumes);
 - traits and buffs are captured **per touched target**;
 - a **sexual-state surface** is added, because a pleasure write moves
-  `pleasure`, `arousal`, `wetness`, and `climax_phase` together.
+  `pleasure`, `arousal`, `wetness`, and `climax_phase` together;
+- the **in-process cache drop runs per touched target too**. `restore()` today
+  calls `_refresh_advance_entity_caches(actor)`, which clears the trait cache
+  *and* pops the memoized `entity.sexual` handler
+  (`world/rules/clock.py:561-580`). `restore_traits` alone clears only the
+  trait cache, so a per-entity restore that skips the handler pop would roll
+  back a companion's stored sexual state while leaving a stale in-memory
+  `companion.sexual` readable in the same process — precisely the failure
+  `_refresh_advance_entity_caches` exists to prevent.
 
 `restore()` walks every captured entity. The combat path
 (`combat.py:659`) folds the multi-entity journal into its existing outer
