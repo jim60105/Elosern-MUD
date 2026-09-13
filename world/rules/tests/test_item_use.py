@@ -1048,11 +1048,17 @@ class NegativeGaugeDrainTests(_MultiEffectTestCase):
 
 
 class SettlementScopeSeamTests(_MultiEffectTestCase):
-    """The self-only seam holds even for profiles injected past the loader."""
+    """Non-self scopes reach real multi-entity resolution (design D2/D4).
 
-    def test_non_self_scope_profile_rejects_as_unknown_effect(self):
-        # The loader refuses other scopes at startup (rulebook tests); this
-        # pins the settlement-time fail-closed for an injected profile.
+    Retired with add-item-effect-targeting: the settlement-time self-only
+    fail-closed these tests pinned is replaced by genuine target resolution,
+    so the suite pins the new observable contract instead.
+    """
+
+    def test_group_scope_profile_reaches_every_present_entity_once(self):
+        # Delta: "A multi-target use consumes exactly one unit" — one
+        # injected ALL-scoped effect settles one step per present entity,
+        # including the actor, and removes exactly one inventory unit.
         from world.rules.item_effects import ItemTargetScope
 
         injected = ItemEffectProfile(
@@ -1063,13 +1069,68 @@ class SettlementScopeSeamTests(_MultiEffectTestCase):
             )
         )
         live_item_effect_profiles()[_APPLY_KEY] = injected
-        self.hurt(50)
+        maximum = self.hurt(50)[1]
+        self.char2.race = "human"
+        self.char2.apply_race_baseline()
+        self.char2.traits.hp.current = 1
+        self.char2.location = self.actor.location
+        self.actor.db.inventory = [_APPLY_KEY]
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, _APPLY_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(int(self.actor.traits.hp.current), maximum - 10)
+        self.assertEqual(int(self.char2.traits.hp.current), 41)
+        self.assertEqual(list_items(self.actor), [])
+        log = result.event_log
+        self.assertEqual(sorted(log.targets), sorted([self.actor.key, self.char2.key]))
+        self.assertEqual(
+            sorted(entry.target for entry in log.entries),
+            sorted([self.actor.key, self.char2.key]),
+        )
+
+    def test_single_scope_without_a_target_rejects_no_target(self):
+        # Delta: "A single-entity effect without a target rejects" — the
+        # stable NO_TARGET reason fires before the resolver is consulted.
+        from world.rules.item_effects import ItemTargetScope
+
+        live_item_effect_profiles()[_APPLY_KEY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
         self.actor.db.inventory = [_APPLY_KEY]
         result = resolve_item_use(
             ItemUseRequest(self.actor, _APPLY_KEY), in_combat=False
         )
         self.assertEqual(result.outcome, "rejected")
-        self.assertIs(result.reason, ItemUseReason.UNKNOWN_EFFECT)
+        self.assertIs(result.reason, ItemUseReason.NO_TARGET)
+        self.assertEqual(list_items(self.actor), [_APPLY_KEY])
+
+    def test_unresolved_target_token_rejects_target_invalid(self):
+        # Delta: "A player cannot change an item's reach" — a raw shorthand
+        # token (or any unresolved key) is a TARGET_INVALID target, never a
+        # crash inside the validators.
+        from world.rules.item_effects import ItemTargetScope
+
+        live_item_effect_profiles()[_APPLY_KEY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
+        self.actor.db.inventory = [_APPLY_KEY]
+        for token in ("all", "all-allies", "some_item_key"):
+            with self.subTest(token=token):
+                result = resolve_item_use(
+                    ItemUseRequest(self.actor, _APPLY_KEY, target=token),
+                    in_combat=False,
+                )
+                self.assertEqual(result.outcome, "rejected")
+                self.assertIs(result.reason, ItemUseReason.TARGET_INVALID)
         self.assertEqual(list_items(self.actor), [_APPLY_KEY])
 
     def test_unknown_status_profile_rejects_as_unknown_effect(self):
