@@ -2,12 +2,15 @@
 
 ## Purpose
 Provides Battlefield and BattlefieldActionContext conforming completely to change 8's ActionContext protocol: relation_to derived from two-team membership, is_present checked against canonical roster membership, and is_in_range reduced to fled status with melee-versus-ranged explicitly unbuilt. Requires combat shortcuts to read the two-team roster directly with no separate expansion path.
+
 ## Requirements
+
 ### Requirement: BattlefieldActionContext conforms to change 8's ActionContext protocol
 `world/rules/combat.py` SHALL provide `Battlefield` (holding a two-team roster, `teams: dict[str,
 frozenset[str]]`, and live entity references keyed by entity key) and `BattlefieldActionContext`,
-implementing change 8's `ActionContext` protocol (`battlefield`, `is_present()`, `relation_to()`,
+implementing the `ActionContext` protocol (`battlefield`, `is_present()`, `relation_to()`,
 `is_in_range()`) completely — closing the conformance target change 8 declared and left unbuilt.
+Conformance SHALL be evaluated against the protocol's current two-argument `is_in_range()` signature.
 
 #### Scenario: BattlefieldActionContext satisfies the full protocol
 - **WHEN** `BattlefieldActionContext` is constructed with a populated `Battlefield` and queried via all
@@ -50,22 +53,22 @@ four validations retain distinct, reachable rejection reasons.
   `battlefield.roster`
 - **THEN** it returns `False`, regardless of `battlefield.fled`
 
-### Requirement: is_in_range checks fled status; melee-versus-ranged is explicitly not built
-`BattlefieldActionContext.is_in_range(actor, target, skill)` SHALL return `False` for any target whose
-key is in `battlefield.fled`, and `True` for every other roster member, regardless of the skill's own
-identity. This is a deliberate, documented scope boundary — a full melee-versus-ranged distinction is
-explicitly out of scope because no dependency this change can edit (`SkillDef`, change 5) carries a
-range/reach classification, and no coordinate system (change 12) exists yet.
+### Requirement: is_in_range checks fled status alone; melee-versus-ranged is structurally unreachable
+`BattlefieldActionContext.is_in_range(actor, target)` SHALL return `False` for any target whose
+key is in `battlefield.fled`, and `True` for every other roster member. The method SHALL NOT receive
+the definition being acted on: a full melee-versus-ranged distinction is explicitly out of scope
+because no dependency this change can edit carries a range/reach classification and no coordinate
+system exists yet, and removing the parameter makes that boundary structural rather than a documented
+promise not to read it.
 
 #### Scenario: A fled combatant is out of range for every skill
-- **WHEN** `is_in_range(actor, target, skill)` is called for a target whose key is in
-  `battlefield.fled`, for any `skill`
+- **WHEN** `is_in_range(actor, target)` is called for a target whose key is in `battlefield.fled`
 - **THEN** it returns `False`
 
 #### Scenario: An active roster member is in range regardless of skill identity
-- **WHEN** `is_in_range(actor, target, skill)` is called for a target still active on the battlefield,
-  for a melee-flavored skill and separately for a ranged-flavored skill
-- **THEN** both calls return `True` — this change does not distinguish them
+- **WHEN** `is_in_range(actor, target)` is called for a target still active on the battlefield
+- **THEN** it returns `True`, and the call site supplies no skill, item, or other definition that
+  could distinguish a melee-flavored use from a ranged-flavored one
 
 #### Scenario: The out-of-range rejection path is genuinely wired, not decorative
 - **WHEN** a `TargetSpec.SINGLE` skill is resolved via `ActionResolver.resolve()` against a fled
@@ -88,4 +91,3 @@ range/reach classification, and no coordinate system (change 12) exists yet.
 - **WHEN** `expand_target_shorthand(actor, context, "all-allies")` is called
 - **THEN** the resulting candidate list contains every entity on the actor's own team, including
   the actor itself
-

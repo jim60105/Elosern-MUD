@@ -273,7 +273,7 @@ class TargetingTests(unittest.TestCase):
             resolve_targets(request.actor, request.context, skill.target_requirement, [item])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_DEAD)
 
-    @covers_requirement("targeting-validation::factionconstraint-is-read-from-skilldef-not-declared-by-the-caller")
+    @covers_requirement("targeting-validation::targeting-rules-are-supplied-by-a-definition-owned-targetrequirement")
     def test_context_polymorphism_changes_relation_not_skill_policy(self):
         room = object()
         actor = _Entity("actor", room)

@@ -29,7 +29,7 @@ class BattlefieldActionContextTests(unittest.TestCase):
         self.assertIs(self.context.relation_to(self.actor, self.ally), Relation.ALLY)
         self.assertIs(self.context.relation_to(self.actor, self.enemy), Relation.ENEMY)
 
-    @covers_requirement("battlefield-action-context::is-in-range-checks-fled-status-melee-versus-ranged-is-explicitly-not-built", "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership")
+    @covers_requirement("battlefield-action-context::is-in-range-checks-fled-status-alone-melee-versus-ranged-is-structurally-unreachable", "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership")
     @covers_requirement("disengage-action::a-fled-entity-is-immediately-excluded-from-targeting-turn-order-and-team-power")
     def test_fled_entity_is_absent_and_out_of_range(self):
         self.battlefield.fled.add("enemy")
