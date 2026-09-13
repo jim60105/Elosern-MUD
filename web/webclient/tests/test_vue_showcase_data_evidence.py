@@ -191,6 +191,15 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 "World/TitleBallotMenu",
                 "Overlays/LineagePanel",
                 "Overlays/TitleCodexPanel",
+                # The gallery management surface refroze the manifest at 56:
+                # Data/GalleryPanel + Data/GalleryDetailRail joined from the
+                # gallery showcase wave, plus the three gallery overlay
+                # drawers (webclient-gallery-ui archive).
+                "Data/GalleryPanel",
+                "Data/GalleryDetailRail",
+                "Overlays/GalleryGenerateDrawer",
+                "Overlays/GalleryBindingDrawer",
+                "Overlays/GalleryFaceRectModal",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

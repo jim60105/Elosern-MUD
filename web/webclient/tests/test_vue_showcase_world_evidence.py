@@ -171,6 +171,15 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/TitleBallotMenu",
     "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
+    # The gallery management surface refroze the manifest at 56:
+    # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery
+    # showcase wave, plus the three gallery overlay drawers
+    # (webclient-gallery-ui archive).
+    "Data/GalleryPanel",
+    "Data/GalleryDetailRail",
+    "Overlays/GalleryGenerateDrawer",
+    "Overlays/GalleryBindingDrawer",
+    "Overlays/GalleryFaceRectModal",
 }
 
 # The World-directory story files that sit outside the B4 family: the

@@ -164,15 +164,28 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/TitleBallotMenu",
     "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
+    # The gallery management surface refroze the manifest at 56:
+    # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery
+    # showcase wave, plus the three gallery overlay drawers
+    # (webclient-gallery-ui archive).
+    "Data/GalleryPanel",
+    "Data/GalleryDetailRail",
+    "Overlays/GalleryGenerateDrawer",
+    "Overlays/GalleryBindingDrawer",
+    "Overlays/GalleryFaceRectModal",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
 # lineage and title-codex big windows joined the frozen manifest with the
-# obsidian-gold wave. The story-count partition below asserts the family
+# obsidian-gold wave, and the three gallery overlay drawers joined with the
+# gallery refreeze at 56. The story-count partition below asserts the family
 # files plus exactly these.
 OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
+    "Overlays/GalleryGenerateDrawer",
+    "Overlays/GalleryBindingDrawer",
+    "Overlays/GalleryFaceRectModal",
 )
 
 

@@ -175,27 +175,52 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         )
         # The reduced-motion media query must survive with its disabling rule
         # intact (nonessential motion forced to 1ms), not merely its keyword.
-        # The minifier emits `@media(prefers-reduced-motion:reduce)`, so anchor
-        # on the keyword and brace-match the block that follows.
-        condition = css.find("prefers-reduced-motion")
-        self.assertNotEqual(
-            condition,
-            -1,
-            "the reduced-motion media query must survive into the built "
-            "stylesheet",
+        # The minifier emits `@media(prefers-reduced-motion:reduce)`; component
+        # styles may re-declare the keyword for local suppression (e.g. the
+        # gallery panel's spinner block), so brace-match every occurrence and
+        # take the design-token block — the exactly-one block that redeclares
+        # the motion tokens.
+        blocks = []
+        for match in re.finditer("prefers-reduced-motion", css):
+            start = css.index("{", match.start())
+            depth = 0
+            end = start
+            for i in range(start, len(css)):
+                if css[i] == "{":
+                    depth += 1
+                elif css[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            blocks.append(re.sub(r"\s+", "", css[start : end + 1]))
+        self.assertTrue(
+            blocks,
+            "no reduced-motion block survived into the built stylesheet",
         )
-        start = css.index("{", condition)
-        depth = 0
-        end = start
-        for i in range(start, len(css)):
-            if css[i] == "{":
-                depth += 1
-            elif css[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    end = i
-                    break
-        block = re.sub(r"\s+", "", css[start : end + 1])
+        # The design-token block is identified by ALL FOUR collapsing tokens
+        # together; component blocks may legitimately suppress a single
+        # animation, but only the token block pairs the two token redeclares
+        # with the two !important duration collapses.
+        token_block = None
+        for candidate in blocks:
+            if all(
+                token in candidate
+                for token in (
+                    "--motion-fast:1ms",
+                    "--motion-base:1ms",
+                    "transition-duration:1ms!important",
+                    "animation-duration:1ms!important",
+                )
+            ):
+                token_block = candidate
+                break
+        self.assertIsNotNone(
+            token_block,
+            "no reduced-motion block collapses all four design motion tokens "
+            "— the design-token block must survive the minifier",
+        )
+        block = token_block
         for token in (
             "--motion-fast:1ms",
             "--motion-base:1ms",
