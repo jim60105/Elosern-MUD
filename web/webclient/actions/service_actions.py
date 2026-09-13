@@ -538,9 +538,19 @@ def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
     if is_in_active_session(actor):
         record = read_session(actor)
         if record is not None:
-            entity = reconstruct_battlefield(actor, record).roster.get(target_key)
-            if entity is not None:
-                return entity
+            try:
+                roster = reconstruct_battlefield(actor, record).roster
+            except CombatSessionError:
+                # A session record whose battlefield no longer reconstructs
+                # (the actor moved while engaged) cannot name a roster
+                # entity; the raw token travels on and the submission's own
+                # session validation renders the stable rejection — never
+                # an exception escaping the adapter.
+                roster = None
+            if roster is not None:
+                entity = roster.get(target_key)
+                if entity is not None:
+                    return entity
         return target_key
     location = getattr(actor, "location", None)
     if location is not None:

@@ -342,6 +342,25 @@ class InventoryUseTargetingTests(InventoryActionBase):
         self.assertEqual(list_items(self.player), [_T_POTION.key])
         self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max) - 20)
 
+    def test_moved_session_actor_target_submission_rejects_stably(self):
+        # A session record whose battlefield no longer reconstructs (the
+        # actor moved while engaged) must render the stable session
+        # rejection even when the payload carries a target: the roster
+        # reconstruction inside target resolution swallows its own
+        # CombatSessionError, and the submission's session validation owns
+        # the rejection — no exception may escape the adapter.
+        self.player.db.inventory = [_T_POTION.key]
+        engage(self.player, self._monster())
+        elsewhere = create_object(Room, key="t_spray_elsewhere")
+        self.player.location = elsewhere
+        result = _inventory_use_adapter(
+            self.player,
+            {"item_key": _T_POTION.key, "target_key": self.ally.key},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "moved")
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
+
 
 class InventoryToggleAdapterTests(InventoryActionBase):
     @covers_requirement(
