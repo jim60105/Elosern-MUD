@@ -50,7 +50,12 @@
     "Overlays/PartyStrip",
     "Overlays/PartyDrawer",
     "Overlays/ObjectiveTracker",
-    "Feedback/ToastQueue"
+    "Feedback/ToastQueue",
+    "Data/GalleryPanel",
+    "Data/GalleryDetailRail",
+    "Overlays/GalleryGenerateDrawer",
+    "Overlays/GalleryBindingDrawer",
+    "Overlays/GalleryFaceRectModal"
   ],
   "frozen": true
 }

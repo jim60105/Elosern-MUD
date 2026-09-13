@@ -85,6 +85,33 @@ panels verbatim and emits only user-intent dispatches.
 - Storybook static build + showcase-coverage gate stay green via the manifest
   append in the same change.
 
+## Implementation reconciliation and storyboard
+
+The four reference images define composition, not additional wire fields.
+The v1 panel has no header/catalog labels, timestamp display label, original
+pixel size, complete stored binding mask/snapshot, or resolved-current-image
+flag. Static chrome and the closed prompt/slot catalog are client vocabulary;
+`created_at` is formatted as UTC. Conditions are shown only from a matching
+`binding_warnings` entry, otherwise marked unavailable; no current-image claim
+is made. Failed `label` strings remain verbatim, including any embedded code.
+The equipment-to-character link is puppet-only because the character drawer
+describes the puppet, not an arbitrary selected gallery subject.
+
+The gallery gains an explicit availability-gated opener beside the existing
+portrait, using the store's existing overlay controller and `OverlayHost`.
+Editors are teleported focus-trapped surfaces with pointer-blocking scrims.
+Form drafts and request correlation are local intent state, never game facts.
+Generation closes after its own successful result and publication revision
+commit; an unrelated pending row never closes it.
+
+In addition to component stories, `Data/GalleryPanel` includes an interactive
+`Storyboard` covering browse → generate → pending/failed → binding → face crop
+→ default/delete confirmation. The existing five required titles suffice.
+An English storyboard in `docs/design/elosern-redesign2/gallery-storyboard.md`
+documents each frame, trigger, visible facts, and recovery path. Offline story
+fixtures simulate explicit server publications only in Storybook, never live
+application code.
+
 ## Batch:
 
 - depends-on: webclient-gallery-panel, webclient-gallery-actions

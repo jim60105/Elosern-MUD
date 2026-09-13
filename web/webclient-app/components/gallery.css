@@ -1,0 +1,56 @@
+/* Gallery chrome follows the existing ink/paper/gold token vocabulary. */
+.gallery-ui {
+  color: var(--paper-100);
+  font-family: var(--f-sans);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.gallery-ui *, .gallery-ui *::before, .gallery-ui *::after { box-sizing: border-box; }
+.gallery-ui h2, .gallery-ui h3, .gallery-ui h4 { font-family: var(--f-display); color: var(--gold-300, #ead4a0); letter-spacing: .06em; }
+.gallery-ui h3 { margin: 0 0 14px; font-size: 21px; }
+.gallery-ui h4 { margin: 0 0 10px; font-size: 17px; }
+.gallery-ui button, .gallery-ui input, .gallery-ui textarea { font: inherit; }
+.gallery-ui button {
+  color: var(--paper-100); background: linear-gradient(140deg, #252831, #13151b);
+  border: 1px solid #85818c65; border-radius: 5px; padding: 8px 14px; cursor: pointer;
+}
+.gallery-ui button:hover:not(:disabled) { border-color: var(--gold-400); color: var(--gold-300, #ead4a0); }
+.gallery-ui :focus-visible { outline: 2px solid var(--gold-400); outline-offset: 3px; }
+.gallery-ui button:disabled { opacity: .45; cursor: not-allowed; }
+.gallery-ui .gallery-primary {
+  border-color: #d0b56b; color: #f2d995;
+  background: linear-gradient(135deg, #59472490, #242018 70%);
+  box-shadow: inset 0 0 0 2px #c0a26725, 0 0 12px #c5a24f12;
+}
+.gallery-ui .gallery-danger { color: #f49595; border-color: #aa505570; }
+.gallery-muted { color: var(--paper-500, #aaa3a0); font-size: 12px; }
+.gallery-note { border: 1px solid #a5967745; background: #a18c5110; padding: 12px; border-radius: 5px; }
+.gallery-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.gallery-chip { font-size: 11px; padding: 3px 7px; border: 1px solid #afa38755; border-radius: 4px; background: #121419dc; }
+.gallery-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.gallery-actions > button { flex: 1; }
+.gallery-section { padding: 18px 0; border-top: 1px solid #a5967735; }
+.gallery-ui input[type="checkbox"] { accent-color: #d9bd73; width: 18px; height: 18px; flex: none; }
+.gallery-choice { display: flex; align-items: center; gap: 12px; padding: 13px; margin-bottom: 9px; border: 1px solid #a5967755; border-radius: 5px; background: #13161c; }
+.gallery-choice:has(input:checked) { border-color: #d9bd7390; background: #ae8f4212; }
+.gallery-choice span { display: block; }
+.gallery-choice__glyph { font-size: 24px; color: #dfc580; width: 28px; text-align: center; }
+.gallery-editor-portrait { width: 100%; max-height: 260px; object-fit: cover; border: 1px solid #b99c5f99; border-radius: 5px; }
+.gallery-ui textarea { width: 100%; min-height: 100px; resize: vertical; color: var(--paper-100); background: #0e1016; border: 1px solid #9b938660; border-radius: 5px; padding: 12px; }
+.gallery-counter { text-align: right; font-size: 12px; color: var(--paper-500); margin: 5px 0 0; }
+.gallery-equipment { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.gallery-equipment > div { padding: 10px; background: #14171e; border: 1px solid #b5a78930; border-radius: 4px; overflow-wrap: anywhere; }
+.gallery-equipment ul { margin: 6px 0; padding-left: 18px; }
+.gallery-ui .gallery-link { padding: 2px 0; background: none; border: none; color: var(--gold-400); text-decoration: underline; }
+.gallery-ui .gallery-feedback { margin: 12px 0; padding: 12px; border: 1px solid #d2876255; background: #59352225; }
+.gallery-ui .gallery-feedback button { margin-left: 8px; }
+.gallery-ui .hud-drawer__title { color: #efdba6; font-size: 28px; }
+.gallery-ui .hud-drawer__head { border-color: #a5967755; }
+.gallery-ui .hud-drawer { border: 1px solid #bca57988; background: linear-gradient(120deg, #1b1c22, #0b1016); }
+.gallery-editor-layout { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 16px; margin: 18px 0; }
+.gallery-editor-reference { min-width: 0; text-align: center; border: 1px solid #bca57977; padding: 6px; background: linear-gradient(145deg, #51402733, #11141c); border-radius: 5px; }
+.gallery-editor-reference .gallery-editor-portrait { height: 260px; border: 0; }
+.gallery-editor-placeholder { display: grid; place-content: center; height: 250px; color: #dcc28c; letter-spacing: .15em; line-height: 2.5; }
+.gallery-editor-layout .gallery-choice { padding: 10px; gap: 8px; }
+.gallery-editor-layout .gallery-choice__glyph { width: 22px; font-size: 21px; }
+.gallery-editor-layout .gallery-muted { font-size: 11px; }
