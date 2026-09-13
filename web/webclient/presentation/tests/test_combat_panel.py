@@ -1627,6 +1627,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             frozenset(
                 {
                     "art",
+                    "gallery",
                     "status",
                     "context_actions",
                     "local_map",
