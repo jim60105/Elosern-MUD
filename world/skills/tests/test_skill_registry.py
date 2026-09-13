@@ -487,7 +487,7 @@ class SkillContentCompletionTests(unittest.TestCase):
     @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
     def test_dual_blade_mastery_is_a_higher_tier_sibling(self):
         skill = SKILL_REGISTRY["dual_blade_mastery"]
-        self.assertEqual(skill.label, "雙刀流·宗師級")
+        self.assertEqual(skill.label, "雙刃旋舞")
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
         self.assertEqual(skill.cost, {"sp": 30})

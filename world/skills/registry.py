@@ -417,7 +417,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _body_multiplier("body_enhancement", "身體強化", 100),
         _body_multiplier("body_enhancement_extreme", "身體超強化", 1000),
-        _body_multiplier("body_enhancement_basic", "身體強化·初階", 1.2),
+        _body_multiplier("body_enhancement_basic", "基礎身體強化", 1.2),
         _skill(
             "fire_mastery",
             "火焰精通",
@@ -524,13 +524,13 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             ("scorching_wave", "灼熱波動", "釋放灼熱的波動，對單一目標造成魔法傷害並使其灼燒。", TargetSpec.SINGLE, 24, ("damage:fire:magic", "buff_apply:fire_scorch"), (SkillPrerequisite("fire_ball", 3),)),
             # 火 — 大師
             ("lava_burst", "熔岩術", "使地面迸裂噴出熔岩，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 52, ("damage:fire:magic",), (SkillPrerequisite("firestorm", 5),)),
-            ("infernal_wrap", "業火纏繞", "以業火纏繞單一目標，造成高額魔法傷害。", TargetSpec.SINGLE, 42, ("damage:fire:magic",), (SkillPrerequisite("scorching_wave", 3),)),
+            ("flame_shroud", "烈焰纏繞", "以烈焰纏繞單一目標，造成高額魔法傷害。", TargetSpec.SINGLE, 42, ("damage:fire:magic",), (SkillPrerequisite("scorching_wave", 3),)),
             # 火 — 賢者
             ("dragon_flame", "龍炎術", "喚起龍之吐息，對範圍內所有目標造成高額魔法傷害。", TargetSpec.AREA, 95, ("damage:fire:magic",), (SkillPrerequisite("lava_burst", 8),)),
-            ("hellfire", "煉獄業火", "召喚煉獄的業火，對單一目標造成極高魔法傷害。", TargetSpec.SINGLE, 78, ("damage:fire:magic",), (SkillPrerequisite("firestorm", 5),)),
+            ("hellfire", "煉獄之火", "召喚煉獄之火，對單一目標造成極高魔法傷害。", TargetSpec.SINGLE, 78, ("damage:fire:magic",), (SkillPrerequisite("firestorm", 5),)),
             # 火 — 主宰
-            ("phoenix_eternal_flame", "不滅鳳凰焰", "召喚不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal"), (SkillPrerequisite("dragon_flame", 8),)),
-            ("world_ending_blaze", "焚世終焰", "召喚足以焚盡世界的終焰，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",), (SkillPrerequisite("hellfire", 5),)),
+            ("sacrificial_flame", "燔祭焰", "獻上自身體能為祭，召喚燔祭之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal"), (SkillPrerequisite("dragon_flame", 8),)),
+            ("final_blaze", "焚世之焰", "召喚足以焚盡世界的焰流，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",), (SkillPrerequisite("hellfire", 5),)),
         ),
         *_elemental_spells(
             "water",
@@ -656,8 +656,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         # out individually per the skill-registry spec's self-only constraint.
         _skill(
             "static_ward",
-            "靜電護體",
-            "以靜電護體，隨時反擊近身之敵。",
+            "靜電護罩",
+            "以靜電護罩，隨時反擊近身之敵。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             usable_out_of_combat=True,
@@ -699,7 +699,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             ("absolute_tundra", "絕對凍土", "將大地凍結為絕對凍土，對範圍內所有目標造成魔法傷害並使其凍結。", TargetSpec.AREA, 82, ("damage:ice:magic", "buff_apply:ice_freeze")),
             # 冰 — 主宰
             ("absolute_zero", "絕對零度", "釋放絕對零度，對單一目標造成處決級魔法傷害並使其凍結。", TargetSpec.SINGLE, 140, ("damage:ice:magic", "buff_apply:ice_freeze")),
-            ("eternal_ice_field", "永夜冰原", "展開永夜的冰原，對範圍內所有目標造成毀滅級魔法傷害並使其凍結。", TargetSpec.AREA, 158, ("damage:ice:magic", "buff_apply:ice_freeze")),
+            ("eternal_ice_field", "長夜冰原", "展開無盡長夜的冰原，對範圍內所有目標造成毀滅級魔法傷害並使其凍結。", TargetSpec.AREA, 158, ("damage:ice:magic", "buff_apply:ice_freeze")),
         ),
         *_elemental_spells(
             "light",
@@ -729,13 +729,13 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             ("dark_burst", "闇裂術", "釋放闇之爆裂，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 29, ("damage:dark:magic",)),
             # 暗 — 大師
             ("dark_corrosion_domain", "闇蝕領域", "展開闇蝕領域，對範圍內所有目標造成魔法傷害並使其腐蝕。", TargetSpec.AREA, 47, ("damage:dark:magic", "buff_apply:dark_corrosion")),
-            ("shadow_torment", "暗影凌遲", "以暗影凌遲目標，造成高額魔法傷害並使其腐蝕。", TargetSpec.SINGLE, 41, ("damage:dark:magic", "buff_apply:dark_corrosion")),
+            ("shadow_torture", "暗影之刑", "對目標施以暗影之刑，造成高額魔法傷害並使其腐蝕。", TargetSpec.SINGLE, 41, ("damage:dark:magic", "buff_apply:dark_corrosion")),
             # 暗 — 賢者
             ("abyss_devour", "深淵吞噬", "召喚深淵吞噬目標，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 85, ("damage:dark:magic",)),
             ("dark_dominion", "黑暗支配", "展開黑暗支配，使範圍內所有目標陷入恐懼。", TargetSpec.AREA, 72, ("buff_apply:fear",)),
             # 暗 — 主宰
-            ("void_annihilation", "終焉黑洞", "召喚終焉黑洞，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 155, ("damage:dark:magic",)),
-            ("netherworld_judgment", "冥府審判", "喚起冥府審判，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 135, ("damage:dark:magic",)),
+            ("void_annihilation", "虛空湮滅", "召喚湮滅萬物的虛空，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 155, ("damage:dark:magic",)),
+            ("underworld_judgment", "冥界審判", "喚起冥界審判，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 135, ("damage:dark:magic",)),
         ),
         _skill(
             "dual_wield_style",
@@ -749,8 +749,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "dual_blade_mastery",
-            "雙刀流·宗師級",
-            "以宗師級的雙刀連擊，對單一目標造成物理傷害。",
+            "雙刃旋舞",
+            "以旋舞般的雙刀連擊，對單一目標造成物理傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,

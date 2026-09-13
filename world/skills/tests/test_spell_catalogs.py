@@ -39,17 +39,17 @@ FIRE_SPELL_CATALOG = (
         ("damage:fire:magic", "buff_apply:fire_scorch"),
     ),
     ("lava_burst", "熔岩術", TargetSpec.AREA, 52, ("damage:fire:magic",)),
-    ("infernal_wrap", "業火纏繞", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
+    ("flame_shroud", "烈焰纏繞", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
     ("dragon_flame", "龍炎術", TargetSpec.AREA, 95, ("damage:fire:magic",)),
-    ("hellfire", "煉獄業火", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
+    ("hellfire", "煉獄之火", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
     (
-        "phoenix_eternal_flame",
-        "不滅鳳凰焰",
+        "sacrificial_flame",
+        "燔祭焰",
         TargetSpec.AREA,
         150,
         ("damage:fire:magic", "self_heal"),
     ),
-    ("world_ending_blaze", "焚世終焰", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
+    ("final_blaze", "焚世之焰", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
 )
 
 
@@ -111,7 +111,7 @@ LIGHTNING_SPELL_CATALOG = (
     ("spark_shock", "電擊術", TargetSpec.SINGLE, 13, ("damage:lightning:magic",)),
     (
         "static_ward",
-        "靜電護體",
+        "靜電護罩",
         TargetSpec.SELF,
         10,
         ("self_buff_apply:lightning_static_ward",),
@@ -169,7 +169,7 @@ ICE_SPELL_CATALOG = (
     ),
     (
         "eternal_ice_field",
-        "永夜冰原",
+        "長夜冰原",
         TargetSpec.AREA,
         158,
         ("damage:ice:magic", "buff_apply:ice_freeze"),
@@ -216,18 +216,18 @@ DARK_SPELL_CATALOG = (
         ("damage:dark:magic", "buff_apply:dark_corrosion"),
     ),
     (
-        "shadow_torment",
-        "暗影凌遲",
+        "shadow_torture",
+        "暗影之刑",
         TargetSpec.SINGLE,
         41,
         ("damage:dark:magic", "buff_apply:dark_corrosion"),
     ),
     ("abyss_devour", "深淵吞噬", TargetSpec.SINGLE, 85, ("damage:dark:magic",)),
     ("dark_dominion", "黑暗支配", TargetSpec.AREA, 72, ("buff_apply:fear",)),
-    ("void_annihilation", "終焉黑洞", TargetSpec.AREA, 155, ("damage:dark:magic",)),
+    ("void_annihilation", "虛空湮滅", TargetSpec.AREA, 155, ("damage:dark:magic",)),
     (
-        "netherworld_judgment",
-        "冥府審判",
+        "underworld_judgment",
+        "冥界審判",
         TargetSpec.SINGLE,
         135,
         ("damage:dark:magic",),
@@ -734,12 +734,12 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
             "fire_ball": ("fire_arrow", 3),
             "scorching_wave": ("fire_ball", 3),
             "firestorm": ("scorching_wave", 3),
-            "infernal_wrap": ("scorching_wave", 3),
+            "flame_shroud": ("scorching_wave", 3),
             "lava_burst": ("firestorm", 5),
             "hellfire": ("firestorm", 5),
-            "world_ending_blaze": ("hellfire", 5),
+            "final_blaze": ("hellfire", 5),
             "dragon_flame": ("lava_burst", 8),
-            "phoenix_eternal_flame": ("dragon_flame", 8),
+            "sacrificial_flame": ("dragon_flame", 8),
         }
         for key, (prereq_key, minimum) in expected.items():
             with self.subTest(key=key):
@@ -748,8 +748,8 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
                     (SkillPrerequisite(prereq_key, minimum),),
                 )
         self.assertEqual(declared_prerequisites("fire_arrow"), ())
-        # Topological canopy: phoenix is the strict last node.
-        self.assertEqual(prerequisite_consumers("phoenix_eternal_flame"), ())
+        # Topological canopy: sacrificial flame is the strict last node.
+        self.assertEqual(prerequisite_consumers("sacrificial_flame"), ())
 
     @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
     def test_mastery_passives_stay_out_of_the_graph(self):

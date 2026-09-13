@@ -65,7 +65,7 @@ SHALL return `False`. The predicate SHALL NOT read entity state.
 
 #### Scenario: Pure damage and heal spells are eligible
 - **WHEN** `is_freeform_eligible` is called for `wind_blade` (`damage:wind:magic`),
-  `tornado_blade`, `sea_of_life` (`heal:area`), and `phoenix_eternal_flame`
+  `tornado_blade`, `sea_of_life` (`heal:area`), and `sacrificial_flame`
   (`damage:fire:magic` + `self_heal`)
 - **THEN** each returns `True`
 

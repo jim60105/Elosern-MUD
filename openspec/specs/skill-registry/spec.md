@@ -19,14 +19,14 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
 | `firestorm` | 火焰風暴 | 術師 | `TargetSpec.AREA` | `mp=30` | `damage:fire:magic` |
 | `scorching_wave` | 灼熱波動 | 術師 | `TargetSpec.SINGLE` | `mp=24` | `damage:fire:magic`, `buff_apply:fire_scorch` |
 | `lava_burst` | 熔岩術 | 大師 | `TargetSpec.AREA` | `mp=52` | `damage:fire:magic` |
-| `infernal_wrap` | 業火纏繞 | 大師 | `TargetSpec.SINGLE` | `mp=42` | `damage:fire:magic` |
+| `flame_shroud` | 烈焰纏繞 | 大師 | `TargetSpec.SINGLE` | `mp=42` | `damage:fire:magic` |
 | `dragon_flame` | 龍炎術 | 賢者 | `TargetSpec.AREA` | `mp=95` | `damage:fire:magic` |
-| `hellfire` | 煉獄業火 | 賢者 | `TargetSpec.SINGLE` | `mp=78` | `damage:fire:magic` |
-| `phoenix_eternal_flame` | 不滅鳳凰焰 | 主宰 | `TargetSpec.AREA` | `mp=150` | `damage:fire:magic`, `self_heal` |
-| `world_ending_blaze` | 焚世終焰 | 主宰 | `TargetSpec.SINGLE` | `mp=130` | `damage:fire:magic` |
+| `hellfire` | 煉獄之火 | 賢者 | `TargetSpec.SINGLE` | `mp=78` | `damage:fire:magic` |
+| `sacrificial_flame` | 燔祭焰 | 主宰 | `TargetSpec.AREA` | `mp=150` | `damage:fire:magic`, `self_heal` |
+| `final_blaze` | 焚世之焰 | 主宰 | `TargetSpec.SINGLE` | `mp=130` | `damage:fire:magic` |
 
 #### Scenario: All ten 火 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 火 keys (`fire_ball`, `fire_arrow`, `firestorm`, `scorching_wave`, `lava_burst`, `infernal_wrap`, `dragon_flame`, `hellfire`, `phoenix_eternal_flame`, `world_ending_blaze`)
+- **WHEN** `SKILL_REGISTRY` is inspected for the ten 火 keys (`fire_ball`, `fire_arrow`, `firestorm`, `scorching_wave`, `lava_burst`, `flame_shroud`, `dragon_flame`, `hellfire`, `sacrificial_flame`, `final_blaze`)
 - **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["fire"]`, the
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
@@ -141,7 +141,7 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
 | `spark_shock` | 電擊術 | 學徒 | `TargetSpec.SINGLE` | `mp=13` | `damage:lightning:magic` |
-| `static_ward` | 靜電護體 | 學徒 | `TargetSpec.SELF` | `mp=10` | `self_buff_apply:lightning_static_ward` |
+| `static_ward` | 靜電護罩 | 學徒 | `TargetSpec.SELF` | `mp=10` | `self_buff_apply:lightning_static_ward` |
 | `chain_lightning` | 雷鎖術 | 術師 | `TargetSpec.AREA` | `mp=27` | `damage:lightning:magic` |
 | `paralyzing_bolt` | 麻痺電擊 | 術師 | `TargetSpec.SINGLE` | `mp=24` | `damage:lightning:magic`, `buff_apply:paralysis` |
 | `thunder_combo` | 雷霆連擊 | 大師 | `TargetSpec.SINGLE` | `mp=46` | `damage:lightning:magic` |
@@ -177,7 +177,7 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
 | `blizzard` | 暴風雪 | 賢者 | `TargetSpec.AREA` | `mp=88` | `damage:ice:magic` |
 | `absolute_tundra` | 絕對凍土 | 賢者 | `TargetSpec.AREA` | `mp=82` | `damage:ice:magic`, `buff_apply:ice_freeze` |
 | `absolute_zero` | 絕對零度 | 主宰 | `TargetSpec.SINGLE` | `mp=140` | `damage:ice:magic`, `buff_apply:ice_freeze` |
-| `eternal_ice_field` | 永夜冰原 | 主宰 | `TargetSpec.AREA` | `mp=158` | `damage:ice:magic`, `buff_apply:ice_freeze` |
+| `eternal_ice_field` | 長夜冰原 | 主宰 | `TargetSpec.AREA` | `mp=158` | `damage:ice:magic`, `buff_apply:ice_freeze` |
 
 #### Scenario: All ten 冰 spell keys exist with correct kind, target, and cost
 - **WHEN** `SKILL_REGISTRY` is inspected for the ten 冰 keys (`ice_shard`, `frost_breath`, `ice_wall`, `frost_arrow_rain`, `permafrost_domain`, `ice_prison`, `blizzard`, `absolute_tundra`, `absolute_zero`, `eternal_ice_field`)
@@ -229,14 +229,14 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
 | `curse` | 詛咒術 | 術師 | `TargetSpec.SINGLE` | `mp=26` | `buff_apply:dark_curse` |
 | `dark_burst` | 闇裂術 | 術師 | `TargetSpec.AREA` | `mp=29` | `damage:dark:magic` |
 | `dark_corrosion_domain` | 闇蝕領域 | 大師 | `TargetSpec.AREA` | `mp=47` | `damage:dark:magic`, `buff_apply:dark_corrosion` |
-| `shadow_torment` | 暗影凌遲 | 大師 | `TargetSpec.SINGLE` | `mp=41` | `damage:dark:magic`, `buff_apply:dark_corrosion` |
+| `shadow_torture` | 暗影之刑 | 大師 | `TargetSpec.SINGLE` | `mp=41` | `damage:dark:magic`, `buff_apply:dark_corrosion` |
 | `abyss_devour` | 深淵吞噬 | 賢者 | `TargetSpec.SINGLE` | `mp=85` | `damage:dark:magic` |
 | `dark_dominion` | 黑暗支配 | 賢者 | `TargetSpec.AREA` | `mp=72` | `buff_apply:fear` |
-| `void_annihilation` | 終焉黑洞 | 主宰 | `TargetSpec.AREA` | `mp=155` | `damage:dark:magic` |
-| `netherworld_judgment` | 冥府審判 | 主宰 | `TargetSpec.SINGLE` | `mp=135` | `damage:dark:magic` |
+| `void_annihilation` | 虛空湮滅 | 主宰 | `TargetSpec.AREA` | `mp=155` | `damage:dark:magic` |
+| `underworld_judgment` | 冥界審判 | 主宰 | `TargetSpec.SINGLE` | `mp=135` | `damage:dark:magic` |
 
 #### Scenario: All ten 暗 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 暗 keys (`shadow_bolt`, `weaken`, `curse`, `dark_burst`, `dark_corrosion_domain`, `shadow_torment`, `abyss_devour`, `dark_dominion`, `void_annihilation`, `netherworld_judgment`)
+- **WHEN** `SKILL_REGISTRY` is inspected for the ten 暗 keys (`shadow_bolt`, `weaken`, `curse`, `dark_burst`, `dark_corrosion_domain`, `shadow_torture`, `abyss_devour`, `dark_dominion`, `void_annihilation`, `underworld_judgment`)
 - **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["dark"]`, the
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
@@ -386,7 +386,7 @@ prefix). `sexual_magic_mastery` remains the sole mastery-domain declaration for 
 - **THEN** it contains exactly one `SexualMasteryEffect` instance and no `ElementMasteryEffect`
 
 ### Requirement: dual_blade_mastery exists as a higher-tier sibling to dual_wield_style
-`SKILL_REGISTRY` SHALL contain `dual_blade_mastery` (雙刀流·宗師級), `ACTIVE`,
+`SKILL_REGISTRY` SHALL contain `dual_blade_mastery` (雙刃旋舞), `ACTIVE`,
 `TargetSpec.SINGLE`, `cost={"sp": 30}`, `effects=["damage:dark:physical"]`,
 `faction_constraint=FactionConstraint.ANY`. This SHALL NOT replace or modify `dual_wield_style`.
 

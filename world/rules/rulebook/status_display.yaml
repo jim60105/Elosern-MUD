@@ -57,7 +57,7 @@
   label: 神速領域
   severity: beneficial
 - code: lightning_static_ward
-  label: 靜電護體
+  label: 靜電護罩
   severity: beneficial
 - code: lightning_extra_action
   label: 雷神之速

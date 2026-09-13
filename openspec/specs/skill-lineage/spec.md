@@ -37,17 +37,17 @@ degree-independent.
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the fire tree:
 `fire_ball` requires `fire_arrow` >= 3; `scorching_wave` requires `fire_ball` >= 3; `firestorm`
 requires `scorching_wave` >= 3; `lava_burst` requires `firestorm` >= 5; `dragon_flame` requires
-`lava_burst` >= 8; `phoenix_eternal_flame` requires `dragon_flame` >= 8. The sister spells declare
-leaf edges onto the same spine in the same change: `infernal_wrap` requires `scorching_wave` >= 3,
-`hellfire` requires `firestorm` >= 5, and `world_ending_blaze` requires `hellfire` >= 5 — none of
-them is consumed by a further edge, so `phoenix_eternal_flame` stays the strict topological canopy.
+`lava_burst` >= 8; `sacrificial_flame` requires `dragon_flame` >= 8. The sister spells declare
+leaf edges onto the same spine in the same change: `flame_shroud` requires `scorching_wave` >= 3,
+`hellfire` requires `firestorm` >= 5, and `final_blaze` requires `hellfire` >= 5 — none of
+them is consumed by a further edge, so `sacrificial_flame` stays the strict topological canopy.
 `fire_arrow` is a root with no prerequisites. The structure is therefore a chain with sister LEAVES
 (one node may feed several edges), not a single-file list. The five element-mastery passives SHALL
 NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
 
 #### Scenario: The fire tree validates with the canopy last
 - **WHEN** the registry loads with the fire edges
-- **THEN** the topological order runs `fire_arrow` first and `phoenix_eternal_flame` last (consumed
+- **THEN** the topological order runs `fire_arrow` first and `sacrificial_flame` last (consumed
   by no edge), and every edge threshold is >= 1
 
 #### Scenario: Mastery passives stay out of the graph
@@ -135,7 +135,7 @@ prerequisite never blocks its child node.
 - **THEN** `db.skill_proficiency["fire_arrow"]` stops increasing at exactly level 3
 
 #### Scenario: The canopy node caps at the yaml default
-- **WHEN** `phoenix_eternal_flame` (consumed by nobody) accrues past level 10
+- **WHEN** `sacrificial_flame` (consumed by nobody) accrues past level 10
 - **THEN** accrual saturates at level 10
 
 #### Scenario: A saturation ceiling still unlocks its child

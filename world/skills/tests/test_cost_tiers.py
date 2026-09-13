@@ -99,9 +99,9 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
         self._assert_labels(
             {
                 "術師": ("firestorm", "scorching_wave"),
-                "大師": ("lava_burst", "infernal_wrap"),
+                "大師": ("lava_burst", "flame_shroud"),
                 "賢者": ("dragon_flame", "hellfire"),
-                "主宰": ("phoenix_eternal_flame", "world_ending_blaze"),
+                "主宰": ("sacrificial_flame", "final_blaze"),
             }
         )
 
@@ -176,8 +176,8 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
         self._assert_labels(
             {
                 "術師": ("curse", "dark_burst"),
-                "大師": ("dark_corrosion_domain", "shadow_torment"),
+                "大師": ("dark_corrosion_domain", "shadow_torture"),
                 "賢者": ("abyss_devour", "dark_dominion"),
-                "主宰": ("void_annihilation", "netherworld_judgment"),
+                "主宰": ("void_annihilation", "underworld_judgment"),
             }
         )
