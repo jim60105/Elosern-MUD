@@ -1211,7 +1211,9 @@ def submit_opening_action(
     )
 
 
-def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
+def submit_player_item_use(
+    actor: Any, item_key: str, *, target: Any | None = None
+) -> dict[str, Any]:
     """Run one ordinary combat round whose player turn consumes one held item.
 
     The facade revalidates the request through the shared item preflight
@@ -1223,6 +1225,11 @@ def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
     returns before initiative and consumes no round or world time; a
     successful use resolves on the player's turn and the item journal is
     merged into the session's outer rollback safety net.
+
+    ``target`` is the player's one explicit choice (add-item-effect-targeting
+    design D1): the session's battlefield context resolves it — and every
+    group scope — through the same roster validators a skill's targets pass;
+    ``run_round`` rebuilds the identical context from the battlefield itself.
     """
     record = read_session(actor)
     if record is None:
@@ -1233,19 +1240,21 @@ def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
     if not isinstance(item_key, str):
         raise TypeError("submit_player_item_use requires an item key string")
     preflight = preflight_item_use(
-        ItemUseRequest(actor=actor, item_key=item_key), in_combat=True
+        ItemUseRequest(actor=actor, item_key=item_key, target=target),
+        in_combat=True,
+        context=_context_for(battlefield, record),
     )
     if not preflight.allowed:
         return {
             "outcome": "rejected",
             "reason": preflight.reason.value if preflight.reason else None,
-            "detail": None,
+            "detail": preflight.detail,
         }
     return _submit_request(
         actor,
         record,
         battlefield,
-        ItemUseRequest(actor=actor, item_key=item_key),
+        ItemUseRequest(actor=actor, item_key=item_key, target=target),
         commanded_kind="item",
         commanded_key=item_key,
     )

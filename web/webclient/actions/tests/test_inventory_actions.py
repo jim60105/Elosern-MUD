@@ -35,10 +35,19 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.lore.items import ItemDefinition
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+    ItemTargetScope,
+)
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import engage, read_session
 from world.skills.equipment import EquipmentSlot, list_items
-from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._combat_session_helpers import (
+    live_item_effect_profiles,
+    open_synthetic_scope,
+)
 from world.tests.synthetic_data import SYNTH_ITEMS
 
 # Kit identities (items+prices scope; the price rows ride along so the kit
@@ -145,6 +154,35 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
                 with self.assertRaises(ServiceActionError):
                     validate_inventory_toggle_equip_payload(payload)
 
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_use_accepts_one_optional_bounded_target_key(self):
+        # add-item-effect-targeting: the use payload accepts exactly
+        # {item_key} or {item_key, target_key} with the same bounded,
+        # whitespace-free key rules; toggle_equip never gains a target.
+        self.assertEqual(
+            validate_inventory_use_payload(
+                {"item_key": _T_POTION.key, "target_key": "t_somebody"}
+            ),
+            {"item_key": _T_POTION.key, "target_key": "t_somebody"},
+        )
+        for payload in (
+            {"item_key": _T_POTION.key, "target_key": ""},
+            {"item_key": _T_POTION.key, "target_key": "t some body"},
+            {"item_key": _T_POTION.key, "target_key": "x" * 65},
+            {"item_key": _T_POTION.key, "target_key": 7},
+            {"target_key": "t_somebody"},
+            {"item_key": _T_POTION.key, "target_key": "ok", "quantity": 1},
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ServiceActionError):
+                    validate_inventory_use_payload(payload)
+        with self.assertRaises(ServiceActionError):
+            validate_inventory_toggle_equip_payload(
+                {"item_key": _T_BLADE.key, "target_key": "t_somebody"}
+            )
+
 
 class InventoryUseAdapterTests(InventoryActionBase):
     @covers_requirement(
@@ -222,6 +260,106 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "hp_full")
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+
+
+class InventoryUseTargetingTests(InventoryActionBase):
+    """inventory.use target_key: names whom, never what (delta scenarios)."""
+
+    def setUp(self):
+        super().setUp()
+        self.ally = create_object(PlayerCharacter, key="t_ember_ally")
+        self.ally.race = "human"
+        self.ally.apply_race_baseline()
+        self.ally.location = self.room
+        self.ally.db.inventory = []
+        self.ally.db.equipment = None
+
+    def _single_scope_heal(self) -> None:
+        live_item_effect_profiles()[_T_POTION.key] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_target_key_heals_the_named_companion_only(self):
+        # The adapter resolves target_key against the location contents and
+        # the deterministic preflight binds the single-scope effect to it:
+        # the ally is healed, the actor is untouched, one unit is consumed.
+        self._single_scope_heal()
+        ally_max = int(self.ally.traits.hp.max)
+        self.ally.traits.hp.current = ally_max - 30
+        self.player.traits.hp.current = int(self.player.traits.hp.max)
+        self.player.db.inventory = [_T_POTION.key, _T_POTION.key]
+        result = _inventory_use_adapter(
+            self.player, {"item_key": _T_POTION.key, "target_key": self.ally.key}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(int(self.ally.traits.hp.current), ally_max)
+        self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max))
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_supplied_target_cannot_widen_a_self_scoped_item(self):
+        # Delta: "A supplied target cannot widen an item's reach" — the kit's
+        # healing row stays self-scoped, so the target is ignored and the
+        # outcome equals the no-target use exactly.
+        self._hurt(20)
+        ally_max = int(self.ally.traits.hp.max)
+        self.ally.traits.hp.current = ally_max - 30
+        self.player.db.inventory = [_T_POTION.key]
+        result = _inventory_use_adapter(
+            self.player, {"item_key": _T_POTION.key, "target_key": self.ally.key}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max))
+        self.assertEqual(int(self.ally.traits.hp.current), ally_max - 30)
+        self.assertEqual(list_items(self.player), [])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_group_shorthand_target_key_is_rejected(self):
+        # Delta: "A target key naming a group shorthand is rejected" — the
+        # token resolves to no present entity, travels raw to the
+        # deterministic preflight, and the fail-closed guard rejects it.
+        self._single_scope_heal()
+        self._hurt(20)
+        self.player.db.inventory = [_T_POTION.key]
+        for token in ("all", "all-allies", "all-enemies"):
+            with self.subTest(token=token):
+                result = _inventory_use_adapter(
+                    self.player, {"item_key": _T_POTION.key, "target_key": token}
+                )
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], "target_invalid")
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
+        self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max) - 20)
+
+    def test_moved_session_actor_target_submission_rejects_stably(self):
+        # A session record whose battlefield no longer reconstructs (the
+        # actor moved while engaged) must render the stable session
+        # rejection even when the payload carries a target: the roster
+        # reconstruction inside target resolution swallows its own
+        # CombatSessionError, and the submission's session validation owns
+        # the rejection — no exception may escape the adapter.
+        self.player.db.inventory = [_T_POTION.key]
+        engage(self.player, self._monster())
+        elsewhere = create_object(Room, key="t_spray_elsewhere")
+        self.player.location = elsewhere
+        result = _inventory_use_adapter(
+            self.player,
+            {"item_key": _T_POTION.key, "target_key": self.ally.key},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "moved")
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
 
 
 class InventoryToggleAdapterTests(InventoryActionBase):

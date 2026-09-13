@@ -99,6 +99,7 @@ from world.rules.item_effects import (
     GaugeAdjustEffect,
     ItemEffectProfile,
     ItemStat,
+    ItemTargetScope,
 )
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 from world.rules.guild_offers import ItemQuantity, QuestReward
@@ -282,7 +283,10 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
 # their own profiles through the same logical target via ``extra=``.
 SYNTH_ITEM_EFFECT_PROFILES: dict[str, ItemEffectProfile] = {
     "t_ember_spray": ItemEffectProfile(
-        effects=(GaugeAdjustEffect(stat=ItemStat.HP, amount=40),)
+        # The explicit self scope is load-bearing now that preflight routes
+        # every effect through the shared resolver: it marks the kit's
+        # healing row as one the targeting pipeline binds to the actor.
+        effects=(GaugeAdjustEffect(stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SELF),)
     ),
 }
 

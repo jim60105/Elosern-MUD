@@ -19,7 +19,7 @@
 | 身份＋外觀＋機制宣告 | `world/lore/items.py::ITEM_REGISTRY` | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
 | 商店成交值 | `world/rules/rulebook/guild_economy.yaml` | 各店 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨 |
-| 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（目前僅接受 `self`），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
+| 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all_allies`／`all_enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
 `ItemDefinition` 是 frozen dataclass，`__post_init__` 在構造時驗證 presentation 與機制的形狀及互斥關係（`key`、名稱、`price_table_key`、`sellable` 本身不做驗證），壞定義會讓 registry 載入直接失敗，不會拖到運行時才爆。機制部分是**唯一的行為縫隙**，三選一：
@@ -105,9 +105,9 @@ items:
       - apply_status: focus
 ```
 
-載入器 `world/rules/item_effects.py` 做**雙向封閉檢查**：每件已註冊可使用物品恰好一筆條目、rulebook 裡不能出現非可使用物品的 key、每筆至少一個效果。條目級驗證：動詞欄位互斥（恰好一個）、`stat` 是封閉計量條、`amount` 非零且絕對值不超過 9999、`apply_status` 只收 `buffs.yaml` 的具體狀態鍵、`remove_status` 收具體鍵或 `all`／`positive`／`negative` 選擇器、同一件物品不得對同一計量條宣告兩筆調整、`scope` 詞彙已定義但僅接受 `self`（其餘要到 `add-item-effect-targeting` 開放，拒絕訊息會點名該 change）。任何違規，載入即拋 `ItemEffectsRulebookError`。
+載入器 `world/rules/item_effects.py` 做**雙向封閉檢查**：每件已註冊可使用物品恰好一筆條目、rulebook 裡不能出現非可使用物品的 key、每筆至少一個效果。條目級驗證：動詞欄位互斥（恰好一個）、`stat` 是封閉計量條、`amount` 非零且絕對值不超過 9999、`apply_status` 只收 `buffs.yaml` 的具體狀態鍵、`remove_status` 收具體鍵或 `all`／`positive`／`negative` 選擇器、同一件物品不得對同一計量條宣告兩筆調整、`scope` 是五檔封閉詞彙（`self` 預設／`single`／`all_allies`／`all_enemies`／`all`，各自映射到技能共用目標解析器的一條驗證規則）。任何違規，載入即拋 `ItemEffectsRulebookError`。
 
-使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items.py` 與 `world/rules/equipment.py` 的共同寫入路徑處理：結算依宣告順序逐條執行，單獨無效的步驟被跳過，全部步驟都無效才拒絕並退還物品。新增資料不需要寫新的狀態變更程式碼，也**不需要任何效果鍵列舉擴充**——既有動詞（含負值、快感計量條、具體狀態、移除選擇器）就是全部詞彙。
+使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items.py` 與 `world/rules/equipment.py` 的共同寫入路徑處理：結算依宣告順序逐條執行，每個條目先經共用目標解析器解析出目標集合（`single` 缺少玩家指定以 `no_target` 拒絕、無法解析的目標以 `target_invalid` 拒絕、群體範圍在無可觸及對象時拒絕），單獨無效的步驟（目標計量條已滿、狀態遭裝備免疫擋下、移除選擇器沒命中任何狀態）被跳過，全部步驟都無效才拒絕並退還物品；群體範圍一次使用只消耗一件物品，回滾日記按每個被觸及實體各自捕獲與復原。新增資料不需要寫新的狀態變更程式碼，也**不需要任何效果鍵列舉擴充**——既有動詞（含負值、快感計量條、具體狀態、移除選擇器）與五檔 `scope` 就是全部詞彙。
 
 ### Step 2b — 可裝備物品：接上裝備效果 rulebook
 
@@ -220,7 +220,7 @@ uv run --locked python -m tools.spec_traceability check
 
 新增一筆資料（新藥水、新飾品、新商店 offer）照上面的流程做即可。但有兩類例外超出「加資料」的範圍：
 
-1. **新行為**，例如新的目標範圍（效果條目的 `scope` 詞彙目前僅接受 `self`，開放其他範圍是 `add-item-effect-targeting` 的範圍）、新的裝備槽、消耗品以外的冷卻、或改變使用耗時的規則，會擴及規則解析與既有規格需求。「給現有動詞加新效果」（新藥水回 SP、施加既有狀態鍵、用負值扣計量條）已不是新行為，是 YAML 資料。
+1. **新行為**，例如新的目標範圍（`scope` 五檔詞彙已是全開放的最終詞彙，再擴充新範圍會擴及目標解析器）、新的裝備槽、消耗品以外的冷卻、或改變使用耗時的規則，會擴及規則解析與既有規格需求。「給現有動詞加新效果」（新藥水回 SP、施加既有狀態鍵、用負值扣計量條）與「為既有條目選一個 `scope`」都不是新行為，是 YAML 資料。
 2. **新視覺詞彙**，即新的 `ItemKind`、`ItemIconKey` 或 `ItemRarity` 值，會擴及三個封閉列舉、前端圖示對應與展示層。
 
 兩者都屬於規格驅動變更，請走 OpenSpec 流程（`openspec-propose`），並同步 `equipment-inventory`、`item-use-resolution`、`inventory-item-actions` 相關主規格。

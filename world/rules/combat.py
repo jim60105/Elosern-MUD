@@ -657,7 +657,18 @@ def run_round(
         if request is None:
             continue
         if isinstance(request, ItemUseRequest):
-            item_result = resolve_item_use(request, in_combat=True)
+            # The battlefield doubles as the action context (design D2):
+            # every scope — self, single, and group — resolves against the
+            # same roster presence/relation/range validators a skill's
+            # targets pass. The resulting multi-entity journal rides the
+            # existing sink, whose restore() walks every captured entity
+            # (design D3), so the outer rollback contract already covers
+            # companion traits, buffs, and sexual state.
+            item_result = resolve_item_use(
+                request,
+                in_combat=True,
+                context=BattlefieldActionContext(battlefield),
+            )
             if item_result.outcome == "success":
                 if item_result.journal is not None and journal_sink is not None:
                     journal_sink.append(item_result.journal)

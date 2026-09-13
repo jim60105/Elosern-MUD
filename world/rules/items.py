@@ -10,6 +10,15 @@ public out-of-combat facade that composes the item plan with the canonical
 command-source clock advance inside one outer transaction and rollback
 journal (mirroring ``cast_settlement``).
 
+Targeting (add-item-effect-targeting): every effect resolves its targets
+through the shared ``world.rules.targeting.resolve_targets`` with the
+``TargetRequirement`` its scope maps to — the identical presence/alive/range/
+faction pipeline a skill's targets pass — and group scopes expand through the
+caller-supplied action context (battlefield shorthand in a session, room
+occupants out of one). The rollback journal is multi-entity: per-touched-
+entity traits, buffs, and sexual state keyed by primary key, with the
+in-process cache drop running per captured entity.
+
 A successful use emits one ``item_used`` EventLog entry per executed effect
 step, in profile order, each carrying ``item_key``, ``consumable``, and the
 per-family payload: gauge steps add ``stat`` plus the signed ``amount``
@@ -17,8 +26,9 @@ actually applied (never the configured magnitude), and status steps add
 ``status_keys`` plus the ``count`` actually applied or removed.
 """
 
+from copy import deepcopy
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -61,11 +71,18 @@ from world.rules.item_effects import (
     ItemTargetScope,
     StatusApplyEffect,
     StatusRemoveEffect,
+    scope_targeting_rule,
 )
 from world.rules.pleasure import apply_pleasure_gain
 from world.rules.status_display import (
     MissingDisplayMetadataError,
     display_for,
+)
+from world.rules.targeting import (
+    Relation,
+    RoomActionContext,
+    expand_target_shorthand,
+    resolve_targets,
 )
 from world.rules.surfaces import (
     attribute_snapshot,
@@ -99,14 +116,24 @@ class ItemUseReason(StrEnum):
     NO_EFFECT = "no_effect"
     STATUS_BLOCKED = "status_blocked"
     NOTHING_TO_REMOVE = "nothing_to_remove"
+    NO_TARGET = "no_target"
+    TARGET_INVALID = "target_invalid"
 
 
 @dataclass(frozen=True)
 class ItemUseRequest:
-    """The closed deterministic request to use one held item."""
+    """The closed deterministic request to use one held item.
+
+    ``target`` is the caller's single explicit choice for the whole use —
+    consumed only by ``single``-scoped effects, never a sequence and never a
+    group shorthand (design D1): an item's reach is fixed by the rulebook, so
+    a list or shorthand would let the caller widen a single-scope item into
+    an area item. Two single-scope effects share the one supplied target.
+    """
 
     actor: Any
     item_key: str
+    target: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -150,43 +177,164 @@ class ItemUsePreflight:
 
     allowed: bool
     reason: ItemUseReason | None = None
+    detail: str | None = None
     plan: ItemUsePlan | None = None
+
+
+#: Every ``sexual_state``-category attribute the sexual surface writes,
+#: snapshotted per touched entity by the journal. The handler-published state
+#: lives in ``sexual_traits`` (category ``traits``); the climax pipeline
+#: additionally stages ``pending_climax_extension`` — which
+#: ``apply_pleasure_gain`` may write for a target mid-climax — plus the
+#: identity/experience and per-turn fields that share the category. Capturing
+#: the whole category (mirroring the shipped round-touched sexual surface)
+#: keeps a rolled-back settlement byte-identical on every writer surface,
+#: including the ``pending_climax_extension`` a handler-read-only rollback
+#: test would otherwise leave behind as a phantom extension.
+_SEXUAL_STATE_KEYS = (
+    "virgin",
+    "experience_types",
+    "climax_turns",
+    "pending_climax_extension",
+)
+
+
+def _entity_identity(entity: Any) -> tuple[str, int]:
+    """Key one captured journal record by the entity's own identity.
+
+    Primary key plus ``str`` identity: the assert on restore may only write a
+    record back to the entity it came from, and an unsaved/pk-less entity
+    still keys distinctly through ``id()``.
+    """
+    pk = getattr(entity, "pk", None) or getattr(entity, "id", None)
+    if pk is None:
+        return ("id", id(entity))
+    return ("pk", int(pk))
+
+
+@dataclass
+class _EntitySnapshot:
+    """The per-entity half of the rollback journal (design D3).
+
+    Traits, buffs, and the full sexual surface for one touched entity — the
+    surfaces every effect family can write on anyone the plan steps on.
+    Restore asserts the identity of the entity it writes back to.
+    """
+
+    entity: Any
+    traits: tuple[bool, Any] | None = None
+    buffs: tuple[bool, Any] | None = None
+    sexual_traits: tuple[bool, Any] | None = None
+    sexual_state: dict[str, tuple[bool, Any]] = field(default_factory=dict)
+
+    @classmethod
+    def capture(cls, entity: Any) -> "_EntitySnapshot":
+        """Snapshot this entity's writable surfaces, pre-write."""
+        return cls(
+            entity=entity,
+            traits=snapshot_traits(entity),
+            buffs=attribute_snapshot(entity, "buffs"),
+            sexual_traits=attribute_snapshot(
+                entity, "sexual_traits", category="traits"
+            ),
+            sexual_state={
+                key: attribute_snapshot(entity, key, category="sexual_state")
+                for key in _SEXUAL_STATE_KEYS
+            },
+        )
+
+    def restore(self) -> None:
+        """Write this entity's snapshot back, best-effort per surface."""
+        entity = self.entity
+        if self.traits is not None:
+            restore_traits(entity, self.traits)
+        if self.buffs is not None:
+            restore_attribute_best_effort(entity, "buffs", self.buffs)
+        if self.sexual_traits is not None:
+            restore_attribute_best_effort(
+                entity, "sexual_traits", self.sexual_traits, category="traits"
+            )
+        for key, surface in self.sexual_state.items():
+            if surface is None:
+                continue
+            existed, value = surface
+            if not existed:
+                # The settlement (or the climax pipeline) created the
+                # attribute after capture: the pre-write state was its
+                # absence, so removal — not a value write — is the restore.
+                try:
+                    entity.attributes.remove(key, category="sexual_state")
+                except Exception as error:
+                    log_warn(
+                        "rollback_restore_failed",
+                        exc=error,
+                        context={
+                            "stage": "item_journal_attribute_remove",
+                            "obj": str(entity),
+                            "key": key,
+                        },
+                    )
+                continue
+            restore_attribute_best_effort(
+                entity, key, surface, category="sexual_state"
+            )
 
 
 @dataclass
 class ItemTouchedJournal:
     """Pre-write snapshots of every surface an item-use settlement may touch.
 
-    The resolver captures this before any write and hands it to the caller on
-    success, so an outer combat transaction whose later phase fails can
-    restore the trait, inventory, quest-progress, buff, and mirror/contents/
-    idmapper caches the resolver committed. Restoration is best-effort per
-    surface with a logged diagnostic and is safe to run twice (idempotent
-    value writes). The buff surface restores through the attribute handler,
-    which Evennia's ``BuffHandler`` re-reads on every access, so live handler
-    reads recover together with persistence.
+    Multi-entity since add-item-effect-targeting (design D3): ``entities``
+    holds one per-entity record — traits, buffs, and the sexual surface —
+    keyed by entity identity and captured for **every** entity the plan
+    touches, the actor included, through the same capture path (no special
+    case). Only the actor consumes, so the actor-owned surfaces (inventory,
+    quest log, the deleted-mirror instance, and the contents-cache re-seed)
+    are captured once, actor-only — a per-target capture would invite a
+    restore that writes inventory onto a companion.
+
+    The resolver captures this before any write (a lazy per-target capture
+    taken after an earlier target's write cannot restore state that earlier
+    step's cascade touched — pleasure moves four sexual values at once) and
+    hands it to the caller on success, so an outer combat transaction whose
+    later phase fails can restore the trait, inventory, quest-progress, buff,
+    sexual, and mirror/contents/idmapper caches the resolver committed.
+    Restoration is best-effort per surface with a logged diagnostic and is
+    safe to run twice (idempotent value writes). The buff surface restores
+    through the attribute handler, which Evennia's ``BuffHandler`` re-reads on
+    every access, so live handler reads recover together with persistence.
+    **The in-process cache drop runs per captured entity, not only the
+    actor**: ``restore_traits`` alone clears only the trait cache, while
+    ``_refresh_advance_entity_caches`` additionally pops the memoized
+    ``entity.sexual`` handler off ``entity.__dict__`` — skipping the drop for
+    a companion would roll back stored sexual state while leaving a stale
+    in-memory ``companion.sexual`` readable in the same process.
     """
 
     actor: Any
-    traits: tuple[bool, Any] | None = None
+    entities: dict[tuple[str, int], "_EntitySnapshot"] = field(default_factory=dict)
     inventory: tuple[bool, Any] | None = None
     quest_log: tuple[bool, Any] | None = None
-    buffs: tuple[bool, Any] | None = None
-    sexual: tuple[bool, Any] | None = None
     mirror: Any | None = None
     mirror_pk: int | None = None
 
     @classmethod
-    def capture(cls, actor: Any) -> "ItemTouchedJournal":
-        """Snapshot every writable surface one settlement may reach, pre-write."""
-        return cls(
+    def capture(cls, actor: Any, targets: Sequence[Any] = ()) -> "ItemTouchedJournal":
+        """Snapshot every surface one settlement may reach, pre-write.
+
+        ``targets`` is every entity the plan will step on; the actor is
+        captured through the same per-entity path as any target (the plan
+        steps the actor for self-scoped effects, so the actor is normally in
+        ``targets`` already; dedup keeps one record either way).
+        """
+        journal = cls(
             actor=actor,
-            traits=snapshot_traits(actor),
             inventory=attribute_snapshot(actor, "inventory"),
             quest_log=snapshot_quest_log(actor),
-            buffs=attribute_snapshot(actor, "buffs"),
-            sexual=attribute_snapshot(actor, "sexual_traits", category="traits"),
         )
+        for entity in dict.fromkeys((actor, *targets)):
+            journal.entities[_entity_identity(entity)] = _EntitySnapshot.capture(entity)
+        return journal
 
     def note_mirror(self, mirror: Any) -> None:
         """Record the live mirror instance before its deletion."""
@@ -195,19 +343,42 @@ class ItemTouchedJournal:
 
     def restore(self) -> None:
         """Restore every snapshotted surface after a rolled-back settlement."""
+        for identity, record in self.entities.items():
+            entity = record.entity
+            if _entity_identity(entity) != identity:
+                # Identity assert (design Risks): a record may only be
+                # written back to the entity it came from. A mismatch means
+                # the journal data itself was corrupted (a crossed pairing);
+                # writing either entity's snapshot onto the other would be a
+                # silent data-destroying "fix", so the record is skipped with
+                # a loud diagnostic instead.
+                log_warn(
+                    "rollback_restore_failed",
+                    context={
+                        "stage": "item_journal_identity",
+                        "obj": str(entity),
+                        "key": str(identity),
+                    },
+                )
+                continue
+            record.restore()
+            try:
+                _refresh_advance_entity_caches(entity)
+            except Exception as error:
+                log_warn(
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "item_journal_entity_caches",
+                        "obj": str(entity),
+                        "key": "traits",
+                    },
+                )
         actor = self.actor
-        if self.traits is not None:
-            restore_traits(actor, self.traits)
         if self.inventory is not None:
             restore_attribute_best_effort(actor, "inventory", self.inventory)
         if self.quest_log is not None:
             restore_quest_log(actor, self.quest_log)
-        if self.buffs is not None:
-            restore_attribute_best_effort(actor, "buffs", self.buffs)
-        if self.sexual is not None:
-            restore_attribute_best_effort(
-                actor, "sexual_traits", self.sexual, category="traits"
-            )
         if self.mirror is not None:
             try:
                 _flush_deleted_instance(self.mirror)
@@ -233,18 +404,6 @@ class ItemTouchedJournal:
                     "stage": "item_journal_contents_cache",
                     "obj": str(actor),
                     "key": "contents_cache",
-                },
-            )
-        try:
-            _refresh_advance_entity_caches(actor)
-        except Exception as error:
-            log_warn(
-                "rollback_restore_failed",
-                exc=error,
-                context={
-                    "stage": "item_journal_entity_caches",
-                    "obj": str(actor),
-                    "key": "traits",
                 },
             )
 
@@ -338,6 +497,88 @@ def _select_mirror(entity: Any, item_key: str) -> Any | None:
 
 def _rejected(reason: ItemUseReason) -> ItemUsePreflight:
     return ItemUsePreflight(allowed=False, reason=reason, plan=None)
+
+
+def _group_candidates(context: Any, actor: Any, shorthand: str) -> list[Any]:
+    """Expand a group scope's candidates through a context without a battlefield.
+
+    ``expand_target_shorthand`` is battlefield-only (it rejects a context
+    without one). Outside a session the same self/ally/enemy filter runs
+    over the room's present entities through the very
+    ``context.relation_to`` the resolver itself will consult, so the room
+    expansion cannot disagree with the validation that follows: out of
+    combat every non-actor is allied (design D6), which makes ``all`` and
+    ``all-allies`` coincide and leaves ``all-enemies`` with no candidate.
+    Candidates are deduplicated by identity — a room's contents include the
+    actor, and the resolver rejects repeated AREA identities.
+    """
+    room = getattr(context, "room", None)
+    if room is None:
+        return []
+    wanted = (
+        {Relation.ENEMY}
+        if shorthand == "all-enemies"
+        else {Relation.SELF, Relation.ALLY}
+    )
+    seen: dict[int, Any] = {}
+    for entity in getattr(room, "contents", ()):
+        if id(entity) in seen:
+            continue
+        if context.relation_to(actor, entity) in wanted:
+            seen[id(entity)] = entity
+    return list(seen.values())
+
+
+def _resolve_effect_targets(
+    request: ItemUseRequest, effect: ItemEffect, context: Any
+) -> list[Any] | ItemUsePreflight:
+    """Resolve one effect's targets through the shared resolver (design D2/D5).
+
+    Self scopes bind the actor through the requirement's SELF spec; single
+    scopes consume the request's one explicit target (never supplied →
+    ``no_target``); group scopes expand their shorthand through the context.
+    Every candidate set then passes the same
+    ``resolve_targets(actor, context, requirement, candidates)`` a skill's
+    targets pass — presence, aliveness, range, faction, no second resolver.
+    A rejected resolver surfaces as ``target_invalid`` with the resolver's
+    own reason as detail (D5). A non-entity target (a raw string key left
+    unresolved, a group shorthand token) fails closed the same way before
+    reaching validators that require entity surface.
+    """
+    rule = item_effects.scope_targeting_rule(effect.scope)
+    if effect.scope is ItemTargetScope.SELF:
+        candidates: list[Any] = [request.actor]
+    elif effect.scope is ItemTargetScope.SINGLE:
+        if request.target is None:
+            return _rejected(ItemUseReason.NO_TARGET)
+        target = request.target
+        if not hasattr(target, "location"):
+            # Entities carry a location; a bare key or shorthand token
+            # never resolves. Naming the resolver's own presence reason
+            # keeps the detail contract uniform with a refused candidate.
+            return _rejected(ItemUseReason.TARGET_INVALID)
+        candidates = [target]
+    else:
+        candidates = (
+            expand_target_shorthand(request.actor, context, rule.shorthand)
+            if context.battlefield is not None
+            else _group_candidates(context, request.actor, rule.shorthand)
+        )
+    try:
+        return resolve_targets(
+            request.actor, context, rule.requirement, candidates
+        )
+    except Exception as error:  # observability: ignore R1: only the resolver's own typed rejection is translated; anything else propagates
+        from world.rules.action import RejectedAction
+
+        if not isinstance(error, RejectedAction):
+            raise
+        return ItemUsePreflight(
+            allowed=False,
+            reason=ItemUseReason.TARGET_INVALID,
+            detail=f"{error.reason.value}: {error.detail}",
+            plan=None,
+        )
 
 
 def _active_matching_keys(entity: Any, matches: Callable[[str], bool]) -> tuple[str, ...]:
@@ -483,20 +724,37 @@ def _plan_status_step(
 
 
 def preflight_item_use(
-    request: ItemUseRequest, *, in_combat: bool
+    request: ItemUseRequest,
+    *,
+    in_combat: bool,
+    context: Any | None = None,
 ) -> ItemUsePreflight:
     """Evaluate item-use eligibility against current state, writing nothing.
 
     Resolves the canonical registry definition and the profile's live
     effect-map entry, verifies at least one held key in the canonical
     inventory, validates the current mode against the definition, then
-    computes one step per EFFECTIVE declared effect in profile order
-    (design §5.1). Every step is target-qualified: this change accepts only
-    the ``self`` scope, so the actor is the sole target of every step. An
-    item whose every effect is ineligible rejects with the uniform bound
-    reason when every step names the same one, otherwise with ``no_effect``
-    (design §5.4). It never mutates inventory, traits, quest state,
-    equipment, combat state, clock, sexual state, or presentation.
+    computes one step per EFFECTIVE EFFECT-AND-TARGET pair in profile order
+    (design §5.1/§5.2). Each effect resolves its targets through the shared
+    ``resolve_targets`` with the requirement its scope maps to — the
+    identical presence/alive/range/faction pipeline a skill's targets pass —
+    and group scopes expand through the caller-supplied action context
+    (battlefield roster shorthand in a session, room occupants out of one;
+    design D2/D6). ``in_combat`` stays an independent parameter: it gates the
+    item's ``combat_allowed`` permission, which is a question about the item,
+    while the context is a question about the world. When ``context`` is
+    omitted, resolution builds the room context from the actor's location —
+    the exploration-side convenience; a resolving request in combat without a
+    context is a caller error and raises ``TypeError`` rather than silently
+    validating against the wrong world. A single-scope effect with no
+    supplied target rejects ``no_target``; a rejected resolver rejects
+    ``target_invalid`` carrying the resolver's own reason as ``detail``
+    (design D5). An item whose every effect is ineligible against every of
+    its targets rejects with the uniform bound reason when every step names
+    the same one, otherwise with ``no_effect`` — one effective pair anywhere
+    carries the whole use (design §5.4). It never mutates inventory, traits,
+    quest state, equipment, combat state, clock, sexual state, or
+    presentation.
     """
     definition = ITEM_REGISTRY.get(request.item_key)
     if definition is None:
@@ -523,21 +781,34 @@ def preflight_item_use(
         return _rejected(ItemUseReason.NOT_ALIVE)
     steps: list[ItemEffectStep] = []
     reasons: list[ItemUseReason] = []
+    needs_resolution = any(
+        effect.scope is not ItemTargetScope.SELF for effect in profile.effects
+    )
+    if context is None:
+        # Legacy no-context callers keep working: out of combat the room
+        # context is the only world view a preflight needs. In combat the
+        # session's BattlefieldActionContext is mandatory the moment an
+        # effect reaches beyond the actor (design D2).
+        if in_combat and needs_resolution:
+            raise TypeError(
+                "preflight_item_use requires the caller's action context "
+                "to resolve non-self scopes in combat (design D2); pass "
+                "the BattlefieldActionContext the session already holds"
+            )
+        context = RoomActionContext(request.actor.location)
     for effect in profile.effects:
-        # Self-only scope seam (design D4): the loader rejects any other
-        # scope at startup with a message naming add-item-effect-targeting;
-        # a profile injected past the loader (test scope) still settles
-        # fail-closed as an effect this change cannot resolve.
-        if effect.scope is not ItemTargetScope.SELF:
-            return _rejected(ItemUseReason.UNKNOWN_EFFECT)
-        if isinstance(effect, GaugeAdjustEffect):
-            step = _plan_gauge_step(effect, request.actor)
-        else:
-            step = _plan_status_step(effect, request.actor)
-        if isinstance(step, ItemEffectStep):
-            steps.append(step)
-        else:
-            reasons.append(step)
+        resolved = _resolve_effect_targets(request, effect, context)
+        if isinstance(resolved, ItemUsePreflight):
+            return resolved
+        for target in resolved:
+            if isinstance(effect, GaugeAdjustEffect):
+                step = _plan_gauge_step(effect, target)
+            else:
+                step = _plan_status_step(effect, target)
+            if isinstance(step, ItemEffectStep):
+                steps.append(step)
+            else:
+                reasons.append(step)
     if not steps:
         if len(reasons) == 1 or len(set(reasons)) == 1:
             return _rejected(reasons[0])
@@ -731,21 +1002,30 @@ def _apply_plan(
 
 
 def resolve_item_use(
-    request: ItemUseRequest, *, in_combat: bool
+    request: ItemUseRequest, *, in_combat: bool, context: Any | None = None
 ) -> ItemUseResult:
     """Atomically settle one item use against current canonical state.
 
     Repeats preflight (a presented descriptor is advisory only), applies the
     complete multi-step effect/consumption plan inside one transaction, and
     restores the durable and in-process surfaces the journal captured —
-    including the sexual surface a pleasure step writes — on any failure
-    before re-raising. A rejection performs no write and emits no EventLog.
+    including the per-entity sexual surface a pleasure step writes, for
+    **every** touched entity — on any failure before re-raising. A rejection
+    performs no write and emits no EventLog, carrying the preflight detail
+    (the resolver's own reason for a ``target_invalid``) unchanged.
     """
-    preflight = preflight_item_use(request, in_combat=in_combat)
+    preflight = preflight_item_use(request, in_combat=in_combat, context=context)
     if not preflight.allowed or preflight.plan is None:
-        return ItemUseResult(outcome="rejected", reason=preflight.reason)
+        return ItemUseResult(
+            outcome="rejected", reason=preflight.reason, detail=preflight.detail
+        )
     plan = preflight.plan
-    journal = ItemTouchedJournal.capture(request.actor)
+    # Capture every entity the plan steps on before the first write (design
+    # D3): a lazy per-target capture could not restore state an earlier
+    # target's write cascade touched.
+    journal = ItemTouchedJournal.capture(
+        request.actor, [step.target for step in plan.steps]
+    )
     try:
         with transaction.atomic():
             settled = _apply_plan(plan, journal)
@@ -767,7 +1047,11 @@ def resolve_item_use(
 
 
 def use_item(
-    actor: Any, item_key: str, *, clock: WorldClock | None = None
+    actor: Any,
+    item_key: str,
+    *,
+    target: Any | None = None,
+    clock: WorldClock | None = None,
 ) -> ItemUseSettlement:
     """Settle one out-of-combat item use plus its canonical six-second cost.
 
@@ -775,9 +1059,12 @@ def use_item(
     player-driven world's command-source advance in one outer transaction. On
     any failure the clock tick, every callback-owned advance surface, and the
     item journal's trait/inventory/quest/mirror caches are restored together
-    before the exception propagates. An active combat session rejects with
-    ``active_combat`` so item consumption can never bypass a combat round; a
-    rejection advances no time.
+    — for every touched entity — before the exception propagates. ``target``
+    is the caller's single explicit choice consumed by single-scope effects
+    (design D1); resolution uses the room context built from the actor's
+    location. An active combat session rejects with ``active_combat`` so item
+    consumption can never bypass a combat round; a rejection advances no
+    time.
     """
     from world.rules.combat_session import is_in_active_session
 
@@ -787,11 +1074,15 @@ def use_item(
                 outcome="rejected", reason=ItemUseReason.ACTIVE_SESSION
             )
         )
-    request = ItemUseRequest(actor=actor, item_key=item_key)
-    preflight = preflight_item_use(request, in_combat=False)
+    request = ItemUseRequest(actor=actor, item_key=item_key, target=target)
+    preflight = preflight_item_use(
+        request, in_combat=False, context=RoomActionContext(actor.location)
+    )
     if not preflight.allowed:
         return ItemUseSettlement(
-            ItemUseResult(outcome="rejected", reason=preflight.reason)
+            ItemUseResult(
+                outcome="rejected", reason=preflight.reason, detail=preflight.detail
+            )
         )
     world_clock = clock if clock is not None else get_world_clock()
     registry = build_advance_snapshot_registry(
@@ -802,7 +1093,11 @@ def use_item(
     result: ItemUseResult | None = None
     try:
         with transaction.atomic():
-            result = resolve_item_use(request, in_combat=False)
+            result = resolve_item_use(
+                request,
+                in_combat=False,
+                context=RoomActionContext(actor.location),
+            )
             if result.outcome == "success":
                 events = tuple(
                     world_clock.advance(
@@ -814,8 +1109,9 @@ def use_item(
         # clock seam restores the tick and every callback-owned surface from
         # the pre-transaction snapshots, and the item journal restores the
         # trait/inventory/quest caches plus the deleted-mirror idmapper and
-        # contents caches. If the resolver itself failed it already restored
-        # its own journal; re-running the restore is an idempotent write.
+        # contents caches — per captured entity for the multi-entity
+        # surfaces. If the resolver itself failed it already restored its own
+        # journal; re-running the restore is an idempotent write.
         _restore_clock_tick(world_clock, tick_snapshot)
         _restore_advance_registry(registry, (actor,))
         if result is not None and result.journal is not None:

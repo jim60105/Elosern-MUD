@@ -530,3 +530,43 @@ class RoomActionContextEventContextTests(unittest.TestCase):
     def test_none_event_context_gains_only_the_room_key(self):
         room = object()
         self.assertEqual(RoomActionContext(room).event_context, {"room": room})
+
+
+class ItemSkillResolverParityTests(unittest.TestCase):
+    """Delta (item-effect-rulebook): "Item and skill targets validate identically"."""
+
+    @covers_requirement(
+        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
+    )
+    def test_item_scope_and_single_target_skill_reject_the_same_dead_candidate(self):
+        # Task 2.2: the requirement an item scope maps to and the requirement
+        # a single-target skill produces are consumed by one resolver, so one
+        # dead candidate must be refused for the identical reason through both
+        # producers — no second validation chain exists on the item side.
+        from world.rules.item_effects import ItemTargetScope, scope_targeting_rule
+
+        room = object()
+        actor = _Entity("actor", room)
+        dead = _Entity("dead", room)
+        dead.traits.hp.value = 0
+        item_requirement = scope_targeting_rule(ItemTargetScope.SINGLE).requirement
+        skill_requirement = _T_ANY_SINGLE.target_requirement
+        with self.subTest(producer="item"):
+            with self.assertRaises(RejectedAction) as item_caught:
+                resolve_targets(
+                    actor, RoomActionContext(room), item_requirement, [dead]
+                )
+        with self.subTest(producer="skill"):
+            with self.assertRaises(RejectedAction) as skill_caught:
+                resolve_targets(
+                    actor, RoomActionContext(room), skill_requirement, [dead]
+                )
+        self.assertIs(
+            item_caught.exception.reason, RejectReason.TARGET_DEAD
+        )
+        self.assertEqual(
+            item_caught.exception.reason, skill_caught.exception.reason
+        )
+        self.assertEqual(
+            item_caught.exception.detail, skill_caught.exception.detail
+        )

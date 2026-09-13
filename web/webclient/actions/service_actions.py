@@ -28,6 +28,8 @@ from world.rules.combat_result import emit_settlement, settle_to_oob_result
 from world.rules.combat_session import (
     CombatSessionError,
     is_in_active_session,
+    read_session,
+    reconstruct_battlefield,
     submit_player_item_use,
 )
 from world.rules.economy import TradeError, buy, sell
@@ -205,8 +207,31 @@ def _validate_inventory_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``inventory.use`` payload (one item key)."""
-    return _validate_inventory_item_payload(payload)
+    """Validate the exact ``inventory.use`` payload (item key plus optional target).
+
+    Accepted forms are exactly ``{item_key}`` or ``{item_key, target_key}``.
+    ``target_key`` names *whom* an effect reaches and never *what* the item
+    does (add-item-effect-targeting): it is consumed only by an effect the
+    rulebook already scoped to a single entity, and a token the adapter
+    cannot resolve to a present entity — a group shorthand included — is the
+    deterministic preflight's fail-closed rejection, never a silently
+    ignored reach.
+    """
+    if not isinstance(payload, dict):
+        raise ServiceActionError("payload must be an object")
+    unknown = set(payload) - {"item_key", "target_key"}
+    if unknown:
+        raise ServiceActionError(f"payload has unknown fields {sorted(unknown)}")
+    if "item_key" not in payload:
+        raise ServiceActionError("payload requires item_key")
+    validated = {"item_key": _require_key_identifier(
+        payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
+    )}
+    if "target_key" in payload:
+        validated["target_key"] = _require_key_identifier(
+            payload["target_key"], "target_key", MAX_KEY_CODE_POINTS
+        )
+    return validated
 
 
 def validate_inventory_toggle_equip_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -500,6 +525,41 @@ def _item_display_name(item_key: str) -> str:
     return definition.display_name_zh if definition is not None else item_key
 
 
+def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
+    """Resolve one ``target_key`` to a present entity for item targeting.
+
+    Inside an active session the battlefield roster is the world view;
+    outside one, the actor's current location's contents are. An
+    unresolvable token — an unknown key or a group shorthand — travels on
+    as the raw string, where the deterministic preflight's fail-closed
+    target guard rejects it with the stable invalid-target reason: the
+    client can never select a reach the rulebook did not grant.
+    """
+    if is_in_active_session(actor):
+        record = read_session(actor)
+        if record is not None:
+            try:
+                roster = reconstruct_battlefield(actor, record).roster
+            except CombatSessionError:
+                # A session record whose battlefield no longer reconstructs
+                # (the actor moved while engaged) cannot name a roster
+                # entity; the raw token travels on and the submission's own
+                # session validation renders the stable rejection — never
+                # an exception escaping the adapter.
+                roster = None
+            if roster is not None:
+                entity = roster.get(target_key)
+                if entity is not None:
+                    return entity
+        return target_key
+    location = getattr(actor, "location", None)
+    if location is not None:
+        for obj in location.contents:
+            if getattr(obj, "key", None) == target_key:
+                return obj
+    return target_key
+
+
 def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Resolve actor mode and delegate one item use to its deterministic facade.
 
@@ -507,12 +567,21 @@ def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     round through ``submit_player_item_use``; out of combat it settles with
     its canonical six-second world cost through ``use_item``. Success always
     publishes a full snapshot (empty affected-panel set).
+
+    An optional ``target_key`` names whom a single-scope effect reaches; it
+    never changes what the item does, and a self-scoped item ignores it
+    exactly as the rulebook's scopes dictate.
     """
     del session
     item_key = payload["item_key"]
+    target = (
+        _resolve_inventory_target(actor, payload["target_key"])
+        if "target_key" in payload
+        else None
+    )
     if is_in_active_session(actor):
         try:
-            result = submit_player_item_use(actor, item_key)
+            result = submit_player_item_use(actor, item_key, target=target)
         except CombatSessionError as error:
             return _session_rejected(error.args[0])
         if result["outcome"] == "rejected":
@@ -521,7 +590,7 @@ def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         settled = settle_to_oob_result(result)
         settled["affected_panels"] = ()
         return settled
-    settlement = use_item(actor, item_key)
+    settlement = use_item(actor, item_key, target=target)
     result = settlement.result
     if result.outcome != "success":
         return _rejected(result.reason)

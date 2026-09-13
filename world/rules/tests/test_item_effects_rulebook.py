@@ -29,6 +29,7 @@ from world.rules.item_effects import (
     StatusRemoveEffect,
     load_item_effect_rules,
     reload_item_effect_rules,
+    scope_targeting_rule,
 )
 
 # A fabricated one-entry registry/buff table: the validator resolves the
@@ -80,7 +81,7 @@ class CanonicalRulebookTests(unittest.TestCase):
         self.assertEqual(set(ITEM_EFFECT_PROFILES), usable)
 
     @covers_requirement(
-        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
+        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
     )
     def test_every_shipped_effect_is_self_scoped(self):
         # Delta scenario: "Every shipped item is self-scoped".
@@ -306,19 +307,57 @@ class RegistryAlignmentTests(unittest.TestCase):
 
 
 class ScopeVocabularyTests(unittest.TestCase):
-    """Delta: only the acting entity is accepted until targeting ships."""
+    """Delta: the five-scope vocabulary loads and maps to one targeting rule each."""
 
-    @covers_requirement(
-        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
-    )
-    def test_every_non_self_scope_is_refused_naming_its_owner(self):
-        for scope in ("single", "all-allies", "all-enemies", "all"):
+    def test_every_scope_value_loads_and_maps_to_its_targeting_rule(self):
+        # Delta scenario: "Every scope value loads": one effect at each of the
+        # five scopes validates, and each scope resolves to exactly one
+        # targeting requirement (self/self-only, single/any, group/area+shorthand).
+        from world.rules.targeting import FactionConstraint, TargetRequirement, TargetSpec
+
+        loaded = _load_via_validate(
+            _document(
+                {"stat": "hp", "amount": 5, "scope": "self"},
+                {"stat": "mp", "amount": 5, "scope": "single"},
+                {"stat": "sp", "amount": 5, "scope": "all-allies"},
+                {"stat": "pleasure", "amount": 5, "scope": "all-enemies"},
+                {"apply_status": "t_test_buff", "scope": "all"},
+            )
+        )
+        scopes = [effect.scope for effect in loaded["profiles"]["t_test_item"].effects]
+        self.assertEqual(
+            scopes,
+            [
+                ItemTargetScope.SELF,
+                ItemTargetScope.SINGLE,
+                ItemTargetScope.ALL_ALLIES,
+                ItemTargetScope.ALL_ENEMIES,
+                ItemTargetScope.ALL,
+            ],
+        )
+        # The profile shape keeps its per-stat uniqueness across scopes.
+        rules = {scope: scope_targeting_rule(scope) for scope in ItemTargetScope}
+        self.assertEqual(
+            rules[ItemTargetScope.SELF].requirement,
+            TargetRequirement(TargetSpec.SELF, FactionConstraint.SELF_ONLY),
+        )
+        self.assertIsNone(rules[ItemTargetScope.SELF].shorthand)
+        self.assertEqual(
+            rules[ItemTargetScope.SINGLE].requirement,
+            TargetRequirement(TargetSpec.SINGLE),
+        )
+        self.assertIsNone(rules[ItemTargetScope.SINGLE].shorthand)
+        for scope, shorthand in (
+            (ItemTargetScope.ALL_ALLIES, "all-allies"),
+            (ItemTargetScope.ALL_ENEMIES, "all-enemies"),
+            (ItemTargetScope.ALL, "all"),
+        ):
             with self.subTest(scope=scope):
-                with self.assertRaises(ItemEffectsRulebookError) as caught:
-                    _load_via_validate(
-                        _document({"stat": "hp", "amount": 5, "scope": scope})
-                    )
-                self.assertIn("add-item-effect-targeting", str(caught.exception))
+                self.assertEqual(
+                    rules[scope].requirement,
+                    TargetRequirement(TargetSpec.AREA),
+                )
+                self.assertEqual(rules[scope].shorthand, shorthand)
 
     def test_unknown_scope_word_fails(self):
         with self.assertRaises(ItemEffectsRulebookError):

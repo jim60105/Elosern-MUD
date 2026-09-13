@@ -17,11 +17,13 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.rooms import Room
+from typeclasses.npcs import NPC
 from world.lore.items import ItemUseMechanics
 from world.rules.item_effects import (
     GaugeAdjustEffect,
     ItemEffectProfile,
     ItemStat,
+    ItemTargetScope,
 )
 from world.rules.action import ActionRequest
 from world.rules.clock import WorldClock
@@ -31,6 +33,7 @@ from world.rules.combat import (
 )
 from world.rules.combat_session import (
     engage,
+    engage_group,
     read_session,
     submit_player_item_use,
     submit_opening_action,
@@ -42,11 +45,20 @@ from world.rules.equipment import (
 )
 from world.rules.items import ItemUseReason, ItemUseResult
 from world.rules.overwhelm import compress_event_logs, resolve_overwhelm
+from world.rules.buffs import apply_buff, entity_active_buffs
+from world.rules.party import join_party
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, FakeEntity
 
 from world.tests.synthetic_data import SYNTH_ITEMS, make_item
 
-from ._combat_session_helpers import _monster, _player, live_item_registry, open_synthetic_scope
+from ._combat_session_helpers import (
+    _race_key,
+    _monster,
+    _player,
+    live_item_effect_profiles,
+    live_item_registry,
+    open_synthetic_scope,
+)
 
 _TONIC_KEY = "t_ember_spray"  # kit SELF_HEAL consumable, combat-allowed
 _FANG_KEY = "t_iron_fang"  # kit weapon: registered, not usable
@@ -454,6 +466,170 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
 
+class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
+    """Design 5.8: the per-target journal rolls back every touched entity."""
+
+    def setUp(self):
+        super().setUp()
+        open_synthetic_scope(
+            self,
+            "items",
+            extra={
+                "items": {_MANA_KEY: _MANA_VIAL},
+                "item_effect_profiles": {_MANA_KEY: _MANA_VIAL_PROFILE},
+            },
+        )
+        self.room = create_object(Room, key="multi item arena")
+        self.player = _player("multi duelist")
+        self.player.location = self.room
+        self.player.db.inventory = []
+        self.player.db.equipment = None
+        self.companion = create_object(NPC, key="multi companion")
+        self.companion.race = _race_key()
+        self.companion.apply_race_baseline()
+        self.companion.location = self.room
+        join_party(self.companion, self.player)
+        self.monster = _monster("troll", hp=10000, atk=0)
+        self.monster.location = self.room
+        # ALL-scoped profile: one HP+40 step and one pleasure+30 step per
+        # present entity. The actor sits at full HP (its HP step is
+        # ineffective and skipped); the companion is hurt so its HP step
+        # lands, and its pleasure sits mid-band so its pleasure step lands
+        # through the memoized handler.
+        live_item_effect_profiles()[_MANA_KEY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.ALL
+                ),
+                GaugeAdjustEffect(
+                    stat=ItemStat.PLEASURE, amount=30, scope=ItemTargetScope.ALL
+                ),
+            )
+        )
+
+    @covers_requirement(
+        "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
+    )
+    def test_upkeep_fault_restores_actor_and_companion_surfaces(self):
+        # The shipped injection pattern (patch a post-settlement seam inside
+        # the round with RuntimeError) extended across every target surface:
+        # the ALL-scoped use writes traits, buffs, and the sexual handler of
+        # both the actor and the companion, deletes the actor's mirror, and
+        # then an injected upkeep fault must walk every captured entity back.
+        self.player.traits.hp.current = int(self.player.traits.hp.max)
+        self.companion.traits.hp.current = 50
+        self.companion.sexual.pleasure.base = 10
+        apply_buff(self.player, "poisoned")
+        apply_buff(self.companion, "poisoned")
+        self.player.db.inventory = [_MANA_KEY]
+        materialize_registry_object(self.player, _MANA_KEY)
+        mirror_pk = next(
+            obj.id
+            for obj in self.player.contents
+            if registry_key_for_object(obj) == _MANA_KEY
+        )
+        engage(self.player, self.monster)
+        # Touch the companion's handler pre-use so its in-process cache is
+        # live across the settlement: a restore that skipped the per-target
+        # cache drop would roll back stored sexual state while a stale
+        # companion.sexual handler still reported the rolled-back gain.
+        self.assertEqual(int(self.companion.sexual.pleasure.base), 10)
+        companion_hp_before = int(self.companion.traits.hp.current)
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("upkeep boom")
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_item_use(self.player, _MANA_KEY)
+        # Actor surfaces: inventory unit, buffs, deleted mirror instance.
+        self.assertEqual(self.player.db.inventory.count(_MANA_KEY), 1)
+        self.assertEqual(entity_active_buffs(self.player), {"poisoned"})
+        self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
+        self.assertIn(
+            mirror_pk,
+            [
+                obj.id
+                for obj in self.player.contents
+                if registry_key_for_object(obj) == _MANA_KEY
+            ],
+        )
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        # Companion surfaces: traits, buffs, and the sexual state restored
+        # through a live handler re-read (the per-target cache drop).
+        self.assertEqual(
+            int(self.companion.traits.hp.current), companion_hp_before
+        )
+        self.assertEqual(entity_active_buffs(self.companion), {"poisoned"})
+        self.assertEqual(int(self.companion.sexual.pleasure.base), 10)
+
+    @covers_requirement(
+        "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
+    )
+    def test_four_target_item_still_consumes_exactly_one_round(self):
+        # Delta: "A four-target item still consumes one round" — player,
+        # companion, and two foes all take the ALL-scoped step within one
+        # initiative position; the round count moves by one and the clock
+        # gains no separate item-use time.
+        from world.rules.clock import WorldClock
+
+        live_item_effect_profiles()[_MANA_KEY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.ALL
+                ),
+            )
+        )
+        second = _monster("cave bear", hp=100, atk=0)
+        second.location = self.room
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 30
+        self.companion.traits.hp.current = int(self.companion.traits.hp.max) - 50
+        self.monster.traits.hp.current = 60
+        second.traits.hp.current = 60
+        self.player.db.inventory = [_MANA_KEY, _MANA_KEY]
+        engage_group(self.player, [self.monster, second])
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_item_use(self.player, _MANA_KEY)
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+        self.assertEqual(clock.tick, 0)
+        item_entries = [
+            entry
+            for log in result["logs"]
+            for entry in log.entries
+            if entry.kind == "item_used"
+        ]
+        self.assertEqual(
+            sorted(entry.target for entry in item_entries),
+            sorted(
+                [
+                    self.player.key,
+                    self.companion.key,
+                    self.monster.key,
+                    second.key,
+                ]
+            ),
+        )
+        # Consumption never scales with target count: two carried, one left.
+        self.assertEqual(self.player.db.inventory.count(_MANA_KEY), 1)
+        self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max))
+        self.assertEqual(
+            int(self.companion.traits.hp.current),
+            int(self.companion.traits.hp.max) - 10,
+        )
+        self.assertEqual(int(self.monster.traits.hp.current), 100)
+        self.assertEqual(int(second.traits.hp.current), 100)
+
+
 class CompressedItemTurnTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
@@ -484,8 +660,8 @@ class CompressedItemTurnTests(EvenniaTestCase):
         item_calls: list[ItemUseRequest] = []
         resolver_calls: list[ActionRequest] = []
 
-        def item_resolver(request, *, in_combat):
-            item_calls.append(request)
+        def item_resolver(request, *, in_combat, context):
+            item_calls.append((request, context))
             return ItemUseResult(
                 outcome="success",
                 event_log=_item_used_log("elf", _TONIC_KEY),
@@ -546,7 +722,12 @@ class CompressedItemTurnTests(EvenniaTestCase):
         self.assertEqual(result.rounds_elapsed, 2)
         self.assertTrue(result.battle_over)
         self.assertEqual(len(item_calls), 1)
-        self.assertTrue(item_calls[0].actor.key, "elf")
+        request, supplied_context = item_calls[0]
+        self.assertTrue(request.actor.key, "elf")
+        # Task 5.1: the round's item branch supplies the battlefield as the
+        # action context, so single and group scopes resolve through the
+        # same roster validators a skill's targets pass.
+        self.assertIs(supplied_context.battlefield, self.field)
         self.assertEqual(len(resolver_calls), 1)
         self.assertEqual(resolver_calls[0].skill_key, _ATTACK_SKILL_KEY)
         self.assertEqual(journals, [sentinel])

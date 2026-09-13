@@ -9,11 +9,13 @@ entry is simply unusable through the registry's ``use_mechanics`` flag, never
 through a magic effect key.
 
 Forward-declared seam (design D4, tasks 4.4): the full target-scope
-vocabulary is defined and validated here, but this change accepts ONLY
-``self``; a rulebook entry naming any other scope fails validation with a
-message naming ``add-item-effect-targeting``, the change that lifts the
-restriction. The vocabulary itself is frozen — the owning change adds reach
-behaviour, never new scope words.
+vocabulary is defined and validated here, and every member maps to exactly
+one :class:`~world.rules.targeting.TargetRequirement` plus the group
+shorthand its candidates expand through (``scope_targeting_rule``,
+add-item-effect-targeting). An item's reach is a property of the item: the
+rulebook fixes it, and no caller input widens or narrows it. The vocabulary
+itself is frozen — the targeting change adds reach behaviour, never new
+scope words.
 
 Consumers resolve an item's profile through the module-level
 :data:`ITEM_EFFECT_PROFILES` map at call time (``items.py`` reads the module
@@ -30,6 +32,9 @@ from typing import Any, Union
 
 import yaml
 
+from world.rules.targeting import TargetRequirement
+from world.skills.registry import FactionConstraint, TargetSpec
+
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.clock import MAX_ADVANCE_SECONDS
 
@@ -39,10 +44,6 @@ _RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "item_effects.yaml"
 #: loader rejects larger magnitudes so a malformed rulebook can never
 #: smuggle an unbounded heal into settlement.
 MAX_EFFECT_AMOUNT = 9999
-
-#: The change that owns non-``self`` target reach; every rejection of a
-#: declared-but-unaccepted scope names it (design D4).
-_TARGETING_OWNER = "add-item-effect-targeting"
 
 #: The polarity-wide words ``world.rules.buffs.remove_by_selector``
 #: understands. A status-apply entry must name one concrete definition key;
@@ -66,8 +67,11 @@ class ItemStat(StrEnum):
 class ItemTargetScope(StrEnum):
     """The closed vocabulary of effect target scopes.
 
-    Every member is validated by the loader; only :attr:`SELF` is accepted
-    for settlement until ``add-item-effect-targeting`` lands (design D4).
+    Every member is validated by the loader and maps to exactly one
+    :class:`~world.rules.targeting.TargetRequirement` plus the group
+    shorthand its candidates expand through (item-effect-model design
+    §4.2/§5.2). An item's reach is a property of the item: the rulebook
+    fixes it, and no caller input widens or narrows it.
     """
 
     SELF = "self"
@@ -75,6 +79,49 @@ class ItemTargetScope(StrEnum):
     ALL_ALLIES = "all-allies"
     ALL_ENEMIES = "all-enemies"
     ALL = "all"
+
+
+@dataclass(frozen=True)
+class ScopeTargetingRule:
+    """The fixed targeting rule one scope value maps to (design §4.2).
+
+    ``requirement`` is the single :class:`TargetRequirement` the shared
+    resolver consumes for the scope — the identical presence/alive/range/
+    faction pipeline a skill's targets pass. ``shorthand`` names the group
+    the scope reaches when it is a group scope (``None`` for the acting
+    entity and the single explicit target); group candidates expand through
+    the action context by that shorthand's semantics, never by a caller
+    choice.
+    """
+
+    requirement: TargetRequirement
+    shorthand: str | None = None
+
+
+_SCOPE_TARGETING_RULES: dict[ItemTargetScope, ScopeTargetingRule] = {
+    ItemTargetScope.SELF: ScopeTargetingRule(
+        TargetRequirement(TargetSpec.SELF, FactionConstraint.SELF_ONLY)
+    ),
+    ItemTargetScope.SINGLE: ScopeTargetingRule(
+        TargetRequirement(TargetSpec.SINGLE)
+    ),
+    ItemTargetScope.ALL_ALLIES: ScopeTargetingRule(
+        TargetRequirement(TargetSpec.AREA), "all-allies"
+    ),
+    ItemTargetScope.ALL_ENEMIES: ScopeTargetingRule(
+        TargetRequirement(TargetSpec.AREA), "all-enemies"
+    ),
+    ItemTargetScope.ALL: ScopeTargetingRule(
+        TargetRequirement(TargetSpec.AREA), "all"
+    ),
+}
+
+
+def scope_targeting_rule(scope: ItemTargetScope) -> ScopeTargetingRule:
+    """Return the one targeting rule the rulebook fixed for ``scope``."""
+    if not isinstance(scope, ItemTargetScope):
+        raise ValueError(f"scope must be an ItemTargetScope member, got {scope!r}")
+    return _SCOPE_TARGETING_RULES[scope]
 
 
 @dataclass(frozen=True)
@@ -229,18 +276,13 @@ def _parse_effect_entry(entry: Any, field: str, buff_definitions: Mapping[str, A
 
 
 def _parse_scope(value: Any, field: str) -> ItemTargetScope:
-    """Parse one scope word; declared-but-unaccepted scopes name the owner."""
+    """Parse one scope word from the closed five-member vocabulary."""
     if not isinstance(value, str):
         raise ItemEffectsRulebookError(f"{field}: scope must be a string")
     try:
         scope = ItemTargetScope(value)
     except ValueError:
         raise ItemEffectsRulebookError(f"{field}: unknown target scope {value!r}") from None
-    if scope is not ItemTargetScope.SELF:
-        raise ItemEffectsRulebookError(
-            f"{field}: target scope {value!r} is rejected until "
-            f"{_TARGETING_OWNER} lands"
-        )
     return scope
 
 
@@ -417,9 +459,11 @@ __all__ = [
     "ITEM_USE_SECONDS",
     "MAX_EFFECT_AMOUNT",
     "GaugeAdjustEffect",
+    "ScopeTargetingRule",
     "StatusApplyEffect",
     "StatusRemoveEffect",
     "load_item_effect_rules",
     "reload_item_effect_rules",
+    "scope_targeting_rule",
     "validate_item_effect_rules",
 ]
