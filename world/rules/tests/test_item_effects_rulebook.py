@@ -81,7 +81,7 @@ class CanonicalRulebookTests(unittest.TestCase):
         self.assertEqual(set(ITEM_EFFECT_PROFILES), usable)
 
     @covers_requirement(
-        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
+        "item-effect-rulebook::only-the-acting-entity-is-an-accepted-scope-until-item-targeting-ships"
     )
     def test_every_shipped_effect_is_self_scoped(self):
         # Delta scenario: "Every shipped item is self-scoped".
@@ -309,9 +309,6 @@ class RegistryAlignmentTests(unittest.TestCase):
 class ScopeVocabularyTests(unittest.TestCase):
     """Delta: the five-scope vocabulary loads and maps to one targeting rule each."""
 
-    @covers_requirement(
-        "item-effect-rulebook::an-effect-s-scope-is-fixed-by-the-rulebook-and-maps-to-one-targeting-requirement"
-    )
     def test_every_scope_value_loads_and_maps_to_its_targeting_rule(self):
         # Delta scenario: "Every scope value loads": one effect at each of the
         # five scopes validates, and each scope resolves to exactly one

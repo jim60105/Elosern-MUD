@@ -43,7 +43,10 @@ from world.rules.guild_offers import (
     QuestReward,
     register_guild_offer,
 )
-from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._combat_session_helpers import (
+    live_item_effect_profiles,
+    open_synthetic_scope,
+)
 from world.rules.tests._guild_service_probes import (
     a_live_monster_tier_key,
     install_synthetic_catalog,
@@ -1342,6 +1345,35 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
             row.action.reason_message,
             "你的體力已經全滿。",
         )
+
+    def test_single_scope_row_disabled_with_no_target_reason(self):
+        # add-item-effect-targeting 6.3: the descriptor preflight builds the
+        # RoomActionContext explicitly, so a single-scope item's row carries
+        # the stable no-target reason instead of appearing enabled with a
+        # target the webclient never supplied.
+        from world.rules.item_effects import (
+            GaugeAdjustEffect,
+            ItemEffectProfile,
+            ItemStat,
+            ItemTargetScope,
+        )
+
+        live_item_effect_profiles()[T_SPRAY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
+        player = actor(
+            location=FakeRoom(),
+            inventory=[T_SPRAY],
+            hp_current=50,
+        )
+        row = self._rows(self._build(player))[T_SPRAY]
+        self.assertIsNotNone(row.action)
+        self.assertFalse(row.action.enabled)
+        self.assertEqual(row.action.reason_code, "no_target")
 
     def test_unknown_and_inspect_only_rows_have_null_actions(self):
         player = actor(

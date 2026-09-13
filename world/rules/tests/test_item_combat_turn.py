@@ -33,6 +33,7 @@ from world.rules.combat import (
 )
 from world.rules.combat_session import (
     engage,
+    engage_group,
     read_session,
     submit_player_item_use,
     submit_opening_action,
@@ -565,6 +566,68 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(entity_active_buffs(self.companion), {"poisoned"})
         self.assertEqual(int(self.companion.sexual.pleasure.base), 10)
+
+    @covers_requirement(
+        "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
+    )
+    def test_four_target_item_still_consumes_exactly_one_round(self):
+        # Delta: "A four-target item still consumes one round" — player,
+        # companion, and two foes all take the ALL-scoped step within one
+        # initiative position; the round count moves by one and the clock
+        # gains no separate item-use time.
+        from world.rules.clock import WorldClock
+
+        live_item_effect_profiles()[_MANA_KEY] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.ALL
+                ),
+            )
+        )
+        second = _monster("cave bear", hp=100, atk=0)
+        second.location = self.room
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 30
+        self.companion.traits.hp.current = int(self.companion.traits.hp.max) - 50
+        self.monster.traits.hp.current = 60
+        second.traits.hp.current = 60
+        self.player.db.inventory = [_MANA_KEY, _MANA_KEY]
+        engage_group(self.player, [self.monster, second])
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_item_use(self.player, _MANA_KEY)
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+        self.assertEqual(clock.tick, 0)
+        item_entries = [
+            entry
+            for log in result["logs"]
+            for entry in log.entries
+            if entry.kind == "item_used"
+        ]
+        self.assertEqual(
+            sorted(entry.target for entry in item_entries),
+            sorted(
+                [
+                    self.player.key,
+                    self.companion.key,
+                    self.monster.key,
+                    second.key,
+                ]
+            ),
+        )
+        # Consumption never scales with target count: two carried, one left.
+        self.assertEqual(self.player.db.inventory.count(_MANA_KEY), 1)
+        self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max))
+        self.assertEqual(
+            int(self.companion.traits.hp.current),
+            int(self.companion.traits.hp.max) - 10,
+        )
+        self.assertEqual(int(self.monster.traits.hp.current), 100)
+        self.assertEqual(int(second.traits.hp.current), 100)
 
 
 class CompressedItemTurnTests(EvenniaTestCase):

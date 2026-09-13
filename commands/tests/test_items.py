@@ -35,10 +35,17 @@ from world.rules.equipment import EquipmentToggleReason
 from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.items import ItemUseReason
 from world.rules.service_messages import rejection_message
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+    ItemTargetScope,
+)
 from world.rules.tests._combat_session_helpers import (
     _monster,
     _player,
     _race_key,
+    live_item_effect_profiles,
     open_synthetic_scope,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -378,3 +385,97 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
             [f"你裝備了 {_BLADE.display_name_zh}{_equip_prose(_BLADE)}。"],
         )
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+
+
+class _TargetedUseBase(_ItemsCommandBase):
+    """Single-scope potion profile + a present wounded ally in room1."""
+
+    def _single_scope_potion(self) -> None:
+        live_item_effect_profiles()[_POTION] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=_HEAL_AMOUNT, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
+
+    def _wounded_ally(self, key: str = "t_wounded_ally", missing: int = 30):
+        from evennia.utils.create import create_object
+
+        from typeclasses.npcs import NPC
+
+        ally = create_object(NPC, key=key)
+        ally.race = _race_key()
+        ally.apply_race_baseline()
+        ally.location = self.room1
+        ally.traits.hp.current = int(ally.traits.hp.max) - missing
+        return ally
+
+    def _run(self, command, args: str) -> list[str]:
+        command.caller = self.player
+        command.args = args
+        command.cmdstring = command.key
+        messages: list[str] = []
+        with patch.object(self.player, "msg", side_effect=messages.append):
+            command.func()
+        return messages
+
+
+class MissingTargetCommandTests(_TargetedUseBase):
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_missing_target_renders_the_stable_no_target_reason(self):
+        # Delta: "A missing target renders the stable reason" — the shared
+        # service_messages surface renders no_target in Traditional Chinese
+        # and nothing is consumed.
+        self._single_scope_potion()
+        self.hurt(20)
+        self.player.db.inventory = [_POTION]
+        messages = self._run(CmdUseItem(), _POTION)
+        self.assertEqual(
+            messages, [rejection_message(ItemUseReason.NO_TARGET)]
+        )
+        self.assertEqual(list_items(self.player), [_POTION])
+        self.assertEqual(
+            int(self.player.traits.hp.current),
+            int(self.player.traits.hp.max) - 20,
+        )
+
+
+class TelnetTargetingCommandTests(_TargetedUseBase):
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_telnet_targeting_matches_webclient_targeting(self):
+        # Delta: "Telnet targeting matches WebClient targeting" — the same
+        # single-scope row settles the same way for the same target: the
+        # companion is healed by the clamped amount, the actor is untouched,
+        # and exactly one unit is consumed. The WebClient path proves its
+        # side in web.webclient.actions.tests.test_inventory_actions against
+        # the same kit row and profile.
+        self._single_scope_potion()
+        ally = self._wounded_ally()
+        ally_max = int(ally.traits.hp.max)
+        self.player.traits.hp.current = int(self.player.traits.hp.max)
+        self.player.db.inventory = [_POTION, _POTION]
+        messages = self._run(CmdUseItem(), f"{_POTION} {ally.key}")
+        self.assertTrue(any("使用了" in line for line in messages))
+        self.assertEqual(int(ally.traits.hp.current), ally_max)
+        self.assertEqual(
+            int(self.player.traits.hp.current), int(self.player.traits.hp.max)
+        )
+        self.assertEqual(list_items(self.player), [_POTION])
+
+    def test_unmatched_target_token_fails_closed_without_consuming(self):
+        # A token resolving to no present entity travels raw to the
+        # deterministic preflight (the command never guesses): the stable
+        # invalid-target rejection renders and the potion stays held.
+        self._single_scope_potion()
+        self.hurt(20)
+        self.player.db.inventory = [_POTION]
+        messages = self._run(CmdUseItem(), f"{_POTION} t_no_such_fellow")
+        self.assertEqual(
+            messages, [rejection_message(ItemUseReason.TARGET_INVALID)]
+        )
+        self.assertEqual(list_items(self.player), [_POTION])
