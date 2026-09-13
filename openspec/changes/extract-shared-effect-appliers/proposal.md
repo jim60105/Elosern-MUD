@@ -77,8 +77,8 @@ None. Every change restates or extends an existing capability.
   every internal call site updated); `world/rules/buffs.py` (`apply_buff`, `remove_by_selector`,
   `cleanse_debuffs` re-expressed).
 - **Call sites**: `_apply_pleasure_gain` has six production call sites — three in `action.py`
-  (`_handle_pleasure_effect` at `:962`, and the two-step climax walk in `_handle_divine_pleasure_max`
-  at `:1101-1102`) and three in `world/rules/defeat_aftermath.py` (`:926`, `:928`, `:1499`), which
+  (`_handle_pleasure_effect` at `:964`, and the two-step climax walk in `_handle_divine_pleasure_max`
+  at `:1103-1104`) and three in `world/rules/defeat_aftermath.py` (`:926`, `:928`, `:1499`), which
   already imports the private name. `_zero_pleasure` has one caller, `_handle_sexual_drain`. Nine
   further call sites live in `world/rules/tests/test_sexual_act_effects.py`.
   `_apply_climax_phase_set` is **not** moved: it lives in `world/rules/sexual_state.py:853` and is

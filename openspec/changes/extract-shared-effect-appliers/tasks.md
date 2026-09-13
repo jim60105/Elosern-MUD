@@ -12,21 +12,27 @@ Design decisions referenced below live in `design.md` (D1–D5).
 - [ ] 1.2 Move the body **unedited** — no reordering, no extraction, no signature change (D2). Verify
   the `sexual-act-effects` source-inspection scenario still passes after being pointed at the new
   location: the arousal-ordinal and climax-phase captures are still the first two statements.
-- [ ] 1.3 Move `_zero_pleasure` (`world/rules/action.py:1380`) into the same module as
+- [ ] 1.3 Move `_zero_pleasure` (`world/rules/action.py:1382`) into the same module as
   `zero_pleasure`, unedited and unmerged with the gain entry (D2b). Verify `_handle_sexual_drain`
   still zeroes a target sitting at 接近 **without** advancing their climax phase to 進行中 — the
   behavior that folding it into `apply_pleasure_gain` would have broken.
-- [ ] 1.4 Update all six production call sites to the imported names: `action.py:962`, `:1101`,
-  `:1102`, and `world/rules/defeat_aftermath.py:926`, `:928`, `:1499` — the last three currently
+- [ ] 1.4 Update all six production call sites to the imported names: `action.py:964`, `:1103`,
+  `:1104`, and `world/rules/defeat_aftermath.py:926`, `:928`, `:1499` — the last three currently
   import the private name across a module boundary (`defeat_aftermath.py:47`). Update the nine call
   sites in `world/rules/tests/test_sexual_act_effects.py`. Verify
-  `grep -rn "_apply_pleasure_gain\|_zero_pleasure"` returns zero hits repository-wide.
-- [ ] 1.5 Add the no-bypass structural test: every assignment to `entity.sexual.pleasure.base` or
-  `.value` in the deterministic core lives in `world/rules/pleasure.py` — module-scoped, not
-  function-scoped, because two writers legitimately exist (D2b). Verify it passes — this is the
+  `grep -rn "_apply_pleasure_gain\|_zero_pleasure"` returns zero code hits repository-wide
+  (historical `docs/` and archived-spec prose excepted).
+- [ ] 1.5 Add the no-bypass structural test: scan the deterministic production core for assignments
+  to a pleasure trait — covering `entity.sexual.pleasure.base`/`.value`, locals bound to it, and
+  `getattr(entity.sexual, field)` dispatch in functions whose dispatch covers `pleasure` — and
+  assert the sanctioned writer set is exactly `pleasure.apply_pleasure_gain`,
+  `pleasure.zero_pleasure`, `sexual_transitions._apply_then`'s `bounded_counter` branch, and
+  `sexual_state.decay_tick`'s pleasure branch (module-scoped, not function-scoped, because two
+  writers legitimately exist in the shared module — D2b). Verify it passes — this is the
   `sexual-act-effects` delta's first ADDED scenario.
-- [ ] 1.6 Add the non-cast-caller test: importing `world/rules/pleasure.py` does not pull in the cast
-  pipeline, and an applied gain produces the identical cascade a cast produces for the same magnitude.
+- [ ] 1.6 Add the non-cast-caller test: the transitive import closure of `world/rules/pleasure.py`
+  (resolved over the source tree's own imports) names no `world.rules.action`, and an applied gain
+  produces the identical cascade a cast produces for the same magnitude.
 
 ## 2. Publish the buff-application entry point
 
@@ -48,7 +54,10 @@ Design decisions referenced below live in `design.md` (D1–D5).
   selector.
 - [ ] 3.2 Re-express `cleanse_debuffs()` as `remove_by_selector(entity, "negative")` (D3). Verify
   `world/rules/tests/test_holy_water_cleanse.py` and the cleanse-handler tests pass unchanged — the
-  shipped call sites are not edited.
+  shipped `cleanse_debuffs` call sites are not edited. Route `_handle_cleanse`'s staged `apply()`
+  through `remove_by_selector(target, "negative")` (the stage-time selection stays solely for the
+  effect description and emptiness check) so the cleanse effect and every other debuff-clearing
+  caller reach the same shared removal, per the `cleanse-effect-handler` delta's trace scenario.
 - [ ] 3.3 Add tests for all five scenarios in the `cleanse-effect-handler` delta's ADDED requirement:
   `negative`, `positive`, `all`, a concrete key with two live instances of one definition, and an
   empty match returning `0`.
