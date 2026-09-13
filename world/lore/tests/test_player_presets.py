@@ -82,6 +82,9 @@ class PlayerPresetTests(unittest.TestCase):
             "violet_altoria": (
                 ("elven_traditional_robe", 1), ("royal_signet_ring", 1),
                 ("royal_heirloom_pendant", 1),
+                # Saintess vestments: carried, not worn — her visible attire is
+                # the elven robe; the Church's vessel robe folds into the kit.
+                ("saintess_vestments", 1),
             ),
             "lidzia_rosenthal": (
                 ("rose_crest_rapier", 1), ("black_maid_dress", 1),
