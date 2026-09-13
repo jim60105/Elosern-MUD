@@ -25,6 +25,7 @@ from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_mo
 from world.rules.dice import roll_d100
 from world.rules.equipment_effects import equipment_immune_buff_keys, equipment_pleasure_gain
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.pleasure import apply_pleasure_gain, zero_pleasure
 from world.rules.progression import (
     can_use_skill,
     FREEFORM_SCALE_VALUES,
@@ -37,7 +38,6 @@ from world.rules.progression import (
 )
 from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
-    _EFFECTS_CONFIG,
     _OBSERVER_GATED_COUNTERS,
     _OBSERVER_GATED_EVENTS,
     compute_pleasure_gain,
@@ -46,7 +46,6 @@ from world.rules.sexual_act_effects import (
     participants,
     resolve_part,
 )
-from world.rules.sexual_state import _apply_climax_phase_set
 from world.rules.skill_effects import (
     apply_disguise_effect,
     record_conferred_grant,
@@ -934,7 +933,7 @@ def _handle_pleasure_effect(
     participant's OWN equipment ``pleasure_gain`` percent (the pure
     accessor is evaluated per participant, never shared across the cast).
     Each staged ``PendingEffect`` applies that participant's own computed
-    gain through :func:`_apply_pleasure_gain`.
+    gain through :func:`world.rules.pleasure.apply_pleasure_gain`.
     """
     del context, scale
     act = _resolve_act(effect_id)
@@ -961,52 +960,12 @@ def _handle_pleasure_effect(
                 participant,
                 f"pleasure_gain|{_entity_key(participant)}|{gain}",
                 frozenset(),
-                lambda participant=participant, gain=gain: _apply_pleasure_gain(
+                lambda participant=participant, gain=gain: apply_pleasure_gain(
                     participant, gain
                 ),
             )
         )
     return pending
-
-
-def _apply_pleasure_gain(entity: Any, gain: int) -> None:
-    """Apply one participant's pleasure gain and the arousal-coupled cascade.
-
-    Replicates two ``sexual.yaml`` rules directly — ``wetness_follows_arousal``
-    and the ``climax_gate``/``climax_phase_critical_point_to_in_progress``
-    pair — because both are conditioned on a change ``apply_event()``'s own
-    snapshot must observe within its own call, which a pleasure gain applied
-    outside ``apply_event()`` cannot produce. The captures below must stay the
-    first statements: the wetness bump compares the arousal ordinal before and
-    after the mutation, the two-step 未達→接近→進行中 semantic depends on
-    reading the pre-mutation climax phase before either transition runs, and
-    the extension trigger fires only for a participant already in 進行中 when
-    the effect applies — a participant this very call pushes from 接近 into
-    進行中 has just started climaxing, it has not received a qualifying
-    extension stimulus (pleasure-model design §3.2/§3.4).
-
-    The extension trigger compares against ``gain``, the uncapped computed
-    value, not the clamped applied delta: ``pleasure`` self-clamps at 100, so
-    an entity already in 進行中 would almost never stage an extension if the
-    post-clamp delta were the gate. ``_apply_climax_phase_set`` no-ops on any
-    edge outside ``_VALID_CLIMAX_TRANSITIONS``, so both transition calls are
-    unconditionally safe to attempt.
-    """
-    pre_arousal_ordinal = entity.sexual.arousal.value
-    was_at_critical_point = entity.sexual.climax_phase.level == "接近"
-    was_in_progress = entity.sexual.climax_phase.level == "進行中"
-
-    entity.sexual.pleasure.base += gain
-
-    if entity.sexual.arousal.value > pre_arousal_ordinal:
-        entity.sexual.wetness.value += 1
-    if entity.sexual.arousal.level == "極限":
-        _apply_climax_phase_set(entity, "接近")
-    if was_at_critical_point:
-        _apply_climax_phase_set(entity, "進行中")
-
-    if was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
-        entity.sexual.stage_climax_extension()
 
 
 def _counter_pending_effect(entity: Any, counter_name: str) -> PendingEffect:
@@ -1075,11 +1034,11 @@ def _handle_divine_pleasure_max(
     """Set every non-actor target's pleasure to its ceiling in one cast.
 
     Stages one ``PendingEffect`` per remaining target whose ``apply()`` calls
-    the shipped :func:`_apply_pleasure_gain` twice in sequence — ``gain=100``
+    the shipped :func:`world.rules.pleasure.apply_pleasure_gain` twice in sequence — ``gain=100``
     (sets ``pleasure`` to its clamped ceiling and walks at most one climax
     cycle edge) then ``gain=0`` (re-runs the pre/post-mutation check, which
     now observes the already-updated phase and walks the second edge into
-    進行中). Two calls, not one, because ``_apply_pleasure_gain`` deliberately
+    進行中). Two calls, not one, because ``apply_pleasure_gain`` deliberately
     advances ``climax_phase`` by at most one cycle edge per call
     (divine-sexual-arts-reuse design D-2).
 
@@ -1100,8 +1059,8 @@ def _handle_divine_pleasure_max(
                 f"divine_pleasure_max|{_entity_key(target)}|100",
                 frozenset(),
                 lambda target=target: (
-                    _apply_pleasure_gain(target, 100),
-                    _apply_pleasure_gain(target, 0),
+                    apply_pleasure_gain(target, 100),
+                    apply_pleasure_gain(target, 0),
                 ),
             )
         )
@@ -1223,7 +1182,7 @@ def _handle_sexual_drain(
             target,
             f"divine_drain|{_entity_key(target)}|{amount}",
             frozenset(),
-            lambda target=target: _zero_pleasure(target),
+            lambda target=target: zero_pleasure(target),
         ),
     ]
 
@@ -1377,11 +1336,6 @@ def _drain_resources(actor: Any, amount: int) -> None:
     for key in ("mp", "sp", "hp"):
         trait = getattr(actor.traits, key)
         trait.current = trait.current + amount
-
-
-def _zero_pleasure(target: Any) -> None:
-    """Set the target's pleasure gauge to zero."""
-    target.sexual.pleasure.base = 0
 
 
 register_effect_handler(

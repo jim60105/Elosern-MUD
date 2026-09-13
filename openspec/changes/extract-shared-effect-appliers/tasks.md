@@ -4,25 +4,25 @@ Design decisions referenced below live in `design.md` (D1–D5).
 
 ## 1. Extract the pleasure entry points
 
-- [ ] 1.1 Create `world/rules/pleasure.py` and move `_apply_pleasure_gain` into it as
+- [x] 1.1 Create `world/rules/pleasure.py` and move `_apply_pleasure_gain` into it as
   `apply_pleasure_gain` (D1, D2). Do **not** move `_apply_climax_phase_set`: it lives in
   `world/rules/sexual_state.py:853` and is already imported by `action.py:48` and
   `sexual_transitions.py:14`; `pleasure.py` imports it the same way. Verify the new module imports
   cleanly and pulls in nothing from `world/rules/action.py`.
-- [ ] 1.2 Move the body **unedited** — no reordering, no extraction, no signature change (D2). Verify
+- [x] 1.2 Move the body **unedited** — no reordering, no extraction, no signature change (D2). Verify
   the `sexual-act-effects` source-inspection scenario still passes after being pointed at the new
   location: the arousal-ordinal and climax-phase captures are still the first two statements.
-- [ ] 1.3 Move `_zero_pleasure` (`world/rules/action.py:1382`) into the same module as
+- [x] 1.3 Move `_zero_pleasure` (`world/rules/action.py:1382`) into the same module as
   `zero_pleasure`, unedited and unmerged with the gain entry (D2b). Verify `_handle_sexual_drain`
   still zeroes a target sitting at 接近 **without** advancing their climax phase to 進行中 — the
   behavior that folding it into `apply_pleasure_gain` would have broken.
-- [ ] 1.4 Update all six production call sites to the imported names: `action.py:964`, `:1103`,
+- [x] 1.4 Update all six production call sites to the imported names: `action.py:964`, `:1103`,
   `:1104`, and `world/rules/defeat_aftermath.py:926`, `:928`, `:1499` — the last three currently
   import the private name across a module boundary (`defeat_aftermath.py:47`). Update the nine call
   sites in `world/rules/tests/test_sexual_act_effects.py`. Verify
   `grep -rn "_apply_pleasure_gain\|_zero_pleasure"` returns zero code hits repository-wide
   (historical `docs/` and archived-spec prose excepted).
-- [ ] 1.5 Add the no-bypass structural test: scan the deterministic production core for assignments
+- [x] 1.5 Add the no-bypass structural test: scan the deterministic production core for assignments
   to a pleasure trait — covering `entity.sexual.pleasure.base`/`.value`, locals bound to it, and
   `getattr(entity.sexual, field)` dispatch in functions whose dispatch covers `pleasure` — and
   assert the sanctioned writer set is exactly `pleasure.apply_pleasure_gain`,
@@ -30,7 +30,7 @@ Design decisions referenced below live in `design.md` (D1–D5).
   `sexual_state.decay_tick`'s pleasure branch (module-scoped, not function-scoped, because two
   writers legitimately exist in the shared module — D2b). Verify it passes — this is the
   `sexual-act-effects` delta's first ADDED scenario.
-- [ ] 1.6 Add the non-cast-caller test: the transitive import closure of `world/rules/pleasure.py`
+- [x] 1.6 Add the non-cast-caller test: the transitive import closure of `world/rules/pleasure.py`
   (resolved over the source tree's own imports) names no `world.rules.action`, and an applied gain
   produces the identical cascade a cast produces for the same magnitude.
 

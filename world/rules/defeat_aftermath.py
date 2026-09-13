@@ -44,7 +44,6 @@ from world.observability import log_error, log_info, log_warn
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.sexual_vocab import SENSITIVITY_LEVELS, SHAME_LEVELS
 from world.rules.action import (
-    _apply_pleasure_gain,
     _attribute_snapshot,
     _restore_attribute,
     _stored_trait_value,
@@ -61,6 +60,7 @@ from world.rules.clock import (
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.player_messages import defeat_aftermath_template
+from world.rules.pleasure import apply_pleasure_gain
 from world.rules.sexual_act_effects import mutator_name_for
 from world.rules.sexual_resist import resist_verdict
 from world.rules.sexual_state import AROUSAL_LEVELS
@@ -238,7 +238,7 @@ def _validate_recovery(raw: dict[str, Any], path: Path) -> RecoveryConfig:
 @dataclass(frozen=True)
 class ViolationDeltas:
     """One attempt's declared pleasure-point deltas (defeat-aftermath-
-    violation-sequence). Points ride the shipped ``_apply_pleasure_gain``
+    violation-sequence). Points ride the shipped ``apply_pleasure_gain``
     path, so wetness, arousal bands, and climax-phase edges follow for free.
     """
 
@@ -923,9 +923,9 @@ def _apply_violation_deltas(
 ) -> None:
     """Apply one attempt's declared pleasure points through the shipped path."""
     if deltas.victim_pleasure:
-        _apply_pleasure_gain(victim, deltas.victim_pleasure)
+        apply_pleasure_gain(victim, deltas.victim_pleasure)
     if deltas.aggressor_pleasure:
-        _apply_pleasure_gain(aggressor, deltas.aggressor_pleasure)
+        apply_pleasure_gain(aggressor, deltas.aggressor_pleasure)
 
 
 def _victim_climax_onset(
@@ -1496,7 +1496,7 @@ def run_violation_sequence(
         restores.append(_snapshot_sexual_surfaces(violator))
         # Victory arousal (parent design §3.1 step 2): the delta lands on top
         # of whatever the fight raised, clamped by the pleasure gauge.
-        _apply_pleasure_gain(violator, row.victory_pleasure_delta)
+        apply_pleasure_gain(violator, row.victory_pleasure_delta)
         if violator.sexual.arousal < row.threshold_ordinal:
             continue
         for attempt_index in range(row.attempt_cap):

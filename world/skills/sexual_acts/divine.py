@@ -7,7 +7,7 @@ pleasure/counter/event triad that `_act_family()`'s fixed row shape always
 attaches (divine-sexual-arts-reuse design D-1):
 
 - 絕頂律令 sets every target's pleasure to its ceiling through two chained
-  ``_apply_pleasure_gain`` calls (design D-2);
+  ``apply_pleasure_gain`` calls (design D-2);
 - 時姦 stages three climax extensions in one cast (design D-3);
 - 神域搾取 moves a target's pleasure into the caster's MP/SP/HP (design D-4).
 

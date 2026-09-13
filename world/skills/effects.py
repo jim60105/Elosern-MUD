@@ -206,7 +206,7 @@ class DivinePleasureMaxEffect:
 
     The effect string's payload is the act's Chinese label, kept for
     readability only; the target set comes from the cast's resolved targets,
-    and the handler reuses the shipped ``_apply_pleasure_gain`` twice
+    and the handler reuses the shipped ``apply_pleasure_gain`` twice
     (``gain=100`` then ``gain=0``) to walk the climax cycle into 進行中.
     """
 
