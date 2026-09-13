@@ -404,40 +404,40 @@ class ApplyPleasureGainTests(EvenniaTestCase):
         self.entity.race = _race_key()
         self.entity.apply_race_baseline()
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_first_crossing_into_limit_moves_climax_phase_to_approaching_only(self):
         self.entity.sexual.pleasure.base = 84
         self.assertEqual(self.entity.sexual.climax_phase.level, "未達")
         apply_pleasure_gain(self.entity, 1)
         self.assertEqual(self.entity.sexual.climax_phase.level, "接近")
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_further_gain_while_already_approaching_moves_to_in_progress(self):
         self.entity.sexual.pleasure.base = 100
         self.entity.sexual.climax_phase.value = "接近"
         apply_pleasure_gain(self.entity, 1)
         self.assertEqual(self.entity.sexual.climax_phase.level, "進行中")
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_one_gain_application_never_advances_two_phases(self):
         self.entity.sexual.pleasure.base = 84
         apply_pleasure_gain(self.entity, 30)
         self.assertEqual(self.entity.sexual.climax_phase.level, "接近")
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_arousal_band_crossing_raises_wetness_by_exactly_one(self):
         self.entity.sexual.pleasure.base = 10
         self.assertEqual(self.entity.sexual.wetness.value, 0)
         apply_pleasure_gain(self.entity, 10)
         self.assertEqual(self.entity.sexual.wetness.value, 1)
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_same_band_gain_leaves_wetness_unchanged(self):
         self.entity.sexual.pleasure.base = 10
         apply_pleasure_gain(self.entity, 4)
         self.assertEqual(self.entity.sexual.wetness.value, 0)
 
-    @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
+    @covers_requirement("sexual-act-effects::one-shared-pleasure-entry-point-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
     def test_captures_are_the_first_two_statements_before_mutation(self):
         tree = ast.parse(inspect.getsource(apply_pleasure_gain))
         function = tree.body[0]
@@ -533,6 +533,7 @@ class SharedPleasureModuleTests(unittest.TestCase):
                     ):
                         yield function.name, node
 
+    @covers_requirement("sexual-act-effects::every-deterministic-pleasure-write-lives-in-one-shared-module")
     def test_no_production_code_outside_the_sanctioned_writers_assigns_pleasure(self):
         offenders = []
         for path in self._production_sources(self._ROOT):

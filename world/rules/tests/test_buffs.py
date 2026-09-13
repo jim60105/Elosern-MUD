@@ -101,11 +101,13 @@ class BuffDefinitionValidationTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             _apply_rate_modifier(entity, {"target": "bogus", "delta": 1})
 
+    @covers_requirement("buff-handler-integration::buff-application-has-one-public-entry-point-carrying-both-grant-time-guards")
     def test_unique_per_source_requires_source_key(self):
         entity = SimpleNamespace(buffs=SimpleNamespace(add=lambda *a, **k: None))
         with self.assertRaises(ValueError):
             apply_buff(entity, "conferred_growth_rate")
 
+    @covers_requirement("buff-handler-integration::buff-application-has-one-public-entry-point-carrying-both-grant-time-guards")
     def test_immune_debuff_is_refused_without_writing(self):
         """The delta's first scenario, reached through the public name: the
         worn-equipment immunity gate inside apply_buff refuses the write."""
@@ -727,6 +729,7 @@ class RemoveBySelectorTests(_BuffFixtureMixin):
             if buff.stacks > 0
         }
 
+    @covers_requirement("cleanse-effect-handler::status-removal-is-expressed-as-one-selector-driven-operation-returning-a-count")
     def test_negative_removes_every_debuff_and_nothing_else(self):
         entity = self._entity()
         debuff_one = self._synth_buff(key="t_neg_one", polarity="debuff")
@@ -799,6 +802,7 @@ class BuffEntryPointStructuralTests(unittest.TestCase):
 
     _ROOT = Path(__file__).resolve().parents[3]
 
+    @covers_requirement("buff-handler-integration::buff-application-has-one-public-entry-point-carrying-both-grant-time-guards")
     def test_no_module_outside_buffs_calls_the_handler_directly(self):
         """No deterministic module outside world/rules/buffs.py reaches
         ``entity.buffs.add(...)``; every buff grant goes through
