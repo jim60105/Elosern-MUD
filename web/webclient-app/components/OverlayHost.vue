@@ -41,6 +41,7 @@ function titleFor(name) {
   if (name === "settings") return "設定";
   if (name === "lineage") return "技能系譜";
   if (name === "codex") return "稱號冊";
+  if (name === "gallery") return "角色肖像圖庫";
 }
 
 function subtitleFor(name) {
@@ -48,6 +49,7 @@ function subtitleFor(name) {
   if (name === "settings") return "閱讀偏好與輔助顯示";
   if (name === "lineage") return "熟練度 · 見頂 · 前置";
   if (name === "codex") return "稱號 · 異名 · 提名中";
+  if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
   return "分類 → 條目 → 子主題";
 }
 
@@ -145,6 +147,19 @@ onBeforeUnmount(() => {
         >
           <circle cx="12" cy="12" r="3" />
           <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z" />
+        </svg>
+        <svg
+          v-else-if="overlay === 'gallery'"
+          class="overlay-host__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          aria-hidden="true"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="2" />
+          <path d="m3 18 6-5 4 3 4-6 4 6" />
         </svg>
         <svg
           v-else
@@ -268,6 +283,16 @@ onBeforeUnmount(() => {
   overscroll-behavior: contain;
   scrollbar-color: var(--gold-500) transparent;
   scrollbar-width: thin;
+}
+
+.overlay-host[data-elosern-overlay="gallery"] { left: 292px; }
+.overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
+.overlay-host[data-elosern-overlay="gallery"] .overlay-host__header { position: absolute; top: 8px; right: 8px; z-index: 1; padding: 0; border: 0; background: none; }
+.overlay-host[data-elosern-overlay="gallery"] .overlay-host__title,
+.overlay-host[data-elosern-overlay="gallery"] .overlay-host__subtitle,
+.overlay-host[data-elosern-overlay="gallery"] .overlay-host__icon { display: none; }
+@media (max-width: 1100px) {
+  .overlay-host[data-elosern-overlay="gallery"] { left: 16px; }
 }
 
 @media (max-width: 700px) {

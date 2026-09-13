@@ -1,72 +1,141 @@
-# Design: webclient-gallery-ui
+## D1 — Committed v1 facts only
 
-## D1 — Committed-panel-only rendering
+The `gallery` panel is the sole live read model. Card labels, chips, filter
+counts, equipment display names and warning conditions are rendered verbatim.
+The client does not recompute rule matches, equipment identity, counts or
+resolved portrait selection. Static headings, filter labels and the closed
+field/slot vocabulary are presentation chrome. `created_at` formats as UTC.
+Failed labels remain intact, including any code included by the server.
 
-Every string the surface shows except static chrome labels comes from the
-committed `gallery` payload: chip lists, filter counts, card labels, crown,
-failed/pending states, equipment summary, binding conditions, overlap warnings.
-The client reads panels by key (established practice) and performs no
-`schema_version` re-check beyond the protocol validator that already gates the
-store. The zh-TW copy of the chrome (headers, button captions, drawer titles,
-field labels, notes) is a static component vocabulary matching the mockups
-verbatim: 角色肖像圖庫, 生成新圖, 全部/預設/已綁定/生成中/失敗, 最新優先, 肖像詳情,
-設為預設, 編輯設定, 刪除, 納入生成的資料, 目前裝備摘要, 補充提示詞, 開始生成,
-裝備綁定, 裝備條件設定, 目前綁定條件, 規則重疊提醒, 儲存綁定, 臉部框選, 原始圖片,
-圖片資訊, 方形裁切預覽（1:1）, 儲存框選, 取消。Full-width punctuation as in the
-mockups.
+The v1 payload has no original pixel dimensions, full stored binding mask or
+snapshot, or resolved-current-image flag. Omit dimensions. Display condition
+lines only from an explicit matching `binding_warnings` record; otherwise mark
+them unavailable. The default marker makes no claim about the currently
+resolved image. Capability booleans independently gate binding, prompt fields
+and free text; `max_cards === 1` supplies the replacement explanation.
 
-## D2 — Client-local view state is exactly three things
+## D2 — Bounded local view and intent state
 
-Filter-tab selection, grid/list view, and the open subject/card/editor
-selection are client-local (the art-focus precedent). Order and counts always
-come from the payload; the tab FILTERS the committed rows by the committed
-row-status/fact fields (never by re-derived semantics: a row is 已綁定 iff
-`binding_present`). Sort stays server order (newest-first); the 最新優先 control
-is a committed-fact label, not a re-sort.
+`GalleryPanel` owns the local filter, grid/list toggle, highlighted image ID,
+active editor, unsaved form drafts and correlation with its admitted request.
+Rows retain their published order. Subjects are selected through
+`gallery.subject.select`; the highlighted subject and rows change only on
+publication. Filters use only published status/boolean fields, never binding
+resolution logic.
 
-## D3 — One dispatch entry, intent only
+Subject replacement, unavailable data and loss of an edited image discard
+stale editors. A same-subject snapshot does not clear drafts. An initially
+empty gallery receiving an unrelated pending row does not close generation.
+Transport/epoch teardown unmounts the existing overlay through the store.
 
-Each control dispatches exactly one committed action: subject-select on a rail
-row, `gallery.generate` from the drawer's submit, `gallery.default.set`,
-`gallery.card.delete` (only after an in-rail confirmation step),
-`gallery.binding.save` (enabled slot ids only), `gallery.face_rect.update`
-(normalized rect). All through the single dispatch entry with its connected /
-locked / one-in-flight gates; non-success results surface the server message
-verbatim through the existing narrative path. No control composes a payload
-field the panel didn't authorize (e.g. the binding drawer can only enable slots
-the payload lists; the generate drawer's counter is cosmetic — the server owns
-the 512 bound).
+## D3 — Five components and existing host integration
 
-## D4 — Face-rect modal is geometry, not image processing
+- `GalleryPanel`: heading, subject rail, five filters, grid/list cards, local
+  selection and action coordination. Cards use `faceObjectPosition` for the
+  shared thumbnail anchoring convention; pending/failed rows have no image URL.
+- `GalleryDetailRail`: selected portrait, default and binding facts, explicit
+  conditions, generation/default/edit/face actions and inline delete confirmation.
+- `GalleryGenerateDrawer`: right-side `HudDrawer`, optional reference portrait,
+  five field choices, equipment summary, raw prompt and counter. The reference
+  portrait is the selected gallery image, not a claim about current resolution.
+- `GalleryBindingDrawer`: right-side `HudDrawer`, selected portrait, checkbox-only
+  slot mask, current equipment facts and explicit warning rows with selection jumps.
+- `GalleryFaceRectModal`: bounded two-column dialog using `createFocusTrap`,
+  original image with drag/resize box, numeric controls, square preview and save.
 
-The modal overlays a draggable/resizable rect on the committed card URL image;
-preview is the same `<img>` cover-cropped to 1:1 at the rect (pure CSS /
-`face-rect.js` vocabulary). The rect normalizes to `{x, y, w, h}` in [0,1] on
-dispatch. Local validation only enforces positive area and [0,1] containment to
-avoid nonsense dispatches; the server re-validates verbatim and is the sole
-authority (no crop is ever uploaded — D9).
+Register `gallery` in the existing store overlay allowlist and mount the family
+inside `OverlayHost`. An availability-gated button beside the existing portrait
+opens it. The gallery-specific host layout leaves the status column and command
+line visible. The integrated heading avoids duplicate host chrome.
 
-## D5 — Failure states are rendered, not hidden
+## D4 — Exact actions and settlement
 
-Pending rows render the spinner card with the committed 生成中 label; failed
-rows render 「暫時無法生成，稍後再試」 with the committed code hidden behind an
-accessible detail. AI-offline therefore shows exactly the mockup's failed-card
-state. The 生成中 refresh needs no client polling: settled jobs push the panel
-through the existing presentation publication path.
+Every live action calls the existing `store.dispatchAction` entry through
+`AppClient`; there is no alternate dispatcher or backend/protocol change:
 
-## D6 — Governed manifest growth
+- `gallery.subject.select`: `subject_key`.
+- `gallery.generate`: `subject_key`, `fields`, raw `custom_prompt`.
+- `gallery.default.set` and `gallery.card.delete`: `subject_key`, `image_id`.
+- `gallery.binding.save`: `subject_key`, `image_id`, `slots`.
+- `gallery.face_rect.update`: `subject_key`, `image_id`, `face_rect`.
 
-The showcase manifest is frozen; this change names its growth as its own scope
-(the governed-redesign clause): required titles `Data/GalleryPanel`,
+The existing connection/mutation/in-flight gate controls all actions. Null
+admission never arms a request. A submitted editor closes only after its own
+successful result and declared presentation revision have committed; unrelated
+results or pending rows do not settle it. Rejection preserves the draft.
+The store appends the server message once; the editor adds only a generic
+recovery hint and a control opening the existing full log above the editor.
+
+## D5 — Generation and binding drafts
+
+Generation exposes only supported controls. The optional text is never
+truncated, trimmed, interpreted or assigned HTML `maxlength`; its counter counts
+Unicode code points. The server validates the 512-code-point limit. A monster
+with disabled field selection and free text submits `fields: []` and
+`custom_prompt: ""`. Only the puppet gallery links to the puppet status drawer;
+that link invokes the existing atomic overlay-to-drawer transition.
+
+Binding starts unchecked because v1 does not expose the stored mask. At least
+one slot must be selected. Saving captures current server equipment; the UI has
+no item picker and computes no overlap/matching results. Empty current equipment
+is a valid selected slot. The four catalog IDs are `weapon_main`, `weapon_off`,
+`armor`, `accessories`. Warning conditions are rendered without reconstruction.
+
+## D6 — Geometry and accessible interaction
+
+The face rectangle remains normalized to the original image. Pointer movement
+uses its actual displayed bounds, excluding any letterbox; move and bottom-right
+resize clamp to the unit square with positive area. Pointer capture and
+cancellation prevent dangling drags. Numeric controls provide keyboard access.
+The editor saves coordinates only and never creates a derivative image.
+
+The preview clips the exact selected region using CSS. The output frame is
+square; a non-square selection is letterboxed to preserve the original aspect
+ratio rather than stretched. Shared thumbnail anchoring remains separate from
+this zoomed preview.
+
+Editors teleport outside the outer host and have pointer-blocking scrims and
+focus traps. Their keyboard events do not bubble into the host. The outer host
+is not made inert because existing synchronous trap restoration precedes a
+reactive inert-removal commit. Editor close restores the opener after rendering;
+if it disappeared, focus falls back to a remaining gallery control. Escape or
+cancel never dispatches. Deletion requires a separate confirmation. Visible
+focus and textual status labels avoid color-only meaning; reduced motion stops
+the pending spinner animation.
+
+## D7 — Reference composition and storyboard
+
+All four `docs/design/elosern-redesign2/角色肖像圖庫管理頁-*.webp` images were
+viewed during design. The composition uses ink-black panels, gold borders and
+headings, a central card grid and right detail rail, right-side generation and
+binding drawers with portrait/controls columns, and a two-column face dialog.
+Backend facts take precedence over illustrative reference copy.
+
+Stories use the existing local fonts/artwork and deterministic synthetic data.
+The frozen manifest adds exactly five titles: `Data/GalleryPanel`,
 `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
-`Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal` are appended in
-the same change that ships their stories, keeping `pnpm run showcase-coverage`
-green. The family mounts in `AppClient.vue` on the committed panel's
-availability via the existing overlay host.
+`Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`. Stories and
+manifest entries exist before application mounting.
 
-## D7 — Accessibility and keyboard parity
+`Data/GalleryPanel/Storyboard` mounts the real family with an explicit offline
+publication driver, action inspector and success/rejection controls. It covers
+browse, generation, pending/failure, bindings, crop, default and delete flows.
+Its synthetic server publications exist only in the story; production code
+never simulates them. The story media adapter uses local fallback images and
+appropriate example face rectangles instead of nonexistent gallery assets.
+`docs/design/elosern-redesign2/gallery-storyboard.md` records frame triggers,
+visible facts, recovery paths, references and honest v1 differences.
 
-Drawers/modal follow the existing focus-trap + Escape + restore-focus parity
-(the CreationOverlay/MapOverlay precedent); cards and rail rows are
-keyboard-actionable with visible focus; the crown and failure states never rely
-on color alone (explicit text). Desktop-only, matching the app contract.
+## D8 — Verification
+
+Focused Vitest component tests cover committed filtering, subject publication,
+raw oversized Unicode text, capability gates, warning rendering, deletion,
+request/revision correlation, empty-gallery publications, stale-context teardown,
+focus restoration and non-square pointer geometry. Application integration uses
+the real Pinia store, wire validator and fake transport to exercise availability,
+confirmation, global locking, duplicate result/narrative handling and disconnect.
+
+Build the Vite bundle and static Storybook, enforce showcase coverage, validate
+the OpenSpec change, and exercise actual Chromium surfaces. Complete Python
+coverage and managed browser evidence remain CI-owned. No player commands,
+Python modules, persistent backend rules or main specifications change here.

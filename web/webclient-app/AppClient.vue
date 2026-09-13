@@ -36,6 +36,7 @@ import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
 import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
+import GalleryPanel from "./components/GalleryPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
@@ -987,6 +988,12 @@ onMounted(() => {
           v-if="panelAvailable('art') && store.view.mode !== 'combat'"
           :art="panel('art')"
         />
+        <button
+          v-if="panelAvailable('gallery')"
+          class="gallery-opener"
+          data-testid="gallery-opener"
+          @click="openOverlayByName('gallery')"
+        >角色肖像圖庫</button>
       </template>
       <template #panel-right>
         <!-- The minimap island (H2, design D9): the stage's right anchor,
@@ -1293,6 +1300,16 @@ onMounted(() => {
           :codex="panel('title_codex')"
           @action="onTitleCodexAction"
         />
+        <GalleryPanel
+          v-else-if="openName === 'gallery'"
+          :model="panel('gallery')"
+          :disabled="!store.view.connected || store.view.mutationsLocked || store.view.dispatch.inFlight !== null"
+          :dispatch="dispatchIntent"
+          :result="store.view.lastActionResult"
+          :revision="store.view.revision"
+          @character="store.openHudDrawer('status')"
+          @log="openFullLog"
+        />
         <!-- The help surface renders the client-owned control reference and
              the statement of how the game's own `help` output is reached —
              no invented copy. -->
@@ -1320,6 +1337,7 @@ onMounted(() => {
       v-if="fullLogOpen"
       ref="fullLogRef"
       :lines="store.narrative"
+      :style="store.view.hudOverlay === 'gallery' ? { zIndex: 3100 } : null"
       @close="closeFullLog(true)"
     />
 
@@ -1339,6 +1357,18 @@ onMounted(() => {
   height: 100%;
   width: 100%;
 }
+
+.gallery-opener {
+  width: 100%;
+  padding: 10px;
+  font: inherit;
+  color: var(--gold-400);
+  background: linear-gradient(120deg, #392e1d, #15171e);
+  border: 1px solid #bca57988;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.gallery-opener:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 3px; }
 
 /* H3 (task 6.4): the skill master-detail layout — the skill list and the
    detail pane sit side by side inside the dock pane (the draft's `.skwrap`

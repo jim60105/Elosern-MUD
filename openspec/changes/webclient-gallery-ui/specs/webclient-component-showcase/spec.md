@@ -32,6 +32,8 @@ and each later growth SHALL re-freeze it at its new complete set.
 
 - **WHEN** the gallery-UI change lands its five gallery components
 - **THEN** the same change's manifest append, story files, and spec entry keep the component-coverage gate green, and no gallery component is mounted in the live application before its story exists
+- **AND** `Data/GalleryPanel` includes an offline interactive storyboard for the
+  complete management journey, with a documented frame guide
 
 #### Scenario: A manifest edit without a story fails the gate
 

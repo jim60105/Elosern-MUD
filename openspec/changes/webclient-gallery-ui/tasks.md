@@ -1,58 +1,76 @@
-# Tasks: webclient-gallery-ui
+## 1. Component family
 
-## 1. Components (all render committed `gallery` payload only)
+- [x] 1.1 Build `GalleryPanel`: subject rail, five server-counted filters,
+  committed-order grid/list cards, default crown, pending/failed states and
+  shared face-position thumbnail anchoring.
+- [x] 1.2 Build `GalleryDetailRail`: selected portrait, default/binding facts,
+  explicit warning condition lines or unavailable copy, default/edit/face actions,
+  and inline delete confirmation; no invented resolved-current-image state.
+- [x] 1.3 Build `GalleryGenerateDrawer`: five capability-gated data fields,
+  equipment summary, puppet-only character shortcut, raw Unicode prompt/counter,
+  request/revision-correlated completion and rejection recovery via the full log.
+- [x] 1.4 Build `GalleryBindingDrawer`: checkbox-only nonempty slot mask,
+  committed current equipment, explicit warning lines and card-selection jumps;
+  no item picker, stored-mask inference or client rule matching.
+- [x] 1.5 Build `GalleryFaceRectModal`: original image, normalized pointer
+  move/resize with bounds and cancellation, keyboard numeric controls, exact
+  aspect-preserving square-frame preview, save/cancel and opener restoration.
+- [x] 1.6 Apply Traditional Chinese static chrome and closed catalog copy,
+  verbatim server labels/chips/equipment/warnings, UTC timestamps, and independent
+  capability gates including single-card monster replacement.
 
-- [ ] 1.1 `components/GalleryPanel.vue`: header copy, subject rail, filter tabs
-  from committed counts (tab filters by row status / `binding_present` /
-  `is_default` facts), 最新優先 label, grid/list toggle (client-local), card
-  grid with cover image via `face-rect.js` `faceObjectPosition()`, server chips,
-  crown badge, pending spinner card, failed card; emits
-  `select-subject` / `select-card` / action-intent events only.
-- [ ] 1.2 `components/GalleryDetailRail.vue`: preview, badges, 綁定條件,
-  當前狀態, 設為預設 / 編輯設定 / 刪除 (in-rail confirm step) / 生成新圖 CTA;
-  capability-flag-gated affordances (monster: no binding editor).
-- [ ] 1.3 `components/GalleryGenerateDrawer.vue`: five catalog checkboxes +
-  已選 n / 5, 目前裝備摘要 strip (+ 從角色資料檢視 opening the character
-  drawer), 補充提示詞 textarea with cosmetic n / 512 counter, 取消 / 開始生成;
-  focus-trap + Escape parity.
-- [ ] 1.4 `components/GalleryBindingDrawer.vue`: per-slot enable checkboxes;
-  enabled slot displays ONLY the committed current value or 未裝備/empty state;
-  目前綁定條件 summary; 規則重疊提醒 from `binding_warnings` with 查看 jump;
-  取消 / 儲存綁定 (payload: enabled slot ids + committed image_id).
-- [ ] 1.5 `components/GalleryFaceRectModal.vue` + pure
-  `components/face-rect-edit.js` (drag/resize → normalized {x,y,w,h}, local
-  clamp to positive area within [0,1]): 原始圖片 layer over the committed URL,
-  圖片資訊 block, 方形裁切預覽（1:1） CSS cover crop of the same image,
-  取消 / 儲存框選.
-- [ ] 1.6 Static zh-TW copy constants exactly matching the mockups (full-width
-  punctuation); no client-side chips/counts/overlap/sort logic by construction
-  (grep-clean the family for recomputation).
+## 2. App wiring
 
-## 2. Wiring
+- [x] 2.1 Register the existing gallery overlay controller, add the
+  availability-gated portrait-area opener, and mount the family through
+  `OverlayHost` with shared connection/mutation/in-flight gates and dispatcher.
+  Invalidate stale editors on subject/card/unavailable/transport transitions.
+- [x] 2.2 Wire deletion confirmation; cancellation sends nothing and confirmation
+  sends one shared-path action without optimistic removal.
 
-- [ ] 2.1 `AppClient.vue`: mount the family via the existing overlay host when
-  the committed `gallery` panel is available; wire every intent to the single
-  dispatch entry with the six committed action ids; non-success messages surface
-  verbatim through the existing narrative error path.
-- [ ] 2.2 Delete flows through the in-rail confirm before dispatch.
+## 3. Verification
 
-## 3. Tests (Vitest, deterministic)
+- [x] 3.1 Add component behavior tests covering all five components: facts and
+  filters, Unicode input, capabilities, warning rendering, confirmation, focus,
+  request/revision correlation, empty-gallery publications and non-square geometry.
+- [x] 3.2 Add application integration tests using the real store and protocol:
+  availability, shared action payloads, global lock, rejection narrative exactly
+  once, retained drafts, full-log access and transport teardown.
 
-- [ ] 3.1 `tests/components/` per component: renders every committed fact
-  (chips, counts, crown, pending, failed, warnings) from a fixed payload
-  fixture; dispatches the exact one action per intent; confirmation gates
-  delete; oversized-input still dispatches raw text (server owns the bound);
-  Escape/focus parity; no facts synthesized (payload-stripped fixtures render
-  empty, never invented content).
-- [ ] 3.2 `tests/app_client_gallery.test.js`: mount-on-availability, gate
-  behavior while unavailable, verbatim rejection surfacing.
+## 4. Storybook and storyboard
 
-## 4. Showcase growth (same change)
+- [x] 4.1 Add deterministic stories under `Data/GalleryPanel`,
+  `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
+  `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`, covering
+  populated, empty, monster, pending/failed, unavailable and rejected states.
+- [x] 4.2 Add all five titles to the frozen component manifest before live app
+  wiring; pass the production and Storybook builds and showcase-coverage gate.
+- [x] 4.3 Add the interactive `Data/GalleryPanel/Storyboard` and English
+  `docs/design/elosern-redesign2/gallery-storyboard.md` frame guide. View all four
+  reference images and exercise browse, generation/rejection, binding, real pointer
+  face editing, confirmation and monster/focus flows in Chromium.
 
-- [ ] 4.1 Stories with deterministic offline fixtures:
-  `Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
-  `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal` (representative
-  `args:` per story).
-- [ ] 4.2 Append the five titles to `web/webclient-app/component-manifest.json`
-  (frozen set re-frozen at the new complete set); `pnpm run showcase-coverage`
-  green; no component mounts before its story exists.
+## Evidence
+
+- Final complete Vitest gate: 92 files / 978 tests passed, including all 19
+  focused gallery tests and the three added lifecycle/focus regressions.
+- Vite production build, Storybook static build and showcase coverage passed;
+  the frozen manifest has 56 registered/required component titles.
+- The legacy Node contract gate caught an undefined body-font token; the gallery
+  now uses the existing `--f-sans` token rather than inventing a parallel token.
+  The complete Node gate then passed all 453 tests.
+- Chromium: draft retained after rejection; successful matching publication closes
+  generation; binding is initially disabled until a slot is chosen; non-square
+  image drag updates normalized coordinates; crop save sends only identity and
+  rectangle; delete cancellation preserves 8 cards and confirmed publication
+  reduces to 7; monster exposes no input fields; Escape restores the clicked CTA.
+- Repeated visual verification in a dedicated headed Wayland Chromium window;
+  default selection changes only after publication, and face-editor cancellation
+  returns to the gallery. Specification traceability: 1512 requirements covered,
+  zero uncovered and zero errors. OpenSpec reports 13/13 tasks complete.
+- No Python code, player commands, main specs, archive or branch merge changed.
+- Final synchronous Rubber Duck review found no blockers. No null-rectangle
+  fallback was added because completed cards are protocol-validated; no second
+  shared-drawer teardown restore was added because the host and editor coordinator
+  already own restoration. Added late-result-after-cancel and detached-opener
+  focus regressions in response to the review's concrete test suggestions.

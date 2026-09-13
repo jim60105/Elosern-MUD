@@ -11,7 +11,9 @@ card order, chips, crown (「目前預設」), pending spinner rows, failed rows
 and overlap warnings SHALL come verbatim from the payload. The client SHALL NOT
 compose chips or labels, compute filter counts or overlap rules, read
 equipment state, or re-sort rows (list order is payload order; the tab FILTERS
-by the committed row status/`binding_present`/`is_default` facts). The
+by the committed row status/`binding_present`/`is_default` facts). Static chrome,
+filter labels and the closed field/slot catalog are client vocabulary, and
+timestamps format the committed epoch as UTC. The
 surface SHALL mount from the existing overlay host when the committed panel is
 available and SHALL lock its mutation controls while the panel is unavailable.
 
@@ -35,6 +37,9 @@ available and SHALL lock its mutation controls while the panel is unavailable.
 The 肖像詳情 rail SHALL show the selected card's preview (cover-cropped through
 the shared `face-rect.js` mapping), committed badges, 綁定條件 rows, 當前狀態
 line, and the affordances 設為預設 / 編輯設定 / 刪除 plus the 生成新圖 CTA.
+Conditions SHALL appear only when committed warnings provide them; otherwise
+their absence SHALL be explicit. The rail SHALL NOT claim that the default
+image is currently resolved for display, because v1 supplies no such flag.
 設為預設 SHALL dispatch `gallery.default.set` once; 刪除 SHALL require an
 in-rail confirmation step before dispatching `gallery.card.delete` and SHALL
 cancel without a dispatch. Monster-kind subjects SHALL render the delete/replace
@@ -62,7 +67,8 @@ committed `equipment_summary` (per-slot equipped display name or 未裝備; the
 accessories count line). 補充提示詞 SHALL be a textarea whose n / 512 counter
 is cosmetic; on submit the surface SHALL dispatch exactly one
 `gallery.generate` with the selected catalog ids and the raw text, SHALL close
-on the published panel showing the pending row, and SHALL surface any server
+after its own successful result and declared presentation revision have both
+committed, and SHALL surface any server
 rejection message verbatim without inventing its own.
 
 #### Scenario: Submit carries only catalog ids
@@ -137,3 +143,27 @@ text and not rely on color alone.
 
 - **WHEN** the face-rect modal is focused and Escape is pressed
 - **THEN** the modal closes, focus returns to its opener, and no action is dispatched
+
+### Requirement: The gallery has an offline interactive storyboard
+
+The five component Storybook families SHALL include an interactive storyboard
+under `Data/GalleryPanel` covering browse, generation, pending and failure,
+binding, face editing, default selection and delete confirmation. A frame guide
+SHALL reference the four design images, state each transition and recovery path,
+and distinguish fixture publications from live behavior.
+
+#### Scenario: The storyboard runs without game or AI services
+
+- **WHEN** the player opens the built Storybook gallery storyboard offline
+- **THEN** the real gallery components expose every documented frame using
+  deterministic fixtures and no game-server or AI-service requests
+
+#### Scenario: Context changes invalidate an editor
+
+- **WHEN** the selected subject changes, its card disappears, or the panel becomes unavailable
+- **THEN** stale drafts are discarded and cannot dispatch against the replacement context
+
+#### Scenario: An unrelated pending job does not complete a submission
+
+- **WHEN** another pending row is published before this editor's correlated result
+- **THEN** the editor remains open, and a rejected result preserves its draft
