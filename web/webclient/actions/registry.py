@@ -160,6 +160,19 @@ def build_production_action_registry() -> ActionRegistry:
         _dismiss_adapter,
         validate_options_dismiss_payload,
     )
+    from web.webclient.actions.gallery_actions import (
+        _gallery_subject_select_adapter,
+        _gallery_generate_adapter,
+        _gallery_default_set_adapter,
+        _gallery_card_delete_adapter,
+        _gallery_face_rect_update_adapter,
+        _gallery_binding_save_adapter,
+        validate_gallery_subject_select_payload,
+        validate_gallery_generate_payload,
+        validate_gallery_card_payload,
+        validate_gallery_face_rect_update_payload,
+        validate_gallery_binding_save_payload,
+    )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
         _exam_start_adapter,
@@ -561,4 +574,28 @@ def build_production_action_registry() -> ActionRegistry:
             affected_panels=(),
         )
     )
+    registry.register(ActionSpec(
+        "gallery.subject.select", validate_gallery_subject_select_payload,
+        _gallery_subject_select_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.generate", validate_gallery_generate_payload,
+        _gallery_generate_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.default.set", validate_gallery_card_payload,
+        _gallery_default_set_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.card.delete", validate_gallery_card_payload,
+        _gallery_card_delete_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.face_rect.update", validate_gallery_face_rect_update_payload,
+        _gallery_face_rect_update_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.binding.save", validate_gallery_binding_save_payload,
+        _gallery_binding_save_adapter, ("gallery",),
+    ))
     return registry

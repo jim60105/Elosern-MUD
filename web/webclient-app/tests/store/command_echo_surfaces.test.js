@@ -16,6 +16,7 @@ import {
 } from "../../stories/fixtures.js";
 import * as fx from "./protocol_fixtures.js";
 import CombatMenu from "../../lib/combat_menu.js";
+import Protocol from "../../lib/protocol.js";
 import { SYNTH_ITEM, SYNTH_SKILL, SYNTH_TITLE } from "../support/synthetic-data.mjs";
 
 // File-local synthetic rows (test-data-independence): the kit skill/item/title
@@ -723,6 +724,31 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
     },
   ];
 
+  const gallerySubject = "portrait:character:t_gallery";
+  const galleryCard = { subject_key: gallerySubject, image_id: "12345678-1234-1234-1234-123456789abc" };
+  for (const [actionId, payload] of [
+    ["gallery.subject.select", { subject_key: gallerySubject }],
+    ["gallery.generate", { subject_key: gallerySubject, fields: ["appearance"], custom_prompt: "光影" }],
+    ["gallery.default.set", galleryCard],
+    ["gallery.card.delete", galleryCard],
+    ["gallery.face_rect.update", { ...galleryCard, face_rect: { x: 0, y: 0, w: 1, h: 1 } }],
+    ["gallery.binding.save", { ...galleryCard, slots: ["armor"] }],
+  ]) {
+    SURFACES.push({
+      id: `EXPECTED SILENCE: ${actionId} webclient-only management`,
+      ids: [actionId],
+      silence: true,
+      prepare() {
+        openExploration();
+        const validated = Protocol.validateGalleryActionPayload(actionId, payload);
+        store.dispatchAction(actionId, validated);
+        expect(sender.sent.actions).toHaveLength(1);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+        expect(sender.sent.actions[0].action_id).toBe(actionId);
+      },
+    });
+  }
+
   for (const surface of SURFACES) {
     it(`${surface.id}`, () => {
       surface.prepare();
@@ -765,6 +791,12 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       "account.character.switch",
       "creation.roll_name",
       "explore.dialogue_leave",
+      "gallery.subject.select",
+      "gallery.generate",
+      "gallery.default.set",
+      "gallery.card.delete",
+      "gallery.face_rect.update",
+      "gallery.binding.save",
       "options.dismiss",
     ]);
   });

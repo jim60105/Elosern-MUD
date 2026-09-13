@@ -4212,6 +4212,54 @@
     if (typeof value !== "string" || value.length !== 36 || !GALLERY_UUID.test(value)) throw new Error("invalid image_id");
   }
 
+  function validateGalleryFaceRect(value) {
+    var rect = validateArtFaceRect(value);
+    if (!rect || rect.w <= 0 || rect.h <= 0 || rect.x + rect.w > 1 || rect.y + rect.h > 1) {
+      throw new Error("invalid face_rect");
+    }
+    return rect;
+  }
+
+  // Exact, kind-neutral mirror of actions/gallery_actions.py. Capability
+  // refusals belong to the server, not this schema or the future gallery UI.
+  function validateGalleryActionPayload(actionId, payload) {
+    var keys = ["subject_key"];
+    if (actionId === "gallery.generate") {
+      keys = keys.concat(["fields", "custom_prompt"]);
+    } else if (actionId === "gallery.default.set" || actionId === "gallery.card.delete") {
+      keys.push("image_id");
+    } else if (actionId === "gallery.face_rect.update") {
+      keys = keys.concat(["image_id", "face_rect"]);
+    } else if (actionId === "gallery.binding.save") {
+      keys = keys.concat(["image_id", "slots"]);
+    } else if (actionId !== "gallery.subject.select") {
+      throw new Error("unknown gallery action");
+    }
+    requireExactFields(payload, actionId, keys, []);
+    gallerySubject(payload.subject_key);
+    if (keys.indexOf("image_id") !== -1) galleryUuid(payload.image_id);
+    if (actionId === "gallery.generate" || actionId === "gallery.binding.save") {
+      var generating = actionId === "gallery.generate";
+      var values = generating ? payload.fields : payload.slots;
+      var catalog = generating ? GALLERY_FIELDS : GALLERY_SLOTS;
+      if (!Array.isArray(values) || values.length > catalog.length ||
+          (!generating && !values.length) ||
+          values.some(function (value) { return typeof value !== "string" || catalog.indexOf(value) === -1; }) ||
+          new Set(values).size !== values.length) {
+        throw new Error("invalid gallery selection");
+      }
+    }
+    if (actionId === "gallery.generate") {
+      // Python isprintable rejects all Unicode C/Z categories except U+0020.
+      requireString(payload.custom_prompt, "custom_prompt", 512);
+      if (/[\p{C}\p{Z}]/u.test(payload.custom_prompt.replace(/ /g, ""))) {
+        throw new Error("non-printable custom_prompt");
+      }
+    }
+    if (actionId === "gallery.face_rect.update") validateGalleryFaceRect(payload.face_rect);
+    return Object.assign({}, payload);
+  }
+
   function validateGalleryEquipment(summary) {
     requireExactFields(summary, "equipment_summary", GALLERY_SLOTS, []);
     GALLERY_SLOTS.forEach(function (slot) {
@@ -4325,10 +4373,7 @@
       if (url.indexOf(prefix) !== 0 || [".png", ".webp", ".jpg", ".avif"].indexOf(url.slice(prefix.length)) === -1) {
         throw new Error("url must name selected subject and image");
       }
-      var rect = validateArtFaceRect(row.face_rect);
-      if (!rect || rect.w <= 0 || rect.h <= 0 || rect.x + rect.w > 1 || rect.y + rect.h > 1) {
-        throw new Error("invalid face_rect");
-      }
+      var rect = validateGalleryFaceRect(row.face_rect);
       var slotChips = GALLERY_SLOT_LABELS.filter(function (label) { return chips.indexOf(label) !== -1; });
       var faceChip = rect.x === 0.25 && rect.y === 0.06 && rect.w === 0.5 && rect.h === 0.5 ? "預設臉框" : "自訂臉框";
       var expected = slotChips.concat([faceChip], row.is_default ? ["目前預設"] : []);
@@ -6027,6 +6072,7 @@
     validateStatusPanel: validateStatusPanel,
     validateArtPanel: validateArtPanel,
     validateGalleryPanel: validateGalleryPanel,
+    validateGalleryActionPayload: validateGalleryActionPayload,
     GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
     GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
     GALLERY_MAX_LABEL: GALLERY_MAX_LABEL,
