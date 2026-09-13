@@ -804,8 +804,9 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             usable_out_of_combat=True,
+            requires_divine_arts=True,
             effects=["set_disguise"],
-            category=SkillCategory.UTILITY,
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "concentration",
@@ -825,8 +826,9 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
+            requires_divine_arts=True,
             effects=["confer_skill_partial"],
-            category=SkillCategory.UTILITY,
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "defense_instinct",

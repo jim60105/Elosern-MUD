@@ -531,7 +531,10 @@ class DivineMysteryRegistryTests(unittest.TestCase):
         disguised = SKILL_REGISTRY["status_disguise"]
         self.assertIn("神之秘法", disguised.label)
         self.assertEqual(disguised.effects, ["set_disguise"])
-        self.assertFalse(disguised.requires_divine_arts)
+        self.assertTrue(disguised.requires_divine_arts)
+        # Single-node known mysteries carry the same cast-time blood gate as
+        # the transmitted four: divine race only, mechanically enforced.
+        self.assertTrue(SKILL_REGISTRY["dominion_art"].requires_divine_arts)
 
         for key, name in (
             ("divine_time_dilation", "時間加速"),
@@ -557,6 +560,8 @@ class DivineMysteryRegistryTests(unittest.TestCase):
             "divine_space_distortion",
             "divine_matter_transmutation",
             "divine_life_extension",
+            "status_disguise",
+            "dominion_art",
         ):
             with self.subTest(gated=key):
                 self.assertTrue(
@@ -753,8 +758,10 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "divine_space_distortion",
                 "divine_matter_transmutation",
                 "divine_life_extension",
+                "status_disguise",
+                "dominion_art",
             },
-            SkillCategory.UTILITY: {"status_disguise", "dominion_art"},
+            SkillCategory.UTILITY: set(),
             SkillCategory.SEXUAL_ACT: {
                 "divine_sexual_arts",
                 "divine_sexual_mastery",
