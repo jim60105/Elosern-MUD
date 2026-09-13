@@ -10,7 +10,6 @@ from world.lore.items import (
     ITEM_REGISTRY,
     EquipmentModifierKey,
     ItemDefinition,
-    ItemEffectKey,
     ItemIconKey,
     ItemKind,
     ItemPresentation,
@@ -229,8 +228,13 @@ class ItemMechanicsTests(unittest.TestCase):
 
     def test_canonical_bindings_resolve(self):
         potion = ITEM_REGISTRY["healing_potion"]
-        self.assertEqual(
-            potion.use_mechanics.effect_key, ItemEffectKey.SELF_HEAL
+        # The mechanics record names no effect: the effect lives in the
+        # item-effect rulebook keyed by the item's own key.
+        self.assertFalse(
+            any(
+                "effect" in name or "stat" in name or "status" in name
+                for name in vars(potion.use_mechanics)
+            )
         )
         self.assertTrue(potion.use_mechanics.consumable)
         self.assertTrue(potion.use_mechanics.combat_allowed)
@@ -242,15 +246,19 @@ class ItemMechanicsTests(unittest.TestCase):
         self.assertIsNone(ITEM_REGISTRY["meal"].equipment_slot)
 
     def test_mutable_use_definition_rejects_malformed_members(self):
-        with self.assertRaises(ValueError):
-            ItemUseMechanics(effect_key="self_heal", consumable=True, combat_allowed=True)
-        with self.assertRaises(ValueError):
+        # The effect-key field no longer exists at all (add-declarative-
+        # item-effects design §3.1): an unknown keyword cannot construct it.
+        with self.assertRaises(TypeError):
             ItemUseMechanics(
-                effect_key=ItemEffectKey.SELF_HEAL, consumable="yes", combat_allowed=True
+                effect_key="self_heal", consumable=True, combat_allowed=True
             )
         with self.assertRaises(ValueError):
             ItemUseMechanics(
-                effect_key=ItemEffectKey.SELF_HEAL, consumable=True, combat_allowed=1
+                consumable="yes", combat_allowed=True
+            )
+        with self.assertRaises(ValueError):
+            ItemUseMechanics(
+                consumable=True, combat_allowed=1
             )
 
     @covers_requirement(
@@ -260,7 +268,6 @@ class ItemMechanicsTests(unittest.TestCase):
         cases = {
             "both-forms": dict(
                 use_mechanics=ItemUseMechanics(
-                    effect_key=ItemEffectKey.SELF_HEAL,
                     consumable=True,
                     combat_allowed=True,
                 ),
@@ -276,7 +283,6 @@ class ItemMechanicsTests(unittest.TestCase):
             ),
             "use-with-modifier": dict(
                 use_mechanics=ItemUseMechanics(
-                    effect_key=ItemEffectKey.SELF_HEAL,
                     consumable=True,
                     combat_allowed=True,
                 ),
@@ -292,7 +298,6 @@ class ItemMechanicsTests(unittest.TestCase):
     def test_reusable_definition_is_valid(self):
         definition = self._definition(
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.SELF_HEAL,
                 consumable=False,
                 combat_allowed=False,
             )

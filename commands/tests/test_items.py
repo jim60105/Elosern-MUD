@@ -33,7 +33,7 @@ from world.lore.items import (
 from world.rules.combat_session import engage, read_session
 from world.rules.equipment import EquipmentToggleReason
 from world.rules.equipment_effects import EquipmentEffectRule
-from world.rules.items import ItemEffectKey, ItemUseReason
+from world.rules.items import ItemUseReason
 from world.rules.service_messages import rejection_message
 from world.rules.tests._combat_session_helpers import (
     _monster,
@@ -43,7 +43,7 @@ from world.rules.tests._combat_session_helpers import (
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.skills.equipment import EquipmentSlot, list_items
-from world.tests.synthetic_data import make_item
+from world.tests.synthetic_data import SYNTH_ITEM_EFFECT_PROFILES, make_item
 
 # Preimport the import-time-validated rulebooks (item effects + equipment
 # effects) before the kit is ever scoped, so their shipped-row validation
@@ -165,8 +165,9 @@ _EQUIPMENT_RULES = {
 }
 
 # The bounded restoration the live item-effect rulebook grants for the
-# potion's effect key (read, never restated).
-_HEAL_AMOUNT = int(_items_rules.ITEM_EFFECT_RULES[ItemEffectKey.SELF_HEAL].amount)
+# potion's key: the scoped profile the kit registers for it (read, never
+# restated).
+_HEAL_AMOUNT = int(SYNTH_ITEM_EFFECT_PROFILES[_POTION].effects[0].amount)
 assert _HEAL_AMOUNT > 20, "the clamped-restore scenario needs a rule above the 20 HP gap"
 
 

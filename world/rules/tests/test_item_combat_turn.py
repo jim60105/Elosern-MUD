@@ -17,7 +17,12 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.rooms import Room
-from world.lore.items import ItemEffectKey, ItemUseMechanics
+from world.lore.items import ItemUseMechanics
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+)
 from world.rules.action import ActionRequest
 from world.rules.clock import WorldClock
 from world.rules.combat import (
@@ -52,9 +57,12 @@ _MANA_VIAL = make_item(
     _MANA_KEY,
     display_name_zh="合成法力藥劑",
     price_table_key="t_mossmeals",
-    use_mechanics=ItemUseMechanics(
-        effect_key=ItemEffectKey.MANA_RESTORE, consumable=True, combat_allowed=True
-    ),
+    use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
+)
+
+# The rulebook-side half of the scoped row (settlement resolves by item key).
+_MANA_VIAL_PROFILE = ItemEffectProfile(
+    effects=(GaugeAdjustEffect(stat=ItemStat.MP, amount=40),)
 )
 
 
@@ -70,8 +78,8 @@ def _item_used_log(actor_key: str, item_key: str) -> EventLog:
                 actor_key,
                 {
                     "item_key": item_key,
-                    "effect_key": "self_heal",
                     "consumable": True,
+                    "stat": "hp",
                     "amount": 40,
                 },
                 "你使用了測試物品。",
@@ -102,7 +110,14 @@ def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
 class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
-        open_synthetic_scope(self, "items", extra={"items": {_MANA_KEY: _MANA_VIAL}})
+        open_synthetic_scope(
+            self,
+            "items",
+            extra={
+                "items": {_MANA_KEY: _MANA_VIAL},
+                "item_effect_profiles": {_MANA_KEY: _MANA_VIAL_PROFILE},
+            },
+        )
         self.room = create_object(Room, key="item arena")
         self.player = _player("item duelist")
         self.player.location = self.room
@@ -143,8 +158,8 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             item_entries[0].data,
             {
                 "item_key": _TONIC_KEY,
-                "effect_key": "self_heal",
                 "consumable": True,
+                "stat": "hp",
                 "amount": 20,
             },
         )

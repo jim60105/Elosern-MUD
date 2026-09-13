@@ -14,6 +14,7 @@ from world.quests.runtime import (
     QuestTransitionError,
 )
 from world.rules.economy import TradeError, TradeReason
+from world.rules.items import ItemUseReason
 from world.rules.guild import (
     GuildDataError,
     GuildError,
@@ -62,6 +63,13 @@ class ServiceMessagesTests(unittest.TestCase):
 
     def test_every_trade_reason_has_a_code_and_message(self):
         for reason in TradeReason:
+            code = rejection_code(reason)
+            self.assertEqual(code, reason.value)
+            self.assertIn(code, SERVICE_REASON_MESSAGES)
+            self.assertTrue(rejection_message(reason))
+
+    def test_every_item_use_reason_has_a_code_and_message(self):
+        for reason in ItemUseReason:
             code = rejection_code(reason)
             self.assertEqual(code, reason.value)
             self.assertIn(code, SERVICE_REASON_MESSAGES)
