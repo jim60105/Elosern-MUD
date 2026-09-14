@@ -491,6 +491,9 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         self.caster.db.skills["active"].append(skill.key)
         return skill
 
+    @covers_requirement(
+        "skill-effect-model::per-effect-potency-is-validated-independently-of-effect-identity"
+    )
     def test_repeated_effects_retain_independent_potency(self):
         # A synthetic skill with two damage strikes of coefficients 1.0 and 2.0.
         skill = self._register_skill(
