@@ -53,11 +53,12 @@ from world.rules.skill_effects import (
 )
 from world.rules.targeting import (
     ActionContext,
+    Relation,
     expand_target_shorthand,
     resolve_targets,
 )
 from world.skills.cost_tiers import is_freeform_eligible
-from world.skills.effects import ResolvedEffect, parse_effect
+from world.skills.effects import EffectAudience, ResolvedEffect, parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -1484,10 +1485,76 @@ def _bind_resolved_effect(
     return effect_context
 
 
+def plan_effect_audiences(
+    actor: Any,
+    context: ActionContext,
+    skill: SkillDef,
+    targets: list[Any],
+) -> tuple[list[Any], ...]:
+    """Derive the per-effect recipient subsets over the validated target pool.
+
+    Shared pure audience planning used by ``ActionResolver.preflight()``,
+    final resolution, and preview validation. Returns one target list per
+    declared effect in ``skill.effects``, matching ``skill.effect_policies``.
+
+    - ``SELECTED``: returns a shallow copy of the validated target pool.
+    - ``ALLIES``: filters validated targets to those with ``relation_to`` in
+      ``(Relation.SELF, Relation.ALLY)``; never adds unselected entities.
+    - ``ENEMIES``: filters validated targets to those with ``relation_to == Relation.ENEMY``;
+      never adds unselected entities.
+    - ``SELF``: binds ``[actor]`` after presence, alive, and range checks;
+      never duplicates the actor.
+
+    If a skill declares at least one non-``SELECTED`` audience and every
+    effect's routed audience is empty, raises
+    ``RejectedAction(RejectReason.NO_VALID_TARGETS_IN_AREA, skill.key)``.
+    """
+    routed: list[list[Any]] = []
+    actor_valid: bool | None = None
+
+    for policy in skill.effect_policies:
+        aud = policy.audience
+        if aud is EffectAudience.SELECTED:
+            routed.append(list(targets))
+        elif aud is EffectAudience.ALLIES:
+            routed.append([
+                t for t in targets
+                if context.relation_to(actor, t) in (Relation.SELF, Relation.ALLY)
+            ])
+        elif aud is EffectAudience.ENEMIES:
+            routed.append([
+                t for t in targets
+                if context.relation_to(actor, t) in (Relation.ENEMY,)
+            ])
+        elif aud is EffectAudience.SELF:
+            if actor_valid is None:
+                alive = False
+                try:
+                    alive = _stored_trait_value(actor.traits.hp) > 0
+                except (AttributeError, KeyError):  # observability: ignore R2: actor has no hp trait or lacks traits container, treating as not alive
+                    pass
+                actor_valid = (
+                    context.is_present(actor, actor)
+                    and alive
+                    and context.is_in_range(actor, actor)
+                )
+            routed.append([actor] if actor_valid else [])
+
+    if any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
+        if not any(routed):
+            raise RejectedAction(
+                RejectReason.NO_VALID_TARGETS_IN_AREA,
+                skill.key,
+            )
+
+    return tuple(routed)
+
+
 def _step5_effect_resolution(
     request: ActionRequest,
     skill: SkillDef,
     targets: list[Any],
+    routed_targets: tuple[list[Any], ...] | None = None,
 ) -> list[PendingEffect]:
     pending: list[PendingEffect] = []
     base_context = _event_context(request)
@@ -1496,11 +1563,17 @@ def _step5_effect_resolution(
         handler = _EFFECT_HANDLERS.get(prefix)
         if handler is None:
             raise RejectedAction(RejectReason.UNKNOWN_EFFECT_ID, effect_id)
+        effect_targets = (
+            routed_targets[i] if routed_targets is not None else targets
+        )
+        policy = skill.effect_policies[i]
+        if policy.audience is not EffectAudience.SELECTED and not effect_targets:
+            continue
         effect_context = _bind_resolved_effect(base_context, skill, i)
         try:
             effects = handler(
                 request.actor,
-                targets,
+                effect_targets,
                 effect_id,
                 effect_context,
                 request.scale,
@@ -2227,7 +2300,7 @@ class ActionResolver:
         try:
             skill = _step1_ownership(request)
             _step2_resource_check(request.actor, skill, request.scale)
-            _step3_targeting(request, skill)
+            targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
             base_context = _event_context(request)
             for i, effect_id in enumerate(skill.effects):
@@ -2244,6 +2317,7 @@ class ActionResolver:
                         RejectReason.MISSING_EFFECT_CONTEXT,
                         f"missing event_context key {sorted(missing)[0]!r}",
                     )
+            plan_effect_audiences(request.actor, request.context, skill, targets)
             _step8_time_cost(request, skill)
         except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
             return ActionResult.rejected(rejection.reason, rejection.detail)
@@ -2261,18 +2335,33 @@ class ActionResolver:
                 skill,
                 targets,
             )
+            routed_targets = plan_effect_audiences(
+                request.actor,
+                request.context,
+                skill,
+                targets,
+            )
             pending = resist_pending + _step5_effect_resolution(
                 request,
                 skill,
                 targets,
+                routed_targets=routed_targets,
             )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
+            delivered_recipients: list[Any] = []
+            seen_delivered_keys: set[Any] = set()
+            for eff_targets in routed_targets:
+                for target in eff_targets:
+                    t_key = practice_claim_key(request.actor, skill.key, target)[2]
+                    if t_key not in seen_delivered_keys:
+                        seen_delivered_keys.add(t_key)
+                        delivered_recipients.append(target)
             practice_claims: list[tuple[Any, str, Any]] = []
             unlock_lines: list[str] = []
             pending += _step6_skill_practice(
                 request,
                 skill,
-                targets,
+                delivered_recipients,
                 practice_claims,
                 unlock_lines,
             )

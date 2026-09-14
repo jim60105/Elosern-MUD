@@ -27,6 +27,7 @@ from world.rules.action import (
     _effect_prefix,
     _step1_divine_arts_gate,
     _stored_trait_value,
+    plan_effect_audiences,
 )
 from world.rules.action_gates import damage_requires_battlefield
 from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage
@@ -48,6 +49,7 @@ from world.rules.targeting import (
     expand_target_shorthand,
 )
 from world.skills.cost_tiers import is_freeform_eligible
+from world.skills.effects import EffectAudience
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
 
 
@@ -244,6 +246,11 @@ def _applicable_shorthands(
             actor, context, skill, list(expanded)
         )
         if valid:
+            if any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
+                try:
+                    plan_effect_audiences(actor, context, skill, list(valid))
+                except RejectedAction:
+                    continue
             applicable.append(shorthand)
     return tuple(applicable)
 
@@ -283,6 +290,11 @@ def preview_skill(
             else RejectReason.TARGET_SPEC_MISMATCH
         )
         return _disabled(skill_key, reason, skill_key)
+    if valid and any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
+        try:
+            plan_effect_audiences(actor, context, skill, list(valid))
+        except RejectedAction as rejection:
+            return _disabled(skill_key, rejection.reason, rejection.detail)
     return ActionPreview(skill_key, True, None, None, tuple(valid), shorthands)
 
 
@@ -355,6 +367,7 @@ def revalidate_submission(
                     raise RejectedAction(
                         RejectReason.NO_VALID_TARGETS_IN_AREA, skill_key
                     )
+        plan_effect_audiences(actor, context, skill, list(resolved))
     except RejectedAction as rejection:
         return _disabled(skill_key, rejection.reason, rejection.detail)
     return ActionPreview(skill_key, True, None, None, tuple(resolved), ())

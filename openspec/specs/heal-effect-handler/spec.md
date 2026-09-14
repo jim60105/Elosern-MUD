@@ -28,9 +28,9 @@ so the declared shape is never silently ignored at use time.
 - **THEN** construction raises `ValueError`
 
 ### Requirement: heal:area targets every valid target in the action's target set
-`heal:area` SHALL apply the same clamped restoration independently to every target the action
-resolution pipeline already validated for an AREA-targeted skill, with no cross-target interaction
-(one target's clamp does not affect another's).
+`heal:area` SHALL apply the same clamped restoration independently to every target selected for that effect from the action
+resolution pipeline's validated AREA candidates, with no cross-target interaction
+(one target's clamp does not affect another's). Without an explicit per-effect audience this is the complete validated list, including enemies; an explicit audience SHALL only narrow delivery as declared.
 
 #### Scenario: An area heal restores each target independently
 - **WHEN** a `heal:area` effect resolves against three targets at different HP percentages

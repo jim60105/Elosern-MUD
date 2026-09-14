@@ -21,10 +21,21 @@ if TYPE_CHECKING:
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import (
+    ActorSexualEventEffect,
+    ClampShameEffect,
+    ClimaxExtensionStageEffect,
     DamageEffect,
+    DivinePleasureMaxEffect,
+    EffectAudience,
     EffectPolicy,
     HealEffect,
+    MarkSubmissionEffect,
+    RestorePurityEffect,
+    SaturateSensitivityEffect,
+    SelfBuffApplyEffect,
     SelfHealEffect,
+    SexualDrainEffect,
+    TargetSexualEventEffect,
     parse_effect,
 )
 
@@ -237,8 +248,10 @@ class SkillDef:
 
         An omitted or empty-tuple declaration normalizes to identity policies
         of the same length as ``effects``. Any other input must be a tuple of
-        ``EffectPolicy`` instances matching the effect count exactly, and
-        only supported effect kinds (damage and healing) may declare a
+        ``EffectPolicy`` instances matching the effect count exactly (an
+        all-default tuple re-normalizes if ``effects`` length changed via
+        ``replace()``), and only supported effect kinds (damage and healing)
+        may declare a
         non-identity coefficient.
         """
         if self.effect_policies is None or (
@@ -258,6 +271,13 @@ class SkillDef:
                 f"skill {self.key!r} effect_policies must be a tuple of EffectPolicy"
             )
         if len(self.effect_policies) != len(self.effects):
+            if all(p == EffectPolicy() for p in self.effect_policies):
+                object.__setattr__(
+                    self,
+                    "effect_policies",
+                    tuple(EffectPolicy() for _ in self.effects),
+                )
+                return
             raise ValueError(
                 f"skill {self.key!r} effect_policies length ({len(self.effect_policies)}) "
                 f"must match effects length ({len(self.effects)})"
@@ -266,6 +286,13 @@ class SkillDef:
             if not isinstance(policy, EffectPolicy):
                 raise ValueError(
                     f"skill {self.key!r} effect_policies item {policy!r} is not an EffectPolicy"
+                )
+            if (
+                self.target_spec is TargetSpec.NONE
+                and policy.audience in (EffectAudience.ALLIES, EffectAudience.ENEMIES)
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} target_spec is NONE and cannot declare {policy.audience} audience"
                 )
         for policy, parsed, effect_id in zip(
             self.effect_policies, self.parsed_effects, self.effects
@@ -276,6 +303,44 @@ class SkillDef:
                 raise ValueError(
                     f"skill {self.key!r} effect {effect_id!r} does not support "
                     f"potency coefficient {policy.coefficient}"
+                )
+            if (
+                isinstance(
+                    parsed,
+                    (SelfHealEffect, ActorSexualEventEffect, SelfBuffApplyEffect),
+                )
+                and policy.audience in (EffectAudience.ALLIES, EffectAudience.ENEMIES)
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} is inherently actor-bound and "
+                    f"cannot declare {policy.audience} audience"
+                )
+            if (
+                isinstance(
+                    parsed,
+                    (
+                        TargetSexualEventEffect,
+                        DivinePleasureMaxEffect,
+                        ClimaxExtensionStageEffect,
+                        SexualDrainEffect,
+                        SaturateSensitivityEffect,
+                        ClampShameEffect,
+                        MarkSubmissionEffect,
+                        RestorePurityEffect,
+                    ),
+                )
+                and policy.audience is EffectAudience.SELF
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} is inherently target-only and "
+                    f"cannot declare SELF audience"
+                )
+            if (
+                self.target_spec is TargetSpec.SELF
+                and policy.audience is EffectAudience.ENEMIES
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} target_spec is SELF and cannot declare ENEMIES audience"
                 )
 
     def _validate_heal_shape(self) -> None:

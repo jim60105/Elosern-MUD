@@ -73,6 +73,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "group",
                 "faction_constraint",
                 "requires_divine_arts",
+                "effect_policies",
                 "parsed_effects",
                 "prerequisites",
             ],
