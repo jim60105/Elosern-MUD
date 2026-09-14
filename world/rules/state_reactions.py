@@ -148,9 +148,17 @@ def dispatch_phase_reaction(
     to_phase: str,
     rules: list[Rule] | None = None,
 ) -> None:
-    """Dispatch phase transition reactions once after canonical climax phase changes."""
+    """Dispatch phase transition reactions once after canonical climax phase changes.
+
+    Callers must execute inside a buffs-snapshotting transaction to preserve
+    all-or-nothing settlement when a reaction applies or removes a marker.
+    Context provides: entity, field (climax_phase), from_phase, to_phase,
+    climax_phase (to_phase), and active_buffs.
+    """
     if not hasattr(entity, "attributes"):
         return
+
+    from world.rules.buffs import active_buff_keys_from_storage
 
     active_rules = rules if rules is not None else STATE_REACTION_RULES
     context = {
@@ -159,6 +167,7 @@ def dispatch_phase_reaction(
         "climax_phase": to_phase,
         "from_phase": from_phase,
         "to_phase": to_phase,
+        "active_buffs": active_buff_keys_from_storage(entity),
     }
 
     for rule in active_rules:

@@ -1145,7 +1145,11 @@ def _handle_pleasure_peak(
     """
     del effect_id, context, scale
     pending: list[PendingEffect] = []
+    seen_ids: set[int] = set()
     for recipient in targets:
+        if id(recipient) in seen_ids:
+            continue
+        seen_ids.add(id(recipient))
         pending.append(
             PendingEffect(
                 recipient,

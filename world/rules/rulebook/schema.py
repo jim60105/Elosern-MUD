@@ -117,18 +117,22 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         if entity is None:
             checks.append(False)
         else:
-            from world.skills.registry import SKILL_REGISTRY
-            from world.rules.progression import can_use_skill
-
-            skill = SKILL_REGISTRY.get(skill_key)
-            if skill is None:
+            skills_handler = getattr(entity, "skills", None)
+            if skills_handler is None:
                 checks.append(False)
             else:
-                owned_keys = set(entity.skills.owned_keys())
-                checks.append(
-                    skill.key in owned_keys
-                    and can_use_skill(entity, skill)
-                )
+                from world.skills.registry import SKILL_REGISTRY
+                from world.rules.progression import can_use_skill
+
+                skill = SKILL_REGISTRY.get(skill_key)
+                if skill is None:
+                    checks.append(False)
+                else:
+                    owned_keys = set(skills_handler.owned_keys())
+                    checks.append(
+                        skill.key in owned_keys
+                        and can_use_skill(entity, skill)
+                    )
     if "equipment_worn" in when:
         # Generic membership mechanism only: referential validation (the
         # value must name a slot-bearing ITEM_REGISTRY member) is table-
