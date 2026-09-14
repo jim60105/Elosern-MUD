@@ -21,6 +21,8 @@ import importlib
 from typing import Any
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -148,6 +150,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             skills[bucket].append(skill_key)
         entity.db.skills = skills
 
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
     def test_different_damage_sources_share_reaction_and_use_captured_tier(self):
         """Scenario: Different damage sources share the reaction.
 
@@ -254,6 +259,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self.assertLess(self.target.traits.hp.current, 200)
         self.assertEqual(self.target.sexual.pleasure.base, 18)
 
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
     def test_immune_and_refresh_outcomes_do_not_count(self):
         """Scenario: Immune and refresh outcomes do not count.
 
@@ -353,6 +361,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             "Positive buff must not trigger negative_buff_added reaction",
         )
 
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
     def test_new_debuff_and_its_ticks_are_distinct(self):
         """Scenario: New debuff and its ticks are distinct.
 
@@ -431,6 +442,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         # Total gain across application and two ticks: 18 + 18 + 18 = 54
         self.assertEqual(pleasure_after_tick2 - pleasure_start, 54)
 
+    @covers_requirement(
+        "damage-state-feedback::feedback-cascades-remain-within-the-initiating-transaction"
+    )
     def test_feedback_can_enter_normal_lock_phase(self):
         """Scenario: Feedback can enter the normal lock phase.
 
@@ -477,6 +491,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         mods_after = evaluate_combat_modifiers(self.target)
         self.assertEqual(mods_after.get("actions_per_turn"), 0)
 
+    @covers_requirement(
+        "damage-state-feedback::feedback-cascades-remain-within-the-initiating-transaction"
+    )
     def test_late_failure_restores_complete_cascade_item_and_clock(self):
         """Scenario: Late failure restores the complete cascade.
 
@@ -547,6 +564,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self.assertEqual(self.target.traits.hp.current, initial_hp)
         self.assertEqual(self.target.sexual.pleasure.base, initial_pleasure)
 
+    @covers_requirement(
+        "damage-state-feedback::recovery-only-passive-adjustment-composes-once-and-is-snapshotted"
+    )
     def test_conferred_passive_does_not_create_binary_reaction_entitlement(self):
         """Spec Requirement: Conferred passive does NOT create binary event-reaction entitlement."""
         feedback_passive = self._register_synth_skill(
@@ -585,6 +605,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             "Conferred passive must NOT grant binary event-reaction entitlement",
         )
 
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
     def test_periodic_buff_retains_source_tier_across_clock_advance(self):
         """Spec Requirement: Periodic buff retains source tier across clock advances."""
         feedback_passive = self._register_synth_skill(
@@ -642,6 +665,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             "Second tick after clock advance must still use retained source tier 賢者 (gain 18)",
         )
 
+    @covers_requirement(
+        "damage-state-feedback::recovery-only-passive-adjustment-composes-once-and-is-snapshotted"
+    )
     def test_recovery_only_passive_multiplier_equipment_independent_and_snapshotted(self):
         """Scenario: Equipment-independent recovery.
 
@@ -729,6 +755,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             "Recovery tick must use snapshotted 1.3 grace multiplier despite caster arousal dropping to 0",
         )
 
+    @covers_requirement(
+        "damage-state-feedback::recovery-only-passive-adjustment-composes-once-and-is-snapshotted"
+    )
     def test_recovery_passive_multiplier_fractional_conferred_scaling(self):
         """Spec Requirement: Numeric conferred adjustments retain fractional scaling."""
         passive_skill = self._register_synth_skill(
@@ -805,6 +834,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         tick_buffs(self.target, 10)
         self.assertEqual(self.target.traits.hp.current - hp_before, 60)
 
+    @covers_requirement(
+        "damage-state-feedback::recovery-only-passive-adjustment-composes-once-and-is-snapshotted"
+    )
     def test_no_duplicate_sacramental_multiplier_and_clean_equipment_composition(self):
         """Scenario: No duplicate sacramental multiplier and clean equipment composition.
 
@@ -906,6 +938,9 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             expected_recovery = math.floor(100 * (1.0 + 15.0 / 100.0) * 1.2)
             self.assertEqual(self.target.traits.hp.current - 10, expected_recovery)
 
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
     def test_second_synthetic_non_light_configuration_proves_generic_engine_reuse(self):
         """Spec Requirement: Verify a second synthetic non-light configuration uses the same generic mechanism."""
         blood_masochism = self._register_synth_skill(
