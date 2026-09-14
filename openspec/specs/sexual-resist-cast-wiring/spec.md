@@ -15,9 +15,7 @@ practice cost on any target's outcome.
 `world/rules/action.py`'s `ActionResolver.resolve()` SHALL call `resist_verdict(actor, target,
 rng=roll_d100)` (`world/rules/sexual_resist.py`, unmodified) exactly once for every entity in the
 resolved target list other than the acting entity, whenever the cast skill's key is present in
-`SEXUAL_ACT_REGISTRY` and the corresponding `SexualActDef.resistible` is `True`. A skill absent from
-`SEXUAL_ACT_REGISTRY`, or a sexual act declaring `resistible=False`, SHALL trigger no resist contest and
-SHALL behave exactly as before this change.
+`SEXUAL_ACT_REGISTRY` and the corresponding `SexualActDef.resistible` is `True`. A non-catalog skill explicitly declaring a resistible interaction policy SHALL use the same single contest per non-actor target. A skill without either entitlement, including ordinary non-catalog spells and non-resistible sexual acts, SHALL trigger no contest. Declaring both sources SHALL never cause duplicate rolls.
 
 #### Scenario: A resistible single-target act rolls one contest against its target
 - **WHEN** an actor casts a `resistible=True`, `TargetSpec.SINGLE` act against one target
@@ -29,8 +27,12 @@ SHALL behave exactly as before this change.
 - **THEN** `resist_verdict` is never called during that cast's resolution
 
 #### Scenario: A non-sexual-act skill triggers no resist contest
-- **WHEN** an actor casts a skill whose key is absent from `SEXUAL_ACT_REGISTRY`
+- **WHEN** an actor casts a skill whose key is absent from `SEXUAL_ACT_REGISTRY` and has no resistible interaction policy
 - **THEN** `resist_verdict` is never called during that cast's resolution
+
+#### Scenario: A non-catalog contact spell uses one contest
+- **WHEN** a spell outside the sexual-act catalog declares a resistible contact policy
+- **THEN** it resolves one ordinary resist contest per non-actor target and emits the existing sexual_resist outcome contract
 
 ### Requirement: A resistible AREA-target act resolves one independent contest per resolved target
 `ActionResolver.resolve()` SHALL NOT branch its resist-contest logic on `SkillDef.target_spec`: for a
@@ -79,7 +81,7 @@ contain exactly one `EventEntry` with `kind == "sexual_resist"`, `target` equal 
   equal to `None` and `data["auto_comply"]` equal to `True`
 
 ### Requirement: The actor's own effects and the cast's resource, time, and practice cost are never gated by a target's resist outcome
-Regardless of any target's `ResistVerdict`, `ActionResolver.resolve()` SHALL apply the cast's own
+For acts declared in `SEXUAL_ACT_REGISTRY` (not generic contact spells), regardless of any target's `ResistVerdict`, `ActionResolver.resolve()` SHALL apply the cast's own
 `actor_counters` and the actor's own pleasure share to the acting entity, SHALL deduct the skill's
 declared resource cost from the actor, SHALL grant skill-practice XP to the actor, and SHALL return
 `ActionResult.outcome == "success"` — none of these SHALL depend on whether any target resisted, including

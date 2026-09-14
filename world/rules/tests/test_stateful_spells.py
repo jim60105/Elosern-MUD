@@ -196,6 +196,7 @@ class StatefulSpellsBase(EvenniaTest):
 class StatefulSpellCastingTests(StatefulSpellsBase):
     """Behavior tests for subject-scoped conditions, magnitudes, contact, and resist gate."""
 
+    @covers_requirement("stateful-spell-casting::subject-scoped-cast-conditions-are-pure-and-authoritative")
     @covers_requirement(
         "action-resolution-pipeline::actionresolver-exposes-side-effect-free-preflight-for-player-combat-input"
     )
@@ -278,6 +279,7 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
             self.assertEqual(res_milk.outcome, "rejected")
             self.assertEqual(res_milk.reason, RejectReason.CAST_CONDITION_UNMET)
 
+    @covers_requirement("stateful-spell-casting::state-dependent-effect-magnitudes-use-canonical-pre-effect-inputs")
     def test_state_sampled_before_spell_changes_it(self):
         """Healing magnitude uses pre-stimulus arousal ordinal with no repeated coefficient multiplication."""
         with self._catalogue():
@@ -318,6 +320,7 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
                     # Base roll was 10, bonus was 4.0 -> total 14
                     self.assertEqual(self.target.sexual.pleasure.base, 14)
 
+    @covers_requirement("stateful-spell-casting::interaction-stimulus-and-resistance-settle-as-one-action")
     @covers_requirement(
         "sexual-resist-cast-wiring::casting-a-resistible-act-resolves-one-resist-contest-per-non-actor-target-before-its-effects-apply",
         "sexual-resist-cast-wiring::the-actor-s-own-effects-and-the-cast-s-resource-time-and-practice-cost-are-never-gated-by-a-target-s-resist-outcome",
