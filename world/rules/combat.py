@@ -334,7 +334,7 @@ def _handle_damage(
             resolved_tier = spell_tier_for(source_skill)
             if resolved_tier:
                 source_tier = resolved_tier
-        except Exception:
+        except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
             source_tier = "學徒"
     pending: list[PendingEffect] = []
     for target in targets:

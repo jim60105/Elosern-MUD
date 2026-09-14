@@ -593,7 +593,7 @@ def _handle_buff_apply(
             resolved_tier = spell_tier_for(source_skill)
             if resolved_tier:
                 source_tier = resolved_tier
-        except Exception:
+        except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
             source_tier = "學徒"
     kwargs["source_tier"] = source_tier
     definition = BUFF_DEFINITIONS.get(key)
@@ -715,7 +715,7 @@ def _handle_self_buff_apply(
             resolved_tier = spell_tier_for(source_skill)
             if resolved_tier:
                 source_tier = resolved_tier
-        except Exception:
+        except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
             source_tier = "學徒"
     kwargs["source_tier"] = source_tier
     if definition is not None and get_recovery_policy(definition) is not None:
