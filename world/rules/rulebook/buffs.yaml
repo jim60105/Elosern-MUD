@@ -99,16 +99,21 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
-- key: light_holy_shield
-  duration: 60
-  stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 5}
 - key: light_blessing
   duration: 60
   stacking: refresh
+  modifiers: {}
+- key: sanctified_ward
+  duration: 30
+  tick_interval: 10
+  stacking: refresh
+  polarity: buff
   modifiers:
-    bounds: {target: defense, ceiling: 3}
+    rate:
+      recovery:
+        target: hp
+        base: 12
+        exposure_percent_per_ordinal: 0.1
 - key: dark_atk_down
   duration: 60
   stacking: refresh

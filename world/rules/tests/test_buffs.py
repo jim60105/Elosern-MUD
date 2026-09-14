@@ -29,6 +29,7 @@ from world.rules.buffs import (
     blocks_action,
     cleanse_debuffs,
     entity_active_buffs,
+    get_recovery_policy,
     grant_conferred_growth_rate,
     growth_rate_multiplier,
     load_buff_definitions,
@@ -400,31 +401,34 @@ class BuffIntegrationTests(_BuffFixtureMixin):
         self.assertIn(definition.key, entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
-    def test_buff_light_holy_shield(self):
-        definition = BUFF_DEFINITIONS["light_holy_shield"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "light_holy_shield")
-        self.assertIn("light_holy_shield", entity_active_buffs(entity))
-
     def test_buff_light_blessing(self):
         definition = BUFF_DEFINITIONS["light_blessing"]
         self.assertEqual(definition.duration, 60)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "buff")
         self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
+            definition.modifiers, {}
         )
 
         entity = self._entity()
         apply_buff(entity, "light_blessing")
         self.assertIn("light_blessing", entity_active_buffs(entity))
+
+    def test_buff_sanctified_ward(self):
+        definition = BUFF_DEFINITIONS["sanctified_ward"]
+        self.assertEqual(definition.duration, 30)
+        self.assertEqual(definition.tick_interval, 10)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        policy = get_recovery_policy(definition)
+        self.assertIsNotNone(policy)
+        self.assertEqual(policy.target, "hp")
+        self.assertEqual(policy.base, 12)
+        self.assertEqual(policy.exposure_percent_per_ordinal, 0.1)
+
+        entity = self._entity()
+        apply_buff(entity, "sanctified_ward")
+        self.assertIn("sanctified_ward", entity_active_buffs(entity))
 
     def test_buff_dark_atk_down(self):
         definition = BUFF_DEFINITIONS["dark_atk_down"]

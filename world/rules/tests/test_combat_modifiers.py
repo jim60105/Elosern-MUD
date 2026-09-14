@@ -514,6 +514,18 @@ class CombatModifierTests(EvenniaTestCase):
         entity.attributes.add("sexual_traits", raw, category="traits")
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
+    def test_rule_priestly_grace_recovery_scale(self):
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": ["priestly_grace"]}
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"recovery_arousal_scale": 0.1}
+        )
+
+    def test_rule_light_blessing_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "light_blessing")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 18})
+
 
 class ApplyCostModifierTests(unittest.TestCase):
     """Unit tests for the shared cost-adjustment helper (floor, zero clamp)."""
