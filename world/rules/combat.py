@@ -324,6 +324,18 @@ def _handle_damage(
     battlefield = event_context.get("battlefield")
     now = event_context.get("now") if event_context is not None else None
     floor = int(COMBAT_YAML["damage"]["floor"])
+    source_tier = "學徒"
+    resolved = event_context.get("resolved_effect") if event_context is not None else None
+    source_skill = getattr(resolved, "source_skill", None)
+    if source_skill is not None:
+        try:
+            from world.skills.cost_tiers import spell_tier_for
+
+            resolved_tier = spell_tier_for(source_skill)
+            if resolved_tier:
+                source_tier = resolved_tier
+        except Exception:
+            source_tier = "學徒"
     pending: list[PendingEffect] = []
     for target in targets:
         key = str(target.key)
@@ -371,6 +383,7 @@ def _handle_damage(
                 key=key,
                 protected=protected,
                 marked=marked,
+                source_tier=source_tier,
             ) -> None:
                 if not hit:
                     _noop()
@@ -383,6 +396,14 @@ def _handle_damage(
                 if before > 0 and before - amount <= 0 and key in nonlethal_keys:
                     if key not in marked:
                         marked.append(key)
+                after = _stored_trait_value(target.traits.hp)
+                actual_loss = max(0, int(before - max(0.0, after)))
+                if actual_loss > 0:
+                    from world.rules.state_reactions import dispatch_outcome_reaction
+
+                    dispatch_outcome_reaction(
+                        target, "hp_loss", source_tier=source_tier
+                    )
 
             pending.append(
                 PendingEffect(

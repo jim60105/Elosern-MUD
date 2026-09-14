@@ -278,6 +278,18 @@ class _EntitySnapshot:
             restore_attribute_best_effort(
                 entity, key, surface, category="sexual_state"
             )
+        try:
+            entity.__dict__.pop("sexual", None)
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "item_journal_sexual_cache",
+                    "obj": str(entity),
+                    "key": "sexual",
+                },
+            )
 
 
 @dataclass
@@ -947,7 +959,14 @@ def _apply_gauge_step(step: ItemEffectStep) -> int:
     current, maximum = gauge
     desired = max(0, min(maximum, current + step.amount))
     _write_gauge(step.target, effect.stat.value, desired)
-    return desired - current
+    applied = desired - current
+    if effect.stat is ItemStat.HP and applied < 0:
+        actual_loss = -applied
+        if actual_loss > 0:
+            from world.rules.state_reactions import dispatch_outcome_reaction
+
+            dispatch_outcome_reaction(step.target, "hp_loss", source_tier="學徒")
+    return applied
 
 
 def _apply_status_step(step: ItemEffectStep, item_key: str) -> int:

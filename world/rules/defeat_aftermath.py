@@ -1618,6 +1618,16 @@ def run_defeat_aftermath(
     hp_before = _stored_trait_value(actor.traits.hp)
     trait_snapshot = _attribute_snapshot(actor, "traits", "traits")
     buff_snapshot = _attribute_snapshot(actor, "buffs")
+    sexual_traits_snapshot = _attribute_snapshot(actor, "sexual_traits", "traits")
+    sexual_state_snapshot = {
+        key: _attribute_snapshot(actor, key, "sexual_state")
+        for key in (
+            "virgin",
+            "experience_types",
+            "climax_turns",
+            "pending_climax_extension",
+        )
+    }
     knocked_out_before = (
         str(actor.key) in battlefield.knocked_out
         if battlefield is not None
@@ -1639,6 +1649,8 @@ def run_defeat_aftermath(
             hp_before,
             trait_snapshot,
             buff_snapshot,
+            sexual_traits_snapshot,
+            sexual_state_snapshot,
             knocked_out_before,
         )
 
@@ -1943,6 +1955,8 @@ def _restore_aftermath_surfaces(
     hp_before: float,
     trait_snapshot: tuple[bool, Any],
     buff_snapshot: tuple[bool, Any],
+    sexual_traits_snapshot: tuple[bool, Any],
+    sexual_state_snapshot: dict[str, tuple[bool, Any]],
     knocked_out_before: bool,
 ) -> None:
     """Undo every in-process surface the writer touched after a rollback.
@@ -1953,12 +1967,16 @@ def _restore_aftermath_surfaces(
     """
     _restore_attribute(actor, "buffs", buff_snapshot)
     _restore_attribute(actor, "traits", trait_snapshot, category="traits")
+    _restore_attribute(actor, "sexual_traits", sexual_traits_snapshot, category="traits")
+    for key, snap in sexual_state_snapshot.items():
+        _restore_attribute(actor, key, snap, category="sexual_state")
     # The trait handler caches its data dict; rebind it to the restored
     # attribute and drop the per-trait cache (same reset as _restore_entity_state).
     actor.traits.trait_data = actor.attributes.get(
         "traits", default={}, category="traits"
     )
     actor.traits._cache.clear()
+    actor.__dict__.pop("sexual", None)
     if battlefield is not None and not knocked_out_before:
         battlefield.knocked_out.discard(str(actor.key))
 
