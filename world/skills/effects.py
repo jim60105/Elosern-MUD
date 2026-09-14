@@ -8,6 +8,7 @@ silently doing nothing at use time.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from math import isfinite
 from typing import Any, Literal
 
@@ -35,6 +36,15 @@ class GrowthRateEffect:
 @dataclass(frozen=True)
 class SexualMasteryEffect:
     """Unlock casting of the sex-magic skill family regardless of magic level."""
+
+
+class EffectAudience(StrEnum):
+    """Routing scope for an individual skill effect component."""
+
+    SELECTED = "selected"
+    SELF = "self"
+    ALLIES = "allies"
+    ENEMIES = "enemies"
 
 
 # Ownership-triggered adjustment bundles resolved by the rule-table engine
@@ -313,6 +323,7 @@ class EffectPolicy:
     """Immutable per-occurrence policy metadata for a skill effect."""
 
     coefficient: float = 1.0
+    audience: EffectAudience = EffectAudience.SELECTED
 
     def __post_init__(self) -> None:
         if isinstance(self.coefficient, bool) or not isinstance(
@@ -332,6 +343,20 @@ class EffectPolicy:
                 f"EffectPolicy coefficient must be a finite positive number, got {self.coefficient!r}"
             )
         object.__setattr__(self, "coefficient", val)
+
+        if isinstance(self.audience, bool) or not isinstance(
+            self.audience, (str, EffectAudience)
+        ):
+            raise ValueError(
+                f"EffectPolicy audience must be an EffectAudience, got {self.audience!r}"
+            )
+        try:
+            aud = EffectAudience(self.audience)
+        except ValueError as error:
+            raise ValueError(
+                f"EffectPolicy audience must be an EffectAudience, got {self.audience!r}"
+            ) from error
+        object.__setattr__(self, "audience", aud)
 
 
 @dataclass(frozen=True)
