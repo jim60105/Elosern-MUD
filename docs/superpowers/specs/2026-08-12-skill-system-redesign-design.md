@@ -147,12 +147,24 @@ today (`RejectedAction`), not a new reject reason.
 | 大師 | 31–70 | 35–48 | 45–60 |
 | 賢者 | 71–90 | 65–85 | 80–110 |
 | 主宰 | 90+ | 120–150 | 140–180 |
+| 神格 | — | 180–220 | 200–260 |
+
+> Planned amendment (2026-09-14, light spell proposal set): 神格 is a sixth
+> display label, not an elf-only Divine Mystery or a numeric cast gate.
+> Match the target-shape column before the opposite column, in ascending tier
+> order: SINGLE 180 and AREA 200 are 神格; AREA 180 remains 主宰. The new
+> row is not implemented until `light-divinity-tier` lands.
 
 Human talented characters cap around 150–200 MP; elves around 10000. This makes "究極魔法人類幾乎不可
 能掌握" (world lore) a mechanical fact (a human can rarely afford even one 主宰-tier cast) rather than
 only a narrative claim.
 
-### 4.4 Full spell catalog — 8 elements × 5 tiers × 2 spells (80 entries)
+### 4.4 Spell catalog
+
+The original 80-entry layout is historical, not a fixed registry-size contract.
+The light table below is the planned 2026-09-14 replacement; other elemental
+catalogs retain their current contracts. Behavior tests, not duplicated light
+catalog tables or exact-key/count assertions, verify this replacement.
 
 Three keys already exist in `SKILL_REGISTRY` and are rebalanced to this table rather than duplicated:
 `fire_ball` (火/學徒), `wind_blade` (風/學徒), `flight` (風/術師). Every other row is new.
@@ -249,18 +261,83 @@ Three keys already exist in `SKILL_REGISTRY` and are rebalanced to this table ra
 
 **光 Light** (heal/purify-focused)
 
-| Key | 名稱 | 位階 | 目標 | 效果 | MP |
-|---|---|---|---|---|---|
-| `heal` | 治癒術 | 學徒 | 單體 | 治療 | 12 |
-| `light_arrow` | 光箭術 | 學徒 | 單體 | 傷害(對暗/不死加成) | 14 |
-| `purify` | 淨化術 | 術師 | 單體 | 解除異常狀態 | 22 |
-| `mass_heal` | 群體治癒 | 術師 | 範圍(友) | 治療 | 30 |
-| `advanced_heal` | 高級治癒 | 大師 | 單體 | 大量治療 | 46 |
-| `holy_shield` | 聖盾術 | 大師 | 單體 | 護盾 | 40 |
-| `holy_radiance` | 神聖光輝 | 賢者 | 範圍 | 傷害(對暗/不死加成)+淨化 | 90 |
-| `revival_light` | 復甦之光 | 賢者 | 單體 | 大量治療+解除瀕死 | 82 |
-| `goddess_blessing` | 女神降福 | 主宰 | 範圍(友) | 全體大量治療+增益 | 145 |
-| `heavens_judgment_light` | 天啟聖裁 | 主宰 | 單體 | 毀滅級傷害(對暗/不死) | 135 |
+| Key | Name | Tier | Target | MP | Prerequisites | Effect |
+|---|---|---|---|---|---|---|
+| `heal` | 治癒術 | 學徒 | SINGLE | 12 | none | Heal coefficient 1.0 |
+| `mass_heal` | 群體治癒 | 術師 | AREA | 30 | heal 3 | Heal 1.0 |
+| `advanced_heal` | 高級治癒 | 大師 | SINGLE | 46 | mass_heal 3 | Heal 2.0 |
+| `sanctified_ward` | 聖光庇護陣 | 大師 | AREA | 45 | advanced_heal 3 | Three 10-second HOT ticks, base 12 HP, recipient exposure +10% per ordinal, no defense |
+| `revival_light` | 復甦之光 | 賢者 | SINGLE | 82 | advanced_heal 5 | Heal 2.8; living targets only |
+| `goddess_blessing` | 女神降福 | 主宰 | AREA | 150 | revival_light 8 | Heal 2.8; defense +18 for 60 seconds |
+| `holy_kiss_heal` | 聖吻之癒〔聖禮〕 | 主宰 | SINGLE | 130 | revival_light 8 | Both participants at least 微興奮; heal 3.2 + 0.2 × caster arousal ordinal; one standard stimulus per participant |
+| `goddess_milk` | 女神之乳〔聖禮〕 | 主宰 | SINGLE | 140 | holy_kiss_heal 3 | Contact ritual; heal 2.8, cleanse debuffs, standard stimulus to target +2 per caster exposure ordinal |
+| `blessed_climax` | 天賜高潮〔聖禮〕 | 主宰 | AREA | 170 | goddess_milk 5 | Heal 3.4; caster pleasure +100 then +0 through canonical writer |
+| `light_arrow` | 光箭術 | 學徒 | SINGLE | 14 | none | Damage 1.0; dark-affinity OR undead target +50%, once |
+| `purify` | 淨化術 | 術師 | SINGLE | 22 | light_arrow 3 | Cleanse debuff-polarity buffs |
+| `penitent_touch` | 懺悔之觸 | 術師 | SINGLE | 27 | purify 3 | Damage 1.4; undead +50%; recent forced-act actor receives one extra independent strike |
+| `judgment_strike` | 聖裁斬 | 大師 | SINGLE | 44 | penitent_touch 3 | Damage 2.0; dark-affinity OR undead target +50%, once |
+| `holy_radiance` | 神聖光輝 | 賢者 | AREA | 90 | judgment_strike 5 | Selected enemies: damage 2.0; selected self/allies: cleanse |
+| `heavens_judgment_light` | 天啟聖裁 | 主宰 | SINGLE | 135 | holy_radiance 8 | Damage 4.0; bypass defense only for dark-affinity OR undead targets |
+| `bliss_apotheosis` | 至福神格 | 神格 | AREA | 240 | blessed_climax 10 AND heavens_judgment_light 10 | Selected self/allies: final heal 3.8; selected enemies: damage 2.6 plus 10% max HP on hit; qualified ownership enables climax-cycle empowerment |
+
+**Planned light semantics and balance authority (2026-09-14).** These decisions
+supersede the old light table and contradictory lore wording, not current code:
+
+- Remove `holy_shield` and its exclusively used buff/display references; no alias,
+  saved-data migration, or alternative defense branch. Other weapon and passive
+  skills are outside the elemental tree. Caps remain reverse-edge-derived,
+  with leaf cap 10; `goddess_blessing` is a leaf, not a third merge prerequisite.
+- Damage inserts the per-effect coefficient before defense subtraction; healing
+  inserts it before the existing rounding and equipment `heal_gain` stage.
+  Existing freeform scaling follows those stages unchanged. No blanket mastery
+  multiplier is introduced. Conditional +50% multiplies the attack component
+  before rounding; devastation adds `floor(0.10 * max_hp)` after defense on a
+  successful hit, before freeform scaling and the final damage floor.
+- Ordinary AREA recovery keeps ANY explicit targeting. Only the two mixed spells
+  declare per-effect self/ally versus enemy subsets; selection never expands the
+  validated candidate pool. Out of combat, retain RoomActionContext relations.
+- At caster arousal ordinals 1/2/3/4 the kiss coefficients are 3.4/3.6/3.8/4.0.
+  Both contact spells require distinct participants, ordinary presence/range,
+  and one existing resist contest; milk additionally requires both participants
+  action-capable. In the current positionless battlefield, engaged roster range
+  is contact range. Neither skill introduces anatomy or fluid resources.
+  A resisted cast spends MP/time but has no healing, cleansing, or stimulus.
+- Standard stimulus uses the existing `stimulus_applied` interval (+8..+14),
+  equipment gain policy, and canonical pleasure writer. Determine random gains
+  while staging, never while committing. The kiss reads arousal before stimulus.
+- Qualified apotheosis ownership means ownership plus satisfied prerequisites.
+  On entry into 進行中 it enables a cycle-scoped empowerment marker, retained in
+  餘韻 and removed on return to 未達. It sets kiss coefficient to 4.0 and milk's
+  exposure contribution to its maximum ordinal; it does not raise milk's 2.8,
+  blessed_climax's 3.4, or apotheosis's 3.8, and bypasses no cast gate or lock.
+- Ward ticks at elapsed 10/20/30 seconds, not at application. Each tick restores
+  `max(0, floor(12 * (1 + 0.1 * recipient_exposure) * (1 + caster_heal_gain/100)
+  * grace_multiplier))`, clamped to the living recipient's HP gap. Snapshot
+  caster heal_gain and grace_multiplier at application; re-read recipient
+  effective exposure each tick. Recasting refreshes three ticks and replaces the
+  source, never stacks. Ward never grants defense or revives dead targets.
+- `priestly_grace` is a story/import-granted PASSIVE, separate from the tree.
+  It supplies ward's `grace_multiplier = 1 + 0.1 * caster_arousal_ordinal`;
+  otherwise the factor is 1. Sacramental node bonuses already include their
+  state benefits and do not multiply by grace again. Equipment bonuses remain.
+- `pain_to_pleasure` is a separate story/import-granted PASSIVE. Actual HP loss
+  and newly applied negative buff instances each trigger a gain of
+  5/8/12/18/28/40 for source tiers 學徒/術師/大師/賢者/主宰/神格.
+  Nonspell sources use 5. Misses, immunity, zero loss, and refreshes do not
+  trigger; damaging rate ticks do. Buffs retain the source tier from application.
+- Penance eligibility lasts 60 world seconds after a committed forced outcome
+  (`resisted is False` AND `auto_comply is False`); the endpoint is exclusive.
+  Repeated incidents refresh expiry, not strike count. Narrative accusations and
+  the word "blasphemy" have no mechanical authority.
+- Defense +18 for 60 seconds is the explicit light healing-rider exception to
+  the earth defense-branch rule. Consume it through combat modifiers, not inert
+  `bounds`. Recasting refreshes rather than stacks. Reviving HP-zero entities,
+  secret godhood acquisition gates, and saintess-specific passives are not added.
+- The implementation uses reusable immutable effect policies, the existing
+  condition evaluator and buff engine, and deterministic state writers. No
+  light-key branches, arbitrary expression evaluator, or second rules engine.
+  Tests exercise synthetic skills and state transitions rather than mirror the
+  authored light table. `docs/lore/skill-trees/light.md` presents this same design.
 
 **暗 Dark** (curse/debuff-focused)
 
@@ -375,3 +452,57 @@ placeholder for "someone forgot to wire this up" (D1's registry-load validation 
 - Per-element proficiency tracking distinct from the single global `magic_level` number (ranks are
   derived from one shared level, per D5; nothing in the current character data requires per-element
   levels).
+
+## 11. Light Spell Proposal Set — Delivery Roadmap (2026-09-14)
+
+> **Status of this section: PROPOSED — nothing below is implemented, applied, archived
+> or merged.** All ten changes sit at `0/N tasks` in `openspec/changes/`; the working tree
+> holds planning artifacts plus the authorized lore/§4 numeric corrections only.
+
+This roadmap is a **second wave**. It is unrelated to the original proposal set this
+document was written for, and it supersedes **only the 光-element rows of §4.4** (and the
+§4.3 神格 row). Every other element catalog and every §1–§10 decision below stays as
+implemented.
+
+**Prior wave — already landed and archived.** §1–§10 were delivered by the 2026-08-13
+through 2026-08-15 series, now under `openspec/changes/archive/`:
+`skill-effects-typed-model`, `skill-owned-rule-condition`, `element-mastery-cast-gate`,
+`cleanse-effect-handler`, `heal-effect-handler`, `weapon-style-stance-split`,
+`conferral-generalization`, `divine-mystery-skills`, `skill-content-completion`,
+`preset-skill-kits`, `movement-skill-waiver`, the eight `spell-catalog-<element>` changes,
+plus the 2026-08-15 `element-mastery-freeform-casting` follow-on. Treat those as current
+behaviour, not as work to redo. Do not re-run or re-propose them from this table.
+
+Implements `docs/lore/skill-trees/light.md` against the light table and rulings in §4.4.
+Ten OpenSpec changes under `openspec/changes/`, each ≤ one engineer-workday, all
+`openspec validate --strict` clean. Shared mechanics are reusable typed policies —
+no light-key branches in generic code and no second rules engine. Verification is
+program-behavior tests on synthetic skills; no light catalog/data-contract tests.
+`light-spell-catalog/design.md` D4–D7 owns the interface-ownership matrix, the
+conflict schedule and the common verification contract; this section is the
+implementation entry point.
+
+| Order | OpenSpec change (all PROPOSED) | Depends on | Delivers |
+|---|---|---|---|
+| 1 | `light-effect-potency` | — | Per-effect immutable coefficient on `EffectPolicy`, trusted `resolved_effect` context binding, pre-defense/pre-rounding formula stages |
+| 2 | `light-divinity-tier` | — | Sixth 神格 cost label (180–220 / 200–260) with matching-column precedence; no cast gate |
+| 3 | `light-effect-routing` | 1 | Per-effect `EffectAudience` (SELECTED/SELF/ALLIES/ENEMIES) over the validated pool; ANY selection stays free |
+| 4 | `light-judgment-traits` | 1 | `combat_traits` (undead) + conditional multiplier / defense bypass / max-HP fraction damage policy |
+| 5 | `light-sustained-recovery` | 1 | Recovery-profile buff rate (snapshot + live exposure, 10/20/30 ticks) + timed defense rider via combat modifiers |
+| 6 | `light-penance-events` | 4 | Bounded 60 s forced-interaction evidence + one policy-controlled independent extra strike |
+| 7 | `light-sacrament-casting` | 1 | Subject-scoped `cast_conditions`, `InteractionPolicy`, `StateMagnitude`, typed `stimulus` on the single resist gate |
+| 8 | `light-climax-empowerment` | 3, 7 | `pleasure_peak` actor-bound advance + phase-scoped empowerment marker via `state_reactions` |
+| 9 | `light-cleric-feedback` | 2, 5, 8 | `hp_loss` / `negative_buff_added` reaction inputs (tier gains) + recovery-only passive multiplier |
+| 10 | `light-spell-catalog` | all | Full 16-node light tree + clergy passives shipped; removes `holy_shield` and light echo tests; docs/traceability integration |
+
+**Batch order** (parallel within a batch, serial across batches): `1+2 → 3 → 4+5 → 6 → 7 → 8 → 9 → 10`.
+Changes 4 and 5 share only `world/rules/action.py` wiring at different boundaries (damage
+formula vs buff source snapshot); their metadata owners are disjoint (`effects.py` vs
+`buffs.py`). Everything else touching `effects.py`/`action.py` serializes. The final
+documentation, shard-manifest and traceability edits belong to the change-10 integration owner.
+
+**Gate notes.** Main-spec synchronization (including the `skill-registry` light-requirement
+replacement and the removed buff test-correspondence requirement) happens in the separately
+authorized archive/sync workflow, topological order 1→10; the two `parse_effect` deltas sync
+sacrament (7) before climax (8) so the prefix set converges on the documented superset.
+Full-suite, evidence and aggregate-coverage gates remain CI-owned.
