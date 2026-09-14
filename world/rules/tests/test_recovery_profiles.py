@@ -5,11 +5,9 @@ Covers requirements from openspec change light-sustained-recovery:
 - buff-handler-integration::finite-recovery-ticks-and-refresh-are-deterministic-across-elapsed-time-partitions
 - buff-handler-integration::buff-verification-establishes-mechanics-rather-than-catalog-correspondence
 """
-
 import copy
 import math
 from unittest.mock import patch
-
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 

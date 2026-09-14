@@ -102,8 +102,8 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                 rec = rate["recovery"]
                 if not isinstance(rec, dict):
                     raise ValueError(f"{path}: buff {key!r} recovery profile must be a mapping")
-                target = rec.get("target", rate.get("target", "hp"))
-                if target != "hp":
+                resolved_target = rec.get("target", rate.get("target", "hp"))
+                if resolved_target != "hp":
                     raise ValueError(f"{path}: buff {key!r} recovery profile target must be 'hp'")
                 allowed_rec_keys = {"target", "base", "exposure_percent_per_ordinal"}
                 if set(rec) - allowed_rec_keys:
@@ -124,9 +124,10 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     )
             elif "target" not in rate:
                 raise ValueError(f"{path}: buff {key!r} rate modifier must be a mapping with a target")
-            if rate["target"] not in GAUGE_KEYS and rate["target"] != "skill_practice":
+            effective_target = resolved_target if has_recovery else rate["target"]
+            if effective_target not in GAUGE_KEYS and effective_target != "skill_practice":
                 raise ValueError(
-                    f"{path}: buff {key!r} rate target {rate['target']!r} is not "
+                    f"{path}: buff {key!r} rate target {effective_target!r} is not "
                     "a gauge key or the pull-only 'skill_practice' target "
                     "(the retired 'magic_level_growth' target is rejected here)"
                 )
