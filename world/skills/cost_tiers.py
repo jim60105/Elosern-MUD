@@ -72,16 +72,16 @@ def _band_contains(band: tuple[int, int], cost: int) -> bool:
 def spell_tier_for(skill: SkillDef) -> str | None:
     """Return the magic-tier data label for one elemental spell skill.
 
-    An elemental spell is an ACTIVE skill carrying both an element and an
-    ``mp`` cost; everything else returns ``None`` (no tier label). The tier
-    is resolved via §4.3 band membership with deterministic column precedence:
-    the column matching the skill's target spec (``SELF`` counts as single/direct)
-    is searched across all tiers in ascending order first, then the opposite
-    column across all tiers, resolving overlapping bands (e.g. 180 MP) to the
-    matching column. ``神格`` is display classification only with no level band
-    or numeric cast gate. An elemental spell whose ``mp`` cost is absent, not
-    a positive integer, or outside every band raises ``ValueError`` — a content-authoring
-    error that must fail closed rather than silently leave a spell without a tier label.
+    An elemental spell is an ACTIVE skill carrying both an element and an ``mp``
+    cost; non-elemental skills or skills without an ``mp`` cost return ``None``
+    (no tier label). The tier is resolved via §4.3 band membership with
+    deterministic column precedence: the column matching the skill's target
+    spec (``SELF`` counts as single/direct) is searched across all tiers in
+    ascending order first, then the opposite column across all tiers, resolving
+    overlapping bands (e.g. 180 MP) to the matching column. ``神格`` is display
+    classification only with no level band or numeric cast gate. An ``mp`` cost
+    that is not a positive integer, or a cost outside every band, raises
+    ``ValueError`` — an authoring error that must fail closed.
     """
     if skill.kind is not SkillKind.ACTIVE or skill.element is None:
         return None

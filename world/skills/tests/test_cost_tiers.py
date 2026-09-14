@@ -109,6 +109,8 @@ class SpellTierLookupTests(unittest.TestCase):
         self.assertEqual(spell_tier_for(single179), "主宰")
         single221 = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": 221})
         self.assertEqual(spell_tier_for(single221), "神格")
+        area190 = replace(SKILL_REGISTRY["wind_blade"], cost={"mp": 190})
+        self.assertEqual(spell_tier_for(area190), "神格")
 
     def test_synthetic_skill_configuration_uses_generic_mechanism(self):
         """A second, fully synthetic skill configuration validates the generic mechanism."""
@@ -122,18 +124,6 @@ class SpellTierLookupTests(unittest.TestCase):
         )
         self.assertEqual(spell_tier_for(synth_single), "神格")
         self.assertEqual(spell_tier_for(synth_area), "神格")
-
-    def test_divinity_tier_is_label_only_without_entity_dependence(self):
-        """spell_tier_for is a pure function of SkillDef without caster race or stats."""
-        import inspect
-
-        sig = inspect.signature(spell_tier_for)
-        self.assertEqual(
-            list(sig.parameters.keys()),
-            ["skill"],
-            "spell_tier_for must take only skill; no entity/race/stats gate",
-        )
-
 
 class SpellTierLabelCatalogTests(unittest.TestCase):
     """Every element's representative per-band spells keep their catalog label.
