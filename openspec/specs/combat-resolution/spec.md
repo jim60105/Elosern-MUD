@@ -2,7 +2,9 @@
 
 ## Purpose
 Defines the dice-combat resolution formulas: to-hit against the recalibrated defender constant of 51, damage multipliers banded by margin of success with a magnitude-only critical, effective_power combining four effective stats multiplied by max HP, and agility-dominant initiative with d100 jitter. Covers the round-based turn loop's time accounting and upkeep, the actions_per_turn skip, the first-actor override, and golden fixed-seed exchange tests.
+
 ## Requirements
+
 ### Requirement: To-hit uses a recalibrated defender constant of 51, not the design doc's original 60
 `world/rules/rulebook/combat.yaml` SHALL declare `to_hit.defender_constant: 51`. A hit SHALL occur when
 `roll_d100() + attacker_effective_agility >= defender_constant + defender_effective_agility`, where both
@@ -37,10 +39,10 @@ agility values are read through `SkillHandler.effective_value("agility")` (chang
 natural 100
 `world/rules/rulebook/combat.yaml`'s `damage` section SHALL declare `crit_multiplier`,
 `solid_hit_margin`, `solid_hit_multiplier`, `base_multiplier`, and `floor`. Damage SHALL be computed as
-`max(round(effective_attack_stat * roll_multiplier) - effective_defense, floor)`, where
+`max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`, where
 `roll_multiplier` is `crit_multiplier` if the raw, unmodified `roll_d100()` result equals 100,
 `solid_hit_multiplier` if the margin of success is at least `solid_hit_margin`, and `base_multiplier`
-otherwise. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
+otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. The existing freeform magnitude scaling and final floor SHALL follow this calculation. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
 100 SHALL NOT cause a miss to become a hit.
 
 #### Scenario: A bare hit uses the base multiplier

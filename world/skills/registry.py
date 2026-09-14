@@ -20,7 +20,13 @@ if TYPE_CHECKING:
     from world.rules.targeting import TargetRequirement
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
-from world.skills.effects import HealEffect, parse_effect
+from world.skills.effects import (
+    DamageEffect,
+    EffectPolicy,
+    HealEffect,
+    SelfHealEffect,
+    parse_effect,
+)
 
 
 class _FrozenDict(dict):
@@ -164,6 +170,7 @@ class SkillDef:
     group: str | None = None
     faction_constraint: FactionConstraint = FactionConstraint.ANY
     requires_divine_arts: bool = False
+    effect_policies: tuple[EffectPolicy, ...] = ()
     parsed_effects: tuple = ()
     prerequisites: tuple["SkillPrerequisite", ...] = ()
 
@@ -222,7 +229,54 @@ class SkillDef:
             "parsed_effects",
             tuple(parse_effect(effect_id) for effect_id in self.effects),
         )
+        self._validate_effect_policies()
         self._validate_heal_shape()
+
+    def _validate_effect_policies(self) -> None:
+        """Enforce cardinality, immutability, and supported-effect kinds on policies.
+
+        An omitted or empty-tuple declaration normalizes to identity policies
+        of the same length as ``effects``. Any other input must be a tuple of
+        ``EffectPolicy`` instances matching the effect count exactly, and
+        only supported effect kinds (damage and healing) may declare a
+        non-identity coefficient.
+        """
+        if self.effect_policies is None or (
+            isinstance(self.effect_policies, tuple) and len(self.effect_policies) == 0
+        ):
+            object.__setattr__(
+                self,
+                "effect_policies",
+                tuple(EffectPolicy() for _ in self.effects),
+            )
+            return
+
+        if isinstance(self.effect_policies, (str, bytes)) or not isinstance(
+            self.effect_policies, tuple
+        ):
+            raise ValueError(
+                f"skill {self.key!r} effect_policies must be a tuple of EffectPolicy"
+            )
+        if len(self.effect_policies) != len(self.effects):
+            raise ValueError(
+                f"skill {self.key!r} effect_policies length ({len(self.effect_policies)}) "
+                f"must match effects length ({len(self.effects)})"
+            )
+        for policy in self.effect_policies:
+            if not isinstance(policy, EffectPolicy):
+                raise ValueError(
+                    f"skill {self.key!r} effect_policies item {policy!r} is not an EffectPolicy"
+                )
+        for policy, parsed, effect_id in zip(
+            self.effect_policies, self.parsed_effects, self.effects
+        ):
+            if policy.coefficient != 1.0 and not isinstance(
+                parsed, (DamageEffect, HealEffect, SelfHealEffect)
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} does not support "
+                    f"potency coefficient {policy.coefficient}"
+                )
 
     def _validate_heal_shape(self) -> None:
         """Reject a heal shape that contradicts the skill's target spec.
@@ -303,6 +357,7 @@ def _skill(
     category: SkillCategory,
     group: str | None = None,
     prerequisites: tuple[SkillPrerequisite, ...] = (),
+    effect_policies: tuple[EffectPolicy, ...] | None = None,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     _validate_metadata(label, description)
@@ -321,6 +376,7 @@ def _skill(
         category=category,
         group=group,
         prerequisites=prerequisites,
+        effect_policies=() if effect_policies is None else tuple(effect_policies),
     )
 
 
@@ -337,6 +393,7 @@ def _spell(
     category: SkillCategory,
     group: str | None = None,
     prerequisites: tuple[SkillPrerequisite, ...] = (),
+    effect_policies: tuple[EffectPolicy, ...] | None = None,
 ) -> SkillDef:
     """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
 
@@ -358,6 +415,7 @@ def _spell(
         category=category,
         group=group,
         prerequisites=prerequisites,
+        effect_policies=effect_policies,
     )
 
 
