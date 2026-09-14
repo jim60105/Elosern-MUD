@@ -85,6 +85,7 @@ class SpellTierLookupTests(unittest.TestCase):
         self.assertEqual(MP_COST_TIERS["主宰"].min_level, 90)
         self.assertEqual(MAGIC_TIER_THRESHOLDS["主宰"], 91)
 
+    @covers_requirement("skill-registry::spell-cost-labels-include-a-sixth-tier-with-deterministic-column-precedence")
     def test_divinity_tier_overlap_honors_shape(self):
         """Synthetic SINGLE and AREA 180 MP resolve by target-shape column first."""
         single180 = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": 180})

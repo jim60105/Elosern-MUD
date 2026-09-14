@@ -2,7 +2,9 @@
 
 Defines immutable skill metadata, shared targeting enums, representative seed definitions, and the
 registry contract used to validate imported active and passive skill keys.
+
 ## Requirements
+
 ### Requirement: SKILL_REGISTRY contains the full 火-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 火-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
@@ -485,7 +487,6 @@ inert `weapon_style:light_sword`), resolved by the already-registered `damage` e
 - **THEN** the cast resolves successfully (no `UNKNOWN_EFFECT_ID` rejection) and the target takes
   light-elemental physical damage
 
-
 ### Requirement: Reincarnation boon labels match the preset character names
 The three per-character 轉生特典 passives SHALL declare labels that read 轉生祝福·悠花
 (`reincarnation_boon_yuka`), 轉生祝福·悠奈 (`reincarnation_boon_yuna`), and 轉生祝福·伊洛希雅
@@ -565,3 +566,18 @@ sexual-act catalog, and `flee` in one inventory.
   editing the test
 - **THEN** the frozen-inventory assertion fails, so every change of judgement is recorded in one
   place
+
+### Requirement: Spell cost labels include a sixth tier with deterministic column precedence
+Elemental spell cost classification SHALL include 神格 with single/direct costs 180 through 220 and area/strong costs 200 through 260, inclusive. It SHALL search all ascending tiers in the target-shape column before the opposite column. Labels SHALL NOT grant ownership, impose a race restriction, or introduce a numeric cast gate. Costs outside every band SHALL fail closed.
+
+#### Scenario: Overlap honors shape
+- **WHEN** synthetic SINGLE and AREA spells each cost 180 MP
+- **THEN** SINGLE classifies as 神格 and AREA as 主宰
+
+#### Scenario: Sixth band accepts boundaries
+- **WHEN** synthetic AREA spells cost 200, 240 or 260 MP
+- **THEN** each classifies as 神格 without dependence on caster race or stats
+
+#### Scenario: Out of all bands stays invalid
+- **WHEN** a synthetic elemental spell has a positive cost outside both columns of all tiers
+- **THEN** classification rejects it instead of inventing a tier or silently omitting the label
