@@ -7,14 +7,14 @@ Defines ActionResolver as the sole entry point for every skill invocation, runni
 
 ### Requirement: ActionResolver exposes side-effect-free preflight for player combat input
 `ActionResolver.preflight(request)` SHALL validate skill ownership/kind, current resources, targets,
-action capability, effect-handler availability, and time-cost metadata without randomness, effect
+action capability, declared actor/target state and contact conditions, nonempty effect audiences, effect-handler availability, and time-cost metadata without randomness, effect
 staging, EventLog emission, state mutation, or world-time advance. It SHALL return the same named
 rejection categories as `resolve()` for those checks. A successful preflight SHALL not guarantee that
 state remains valid after earlier initiative actions; final resolution SHALL still run all eight steps.
 
 #### Scenario: Preflight rejection has no side effects
 - **WHEN** preflight rejects an unknown skill, insufficient resource, invalid target, blocking buff,
-  unknown effect handler, or malformed time metadata
+  unmet state/contact condition, empty delivery audiences, unknown effect handler, or malformed time metadata
 - **THEN** entity, battlefield, quest, session, random-generator, EventLog, and world-clock state are
   unchanged
 

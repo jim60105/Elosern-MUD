@@ -29,15 +29,20 @@ from world.skills.effects import (
     EffectAudience,
     EffectPolicy,
     HealEffect,
+    InteractionPolicy,
     MarkSubmissionEffect,
     RestorePurityEffect,
     SaturateSensitivityEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
     SexualDrainEffect,
+    StateMagnitude,
+    StateMagnitudeSubject,
+    StimulusEffect,
     TargetSexualEventEffect,
     parse_effect,
 )
+from world.rules.spell_conditions import CastCondition
 
 
 class _FrozenDict(dict):
@@ -184,6 +189,8 @@ class SkillDef:
     effect_policies: tuple[EffectPolicy, ...] = ()
     parsed_effects: tuple = ()
     prerequisites: tuple["SkillPrerequisite", ...] = ()
+    cast_conditions: tuple[CastCondition, ...] = ()
+    interaction: InteractionPolicy | None = None
 
     def __post_init__(self) -> None:
         """Enforce the registry invariants for every constructor path.
@@ -216,6 +223,27 @@ class SkillDef:
                     f"skill {self.key!r} prerequisite {prereq!r} is not a "
                     "SkillPrerequisite"
                 )
+        if isinstance(self.cast_conditions, (str, bytes)) or not isinstance(
+            self.cast_conditions, tuple
+        ):
+            raise ValueError(
+                f"skill {self.key!r} cast_conditions must be a tuple of CastCondition"
+            )
+        for cond in self.cast_conditions:
+            if not isinstance(cond, CastCondition):
+                raise ValueError(
+                    f"skill {self.key!r} cast_condition {cond!r} is not a CastCondition"
+                )
+
+        if self.interaction is None:
+            for p in self.effect_policies:
+                if p.interaction is not None:
+                    object.__setattr__(self, "interaction", p.interaction)
+                    break
+        elif not isinstance(self.interaction, InteractionPolicy):
+            raise ValueError(
+                f"skill {self.key!r} interaction must be an InteractionPolicy or None, got {self.interaction!r}"
+            )
         # The declared type is Element | None: normalize (and validate) a raw
         # string on EVERY constructor path, so direct SkillDef(...) authors
         # (flee, test fixtures) cannot leave a str where consumers read
@@ -347,6 +375,39 @@ class SkillDef:
                 raise ValueError(
                     f"skill {self.key!r} target_spec is SELF and cannot declare ENEMIES audience"
                 )
+            if isinstance(parsed, StimulusEffect):
+                if policy.damage is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is a StimulusEffect and cannot declare DamagePolicy"
+                    )
+                if policy.coefficient != 1.0:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support potency coefficient {policy.coefficient}"
+                    )
+                if parsed.recipient == "actor" and policy.audience in (EffectAudience.ALLIES, EffectAudience.ENEMIES):
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is inherently actor-bound and cannot declare {policy.audience} audience"
+                    )
+                if parsed.recipient == "target" and policy.audience is EffectAudience.SELF:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is inherently target-only and cannot declare SELF audience"
+                    )
+            if policy.stimulus_bonus is not None and not isinstance(parsed, StimulusEffect):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} is not a StimulusEffect and cannot declare stimulus_bonus"
+                )
+            if policy.magnitude is not None:
+                if not isinstance(parsed, (DamageEffect, HealEffect, SelfHealEffect)):
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support state magnitude"
+                    )
+                if (
+                    policy.magnitude.subject == StateMagnitudeSubject.TARGET
+                    and self.target_spec not in (TargetSpec.SINGLE, TargetSpec.SELF)
+                ):
+                    raise ValueError(
+                        f"skill {self.key!r} TARGET-subject magnitude requires SINGLE or SELF target_spec"
+                    )
 
     def _validate_heal_shape(self) -> None:
         """Reject a heal shape that contradicts the skill's target spec.
@@ -428,6 +489,8 @@ def _skill(
     group: str | None = None,
     prerequisites: tuple[SkillPrerequisite, ...] = (),
     effect_policies: tuple[EffectPolicy, ...] | None = None,
+    cast_conditions: tuple[CastCondition, ...] = (),
+    interaction: InteractionPolicy | None = None,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     _validate_metadata(label, description)
@@ -447,6 +510,8 @@ def _skill(
         group=group,
         prerequisites=prerequisites,
         effect_policies=() if effect_policies is None else tuple(effect_policies),
+        cast_conditions=tuple(cast_conditions),
+        interaction=interaction,
     )
 
 
@@ -464,6 +529,8 @@ def _spell(
     group: str | None = None,
     prerequisites: tuple[SkillPrerequisite, ...] = (),
     effect_policies: tuple[EffectPolicy, ...] | None = None,
+    cast_conditions: tuple[CastCondition, ...] = (),
+    interaction: InteractionPolicy | None = None,
 ) -> SkillDef:
     """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
 
@@ -486,6 +553,8 @@ def _spell(
         group=group,
         prerequisites=prerequisites,
         effect_policies=effect_policies,
+        cast_conditions=cast_conditions,
+        interaction=interaction,
     )
 
 

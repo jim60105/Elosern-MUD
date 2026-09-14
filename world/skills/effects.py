@@ -320,6 +320,139 @@ class DisengageEffect:
 
 
 @dataclass(frozen=True)
+class StimulusEffect:
+    """Apply standard stimulus to actor, target, or both participants."""
+
+    recipient: Literal["actor", "target", "both"]
+
+
+class StateMagnitudeSubject(StrEnum):
+    """Subject whose state ordinal determines the magnitude."""
+
+    ACTOR = "actor"
+    TARGET = "target"
+
+
+_SUPPORTED_MAGNITUDE_FIELDS = frozenset({"arousal", "effective_exposure", "exposure"})
+
+
+@dataclass(frozen=True)
+class StateMagnitude:
+    """Bounded state-derived magnitude from an explicitly declared subject and field."""
+
+    subject: StateMagnitudeSubject
+    field: str
+    base: float
+    per_ordinal: float
+    maximum: float | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.subject, str):
+            try:
+                subj = StateMagnitudeSubject(self.subject)
+            except ValueError as error:
+                raise ValueError(
+                    f"invalid StateMagnitude subject {self.subject!r}; "
+                    f"must be one of {list(StateMagnitudeSubject)}"
+                ) from error
+            object.__setattr__(self, "subject", subj)
+        elif not isinstance(self.subject, StateMagnitudeSubject):
+            raise ValueError(
+                f"StateMagnitude subject must be a StateMagnitudeSubject, got {self.subject!r}"
+            )
+
+        if not isinstance(self.field, str) or self.field not in _SUPPORTED_MAGNITUDE_FIELDS:
+            raise ValueError(
+                f"unsupported StateMagnitude field {self.field!r}; "
+                f"must be one of {sorted(_SUPPORTED_MAGNITUDE_FIELDS)}"
+            )
+
+        for name, val in (("base", self.base), ("per_ordinal", self.per_ordinal)):
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                raise ValueError(f"StateMagnitude {name} must be a non-negative finite number, got {val!r}")
+            f_val = float(val)
+            if not isfinite(f_val) or f_val < 0:
+                raise ValueError(f"StateMagnitude {name} must be a non-negative finite number, got {val!r}")
+            object.__setattr__(self, name, f_val)
+
+        if self.maximum is not None:
+            if isinstance(self.maximum, bool) or not isinstance(self.maximum, (int, float)):
+                raise ValueError(f"StateMagnitude maximum must be a finite number >= base, got {self.maximum!r}")
+            f_max = float(self.maximum)
+            if not isfinite(f_max) or f_max < self.base:
+                raise ValueError(
+                    f"StateMagnitude maximum must be a finite number >= base ({self.base}), got {self.maximum!r}"
+                )
+            object.__setattr__(self, "maximum", f_max)
+
+    def compute(self, entity: Any) -> float:
+        """Sample entity state and compute the magnitude value."""
+        from world.lore.sexual_vocab import AROUSAL_LEVELS, EXPOSURE_LEVELS
+        from world.rules.equipment_effects import effective_exposure
+        from world.rules.stored_sexual_reads import StoredLevel
+        from world.rules.sexual_state import PLEASURE_CONFIG
+
+        field_name = "effective_exposure" if self.field == "exposure" else self.field
+        ordinal = 0
+
+        if field_name == "arousal":
+            sexual = getattr(entity, "__dict__", {}).get("sexual")
+            if sexual is not None:
+                ordinal = sexual.arousal.value
+            else:
+                traits = (
+                    entity.attributes.get("sexual_traits", default=None, category="traits")
+                    if hasattr(entity, "attributes")
+                    else None
+                )
+                if isinstance(traits, Mapping) and "pleasure" in traits:
+                    raw = traits["pleasure"]
+                    base = raw.get("base") if isinstance(raw, Mapping) else None
+                    if isinstance(base, int) and not isinstance(base, bool):
+                        base = min(100, max(0, base))
+                        ordinal = PLEASURE_CONFIG.ordinal_for(base)
+                else:
+                    baseline = (
+                        entity.attributes.get("sexual", default=None)
+                        if hasattr(entity, "attributes")
+                        else None
+                    )
+                    if isinstance(baseline, Mapping) and "arousal" in baseline:
+                        val = baseline["arousal"]
+                        if val in AROUSAL_LEVELS:
+                            ordinal = AROUSAL_LEVELS.index(val)
+        elif field_name == "effective_exposure":
+            eff = effective_exposure(entity)
+            if isinstance(eff, StoredLevel):
+                ordinal = eff.value
+            elif isinstance(eff, str) and eff in EXPOSURE_LEVELS:
+                ordinal = EXPOSURE_LEVELS.index(eff)
+
+        val = self.base + self.per_ordinal * ordinal
+        if self.maximum is not None:
+            val = min(val, self.maximum)
+        if not isfinite(val) or val <= 0:
+            raise ValueError(f"StateMagnitude computed non-positive or non-finite value: {val}")
+        return float(val)
+
+
+@dataclass(frozen=True)
+class InteractionPolicy:
+    """Immutable contact and interaction metadata for skill effects."""
+
+    contact: bool = True
+    distinct_participants: bool = True
+    target_capable: bool = False
+    resistible: bool = False
+
+    def __post_init__(self) -> None:
+        for name in ("contact", "distinct_participants", "target_capable", "resistible"):
+            val = getattr(self, name)
+            if not isinstance(val, bool):
+                raise ValueError(f"InteractionPolicy {name} must be a bool, got {val!r}")
+
+
+@dataclass(frozen=True)
 class DamagePolicy:
     """Immutable conditional damage policy metadata for a skill effect.
 
@@ -504,6 +637,9 @@ class EffectPolicy:
     coefficient: float = 1.0
     audience: EffectAudience = EffectAudience.SELECTED
     damage: DamagePolicy | None = None
+    magnitude: StateMagnitude | None = None
+    interaction: InteractionPolicy | None = None
+    stimulus_bonus: StateMagnitude | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.coefficient, bool) or not isinstance(
@@ -541,6 +677,18 @@ class EffectPolicy:
         if self.damage is not None and not isinstance(self.damage, DamagePolicy):
             raise ValueError(
                 f"EffectPolicy damage must be a DamagePolicy or None, got {self.damage!r}"
+            )
+        if self.magnitude is not None and not isinstance(self.magnitude, StateMagnitude):
+            raise ValueError(
+                f"EffectPolicy magnitude must be a StateMagnitude or None, got {self.magnitude!r}"
+            )
+        if self.interaction is not None and not isinstance(self.interaction, InteractionPolicy):
+            raise ValueError(
+                f"EffectPolicy interaction must be an InteractionPolicy or None, got {self.interaction!r}"
+            )
+        if self.stimulus_bonus is not None and not isinstance(self.stimulus_bonus, StateMagnitude):
+            raise ValueError(
+                f"EffectPolicy stimulus_bonus must be a StateMagnitude or None, got {self.stimulus_bonus!r}"
             )
 
 
@@ -722,4 +870,11 @@ def parse_effect(effect_id: str) -> object:
                 f"cleanse effect must be cleanse:status, got {effect_id!r}"
             )
         return CleanseEffect(scope=scope)
+    if prefix == "stimulus":
+        recipient = _parse_single_arg(effect_id, prefix)
+        if recipient not in ("actor", "target", "both"):
+            raise ValueError(
+                f"stimulus effect recipient must be 'actor', 'target', or 'both', got {recipient!r}"
+            )
+        return StimulusEffect(recipient=recipient)
     raise ValueError(f"unrecognized skill effect prefix {prefix!r} in {effect_id!r}")

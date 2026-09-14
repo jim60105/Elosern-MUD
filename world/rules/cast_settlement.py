@@ -436,7 +436,13 @@ def settle_out_of_combat_cast(
             f"{request.targets!r}"
         )
     act = SEXUAL_ACT_REGISTRY.get(request.skill_key)
-    if act is not None and act.resistible:
+    from world.skills.registry import SKILL_REGISTRY
+    skill = SKILL_REGISTRY.get(request.skill_key)
+    is_resistible = (
+        (act is not None and act.resistible)
+        or (skill is not None and skill.interaction is not None and skill.interaction.resistible)
+    )
+    if is_resistible:
         target_keys = [str(target.key) for target in request.targets]
         if len(target_keys) != len(set(target_keys)):
             # The ``sexual_resist`` entry contract is key-keyed, so a target

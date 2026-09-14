@@ -1,6 +1,7 @@
 """Atomic, deterministic skill-action resolution."""
 
 import time
+import random
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -22,7 +23,11 @@ from world.rules.buffs import (
     entity_active_buffs,
     grant_conferred_growth_rate,
 )
-from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
+from world.rules.combat_modifiers import (
+    apply_cost_modifier,
+    evaluate_combat_modifiers,
+    evaluate_combat_modifiers_no_create,
+)
 from world.rules.dice import roll_d100
 from world.rules.equipment_effects import equipment_immune_buff_keys, equipment_pleasure_gain
 from world.rules.event_log import EventEntry, EventLog
@@ -81,6 +86,7 @@ class RejectReason(StrEnum):
     ACTION_FORBIDDEN = "action_forbidden"
     DIVINE_ARTS_FORBIDDEN = "divine_arts_forbidden"
     SCALED_CAST_FORBIDDEN = "scaled_cast_forbidden"
+    CAST_CONDITION_UNMET = "cast_condition_unmet"
     UNKNOWN_EFFECT_ID = "unknown_effect_id"
     EFFECT_RESOLUTION_FAILED = "effect_resolution_failed"
     MISSING_EFFECT_CONTEXT = "missing_effect_context"
@@ -353,7 +359,7 @@ def _adjusted_costs(
     scale, so preflight and deduction always compare and deduct the same
     scaled amount.
     """
-    bundle = evaluate_combat_modifiers(actor)
+    bundle = evaluate_combat_modifiers_no_create(actor)
     costs = {
         resource_key: apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
         for resource_key, amount in skill.cost.items()
@@ -403,6 +409,20 @@ def _step4_capability(actor: Any) -> None:
         raise RejectedAction(RejectReason.ACTION_FORBIDDEN, _entity_key(actor))
 
 
+def _step4a_spell_conditions(
+    request: ActionRequest,
+    skill: SkillDef,
+    targets: list[Any],
+) -> None:
+    from world.rules.spell_conditions import (
+        evaluate_cast_conditions,
+        evaluate_interaction_policy,
+    )
+
+    evaluate_cast_conditions(request.actor, targets, skill)
+    evaluate_interaction_policy(request.actor, targets, request.context, skill)
+
+
 def _resist_pending_effect(target: Any, verdict: Any) -> PendingEffect:
     """Stage one logged resist verdict as a non-mutating pending effect.
 
@@ -429,7 +449,7 @@ def _step4b_sexual_resist_gate(
     request: ActionRequest,
     skill: SkillDef,
     targets: list[Any],
-) -> tuple[list[Any], list[PendingEffect]]:
+) -> tuple[list[Any], list[PendingEffect], bool]:
     """Resolve one resist contest per non-actor target of a resistible act.
 
     Fires only when the cast skill's key is present in
@@ -442,12 +462,17 @@ def _step4b_sexual_resist_gate(
     ``roll_d100`` binding provides for testability (design D-6).
     """
     act = SEXUAL_ACT_REGISTRY.get(skill.key)
-    if act is None or not act.resistible:
-        return targets, []
+    is_catalog_act = act is not None and act.resistible
+    is_generic_resistible = not is_catalog_act and (
+        skill.interaction is not None and skill.interaction.resistible
+    )
+    if not is_catalog_act and not is_generic_resistible:
+        return targets, [], False
     from world.rules.sexual_resist import resist_verdict
 
     surviving: list[Any] = []
     pending: list[PendingEffect] = []
+    generic_resisted = False
     for target in targets:
         if target is request.actor:
             # The actor never resists their own act (design D-2); without
@@ -458,9 +483,14 @@ def _step4b_sexual_resist_gate(
             continue
         verdict = resist_verdict(request.actor, target, rng=roll_d100)
         pending.append(_resist_pending_effect(target, verdict))
-        if not verdict.resisted:
+        if verdict.resisted:
+            if is_generic_resistible:
+                generic_resisted = True
+        else:
             surviving.append(target)
-    return surviving, pending
+    if generic_resisted:
+        return [], pending, True
+    return surviving, pending, False
 
 
 def _require_context(context: dict[str, Any], prefix: str) -> dict[str, Any]:
@@ -1490,6 +1520,86 @@ register_effect_handler(
 )
 
 
+def _get_stimulus_interval() -> tuple[int, int]:
+    from world.rules.sexual_transitions import _RULES, _parse_delta
+
+    for rule in _RULES:
+        if rule.when.get("event") == "stimulus_applied" and rule.then.get("field") == "pleasure":
+            parsed = _parse_delta(rule.then["delta"])
+            if isinstance(parsed, tuple):
+                return parsed
+            return (parsed, parsed)
+    return (8, 14)
+
+
+_stimulus_rng = random.Random()
+
+
+def _handle_stimulus(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    del scale
+    prefix, _, scope = effect_id.partition(":")
+    if scope not in ("actor", "target", "both"):
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            f"invalid stimulus scope {scope!r}",
+        )
+
+    resolved = context.get("resolved_effect")
+    policy = resolved.policy if isinstance(resolved, ResolvedEffect) else None
+    stimulus_bonus = getattr(policy, "stimulus_bonus", None)
+
+    recipients: list[Any] = []
+    seen_ids: set[int] = set()
+
+    def _add_recipient(obj: Any) -> None:
+        if id(obj) not in seen_ids:
+            seen_ids.add(id(obj))
+            recipients.append(obj)
+
+    if scope in ("actor", "both"):
+        _add_recipient(actor)
+    if scope in ("target", "both"):
+        for target in targets:
+            if target is not actor:
+                _add_recipient(target)
+
+    lo, hi = _get_stimulus_interval()
+    pending: list[PendingEffect] = []
+
+    for recipient in recipients:
+        base_delta = _stimulus_rng.randint(lo, hi)
+        bonus = 0.0
+        if recipient is not actor and stimulus_bonus is not None:
+            bonus = stimulus_bonus.compute(actor)
+
+        pleasure_pct = equipment_pleasure_gain(recipient)
+        total_gain = max(0, round((base_delta + bonus) * (1 + pleasure_pct / 100)))
+
+        pending.append(
+            PendingEffect(
+                recipient,
+                f"pleasure_gain|{_entity_key(recipient)}|{total_gain}",
+                frozenset({"sexual", "traits"}),
+                lambda r=recipient, g=total_gain: apply_pleasure_gain(r, g),
+            )
+        )
+    return pending
+
+
+register_effect_handler(
+    "stimulus",
+    _handle_stimulus,
+    frozenset({"sexual", "traits"}),
+    requires_event_context=frozenset(),
+)
+
+
 def _effect_prefix(effect_id: str) -> str:
     return effect_id.partition(":")[0]
 
@@ -1498,6 +1608,8 @@ def _bind_resolved_effect(
     base_context: dict[str, Any],
     skill: SkillDef,
     ordinal: int,
+    actor: Any = None,
+    targets: list[Any] | None = None,
 ) -> dict[str, Any]:
     """Synthesize trusted effect context for one effect execution ordinal.
 
@@ -1507,8 +1619,27 @@ def _bind_resolved_effect(
     forgery without mutating the request dictionary.
     """
     effect_context = dict(base_context)
+    policy = skill.effect_policies[ordinal]
+    if policy.magnitude is not None and actor is not None:
+        from world.skills.effects import StateMagnitudeSubject
+
+        target_entity = targets[0] if targets else None
+        entity = (
+            actor
+            if policy.magnitude.subject == StateMagnitudeSubject.ACTOR
+            else target_entity
+        )
+        if entity is not None:
+            try:
+                computed_magnitude = policy.magnitude.compute(entity)
+                policy = replace(policy, coefficient=computed_magnitude)
+            except Exception as error:
+                raise RejectedAction(
+                    RejectReason.EFFECT_RESOLUTION_FAILED,
+                    f"state magnitude computation failed for {policy.magnitude}: {error}",
+                ) from error
     effect_context["resolved_effect"] = ResolvedEffect(
-        policy=skill.effect_policies[ordinal],
+        policy=policy,
         source_skill=skill,
     )
     return effect_context
@@ -1598,7 +1729,9 @@ def _step5_effect_resolution(
         policy = skill.effect_policies[i]
         if policy.audience is not EffectAudience.SELECTED and not effect_targets:
             continue
-        effect_context = _bind_resolved_effect(base_context, skill, i)
+        effect_context = _bind_resolved_effect(
+            base_context, skill, i, actor=request.actor, targets=effect_targets
+        )
         try:
             effects = handler(
                 request.actor,
@@ -2085,6 +2218,11 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
             "pending_climax_extension",
             "sexual_state",
         ),
+        "submission_marks": _attribute_snapshot(
+            entity,
+            "submission_marks",
+            "sexual_state",
+        ),
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
         "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
@@ -2141,6 +2279,12 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
         entity,
         "pending_climax_extension",
         snapshot["pending_climax_extension"],
+        "sexual_state",
+    )
+    _restore_attribute(
+        entity,
+        "submission_marks",
+        snapshot["submission_marks"],
         "sexual_state",
     )
     _restore_attribute(entity, "buffs", snapshot["buffs"])
@@ -2335,6 +2479,7 @@ class ActionResolver:
             _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
+            _step4a_spell_conditions(request, skill, targets)
             base_context = _event_context(request)
             for i, effect_id in enumerate(skill.effects):
                 prefix = _effect_prefix(effect_id)
@@ -2343,7 +2488,9 @@ class ActionResolver:
                         RejectReason.UNKNOWN_EFFECT_ID,
                         effect_id,
                     )
-                effect_context = _bind_resolved_effect(base_context, skill, i)
+                effect_context = _bind_resolved_effect(
+                    base_context, skill, i, actor=request.actor, targets=targets
+                )
                 missing = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] - effect_context.keys()
                 if missing:
                     raise RejectedAction(
@@ -2363,41 +2510,47 @@ class ActionResolver:
             _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
-            targets, resist_pending = _step4b_sexual_resist_gate(
+            _step4a_spell_conditions(request, skill, targets)
+            targets, resist_pending, generic_resisted = _step4b_sexual_resist_gate(
                 request,
                 skill,
                 targets,
             )
-            routed_targets = plan_effect_audiences(
-                request.actor,
-                request.context,
-                skill,
-                targets,
-            )
-            pending = resist_pending + _step5_effect_resolution(
-                request,
-                skill,
-                targets,
-                routed_targets=routed_targets,
-            )
+            if generic_resisted:
+                pending = list(resist_pending)
+                routed_targets = ()
+            else:
+                routed_targets = plan_effect_audiences(
+                    request.actor,
+                    request.context,
+                    skill,
+                    targets,
+                )
+                pending = resist_pending + _step5_effect_resolution(
+                    request,
+                    skill,
+                    targets,
+                    routed_targets=routed_targets,
+                )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             delivered_recipients: list[Any] = []
-            seen_delivered_keys: set[Any] = set()
-            for eff_targets in routed_targets:
-                for target in eff_targets:
-                    t_key = practice_claim_key(request.actor, skill.key, target)[2]
-                    if t_key not in seen_delivered_keys:
-                        seen_delivered_keys.add(t_key)
-                        delivered_recipients.append(target)
             practice_claims: list[tuple[Any, str, Any]] = []
             unlock_lines: list[str] = []
-            pending += _step6_skill_practice(
-                request,
-                skill,
-                delivered_recipients,
-                practice_claims,
-                unlock_lines,
-            )
+            if not generic_resisted:
+                seen_delivered_keys: set[Any] = set()
+                for eff_targets in routed_targets:
+                    for target in eff_targets:
+                        t_key = practice_claim_key(request.actor, skill.key, target)[2]
+                        if t_key not in seen_delivered_keys:
+                            seen_delivered_keys.add(t_key)
+                            delivered_recipients.append(target)
+                pending += _step6_skill_practice(
+                    request,
+                    skill,
+                    delivered_recipients,
+                    practice_claims,
+                    unlock_lines,
+                )
             event_log = _step7_build_event_log(request, skill, pending)
             try:
                 for planner in _EVENT_EFFECT_PLANNERS.values():
