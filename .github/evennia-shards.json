@@ -36,6 +36,7 @@
         "world.rules.tests.test_conferral_action",
         "world.rules.tests.test_creation_messages",
         "world.rules.tests.test_creation_wizard",
+        "world.rules.tests.test_conditional_damage",
         "world.rules.tests.test_damage_bands",
         "world.rules.tests.test_damage_effect_handler",
         "world.rules.tests.test_defeat_aftermath_core",
