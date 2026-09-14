@@ -123,6 +123,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "wallet",
                     "inventory",
                     "reward_claims",
+                    "action_evidence",
                 }
             ),
         )

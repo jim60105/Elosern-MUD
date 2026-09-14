@@ -336,6 +336,8 @@ class DamagePolicy:
     attack_multiplier: float = 1.0
     bypass_defense: bool = False
     max_hp_fraction: float = 0.0
+    repeat_when: str | None = None
+    extra_strikes: int = 0
 
     def __init__(
         self,
@@ -347,6 +349,8 @@ class DamagePolicy:
         target_facts: Sequence[str] | None = None,
         conditional_multiplier: float | None = None,
         conditional_defense_bypass: bool | None = None,
+        repeat_when: str | None = None,
+        extra_strikes: int | None = None,
     ) -> None:
         if predicate is None and target_facts is not None:
             predicate = target_facts
@@ -358,10 +362,15 @@ class DamagePolicy:
         if conditional_defense_bypass is not None:
             bypass_defense = conditional_defense_bypass
 
+        if extra_strikes is None:
+            extra_strikes = 1 if repeat_when is not None else 0
+
         object.__setattr__(self, "predicate", predicate)
         object.__setattr__(self, "attack_multiplier", attack_multiplier)
         object.__setattr__(self, "bypass_defense", bypass_defense)
         object.__setattr__(self, "max_hp_fraction", max_hp_fraction)
+        object.__setattr__(self, "repeat_when", repeat_when)
+        object.__setattr__(self, "extra_strikes", extra_strikes)
         self.__post_init__()
 
     @property
@@ -456,6 +465,36 @@ class DamagePolicy:
                 raise ValueError(
                     "DamagePolicy specifies bypass_defense=True but has an empty predicate"
                 )
+
+        if self.repeat_when is not None:
+            if not isinstance(self.repeat_when, str):
+                raise ValueError(
+                    f"DamagePolicy repeat_when must be a string or None, got {type(self.repeat_when).__name__}"
+                )
+            from world.rules.action_evidence import EVIDENCE_KINDS
+
+            if self.repeat_when not in EVIDENCE_KINDS:
+                raise ValueError(
+                    f"unknown DamagePolicy repeat_when predicate {self.repeat_when!r}; "
+                    f"must be in {sorted(EVIDENCE_KINDS)}"
+                )
+
+        if isinstance(self.extra_strikes, bool) or not isinstance(self.extra_strikes, int):
+            raise ValueError(
+                f"DamagePolicy extra_strikes must be an int, got {type(self.extra_strikes).__name__}"
+            )
+        if self.extra_strikes not in (0, 1):
+            raise ValueError(
+                f"DamagePolicy extra_strikes cannot exceed 1, got {self.extra_strikes}"
+            )
+        if self.repeat_when is None and self.extra_strikes != 0:
+            raise ValueError(
+                "DamagePolicy specifies extra_strikes > 0 but has no repeat_when predicate"
+            )
+        if self.repeat_when is not None and self.extra_strikes != 1:
+            raise ValueError(
+                "DamagePolicy with repeat_when requires extra_strikes=1"
+            )
 
 
 @dataclass(frozen=True)

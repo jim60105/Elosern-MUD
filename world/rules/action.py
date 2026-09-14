@@ -193,6 +193,7 @@ SNAPSHOTTED_SURFACES = frozenset(
         "wallet",
         "inventory",
         "reward_claims",
+        "action_evidence",
     }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
@@ -2203,6 +2204,8 @@ def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
         snapshot["inventory"] = _attribute_snapshot(obj, "inventory")
     if "reward_claims" in surfaces:
         snapshot["reward_claims"] = _attribute_snapshot(obj, "guild_reward_claims")
+    if "action_evidence" in surfaces:
+        snapshot["action_evidence"] = _attribute_snapshot(obj, "action_evidence")
     return snapshot
 
 
@@ -2236,6 +2239,8 @@ def _restore_touched(
         _restore_attribute(obj, "inventory", snapshot["inventory"])
     if "reward_claims" in surfaces and "reward_claims" in snapshot:
         _restore_attribute(obj, "guild_reward_claims", snapshot["reward_claims"])
+    if "action_evidence" in surfaces and "action_evidence" in snapshot:
+        _restore_attribute(obj, "action_evidence", snapshot["action_evidence"])
 
 
 def _restore_touched_best_effort(
@@ -2434,3 +2439,7 @@ class ActionResolver:
         if unlock_lines:
             notifications = notifications + tuple(unlock_lines)
         return ActionResult.success(event_log, time_cost, notifications)
+
+
+from world.rules.action_evidence import register_action_evidence_planner
+register_action_evidence_planner()
