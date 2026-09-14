@@ -1609,7 +1609,7 @@ def _handle_stimulus(
         base_delta = _stimulus_rng.randint(lo, hi)
         bonus = 0.0
         if recipient is not actor and stimulus_bonus is not None:
-            bonus = stimulus_bonus.compute(actor)
+            bonus = stimulus_bonus.compute(actor, actor=actor)
 
         pleasure_pct = equipment_pleasure_gain(recipient)
         total_gain = max(0, round((base_delta + bonus) * (1 + pleasure_pct / 100)))
@@ -1618,7 +1618,7 @@ def _handle_stimulus(
             PendingEffect(
                 recipient,
                 f"pleasure_gain|{_entity_key(recipient)}|{total_gain}",
-                frozenset({"sexual", "traits"}),
+                frozenset({"sexual", "traits", "buffs"}),
                 lambda r=recipient, g=total_gain: apply_pleasure_gain(r, g),
             )
         )
@@ -1670,7 +1670,7 @@ def _bind_resolved_effect(
         )
         if entity is not None:
             try:
-                computed_magnitude = policy.magnitude.compute(entity)
+                computed_magnitude = policy.magnitude.compute(entity, actor=actor)
                 policy = replace(policy, coefficient=computed_magnitude)
             except Exception as error:
                 raise RejectedAction(

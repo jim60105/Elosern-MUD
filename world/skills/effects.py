@@ -351,6 +351,7 @@ class StateMagnitude:
     base: float
     per_ordinal: float
     maximum: float | None = None
+    marker: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.subject, str):
@@ -391,12 +392,36 @@ class StateMagnitude:
                 )
             object.__setattr__(self, "maximum", f_max)
 
-    def compute(self, entity: Any) -> float:
+        if self.marker is not None:
+            if isinstance(self.marker, bool) or not isinstance(self.marker, str) or not self.marker.strip():
+                raise ValueError(
+                    f"StateMagnitude marker must be a non-empty string, got {self.marker!r}"
+                )
+            if self.maximum is None:
+                raise ValueError("StateMagnitude with marker requires maximum to be specified")
+            if self.maximum <= 0:
+                raise ValueError(
+                    f"StateMagnitude with marker requires positive maximum, got {self.maximum!r}"
+                )
+            from world.rules.state_reactions import is_configured_marker
+
+            if not is_configured_marker(self.marker):
+                raise ValueError(f"unresolved configured marker {self.marker!r}")
+
+    def compute(self, entity: Any, actor: Any | None = None) -> float:
         """Sample entity state and compute the magnitude value."""
         from world.lore.sexual_vocab import AROUSAL_LEVELS, EXPOSURE_LEVELS
         from world.rules.equipment_effects import effective_exposure
         from world.rules.stored_sexual_reads import StoredLevel
         from world.rules.sexual_state import PLEASURE_CONFIG
+        from world.rules.state_reactions import is_empowered
+
+        empowerment_actor = actor if actor is not None else entity
+        if self.marker is not None and is_empowered(empowerment_actor, self.marker):
+            if self.maximum is not None:
+                if not isfinite(self.maximum) or self.maximum <= 0:
+                    raise ValueError(f"StateMagnitude maximum must be positive, got {self.maximum}")
+                return float(self.maximum)
 
         field_name = "effective_exposure" if self.field == "exposure" else self.field
         ordinal = 0
@@ -437,7 +462,7 @@ class StateMagnitude:
         val = self.base + self.per_ordinal * ordinal
         if self.maximum is not None:
             val = min(val, self.maximum)
-        if not isfinite(val) or val <= 0:
+        if not isfinite(val) or val < 0 or (self.base > 0 and val <= 0):
             raise ValueError(f"StateMagnitude computed non-positive or non-finite value: {val}")
         return float(val)
 
