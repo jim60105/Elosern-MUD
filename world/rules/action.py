@@ -407,6 +407,9 @@ def _step3_targeting(
 def _step4_capability(actor: Any) -> None:
     if actor.attributes.has("buffs") and blocks_action(actor):
         raise RejectedAction(RejectReason.ACTION_FORBIDDEN, _entity_key(actor))
+    mods = evaluate_combat_modifiers_no_create(actor)
+    if mods.get("actions_per_turn", 1) == 0:
+        raise RejectedAction(RejectReason.ACTION_FORBIDDEN, _entity_key(actor))
 
 
 def _step4a_spell_conditions(
@@ -1127,6 +1130,36 @@ def _handle_divine_pleasure_max(
     return pending
 
 
+def _handle_pleasure_peak(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Advance every recipient's pleasure through positive-gain then zero-gain.
+
+    Stages one PendingEffect per recipient calling apply_pleasure_gain(100)
+    then apply_pleasure_gain(0), advancing climax phase through canonical
+    cycle edges without direct phase assignment or artificial extension.
+    """
+    del effect_id, context, scale
+    pending: list[PendingEffect] = []
+    for recipient in targets:
+        pending.append(
+            PendingEffect(
+                recipient,
+                f"pleasure_peak|{_entity_key(recipient)}|100",
+                frozenset({"sexual", "traits", "buffs"}),
+                lambda r=recipient: (
+                    apply_pleasure_gain(r, 100),
+                    apply_pleasure_gain(r, 0),
+                ),
+            )
+        )
+    return pending
+
+
 def _handle_climax_extension_stage(
     actor: Any,
     targets: list[Any],
@@ -1431,25 +1464,25 @@ register_effect_handler(
 register_effect_handler(
     "sexual_event",
     _handle_sexual_event,
-    frozenset({"sexual", "traits"}),
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
     "sexual_event_actor",
     _handle_actor_sexual_event,
-    frozenset({"sexual"}),
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
     "sexual_event_target",
     _handle_target_sexual_event,
-    frozenset({"sexual", "traits"}),
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
     "pleasure",
     _handle_pleasure_effect,
-    frozenset({"sexual"}),
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
@@ -1467,7 +1500,7 @@ register_effect_handler(
 register_effect_handler(
     "divine_pleasure_max",
     _handle_divine_pleasure_max,
-    frozenset({"sexual"}),
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
@@ -1595,7 +1628,13 @@ def _handle_stimulus(
 register_effect_handler(
     "stimulus",
     _handle_stimulus,
-    frozenset({"sexual", "traits"}),
+    frozenset({"sexual", "traits", "buffs"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "pleasure_peak",
+    _handle_pleasure_peak,
+    frozenset({"sexual", "traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 
@@ -1881,6 +1920,7 @@ _ENTRY_TEMPLATES = {
     "divine_clamp_shame": "{actor} 以神之律令，剝奪了 {target} 的羞恥。",
     "divine_mark_submission": "{actor} 以神之律令，將 {target} 化為絕對從屬。",
     "divine_restore_purity": "{actor} 以神之律令，使 {target} 回歸純淨。",
+    "pleasure_peak": "{actor} 使 {target} 的快感推至頂點。",
 }
 
 

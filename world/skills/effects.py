@@ -326,6 +326,12 @@ class StimulusEffect:
     recipient: Literal["actor", "target", "both"]
 
 
+@dataclass(frozen=True)
+class PleasurePeakEffect:
+    """Actor-bound peak effect advancing pleasure through canonical writer."""
+    pass
+
+
 class StateMagnitudeSubject(StrEnum):
     """Subject whose state ordinal determines the magnitude."""
 
@@ -877,4 +883,7 @@ def parse_effect(effect_id: str) -> object:
                 f"stimulus effect recipient must be 'actor', 'target', or 'both', got {recipient!r}"
             )
         return StimulusEffect(recipient=recipient)
+    if prefix == "pleasure_peak":
+        _parse_bare(effect_id, prefix)
+        return PleasurePeakEffect()
     raise ValueError(f"unrecognized skill effect prefix {prefix!r} in {effect_id!r}")
