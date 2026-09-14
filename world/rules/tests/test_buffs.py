@@ -1,8 +1,7 @@
 """Data-contract test: buff rulebook content contract
-One-to-one binding tests for the shipped buffs.yaml rows: each
-``test_buff_<key>`` method asserts its shipped row's fields and that the row
-applies through the BuffHandler; the shipped polarity and modifier-shape
-scans bind the catalogue-wide claims in buff-handler-integration and
+Integration and behavior tests for buff mechanics: rate-of-change, bounds,
+duration, expiry, immunity, and stacking policies. The shipped polarity and
+modifier-shape scans bind the catalogue-wide claims in buff-handler-integration and
 cleanse-effect-handler."""
 
 from tools.spec_traceability import covers_requirement

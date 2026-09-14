@@ -139,6 +139,7 @@
         "world.rules.tests.test_quest_issuance",
         "world.rules.tests.test_quest_issuer_component",
         "world.rules.tests.test_race_scale",
+        "world.rules.tests.test_recovery_profiles",
         "world.rules.tests.test_rule_id_test_correspondence",
         "world.rules.tests.test_rulebook_schema",
         "world.rules.tests.test_service_messages",
