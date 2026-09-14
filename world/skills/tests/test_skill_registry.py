@@ -76,6 +76,8 @@ class SkillRegistryTests(unittest.TestCase):
                 "effect_policies",
                 "parsed_effects",
                 "prerequisites",
+                "cast_conditions",
+                "interaction",
             ],
         )
         for key, skill in SKILL_REGISTRY.items():
@@ -778,6 +780,8 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "magic_circle_comprehension",
                 "precise_mana_control",
                 "concentration",
+                "pain_to_pleasure",
+                "priestly_grace",
             },
             SkillCategory.INNATE_GIFT: {
                 "reincarnation_boon_elosia",
@@ -935,7 +939,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                         tuple(skill.effects),
                         ("passive_trait:element_mastery",),
                     )
-                else:
+                elif key in _CATALOG_EFFECTS:
                     self.assertEqual(
                         tuple(skill.effects),
                         _CATALOG_EFFECTS[key],

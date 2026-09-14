@@ -68,7 +68,6 @@ SKILL_REGISTRY_CLASS_MODULES = {
     "WindSpellCatalogTests": "test_spell_catalogs.py",
     "LightningSpellCatalogTests": "test_spell_catalogs.py",
     "IceSpellCatalogTests": "test_spell_catalogs.py",
-    "LightSpellCatalogTests": "test_spell_catalogs.py",
     "DarkSpellCatalogTests": "test_spell_catalogs.py",
     # The shipped-content cast classes retired when the cast suite migrated
     # onto the synthetic kit (skills-migration DC2): the cast-resolution

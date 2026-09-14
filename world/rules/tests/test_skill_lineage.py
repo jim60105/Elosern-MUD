@@ -916,6 +916,7 @@ class StudyPracticeGrantTests(_Scoped):
             progression.grant_study_practice_xp(entity, "t_tree_root", 1.5)
         self.assertEqual(entity.db.skill_proficiency, {})
 
+
     def test_unknown_and_passive_skills_grant_nothing(self):
         entity = _entity(
             owned=("t_tree_root", SYNTH_SKILLS["t_steady_stride"].key),
@@ -930,3 +931,46 @@ class StudyPracticeGrantTests(_Scoped):
             )
         )
         self.assertEqual(entity.db.skill_proficiency, {})
+
+
+class LightSpellProgressionLineageTests(_Scoped):
+    """Synthetic behavior tests for branch and merge progression with two-parent capstone."""
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    def test_branch_and_merge_progression_gates_until_all_parents_satisfied(self):
+        """Scenario: Branch and merge progression uses existing mechanics.
+
+        WHEN a synthetic two-root spell family has branching prerequisites and a two-parent capstone
+        THEN use rejects until every parent threshold is met, and cap saturation does not prevent attaining a consuming edge
+        """
+        registry = {
+            "root_a": _fake_skill("root_a"),
+            "root_b": _fake_skill("root_b"),
+            "branch_a1": _fake_skill("branch_a1", (SkillPrerequisite("root_a", 3),)),
+            "branch_a2_leaf": _fake_skill("branch_a2_leaf", (SkillPrerequisite("branch_a1", 3),)),
+            "branch_b1": _fake_skill("branch_b1", (SkillPrerequisite("root_b", 3),)),
+            "branch_b2": _fake_skill("branch_b2", (SkillPrerequisite("branch_b1", 5),)),
+            "capstone_merge": _fake_skill(
+                "capstone_merge",
+                (SkillPrerequisite("branch_a1", 5), SkillPrerequisite("branch_b2", 5)),
+            ),
+        }
+        validate_prerequisite_graph(registry)
+
+        self.assertEqual(proficiency_cap("root_a"), 3)
+        self.assertEqual(proficiency_cap("branch_a1"), 5)
+        self.assertEqual(proficiency_cap("branch_a2_leaf"), PROFICIENCY_TIP_CAP)
+        self.assertEqual(proficiency_cap("branch_b2"), 5)
+        self.assertEqual(proficiency_cap("capstone_merge"), PROFICIENCY_TIP_CAP)
+
+        entity = _entity(
+            owned=("root_a", "root_b", "branch_a1", "branch_b1", "branch_b2", "capstone_merge"),
+            proficiency={
+                "branch_a1": 4.0 * SKILL_PROFICIENCY_XP_PER_LEVEL,
+                "branch_b2": 5.0 * SKILL_PROFICIENCY_XP_PER_LEVEL,
+            },
+        )
+        self.assertFalse(can_use_skill(entity, registry["capstone_merge"]))
+
+        entity.db.skill_proficiency["branch_a1"] = 5.0 * SKILL_PROFICIENCY_XP_PER_LEVEL
+        self.assertTrue(can_use_skill(entity, registry["capstone_merge"]))
