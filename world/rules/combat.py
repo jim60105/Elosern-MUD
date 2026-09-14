@@ -25,6 +25,7 @@ from world.rules.combat_modifiers import (
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.items import ItemUseRequest, resolve_item_use
+from world.rules.action_evidence import has_action_evidence
 from world.rules.progression import can_use_skill, scaled_magnitude
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
@@ -321,67 +322,78 @@ def _handle_damage(
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
+    now = event_context.get("now") if event_context is not None else None
     floor = int(COMBAT_YAML["damage"]["floor"])
     pending: list[PendingEffect] = []
     for target in targets:
-        raw_roll = roll_d100()
-        hit, margin = _to_hit(actor, target, raw_roll)
-        amount = 0
-        if hit:
-            multiplier = _roll_multiplier(raw_roll, margin)
-            attack = _adjusted_attack(actor, attack_key)
-            if damage_policy is not None:
-                matched = matches_target_predicate(target, damage_policy.predicate)
-                matched_mult = damage_policy.attack_multiplier if matched else 1.0
-                defense = (
-                    0
-                    if (matched and damage_policy.bypass_defense)
-                    else _adjusted_defense(target)
-                )
-                max_hp_frac = damage_policy.max_hp_fraction
-            else:
-                matched_mult = 1.0
-                defense = _adjusted_defense(target)
-                max_hp_frac = 0.0
-            attack_part = round(attack * multiplier * coefficient * matched_mult)
-            post_defense = attack_part - defense
-            rider = math_floor(round(_max_hp(target) * max_hp_frac, 6))
-            base_amount = int(max(post_defense + rider, floor))
-            amount = max(scaled_magnitude(base_amount, scale), floor)
-            amount = int(amount)
         key = str(target.key)
         protected = session_nonlethal or key in nonlethal_keys
         marked: list[str] = []
-
-        def apply(
-            target=target,
-            amount=amount,
-            hit=hit,
-            key=key,
-            protected=protected,
-            marked=marked,
-        ) -> None:
-            if not hit:
-                _noop()
-                return
-            if not protected:
-                _apply_hp_delta(target, -amount)
-                return
-            before = _stored_trait_value(target.traits.hp)
-            _apply_hp_delta_nonlethal(target, -amount)
-            if before > 0 and before - amount <= 0 and key in nonlethal_keys:
-                marked.append(key)
-
-        pending.append(
-            PendingEffect(
-                entity=target,
-                description=(
-                    f"damage|{key}|{raw_roll}|{int(hit)}|{amount}"
-                ),
-                surfaces=frozenset(),
-                apply=apply,
-            )
+        extra = (
+            damage_policy is not None
+            and damage_policy.repeat_when is not None
+            and damage_policy.extra_strikes > 0
+            and has_action_evidence(target, damage_policy.repeat_when, now=now)
         )
+        total_strikes = 2 if extra else 1
+
+        for _ in range(total_strikes):
+            raw_roll = roll_d100()
+            hit, margin = _to_hit(actor, target, raw_roll)
+            amount = 0
+            if hit:
+                multiplier = _roll_multiplier(raw_roll, margin)
+                attack = _adjusted_attack(actor, attack_key)
+                if damage_policy is not None:
+                    matched = matches_target_predicate(target, damage_policy.predicate)
+                    matched_mult = damage_policy.attack_multiplier if matched else 1.0
+                    defense = (
+                        0
+                        if (matched and damage_policy.bypass_defense)
+                        else _adjusted_defense(target)
+                    )
+                    max_hp_frac = damage_policy.max_hp_fraction
+                else:
+                    matched_mult = 1.0
+                    defense = _adjusted_defense(target)
+                    max_hp_frac = 0.0
+                attack_part = round(attack * multiplier * coefficient * matched_mult)
+                post_defense = attack_part - defense
+                rider = math_floor(round(_max_hp(target) * max_hp_frac, 6))
+                base_amount = int(max(post_defense + rider, floor))
+                amount = max(scaled_magnitude(base_amount, scale), floor)
+                amount = int(amount)
+
+            def apply(
+                target=target,
+                amount=amount,
+                hit=hit,
+                key=key,
+                protected=protected,
+                marked=marked,
+            ) -> None:
+                if not hit:
+                    _noop()
+                    return
+                if not protected:
+                    _apply_hp_delta(target, -amount)
+                    return
+                before = _stored_trait_value(target.traits.hp)
+                _apply_hp_delta_nonlethal(target, -amount)
+                if before > 0 and before - amount <= 0 and key in nonlethal_keys:
+                    if key not in marked:
+                        marked.append(key)
+
+            pending.append(
+                PendingEffect(
+                    entity=target,
+                    description=(
+                        f"damage|{key}|{raw_roll}|{int(hit)}|{amount}"
+                    ),
+                    surfaces=frozenset(),
+                    apply=apply,
+                )
+            )
         if key in nonlethal_keys and battlefield is not None:
             # One battlefield-shaped effect per protected target: the commit's
             # duck-typed snapshot/restore dispatch captures ``fled`` and
