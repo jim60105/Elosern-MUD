@@ -22,6 +22,8 @@ import importlib
 import unittest
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -122,6 +124,9 @@ class MockContext:
 class EffectAudienceAuthoringTests(unittest.TestCase):
     """Immutable per-occurrence policy validation for effect audiences."""
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_effect_policy_defaults_to_selected_audience(self):
         policy = EffectPolicy()
         self.assertEqual(policy.coefficient, 1.0)
@@ -144,6 +149,9 @@ class EffectAudienceAuthoringTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     EffectPolicy(audience=bad)
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_inherently_actor_bound_effects_reject_allies_and_enemies(self):
         # SelfHealEffect, ActorSexualEventEffect, SelfBuffApplyEffect
         for bad_aud in (EffectAudience.ALLIES, EffectAudience.ENEMIES):
@@ -456,6 +464,9 @@ class PureAudiencePlannerTests(unittest.TestCase):
         self.assertEqual(routed[0], [self.ally])
         self.assertEqual(routed[1], [])
 
+    @covers_requirement(
+        "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
+    )
     def test_mixed_spell_one_empty_and_all_empty(self):
         mixed_skill = SkillDef(
             key="t_mixed",
@@ -560,6 +571,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.addCleanup(lambda: BUFF_DEFINITIONS.pop(key, None))
         return key
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_mixed_spell_damages_enemies_and_cleanses_allies(self):
         # Scenario: ENEMIES damage + ALLIES cleanse
         debuff_key = self._register_synth_debuff()
@@ -618,6 +632,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         # Bystander (unselected): untouched
         self.assertEqual(len(entity_active_buffs(self.bystander)), 1)
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_unconfigured_attack_damages_companion(self):
         # Scenario: unconfigured attack targets a companion -> companion takes damage
         skill = self._register_skill(
@@ -644,6 +661,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         self.assertLess(self.companion.traits.hp.current, comp_hp)
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_unconfigured_heal_heals_enemy(self):
         # Scenario: unconfigured heal targets an enemy -> enemy recovers
         skill = self._register_skill(
@@ -666,6 +686,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         self.assertGreater(self.target.traits.hp.current, 40)
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_explicit_self_binding_independent_of_pool(self):
         # Scenario: caster not in pool, but one effect is self-bound -> caster receives it once
         skill = self._register_skill(
@@ -698,6 +721,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         # Verify caster appears in event log
         self.assertIn("caster", res.event_log.targets)
 
+    @covers_requirement(
+        "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
+    )
     def test_one_audience_empty_skips_without_roll_and_pays_once(self):
         # Scenario: authored mixed spell has allies in selection but no enemies
         skill = self._register_skill(
@@ -736,6 +762,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         # MP deducted once
         self.assertEqual(self.caster.traits.mp.current, mp_before - 10)
 
+    @covers_requirement(
+        "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
+    )
     def test_all_audiences_empty_rejects_before_resources_time_practice(self):
         # Scenario: every configured component has no valid recipient -> action rejected
         skill = self._register_skill(
@@ -771,6 +800,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertIsNone(res.time_cost_seconds)
         self.assertIsNone(res.event_log)
 
+    @covers_requirement(
+        "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
+    )
     def test_relationship_change_between_preflight_and_resolve(self):
         # Scenario: preflight succeeds against enemy; relation flips before resolve -> resolve rejects
         skill = self._register_skill(
@@ -800,6 +832,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
+    @covers_requirement(
+        "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
+    )
     def test_late_failure_rollback_restores_all_recipients_including_self(self):
         # Scenario: late error restores all actual recipients including self-bound actor
         skill = self._register_skill(
@@ -907,6 +942,9 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         args, kwargs = mock_grant.call_args
         self.assertIsNone(kwargs.get("target"))
 
+    @covers_requirement(
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+    )
     def test_second_synthetic_configuration_alternate_element(self):
         # Alternate element (water/earth) synthetic configuration proving generic mechanism reuse
         debuff_key = self._register_synth_debuff("t_water_debuff")
