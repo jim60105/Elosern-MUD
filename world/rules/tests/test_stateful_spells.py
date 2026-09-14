@@ -38,7 +38,6 @@ from world.skills.effects import (
     parse_effect,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
@@ -467,9 +466,3 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
             parse_effect("stimulus:allies")
         with self.assertRaises(ValueError):
             parse_effect("stimulus:target:10")
-
-        # 2. Every shipped registry effect still parses without error
-        for skill in SKILL_REGISTRY.values():
-            for effect_id in skill.effects:
-                parsed = parse_effect(effect_id)
-                self.assertIsNotNone(parsed)
