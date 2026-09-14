@@ -6,6 +6,7 @@ healing composition. Uses synthetic skills only.
 """
 
 from copy import deepcopy
+import importlib
 import math
 import unittest
 from unittest.mock import patch
@@ -40,7 +41,6 @@ from world.skills.effects import (
     SelfHealEffect,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     FactionConstraint,
     SkillCategory,
     SkillDef,
@@ -49,6 +49,7 @@ from world.skills.registry import (
     _skill,
     _spell,
 )
+from world.tests.synthetic_data import REGISTRY_TARGETS
 
 
 class EffectPolicyAuthoringTests(unittest.TestCase):
@@ -475,16 +476,18 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         )
 
     def _register_skill(self, skill: SkillDef) -> SkillDef:
-        previous = SKILL_REGISTRY.get(skill.key)
+        mod_name, attr = REGISTRY_TARGETS["skills"]
+        registry = getattr(importlib.import_module(mod_name), attr)
+        previous = registry.get(skill.key)
 
         def _cleanup():
             if previous is None:
-                SKILL_REGISTRY.pop(skill.key, None)
+                registry.pop(skill.key, None)
             else:
-                SKILL_REGISTRY[skill.key] = previous
+                registry[skill.key] = previous
 
         self.addCleanup(_cleanup)
-        SKILL_REGISTRY[skill.key] = skill
+        registry[skill.key] = skill
         self.caster.db.skills["active"].append(skill.key)
         return skill
 
