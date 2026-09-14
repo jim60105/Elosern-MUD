@@ -11,7 +11,7 @@ from world.rules.tests import test_combat_modifiers
 
 
 class RuleCorrespondenceTests(TestCase):
-    @covers_requirement("buff-handler-integration::every-buff-key-in-buffs-yaml-has-exactly-one-corresponding-unit-test", "combat-modifier-table::every-rule-id-in-combat-modifiers-yaml-has-exactly-one-corresponding-unit-test", "sexual-transition-rulebook::every-rule-id-has-exactly-one-matching-test-structurally-enforced")
+    @covers_requirement("combat-modifier-table::every-rule-id-in-combat-modifiers-yaml-has-exactly-one-corresponding-unit-test", "sexual-transition-rulebook::every-rule-id-has-exactly-one-matching-test-structurally-enforced")
     def test_every_rule_and_buff_has_exactly_one_named_test(self):
         combat_names = [
             name for name, _ in inspect.getmembers(

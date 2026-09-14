@@ -8,6 +8,7 @@ Covers requirements from openspec change light-sustained-recovery:
 import copy
 import math
 from unittest.mock import patch
+from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -52,6 +53,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         self.addCleanup(patcher.stop)
         return definition
 
+    @covers_requirement(
+        "buff-handler-integration::recovery-profiles-restore-living-recipients-with-explicit-snapshot-and-live-inputs"
+    )
     def test_malformed_recovery_policies_rejected_at_definition_load(self):
         """Mutually exclusive fixed/recovery rate validation rejects invalid policies."""
         import tempfile
@@ -124,6 +128,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
       recovery: {base: 12}
 """)
 
+    @covers_requirement(
+        "buff-handler-integration::recovery-profiles-restore-living-recipients-with-explicit-snapshot-and-live-inputs"
+    )
     def test_live_recipient_and_captured_caster_inputs_differ(self):
         """Scenario: Live recipient and captured caster inputs differ.
 
@@ -179,6 +186,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         self.assertEqual(records, ())  # Recovery ticks emit no damaging TickRecords
         self.assertEqual(self.recipient.traits.hp.current, hp_before + 18)
 
+    @covers_requirement(
+        "buff-handler-integration::recovery-profiles-restore-living-recipients-with-explicit-snapshot-and-live-inputs"
+    )
     def test_no_revival_or_overflow(self):
         """Scenario: No revival or overflow.
 
@@ -218,6 +228,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         tick_buffs(self.recipient, 10)
         self.assertEqual(self.recipient.traits.hp.current, 100)
 
+    @covers_requirement(
+        "buff-handler-integration::finite-recovery-ticks-and-refresh-are-deterministic-across-elapsed-time-partitions"
+    )
     def test_finite_recovery_ticks_and_timing_partitions(self):
         """Scenario: Final tick precedes expiration.
 
@@ -271,6 +284,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         tick_buffs(self.recipient, 30)
         self.assertEqual(self.recipient.traits.hp.current, 40)  # exactly 3 ticks (30 HP)
 
+    @covers_requirement(
+        "buff-handler-integration::finite-recovery-ticks-and-refresh-are-deterministic-across-elapsed-time-partitions"
+    )
     def test_refresh_and_reload_preserve_schedule(self):
         """Scenario: Refresh and reload preserve schedule.
 
@@ -336,6 +352,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         tick_buffs(self.recipient, 10)
         self.assertEqual(self.recipient.traits.hp.current, 65)
 
+    @covers_requirement(
+        "buff-handler-integration::finite-recovery-ticks-and-refresh-are-deterministic-across-elapsed-time-partitions"
+    )
     def test_removal_cancels_recovery(self):
         """Scenario: Removal cancels recovery.
 
@@ -374,6 +393,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         tick_buffs(self.recipient, 20)
         self.assertEqual(self.recipient.traits.hp.current, 20)
 
+    @covers_requirement(
+        "buff-handler-integration::buff-verification-establishes-mechanics-rather-than-catalog-correspondence"
+    )
     def test_second_synthetic_configuration_reusable_for_non_light_source(self):
         """A second distinct synthetic configuration proves the recovery profile is generic and reusable."""
         buff_def = self._register_synth_buff(
@@ -413,6 +435,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         tick_buffs(self.recipient, 20)
         self.assertEqual(self.recipient.traits.hp.current, 49)
 
+    @covers_requirement(
+        "buff-handler-integration::buff-verification-establishes-mechanics-rather-than-catalog-correspondence"
+    )
     def test_synthetic_timed_defense_affects_combat_and_expires(self):
         """Scenario: Synthetic timed defense affects combat.
 
@@ -461,6 +486,9 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
         mods_expired = evaluate_combat_modifiers(self.recipient)
         self.assertEqual(mods_expired.get("defense", 0), 0)
 
+    @covers_requirement(
+        "buff-handler-integration::finite-recovery-ticks-and-refresh-are-deterministic-across-elapsed-time-partitions"
+    )
     def test_clock_advance_beyond_quanta_budget_never_fabricates_ticks(self):
         """Clock advances beyond max_settlement_quanta never fabricate extra ticks."""
         buff_def = self._register_synth_buff(
