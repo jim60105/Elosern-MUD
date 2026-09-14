@@ -119,7 +119,7 @@ _T_PREREQ_B_SKILL = _skill(
     category=SkillCategory.ENHANCEMENT,
 )
 
-_T_APOTHEOSIS = "bliss_apotheosis"
+_T_APOTHEOSIS = "t_synth_apotheosis"
 _T_APOTHEOSIS_SKILL = _skill(
     _T_APOTHEOSIS,
     "合成至福神格",
@@ -301,6 +301,16 @@ class PhaseSpellReactionsTests(EvenniaTest):
         self.target = create_object(PlayerCharacter, key="target", location=self.room1)
         self.target.race = _race_key()
         self.target.apply_race_baseline()
+
+        synth_rules = [
+            replace(rule, when=dict(rule.when, skill_qualified=_T_APOTHEOSIS))
+            if rule.id == "climax_in_progress_empowerment"
+            else rule
+            for rule in STATE_REACTION_RULES
+        ]
+        patcher = patch("world.rules.state_reactions.STATE_REACTION_RULES", synth_rules)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _catalogue(self, skills: dict[str, SkillDef] | None = None):
         if skills is None:

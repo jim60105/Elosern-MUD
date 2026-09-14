@@ -74,9 +74,6 @@
 - code: ice_prison
   label: 定身
   severity: harmful
-- code: light_holy_shield
-  label: 聖盾
-  severity: beneficial
 - code: light_blessing
   label: 女神降福
   severity: beneficial
@@ -154,4 +151,13 @@
   severity: warning
 - code: climax_empowerment
   label: 高潮賦能
+  severity: beneficial
+- code: sanctified_ward
+  label: 聖光庇護陣
+  severity: beneficial
+- code: priestly_grace_recovery_scale
+  label: 女神近接回復強化
+  severity: beneficial
+- code: light_blessing_defense_bonus
+  label: 女神降福防禦提升
   severity: beneficial

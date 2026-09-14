@@ -177,32 +177,6 @@ ICE_SPELL_CATALOG = (
 )
 
 
-LIGHT_SPELL_CATALOG = (
-    ("heal", "治癒術", TargetSpec.SINGLE, 12, ("heal:single",)),
-    ("light_arrow", "光箭術", TargetSpec.SINGLE, 14, ("damage:light:magic",)),
-    ("purify", "淨化術", TargetSpec.SINGLE, 22, ("cleanse:status",)),
-    ("mass_heal", "群體治癒", TargetSpec.AREA, 30, ("heal:area",)),
-    ("advanced_heal", "高級治癒", TargetSpec.SINGLE, 46, ("heal:single",)),
-    ("holy_shield", "聖盾術", TargetSpec.SINGLE, 40, ("buff_apply:light_holy_shield",)),
-    ("holy_radiance", "神聖光輝", TargetSpec.AREA, 90, ("damage:light:magic",)),
-    ("revival_light", "復甦之光", TargetSpec.SINGLE, 82, ("heal:single",)),
-    (
-        "goddess_blessing",
-        "女神降福",
-        TargetSpec.AREA,
-        145,
-        ("heal:area", "buff_apply:light_blessing"),
-    ),
-    (
-        "heavens_judgment_light",
-        "天啟聖裁",
-        TargetSpec.SINGLE,
-        135,
-        ("damage:light:magic",),
-    ),
-)
-
-
 DARK_SPELL_CATALOG = (
     ("shadow_bolt", "暗影箭", TargetSpec.SINGLE, 14, ("damage:dark:magic",)),
     ("weaken", "衰弱術", TargetSpec.SINGLE, 11, ("buff_apply:dark_atk_down",)),
@@ -244,7 +218,6 @@ _CATALOG_EFFECTS = {
         WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
         ICE_SPELL_CATALOG,
-        LIGHT_SPELL_CATALOG,
         DARK_SPELL_CATALOG,
     )
     for row in rows
@@ -619,58 +592,6 @@ class IceSpellCatalogTests(unittest.TestCase):
                 and skill.kind is SkillKind.ACTIVE
             },
             {row[0] for row in ICE_SPELL_CATALOG},
-        )
-
-class LightSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
-    def test_all_ten_light_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in LIGHT_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
-    def test_every_light_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in LIGHT_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="light", school="magic"),
-                        )
-                    elif effect_id.startswith("heal:"):
-                        self.assertEqual(
-                            parsed,
-                            HealEffect(shape=effect_id.partition(":")[2]),
-                        )
-                    elif effect_id.startswith("cleanse:"):
-                        self.assertEqual(parsed, CleanseEffect(scope="status"))
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
-    def test_light_active_spell_keys_are_exactly_the_catalog_set(self):
-        self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["light"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in LIGHT_SPELL_CATALOG} | {"light_sword_style"},
         )
 
 class DarkSpellCatalogTests(unittest.TestCase):

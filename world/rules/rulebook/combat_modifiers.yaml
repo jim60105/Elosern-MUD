@@ -100,3 +100,9 @@
   # 朝聖者銅符 (pilgrim_medallion) — 朝聖旅途的虔誠, 微興奮即得防禦 +2。
   when: {equipment_worn: pilgrim_medallion, field: arousal, gte: 微興奮}
   then: {defense: 2}
+- id: priestly_grace_recovery_scale
+  when: {skill_owned: priestly_grace}
+  then: {recovery_arousal_scale: 0.1}
+- id: light_blessing_defense_bonus
+  when: {buff_active: light_blessing}
+  then: {defense: 18}

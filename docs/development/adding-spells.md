@@ -94,6 +94,17 @@ MP 必須落在 §4.3 的對應位階成本帶內：
 
 `_elemental_spells(element, *rows)` 會固定 `SkillKind.ACTIVE`、`FactionConstraint.ANY`、`cost={"mp": <mp>}`，元素只寫一次。
 
+若法術宣告了具名型別政策（如 `effect_policies`、`cast_conditions`、`interaction`、前置系譜等複合機制，如光系 16 節點），則改採個別具名 `_spell(...)` 宣告，顯式指派參數與 `usable_out_of_combat=True`，不強行套入六欄或七欄位置 tuple：
+
+```python
+_spell(
+    "holy_radiance", "神聖光輝", "綻放神聖光輝，對敵方造成光魔法傷害，同時淨化自身與友方的異常狀態。",
+    TargetSpec.AREA, usable_out_of_combat=True, mp=90, element="light", effects=("damage:light:magic", "cleanse:status"),
+    category=SkillCategory.ELEMENTAL_MAGIC, group="light", prerequisites=(SkillPrerequisite("judgment_strike", 5),),
+    effect_policies=(EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=2.0), EffectPolicy(audience=EffectAudience.ALLIES)),
+)
+```
+
 ### Step 3 — 特殊案例
 
 **自我限定（SELF_ONLY）**：寫成個別 `_skill(...)`，放在該元素 builder 區塊之後、同一階層註解之下：
@@ -159,6 +170,7 @@ _skill(
 測試與行為同步落地，位置與風格對齊 `spell-catalog-*` 系列：
 
 1. **`world/skills/tests/test_spell_catalogs.py`**：定義 `WATER_SPELL_CATALOG` 形式的 tuple，並加三個測試：
+   （註：光屬性目錄與後續複合機制法術採**可執行程式行為測試**驗證，不使用重複目錄資料表鏡像測試，免除資料契約重複維護負擔）
    - `test_all_ten_<element>_spells_declare_the_exact_catalog_fields` — 逐一斷言 label、kind、element、target、faction、cost、effects
    - `test_every_<element>_spell_effect_round_trips_through_typed_dispatch` — 每個 effect 字串經 `parse_effect` 得到正確的 typed dataclass 且存在於 `parsed_effects`
    - `test_<element>_active_spell_keys_are_exactly_the_catalog_set` — 精確 key 集合（元素已有其他 ACTIVE 技能時記得納入，例如 光含 `light_sword_style`、暗含 `shadow_slash`／`dual_blade_mastery`）

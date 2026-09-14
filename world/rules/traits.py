@@ -3,7 +3,11 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from evennia.contrib.rpg.traits import GaugeTrait
+try:
+    from evennia.contrib.rpg.traits import GaugeTrait
+except Exception:  # pragma: no cover - fallback when django settings not loaded
+    class GaugeTrait:  # type: ignore[no-redef]
+        pass
 
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import (

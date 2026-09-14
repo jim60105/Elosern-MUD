@@ -1026,3 +1026,103 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
         self.assertFalse(reval_fail.enabled)
         self.assertEqual(reval_fail.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+
+    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
+    def test_ordinary_recovery_and_mixed_policy_remain_distinct(self):
+        """Scenario: Ordinary recovery and mixed policy remain distinct.
+
+        WHEN ordinary recovery targets an enemy while a mixed spell selects both teams
+        THEN ordinary recovery still applies and the mixed spell follows its explicitly separate effect audiences
+        """
+        # 1. Ordinary recovery (SELECTED audience) targeting an enemy in battle
+        heal_skill = self._register_skill(
+            SkillDef(
+                key="t_synth_ord_heal",
+                label="普通治療測試",
+                description="單體治療。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                cost={"mp": 10},
+                usable_out_of_combat=True,
+                element=None,
+                effects=["heal:single"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+            )
+        )
+        self.target.traits.hp.current = 50
+        req_heal = ActionRequest(self.caster, heal_skill.key, [self.target], self.context)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=60),
+            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+        ):
+            res_heal = ActionResolver.resolve(req_heal)
+        self.assertEqual(res_heal.outcome, "success")
+        self.assertGreater(self.target.traits.hp.current, 50)
+
+        # 2. Mixed spell selects both teams -> damage to enemy, cleanse to ally
+        debuff_key = self._register_synth_debuff("t_synth_distinct_debuff")
+        apply_buff(self.companion, debuff_key)
+        self.assertEqual(len(entity_active_buffs(self.companion)), 1)
+        mixed_skill = self._register_skill(
+            SkillDef(
+                key="t_synth_mixed_distinct",
+                label="混編法術測試",
+                description="敵方傷害我方淨化。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.AREA,
+                cost={"mp": 20},
+                usable_out_of_combat=True,
+                element=None,
+                effects=["damage:light:magic", "cleanse:status"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(
+                    EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=2.0),
+                    EffectPolicy(audience=EffectAudience.ALLIES),
+                ),
+            )
+        )
+        target_hp_before = self.target.traits.hp.current
+        companion_hp_before = self.companion.traits.hp.current
+        req_mixed = ActionRequest(self.caster, mixed_skill.key, [self.target, self.companion], self.context)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=60),
+            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+        ):
+            res_mixed = ActionResolver.resolve(req_mixed)
+        self.assertEqual(res_mixed.outcome, "success")
+        self.assertLess(self.target.traits.hp.current, target_hp_before)
+        self.assertEqual(self.companion.traits.hp.current, companion_hp_before)
+        self.assertEqual(len(entity_active_buffs(self.companion)), 0)
+
+    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
+    def test_composite_effects_are_actual_state_changes_with_atomic_rollback(self):
+        """Scenario: Composite effects are actual state changes."""
+        composite_skill = self._register_skill(
+            SkillDef(
+                key="t_synth_composite_atomic",
+                label="複合狀態法術",
+                description="友方治療敵方傷害。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.AREA,
+                cost={"mp": 25},
+                usable_out_of_combat=True,
+                element=None,
+                effects=["heal:area", "damage:fire:magic"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(
+                    EffectPolicy(audience=EffectAudience.ALLIES, coefficient=2.0),
+                    EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=1.5),
+                ),
+            )
+        )
+        self.companion.traits.hp.current = 50
+        caster_mp_before = self.caster.traits.mp.current
+        req = ActionRequest(self.caster, composite_skill.key, [self.companion, self.target], self.context)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=60),
+            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+        ):
+            res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertEqual(self.caster.traits.mp.current, caster_mp_before - 25)
+        self.assertGreater(self.companion.traits.hp.current, 50)

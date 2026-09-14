@@ -187,34 +187,6 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-### Requirement: SKILL_REGISTRY contains the full 光-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 光-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["light"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `heal` | 治癒術 | 學徒 | `TargetSpec.SINGLE` | `mp=12` | `heal:single` |
-| `light_arrow` | 光箭術 | 學徒 | `TargetSpec.SINGLE` | `mp=14` | `damage:light:magic` |
-| `purify` | 淨化術 | 術師 | `TargetSpec.SINGLE` | `mp=22` | `cleanse:status` |
-| `mass_heal` | 群體治癒 | 術師 | `TargetSpec.AREA` | `mp=30` | `heal:area` |
-| `advanced_heal` | 高級治癒 | 大師 | `TargetSpec.SINGLE` | `mp=46` | `heal:single` |
-| `holy_shield` | 聖盾術 | 大師 | `TargetSpec.SINGLE` | `mp=40` | `buff_apply:light_holy_shield` |
-| `holy_radiance` | 神聖光輝 | 賢者 | `TargetSpec.AREA` | `mp=90` | `damage:light:magic` |
-| `revival_light` | 復甦之光 | 賢者 | `TargetSpec.SINGLE` | `mp=82` | `heal:single` |
-| `goddess_blessing` | 女神降福 | 主宰 | `TargetSpec.AREA` | `mp=145` | `heal:area`, `buff_apply:light_blessing` |
-| `heavens_judgment_light` | 天啟聖裁 | 主宰 | `TargetSpec.SINGLE` | `mp=135` | `damage:light:magic` |
-
-#### Scenario: All ten 光 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 光 keys (`heal`, `light_arrow`, `purify`, `mass_heal`, `advanced_heal`, `holy_shield`, `holy_radiance`, `revival_light`, `goddess_blessing`, `heavens_judgment_light`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["light"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY contains the full 暗-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 暗-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
@@ -581,3 +553,18 @@ Elemental spell cost classification SHALL include 神格 with single/direct cost
 #### Scenario: Out of all bands stays invalid
 - **WHEN** a synthetic elemental spell has a positive cost outside both columns of all tiers
 - **THEN** classification rejects it instead of inventing a tier or silently omitting the label
+
+### Requirement: Light spell progression composes executable recovery and judgment behavior
+The light spell family SHALL provide the documented grace and judgment progression as executable skill behavior using the common effect, condition, recovery and reaction mechanisms. Branch and merge requirements SHALL gate use independently of ownership and preserve reverse-edge-derived proficiency caps. Recovery SHALL respect living-target HP bounds; mixed spells SHALL deliver damage and recovery/cleanse to their declared selected audiences; contact effects SHALL respect state gates and resistance; emergency peak effects SHALL retain ordinary phase locks. The apotheosis merge SHALL require both terminal branches, not the independent ordinary blessing leaf. The superseded stand-alone shield spell SHALL be removed without an alias. Verification SHALL use substantive program behavior and synthetic definitions, not an exact light key/count/label/cost/effect-table test contract.
+
+#### Scenario: Branch and merge progression uses existing mechanics
+- **WHEN** a synthetic two-root spell family has branching prerequisites and a two-parent capstone
+- **THEN** use rejects until every parent threshold is met, and cap saturation does not prevent attaining a consuming edge
+
+#### Scenario: Composite effects are actual state changes
+- **WHEN** a configured spell family is exercised through ordinary action settlement
+- **THEN** the declared healing, timed recovery, cleansing, target-dependent damage and state interactions produce their specified observable outcomes with one paid cast and atomic rollback
+
+#### Scenario: Ordinary recovery and mixed policy remain distinct
+- **WHEN** ordinary recovery targets an enemy while a mixed spell selects both teams
+- **THEN** ordinary recovery still applies and the mixed spell follows its explicitly separate effect audiences

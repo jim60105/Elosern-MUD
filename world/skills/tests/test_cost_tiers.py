@@ -207,17 +207,6 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
             }
         )
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
-    def test_light_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("purify", "mass_heal"),
-                "大師": ("advanced_heal", "holy_shield"),
-                "賢者": ("holy_radiance", "revival_light"),
-                "主宰": ("goddess_blessing", "heavens_judgment_light"),
-            }
-        )
-
     @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
     def test_dark_spell_tier_labels_match_the_catalog(self):
         self._assert_labels(
