@@ -1,10 +1,10 @@
-# Declarative phase transition reactions (light-climax-empowerment).
+# Declarative phase transition and outcome reactions (light-climax-empowerment / light-cleric-feedback).
 #
 # Reactions dispatch once after a successful canonical _apply_climax_phase_set edge,
-# including rulebook and direct-gain callers.
+# including rulebook and direct-gain callers, or outcome events (hp_loss, negative_buff_added).
 #
 # Rules evaluate using the shared evaluate_condition condition engine.
-# Only allowed actions in then are apply_buff and remove_buff.
+# Allowed actions in then are apply_buff, remove_buff, and pleasure_gain.
 
 - id: climax_in_progress_empowerment
   when:
@@ -20,3 +20,29 @@
     equals: 未達
   then:
     remove_buff: climax_empowerment
+
+- id: pain_to_pleasure_hp_loss
+  when:
+    event: hp_loss
+    skill_qualified: pain_to_pleasure
+  then:
+    pleasure_gain:
+      學徒: 5
+      術師: 8
+      大師: 12
+      賢者: 18
+      主宰: 28
+      神格: 40
+
+- id: pain_to_pleasure_negative_buff_added
+  when:
+    event: negative_buff_added
+    skill_qualified: pain_to_pleasure
+  then:
+    pleasure_gain:
+      學徒: 5
+      術師: 8
+      大師: 12
+      賢者: 18
+      主宰: 28
+      神格: 40
