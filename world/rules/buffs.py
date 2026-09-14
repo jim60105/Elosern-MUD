@@ -205,7 +205,8 @@ class RulebookBuff(BaseBuff):
         rate = BUFF_DEFINITIONS[self.definition_key].modifiers.get("rate")
         recovery = get_recovery_policy(BUFF_DEFINITIONS[self.definition_key])
         if rate and recovery is None:
-            _apply_rate_modifier(self.owner, rate)
+            source_tier = getattr(self, "source_tier", None) or "學徒"
+            _apply_rate_modifier(self.owner, rate, source_tier=source_tier)
 
 
 def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
@@ -220,7 +221,9 @@ def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
     )
 
 
-def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
+def _apply_rate_modifier(
+    entity, rate_mod: dict[str, Any], source_tier: str | None = None
+) -> None:
     """Apply one rate tick.
 
     ``skill_practice`` (the ``conferred_growth_rate`` buff's declared rate
@@ -237,7 +240,28 @@ def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
             f"buff rate target {target!r} belongs to its owning future change"
         )
     trait = getattr(entity.traits, target)
-    trait.current = trait.current + rate_mod["delta"]
+    delta = rate_mod["delta"]
+    current = getattr(trait, "current", None)
+    if current is not None:
+        before = float(current)
+        if target == "hp" and before <= 0:
+            return
+        trait.current = current + delta
+        after = float(getattr(trait, "current", 0))
+    else:
+        before = float(getattr(trait, "value", 0))
+        if target == "hp" and before <= 0:
+            return
+        trait.value = getattr(trait, "value", 0) + delta
+        after = float(getattr(trait, "value", 0))
+
+    if target == "hp" and delta < 0:
+        actual_loss = max(0, int(before - max(0.0, after)))
+        if actual_loss > 0:
+            from world.rules.state_reactions import dispatch_outcome_reaction
+
+            tier = source_tier or "學徒"
+            dispatch_outcome_reaction(entity, "hp_loss", source_tier=tier)
 
 
 
@@ -311,6 +335,25 @@ def apply_buff(
         return
     if definition.stacking == "unique_per_source" and "source_key" not in data:
         raise ValueError(f"buff {definition_key!r} requires source_key")
+    target_key = instance_key or definition_key
+    existing = (
+        entity.buffs.all.get(target_key)
+        if hasattr(getattr(entity, "buffs", None), "all")
+        else None
+    )
+    is_refresh = (
+        existing is not None
+        and not getattr(existing, "paused", False)
+        and getattr(existing, "stacks", 1) > 0
+        and (
+            getattr(existing, "remaining_seconds", None) is None
+            or existing.remaining_seconds > 0
+        )
+    )
+    source_tier = data.get("source_tier")
+    if source_tier is None:
+        source_tier = "學徒"
+    data["source_tier"] = source_tier
     recovery_policy = get_recovery_policy(definition)
     if recovery_policy is not None:
         # Normalize snapshot data with neutral defaults
@@ -333,6 +376,12 @@ def apply_buff(
         duration=-1,
         to_cache=cache,
     )
+    if definition.polarity == "debuff" and not is_refresh:
+        from world.rules.state_reactions import dispatch_outcome_reaction
+
+        dispatch_outcome_reaction(
+            entity, "negative_buff_added", source_tier=source_tier
+        )
 
 
 def entity_active_buffs(entity) -> set[str]:

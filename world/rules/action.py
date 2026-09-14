@@ -583,6 +583,19 @@ def _handle_buff_apply(
             effect_id,
         ) from error
     kwargs = dict(context.get("buff_kwargs", {}))
+    source_tier = "學徒"
+    resolved = context.get("resolved_effect") if context is not None else None
+    source_skill = getattr(resolved, "source_skill", None)
+    if source_skill is not None:
+        try:
+            from world.skills.cost_tiers import spell_tier_for
+
+            resolved_tier = spell_tier_for(source_skill)
+            if resolved_tier:
+                source_tier = resolved_tier
+        except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
+            source_tier = "學徒"
+    kwargs["source_tier"] = source_tier
     definition = BUFF_DEFINITIONS.get(key)
     rate = definition.modifiers.get("rate") if definition is not None else None
     if _is_damaging_rate(rate):
@@ -604,9 +617,30 @@ def _handle_buff_apply(
         heal_gain = caster_mods.get("heal_gain")
         if heal_gain is not None:
             kwargs["snapshot_heal_gain"] = heal_gain
-        grace_mult = context.get("grace_multiplier")
-        if grace_mult is not None:
-            kwargs["snapshot_grace_multiplier"] = grace_mult
+        arousal_scale = float(
+            caster_mods.get("recovery_arousal_scale", 0.0)
+            or caster_mods.get("recovery_scale", 0.0)
+            or 0.0
+        )
+        arousal_ordinal = 0
+        if actor is not None:
+            sexual = getattr(actor, "sexual", None)
+            if sexual is not None:
+                arousal_level = sexual.arousal
+                arousal_ordinal = int(getattr(arousal_level, "value", 0))
+            else:
+                from world.rules.stored_sexual_reads import stored_sexual_level
+
+                stored_lvl = stored_sexual_level(actor, "arousal")
+                if stored_lvl is not None:
+                    arousal_ordinal = int(getattr(stored_lvl, "value", 0))
+        passive_grace = 1.0 + arousal_scale * arousal_ordinal
+        context_grace = context.get("grace_multiplier")
+        if context_grace is not None:
+            final_grace = passive_grace * float(context_grace)
+        else:
+            final_grace = passive_grace
+        kwargs["snapshot_grace_multiplier"] = final_grace
         pk = getattr(actor, "pk", None)
         if isinstance(pk, int) and not isinstance(pk, bool) and pk > 0:
             kwargs["source_pk"] = int(pk)
@@ -671,15 +705,49 @@ def _handle_self_buff_apply(
         ) from error
     definition = BUFF_DEFINITIONS.get(key)
     kwargs: dict[str, Any] = {}
+    source_tier = "學徒"
+    resolved = context.get("resolved_effect") if context is not None else None
+    source_skill = getattr(resolved, "source_skill", None)
+    if source_skill is not None:
+        try:
+            from world.skills.cost_tiers import spell_tier_for
+
+            resolved_tier = spell_tier_for(source_skill)
+            if resolved_tier:
+                source_tier = resolved_tier
+        except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
+            source_tier = "學徒"
+    kwargs["source_tier"] = source_tier
     if definition is not None and get_recovery_policy(definition) is not None:
         from world.rules.combat_modifiers import evaluate_combat_modifiers
         caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
         heal_gain = caster_mods.get("heal_gain")
         if heal_gain is not None:
             kwargs["snapshot_heal_gain"] = heal_gain
-        grace_mult = context.get("grace_multiplier")
-        if grace_mult is not None:
-            kwargs["snapshot_grace_multiplier"] = grace_mult
+        arousal_scale = float(
+            caster_mods.get("recovery_arousal_scale", 0.0)
+            or caster_mods.get("recovery_scale", 0.0)
+            or 0.0
+        )
+        arousal_ordinal = 0
+        if actor is not None:
+            sexual = getattr(actor, "sexual", None)
+            if sexual is not None:
+                arousal_level = sexual.arousal
+                arousal_ordinal = int(getattr(arousal_level, "value", 0))
+            else:
+                from world.rules.stored_sexual_reads import stored_sexual_level
+
+                stored_lvl = stored_sexual_level(actor, "arousal")
+                if stored_lvl is not None:
+                    arousal_ordinal = int(getattr(stored_lvl, "value", 0))
+        passive_grace = 1.0 + arousal_scale * arousal_ordinal
+        context_grace = context.get("grace_multiplier")
+        if context_grace is not None:
+            final_grace = passive_grace * float(context_grace)
+        else:
+            final_grace = passive_grace
+        kwargs["snapshot_grace_multiplier"] = final_grace
         pk = getattr(actor, "pk", None)
         if isinstance(pk, int) and not isinstance(pk, bool) and pk > 0:
             kwargs["source_pk"] = int(pk)
