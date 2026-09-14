@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from evennia.contrib.rpg.buffs import BaseBuff
+try:
+    from evennia.contrib.rpg.buffs import BaseBuff
+except Exception:  # pragma: no cover - fallback when django settings not loaded
+    class BaseBuff:  # type: ignore[no-redef]
+        pass
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 
 from world.rules.traits import GAUGE_KEYS
