@@ -13,6 +13,8 @@ from collections.abc import Mapping
 import unittest
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -195,6 +197,7 @@ class ActionEvidencePurityTests(unittest.TestCase):
                 self.assertFalse(has_action_evidence(entity, "forced_interaction"))
                 self.assertIsNone(get_action_evidence(entity, "forced_interaction"))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_exclusive_expiry_boundary(self):
         class DummyAttributes:
             def get(self, key, default=None):
@@ -223,6 +226,7 @@ class ActionEvidencePurityTests(unittest.TestCase):
         self.assertFalse(has_action_evidence(entity, "forced_interaction", now=101))
         self.assertIsNone(get_action_evidence(entity, "forced_interaction", now=101))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_queries_do_not_mutate_storage(self):
         storage = {
             "forced_interaction": {
@@ -254,6 +258,7 @@ class ActionEvidencePurityTests(unittest.TestCase):
         self.assertIn("forced_interaction", storage)
         self.assertEqual(read_all_action_evidence(entity), storage)
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_refresh_monotonic_and_non_monotonic_semantics(self):
         storage = {}
 
@@ -357,6 +362,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             restore_gauges_to_full(entity)
             entity.db.skills = {"active": [], "passive": []}
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_qualifying_forced_outcome_marks_perpetrator_actor(self):
         """WHEN a forced outcome commits against a target, the actor qualifies, not the target."""
         event_log = EventLog(
@@ -395,6 +401,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         # Event log contains no action_evidence entries (narrative text has no mechanical authority)
         self.assertFalse(any(e.kind == "action_evidence" for e in event_log.entries))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_resisted_outcome_records_no_evidence(self):
         """WHEN the outcome is resisted, no new evidence is staged."""
         event_log = EventLog(
@@ -422,6 +429,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         self.assertEqual(effects, [])
         self.assertFalse(has_action_evidence(self.actor, "forced_interaction", now=100))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_auto_comply_outcome_records_no_evidence(self):
         """WHEN the outcome is automatic compliance, no new evidence is staged."""
         event_log = EventLog(
@@ -477,6 +485,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
                 effects = action_evidence_planner(request, event_log)
                 self.assertEqual(effects, [])
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_narrative_context_cannot_create_evidence(self):
         """WHEN a narrative or client context accuses a target of wrongdoing, no evidence is created."""
         event_log = EventLog(
@@ -505,6 +514,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         self.assertFalse(has_action_evidence(self.actor, "forced_interaction"))
         self.assertFalse(has_action_evidence(self.target, "forced_interaction"))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_direct_resolver_cast_marks_actor(self):
         """A resistible act resolved through ActionResolver records evidence on the caster."""
         grant_lineage(self.actor, [_T_RESISTIBLE_ACT_SKILL.key])
@@ -526,6 +536,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=109))
         self.assertFalse(has_action_evidence(self.actor, "forced_interaction", now=110))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_npc_perpetrator_cast_marks_npc(self):
         """An NPC perpetrator using a forced act is marked with evidence identically to a player."""
         npc = create_object(NPC, key="evid_npc")
@@ -551,6 +562,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         self.assertTrue(has_action_evidence(npc, "forced_interaction", now=259))
         self.assertFalse(has_action_evidence(npc, "forced_interaction", now=260))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_rollback_restores_action_evidence(self):
         """A failed commit rolls back staged action evidence to pre-action state."""
         grant_lineage(self.actor, [_T_RESISTIBLE_ACT_SKILL.key])
@@ -583,6 +595,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         # Evidence was rolled back and does not survive
         self.assertFalse(has_action_evidence(self.actor, "forced_interaction", now=50))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_settle_out_of_combat_cast_marks_actor(self):
         """Out-of-combat cast settlement commits evidence on the caster on qualifying outcome."""
         room = create_object(Room, key="evid_room")
@@ -604,6 +617,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=129))
         self.assertFalse(has_action_evidence(self.actor, "forced_interaction", now=130))
 
+    @covers_requirement("recent-action-evidence::recent-evidence-is-committed-on-the-actor-and-expires-in-world-time")
     def test_settle_out_of_combat_cast_rollback_restores_evidence(self):
         """Outer settlement rollback restores pre-action evidence."""
         room = create_object(Room, key="evid_room_rb")
@@ -664,6 +678,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             event_ctx["nonlethal_keys"] = nonlethal_keys
         return bf, BattlefieldActionContext(bf, event_context=event_ctx)
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_first_miss_second_hit_deals_damage_and_records_both_rolls(self):
         """WHEN strike 1 misses and strike 2 hits on an eligible target, only strike 2 damages HP and both rolls are recorded."""
         # Mark target with fresh forced_interaction evidence
@@ -697,6 +712,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertGreater(damage_entries[0].data["amount"], 0)
         self.assertEqual(initial_hp - _stored_hp(self.target), damage_entries[0].data["amount"])
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_ineligible_target_has_only_one_strike(self):
         """WHEN recent evidence is missing or expired, only the ordinary single strike occurs."""
         # Target has no evidence
@@ -728,6 +744,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         roll_entries2 = [e for e in result2.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(roll_entries2), 1)
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_ordered_hp_projection_and_single_defeat_entry(self):
         """Two strikes crossing target HP emit exactly one target_defeated entry."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -753,6 +770,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertEqual(len(defeat_entries), 1)
         self.assertEqual(defeat_entries[0].target, str(self.target.key))
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_repeated_damage_floors_at_1_hp_with_single_knockout_in_nonlethal(self):
         """In nonlethal combat, two strikes crossing target HP floor at 1 with one knockout mark."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -781,6 +799,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         # Battlefield knockout mark recorded
         self.assertIn(str(self.target.key), bf.knocked_out)
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_atomic_rollback_restores_hp_and_evidence(self):
         """A failed commit after two strikes restores target HP and evidence atomically."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -814,6 +833,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         # Evidence is restored
         self.assertTrue(has_action_evidence(self.target, "forced_interaction", now=100))
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_second_synthetic_configuration_proves_policy_reuse(self):
         """A second synthetic physical skill uses the same generic repeat_when mechanism."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -835,6 +855,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         damage_entries = [e for e in result.event_log.entries if e.kind == "damage"]
         self.assertEqual(len(damage_entries), 2)
 
+    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
     def test_area_mixed_eligibility_targets(self):
         """In an AREA cast, only the target carrying evidence receives the extra strike."""
         target2 = create_object(PlayerCharacter, key="target_clean")
