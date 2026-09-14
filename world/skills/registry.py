@@ -31,6 +31,7 @@ from world.skills.effects import (
     HealEffect,
     InteractionPolicy,
     MarkSubmissionEffect,
+    PleasurePeakEffect,
     RestorePurityEffect,
     SaturateSensitivityEffect,
     SelfBuffApplyEffect,
@@ -396,6 +397,23 @@ class SkillDef:
                 raise ValueError(
                     f"skill {self.key!r} effect {effect_id!r} is not a StimulusEffect and cannot declare stimulus_bonus"
                 )
+            if isinstance(parsed, PleasurePeakEffect):
+                if policy.damage is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is a PleasurePeakEffect and cannot declare DamagePolicy"
+                    )
+                if policy.stimulus_bonus is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is a PleasurePeakEffect and cannot declare stimulus_bonus"
+                    )
+                if policy.magnitude is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support state magnitude"
+                    )
+                if policy.coefficient != 1.0:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support potency coefficient {policy.coefficient}"
+                    )
             if policy.magnitude is not None:
                 if not isinstance(parsed, (DamageEffect, HealEffect, SelfHealEffect)):
                     raise ValueError(
@@ -408,6 +426,14 @@ class SkillDef:
                     raise ValueError(
                         f"skill {self.key!r} TARGET-subject magnitude requires SINGLE or SELF target_spec"
                     )
+            for mag in (policy.magnitude, policy.stimulus_bonus):
+                if mag is not None and mag.marker is not None:
+                    from world.rules.state_reactions import is_configured_marker
+
+                    if not is_configured_marker(mag.marker):
+                        raise ValueError(
+                            f"skill {self.key!r} declares unresolved configured marker {mag.marker!r}"
+                        )
 
     def _validate_heal_shape(self) -> None:
         """Reject a heal shape that contradicts the skill's target spec.

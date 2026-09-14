@@ -1,0 +1,22 @@
+# Declarative phase transition reactions (light-climax-empowerment).
+#
+# Reactions dispatch once after a successful canonical _apply_climax_phase_set edge,
+# including rulebook and direct-gain callers.
+#
+# Rules evaluate using the shared evaluate_condition condition engine.
+# Only allowed actions in then are apply_buff and remove_buff.
+
+- id: climax_in_progress_empowerment
+  when:
+    field: climax_phase
+    equals: 進行中
+    skill_qualified: bliss_apotheosis
+  then:
+    apply_buff: climax_empowerment
+
+- id: climax_neutral_remove_empowerment
+  when:
+    field: climax_phase
+    equals: 未達
+  then:
+    remove_buff: climax_empowerment

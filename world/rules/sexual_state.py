@@ -856,6 +856,9 @@ def _apply_climax_phase_set(entity, target_level: str) -> str | None:
     if target_level not in _VALID_CLIMAX_TRANSITIONS.get(current, set()):
         return None
     entity.sexual.climax_phase.value = target_level
+    from world.rules.state_reactions import dispatch_phase_reaction
+
+    dispatch_phase_reaction(entity, from_phase=current, to_phase=target_level)
     return "cycle"
 
 
