@@ -1027,7 +1027,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertFalse(reval_fail.enabled)
         self.assertEqual(reval_fail.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
     def test_ordinary_recovery_and_mixed_policy_remain_distinct(self):
         """Scenario: Ordinary recovery and mixed policy remain distinct.
 
@@ -1094,7 +1094,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(self.companion.traits.hp.current, companion_hp_before)
         self.assertEqual(len(entity_active_buffs(self.companion)), 0)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
     def test_composite_effects_are_actual_state_changes_with_atomic_rollback(self):
         """Scenario: Composite effects are actual state changes."""
         composite_skill = self._register_skill(

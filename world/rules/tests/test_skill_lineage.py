@@ -936,7 +936,7 @@ class StudyPracticeGrantTests(_Scoped):
 class LightSpellProgressionLineageTests(_Scoped):
     """Synthetic behavior tests for branch and merge progression with two-parent capstone."""
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
     def test_branch_and_merge_progression_gates_until_all_parents_satisfied(self):
         """Scenario: Branch and merge progression uses existing mechanics.
 
