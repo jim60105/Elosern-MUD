@@ -57,7 +57,7 @@ from world.rules.targeting import (
     resolve_targets,
 )
 from world.skills.cost_tiers import is_freeform_eligible
-from world.skills.effects import parse_effect
+from world.skills.effects import ResolvedEffect, parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -1464,24 +1464,45 @@ def _effect_prefix(effect_id: str) -> str:
     return effect_id.partition(":")[0]
 
 
+def _bind_resolved_effect(
+    base_context: dict[str, Any],
+    skill: SkillDef,
+    ordinal: int,
+) -> dict[str, Any]:
+    """Synthesize trusted effect context for one effect execution ordinal.
+
+    Deliberately creates a shallow copy of ``base_context`` with the reserved
+    ``resolved_effect`` key bound to that ordinal's authored policy, isolating
+    effects from cross-effect mutations and overriding any caller-supplied
+    forgery without mutating the request dictionary.
+    """
+    effect_context = dict(base_context)
+    effect_context["resolved_effect"] = ResolvedEffect(
+        policy=skill.effect_policies[ordinal],
+        source_skill=skill,
+    )
+    return effect_context
+
+
 def _step5_effect_resolution(
     request: ActionRequest,
     skill: SkillDef,
     targets: list[Any],
 ) -> list[PendingEffect]:
     pending: list[PendingEffect] = []
-    context = _event_context(request)
-    for effect_id in skill.effects:
+    base_context = _event_context(request)
+    for i, effect_id in enumerate(skill.effects):
         prefix = _effect_prefix(effect_id)
         handler = _EFFECT_HANDLERS.get(prefix)
         if handler is None:
             raise RejectedAction(RejectReason.UNKNOWN_EFFECT_ID, effect_id)
+        effect_context = _bind_resolved_effect(base_context, skill, i)
         try:
             effects = handler(
                 request.actor,
                 targets,
                 effect_id,
-                context,
+                effect_context,
                 request.scale,
             )
             surfaces = _EFFECT_HANDLER_SURFACES[prefix]
@@ -2208,15 +2229,16 @@ class ActionResolver:
             _step2_resource_check(request.actor, skill, request.scale)
             _step3_targeting(request, skill)
             _step4_capability(request.actor)
-            context = _event_context(request)
-            for effect_id in skill.effects:
+            base_context = _event_context(request)
+            for i, effect_id in enumerate(skill.effects):
                 prefix = _effect_prefix(effect_id)
                 if prefix not in _EFFECT_HANDLERS:
                     raise RejectedAction(
                         RejectReason.UNKNOWN_EFFECT_ID,
                         effect_id,
                     )
-                missing = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] - context.keys()
+                effect_context = _bind_resolved_effect(base_context, skill, i)
+                missing = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] - effect_context.keys()
                 if missing:
                     raise RejectedAction(
                         RejectReason.MISSING_EFFECT_CONTEXT,

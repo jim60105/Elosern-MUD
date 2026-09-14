@@ -29,6 +29,7 @@ from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
+from world.skills.effects import EffectPolicy, ResolvedEffect
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -37,6 +38,21 @@ COMBAT_YAML = yaml.safe_load(
         encoding="utf-8"
     )
 )
+
+
+def _extract_effect_coefficient(event_context: dict[str, Any] | None) -> float:
+    """Extract the trusted potency coefficient or fall back to identity 1.0.
+
+    When invoked through ActionResolver, ``event_context`` carries the trusted
+    ``ResolvedEffect`` synthesized for this effect ordinal. Direct invocations
+    without the binding or with an unverified object use identity semantics.
+    """
+    if not event_context:
+        return 1.0
+    resolved = event_context.get("resolved_effect")
+    if isinstance(resolved, ResolvedEffect) and isinstance(resolved.policy, EffectPolicy):
+        return resolved.policy.coefficient
+    return 1.0
 
 
 @dataclass
@@ -279,6 +295,7 @@ def _handle_damage(
     """
     _, school = _parse_damage_effect(effect_id)
     attack_key = "atk_phys" if school == "physical" else "magic_power"
+    coefficient = _extract_effect_coefficient(event_context)
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
@@ -292,7 +309,7 @@ def _handle_damage(
             multiplier = _roll_multiplier(raw_roll, margin)
             attack = _adjusted_attack(actor, attack_key)
             defense = _adjusted_defense(target)
-            base_amount = int(max(round(attack * multiplier) - defense, floor))
+            base_amount = int(max(round(attack * multiplier * coefficient) - defense, floor))
             amount = max(scaled_magnitude(base_amount, scale), floor)
             amount = int(amount)
         key = str(target.key)
@@ -354,7 +371,7 @@ register_effect_handler(
 )
 
 
-def _heal_magnitude(actor: Any) -> int:
+def _heal_magnitude(actor: Any, coefficient: float = 1.0) -> int:
     """Return the caster-stat-derived HP restoration amount for one heal.
 
     Substitutes a healing coefficient for damage's roll-derived multiplier and
@@ -372,7 +389,7 @@ def _heal_magnitude(actor: Any) -> int:
     multiplier = float(COMBAT_YAML["heal"]["multiplier"])
     floor = int(COMBAT_YAML["heal"]["floor"])
     magic = _adjusted_attack(actor, "magic_power")
-    base_amount = max(round(magic * multiplier), floor)
+    base_amount = max(round(magic * multiplier * coefficient), floor)
     heal_gain = evaluate_combat_modifiers(actor).get("heal_gain")
     return max(apply_cost_modifier(base_amount, heal_gain), floor)
 
@@ -432,9 +449,9 @@ def _handle_heal(
     log reports the real increase, and the commit-time closure re-checks
     aliveness and the cap.
     """
-    del event_context
     _parse_heal_effect(effect_id)
-    amount = scaled_magnitude(_heal_magnitude(actor), scale)
+    coefficient = _extract_effect_coefficient(event_context)
+    amount = scaled_magnitude(_heal_magnitude(actor, coefficient), scale)
     pending: list[PendingEffect] = []
     for target in targets:
         key = str(target.key)
@@ -465,10 +482,11 @@ def _handle_self_heal(
     heal cannot express "the caster heals themself while the same cast also
     damages an enemy", so this effect binds the actor instead of ``targets``.
     """
-    del targets, event_context
+    del targets
     if effect_id != "self_heal":
         raise ValueError("self_heal effect takes no argument")
-    amount = scaled_magnitude(_heal_magnitude(actor), scale)
+    coefficient = _extract_effect_coefficient(event_context)
+    amount = scaled_magnitude(_heal_magnitude(actor, coefficient), scale)
     restored = _restored_amount(actor, amount)
     return [
         PendingEffect(

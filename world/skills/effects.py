@@ -9,7 +9,7 @@ silently doing nothing at use time.
 
 from dataclasses import dataclass
 from math import isfinite
-from typing import Literal
+from typing import Any, Literal
 
 # Continuous-valued ownership effects read by deterministic consumers.
 # ``StatMultiplyEffect`` is consumed by ``SkillHandler.effective_value``;
@@ -306,6 +306,46 @@ class DisengageEffect:
     """Attempt a disengage; the mode names the flavor (e.g. ``self``)."""
 
     mode: str
+
+
+@dataclass(frozen=True)
+class EffectPolicy:
+    """Immutable per-occurrence policy metadata for a skill effect."""
+
+    coefficient: float = 1.0
+
+    def __post_init__(self) -> None:
+        if isinstance(self.coefficient, bool) or not isinstance(
+            self.coefficient, (int, float)
+        ):
+            raise ValueError(
+                f"EffectPolicy coefficient must be a finite positive number, got {self.coefficient!r}"
+            )
+        try:
+            val = float(self.coefficient)
+        except OverflowError as error:
+            raise ValueError(
+                f"EffectPolicy coefficient must be a finite positive number, got {self.coefficient!r}"
+            ) from error
+        if not isfinite(val) or val <= 0:
+            raise ValueError(
+                f"EffectPolicy coefficient must be a finite positive number, got {self.coefficient!r}"
+            )
+        object.__setattr__(self, "coefficient", val)
+
+
+@dataclass(frozen=True)
+class ResolvedEffect:
+    """Trusted server-bound effect context synthesized during action resolution."""
+
+    policy: EffectPolicy
+    source_skill: Any = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.policy, EffectPolicy):
+            raise ValueError(
+                f"ResolvedEffect policy must be an EffectPolicy, got {self.policy!r}"
+            )
 
 
 def _parse_stat_like(effect_id: str, prefix: str) -> tuple[str, float]:
