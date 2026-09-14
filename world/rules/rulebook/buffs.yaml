@@ -182,3 +182,8 @@
   stacking: unique_per_source
   modifiers:
     rate: {target: hp, delta: 3}
+- key: climax_empowerment
+  duration: null
+  stacking: refresh
+  polarity: buff
+  modifiers: {}

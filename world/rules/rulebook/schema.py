@@ -59,6 +59,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
         "buff_active", "skill_owned", "dual_wielding", "equipment_worn",
+        "skill_qualified",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -108,6 +109,26 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         if not isinstance(when["dual_wielding"], bool):
             raise ValueError("dual_wielding condition requires a boolean value")
         checks.append(context.get("dual_wielding") == when["dual_wielding"])
+    if "skill_qualified" in when:
+        skill_key = when["skill_qualified"]
+        if not isinstance(skill_key, str):
+            raise ValueError("skill_qualified condition requires a string skill key")
+        entity = context.get("entity")
+        if entity is None:
+            checks.append(False)
+        else:
+            from world.skills.registry import SKILL_REGISTRY
+            from world.rules.progression import can_use_skill
+
+            skill = SKILL_REGISTRY.get(skill_key)
+            if skill is None:
+                checks.append(False)
+            else:
+                owned_keys = set(entity.skills.owned_keys())
+                checks.append(
+                    skill.key in owned_keys
+                    and can_use_skill(entity, skill)
+                )
     if "equipment_worn" in when:
         # Generic membership mechanism only: referential validation (the
         # value must name a slot-bearing ITEM_REGISTRY member) is table-
