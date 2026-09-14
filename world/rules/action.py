@@ -1524,7 +1524,7 @@ def plan_effect_audiences(
         elif aud is EffectAudience.ENEMIES:
             routed.append([
                 t for t in targets
-                if context.relation_to(actor, t) is Relation.ENEMY
+                if context.relation_to(actor, t) in (Relation.ENEMY,)
             ])
         elif aud is EffectAudience.SELF:
             if actor_valid is None:

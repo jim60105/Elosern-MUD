@@ -32,6 +32,7 @@ from world.rules.action import (
     ActionResolver,
     PendingEffect,
     RejectReason,
+    RejectedAction,
     _stored_trait_value,
     plan_effect_audiences,
 )
@@ -270,6 +271,42 @@ class EffectAudienceAuthoringTests(unittest.TestCase):
                 )
                 self.assertIs(skill.effect_policies[0].audience, aud)
 
+    def test_target_spec_none_rejects_allies_and_enemies(self):
+        for bad_aud in (EffectAudience.ALLIES, EffectAudience.ENEMIES):
+            with self.subTest(bad_aud=bad_aud):
+                with self.assertRaises(ValueError):
+                    SkillDef(
+                        key="t_bad_none_routed",
+                        label="測試無目標聲明隊友或敵人",
+                        description="測試矛盾配置。",
+                        kind=SkillKind.ACTIVE,
+                        target_spec=TargetSpec.NONE,
+                        cost={},
+                        usable_out_of_combat=True,
+                        element=None,
+                        effects=["heal:area"],
+                        category=SkillCategory.UTILITY,
+                        effect_policies=(EffectPolicy(audience=bad_aud),),
+                    )
+
+    def test_replace_renormalizes_default_effect_policies(self):
+        skill = SkillDef(
+            key="t_single",
+            label="單一效果",
+            description="測試單效果。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=["damage:fire:magic"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        )
+        self.assertEqual(len(skill.effect_policies), 1)
+        doubled = replace(skill, key="t_doubled", effects=["damage:fire:magic", "damage:fire:magic"])
+        self.assertEqual(len(doubled.effect_policies), 2)
+        self.assertEqual(doubled.effect_policies, (EffectPolicy(), EffectPolicy()))
+
 
 class PureAudiencePlannerTests(unittest.TestCase):
     """Pure side-effect-free audience planning unit tests."""
@@ -377,7 +414,7 @@ class PureAudiencePlannerTests(unittest.TestCase):
         skill = SkillDef(
             key="t_self_dead",
             label="自身測試",
-            description="死者不滿足受眾。",
+            description="死者或不在場不滿足受眾。",
             kind=SkillKind.ACTIVE,
             target_spec=TargetSpec.SELF,
             cost={},
@@ -388,8 +425,36 @@ class PureAudiencePlannerTests(unittest.TestCase):
             effect_policies=(EffectPolicy(audience=EffectAudience.SELF),),
         )
         dead_actor = FakeEntity("dead_actor", hp=0)
-        with self.assertRaises(Exception):
+        with self.assertRaises(RejectedAction) as cm_dead:
             plan_effect_audiences(dead_actor, self.context, skill, [dead_actor])
+        self.assertEqual(cm_dead.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+
+        not_present_context = MockContext(present=set())
+        with self.assertRaises(RejectedAction) as cm_absent:
+            plan_effect_audiences(self.actor, not_present_context, skill, [self.actor])
+        self.assertEqual(cm_absent.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+
+    def test_mixed_selected_and_non_selected_policy_combo(self):
+        mixed_combo = SkillDef(
+            key="t_mixed_combo",
+            label="全選與路由混用",
+            description="一項全選，一項限定敵人。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.AREA,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=["heal:area", "damage:fire:magic"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            effect_policies=(
+                EffectPolicy(audience=EffectAudience.SELECTED),
+                EffectPolicy(audience=EffectAudience.ENEMIES),
+            ),
+        )
+        # When targets has only allies: heal gets allies, damage gets empty list
+        routed = plan_effect_audiences(self.actor, self.context, mixed_combo, [self.ally])
+        self.assertEqual(routed[0], [self.ally])
+        self.assertEqual(routed[1], [])
 
     def test_mixed_spell_one_empty_and_all_empty(self):
         mixed_skill = SkillDef(

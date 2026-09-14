@@ -248,8 +248,10 @@ class SkillDef:
 
         An omitted or empty-tuple declaration normalizes to identity policies
         of the same length as ``effects``. Any other input must be a tuple of
-        ``EffectPolicy`` instances matching the effect count exactly, and
-        only supported effect kinds (damage and healing) may declare a
+        ``EffectPolicy`` instances matching the effect count exactly (an
+        all-default tuple re-normalizes if ``effects`` length changed via
+        ``replace()``), and only supported effect kinds (damage and healing)
+        may declare a
         non-identity coefficient.
         """
         if self.effect_policies is None or (
@@ -284,6 +286,13 @@ class SkillDef:
             if not isinstance(policy, EffectPolicy):
                 raise ValueError(
                     f"skill {self.key!r} effect_policies item {policy!r} is not an EffectPolicy"
+                )
+            if (
+                self.target_spec is TargetSpec.NONE
+                and policy.audience in (EffectAudience.ALLIES, EffectAudience.ENEMIES)
+            ):
+                raise ValueError(
+                    f"skill {self.key!r} target_spec is NONE and cannot declare {policy.audience} audience"
                 )
         for policy, parsed, effect_id in zip(
             self.effect_policies, self.parsed_effects, self.effects
