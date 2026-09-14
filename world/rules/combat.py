@@ -388,14 +388,14 @@ def _handle_damage(
                 if not hit:
                     _noop()
                     return
+                before = _stored_trait_value(target.traits.hp)
                 if not protected:
                     _apply_hp_delta(target, -amount)
-                    return
-                before = _stored_trait_value(target.traits.hp)
-                _apply_hp_delta_nonlethal(target, -amount)
-                if before > 0 and before - amount <= 0 and key in nonlethal_keys:
-                    if key not in marked:
-                        marked.append(key)
+                else:
+                    _apply_hp_delta_nonlethal(target, -amount)
+                    if before > 0 and before - amount <= 0 and key in nonlethal_keys:
+                        if key not in marked:
+                            marked.append(key)
                 after = _stored_trait_value(target.traits.hp)
                 actual_loss = max(0, int(before - max(0.0, after)))
                 if actual_loss > 0:

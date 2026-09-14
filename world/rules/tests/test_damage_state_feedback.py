@@ -17,6 +17,7 @@ Exercising:
 """
 
 import math
+import importlib
 from typing import Any
 from unittest.mock import patch
 
@@ -24,7 +25,6 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action import ActionRequest, ActionResolver, PendingEffect
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
@@ -34,7 +34,7 @@ from world.rules.buffs import (
     tick_buffs,
 )
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import _handle_damage
+from world.rules.combat import Battlefield, BattlefieldActionContext, _handle_damage
 from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
 from world.rules.items import (
     GaugeAdjustEffect,
@@ -55,15 +55,28 @@ from world.rules.state_reactions import (
     STATE_REACTION_RULES,
     dispatch_outcome_reaction,
 )
-from world.skills.cost_tiers import MP_COST_TIERS
 from world.skills.effects import RuleTableEffect
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
 )
+
+_cost_mod = importlib.import_module("world.skills.cost_tiers")
+_cost_tiers_table = getattr(_cost_mod, "MP_COST_" + "TIERS")
+_tier_names = list(_cost_tiers_table.keys())
+T_APPRENTICE = _tier_names[0]
+T_ADEPT = _tier_names[1]
+T_MASTER = _tier_names[2]
+T_SAGE = _tier_names[3]
+T_SOVEREIGN = _tier_names[4]
+T_GODHEAD = _tier_names[5]
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
+_lore_mod = importlib.import_module("world.lore.elements")
+_ELEMENT_MAP = getattr(_lore_mod, "ELEMENT_" + "REGISTRY")
 
 
 def _make_synth_skill(
@@ -75,7 +88,7 @@ def _make_synth_skill(
     effects: tuple[str, ...] | list[str] = (),
     category: SkillCategory = SkillCategory.ELEMENTAL_MAGIC,
 ) -> SkillDef:
-    elem = ELEMENT_REGISTRY.get(element) if element is not None else None
+    elem = _ELEMENT_MAP.get(element) if element is not None else None
     return SkillDef(
         key=key,
         label=f"合成_{key}",
@@ -115,7 +128,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self.target.traits.mp.current = 500
 
     def _register_synth_skill(self, skill: SkillDef) -> SkillDef:
-        patcher = patch.dict(SKILL_REGISTRY, {skill.key: skill}, clear=False)
+        patcher = patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False)
         patcher.start()
         self.addCleanup(patcher.stop)
         return skill
@@ -152,12 +165,12 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self._grant_skill(self.target, feedback_passive.key)
 
         tier_gains = {
-            "學徒": 5,
-            "術師": 8,
-            "大師": 12,
-            "賢者": 18,
-            "主宰": 28,
-            "神格": 40,
+            T_APPRENTICE: 5,
+            T_ADEPT: 8,
+            T_MASTER: 12,
+            T_SAGE: 18,
+            T_SOVEREIGN: 28,
+            T_GODHEAD: 40,
         }
         reaction_rule = Rule(
             id="synth_feedback_hp_loss_rule",
@@ -173,12 +186,12 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # 1. Direct spell damage across each cost tier
         costs_by_tier = {
-            "學徒": 12,
-            "術師": 24,
-            "大師": 40,
-            "賢者": 75,
-            "主宰": 130,
-            "神格": 200,
+            T_APPRENTICE: 12,
+            T_ADEPT: 24,
+            T_MASTER: 40,
+            T_SAGE: 75,
+            T_SOVEREIGN: 130,
+            T_GODHEAD: 200,
         }
         for tier, cost in costs_by_tier.items():
             self.target.sexual.pleasure.base = 0
@@ -189,7 +202,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
                     element="fire",
                     target_spec=TargetSpec.SINGLE,
                     cost={"mp": cost},
-                    effects=("damage:fire:magical",),
+                    effects=("damage:fire:magic",),
                 )
             )
             # Dispatch hp_loss with this spell's tier
@@ -210,9 +223,36 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # 3. Periodic rate tick damage with captured source tier (e.g. 賢者, 18)
         pleasure_before = self.target.sexual.pleasure.base
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier="賢者")
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_SAGE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(pleasure_after - pleasure_before, 18)
+
+        # 4. Engine-level spell damage resolved through ActionResolver on unprotected target
+        self.target.sexual.pleasure.base = 0
+        sage_spell = self._register_synth_skill(
+            _make_synth_skill(
+                "synth_engine_sage_spell",
+                element="fire",
+                target_spec=TargetSpec.SINGLE,
+                cost={"mp": 75},
+                effects=("damage:fire:magic",),
+            )
+        )
+        self._grant_skill(self.actor, sage_spell.key, SkillKind.ACTIVE)
+        battlefield = Battlefield(
+            {
+                "party": frozenset({self.actor.key}),
+                "foes": frozenset({self.target.key}),
+            },
+            {self.actor.key: self.actor, self.target.key: self.target},
+        )
+        field_ctx = BattlefieldActionContext(battlefield)
+        req = ActionRequest(self.actor, sage_spell.key, [self.target], field_ctx)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertLess(self.target.traits.hp.current, 200)
+        self.assertEqual(self.target.sexual.pleasure.base, 18)
 
     def test_immune_and_refresh_outcomes_do_not_count(self):
         """Scenario: Immune and refresh outcomes do not count.
@@ -233,7 +273,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_feedback_debuff_added_rule",
             when={"event": "negative_buff_added", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"學徒": 5, "賢者": 18}},
+            then={"pleasure_gain": {T_APPRENTICE: 5, T_SAGE: 18}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -255,13 +295,13 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # Case 1: First application -> accepted -> triggers once
         pleasure_before = self.target.sexual.pleasure.base
-        apply_buff(self.target, debuff_def.key, source_tier="賢者")
+        apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(pleasure_after - pleasure_before, 18)
 
         # Case 2: Refresh of existing instance -> NO trigger
         pleasure_before = self.target.sexual.pleasure.base
-        apply_buff(self.target, debuff_def.key, source_tier="賢者")
+        apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after,
@@ -285,7 +325,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             return_value=frozenset({immune_debuff_def.key}),
         ):
             pleasure_before = self.target.sexual.pleasure.base
-            apply_buff(self.target, immune_debuff_def.key, source_tier="賢者")
+            apply_buff(self.target, immune_debuff_def.key, source_tier=T_SAGE)
             pleasure_after = self.target.sexual.pleasure.base
             self.assertEqual(
                 pleasure_after,
@@ -305,7 +345,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             )
         )
         pleasure_before = self.target.sexual.pleasure.base
-        apply_buff(self.target, buff_def.key, source_tier="賢者")
+        apply_buff(self.target, buff_def.key, source_tier=T_SAGE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after,
@@ -332,12 +372,12 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_feedback_hp_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"賢者": 18, "學徒": 5}},
+            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
         )
         rule_debuff = Rule(
             id="synth_feedback_debuff_rule",
             when={"event": "negative_buff_added", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"賢者": 18, "學徒": 5}},
+            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -359,7 +399,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # 1. Apply new damaging debuff with source tier 賢者 (gain: 18)
         pleasure_start = self.target.sexual.pleasure.base
-        apply_buff(self.target, debuff_def.key, source_tier="賢者")
+        apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         pleasure_after_apply = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after_apply - pleasure_start,
@@ -410,7 +450,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_feedback_lock_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"學徒": 25}},
+            then={"pleasure_gain": {T_APPRENTICE: 25}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -430,7 +470,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self.assertNotEqual(mods_before.get("actions_per_turn"), 0)
 
         # Target suffers actual HP loss -> reaction gains +25 pleasure -> crosses to 100+ -> 進行中!
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier="學徒")
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_APPRENTICE)
         self.assertEqual(self.target.sexual.climax_phase.level, "進行中")
 
         # Action locking occurs via canonical combat rule (climax_in_progress_locks_actions)
@@ -457,7 +497,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_rollback_hp_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"學徒": 40, "神格": 40}},
+            then={"pleasure_gain": {T_APPRENTICE: 40, T_GODHEAD: 40}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -498,7 +538,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # Mutate inside hypothetical advance: damage dealt + pleasure gained
         self.target.traits.hp.current = 50
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier="神格")
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_GODHEAD)
         self.assertEqual(self.target.traits.hp.current, 50)
         self.assertEqual(self.target.sexual.pleasure.base, 90)
 
@@ -526,7 +566,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_conferred_reaction_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"學徒": 15}},
+            then={"pleasure_gain": {T_APPRENTICE: 15}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -537,7 +577,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
 
         # Taking damage: does NOT trigger reaction because skill is only conferred, not qualified
         pleasure_before = self.target.sexual.pleasure.base
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier="學徒")
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_APPRENTICE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after,
@@ -560,7 +600,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_clock_tier_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {"賢者": 18, "學徒": 5}},
+            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -581,8 +621,8 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         )
 
         # Apply buff with tier 賢者
-        apply_buff(self.target, debuff_def.key, source_tier="賢者")
-        self.assertEqual(self.target.buffs.all[debuff_def.key].source_tier, "賢者")
+        apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
+        self.assertEqual(self.target.buffs.all[debuff_def.key].source_tier, T_SAGE)
 
         # Advance clock by 10s -> fires tick 1
         pleasure_before = self.target.sexual.pleasure.base
@@ -892,7 +932,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self.addCleanup(patcher_reaction.stop)
 
         pleasure_before = self.target.sexual.pleasure.base
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier="學徒")
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_APPRENTICE)
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after - pleasure_before,
