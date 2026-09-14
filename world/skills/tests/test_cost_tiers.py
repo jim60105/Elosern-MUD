@@ -9,6 +9,8 @@ from tools.spec_traceability import covers_requirement
 from world.skills.cost_tiers import MP_COST_TIERS, spell_tier_for
 from world.skills.registry import SKILL_REGISTRY
 
+from world.tests.synthetic_data import SYNTH_SKILLS
+
 
 class SpellTierLookupTests(unittest.TestCase):
     def test_existing_spells_map_to_their_cost_bands(self):
@@ -50,7 +52,7 @@ class SpellTierLookupTests(unittest.TestCase):
         self.assertEqual(spell_tier_for(self_spell), "術師")
 
     def test_out_of_band_cost_fails_closed(self):
-        for cost in (5, 115, 200):
+        for cost in (5, 115, 261, 300):
             with self.subTest(cost=cost):
                 with self.assertRaises(ValueError):
                     spell_tier_for(
@@ -66,18 +68,63 @@ class SpellTierLookupTests(unittest.TestCase):
                     )
 
     def test_tier_tables_share_the_five_rank_titles(self):
+        """The five mortal rank titles match between progression and cost tiers."""
         from world.rules.progression import MAGIC_TIER_THRESHOLDS
 
+        # The five mortal rank titles match between progression and cost tiers;
+        # 神格 is the label-only sixth cost tier with no level band or cast gate.
         self.assertEqual(
-            set(MP_COST_TIERS),
+            set(MP_COST_TIERS) - {"神格"},
             set(MAGIC_TIER_THRESHOLDS),
-            "cost tiers and cast-gate thresholds must stay keyed identically",
+            "mortal cost tiers and cast-gate thresholds must stay keyed identically",
         )
+        self.assertIsNone(MP_COST_TIERS["神格"].min_level)
+        self.assertIsNone(MP_COST_TIERS["神格"].max_level)
         # 主宰's cost band starts at 90 while its cast gate sits at 91 — a
         # deliberate split documented in element-mastery-cast-gate design.md.
         self.assertEqual(MP_COST_TIERS["主宰"].min_level, 90)
         self.assertEqual(MAGIC_TIER_THRESHOLDS["主宰"], 91)
 
+    @covers_requirement("skill-registry::spell-cost-labels-include-a-sixth-tier-with-deterministic-column-precedence")
+    def test_divinity_tier_overlap_honors_shape(self):
+        """Synthetic SINGLE and AREA 180 MP resolve by target-shape column first."""
+        single180 = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": 180})
+        area180 = replace(SKILL_REGISTRY["wind_blade"], cost={"mp": 180})
+        self.assertEqual(spell_tier_for(single180), "神格")
+        self.assertEqual(spell_tier_for(area180), "主宰")
+
+    def test_divinity_tier_boundaries_and_fallback_edges(self):
+        """Area and single endpoints in the sixth band resolve to 神格."""
+        for mp in (200, 240, 260):
+            with self.subTest(shape="area", mp=mp):
+                spell = replace(SKILL_REGISTRY["wind_blade"], cost={"mp": mp})
+                self.assertEqual(spell_tier_for(spell), "神格")
+
+        for mp in (180, 200, 220):
+            with self.subTest(shape="single", mp=mp):
+                spell = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": mp})
+                self.assertEqual(spell_tier_for(spell), "神格")
+
+        # Fallback edges bridging columns
+        single179 = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": 179})
+        self.assertEqual(spell_tier_for(single179), "主宰")
+        single221 = replace(SKILL_REGISTRY["fire_ball"], cost={"mp": 221})
+        self.assertEqual(spell_tier_for(single221), "神格")
+        area190 = replace(SKILL_REGISTRY["wind_blade"], cost={"mp": 190})
+        self.assertEqual(spell_tier_for(area190), "神格")
+
+    def test_synthetic_skill_configuration_uses_generic_mechanism(self):
+        """A second, fully synthetic skill configuration validates the generic mechanism."""
+        synth_single = replace(
+            SYNTH_SKILLS["t_hush_mend"],
+            cost={"mp": 180},
+        )
+        synth_area = replace(
+            SYNTH_SKILLS["t_glowmire_bloom"],
+            cost={"mp": 200},
+        )
+        self.assertEqual(spell_tier_for(synth_single), "神格")
+        self.assertEqual(spell_tier_for(synth_area), "神格")
 
 class SpellTierLabelCatalogTests(unittest.TestCase):
     """Every element's representative per-band spells keep their catalog label.

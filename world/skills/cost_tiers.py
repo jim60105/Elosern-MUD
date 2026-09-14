@@ -1,7 +1,7 @@
 """MP cost tiers for spell skills (skill-system-redesign design doc §4.3, D9).
 
-The five tiers are keyed by the world-lore rank titles; later spell-catalog
-proposals pick a range from here instead of inventing ad hoc costs. The level
+The six tiers are keyed by the world-lore rank titles; later spell-catalog
+proposals pick a range from here instead of inventing ad hoc costs. The mortal level
 band is descriptive (the design doc's rank-title table and this cost table
 share the 90 boundary); nothing in this module gates on it.
 
@@ -18,9 +18,9 @@ from .registry import SkillDef, SkillKind, TargetSpec
 
 
 class CostTier(NamedTuple):
-    """One MP cost tier: a level band plus single- and area-effect ranges."""
+    """One MP cost tier: an optional level band plus single- and area-effect ranges."""
 
-    min_level: int
+    min_level: int | None
     max_level: int | None
     single_mp: tuple[int, int]
     area_mp: tuple[int, int]
@@ -32,6 +32,7 @@ MP_COST_TIERS: dict[str, CostTier] = {
     "大師": CostTier(31, 70, (35, 48), (45, 60)),
     "賢者": CostTier(71, 90, (65, 85), (80, 110)),
     "主宰": CostTier(90, None, (120, 150), (140, 180)),
+    "神格": CostTier(None, None, (180, 220), (200, 260)),
 }
 
 
@@ -71,15 +72,16 @@ def _band_contains(band: tuple[int, int], cost: int) -> bool:
 def spell_tier_for(skill: SkillDef) -> str | None:
     """Return the magic-tier data label for one elemental spell skill.
 
-    An elemental spell is an ACTIVE skill carrying both an element and an
-    ``mp`` cost; everything else returns ``None`` (no tier label). The tier
-    is the unique §4.3 band containing the skill's MP cost: the column
-    matching the skill's target spec (``SELF`` counts as single/direct) is
-    preferred, then the other column, because a few catalog costs
-    intentionally sit in the opposite column of their tier. An elemental
-    spell whose ``mp`` cost is absent, not a positive integer, or outside
-    every band raises ``ValueError`` — a content-authoring error that must
-    fail closed rather than silently leave a spell without a tier label.
+    An elemental spell is an ACTIVE skill carrying both an element and an ``mp``
+    cost; non-elemental skills or skills without an ``mp`` cost return ``None``
+    (no tier label). The tier is resolved via §4.3 band membership with
+    deterministic column precedence: the column matching the skill's target
+    spec (``SELF`` counts as single/direct) is searched across all tiers in
+    ascending order first, then the opposite column across all tiers, resolving
+    overlapping bands (e.g. 180 MP) to the matching column. ``神格`` is display
+    classification only with no level band or numeric cast gate. An ``mp`` cost
+    that is not a positive integer, or a cost outside every band, raises
+    ``ValueError`` — an authoring error that must fail closed.
     """
     if skill.kind is not SkillKind.ACTIVE or skill.element is None:
         return None
