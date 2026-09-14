@@ -113,6 +113,7 @@ class StageNpcCharacterization:
     portrait_stable_key: str | None = None
     background: str | None = None
     persona: tuple[tuple[str, str], ...] = ()
+    combat_traits: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -335,6 +336,17 @@ def _compile_characterization(
             for field in ("personality", "life_story", "habit")
             if isinstance(persona.get(field), str) and persona[field].strip()
         )
+    raw_combat_traits = requirement.get("combat_traits")
+    combat_traits: tuple[str, ...] = ()
+    if raw_combat_traits is not None:
+        from world.rules.traits import validate_combat_traits
+
+        try:
+            combat_traits = tuple(validate_combat_traits(raw_combat_traits))
+        except ValueError as error:
+            raise QuestCompileError(
+                f"invalid combat_traits in characterization: {error}"
+            ) from error
     return StageNpcCharacterization(
         display_name=requirement.get("display_name"),
         title=requirement.get("title"),
@@ -343,6 +355,7 @@ def _compile_characterization(
         portrait_stable_key=stable_key,
         background=background if isinstance(background, str) else None,
         persona=persona_prose,
+        combat_traits=combat_traits,
     )
 
 
@@ -557,6 +570,8 @@ def _npc_req_canonical(
             canonical["background"] = characterization.background
         if characterization.persona:
             canonical["persona"] = dict(characterization.persona)
+        if characterization.combat_traits:
+            canonical["combat_traits"] = list(characterization.combat_traits)
     return canonical
 
 
@@ -930,9 +945,10 @@ def _characterization_from_payload(
         title=data["title"],
         age=data["age"],
         apparent_age=data["apparent_age"],
-        portrait_stable_key=data["portrait_stable_key"],
+        portrait_stable_key=data.get("portrait_stable_key"),
         background=data.get("background"),
         persona=tuple(tuple(pair) for pair in data.get("persona") or ()),
+        combat_traits=tuple(data.get("combat_traits") or ()),
     )
 
 

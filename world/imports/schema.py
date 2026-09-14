@@ -203,6 +203,19 @@ CHARACTER_SCHEMA_V1 = {
                 "semantically)."
             ),
         },
+        "combat_traits": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["undead"],
+            },
+            "uniqueItems": True,
+            "description": (
+                "Optional combat-trait classifications for conditional effects. "
+                "Initially accepts only 'undead'. Absent or empty array means "
+                "neutral classification."
+            ),
+        },
         "profession": {
             "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
             "description": (

@@ -284,6 +284,10 @@ def _apply_characterization(
         if characterization.background is not None:
             record["background"] = characterization.background
         npc.db.persona = record
+    if characterization.combat_traits:
+        from world.rules.traits import set_combat_traits
+
+        set_combat_traits(npc, characterization.combat_traits)
 
 
 def _spawn_npc(

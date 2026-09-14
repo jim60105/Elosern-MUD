@@ -7,7 +7,7 @@ import importlib
 import json
 import unicodedata
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -404,6 +404,35 @@ def _check_affinity_elements(record: dict[str, Any]) -> list[Issue]:
     return issues
 
 
+def _check_combat_traits(record: dict[str, Any]) -> list[Issue]:
+    """Reject combat traits that violate vocabulary or duplicate rules.
+
+    The schema already checks enum and uniqueness for schema-validated records,
+    but semantic validation also verifies plain dictionary records.
+    """
+    traits = record.get("combat_traits")
+    if traits is None:
+        return []
+    from world.rules.traits import COMBAT_TRAITS_VOCABULARY
+
+    if isinstance(traits, (str, bytes)) or not isinstance(traits, Iterable):
+        return [Issue("combat_traits", "combat_traits must be a sequence of strings")]
+    issues: list[Issue] = []
+    seen: set[str] = set()
+    for item in traits:
+        if not isinstance(item, str):
+            issues.append(
+                Issue("combat_traits", f"combat_traits entry must be a string, got {item!r}")
+            )
+            continue
+        if item in seen:
+            issues.append(Issue("combat_traits", f"duplicate combat trait {item!r}"))
+        elif item not in COMBAT_TRAITS_VOCABULARY:
+            issues.append(Issue("combat_traits", f"unknown combat trait {item!r}"))
+        seen.add(item)
+    return issues
+
+
 def _resolve_skill_registry() -> Mapping[str, Any] | None:
     """Resolve forward-declared ``world.skills.registry.SKILL_REGISTRY``."""
     try:
@@ -742,6 +771,7 @@ def validate_character(
     report.rejections.extend(magic_rejections)
     report.warnings.extend(magic_warnings)
     report.rejections.extend(_check_affinity_elements(record))
+    report.rejections.extend(_check_combat_traits(record))
     report.rejections.extend(_check_skills(record))
     profession_issues, report.profession_row = _check_profession_fields(
         record, _is_npc_target(typeclass)
