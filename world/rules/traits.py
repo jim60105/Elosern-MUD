@@ -1,6 +1,6 @@
 """Deterministic entity-trait construction from design section 5.2."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from evennia.contrib.rpg.traits import GaugeTrait
@@ -229,3 +229,52 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     if isinstance(disguised, Mapping) and trait_key in disguised:
         return disguised[trait_key]
     return getattr(entity.traits, trait_key).value
+
+
+COMBAT_TRAITS_VOCABULARY: frozenset[str] = frozenset({"undead"})
+
+
+def validate_combat_traits(traits: Any) -> list[str]:
+    """Validate a sequence of combat trait keys.
+
+    Accepts an iterable of string trait keys. Missing (None) validates as an
+    empty list. Rejects non-sequences (including str and bytes), non-string
+    entries, duplicate entries, and unknown trait keys outside
+    COMBAT_TRAITS_VOCABULARY.
+    """
+    if traits is None:
+        return []
+    if isinstance(traits, (str, bytes)) or not isinstance(traits, Iterable):
+        raise ValueError(
+            f"combat_traits must be an iterable sequence of strings, got {type(traits).__name__}"
+        )
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in traits:
+        if not isinstance(item, str):
+            raise ValueError(
+                f"combat_traits entry must be a string, got {type(item).__name__}: {item!r}"
+            )
+        if item in seen:
+            raise ValueError(f"duplicate combat trait {item!r}")
+        if item not in COMBAT_TRAITS_VOCABULARY:
+            raise ValueError(f"unknown combat trait {item!r}")
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def set_combat_traits(entity: Any, traits: Any) -> list[str]:
+    """Validate and persist combat traits onto an entity.
+
+    Writes to entity.combat_traits (backed by AttributeProperty) or
+    entity.db.combat_traits, returning the validated list.
+    """
+    validated = validate_combat_traits(traits)
+    if hasattr(entity, "attributes") and hasattr(entity.attributes, "add"):
+        entity.attributes.add("combat_traits", validated)
+    elif hasattr(entity, "db"):
+        entity.db.combat_traits = validated
+    else:
+        setattr(entity, "combat_traits", validated)
+    return validated
