@@ -50,6 +50,7 @@
         "world.rules.tests.test_displayed_stats",
         "world.rules.tests.test_divine_mystery_gate",
         "world.rules.tests.test_effect_handlers",
+        "world.rules.tests.test_effect_audiences",
         "world.rules.tests.test_effect_potency",
         "world.rules.tests.test_effective_power",
         "world.rules.tests.test_equipment_attached_buffs",
