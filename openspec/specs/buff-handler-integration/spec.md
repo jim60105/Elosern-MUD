@@ -30,7 +30,7 @@ to `entity.db.buffs`.
 ### Requirement: Buff definitions configure a subset of rate of change, clamped bounds, and decay rate
 — never a combat-stat multiplier
 `world/rules/rulebook/buffs.yaml` SHALL define each buff's tunable parameters (duration, tick interval,
-stacking policy, and a `modifiers` mapping using at most the keys `rate`, `bounds`, and `decay`) per
+stacking policy, and a `modifiers` mapping using at most the keys `rate`, `bounds`, and `decay`) with rate choosing either a fixed delta or a validated recovery profile (never both), per
 design doc §6.4's exhaustive list of what a buff may modify. A buff definition SHALL NOT configure a
 combat-stat multiplier (`atk_phys`/`agility`/`defense` scaling) — that remains change 5's
 `SkillHandler.effective_value()` territory. A buff MAY declare an empty `modifiers` mapping when its
@@ -215,22 +215,6 @@ When the action-resolution workflow would grant a debuff-polarity buff to a targ
 - **WHEN** the same damaging buff key is re-applied by a different caster before expiry
 - **THEN** the buff cache's `source_pk` is the newest caster's dbref, and a refresh that omits `source_pk` retains the previously cached value rather than erasing attribution
 
-### Requirement: Every buff key in buffs.yaml has exactly one corresponding unit test
-For every buff `key` present in `world/rules/rulebook/buffs.yaml`, `world/rules/tests/test_buffs.py`
-SHALL define exactly one test function named `test_buff_<key>`. A regression test SHALL mechanically
-verify this correspondence.
-
-#### Scenario: Every seed buff has a matching test function
-- **WHEN** the mechanical correspondence check inspects `buffs.yaml`'s buff keys against
-  `test_buffs.py`'s test function names
-- **THEN** it finds exactly one `test_buff_<key>` function for each of `poisoned`, `paralysis`, `fear`,
-  and `conferred_growth_rate`
-
-#### Scenario: Adding a buff without a matching test fails the correspondence check
-- **WHEN** a new buff definition is added to `buffs.yaml` with no corresponding `test_buff_<key>`
-  function added to `test_buffs.py`
-- **THEN** the mechanical correspondence check fails, naming the buff key missing a test
-
 ### Requirement: Buff application has one public entry point carrying both grant-time guards
 `world/rules/buffs.py` SHALL expose a public buff-application function taking an entity, a buff
 definition key, an optional instance key, and arbitrary cache data. Every deterministic caller that
@@ -254,3 +238,36 @@ weakened or made optional for any caller.
 - **WHEN** a deterministic module other than `world/rules/buffs.py` applies a buff
 - **THEN** it does so through the public entry point, and no module outside `world/rules/buffs.py`
   calls `entity.buffs.add(...)` directly
+
+### Requirement: Recovery profiles restore living recipients with explicit snapshot and live inputs
+A timed recovery profile SHALL combine a validated base amount, optional live recipient-state adjustment and persisted caster-side modifiers. Caster inputs SHALL be captured on application and recipient effective state SHALL be read at each tick. Recovery SHALL floor the resulting nonnegative value, clamp to each living HP gap, and never revive a dead target. Malformed profiles SHALL be rejected before application.
+
+#### Scenario: Live recipient and captured caster inputs differ
+- **WHEN** recipient exposure changes after application and the caster later changes equipment or is deleted
+- **THEN** the next tick reflects new recipient exposure but the original caster modifier and does not require the caster object
+
+#### Scenario: No revival or overflow
+- **WHEN** a tick addresses a dead recipient or a living recipient near maximum HP
+- **THEN** dead HP is unchanged and living HP never exceeds its maximum
+
+### Requirement: Finite recovery ticks and refresh are deterministic across elapsed-time partitions
+A configured three-tick recovery SHALL tick at 10, 20 and 30 elapsed world seconds, never at application or after expiration. Advances within the clock's settlement-quanta budget SHALL produce the same ticks whether taken at once or in equivalent segments; an advance beyond that budget SHALL never fabricate ticks. Reapplication SHALL replace source snapshots and restart duration and tick remainder without stacking. Removal SHALL stop future ticks; persistence reload SHALL not replay completed ticks.
+
+#### Scenario: Final tick precedes expiration
+- **WHEN** world time advances 30 seconds at once or in three equal segments
+- **THEN** exactly three recovery ticks occur with no application-time tick and no fourth tick at 40 seconds
+
+#### Scenario: Refresh and reload preserve schedule
+- **WHEN** a partially elapsed profile is refreshed and refetched
+- **THEN** only the new three-tick schedule runs using the new source snapshots
+
+#### Scenario: Removal cancels recovery
+- **WHEN** the buff is removed before its next due tick
+- **THEN** no later tick restores HP
+
+### Requirement: Buff verification establishes mechanics rather than catalog correspondence
+Distinct buff mechanics SHALL have substantive behavior tests using synthetic definitions. Assertions SHALL establish state changes, timing, refresh, expiry or immunity rather than require test function names or duplicate each authored buff key. Timed defense riders SHALL be verified through actual damage changes and expiration, not declaration equality.
+
+#### Scenario: Synthetic timed defense affects combat
+- **WHEN** a synthetic refreshable defense marker is applied and then expires
+- **THEN** computed incoming damage is reduced while active and returns to its prior value after expiration without stacking on refresh

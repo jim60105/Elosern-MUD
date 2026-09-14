@@ -15,6 +15,7 @@ from evennia.utils.search import search_script
 
 from world.observability import log_info, log_warn
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
+from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
 from world.rules.sexual_state import (
     DECAY_CONFIG,
@@ -51,7 +52,11 @@ def _validate_settlement_intervals(buff_definitions, decay_config) -> int:
     return gcd(*intervals)
 
 
-SETTLEMENT_QUANTUM_SECONDS = _validate_settlement_intervals(BUFF_DEFINITIONS, DECAY_CONFIG)
+_DERIVED_QUANTUM = _validate_settlement_intervals(BUFF_DEFINITIONS, DECAY_CONFIG)
+if _DERIVED_QUANTUM != SETTLEMENT_QUANTUM_SECONDS:
+    raise ValueError(
+        f"derived settlement quantum {_DERIVED_QUANTUM} does not match canonical SETTLEMENT_QUANTUM_SECONDS {SETTLEMENT_QUANTUM_SECONDS}"
+    )
 _STAGE_ORDER = (
     "gauge_regen",
     "buff_ticks",

@@ -17,6 +17,7 @@ from world.rules.buffs import (
     apply_buff,
     _handle_cleanse,
     _is_damaging_rate,
+    get_recovery_policy,
     blocks_action,
     entity_active_buffs,
     grant_conferred_growth_rate,
@@ -563,6 +564,20 @@ def _handle_buff_apply(
                 f"buff {key!r} requires a caster with a positive-int dbref",
             )
         kwargs["source_pk"] = int(pk)
+    if definition is not None and get_recovery_policy(definition) is not None:
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+        caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
+        heal_gain = caster_mods.get("heal_gain")
+        if heal_gain is not None:
+            kwargs["snapshot_heal_gain"] = heal_gain
+        grace_mult = context.get("grace_multiplier")
+        if grace_mult is not None:
+            kwargs["snapshot_grace_multiplier"] = grace_mult
+        pk = getattr(actor, "pk", None)
+        if isinstance(pk, int) and not isinstance(pk, bool) and pk > 0:
+            kwargs["source_pk"] = int(pk)
+        elif getattr(actor, "id", None) and isinstance(actor.id, int) and actor.id > 0:
+            kwargs["source_pk"] = int(actor.id)
     pending: list[PendingEffect] = []
     for target in targets:
         if (
@@ -612,7 +627,7 @@ def _handle_self_buff_apply(
     equipment immunises stages the same non-mutating neutralization event as
     the target-scoped handler.
     """
-    del targets, context, scale
+    del targets, scale
     try:
         key = effect_id.split(":", 1)[1]
     except IndexError as error:
@@ -621,6 +636,19 @@ def _handle_self_buff_apply(
             effect_id,
         ) from error
     definition = BUFF_DEFINITIONS.get(key)
+    kwargs: dict[str, Any] = {}
+    if definition is not None and get_recovery_policy(definition) is not None:
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+        caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
+        heal_gain = caster_mods.get("heal_gain")
+        if heal_gain is not None:
+            kwargs["snapshot_heal_gain"] = heal_gain
+        grace_mult = context.get("grace_multiplier")
+        if grace_mult is not None:
+            kwargs["snapshot_grace_multiplier"] = grace_mult
+        pk = getattr(actor, "pk", None)
+        if isinstance(pk, int) and not isinstance(pk, bool) and pk > 0:
+            kwargs["source_pk"] = int(pk)
     if (
         definition is not None
         and definition.polarity == "debuff"
@@ -639,7 +667,7 @@ def _handle_self_buff_apply(
             actor,
             f"self_buff_applied|{_entity_key(actor)}|{key}",
             frozenset({"buffs"}),
-            lambda: apply_buff(actor, key),
+            lambda: apply_buff(actor, key, **kwargs),
         )
     ]
 
