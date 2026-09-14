@@ -1,6 +1,6 @@
 """Deterministic entity-trait construction from design section 5.2."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from evennia.contrib.rpg.traits import GaugeTrait
@@ -244,9 +244,9 @@ def validate_combat_traits(traits: Any) -> list[str]:
     """
     if traits is None:
         return []
-    if isinstance(traits, (str, bytes)) or not isinstance(traits, Iterable):
+    if isinstance(traits, (str, bytes)) or not isinstance(traits, Sequence):
         raise ValueError(
-            f"combat_traits must be an iterable sequence of strings, got {type(traits).__name__}"
+            f"combat_traits must be a sequence of strings, got {type(traits).__name__}"
         )
     result: list[str] = []
     seen: set[str] = set()

@@ -945,7 +945,7 @@ def _characterization_from_payload(
         title=data["title"],
         age=data["age"],
         apparent_age=data["apparent_age"],
-        portrait_stable_key=data.get("portrait_stable_key"),
+        portrait_stable_key=data["portrait_stable_key"],
         background=data.get("background"),
         persona=tuple(tuple(pair) for pair in data.get("persona") or ()),
         combat_traits=tuple(data.get("combat_traits") or ()),

@@ -345,7 +345,7 @@ def _handle_damage(
                 max_hp_frac = 0.0
             attack_part = round(attack * multiplier * coefficient * matched_mult)
             post_defense = attack_part - defense
-            rider = math_floor(_max_hp(target) * max_hp_frac)
+            rider = math_floor(round(_max_hp(target) * max_hp_frac, 6))
             base_amount = int(max(post_defense + rider, floor))
             amount = max(scaled_magnitude(base_amount, scale), floor)
             amount = int(amount)

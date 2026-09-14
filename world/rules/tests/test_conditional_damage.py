@@ -654,7 +654,15 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         self.assertEqual(canonical["combat_traits"], ["undead"])
 
         # Deserialization from payload
-        deserialized = _characterization_from_payload(canonical)
+        payload = {
+            "display_name": "亡靈祭司",
+            "title": "無光者",
+            "age": 40,
+            "apparent_age": 40,
+            "portrait_stable_key": None,
+            "combat_traits": ["undead"],
+        }
+        deserialized = _characterization_from_payload(payload)
         self.assertEqual(deserialized.combat_traits, ("undead",))
 
         # Invalid trait raises QuestCompileError
