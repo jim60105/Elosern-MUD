@@ -277,6 +277,9 @@ class TargetFactsPurityTests(EvenniaTestCase):
         self.assertEqual(affinities, frozenset())
         self.assertIsNone(char.attributes.get("affinity_elements"))
 
+    @covers_requirement(
+        "combat-target-traits::combat-target-facts-are-explicit-and-persist-through-construction"
+    )
     def test_names_and_labels_do_not_imply_facts(self):
         char = create_object(PlayerCharacter, key="Dark Undead Necromancer")
         char.db.desc = "A dark undead creature of darkness."
@@ -342,6 +345,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             return result
 
     @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching",
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
     )
     def test_two_facts_match_once_not_squared(self):
@@ -378,6 +382,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         self.assertGreater(damage_both, damage_neutral)
 
     @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching",
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
     )
     def test_bypass_and_bonus_are_independent(self):
@@ -405,6 +410,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         self.assertEqual(damage_bypassed - damage_not_bypassed, 20)
 
     @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching",
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
     )
     def test_percent_rider_requires_a_hit(self):
@@ -606,6 +612,9 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             validate_combat_traits([123])  # Non-string rejected
 
+    @covers_requirement(
+        "combat-target-traits::combat-target-facts-are-explicit-and-persist-through-construction"
+    )
     def test_set_combat_traits_persists_and_survives_refetch(self):
         npc = create_object(NPC, key="undead_guard")
         set_combat_traits(npc, ["undead"])
@@ -616,6 +625,9 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         refetched = NPC.objects.get(id=pk)
         self.assertEqual(get_combat_traits(refetched), frozenset({"undead"}))
 
+    @covers_requirement(
+        "combat-target-traits::combat-target-facts-are-explicit-and-persist-through-construction"
+    )
     def test_character_schema_and_validator_accept_combat_traits(self):
         record = example_record()
         record["combat_traits"] = ["undead"]
