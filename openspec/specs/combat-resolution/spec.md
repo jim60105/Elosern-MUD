@@ -42,7 +42,7 @@ natural 100
 `max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`, where
 `roll_multiplier` is `crit_multiplier` if the raw, unmodified `roll_d100()` result equals 100,
 `solid_hit_multiplier` if the margin of success is at least `solid_hit_margin`, and `base_multiplier`
-otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. The existing freeform magnitude scaling and final floor SHALL follow this calculation. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
+otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. For a declared conditional policy, the attack component SHALL additionally use the matched attack multiplier once, defense SHALL be zero only when its configured bypass predicate matches, and floor(max_hp * declared_fraction) SHALL be added after defense subtraction on a successful hit. The existing damage floor, freeform magnitude scaling and final floor SHALL follow these components; unconfigured effects retain the ordinary formula. Existing nonlethal projection SHALL apply before defeat/knockout event consumers. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
 100 SHALL NOT cause a miss to become a hit.
 
 #### Scenario: A bare hit uses the base multiplier
@@ -67,6 +67,14 @@ otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defau
 - **WHEN** the to-hit check fails
 - **THEN** no damage is applied to the target's `hp`, and the damage floor does not apply (a miss is
   not a "zero-damage hit")
+
+#### Scenario: Conditional damage preserves nonlethal outcome
+- **WHEN** a configured defense bypass and maximum-HP component would cross a protected target below zero
+- **THEN** final HP is 1 with one knockout outcome and no ordinary defeat
+
+#### Scenario: Freeform scaling follows every damage component
+- **WHEN** a freeform-scaled cast of a skill carrying a maximum-HP component hits
+- **THEN** the declared freeform magnitude scaling applies after the maximum-HP component is added, so the rider is scaled by the same stage rather than remaining unscaled
 
 ### Requirement: effective_power combines four effective stats multiplied by max hp
 `world/rules/combat.py` SHALL provide `effective_power(entity) -> float`, computed as the sum of

@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from math import floor as math_floor
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +28,10 @@ from world.rules.items import ItemUseRequest, resolve_item_use
 from world.rules.progression import can_use_skill, scaled_magnitude
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
+from world.rules.target_facts import matches_target_predicate
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
-from world.skills.effects import EffectPolicy, ResolvedEffect
+from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -53,6 +55,25 @@ def _extract_effect_coefficient(event_context: dict[str, Any] | None) -> float:
     if isinstance(resolved, ResolvedEffect) and isinstance(resolved.policy, EffectPolicy):
         return resolved.policy.coefficient
     return 1.0
+
+
+def _extract_damage_policy(event_context: dict[str, Any] | None) -> DamagePolicy | None:
+    """Extract the trusted DamagePolicy or None if not configured.
+
+    When invoked through ActionResolver, ``event_context`` carries the trusted
+    ``ResolvedEffect`` synthesized for this effect ordinal. Direct invocations
+    without the binding or with an unverified object return None.
+    """
+    if not event_context:
+        return None
+    resolved = event_context.get("resolved_effect")
+    if (
+        isinstance(resolved, ResolvedEffect)
+        and isinstance(resolved.policy, EffectPolicy)
+        and isinstance(resolved.policy.damage, DamagePolicy)
+    ):
+        return resolved.policy.damage
+    return None
 
 
 @dataclass
@@ -296,6 +317,7 @@ def _handle_damage(
     _, school = _parse_damage_effect(effect_id)
     attack_key = "atk_phys" if school == "physical" else "magic_power"
     coefficient = _extract_effect_coefficient(event_context)
+    damage_policy = _extract_damage_policy(event_context)
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
@@ -308,8 +330,23 @@ def _handle_damage(
         if hit:
             multiplier = _roll_multiplier(raw_roll, margin)
             attack = _adjusted_attack(actor, attack_key)
-            defense = _adjusted_defense(target)
-            base_amount = int(max(round(attack * multiplier * coefficient) - defense, floor))
+            if damage_policy is not None:
+                matched = matches_target_predicate(target, damage_policy.predicate)
+                matched_mult = damage_policy.attack_multiplier if matched else 1.0
+                defense = (
+                    0
+                    if (matched and damage_policy.bypass_defense)
+                    else _adjusted_defense(target)
+                )
+                max_hp_frac = damage_policy.max_hp_fraction
+            else:
+                matched_mult = 1.0
+                defense = _adjusted_defense(target)
+                max_hp_frac = 0.0
+            attack_part = round(attack * multiplier * coefficient * matched_mult)
+            post_defense = attack_part - defense
+            rider = math_floor(round(_max_hp(target) * max_hp_frac, 6))
+            base_amount = int(max(post_defense + rider, floor))
             amount = max(scaled_magnitude(base_amount, scale), floor)
             amount = int(amount)
         key = str(target.key)

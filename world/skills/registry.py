@@ -304,6 +304,11 @@ class SkillDef:
                     f"skill {self.key!r} effect {effect_id!r} does not support "
                     f"potency coefficient {policy.coefficient}"
                 )
+            if policy.damage is not None and not isinstance(parsed, DamageEffect):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} is not a DamageEffect and "
+                    f"cannot declare a DamagePolicy"
+                )
             if (
                 isinstance(
                     parsed,

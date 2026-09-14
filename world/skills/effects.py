@@ -10,6 +10,7 @@ silently doing nothing at use time.
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
+from collections.abc import Iterable, Sequence
 from typing import Any, Literal
 
 # Continuous-valued ownership effects read by deterministic consumers.
@@ -319,11 +320,151 @@ class DisengageEffect:
 
 
 @dataclass(frozen=True)
+class DamagePolicy:
+    """Immutable conditional damage policy metadata for a skill effect.
+
+    When predicate is non-empty, matching targets receive the attack_multiplier
+    (applied once even if multiple predicate facts match) and bypass defense
+    if bypass_defense is True.
+
+    max_hp_fraction is a devastation rider: when non-zero, floor(max_hp * max_hp_fraction)
+    is added after defense subtraction on any successful hit, regardless of whether
+    a predicate is configured or matched. On a miss, zero total damage is dealt.
+    """
+
+    predicate: tuple[str, ...] = ()
+    attack_multiplier: float = 1.0
+    bypass_defense: bool = False
+    max_hp_fraction: float = 0.0
+
+    def __init__(
+        self,
+        predicate: Sequence[str] | None = None,
+        attack_multiplier: float = 1.0,
+        bypass_defense: bool = False,
+        max_hp_fraction: float = 0.0,
+        *,
+        target_facts: Sequence[str] | None = None,
+        conditional_multiplier: float | None = None,
+        conditional_defense_bypass: bool | None = None,
+    ) -> None:
+        if predicate is None and target_facts is not None:
+            predicate = target_facts
+        elif predicate is None:
+            predicate = ()
+
+        if conditional_multiplier is not None:
+            attack_multiplier = conditional_multiplier
+        if conditional_defense_bypass is not None:
+            bypass_defense = conditional_defense_bypass
+
+        object.__setattr__(self, "predicate", predicate)
+        object.__setattr__(self, "attack_multiplier", attack_multiplier)
+        object.__setattr__(self, "bypass_defense", bypass_defense)
+        object.__setattr__(self, "max_hp_fraction", max_hp_fraction)
+        self.__post_init__()
+
+    @property
+    def target_facts(self) -> tuple[str, ...]:
+        return self.predicate
+
+    @property
+    def conditional_multiplier(self) -> float:
+        return self.attack_multiplier
+
+    def __post_init__(self) -> None:
+        if isinstance(self.predicate, (str, bytes)) or not isinstance(
+            self.predicate, Iterable
+        ):
+            raise ValueError(
+                f"DamagePolicy predicate must be a sequence of strings, got {type(self.predicate).__name__}"
+            )
+        from world.lore.elements import ELEMENT_REGISTRY
+        from world.rules.traits import COMBAT_TRAITS_VOCABULARY
+
+        validated_predicate: list[str] = []
+        seen: set[str] = set()
+        for entry in self.predicate:
+            if not isinstance(entry, str):
+                raise ValueError(
+                    f"DamagePolicy predicate entry must be a string, got {type(entry).__name__}: {entry!r}"
+                )
+            if ":" in entry:
+                raise ValueError(
+                    f"DamagePolicy predicate entries must be bare registry keys, not namespaced: {entry!r}"
+                )
+            if entry in seen:
+                raise ValueError(
+                    f"duplicate DamagePolicy predicate entry: {entry!r}"
+                )
+            if entry not in ELEMENT_REGISTRY and entry not in COMBAT_TRAITS_VOCABULARY:
+                raise ValueError(
+                    f"unknown DamagePolicy predicate fact {entry!r}; must be in ELEMENT_REGISTRY or COMBAT_TRAITS_VOCABULARY"
+                )
+            seen.add(entry)
+            validated_predicate.append(entry)
+        canon_pred = tuple(validated_predicate)
+        object.__setattr__(self, "predicate", canon_pred)
+
+        if isinstance(self.attack_multiplier, bool) or not isinstance(
+            self.attack_multiplier, (int, float)
+        ):
+            raise ValueError(
+                f"DamagePolicy attack_multiplier must be a finite positive number, got {self.attack_multiplier!r}"
+            )
+        try:
+            mult = float(self.attack_multiplier)
+        except OverflowError as error:
+            raise ValueError(
+                f"DamagePolicy attack_multiplier must be a finite positive number, got {self.attack_multiplier!r}"
+            ) from error
+        if not isfinite(mult) or mult <= 0:
+            raise ValueError(
+                f"DamagePolicy attack_multiplier must be a finite positive number, got {self.attack_multiplier!r}"
+            )
+        object.__setattr__(self, "attack_multiplier", mult)
+
+        if not isinstance(self.bypass_defense, bool):
+            raise ValueError(
+                f"DamagePolicy bypass_defense must be a bool, got {type(self.bypass_defense).__name__}"
+            )
+
+        if isinstance(self.max_hp_fraction, bool) or not isinstance(
+            self.max_hp_fraction, (int, float)
+        ):
+            raise ValueError(
+                f"DamagePolicy max_hp_fraction must be a finite number between 0.0 and 1.0, got {self.max_hp_fraction!r}"
+            )
+        try:
+            frac = float(self.max_hp_fraction)
+        except OverflowError as error:
+            raise ValueError(
+                f"DamagePolicy max_hp_fraction must be a finite number between 0.0 and 1.0, got {self.max_hp_fraction!r}"
+            ) from error
+        if not isfinite(frac) or not (0.0 <= frac <= 1.0):
+            raise ValueError(
+                f"DamagePolicy max_hp_fraction must be a finite number between 0.0 and 1.0, got {self.max_hp_fraction!r}"
+            )
+        object.__setattr__(self, "max_hp_fraction", frac)
+
+        if not canon_pred:
+            if mult != 1.0:
+                raise ValueError(
+                    f"DamagePolicy specifies attack_multiplier={mult} but has an empty predicate"
+                )
+            if self.bypass_defense:
+                raise ValueError(
+                    "DamagePolicy specifies bypass_defense=True but has an empty predicate"
+                )
+
+
+@dataclass(frozen=True)
 class EffectPolicy:
     """Immutable per-occurrence policy metadata for a skill effect."""
 
     coefficient: float = 1.0
     audience: EffectAudience = EffectAudience.SELECTED
+    damage: DamagePolicy | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.coefficient, bool) or not isinstance(
@@ -357,6 +498,11 @@ class EffectPolicy:
                 f"EffectPolicy audience must be an EffectAudience, got {self.audience!r}"
             ) from error
         object.__setattr__(self, "audience", aud)
+
+        if self.damage is not None and not isinstance(self.damage, DamagePolicy):
+            raise ValueError(
+                f"EffectPolicy damage must be a DamagePolicy or None, got {self.damage!r}"
+            )
 
 
 @dataclass(frozen=True)

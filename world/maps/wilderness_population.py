@@ -72,6 +72,7 @@ class MonsterPopulation:
 
     tier: str
     name_zh: str
+    combat_traits: tuple[str, ...] = ()
 
 
 def _coordinate_hash(x: int, y: int) -> int:
@@ -192,6 +193,10 @@ def _spawn(wilderness, coordinates: tuple[int, int], expected: MonsterPopulation
     monster = create_object(Monster, key=expected.name_zh)
     monster.threat_tier = expected.tier
     monster.apply_monster_tier("floor")
+    if expected.combat_traits:
+        from world.rules.traits import set_combat_traits
+
+        set_combat_traits(monster, expected.combat_traits)
     monster.db.population_key = _population_key(x, y)
     wilderness.db.itemcoordinates[monster] = coordinates
     room = wilderness.db.rooms.get(coordinates)
@@ -208,10 +213,13 @@ def _matches_expected(monster: Monster, expected: MonsterPopulation) -> bool:
     kept stale. Compare the monster's stored tier and its key against the
     expected population to close the drift gap.
     """
+    from world.rules.target_facts import get_combat_traits
+
     return (
         _stored_hp(monster) > 0
         and monster.threat_tier == expected.tier
         and monster.key == expected.name_zh
+        and get_combat_traits(monster) == frozenset(expected.combat_traits)
     )
 
 

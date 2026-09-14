@@ -26,6 +26,7 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     race: str | None = AttributeProperty(default=None)
     subrace: str | None = AttributeProperty(default=None)
     sex: str = AttributeProperty(default=DEFAULT_SEX)
+    combat_traits: list[str] = AttributeProperty(default=list, autocreate=False)
 
     @lazy_property
     def traits(self) -> TraitHandler:
