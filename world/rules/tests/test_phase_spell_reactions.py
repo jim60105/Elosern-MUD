@@ -27,6 +27,7 @@ from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from tools.spec_traceability import covers_requirement
 
 from typeclasses.characters import PlayerCharacter
 from world.quests.catalog import register_catalog
@@ -335,6 +336,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 1. Parsing & Recognized Prefix Superset ---
 
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
     def test_bare_pleasure_peak_parses_and_rejects_payload(self):
         """pleasure_peak parses as bare dataclass; any payload or suffix raises ValueError."""
         parsed = parse_effect("pleasure_peak")
@@ -345,6 +349,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
                 with self.assertRaises(ValueError):
                     parse_effect(invalid)
 
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
     def test_parse_effect_superset_matches_recognized_set(self):
         """parse_effect classifies all 34 recognized prefixes and rejects retired or unknown keys."""
         # 34 prefixes including stimulus and pleasure_peak
@@ -401,6 +408,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 2. pleasure_peak Canonical Advance & Boundaries ---
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::peak-effects-bind-declared-recipients-and-retain-action-locks"
+    )
     def test_pleasure_peak_advances_phase_through_canonical_writer_not_direct_set(self):
         """pleasure_peak walks canonical cycle edges (未達 -> 接近 -> 進行中) without direct phase assignment."""
         with self._catalogue():
@@ -418,6 +428,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.assertGreater(self.target.traits.hp.current, 10)
             self.assertEqual(self.target.sexual.climax_phase.level, "未達")
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::peak-effects-bind-declared-recipients-and-retain-action-locks"
+    )
     def test_pleasure_peak_approaching_phase_no_artificial_extension(self):
         """Caster starting at 接近 enters 進行中 without counting the zero-gain call as extension stimulus."""
         with self._catalogue():
@@ -435,6 +448,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             # pending_climax_extension must remain 0
             self.assertEqual(self.actor.sexual.pending_climax_extension, 0)
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::peak-effects-bind-declared-recipients-and-retain-action-locks"
+    )
     def test_already_locked_caster_cannot_cast(self):
         """An in-progress caster is rejected at capability check before MP or healing changes."""
         with self._catalogue():
@@ -457,6 +473,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.assertEqual(self.actor.traits.mp.current, mp_before)
             self.assertEqual(self.target.traits.hp.current, hp_before)
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::peak-effects-bind-declared-recipients-and-retain-action-locks"
+    )
     def test_emergency_recovery_locks_only_caster(self):
         """Caster is locked for subsequent casts, while healed target remains capable."""
         with self._catalogue():
@@ -477,6 +496,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 3. Qualified Climax Empowerment Marker Lifecycle ---
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_qualified_phase_entry_grants_marker_both_canonical_sources(self):
         """Qualified actor entering 進行中 via pleasure gain or rule event receives climax_empowerment."""
         with self._catalogue():
@@ -504,6 +526,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.assertEqual(self.actor.sexual.climax_phase.level, "進行中")
             self.assertIn("climax_empowerment", active_buff_keys_from_storage(self.actor))
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_non_qualified_owner_never_gets_marker(self):
         """Unqualified actor entering 進行中 never receives climax_empowerment."""
         with self._catalogue():
@@ -527,6 +552,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.assertEqual(self.actor.sexual.climax_phase.level, "進行中")
             self.assertNotIn("climax_empowerment", active_buff_keys_from_storage(self.actor))
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_mid_cycle_acquisition_not_retroactive(self):
         """Acquiring qualification after phase entry does not retroactively grant the marker."""
         with self._catalogue():
@@ -542,6 +570,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             # Still no marker!
             self.assertNotIn("climax_empowerment", active_buff_keys_from_storage(self.actor))
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_marker_survives_afterglow_and_expires_at_neutral(self):
         """Marker survives afterglow and reload via attribute storage, allows ordinary actions, and expires at neutral."""
         with self._catalogue():
@@ -577,6 +608,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             # Marker removed
             self.assertNotIn("climax_empowerment", active_buff_keys_from_storage(self.actor))
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_qualification_loss_disables_benefits_immediately(self):
         """Removing qualification mid-cycle disables marker benefits immediately without writes on reads."""
         with self._catalogue():
@@ -604,6 +638,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             mag = _T_KISS_CURVE.compute(self.actor, actor=self.actor)
             self.assertAlmostEqual(mag, 3.4, places=5)
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::qualified-phase-entry-grants-a-persistent-cycle-scoped-benefit"
+    )
     def test_marker_idempotence_across_cycles(self):
         """Entering 進行中 across repeated cycles idempotently grants, retains, and removes marker."""
         with self._catalogue():
@@ -624,6 +661,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 4. Marker-Max Selection & Untouched Fixed Magnitudes ---
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::empowerment-selects-configured-maxima-without-bypassing-conditions"
+    )
     def test_marker_max_override_vs_higher_authored_coefficient(self):
         """Empowered curve selects authored maximum (3.5), replacing authored coefficient; fixed coefficients remain fixed."""
         with self._catalogue():
@@ -659,6 +699,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             )
             self.assertEqual(effect_ctx_apo["resolved_effect"].policy.coefficient, 3.8)
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::empowerment-selects-configured-maxima-without-bypassing-conditions"
+    )
     def test_marker_does_not_bypass_cast_prerequisites_or_gates(self):
         """Active marker does not bypass unmet target conditions or action capability."""
         with self._catalogue():
@@ -679,6 +722,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 5. Rollback Consistency (Action and Clock paths) ---
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::empowerment-selects-configured-maxima-without-bypassing-conditions"
+    )
     def test_rollback_restores_marker_phase_and_traits_action_path(self):
         """Action transaction commit failure restores marker, buffs, phase, and traits."""
         with self._catalogue():
@@ -712,6 +758,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.assertEqual(self.actor.sexual.climax_phase.level, "未達")
             self.assertNotIn("climax_empowerment", active_buff_keys_from_storage(self.actor))
 
+    @covers_requirement(
+        "phase-scoped-spell-empowerment::empowerment-selects-configured-maxima-without-bypassing-conditions"
+    )
     def test_rollback_restores_marker_phase_and_buffs_clock_path(self):
         """Clock advance failure restores marker removed on transition to 未達."""
         with self._catalogue():
@@ -741,6 +790,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 6. Generic Reuse (Second Synthetic Configuration) ---
 
+    @covers_requirement(
+        "skill-effect-model::peak-effects-and-marker-selected-state-maxima-are-validated-typed-behavior"
+    )
     def test_second_synthetic_non_light_configuration(self):
         """A synthetic water spell declares self peak and marker-bound state magnitude, reusing generic machinery."""
         with self._catalogue():
@@ -764,6 +816,9 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
     # --- 7. Rejection of Malformed Declarations ---
 
+    @covers_requirement(
+        "skill-effect-model::peak-effects-and-marker-selected-state-maxima-are-validated-typed-behavior"
+    )
     def test_malformed_peak_or_unresolved_marker_rejected(self):
         """Authoring supplies invalid marker references, bad peak syntax, or contradictory policies raises ValueError."""
         # Unresolved marker raises

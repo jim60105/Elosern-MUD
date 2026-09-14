@@ -10,15 +10,16 @@ at import, not silently at use.
 ### Requirement: parse_effect classifies every declared prefix into a typed dataclass
 `world/skills/effects.py` SHALL define `parse_effect(effect_id: str)` returning one of a fixed set of
 frozen dataclasses, one per recognized prefix. The recognized set is the complete set
-already dispatched by `world/skills/effects.py` plus this change's `stimulus`, namely:
-(`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
+already dispatched by `world/skills/effects.py` plus `stimulus` (introduced by
+`light-sacrament-casting`, which syncs before this change) plus this change's `pleasure_peak`,
+namely: (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
 `passive_trait`, `movement`, `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`,
 `self_buff_apply`, `confer_growth_rate`, `sexual_event`, `sexual_event_actor`, `sexual_event_target`,
 `pleasure`, `sexual_counter`, `act_pair_event`, `damage`, `heal`, `self_heal`, `cleanse`, `disengage`,
 `divine_mystery`, `divine_pleasure_max`, `divine_climax_extension_stage`, `divine_drain`,
 `divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`,
-`stimulus`). `parse_effect` SHALL raise `ValueError` for any prefix not in this set and SHALL retain
-every prefix currently dispatched, so no shipped skill fails to parse.
+`stimulus`, `pleasure_peak`). `parse_effect` SHALL raise `ValueError` for any prefix not in this set
+and SHALL retain every prefix previously recognized, so no shipped skill fails to parse.
 `growth_rate` SHALL be recognized because
 `reincarnation_boon_elosia` already declares `growth_rate:practice:100`, which
 the registry parses at load (the magic-XP consumer retired with
@@ -61,10 +62,8 @@ lands); omitting it would make the registry's own import fail the
 
 #### Scenario: Every shipped registry effect still parses
 - **WHEN** `SKILL_REGISTRY` is imported after this change and every registered effect string is parsed
-- **THEN** no shipped sexual-act or divine effect (`pleasure`, `sexual_counter`, `act_pair_event`,
-  `sexual_event_actor`, `sexual_event_target`, `divine_pleasure_max`, `divine_climax_extension_stage`,
-  `divine_drain`, `divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`,
-  `divine_restore_purity`) raises, and the enumeration above is exactly the recognized set
+- **THEN** no shipped sexual-act, divine or stimulus effect raises, the bare `pleasure_peak` parses,
+  any `pleasure_peak:<suffix>` form raises, and the enumeration above is exactly the recognized set
 
 ### Requirement: SkillDef.__post_init__ rejects unparseable effects at construction
 `SkillDef.__post_init__` SHALL call `parse_effect` on every string in `effects` and store the results
@@ -174,3 +173,14 @@ A validated damage policy SHALL permit one extra independent strike against a ta
 #### Scenario: Repeated damage is atomic and nonlethal aware
 - **WHEN** two strikes cross a protected target or a later commit step fails
 - **THEN** successful settlement floors HP at 1 with one knockout; a failed settlement restores all HP and evidence
+
+### Requirement: Peak effects and marker-selected state maxima are validated typed behavior
+Effect authoring SHALL accept a peak effect with declared recipient policy and an optional marker-bound maximum on a state-derived magnitude. Unknown effect syntax, invalid marker references and contradictory recipient policies SHALL fail before runtime. These declarations SHALL use the same behavior for synthetic spells of any element.
+
+#### Scenario: Typed declaration is executable outside light
+- **WHEN** a synthetic non-light spell declares a self peak and a marker-bound state magnitude
+- **THEN** it follows the same recipient and bounded-state behavior without a light-spell identity requirement
+
+#### Scenario: Malformed peak or marker is rejected
+- **WHEN** authoring supplies unknown peak syntax or an unresolved configured marker
+- **THEN** the definition is rejected rather than silently producing no effect
