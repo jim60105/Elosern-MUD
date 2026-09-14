@@ -154,16 +154,21 @@ def stage_action_evidence(
         existing_mapping = dict(raw) if isinstance(raw, Mapping) else {}
         old_entry = existing_mapping.get(kind)
         old_expires_at = 0
+        old_recorded_at = 0
         if isinstance(old_entry, Mapping):
             val = old_entry.get("expires_at", 0)
             if isinstance(val, (int, float)):
                 old_expires_at = int(val)
+            rec = old_entry.get("recorded_at", 0)
+            if isinstance(rec, (int, float)):
+                old_recorded_at = int(rec)
         new_expires_at = max(old_expires_at, int(event_time + duration))
+        new_recorded_at = max(old_recorded_at, int(event_time))
         actor_id = str(getattr(actor, "pk", None) or getattr(actor, "key", ""))
         existing_mapping[kind] = {
             "kind": kind,
             "actor_id": actor_id,
-            "recorded_at": int(event_time),
+            "recorded_at": new_recorded_at,
             "expires_at": new_expires_at,
         }
         attributes.add(ACTION_EVIDENCE_ATTR, existing_mapping)

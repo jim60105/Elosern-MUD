@@ -575,6 +575,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
                     PendingEffect(self.actor, "poison", frozenset({"action_evidence"}), failing_apply)
                 ]
             },
+            clear=False,
         ):
             result = ActionResolver.resolve(request)
 
