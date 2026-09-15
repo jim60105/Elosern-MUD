@@ -3,8 +3,7 @@
 1. `water-mp-depletion-reaction` (this change) — MUST land before any 潮退 buffs.yaml row goes live.
 2. `water-mana-transfer` — depends on this change's canonical writer.
 3. `water-damage-redirect-shield` — depends on this change's writer; independent of 2.
-4. `water-reflux-team-marker` — depends on 2.
-5. `water-spell-catalog` — depends on all; data-only final integration.
+4. `water-spell-catalog` — depends on all; data-only final integration (the 回流 team marker is folded into 2, no separate change).
 
 ## 1. Canonical writer and routing
 
@@ -30,8 +29,10 @@
 
 ### Focused invocation
 
+`world.rules.tests.test_mp_flow` is the intended synthetic writer/event module owned by this change, not an existing-test claim.
+
 ```sh
-uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_mp_flow world.rules.tests.test_mp_state_feedback world.rules.tests.test_buffs world.rules.tests.test_state_reactions world.rules.tests.test_combat_modifiers
+uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_mp_flow world.rules.tests.test_buffs world.rules.tests.test_damage_state_feedback world.rules.tests.test_combat_modifiers
 uv run --locked python -m tools.observability_lint check
 uv run --locked python -m tools.test_data_lint check
 uv run --locked python -m tools.spec_traceability check

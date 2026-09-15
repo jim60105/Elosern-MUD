@@ -61,7 +61,7 @@ The buff engine's rate-tick path SHALL apply an mp-target delta through the cano
 
 #### Scenario: A tiered MP drain ticks, attributes, and can deplete
 - **WHEN** a synthetic mp-target DoT buff applied by a source-bearing cast ticks MP from positive to zero across successive intervals
-- **THEN** each tick routes through the writer with the persisted source and tier, and the crossing tick alone dispatches `mp_zero`
+- **THEN** each tick routes through the writer with the persisted grant-time source skill and tier, and the crossing tick alone dispatches `mp_zero`
 
 #### Scenario: HP DoT behavior is untouched
 - **WHEN** an hp-target damaging buff ticks
