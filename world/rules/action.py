@@ -17,6 +17,7 @@ from world.rules.buffs import (
     BUFF_DEFINITIONS,
     apply_buff,
     _handle_cleanse,
+    _is_damaging_gauge_rate,
     _is_damaging_rate,
     get_recovery_policy,
     blocks_action,
@@ -599,12 +600,13 @@ def _handle_buff_apply(
     kwargs["source_tier"] = source_tier
     definition = BUFF_DEFINITIONS.get(key)
     rate = definition.modifiers.get("rate") if definition is not None else None
-    if _is_damaging_rate(rate):
+    if _is_damaging_gauge_rate(rate):
         # Attribution is authoritative-actor-derived and cannot be spoofed: a
         # caller-supplied ``source_pk`` is popped and replaced by the actor's
         # dbref, and an actor without a resolvable positive-int dbref rejects
         # the action before commit (fix-dot-kill-credit D1).
         kwargs.pop("source_pk", None)
+        kwargs.pop("source_skill", None)
         pk = getattr(actor, "pk", None)
         if isinstance(pk, bool) or not isinstance(pk, int) or pk <= 0:
             raise RejectedAction(
@@ -612,6 +614,8 @@ def _handle_buff_apply(
                 f"buff {key!r} requires a caster with a positive-int dbref",
             )
         kwargs["source_pk"] = int(pk)
+        if source_skill is not None:
+            kwargs["source_skill"] = getattr(source_skill, "key", str(source_skill))
     if definition is not None and get_recovery_policy(definition) is not None:
         from world.rules.combat_modifiers import evaluate_combat_modifiers
         caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
@@ -719,6 +723,19 @@ def _handle_self_buff_apply(
         except Exception:  # observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung
             source_tier = "學徒"
     kwargs["source_tier"] = source_tier
+    rate = definition.modifiers.get("rate") if definition is not None else None
+    if _is_damaging_gauge_rate(rate):
+        kwargs.pop("source_pk", None)
+        kwargs.pop("source_skill", None)
+        pk = getattr(actor, "pk", None)
+        if isinstance(pk, bool) or not isinstance(pk, int) or pk <= 0:
+            raise RejectedAction(
+                RejectReason.EFFECT_RESOLUTION_FAILED,
+                f"buff {key!r} requires a caster with a positive-int dbref",
+            )
+        kwargs["source_pk"] = int(pk)
+        if source_skill is not None:
+            kwargs["source_skill"] = getattr(source_skill, "key", str(source_skill))
     if definition is not None and get_recovery_policy(definition) is not None:
         from world.rules.combat_modifiers import evaluate_combat_modifiers
         caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
@@ -1895,14 +1912,28 @@ def _step6_resource_deduction(
                 RejectReason.RESOURCE_DEDUCTION_FAILED,
                 resource_key,
             )
-        pending.append(
-            PendingEffect(
-                actor,
-                f"resource_spend|{_entity_key(actor)}|{resource_key}|{amount}",
-                frozenset({"traits"}),
-                lambda trait=trait, amount=amount: _deduct_resource(trait, amount),
+        if resource_key == "mp":
+            from world.rules.mp_flow import apply_mp_change
+
+            pending.append(
+                PendingEffect(
+                    actor,
+                    f"resource_spend|{_entity_key(actor)}|{resource_key}|{amount}",
+                    frozenset({"traits"}),
+                    lambda actor=actor, amount=amount, skill_key=skill.key: (
+                        apply_mp_change(actor, -amount, source_skill=skill_key)
+                    ),
+                )
             )
-        )
+        else:
+            pending.append(
+                PendingEffect(
+                    actor,
+                    f"resource_spend|{_entity_key(actor)}|{resource_key}|{amount}",
+                    frozenset({"traits"}),
+                    lambda trait=trait, amount=amount: _deduct_resource(trait, amount),
+                )
+            )
     return pending
 
 

@@ -34,6 +34,7 @@ _RECOGNIZED_WHEN_KEYS = frozenset(
         "direction",
         "dual_wielding",
         "equipment_worn",
+        "event_source_skill",
     }
 )
 
@@ -45,6 +46,17 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
     seen_empowerment_markers: set[str] = set()
 
     for rule in rules:
+        if "event_source_skill" in rule.when:
+            if "event" not in rule.when:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} declares event_source_skill without an event condition"
+                )
+            expected = rule.when["event_source_skill"]
+            if isinstance(expected, bool) or not isinstance(expected, str) or not expected.strip():
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} event_source_skill must be a non-empty string, got {expected!r}"
+                )
+
         unknown_when = set(rule.when) - _RECOGNIZED_WHEN_KEYS
         if unknown_when:
             raise ValueError(
@@ -334,6 +346,7 @@ def dispatch_outcome_reaction(
     event: str,
     source_tier: str | None = None,
     rules: list[Rule] | None = None,
+    source_skill: str | None = None,
 ) -> None:
     """Dispatch outcome reactions (hp_loss, negative_buff_added) to matching rules.
 
@@ -355,6 +368,7 @@ def dispatch_outcome_reaction(
         "entity": entity,
         "event": event,
         "active_buffs": active_buff_keys_from_storage(entity),
+        "source_skill": source_skill,
     }
 
     sexual = getattr(entity, "sexual", None)
@@ -375,7 +389,20 @@ def dispatch_outcome_reaction(
         if "event" not in rule.when:
             continue
         if evaluate_condition(rule.when, context):
-            if "pleasure_gain" in rule.then:
+            if "apply_buff" in rule.then:
+                from world.rules.buffs import apply_buff
+
+                kwargs: dict[str, Any] = {}
+                if source_skill is not None:
+                    kwargs["source_skill"] = source_skill
+                if source_tier is not None:
+                    kwargs["source_tier"] = source_tier
+                apply_buff(entity, rule.then["apply_buff"], **kwargs)
+            elif "remove_buff" in rule.then:
+                from world.rules.buffs import remove_by_selector
+
+                remove_by_selector(entity, rule.then["remove_buff"])
+            elif "pleasure_gain" in rule.then:
                 from world.rules.pleasure import apply_pleasure_gain
 
                 gain_spec = rule.then["pleasure_gain"]

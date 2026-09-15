@@ -210,23 +210,37 @@ class RulebookBuff(BaseBuff):
         recovery = get_recovery_policy(BUFF_DEFINITIONS[self.definition_key])
         if rate and recovery is None:
             source_tier = getattr(self, "source_tier", None) or "學徒"
-            _apply_rate_modifier(self.owner, rate, source_tier=source_tier)
+            source_skill = getattr(self, "source_skill", None)
+            _apply_rate_modifier(
+                self.owner,
+                rate,
+                source_tier=source_tier,
+                source_skill=source_skill,
+            )
 
 
-def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
-    """Return whether one rate modifier damages HP (negative delta)."""
+def _is_damaging_gauge_rate(rate: dict[str, Any] | None) -> bool:
+    """Return whether one rate modifier damages a gauge (HP or MP, negative delta)."""
     if not isinstance(rate, dict):
         return False
     return (
-        rate.get("target") == "hp"
+        rate.get("target") in ("hp", "mp")
         and isinstance(rate.get("delta"), (int, float))
         and not isinstance(rate.get("delta"), bool)
         and rate["delta"] < 0
     )
 
 
+def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
+    """Return whether one rate modifier damages HP (negative delta)."""
+    return _is_damaging_gauge_rate(rate) and isinstance(rate, dict) and rate.get("target") == "hp"
+
+
 def _apply_rate_modifier(
-    entity, rate_mod: dict[str, Any], source_tier: str | None = None
+    entity,
+    rate_mod: dict[str, Any],
+    source_tier: str | None = None,
+    source_skill: str | None = None,
 ) -> None:
     """Apply one rate tick.
 
@@ -243,8 +257,19 @@ def _apply_rate_modifier(
         raise NotImplementedError(
             f"buff rate target {target!r} belongs to its owning future change"
         )
-    trait = getattr(entity.traits, target)
     delta = rate_mod["delta"]
+    if target == "mp":
+        from world.rules.mp_flow import apply_mp_change
+
+        apply_mp_change(
+            entity,
+            delta,
+            source_skill=source_skill,
+            source_tier=source_tier,
+        )
+        return
+
+    trait = getattr(entity.traits, target)
     current = getattr(trait, "current", None)
     if current is not None:
         before = float(current)

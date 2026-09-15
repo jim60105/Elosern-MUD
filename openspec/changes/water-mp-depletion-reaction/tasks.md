@@ -7,11 +7,11 @@
 
 ## 1. Canonical writer and routing
 
-- [ ] 1.1 Inspect current source and exported references (codegraph/LSP) for every `traits.mp` write site; enumerate them in the PR notes. Confirm the shared interfaces in ../water-spell-catalog/design.md and that no predecessor contract is unimplemented.
-- [ ] 1.2 Implement `world/rules/mp_flow.py` per design D1: one clamped writer returning the actual signed change, `remove_mp` drain-all entry, exactly-once `mp_zero` dispatch on positive→zero crossings via a decrease, source-skill + source-tier attribution with first-tier fallback; extend `dispatch_outcome_reaction` with the optional event-source parameter without changing existing callers.
-- [ ] 1.3 Route the buff engine's `rate {target: mp}` tick through the writer (both signs), persisting grant-time source/tier attribution into the event; keep the hp branch's `hp_loss` dispatch, the pull no-op and recovery profiles unchanged.
-- [ ] 1.4 Route the step-6 cast-cost `mp` deduction through the writer inside the existing staged pending effect with the cast skill as source; hp/sp deduction and preflight/recheck agreement untouched.
-- [ ] 1.5 Add the closed `event_source_skill` when key to `state_reactions.py` validation and the shared condition evaluator (fail closed on missing/unknown/non-string; load-time rejection when paired with no `event`); verify an alternate synthetic rule reuses the key with no water-key branch in generic code.
+- [x] 1.1 Inspect current source and exported references (codegraph/LSP) for every `traits.mp` write site; enumerate them in the PR notes. Confirm the shared interfaces in ../water-spell-catalog/design.md and that no predecessor contract is unimplemented.
+- [x] 1.2 Implement `world/rules/mp_flow.py` per design D1: one clamped writer returning the actual signed change, `remove_mp` drain-all entry, exactly-once `mp_zero` dispatch on positive→zero crossings via a decrease, source-skill + source-tier attribution with first-tier fallback; extend `dispatch_outcome_reaction` with the optional event-source parameter without changing existing callers.
+- [x] 1.3 Route the buff engine's `rate {target: mp}` tick through the writer (both signs), persisting grant-time source/tier attribution into the event; keep the hp branch's `hp_loss` dispatch, the pull no-op and recovery profiles unchanged.
+- [x] 1.4 Route the step-6 cast-cost `mp` deduction through the writer inside the existing staged pending effect with the cast skill as source; hp/sp deduction and preflight/recheck agreement untouched.
+- [x] 1.5 Add the closed `event_source_skill` when key to `state_reactions.py` validation and the shared condition evaluator (fail closed on missing/unknown/non-string; load-time rejection when paired with no `event`); verify an alternate synthetic rule reuses the key with no water-key branch in generic code.
 
 ## 2. Rulebook rows (no-silent-window given: DoT rows ship here)
 
