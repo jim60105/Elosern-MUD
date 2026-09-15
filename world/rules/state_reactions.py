@@ -1,9 +1,15 @@
-"""Declarative phase transition reactions (light-climax-empowerment D2).
+"""Declarative phase transition and outcome reactions (light-climax-empowerment D2).
 
 Consumes load_rules and evaluate_condition from world.rules.rulebook.schema
-without inventing a new language or event bus. Dispatches once after a
-successful canonical _apply_climax_phase_set edge, executing declared
-apply_buff / remove_buff actions.
+without inventing a new language or event bus. Two dispatchers share the rule
+list with disjoint action ownership:
+
+* ``dispatch_phase_reaction`` runs once after a successful canonical
+  ``_apply_climax_phase_set`` edge and executes the ``apply_buff`` /
+  ``remove_buff`` actions of field-conditioned phase rules.
+* ``dispatch_outcome_reaction`` runs on named outcome events (``hp_loss``,
+  ``negative_buff_added``) and executes only the ``pleasure_gain`` action of
+  event-conditioned rules; buff actions belong to the phase dispatcher.
 """
 
 from pathlib import Path
@@ -230,6 +236,10 @@ def dispatch_outcome_reaction(
     Context provides: entity, event, active_buffs, and sexual fields (climax_phase, arousal).
     A pleasure_gain action calculates the gain using the source_tier (falling back to '學徒'
     for non-spell or unspecified sources) and calls canonical apply_pleasure_gain.
+
+    Only event-conditioned rules are considered: the buff actions of
+    field-conditioned phase rules belong to ``dispatch_phase_reaction`` and
+    must never fire from an outcome dispatch.
     """
     if not hasattr(entity, "attributes"):
         return
@@ -258,6 +268,8 @@ def dispatch_outcome_reaction(
             context["arousal"] = getattr(ar, "level", str(ar))
 
     for rule in active_rules:
+        if "event" not in rule.when:
+            continue
         if evaluate_condition(rule.when, context):
             if "pleasure_gain" in rule.then:
                 from world.rules.pleasure import apply_pleasure_gain
@@ -277,11 +289,3 @@ def dispatch_outcome_reaction(
 
                 if gain > 0:
                     apply_pleasure_gain(entity, gain)
-            elif "apply_buff" in rule.then:
-                from world.rules.buffs import apply_buff
-
-                apply_buff(entity, rule.then["apply_buff"])
-            elif "remove_buff" in rule.then:
-                from world.rules.buffs import remove_by_selector
-
-                remove_by_selector(entity, rule.then["remove_buff"])
