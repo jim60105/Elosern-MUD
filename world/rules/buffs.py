@@ -506,10 +506,6 @@ def active_stack_count(arg1: Any, arg2: Any) -> int:
 
     return 0
 
-
-active_marker_stack_count = active_stack_count
-
-
 def _active_buff_instances(entity) -> tuple[RulebookBuff, ...]:
     """Return unpaused game-time-unexpired buff instances with positive stacks."""
     return tuple(

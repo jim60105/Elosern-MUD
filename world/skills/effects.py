@@ -10,7 +10,7 @@ silently doing nothing at use time.
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal
 
 # Continuous-valued ownership effects read by deterministic consumers.
