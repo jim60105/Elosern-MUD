@@ -212,13 +212,13 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         tick_buffs(entity, 10)
         self.assertNotIn("fire_scorch", entity_active_buffs(entity))
 
-    def test_buff_water_shield(self):
+    def test_buff_water_film_divert_shape(self):
         definition = self._synth_buff(
-            key="t_water_shape",
+            key="t_divert_shape",
             duration=60,
             stacking="refresh",
             polarity="buff",
-            modifiers={"bounds": {"target": "defense", "ceiling": 5}},
+            modifiers={"divert": {"target": "mp", "fraction": 0.3, "cap": 30}},
         )
         entity = self._entity()
         apply_buff(entity, definition.key)
