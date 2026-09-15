@@ -68,7 +68,7 @@ SKILL_REGISTRY_CLASS_MODULES = {
     "LightningSpellCatalogTests": "test_spell_catalogs.py",
     "IceSpellCatalogTests": "test_spell_catalogs.py",
     "DarkSpellCatalogTests": "test_spell_catalogs.py",
-    # The shipped-content cast classes retired when the cast suite migrated
+    # The shipped-content cast classes retired when the cast suite migrated (light/water synthetic behavior precedent)
     # onto the synthetic kit (skills-migration DC2): the cast-resolution
     # behaviour they pinned now lives in these synthetic-scope classes.
     "SyntheticDamageCastTests": "test_skill_casts.py",
