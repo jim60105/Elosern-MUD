@@ -597,6 +597,11 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.roll_d100", return_value=1),
             patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            # The troll sits below its archetype's flee boundary and acts
+            # before the player, so its turn always attempts to flee; pin the
+            # disengage seam to a failing roll (1 + agility < 51 + pursuer) so
+            # the ALL scope stays four-targeted regardless of shard order.
+            patch("world.rules.disengage.roll_d100", return_value=1),
         ):
             result = submit_player_item_use(self.player, _MANA_KEY)
         self.assertEqual(result["outcome"], "round")
