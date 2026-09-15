@@ -10,7 +10,7 @@ silently doing nothing at use time.
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal
 
 # Continuous-valued ownership effects read by deterministic consumers.
@@ -563,10 +563,6 @@ class DamagePolicy:
                 raise ValueError(
                     f"DamagePolicy specifies attack_multiplier={mult} but has an empty predicate"
                 )
-            if self.bypass_defense:
-                raise ValueError(
-                    "DamagePolicy specifies bypass_defense=True but has an empty predicate"
-                )
 
         if self.repeat_when is not None:
             if not isinstance(self.repeat_when, str):
@@ -609,6 +605,8 @@ class EffectPolicy:
     magnitude: StateMagnitude | None = None
     interaction: InteractionPolicy | None = None
     stimulus_bonus: StateMagnitude | None = None
+    transfer: "GaugeTransferPolicy | None" = None
+    audience_condition: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.coefficient, bool) or not isinstance(
@@ -659,6 +657,186 @@ class EffectPolicy:
             raise ValueError(
                 f"EffectPolicy stimulus_bonus must be a StateMagnitude or None, got {self.stimulus_bonus!r}"
             )
+        if self.transfer is not None and not isinstance(self.transfer, GaugeTransferPolicy):
+            raise ValueError(
+                f"EffectPolicy transfer must be a GaugeTransferPolicy or None, got {self.transfer!r}"
+            )
+        if self.audience_condition is not None:
+            raw_cond = self.audience_condition
+            valid_facts = {"mp_max_zero", "mp_positive"}
+            if isinstance(raw_cond, str):
+                if raw_cond not in valid_facts:
+                    raise ValueError(
+                        f"unknown audience_condition fact {raw_cond!r}; must be in {sorted(valid_facts)}"
+                    )
+                canon_cond = raw_cond
+            elif isinstance(raw_cond, Mapping):
+                unknown = set(raw_cond.keys()) - valid_facts
+                if unknown:
+                    raise ValueError(
+                        f"unknown audience_condition fact {sorted(unknown)[0]!r}; must be in {sorted(valid_facts)}"
+                    )
+                active = [k for k, v in raw_cond.items() if v]
+                if "mp_max_zero" in active and "mp_positive" in active:
+                    raise ValueError(
+                        "contradictory audience_condition: cannot declare both mp_max_zero and mp_positive"
+                    )
+                if not active:
+                    canon_cond = None
+                else:
+                    canon_cond = active[0]
+            elif isinstance(raw_cond, Iterable) and not isinstance(raw_cond, (bytes,)):
+                cond_list = list(raw_cond)
+                unknown = set(cond_list) - valid_facts
+                if unknown:
+                    raise ValueError(
+                        f"unknown audience_condition fact {sorted(unknown)[0]!r}; must be in {sorted(valid_facts)}"
+                    )
+                if "mp_max_zero" in cond_list and "mp_positive" in cond_list:
+                    raise ValueError(
+                        "contradictory audience_condition: cannot declare both mp_max_zero and mp_positive"
+                    )
+                if not cond_list:
+                    canon_cond = None
+                else:
+                    canon_cond = cond_list[0]
+            else:
+                raise ValueError(
+                    f"audience_condition must be a string, mapping, or sequence, got {type(raw_cond).__name__}"
+                )
+            object.__setattr__(self, "audience_condition", canon_cond)
+
+
+@dataclass(frozen=True)
+class GaugeTransferEffect:
+    """A typed gauge transfer effect (drain or restore)."""
+
+    gauge: str
+    direction: str
+    magnitude_mode: str
+    magnitude: float | int | None = None
+
+    def __post_init__(self) -> None:
+        if self.gauge not in ("mp", "hp"):
+            raise ValueError(
+                f"GaugeTransferEffect gauge must be 'mp' or 'hp', got {self.gauge!r} (sp is rejected until a consumer exists)"
+            )
+        if self.direction not in ("drain", "restore"):
+            raise ValueError(
+                f"GaugeTransferEffect direction must be 'drain' or 'restore', got {self.direction!r}"
+            )
+        if self.gauge == "hp" and self.direction != "drain":
+            raise ValueError(
+                f"hp gauge supports drain only, got {self.direction!r} (HP restoration is the heal effect's exclusive verb)"
+            )
+        if self.magnitude_mode not in ("fixed", "fraction", "all"):
+            raise ValueError(
+                f"GaugeTransferEffect magnitude_mode must be 'fixed', 'fraction', or 'all', got {self.magnitude_mode!r}"
+            )
+        if self.magnitude_mode == "fixed":
+            if isinstance(self.magnitude, bool) or not isinstance(self.magnitude, int):
+                raise ValueError(
+                    f"fixed transfer magnitude must be an integer, got {self.magnitude!r}"
+                )
+            if self.magnitude <= 0:
+                raise ValueError(
+                    f"fixed transfer magnitude must be positive, got {self.magnitude!r}"
+                )
+        elif self.magnitude_mode == "fraction":
+            if isinstance(self.magnitude, bool) or not isinstance(self.magnitude, (int, float)):
+                raise ValueError(
+                    f"fraction transfer magnitude must be a number, got {self.magnitude!r}"
+                )
+            mag = float(self.magnitude)
+            if not isfinite(mag) or not (0.0 < mag <= 1.0):
+                raise ValueError(
+                    f"fraction transfer magnitude must be finite in (0, 1], got {self.magnitude!r}"
+                )
+            object.__setattr__(self, "magnitude", mag)
+        elif self.magnitude_mode == "all":
+            if self.magnitude is not None:
+                raise ValueError(
+                    f"'all' transfer magnitude mode takes no magnitude argument, got {self.magnitude!r}"
+                )
+
+
+@dataclass(frozen=True)
+class GaugeTransferPolicy:
+    """Immutable per-occurrence policy metadata for a gauge transfer effect."""
+
+    caster_recovery_share: float = 0.0
+    restore_bonus_per_stack: tuple[tuple[str, int], ...] = ()
+
+    def __init__(
+        self,
+        caster_recovery_share: float = 0.0,
+        restore_bonus_per_stack: Any = (),
+    ) -> None:
+        object.__setattr__(self, "caster_recovery_share", caster_recovery_share)
+        object.__setattr__(self, "restore_bonus_per_stack", restore_bonus_per_stack)
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.caster_recovery_share, bool) or not isinstance(
+            self.caster_recovery_share, (int, float)
+        ):
+            raise ValueError(
+                f"GaugeTransferPolicy caster_recovery_share must be a finite number between 0.0 and 1.0, got {self.caster_recovery_share!r}"
+            )
+        try:
+            share = float(self.caster_recovery_share)
+        except OverflowError as error:
+            raise ValueError(
+                f"GaugeTransferPolicy caster_recovery_share must be a finite number between 0.0 and 1.0, got {self.caster_recovery_share!r}"
+            ) from error
+        if not isfinite(share) or not (0.0 <= share <= 1.0):
+            raise ValueError(
+                f"GaugeTransferPolicy caster_recovery_share must be a finite number between 0.0 and 1.0, got {self.caster_recovery_share!r}"
+            )
+        object.__setattr__(self, "caster_recovery_share", share)
+
+        from world.rules.buffs import BUFF_DEFINITIONS
+
+        canon_bonuses: list[tuple[str, int]] = []
+        raw_bonus = self.restore_bonus_per_stack
+        if raw_bonus is None:
+            raw_bonus = ()
+        if isinstance(raw_bonus, Mapping):
+            items = list(raw_bonus.items())
+        elif (
+            isinstance(raw_bonus, (list, tuple))
+            and len(raw_bonus) == 2
+            and isinstance(raw_bonus[0], (list, tuple, set, frozenset))
+        ):
+            keys, amount = raw_bonus
+            items = [(k, amount) for k in keys]
+        elif isinstance(raw_bonus, Iterable) and not isinstance(raw_bonus, (str, bytes)):
+            items = list(raw_bonus)
+        else:
+            raise ValueError(
+                f"GaugeTransferPolicy restore_bonus_per_stack must be an iterable or mapping, got {type(raw_bonus).__name__}"
+            )
+
+        for item in items:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                key, amt = item
+            else:
+                raise ValueError(
+                    f"restore_bonus_per_stack entry must be a (key, amount) pair, got {item!r}"
+                )
+            if not isinstance(key, str):
+                raise ValueError(f"buff key must be a string, got {key!r}")
+            if key not in BUFF_DEFINITIONS:
+                raise ValueError(
+                    f"unknown buff key {key!r} in restore_bonus_per_stack; must exist in BUFF_DEFINITIONS"
+                )
+            if isinstance(amt, bool) or not isinstance(amt, int) or amt <= 0:
+                raise ValueError(
+                    f"restore_bonus_per_stack amount must be a positive integer, got {amt!r}"
+                )
+            canon_bonuses.append((key, amt))
+
+        object.__setattr__(self, "restore_bonus_per_stack", tuple(canon_bonuses))
 
 
 @dataclass(frozen=True)
@@ -849,4 +1027,52 @@ def parse_effect(effect_id: str) -> object:
     if prefix == "pleasure_peak":
         _parse_bare(effect_id, prefix)
         return PleasurePeakEffect()
+    if prefix == "gauge_transfer":
+        parts = effect_id.split(":")
+        if len(parts) < 4:
+            raise ValueError(
+                f"gauge_transfer effect must have at least 4 segments, got {effect_id!r}"
+            )
+        _, gauge, direction, mode = parts[:4]
+        rest = parts[4:]
+        if mode == "fixed":
+            if len(rest) != 1:
+                raise ValueError(
+                    f"gauge_transfer fixed mode requires exactly one magnitude argument, got {effect_id!r}"
+                )
+            try:
+                mag_val = int(rest[0])
+            except ValueError as error:
+                raise ValueError(
+                    f"gauge_transfer fixed magnitude must be an integer, got {rest[0]!r}"
+                ) from error
+            return GaugeTransferEffect(
+                gauge=gauge, direction=direction, magnitude_mode=mode, magnitude=mag_val
+            )
+        elif mode == "fraction":
+            if len(rest) != 1:
+                raise ValueError(
+                    f"gauge_transfer fraction mode requires exactly one magnitude argument, got {effect_id!r}"
+                )
+            try:
+                frac_val = float(rest[0])
+            except ValueError as error:
+                raise ValueError(
+                    f"gauge_transfer fraction magnitude must be a number, got {rest[0]!r}"
+                ) from error
+            return GaugeTransferEffect(
+                gauge=gauge, direction=direction, magnitude_mode=mode, magnitude=frac_val
+            )
+        elif mode == "all":
+            if rest:
+                raise ValueError(
+                    f"gauge_transfer 'all' mode takes no magnitude argument, got {effect_id!r}"
+                )
+            return GaugeTransferEffect(
+                gauge=gauge, direction=direction, magnitude_mode=mode, magnitude=None
+            )
+        else:
+            raise ValueError(
+                f"gauge_transfer magnitude_mode must be 'fixed', 'fraction', or 'all', got {mode!r} in {effect_id!r}"
+            )
     raise ValueError(f"unrecognized skill effect prefix {prefix!r} in {effect_id!r}")

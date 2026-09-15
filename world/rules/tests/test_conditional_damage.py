@@ -156,6 +156,21 @@ _T_WATER_HUNTER = make_skill(
     ),
 )
 
+_T_UNCONDITIONAL_BYPASS = make_skill(
+    "t_unconditional_bypass",
+    element=_T_BASE_DAMAGE.element,
+    effects=("damage:water:magic",),
+    effect_policies=(
+        EffectPolicy(
+            coefficient=1.0,
+            damage=DamagePolicy(
+                predicate=(),
+                bypass_defense=True,
+            ),
+        ),
+    ),
+)
+
 _EXTRA_SKILLS = {
     _T_BASE_DAMAGE.key: _T_BASE_DAMAGE,
     _T_JUDGMENT_BURST.key: _T_JUDGMENT_BURST,
@@ -163,6 +178,7 @@ _EXTRA_SKILLS = {
     _T_DEVASTATION_BURST.key: _T_DEVASTATION_BURST,
     _T_BYPASS_DEVASTATION.key: _T_BYPASS_DEVASTATION,
     _T_WATER_HUNTER.key: _T_WATER_HUNTER,
+    _T_UNCONDITIONAL_BYPASS.key: _T_UNCONDITIONAL_BYPASS,
 }
 _SCOPE = synthetic_registries("skills", extra={"skills": _EXTRA_SKILLS})
 
@@ -175,10 +191,11 @@ class DamagePolicyValidationTests(unittest.TestCase):
             DamagePolicy(predicate=(), attack_multiplier=1.5)
         self.assertIn("empty predicate", str(ctx.exception))
 
-    def test_empty_predicate_with_bypass_defense_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            DamagePolicy(predicate=(), bypass_defense=True)
-        self.assertIn("empty predicate", str(ctx.exception))
+    def test_empty_predicate_with_bypass_defense_validates(self):
+        policy = DamagePolicy(predicate=(), bypass_defense=True)
+        self.assertEqual(policy.predicate, ())
+        self.assertTrue(policy.bypass_defense)
+        self.assertEqual(policy.attack_multiplier, 1.0)
 
     def test_pure_unconditional_rider_with_empty_predicate_is_valid(self):
         policy = DamagePolicy(predicate=(), max_hp_fraction=0.10)
@@ -582,6 +599,36 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
 
         # Water target has defense bypassed AND 1.5x attack, so takes much higher damage
         self.assertGreater(damage_water, damage_earth + 25)
+
+    @covers_requirement(
+        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+    )
+    def test_unconditional_execution_bypass_ignores_defense(self):
+        # Empty predicate with multiplier raises
+        with self.assertRaises(ValueError):
+            DamagePolicy(predicate=(), attack_multiplier=2.0)
+
+        skill_key = _T_UNCONDITIONAL_BYPASS.key
+
+        # Test against high defense
+        self.target.traits.defense.base = 100
+        restore_gauges_to_full(self.target)
+        before_hp = _stored_hp(self.target)
+        result = self._resolve_cast(skill_key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_high_def = before_hp - _stored_hp(self.target)
+
+        # Test against low defense
+        self.target.traits.defense.base = 10
+        restore_gauges_to_full(self.target)
+        before_hp = _stored_hp(self.target)
+        result = self._resolve_cast(skill_key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_low_def = before_hp - _stored_hp(self.target)
+
+        # Both hits deal identical damage because defense was bypassed (0) for both
+        self.assertEqual(damage_high_def, damage_low_def)
+        self.assertEqual(damage_high_def, 40)
 
     def test_transaction_rollback_restores_hp_on_late_failure(self):
         """A multi-effect commit failure cleanly rolls back the damage effect."""

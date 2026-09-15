@@ -16,6 +16,13 @@ marker buffs added by the MP-depletion reaction wave (a suffocation marker, and 
 water wave binds through the table) SHALL join as ordinary `buff_active`-origin rows carrying the
 existing `actions_per_turn: 0` bundle value — no new bundle key, no marker-specific consumer code —
 and every new rule ID SHALL keep the one-unit-test correspondence the table already enforces.
+The gauge-transfer wave SHALL extend the merged bundle with exactly two further generic leaf values
+following the existing heterogeneous-value posture: `{gauge}_regen_scale` (a per-gauge regen
+multiplier consumed only by the world-clock regen stage) and `recovery_share_bonus` (an additive
+drain-recovery share bonus consumed only by the gauge-transfer caster-share read site, folded gauge-agnostically). Both SHALL be
+produced by ordinary `buff_active`-origin rows, SHALL be absent-by-default rather than defaulted in
+table code, and SHALL NOT introduce a marker-specific consumer, an element name, or a skill key
+anywhere in the table or its evaluation module.
 
 #### Scenario: The seed table contains both condition origins
 - **WHEN** `world/rules/rulebook/combat_modifiers.yaml` is loaded
@@ -34,6 +41,13 @@ and every new rule ID SHALL keep the one-unit-test correspondence the table alre
   `buff_active`-conditioned `actions_per_turn: 0` rule
 - **THEN** the merged bundle reports the zero exactly as `paralysis_locks_actions` does, the existing
   turn-skip and cast-gate consumers observe it with no code change, and expiry restores action
+
+#### Scenario: New leaf values ride the same merge without defaulting
+- **WHEN** `evaluate_combat_modifiers(entity)` runs for an entity holding only a regen-lock marker,
+  only a share-bonus marker, and neither
+- **THEN** each bundle contains exactly its one new leaf value from its row, the third bundle lacks
+  both keys entirely (absent, not zero, for `regen_scale`), and every pre-existing leaf value is
+  merged unchanged
 
 ### Requirement: evaluate_combat_modifiers() is a pure query that never writes to entity state
 `world/rules/combat_modifiers.py` SHALL provide `evaluate_combat_modifiers(entity)`, returning a merged

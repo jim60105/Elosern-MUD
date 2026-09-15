@@ -361,7 +361,7 @@ def _handle_damage(
                     matched_mult = damage_policy.attack_multiplier if matched else 1.0
                     defense = (
                         0
-                        if (matched and damage_policy.bypass_defense)
+                        if (damage_policy.bypass_defense and (matched or not damage_policy.predicate))
                         else _adjusted_defense(target)
                     )
                     max_hp_frac = damage_policy.max_hp_fraction

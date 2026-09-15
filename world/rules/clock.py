@@ -175,11 +175,23 @@ def _gauge_value(gauge: Any) -> float:
 
 def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
     for entity in entities:
+        mods: dict[str, Any] = {}
+        if hasattr(entity, "traits"):
+            try:
+                from world.rules.combat_modifiers import evaluate_combat_modifiers
+
+                mods = evaluate_combat_modifiers(entity)
+            except Exception:  # observability: ignore R2: entity may be a test double without db or complete attributes, treating as unscaled
+                pass
+
         for key in GAUGE_KEYS:
             gauge = getattr(entity.traits, key, None)
             if gauge is None:
                 continue
-            rate = float(getattr(gauge, "rate", 0))
+            scale = float(mods.get(f"{key}_regen_scale", 1.0))
+            if scale == 0.0:
+                continue
+            rate = float(getattr(gauge, "rate", 0)) * scale
             maximum = float(gauge.max)
             # Gauge storage is integral (the status read model rejects floats),
             # so each gauge keeps a sub-unit regen remainder. Accruing in

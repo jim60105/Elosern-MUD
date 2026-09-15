@@ -55,6 +55,18 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "water_bind")
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
+    @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
+    def test_rule_mp_regen_lock_freeze(self):
+        entity = self._entity()
+        apply_buff(entity, "mp_regen_lock")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"mp_regen_scale": 0})
+
+    @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
+    def test_rule_mana_reflux_share_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "mana_reflux")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"recovery_share_bonus": 0.1})
+
     def test_rule_fear_agility_and_accuracy_penalty(self):
         entity = self._entity()
         apply_buff(entity, "fear")
