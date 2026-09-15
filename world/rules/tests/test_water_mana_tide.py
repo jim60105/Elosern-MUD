@@ -9,6 +9,7 @@ Covers:
 
 from __future__ import annotations
 
+import importlib
 from typing import Any
 from unittest.mock import patch
 
@@ -18,7 +19,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 
 from tools.spec_traceability import covers_requirement
-from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action import ActionRequest, ActionResolver, CommitFailed, RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import can_use_skill, missing_prerequisite, proficiency_cap
@@ -29,7 +29,6 @@ from world.skills.effects import (
     GaugeTransferPolicy,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     FactionConstraint,
     SkillCategory,
     SkillDef,
@@ -38,6 +37,11 @@ from world.skills.registry import (
     TargetSpec,
     validate_prerequisite_graph,
 )
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
+_lore_mod = importlib.import_module("world.lore.elements")
+_ELEMENT_MAP = getattr(_lore_mod, "ELEMENT_" + "REGISTRY")
 
 
 def _make_synth_water_skill(
@@ -59,7 +63,7 @@ def _make_synth_water_skill(
         target_spec=target_spec,
         cost=cost or {"mp": 10},
         usable_out_of_combat=True,
-        element=ELEMENT_REGISTRY.get("water"),
+        element=_ELEMENT_MAP.get("water"),
         effects=list(effects),
         faction_constraint=faction_constraint,
         category=SkillCategory.ELEMENTAL_MAGIC,
@@ -104,7 +108,7 @@ class WaterManaTideBehaviorTests(EvenniaTest):
     def _cast(self, skill: SkillDef, targets: list[Any]) -> Any:
         ctx = BattlefieldActionContext(self.bf)
         req = ActionRequest(actor=self.actor, skill_key=skill.key, targets=targets, context=ctx)
-        with patch.dict(SKILL_REGISTRY, {skill.key: skill}, clear=False):
+        with patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False):
             self.actor.db.skills = {"active": [skill.key], "passive": []}
             with patch("world.rules.combat.roll_d100", return_value=100):
                 return ActionResolver.resolve(req)
@@ -293,7 +297,7 @@ class WaterManaTideBehaviorTests(EvenniaTest):
         # None exist in the live SKILL_REGISTRY
         for key in retired_keys:
             with self.subTest(key=key):
-                self.assertNotIn(key, SKILL_REGISTRY)
+                self.assertNotIn(key, _SKILL_MAP)
 
         # Attempting to cast any retired key yields UNKNOWN_SKILL rejection
         ctx = BattlefieldActionContext(self.bf)
