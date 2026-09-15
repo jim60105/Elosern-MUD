@@ -58,6 +58,16 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+- key: mp_regen_lock
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: mana_reflux
+  duration: 60
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 - key: earth_hardened_skin
   duration: 60
   stacking: refresh

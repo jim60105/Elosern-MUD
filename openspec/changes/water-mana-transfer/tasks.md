@@ -13,9 +13,9 @@
 
 ## 2. Markers and clock
 
-- [ ] 2.1 Add `mp_regen_lock` (60 s, debuff, empty modifiers) and `mana_reflux` (60 s, buff, refresh, empty modifiers) rows to `buffs.yaml`; `combat_modifiers.yaml` rows `mp_regen_lock_freeze` (`mp_regen_scale: 0`) and `mana_reflux_share_bonus` (`recovery_share_bonus: 0.1`); matching `status_display.yaml` entries; one unit test per new rule ID.
-- [ ] 2.2 Extend `_settle_gauge_regen` to multiply each gauge rate by the bundle's `{gauge}_regen_scale` (absent 1.0) inside the existing closed form without touching `regen_remainder` while zero (design D3); verify unlocked arithmetic is unchanged.
-- [ ] 2.3 Implement `EffectPolicy.audience_condition` (closed gauge-state fields `mp_max_zero`/`mp_positive`, construction-time fail-closed validation) and apply it in `plan_effect_audiences` with the same evaluation in preflight and final resolution; ship the synthetic disjoint-subset proof (ungated component to all + zero-max rider to the matching subset) demonstrating 溺潮's redirect is expressible as pure catalog data (design D4).
+- [x] 2.1 Add `mp_regen_lock` (60 s, debuff, empty modifiers) and `mana_reflux` (60 s, buff, refresh, empty modifiers) rows to `buffs.yaml`; `combat_modifiers.yaml` rows `mp_regen_lock_freeze` (`mp_regen_scale: 0`) and `mana_reflux_share_bonus` (`recovery_share_bonus: 0.1`); matching `status_display.yaml` entries; one unit test per new rule ID.
+- [x] 2.2 Extend `_settle_gauge_regen` to multiply each gauge rate by the bundle's `{gauge}_regen_scale` (absent 1.0) inside the existing closed form without touching `regen_remainder` while zero (design D3); verify unlocked arithmetic is unchanged.
+- [x] 2.3 Implement `EffectPolicy.audience_condition` (closed gauge-state fields `mp_max_zero`/`mp_positive`, construction-time fail-closed validation) and apply it in `plan_effect_audiences` with the same evaluation in preflight and final resolution; ship the synthetic disjoint-subset proof (ungated component to all + zero-max rider to the matching subset) demonstrating 溺潮's redirect is expressible as pure catalog data (design D4).
 
 ## 3. Behavioral evidence and integration
 

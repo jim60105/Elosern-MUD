@@ -47,6 +47,18 @@
 - code: suffocated
   label: 窒息
   severity: critical
+- code: mp_regen_lock
+  label: 魔力恢復封鎖
+  severity: harmful
+- code: mana_reflux
+  label: 回流
+  severity: beneficial
+- code: mp_regen_lock_freeze
+  label: 魔力恢復凍結
+  severity: harmful
+- code: mana_reflux_share_bonus
+  label: 回流回收加乘
+  severity: beneficial
 - code: earth_hardened_skin
   label: 硬化肌膚
   severity: beneficial

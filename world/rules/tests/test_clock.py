@@ -112,6 +112,35 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(entity.traits.hp.current, 125)
         self.assertEqual(entity.traits.hp.regen_remainder, 0.0)
 
+    @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")
+    def test_zero_regen_scale_freezes_without_disturbing_remainder(self):
+        entity = Entity()
+        entity.traits.mp = Gauge(10, 100, 1.0)
+        entity.traits.mp.regen_remainder = 0.35
+
+        with patch("world.rules.combat_modifiers.evaluate_combat_modifiers", return_value={"mp_regen_scale": 0}):
+            _settle_gauge_regen([entity], 30)
+            self.assertEqual(entity.traits.mp.current, 10)
+            self.assertEqual(entity.traits.mp.regen_remainder, 0.35)
+
+            _settle_gauge_regen([entity], 30)
+            self.assertEqual(entity.traits.mp.current, 10)
+            self.assertEqual(entity.traits.mp.regen_remainder, 0.35)
+
+        # After lock ends, regen resumes from the exact carried remainder
+        _settle_gauge_regen([entity], 10)
+        self.assertEqual(entity.traits.mp.current, 20)
+        self.assertAlmostEqual(entity.traits.mp.regen_remainder, 0.35, places=5)
+
+    @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")
+    def test_scaled_regen_is_still_one_closed_form_step(self):
+        entity = Entity()
+        entity.traits.hp = Gauge(10, 100, 2.0)
+        with patch("world.rules.combat_modifiers.evaluate_combat_modifiers", return_value={"hp_regen_scale": 0.5}):
+            # rate 2.0 * scale 0.5 = 1.0/s -> 45s = +45 -> 55
+            _settle_gauge_regen([entity], 45)
+            self.assertEqual(entity.traits.hp.current, 55)
+
     @covers_requirement("settlement-stage-order::long-jumps-settle-in-quanta-not-per-second-steps-with-an-early-exit-once-nothing")
     def test_no_work_exits_before_a_quantum(self):
         entity = Entity()

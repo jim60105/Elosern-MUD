@@ -1980,6 +1980,31 @@ def _bind_resolved_effect(
     return effect_context
 
 
+def _matches_audience_condition(target: Any, condition: str | None) -> bool:
+    """Evaluate one declarative audience condition against a target entity.
+
+    Closed gauge-state vocabulary:
+    - 'mp_max_zero': target has an MP gauge whose maximum is 0
+    - 'mp_positive': target has an MP gauge whose maximum is > 0
+
+    An entity lacking traits or an MP gauge matches neither condition.
+    """
+    if condition is None:
+        return True
+    traits = getattr(target, "traits", None)
+    if traits is None or not hasattr(traits, "mp"):
+        return False
+    trait = getattr(traits, "mp")
+    if trait is None:
+        return False
+    _, maximum = stored_gauge_pair(target, "mp")
+    if condition == "mp_max_zero":
+        return maximum == 0
+    if condition == "mp_positive":
+        return maximum > 0
+    return False
+
+
 def plan_effect_audiences(
     actor: Any,
     context: ActionContext,
@@ -2010,17 +2035,17 @@ def plan_effect_audiences(
     for policy in skill.effect_policies:
         aud = policy.audience
         if aud is EffectAudience.SELECTED:
-            routed.append(list(targets))
+            candidate = list(targets)
         elif aud is EffectAudience.ALLIES:
-            routed.append([
+            candidate = [
                 t for t in targets
                 if context.relation_to(actor, t) in (Relation.SELF, Relation.ALLY)
-            ])
+            ]
         elif aud is EffectAudience.ENEMIES:
-            routed.append([
+            candidate = [
                 t for t in targets
                 if context.relation_to(actor, t) in (Relation.ENEMY,)
-            ])
+            ]
         elif aud is EffectAudience.SELF:
             if actor_valid is None:
                 alive = False
@@ -2033,9 +2058,22 @@ def plan_effect_audiences(
                     and alive
                     and context.is_in_range(actor, actor)
                 )
-            routed.append([actor] if actor_valid else [])
+            candidate = [actor] if actor_valid else []
+        else:
+            candidate = list(targets)
 
-    if any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
+        if policy.audience_condition is not None:
+            candidate = [
+                t for t in candidate
+                if _matches_audience_condition(t, policy.audience_condition)
+            ]
+
+        routed.append(candidate)
+
+    if any(
+        p.audience is not EffectAudience.SELECTED or p.audience_condition is not None
+        for p in skill.effect_policies
+    ):
         if not any(routed):
             raise RejectedAction(
                 RejectReason.NO_VALID_TARGETS_IN_AREA,
