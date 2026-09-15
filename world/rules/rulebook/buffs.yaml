@@ -32,6 +32,32 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+- key: ebbing
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: mp, delta: -5}
+- key: ebbing_deep
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: mp, delta: -12}
+- key: ebbing_maelstrom
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: mp, delta: -18}
+- key: suffocated
+  duration: 40
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
 - key: earth_hardened_skin
   duration: 60
   stacking: refresh

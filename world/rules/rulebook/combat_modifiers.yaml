@@ -4,6 +4,12 @@
 - id: paralysis_locks_actions
   when: {buff_active: paralysis}
   then: {actions_per_turn: 0}
+- id: suffocation_locks_actions
+  when: {buff_active: suffocated}
+  then: {actions_per_turn: 0}
+- id: water_bind_locks_actions
+  when: {buff_active: water_bind}
+  then: {actions_per_turn: 0}
 - id: fear_agility_and_accuracy_penalty
   when: {buff_active: fear}
   then: {agility: "-15%", accuracy: -10}

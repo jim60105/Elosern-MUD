@@ -83,6 +83,11 @@ target resolution, (4) action capability, (5) effect resolution, (6) resource de
 EventLog construction, (8) time-cost computation. Any step that fails SHALL cause `resolve()` to
 return an `ActionResult` with `outcome == "rejected"` and a `reason` drawn from a named
 `RejectReason` value — never a bare boolean or an unstructured exception escaping to the caller.
+Step 6's `mp` resource deduction SHALL be applied through the canonical MP-change writer as the
+staged pending effect's committed behavior, carrying the cast skill as the MP-event source, while
+hp and sp deduction behavior and the preflight/recheck amount agreement stay unchanged; an MP
+crossing to zero caused by cost payment is an ordinary attributed depletion fact, never a new
+rejection reason.
 Step 7 SHALL convert a structured damage pending-effect description into a `"roll"` `EventEntry`
 and, when the attack hit, a `"damage"` `EventEntry`; it SHALL NOT perform combat math or randomness.
 Step 7 SHALL track projected HP in pending-effect order and emit exactly one `"target_defeated"` entry
@@ -115,6 +120,11 @@ After step 7 constructs the immutable log, registered event-effect planners SHAL
   has no registered handler in `_EFFECT_HANDLERS`
 - **THEN** it returns `ActionResult(outcome="rejected", reason=RejectReason.UNKNOWN_EFFECT_ID)` and
   the rejection's `detail` names the exact unresolved effect ID
+
+#### Scenario: MP cost payment to zero is a routed attributed deduction, not a rejection
+- **WHEN** `resolve()` completes a cast whose adjusted MP cost equals the caster's entire remaining MP
+- **THEN** the staged deduction applied the change through the canonical MP writer with the cast skill
+  as the event source, the commit succeeded, and a rule qualified to that source observes the crossing
 
 #### Scenario: A damage effect produces structured roll and damage entries
 - **WHEN** a registered damage handler stages `damage|target|73|1|12`

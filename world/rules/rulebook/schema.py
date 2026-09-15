@@ -59,7 +59,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
         "buff_active", "skill_owned", "dual_wielding", "equipment_worn",
-        "skill_qualified",
+        "skill_qualified", "event_source_skill",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -147,4 +147,21 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         if not isinstance(worn, (set, frozenset)):
             worn = frozenset()
         checks.append(item_key in worn)
+    if "event_source_skill" in when:
+        expected = when["event_source_skill"]
+        if not isinstance(expected, str) or isinstance(expected, bool):
+            raise ValueError("event_source_skill condition requires a string skill key")
+        from world.skills.registry import SKILL_REGISTRY
+
+        if expected not in SKILL_REGISTRY:
+            checks.append(False)
+        else:
+            source = context.get("source_skill")
+            checks.append(
+                bool(
+                    source is not None
+                    and isinstance(source, str)
+                    and source == expected
+                )
+            )
     return bool(checks) and all(checks)

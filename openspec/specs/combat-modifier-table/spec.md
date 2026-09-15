@@ -2,14 +2,20 @@
 
 ## Purpose
 Keeps combat_modifiers.yaml one table — buff-origin and sexual-origin rules alike — evaluated by the identical shared condition engine with no origin-specific branch, exposed through the pure query evaluate_combat_modifiers(). Defines bundle value semantics (flat defense/atk_phys magnitude adjustments, percentage mp/sp cost adjustments, non-negative adjusted agility), condition kinds such as skill_owned and worn-equipment facts, and the requirement that preview, preflight, and resolve agree on adjusted values.
+
 ## Requirements
+
 ### Requirement: combat_modifiers.yaml is one table evaluated by one condition engine, with no
 special-case branch between buff-origin and sexual-origin rows
 `world/rules/rulebook/combat_modifiers.yaml` SHALL contain both buff-presence rules (poison, paralysis,
 fear) and sexual-field-threshold rules (arousal, climax phase), and `world/rules/combat_modifiers.py`
 SHALL evaluate every rule in the table through the identical `evaluate_condition()` function from
 `world/rules/rulebook/schema.py`. No function in `combat_modifiers.py` SHALL contain a conditional
-branch that distinguishes a sexual-origin condition from a buff-origin condition.
+branch that distinguishes a sexual-origin condition from a buff-origin condition. Action-locking
+marker buffs added by the MP-depletion reaction wave (a suffocation marker, and the bind marker the
+water wave binds through the table) SHALL join as ordinary `buff_active`-origin rows carrying the
+existing `actions_per_turn: 0` bundle value — no new bundle key, no marker-specific consumer code —
+and every new rule ID SHALL keep the one-unit-test correspondence the table already enforces.
 
 #### Scenario: The seed table contains both condition origins
 - **WHEN** `world/rules/rulebook/combat_modifiers.yaml` is loaded
@@ -22,6 +28,12 @@ branch that distinguishes a sexual-origin condition from a buff-origin condition
 - **WHEN** `world/rules/combat_modifiers.py`'s source is inspected
 - **THEN** it contains no conditional (e.g. `if rule.id.startswith(...)`, `if "arousal" in rule.when`)
   that special-cases a sexual-origin rule differently from a buff-origin rule when evaluating them
+
+#### Scenario: A newly added lock-marker row locks through the shared mechanism
+- **WHEN** a synthetic entity holds a marker buff whose only mechanical row is a new
+  `buff_active`-conditioned `actions_per_turn: 0` rule
+- **THEN** the merged bundle reports the zero exactly as `paralysis_locks_actions` does, the existing
+  turn-skip and cast-gate consumers observe it with no code change, and expiry restores action
 
 ### Requirement: evaluate_combat_modifiers() is a pure query that never writes to entity state
 `world/rules/combat_modifiers.py` SHALL provide `evaluate_combat_modifiers(entity)`, returning a merged
@@ -408,6 +420,7 @@ through one neutral shared reader that imports no rules modules.
 
 - **WHEN** an unequipped entity's contexts are built
 - **THEN** exposure conditions match on the stored value exactly as before
+
 ### Requirement: Equipment-worn conditions match a shared worn-item fact
 
 The rulebook condition vocabulary SHALL include `equipment_worn:

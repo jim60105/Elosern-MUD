@@ -197,7 +197,7 @@ When the action-resolution workflow would grant a debuff-polarity buff to a targ
 - **THEN** buff storage is unchanged after all three and each attempt produced its own neutralization event
 
 ### Requirement: Damaging rate buffs persist a validated effect-source identity in the buff cache
-`_handle_buff_apply` SHALL persist the resolving actor's dbref as `source_pk` in the buff cache whenever the applied definition's `rate` modifier damages HP (target `hp` with a negative delta). The value SHALL be derived from the actor inside the handler; a caller-supplied `source_pk` in `buff_kwargs` SHALL NOT override it, and an actor without a resolvable positive-int dbref SHALL reject the action before commit. Buff instances created outside the handler (for example direct `_add_buff` calls) MAY lack `source_pk`, in which case their rate ticks are unattributed.
+`_handle_buff_apply` SHALL persist the resolving actor's dbref as `source_pk`, and for a source-bearing cast also the granting skill key as `source_skill`, in the buff cache whenever the applied definition's `rate` modifier damages a gauge (target `hp` or `mp` with a negative delta). The value SHALL be derived from the actor inside the handler; a caller-supplied `source_pk` in `buff_kwargs` SHALL NOT override it, and an actor without a resolvable positive-int dbref SHALL reject the action before commit. Widening this persistence gate to mp-target rates SHALL NOT widen the combat-round consumption gates: `tick_buffs`' `TickRecord` emission and `settle_upkeep`'s HP damage/defeat event projection stay hp-rate-only. Buff instances created outside the handler (for example direct `_add_buff` calls) MAY lack `source_pk`, in which case their rate ticks are unattributed. An mp-target damaging rate tick SHALL carry this persisted attribution into the canonical MP-change writer so a depletion crossing it causes dispatches with the grant-time source skill and source tier; the hp-target dispatch path SHALL remain behaviorally unchanged.
 
 #### Scenario: Applying fire_scorch stores the caster's dbref
 - **WHEN** `_handle_buff_apply` resolves `buff:fire_scorch` for a target in combat
@@ -214,6 +214,14 @@ When the action-resolution workflow would grant a debuff-polarity buff to a targ
 #### Scenario: Reapplying a damaging buff replaces the source with the new caster
 - **WHEN** the same damaging buff key is re-applied by a different caster before expiry
 - **THEN** the buff cache's `source_pk` is the newest caster's dbref, and a refresh that omits `source_pk` retains the previously cached value rather than erasing attribution
+
+#### Scenario: An mp-target drain ticks with grant-time attribution
+- **WHEN** a synthetic mp-target negative-delta buff applied by a source-bearing cast later ticks the holder's MP to zero
+- **THEN** the depletion crossing is attributed to the persisted grant-time source skill and tier, not to the tick moment
+
+#### Scenario: An mp tick inside a combat round fabricates no HP consumption
+- **WHEN** a combat round settles while an mp-target damaging buff ticks on a low-HP roster entity
+- **THEN** the round's event log contains no HP damage or defeat entry attributable to that tick, while hp-target rates keep producing their existing records unchanged
 
 ### Requirement: Buff application has one public entry point carrying both grant-time guards
 `world/rules/buffs.py` SHALL expose a public buff-application function taking an entity, a buff

@@ -35,6 +35,18 @@
 - code: water_bind
   label: 束縛
   severity: harmful
+- code: ebbing
+  label: 潮退
+  severity: harmful
+- code: ebbing_deep
+  label: 潮退·深流
+  severity: harmful
+- code: ebbing_maelstrom
+  label: 潮退·漩渦
+  severity: harmful
+- code: suffocated
+  label: 窒息
+  severity: critical
 - code: earth_hardened_skin
   label: 硬化肌膚
   severity: beneficial
@@ -91,6 +103,12 @@
   severity: harmful
 - code: paralysis_locks_actions
   label: 麻痺鎖定行動
+  severity: critical
+- code: suffocation_locks_actions
+  label: 窒息鎖定行動
+  severity: critical
+- code: water_bind_locks_actions
+  label: 束縛鎖定行動
   severity: critical
 - code: fear_agility_and_accuracy_penalty
   label: 恐懼敏捷與準度減損
