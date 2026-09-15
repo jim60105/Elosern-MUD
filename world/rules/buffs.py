@@ -102,6 +102,12 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                 raise ValueError(
                     f"{path}: buff {key!r} rate modifier must declare either delta or recovery"
                 )
+            if has_delta:
+                delta_val = rate["delta"]
+                if rate.get("target") == "mp" and (isinstance(delta_val, bool) or not isinstance(delta_val, int)):
+                    raise ValueError(
+                        f"{path}: buff {key!r} mp rate delta must be an integer, got {delta_val!r}"
+                    )
             if has_recovery:
                 rec = rate["recovery"]
                 if not isinstance(rec, dict):

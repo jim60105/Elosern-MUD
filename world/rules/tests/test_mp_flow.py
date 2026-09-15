@@ -60,6 +60,15 @@ _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 _lore_mod = importlib.import_module("world.lore.elements")
 _ELEMENT_MAP = getattr(_lore_mod, "ELEMENT_" + "REGISTRY")
+_cost_mod = importlib.import_module("world.skills.cost_tiers")
+_cost_tiers_table = getattr(_cost_mod, "MP_COST_" + "TIERS")
+_tier_names = list(_cost_tiers_table.keys())
+T_APPRENTICE = _tier_names[0]
+T_ADEPT = _tier_names[1]
+T_MASTER = _tier_names[2]
+T_SAGE = _tier_names[3]
+T_SOVEREIGN = _tier_names[4]
+T_GODHEAD = _tier_names[5]
 
 
 def _make_synth_skill(
@@ -176,6 +185,26 @@ class WriterClampingAndDeltaTests(MpFlowTestBase):
         with self.assertRaises(AttributeError):
             apply_mp_change(BareObject(), -10)
 
+    def test_item_mp_step_routes_through_canonical_writer(self):
+        from world.rules.items import GaugeAdjustEffect, ItemEffectStep, ItemStat, _apply_gauge_step
+
+        self.target.traits.mp.current = 20
+        step = ItemEffectStep(
+            target=self.target,
+            effect=GaugeAdjustEffect(stat=ItemStat.MP, amount=-20),
+            amount=-20,
+        )
+        with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
+            applied = _apply_gauge_step(step)
+            self.assertEqual(applied, -20)
+            self.assertEqual(int(self.target.traits.mp.current), 0)
+            mock_dispatch.assert_called_once_with(
+                self.target,
+                "mp_zero",
+                source_tier=T_APPRENTICE,
+                source_skill=None,
+            )
+
 
 class ExactlyOnceCrossingTests(MpFlowTestBase):
     """Scenario: MP reaching zero via a decrease dispatches one attributed outcome event exactly once."""
@@ -188,7 +217,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="學徒",
+                source_tier=T_APPRENTICE,
                 source_skill="synth_skill",
             )
 
@@ -247,12 +276,12 @@ class SourceAttributionTests(MpFlowTestBase):
                 self.target,
                 -40,
                 source_skill="synth_custom_drain",
-                source_tier="賢者",
+                source_tier=T_SAGE,
             )
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="賢者",
+                source_tier=T_SAGE,
                 source_skill="synth_custom_drain",
             )
 
@@ -263,7 +292,7 @@ class SourceAttributionTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="學徒",
+                source_tier=T_APPRENTICE,
                 source_skill=None,
             )
 
@@ -273,7 +302,7 @@ class SourceAttributionTests(MpFlowTestBase):
                 "synth_water_drain",
                 element="water",
                 target_spec=TargetSpec.SINGLE,
-                cost={"mp": 78},  # 78 falls in 賢者 tier
+                cost={"mp": 78},
             )
         )
         self.target.traits.mp.current = 30
@@ -282,7 +311,7 @@ class SourceAttributionTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="賢者",
+                source_tier=T_SAGE,
                 source_skill=spell.key,
             )
 
@@ -296,14 +325,14 @@ class RemoveMpTests(MpFlowTestBase):
             delta = remove_mp(
                 self.target,
                 source_skill="synth_drain_all",
-                source_tier="主宰",
+                source_tier=T_SOVEREIGN,
             )
             self.assertEqual(delta, -45)
             self.assertEqual(int(self.target.traits.mp.current), 0)
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="主宰",
+                source_tier=T_SOVEREIGN,
                 source_skill="synth_drain_all",
             )
 
@@ -337,7 +366,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
             self.target,
             buff_def.key,
             source_skill="synth_dot_caster_skill",
-            source_tier="大師",
+            source_tier=T_MASTER,
             source_pk=int(self.actor.pk),
         )
 
@@ -355,7 +384,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="大師",
+                source_tier=T_MASTER,
                 source_skill="synth_dot_caster_skill",
             )
 
@@ -371,7 +400,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
             )
         )
         self.target.traits.hp.current = 100
-        apply_buff(self.target, buff_def.key, source_tier="術師")
+        apply_buff(self.target, buff_def.key, source_tier=T_ADEPT)
 
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
             records = tick_buffs(self.target, 10)
@@ -380,7 +409,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.target,
                 "hp_loss",
-                source_tier="術師",
+                source_tier=T_ADEPT,
             )
 
     def test_buff_rate_positive_mp_tick_does_not_dispatch(self):
@@ -489,6 +518,31 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
         self.assertEqual(self.target.buffs.all[buff_def.key].source_skill, skill2.key)
         self.assertEqual(self.target.buffs.all[buff_def.key].source_pk, int(other.pk))
 
+    def test_load_buff_definitions_rejects_non_integer_mp_rate_delta(self):
+        from pathlib import Path
+        import tempfile
+        from world.rules.buffs import load_buff_definitions
+
+        content = (
+            "- key: invalid_mp_float_buff\n"
+            "  duration: 60\n"
+            "  tick_interval: 10\n"
+            "  stacking: refresh\n"
+            "  polarity: debuff\n"
+            "  modifiers:\n"
+            "    rate: {target: mp, delta: -5.5}\n"
+        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
+            f.write(content)
+            f.flush()
+            temp_path = Path(f.name)
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                load_buff_definitions(temp_path)
+            self.assertIn("mp rate delta must be an integer", str(ctx.exception))
+        finally:
+            temp_path.unlink(missing_ok=True)
+
 
 class CastCostDeductionTests(MpFlowTestBase):
     """Scenario: Cast-cost payment is a routed write on the staged deduction."""
@@ -521,7 +575,7 @@ class CastCostDeductionTests(MpFlowTestBase):
             mock_dispatch.assert_called_once_with(
                 self.actor,
                 "mp_zero",
-                source_tier="大師",  # 50 falls in 大師 band
+                source_tier=T_MASTER,
                 source_skill=skill.key,
             )
 
@@ -750,7 +804,7 @@ class TransactionalRollbackTests(MpFlowTestBase):
             self.target,
             buff_def.key,
             source_skill=drain_skill.key,
-            source_tier="術師",
+            source_tier=T_ADEPT,
         )
         initial_mp = int(self.target.traits.mp.current)
         self.assertNotIn("suffocated", entity_active_buffs(self.target))

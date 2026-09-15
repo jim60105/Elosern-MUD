@@ -951,6 +951,10 @@ def _apply_gauge_step(step: ItemEffectStep) -> int:
         apply_pleasure_gain(step.target, step.amount)
         after = _pleasure_current(step.target)
         return after - before
+    if effect.stat is ItemStat.MP:
+        from world.rules.mp_flow import apply_mp_change
+
+        return apply_mp_change(step.target, step.amount)
     gauge = _gauge_from_storage(step.target, effect.stat.value)
     if gauge is None:
         # Storage went malformed mid-transaction: fail closed so the outer
