@@ -237,15 +237,6 @@ class SkillDef:
                     f"skill {self.key!r} cast_condition {cond!r} is not a CastCondition"
                 )
 
-        if self.interaction is None:
-            for p in self.effect_policies:
-                if p.interaction is not None:
-                    object.__setattr__(self, "interaction", p.interaction)
-                    break
-        elif not isinstance(self.interaction, InteractionPolicy):
-            raise ValueError(
-                f"skill {self.key!r} interaction must be an InteractionPolicy or None, got {self.interaction!r}"
-            )
         # The declared type is Element | None: normalize (and validate) a raw
         # string on EVERY constructor path, so direct SkillDef(...) authors
         # (flee, test fixtures) cannot leave a str where consumers read
@@ -271,6 +262,18 @@ class SkillDef:
             tuple(parse_effect(effect_id) for effect_id in self.effects),
         )
         self._validate_effect_policies()
+        # Interaction derivation runs only AFTER effect_policies validation:
+        # a raw (non-EffectPolicy) declaration is rejected there with the
+        # registry error, never iterated here as policy rows.
+        if self.interaction is None:
+            for p in self.effect_policies:
+                if p.interaction is not None:
+                    object.__setattr__(self, "interaction", p.interaction)
+                    break
+        elif not isinstance(self.interaction, InteractionPolicy):
+            raise ValueError(
+                f"skill {self.key!r} interaction must be an InteractionPolicy or None, got {self.interaction!r}"
+            )
         self._validate_heal_shape()
 
     def _validate_effect_policies(self) -> None:
