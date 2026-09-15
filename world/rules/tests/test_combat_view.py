@@ -478,24 +478,24 @@ class GroupSkillViewsTests(unittest.TestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_category_order_follows_enum_declaration_not_ownership(self):
-        # The movement skill is granted before the elemental one, but the
-        # enum declares elemental_magic before movement.
-        movement = replace(
+        # The martial arts skill is granted before the elemental one, but the
+        # enum declares elemental_magic before martial_arts.
+        martial = replace(
             SYNTH_SKILLS["t_cinder_cleave"],
-            key="t_gale_blink",
-            label="馭風殘影",
-            description="化作一縷風殘影位移的合成身法。",
-            category=SkillCategory.MOVEMENT,
+            key="t_iron_fist",
+            label="鐵拳",
+            description="剛猛的合成拳術。",
+            category=SkillCategory.MARTIAL_ARTS,
         )
-        groups = self._categories(movement, _T_CAST)
+        groups = self._categories(martial, _T_CAST)
         self.assertEqual(
             [category.category for category in groups],
-            ["elemental_magic", "movement"],
+            ["elemental_magic", "martial_arts"],
         )
         self.assertEqual(
             [category.label for category in groups],
             [CATEGORY_LABELS[SkillCategory.ELEMENTAL_MAGIC],
-             CATEGORY_LABELS[SkillCategory.MOVEMENT]],
+             CATEGORY_LABELS[SkillCategory.MARTIAL_ARTS]],
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
@@ -514,10 +514,52 @@ class GroupSkillViewsTests(unittest.TestCase):
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_enhancement_sub_groups_follow_tag_order(self):
+        # Enhancement sub-groups follow fixed order: None -> 天賦 -> 身法,
+        # independent of ownership order.
+        step = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_step",
+            label="瞬步測試",
+            category=SkillCategory.ENHANCEMENT,
+            group="身法",
+        )
+        boon = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_boon",
+            label="天賦測試",
+            category=SkillCategory.ENHANCEMENT,
+            group="天賦",
+        )
+        untagged = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_untagged",
+            label="強化測試",
+            category=SkillCategory.ENHANCEMENT,
+            group=None,
+        )
+        groups = self._categories(step, boon, untagged)
+        enh = next(c for c in groups if c.category == "enhancement")
+        self.assertEqual(
+            [g.group for g in enh.groups],
+            [None, "天賦", "身法"],
+        )
+        self.assertEqual(
+            [g.label for g in enh.groups],
+            [None, "天賦", "身法"],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_category_with_zero_owned_skills_is_omitted(self):
         groups = self._categories(_T_CAST)
         self.assertNotIn(
             "sexual_act", [category.category for category in groups]
+        )
+        self.assertNotIn(
+            "divine_mystery", [category.category for category in groups]
+        )
+        self.assertNotIn(
+            "movement", [category.category for category in groups]
         )
         self.assertNotIn(
             "innate_gift", [category.category for category in groups]

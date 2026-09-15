@@ -52,8 +52,8 @@ const FREEFORM_SCALES = [
 function nestedSkills(skills) {
   return [
     {
-      category: "innate_gift",
-      label: "天賦",
+      category: "martial_arts",
+      label: "武技",
       groups: [{ group: null, label: null, skills }],
     },
   ];

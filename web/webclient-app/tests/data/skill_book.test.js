@@ -82,7 +82,6 @@ describe("SkillBook (B3 data family)", () => {
     expect(cats.map((c) => c.attributes("data-category"))).toEqual([
       "elemental_magic",
       "martial_arts",
-      "movement",
       "sexual_act",
     ]);
     expect(cats[0].text()).toContain("元素魔法");
@@ -107,7 +106,6 @@ describe("SkillBook (B3 data family)", () => {
     expect(w.get('[data-testid="skill-book__tab--passive"]').attributes("aria-selected")).toBe("true");
     expect(categories(w).map((c) => c.attributes("data-category"))).toEqual([
       "enhancement",
-      "innate_gift",
     ]);
     expect(w.text()).toContain("強化身體");
     expect(w.text()).not.toContain("火矢");
@@ -118,7 +116,6 @@ describe("SkillBook (B3 data family)", () => {
     expect(w.get('[data-testid="skill-book__tab--passive"]').attributes("aria-selected")).toBe("true");
     expect(categories(w).map((c) => c.attributes("data-category"))).toEqual([
       "enhancement",
-      "innate_gift",
     ]);
   });
 

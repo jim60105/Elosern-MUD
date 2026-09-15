@@ -234,8 +234,8 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   describe("combat frames refresh by resolution", () => {
     const skillsFixture = (targets) => [
       {
-        category: "innate_gift",
-        label: "天賦",
+        category: "martial_arts",
+        label: "武技",
         groups: [
           {
             group: null,

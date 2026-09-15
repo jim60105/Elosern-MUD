@@ -1739,6 +1739,16 @@ test("rejects malformed category and skill groups", () => {
       validCombatPanel({ skills: [validCategoryGroup({ category: "bogus" })] })
     )
   );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCategoryGroup({ category: "movement" })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCategoryGroup({ category: "innate_gift" })] })
+    )
+  );
   // Co-nullability of group and label.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
@@ -1770,7 +1780,7 @@ test("rejects malformed category and skill groups", () => {
   );
   // The top-level array is bounded by the SkillCategory count.
   const tooMany = [];
-  for (let index = 0; index < 9; index++) {
+  for (let index = 0; index < 7; index++) {
     tooMany.push(validCategoryGroup());
   }
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ skills: tooMany })));
@@ -4649,8 +4659,8 @@ test("character panel v3 validates the category-grouped skill shape", () => {
     )
   );
   // Category-group count is bounded by the SkillCategory member count plus
-  // the synthetic fallback slot; nine groups (eight real categories plus the
-  // "unknown" fallback) must stay acceptable, ten must not.
+  // the synthetic fallback slot; seven groups (six real categories plus the
+  // "unknown" fallback) must stay acceptable, eight must not.
   assert.doesNotThrow(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({

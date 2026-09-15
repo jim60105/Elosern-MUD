@@ -969,10 +969,10 @@ class GroupSkillKeysTests(unittest.TestCase):
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
     def test_category_order_follows_skillcategory_declaration_order(self):
-        views = group_skill_keys([_T_EL_A, _T_MART_A, _T_REST[2]])
+        views = group_skill_keys([_T_EL_A, _T_MART_A, _T_REST[0]])
         self.assertEqual(
             [view.category for view in views],
-            ["elemental_magic", "martial_arts", "movement"],
+            ["elemental_magic", "martial_arts", "enhancement"],
         )
 
     @covers_requirement(
@@ -1001,6 +1001,28 @@ class GroupSkillKeysTests(unittest.TestCase):
             "sexual_act",
             [view.category for view in views],
             "an entity owning no sexual-act skill must see no sexual_act category",
+        )
+
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
+    def test_enhancement_sub_groups_follow_tag_order(self):
+        # Enhancement sub-groups follow fixed order: None -> 天賦 -> 身法
+        # Local fixture keys passed in reverse order:
+        # _T_REST[2] ("身法"), _T_REST[1] ("天賦"), _T_REST[0] (None).
+        views = group_skill_keys([_T_REST[2], _T_REST[1], _T_REST[0]])
+        self.assertEqual([view.category for view in views], ["enhancement"])
+        self.assertEqual(
+            [group.group for group in views[0].groups],
+            [None, "天賦", "身法"],
+        )
+        self.assertEqual(
+            [group.label for group in views[0].groups],
+            [None, "天賦", "身法"],
+        )
+        self.assertEqual(
+            [row.key for group in views[0].groups for row in group.skills],
+            [_T_REST[0], _T_REST[1], _T_REST[2]],
         )
 
     @covers_requirement(
@@ -1052,12 +1074,11 @@ class GroupSkillKeysTests(unittest.TestCase):
 
     def test_category_labels_are_the_canonical_traditional_chinese_forms(self):
         views = group_skill_keys(
-            [_T_EL_A, _T_MART_A, _T_REST[0], _T_REST[1],
-             _T_REST[2], _T_REST[3], _T_REST[4], _T_SEX_A]
+            [_T_EL_A, _T_MART_A, _T_REST[0], _T_REST[3], _T_REST[4], _T_SEX_A]
         )
         self.assertEqual(
             [view.label for view in views],
-            ["元素魔法", "武技", "強化", "天賦", "移動", "神之秘法", "特殊", "性愛行為"],
+            ["元素魔法", "武技", "強化", "神之秘法", "特殊", "性愛行為"],
         )
 
     def test_group_skill_keys_is_empty_for_no_keys(self):

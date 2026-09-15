@@ -91,8 +91,8 @@ test("active and passive skill sections flatten the category-grouped payload", (
     validPanel({
       actives: [
         {
-          category: "movement",
-          label: "移動",
+          category: "martial_arts",
+          label: "武技",
           groups: [
             {
               group: null,
@@ -112,7 +112,7 @@ test("active and passive skill sections flatten the category-grouped payload", (
   assert.ok(labels.includes("逃跑"));
   assert.ok(labels.includes(T_MOVE_SKILL.label));
   // The category/group taxonomy stays wire-only; the menu flattens it.
-  assert.ok(!labels.includes("移動"));
+  assert.ok(!labels.includes("武技"));
   assert.ok(!labels.includes("元素魔法"));
   assert.ok(!labels.includes(T_FIRE_GROUP_LABEL));
 });
