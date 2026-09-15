@@ -47,6 +47,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "world_clock_init",
     "equipment_rulebook_validation",
     "starting_companion_validation",
+    "state_reaction_rules",
     "sync_all",
     "sync_limbo",
     "sync_grid",
@@ -386,6 +387,18 @@ def at_server_start():
     _startup_step(
         "starting_companion_validation",
         lambda: importlib.import_module("world.rules.starting_companions"),
+    )
+    # Fail-loud shipped-skill marker validation plus the explicit production
+    # registration of the climax-phase dispatcher (light-climax-empowerment):
+    # importing the reaction module validates every shipped skill's declared
+    # markers against the configured-marker vocabulary and publishes its
+    # dispatcher into world.rules.phase_hooks, so a pleasure-only cast path
+    # can never reach its first phase edge with the slot empty. Same
+    # boot-step convention as the two validation gates above, and it must
+    # precede session restoration (a committed session may settle immediately).
+    _startup_step(
+        "state_reaction_rules",
+        lambda: importlib.import_module("world.rules.state_reactions"),
     )
     _startup_step("sync_all", sync_all)
     _startup_step("sync_limbo", sync_limbo)

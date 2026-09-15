@@ -856,7 +856,12 @@ def _apply_climax_phase_set(entity, target_level: str) -> str | None:
     if target_level not in _VALID_CLIMAX_TRANSITIONS.get(current, set()):
         return None
     entity.sexual.climax_phase.value = target_level
-    from world.rules.state_reactions import dispatch_phase_reaction
+    # Route through the phase_hooks leaf — importing the reaction engine here
+    # would drag the whole cast pipeline into world.rules.pleasure's import
+    # closure. The dispatcher is registered at bootstrap (see
+    # server/conf/at_server_startstop.py); an unregistered edge proceeds
+    # without reactions, since empowerment is additive.
+    from world.rules.phase_hooks import dispatch_phase_reaction
 
     dispatch_phase_reaction(entity, from_phase=current, to_phase=target_level)
     return "cycle"

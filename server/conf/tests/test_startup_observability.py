@@ -121,6 +121,7 @@ class StartupStepEventTests(_StubbedStartup):
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "starting_companion_validation",
+                "state_reaction_rules",
             ],
         )
 
