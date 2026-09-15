@@ -85,7 +85,7 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                 f"{path}: buff key {key!r} collides with a remove_by_selector selector"
             )
         modifiers = entry.get("modifiers", {})
-        if not isinstance(modifiers, dict) or set(modifiers) - {"rate", "bounds", "decay"}:
+        if not isinstance(modifiers, dict) or set(modifiers) - {"rate", "bounds", "decay", "divert"}:
             raise ValueError(f"{path}: buff {key!r} has invalid modifiers")
         rate = modifiers.get("rate")
         if rate is not None:
@@ -141,6 +141,29 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     "a gauge key or the pull-only 'skill_practice' target "
                     "(the retired 'magic_level_growth' target is rejected here)"
                 )
+        divert = modifiers.get("divert")
+        if divert is not None:
+            if not isinstance(divert, dict):
+                raise ValueError(f"{path}: buff {key!r} divert modifier must be a mapping")
+            allowed_divert_keys = {"target", "fraction", "cap"}
+            if set(divert) - allowed_divert_keys or allowed_divert_keys - set(divert):
+                raise ValueError(f"{path}: buff {key!r} divert modifier requires exactly keys {sorted(allowed_divert_keys)}")
+            target = divert["target"]
+            if target not in GAUGE_KEYS:
+                raise ValueError(f"{path}: buff {key!r} divert target {target!r} must be a gauge key")
+            if target not in ("mp", "hp"):
+                raise ValueError(f"{path}: buff {key!r} divert target {target!r} is not supported (must be 'mp' or 'hp')")
+            fraction = divert["fraction"]
+            if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not isfinite(fraction) or fraction <= 0 or fraction > 1:
+                raise ValueError(f"{path}: buff {key!r} divert fraction must be a finite number in (0, 1]")
+            cap = divert["cap"]
+            if isinstance(cap, bool) or not isinstance(cap, int) or cap <= 0:
+                raise ValueError(f"{path}: buff {key!r} divert cap must be a positive integer")
+            duration = entry.get("duration")
+            if isinstance(duration, bool) or not isinstance(duration, int) or duration <= 0:
+                raise ValueError(f"{path}: buff {key!r} with divert profile requires a finite positive int duration")
+            if rate is not None and isinstance(rate, dict) and "recovery" in rate:
+                raise ValueError(f"{path}: buff {key!r} cannot declare both divert and recovery")
         stacking = entry.get("stacking", "refresh")
         if stacking not in {"refresh", "unique_per_source"}:
             raise ValueError(f"{path}: buff {key!r} has unsupported stacking {stacking!r}")
@@ -192,6 +215,35 @@ def _parse_percent_value(value: Any) -> float:
             raise ValueError(f"invalid percent string: {value!r}")
     raise ValueError(f"invalid percent type: {type(value)}")
     return definitions
+
+
+def get_divert_consumed(buff: Any) -> int:
+    """Return the consumed divert budget for one buff instance."""
+    val = getattr(buff, "divert_consumed", None)
+    if val is None and hasattr(buff, "cache") and isinstance(buff.cache, dict):
+        val = buff.cache.get("divert_consumed")
+    if val is None and hasattr(buff, "handler") and hasattr(buff.handler, "buffcache"):
+        entry = buff.handler.buffcache.get(getattr(buff, "buffkey", None))
+        if isinstance(entry, dict):
+            val = entry.get("divert_consumed")
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        return 0
+    return max(0, int(val))
+
+
+def update_divert_consumed(buff: Any, consumed: int) -> None:
+    """Update the consumed divert budget on a buff instance cache."""
+    consumed_int = max(0, int(consumed))
+    if hasattr(buff, "cache") and isinstance(buff.cache, dict):
+        buff.cache["divert_consumed"] = consumed_int
+    if hasattr(buff, "handler") and hasattr(buff.handler, "buffcache"):
+        key = getattr(buff, "buffkey", None)
+        if key and key in buff.handler.buffcache:
+            buff.handler.buffcache[key]["divert_consumed"] = consumed_int
+    try:
+        setattr(buff, "divert_consumed", consumed_int)
+    except Exception:  # observability: ignore R2: optional write-through on foreign test instances
+        pass
 
 
 BUFF_DEFINITIONS = load_buff_definitions(
@@ -405,6 +457,8 @@ def apply_buff(
         "tick_elapsed_seconds": 0,
         **data,
     }
+    if "divert" in definition.modifiers and not is_refresh and "divert_consumed" not in data:
+        cache["divert_consumed"] = 0
     entity.buffs.add(
         RulebookBuff,
         key=instance_key or definition_key,
@@ -508,11 +562,18 @@ def active_stack_count(arg1: Any, arg2: Any) -> int:
 
 def _active_buff_instances(entity) -> tuple[RulebookBuff, ...]:
     """Return unpaused game-time-unexpired buff instances with positive stacks."""
+    if not hasattr(entity, "buffs"):
+        return ()
+    if hasattr(entity, "attributes") and not entity.attributes.has("buffs"):
+        return ()
+    buffs = getattr(entity, "buffs", None)
+    if buffs is None or not hasattr(buffs, "all"):
+        return ()
     return tuple(
         buff
-        for buff in entity.buffs.all.values()
-        if not buff.paused
-        and buff.stacks > 0
+        for buff in buffs.all.values()
+        if not getattr(buff, "paused", False)
+        and getattr(buff, "stacks", 1) > 0
         and (
             getattr(buff, "remaining_seconds", None) is None
             or buff.remaining_seconds > 0

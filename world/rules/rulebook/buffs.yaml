@@ -22,11 +22,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
-- key: water_shield
+- key: water_film
   duration: 60
   stacking: refresh
+  polarity: buff
   modifiers:
-    bounds: {target: defense, ceiling: 5}
+    divert: {target: mp, fraction: 0.3, cap: 30}
 - key: water_bind
   duration: 30
   stacking: refresh

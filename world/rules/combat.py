@@ -15,8 +15,17 @@ from world.rules.action import (
     PendingEffect,
     _stored_trait_value,
     register_effect_handler,
+    stored_gauge_pair,
 )
-from world.rules.buffs import TickRecord, tick_buffs
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    TickRecord,
+    _active_buff_instances,
+    get_divert_consumed,
+    tick_buffs,
+    update_divert_consumed,
+)
+from world.rules.mp_flow import apply_mp_change
 from world.rules.combat_modifiers import (
     adjusted_agility,
     apply_cost_modifier,
@@ -348,6 +357,8 @@ def _handle_damage(
             and has_action_evidence(target, damage_policy.repeat_when, now=now)
         )
         total_strikes = 2 if extra else 1
+        planned_cap_spend: dict[str, int] = {}
+        planned_gauge_spend: dict[str, int] = {}
 
         for _ in range(total_strikes):
             raw_roll = roll_d100()
@@ -376,9 +387,54 @@ def _handle_damage(
                 amount = max(scaled_magnitude(base_amount, scale), floor)
                 amount = int(amount)
 
+            residual = amount
+            planned_diverts: list[tuple[Any, int, str, str | None, str | None]] = []
+            if hit and amount > 0:
+                active_diverts = [
+                    buff
+                    for buff in _active_buff_instances(target)
+                    if BUFF_DEFINITIONS.get(buff.definition_key) is not None
+                    and "divert" in BUFF_DEFINITIONS[buff.definition_key].modifiers
+                ]
+                active_diverts.sort(
+                    key=lambda b: (
+                        b.definition_key,
+                        getattr(b, "buffkey", b.definition_key),
+                    )
+                )
+                for buff in active_diverts:
+                    if residual <= 0:
+                        break
+                    spec = BUFF_DEFINITIONS[buff.definition_key].modifiers["divert"]
+                    target_gauge = spec["target"]
+                    fraction = float(spec["fraction"])
+                    cap = int(spec["cap"])
+                    buff_id = getattr(buff, "buffkey", buff.definition_key)
+                    consumed = get_divert_consumed(buff)
+                    already_spent_cap = planned_cap_spend.get(buff_id, 0)
+                    remaining_cap = max(0, cap - consumed - already_spent_cap)
+                    current_gauge, _ = stored_gauge_pair(target, target_gauge)
+                    already_spent_gauge = planned_gauge_spend.get(target_gauge, 0)
+                    available_gauge = max(0, current_gauge - already_spent_gauge)
+
+                    diverted = min(
+                        round(residual * fraction), remaining_cap, available_gauge
+                    )
+                    diverted = max(0, int(diverted))
+                    if diverted > 0:
+                        residual -= diverted
+                        planned_cap_spend[buff_id] = already_spent_cap + diverted
+                        planned_gauge_spend[target_gauge] = already_spent_gauge + diverted
+                        src_skill = getattr(buff, "source_skill", None)
+                        src_tier = getattr(buff, "source_tier", None) or "學徒"
+                        planned_diverts.append(
+                            (buff, diverted, target_gauge, src_skill, src_tier)
+                        )
+            residual = max(0, residual)
+
             def apply(
                 target=target,
-                amount=amount,
+                amount=residual,
                 hit=hit,
                 key=key,
                 protected=protected,
@@ -409,12 +465,59 @@ def _handle_damage(
                 PendingEffect(
                     entity=target,
                     description=(
-                        f"damage|{key}|{raw_roll}|{int(hit)}|{amount}"
+                        f"damage|{key}|{raw_roll}|{int(hit)}|{residual}"
                     ),
-                    surfaces=frozenset(),
+                    surfaces=frozenset({"traits", "buffs"}),
                     apply=apply,
                 )
             )
+            for buff, diverted, target_gauge, src_skill, src_tier in planned_diverts:
+                def make_divert_apply(
+                    b=buff,
+                    div=diverted,
+                    g_key=target_gauge,
+                    s_skill=src_skill,
+                    s_tier=src_tier,
+                    cap=int(BUFF_DEFINITIONS[buff.definition_key].modifiers["divert"]["cap"]),
+                ):
+                    def apply_divert() -> None:
+                        cur_consumed = get_divert_consumed(b)
+                        rem_cap = max(0, cap - cur_consumed)
+                        to_pay = min(div, rem_cap)
+                        if to_pay <= 0:
+                            return
+                        if g_key == "mp":
+                            actual_delta = apply_mp_change(
+                                target,
+                                -to_pay,
+                                source_skill=s_skill,
+                                source_tier=s_tier,
+                            )
+                            paid = abs(actual_delta)
+                        elif g_key == "hp":
+                            trait = getattr(target.traits, "hp")
+                            before = _stored_trait_value(trait)
+                            _apply_hp_delta(target, -to_pay)
+                            after = _stored_trait_value(trait)
+                            paid = max(0, int(before - max(0.0, after)))
+                        else:
+                            raise NotImplementedError(
+                                f"divert target {g_key!r} is not supported"
+                            )
+                        update_divert_consumed(b, cur_consumed + paid)
+
+                    return apply_divert
+
+                pending.append(
+                    PendingEffect(
+                        entity=target,
+                        description=(
+                            f"damage_divert|{key}|{buff.definition_key}|{diverted}"
+                        ),
+                        surfaces=frozenset({"traits", "buffs"}),
+                        apply=make_divert_apply(),
+                    )
+                )
         if key in nonlethal_keys and battlefield is not None:
             # One battlefield-shaped effect per protected target: the commit's
             # duck-typed snapshot/restore dispatch captures ``fled`` and
@@ -436,7 +539,7 @@ def _handle_damage(
 register_effect_handler(
     "damage",
     _handle_damage,
-    surfaces=frozenset({"traits"}),
+    surfaces=frozenset({"traits", "buffs"}),
     requires_event_context=frozenset(),
 )
 
