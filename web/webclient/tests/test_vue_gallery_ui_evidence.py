@@ -24,7 +24,7 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
-from ._showcase_build import showcase_build_lock
+from ._showcase_build import ensure_storybook_out, showcase_build_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
@@ -114,22 +114,12 @@ class VueGalleryUiEvidenceTest(unittest.TestCase):
         super().setUpClass()
         # The storyboard gate needs the static Storybook build; build it once
         # per process when the checkout has none (CI workspaces only build the
-        # app dist). The lock serializes against the B1/B2 evidence classes,
-        # which rebuild the same .storybook-out in other parallel workers.
+        # app dist). The shared fingerprint-guarded chain serializes against
+        # the B1/B2 evidence classes (which rebuild the same .storybook-out
+        # in other parallel workers) and rebuilds only on input-fingerprint
+        # mismatch.
         with showcase_build_lock():
-            if not (STORYBOOK_OUT / "iframe.html").is_file():
-                result = subprocess.run(
-                    ["npm", "run", "build-storybook"],
-                    cwd=str(REPO_ROOT),
-                    capture_output=True,
-                    text=True,
-                    timeout=900,
-                )
-                assert result.returncode == 0, (
-                    "Storybook build failed under gallery evidence:\n"
-                    + result.stdout
-                    + result.stderr
-                )
+            ensure_storybook_out()
 
     @covers_requirement(
         "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts"

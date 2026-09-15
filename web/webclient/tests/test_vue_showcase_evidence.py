@@ -54,7 +54,7 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
-from ._showcase_build import showcase_build_lock
+from ._showcase_build import ensure_app_dist, ensure_storybook_out, showcase_build_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
@@ -98,10 +98,12 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        result = run_npm(["run", "build"], timeout=600)
-        assert (
-            result.returncode == 0
-        ), "vite build failed under evidence:\n" + result.stdout + result.stderr
+        # The vite build wipes and repopulates dist while other parallel
+        # workers read it or copy it into the showcase, so it runs under the
+        # shared showcase build lock; the input fingerprint recorded in the
+        # output lets the other workers reuse a green build.
+        with showcase_build_lock():
+            ensure_app_dist()
 
     @covers_requirement(
         "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa"
@@ -255,20 +257,14 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
     def test_storybook_showcase_build_succeeds(self):
         """The showcase gate builds the static Storybook from local data.
 
-        The build and the output read run under the shared showcase build
-        lock: the parallel Evennia runner may execute the B2 action-dock
-        evidence class in another worker, and it builds the same
-        ``.storybook-out`` directory on demand.
+        The build runs through the shared fingerprint-guarded lock chain
+        (it refreshes the app dist first, which the showcase copies): the
+        parallel Evennia runner may execute the B2 action-dock evidence
+        class in another worker, and it builds the same ``.storybook-out``
+        directory on demand.
         """
         with showcase_build_lock():
-            result = run_npm(["run", "build-storybook"], timeout=900)
-            self.assertEqual(
-                result.returncode,
-                0,
-                "Storybook showcase build failed:\n"
-                + result.stdout
-                + result.stderr,
-            )
+            ensure_storybook_out()
             out_dir = REPO_ROOT / ".storybook-out"
             self.assertTrue(
                 (out_dir / "iframe.html").is_file(), "missing iframe.html"

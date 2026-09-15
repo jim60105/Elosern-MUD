@@ -37,7 +37,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from ._showcase_build import showcase_build_lock
+from ._showcase_build import ensure_storybook_out, showcase_build_lock
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -92,16 +92,12 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
         super().setUpClass()
         # The data family stories are registered in the static Storybook
         # build; build it once per process when the checkout has none (CI
-        # workspaces only build the app dist). The lock serializes against
-        # the B1/B2 evidence classes, which rebuild the same .storybook-out
-        # in another parallel worker as their gate evidence.
+        # workspaces only build the app dist). The shared fingerprint-guarded
+        # chain serializes against the B1/B2 evidence classes (which rebuild
+        # the same .storybook-out in another parallel worker as their gate
+        # evidence) and rebuilds only on input-fingerprint mismatch.
         with showcase_build_lock():
-            if not (STORYBOOK_OUT / "iframe.html").is_file():
-                result = run_npm(["run", "build-storybook"], timeout=900)
-                assert (
-                    result.returncode == 0
-                ), "Storybook build failed under data evidence:\n" \
-                    + result.stdout + result.stderr
+            ensure_storybook_out()
 
     @covers_requirement(
         "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"

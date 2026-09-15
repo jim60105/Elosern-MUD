@@ -37,7 +37,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from ._showcase_build import showcase_build_lock
+from ._showcase_build import ensure_storybook_out, showcase_build_lock
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -82,16 +82,13 @@ class VueBreakdownEvidenceTest(unittest.TestCase):
         super().setUpClass()
         # The breakdown stories are registered in the static Storybook
         # build; build it once per process when the checkout has none (CI
-        # workspaces only build the app dist). The lock serializes against
-        # the B1/B2/B3 evidence classes, which rebuild the same
-        # .storybook-out in another parallel worker as their gate evidence.
+        # workspaces only build the app dist). The shared fingerprint-guarded
+        # chain serializes against the B1/B2/B3 evidence classes (which
+        # rebuild the same .storybook-out in another parallel worker as
+        # their gate evidence) and rebuilds only when the input fingerprint
+        # no longer matches, so workers reuse a green build.
         with showcase_build_lock():
-            if not (STORYBOOK_OUT / "iframe.html").is_file():
-                result = run_npm(["run", "build-storybook"], timeout=900)
-                assert (
-                    result.returncode == 0
-                ), "Storybook build failed under breakdown evidence:\n" \
-                    + result.stdout + result.stderr
+            ensure_storybook_out()
 
     @covers_requirement(
         "webclient-vue-application::the-character-ui-renders-server-breakdown-without-recomputation"

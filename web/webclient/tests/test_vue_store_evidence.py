@@ -31,6 +31,8 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
+from ._showcase_build import ensure_app_dist, showcase_build_lock
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DIST_ROOT = REPO_ROOT / "web/static/webclient/app/dist"
 
@@ -51,10 +53,12 @@ class VueStoreEvidenceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        result = run_npm(["run", "build"], timeout=600)
-        assert (
-            result.returncode == 0
-        ), "vite build failed under C1 evidence:\n" + result.stdout + result.stderr
+        # The vite build wipes and repopulates dist while other parallel
+        # workers read it or copy it into the showcase, so it runs under the
+        # shared showcase build lock; the input fingerprint recorded in the
+        # output lets the other workers reuse a green build.
+        with showcase_build_lock():
+            ensure_app_dist()
 
     @covers_requirement(
         "webclient-vue-application::the-vue-app-binds-the-preserved-strict-dom-independent-logic-to-a-reactive-store"
