@@ -263,6 +263,22 @@ class DamagePolicyValidationTests(unittest.TestCase):
 class TargetFactsPurityTests(EvenniaTestCase):
     """Purity and correctness tests for target fact readers."""
 
+    def setUp(self):
+        # A prior module in the same shard may leave idmapper ghost rows
+        # (ndb-stamped objects EvenniaTestCase's non-forced flush_cache
+        # cannot evict). Without a forced flush, create_object here resolves
+        # DEFAULT_HOME (#2) through the stale cache entry and writes a
+        # dangling db_home_id that fails teardown's check_constraints — the
+        # same documented class as WildernessDefeatMixin's tearDown flush in
+        # test_defeat_aftermath_core. Must run in setUp, before this class's
+        # create_object calls: EvenniaTestCase.tearDown runs the constraint
+        # check inside super().tearDown() BEFORE any flush, so a
+        # tearDown-side flush here could never precede the error.
+        from evennia.objects.models import ObjectDB
+
+        ObjectDB.flush_instance_cache(force=True)
+        super().setUp()
+
     def test_uninitialized_entity_does_not_materialize_storage(self):
         char = create_object(PlayerCharacter, key="uninit_char")
         # Ensure combat_traits attribute has not been written to DB
