@@ -45,6 +45,16 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "paralysis")
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
+    def test_rule_suffocation_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "suffocated")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_water_bind_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "water_bind")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
     def test_rule_fear_agility_and_accuracy_penalty(self):
         entity = self._entity()
         apply_buff(entity, "fear")

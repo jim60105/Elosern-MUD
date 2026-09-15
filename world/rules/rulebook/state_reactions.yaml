@@ -34,6 +34,13 @@
       主宰: 28
       神格: 40
 
+- id: drowning_suffocation
+  when:
+    event: mp_zero
+    event_source_skill: drowned_surging
+  then:
+    apply_buff: suffocated
+
 - id: pain_to_pleasure_negative_buff_added
   when:
     event: negative_buff_added

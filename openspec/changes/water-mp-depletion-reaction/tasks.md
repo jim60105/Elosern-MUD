@@ -15,10 +15,10 @@
 
 ## 2. Rulebook rows (no-silent-window given: DoT rows ship here)
 
-- [ ] 2.1 Add `ebbing` / `ebbing_deep` / `ebbing_maelstrom` rows to `buffs.yaml` (`rate {target: mp, delta: -5|-12|-18}`, tick_interval 10, duration 60, polarity debuff, refresh stacking) and `suffocated` (duration 40, debuff, empty modifiers).
-- [ ] 2.2 Add `suffocation_locks_actions` and the bind-marker lock row to `combat_modifiers.yaml` (`actions_per_turn: 0`); keep the per-rule-ID test correspondence requirement satisfied by adding exactly one test per new rule ID.
-- [ ] 2.3 Add the `drowning_suffocation` rule to `state_reactions.yaml` (`event: mp_zero` + `event_source_skill` qualification per design D5, `then: apply_buff: suffocated`); confirm load-time validation passes with the row present while the qualified registry node arrives only with the catalog change.
-- [ ] 2.4 Add fail-closed `status_display.yaml` rows (潮退／潮退退潮 wording per the wave naming decision recorded in the catalog design, 窒息) for every new buff key
+- [x] 2.1 Add `ebbing` / `ebbing_deep` / `ebbing_maelstrom` rows to `buffs.yaml` (`rate {target: mp, delta: -5|-12|-18}`, tick_interval 10, duration 60, polarity debuff, refresh stacking) and `suffocated` (duration 40, debuff, empty modifiers).
+- [x] 2.2 Add `suffocation_locks_actions` and the bind-marker lock row to `combat_modifiers.yaml` (`actions_per_turn: 0`); keep the per-rule-ID test correspondence requirement satisfied by adding exactly one test per new rule ID.
+- [x] 2.3 Add the `drowning_suffocation` rule to `state_reactions.yaml` (`event: mp_zero` + `event_source_skill` qualification per design D5, `then: apply_buff: suffocated`); confirm load-time validation passes with the row present while the qualified registry node arrives only with the catalog change.
+- [x] 2.4 Add fail-closed `status_display.yaml` rows (潮退／潮退退潮 wording per the wave naming decision recorded in the catalog design, 窒息) for every new buff key
 
 ## 3. Behavioral evidence and integration
 
