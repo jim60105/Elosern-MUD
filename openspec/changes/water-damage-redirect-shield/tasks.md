@@ -29,8 +29,10 @@
 
 ### Focused invocation
 
+`world.rules.tests.test_damage_divert` is the intended synthetic divert module owned by this change, not an existing-test claim.
+
 ```sh
-uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_damage_divert world.rules.tests.test_buffs world.rules.tests.test_combat_resolution
+uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_damage_divert world.rules.tests.test_buffs world.rules.tests.test_conditional_damage
 uv run --locked python -m tools.observability_lint check
 uv run --locked python -m tools.test_data_lint check
 uv run --locked python -m tools.spec_traceability check

@@ -1,13 +1,13 @@
 ## MODIFIED Requirements
 
-### Requirement: Buff definitions configure a subset of rate of change, clamped bounds, and decay
-rate — never a combat-stat multiplier
+### Requirement: Buff definitions configure a subset of rate of change, clamped bounds, and decay rate
+— never a combat-stat multiplier
 `world/rules/rulebook/buffs.yaml` SHALL define each buff's tunable parameters (duration, tick interval,
 stacking policy, and a `modifiers` mapping using at most the keys `rate`, `bounds`, `divert`, and
 `decay`) with rate choosing either a fixed delta or a validated recovery profile (never both), per
 design doc §6.4's exhaustive list of what a buff may modify. A buff definition SHALL NOT configure a
-combat-stat multiplier (`atk_phys`/`agility`/`defense` scaling) — that remains change 5's
-`SkillHandler.effective_value()` territory. A buff MAY declare an empty `modifiers` mapping when its
+combat-stat multiplier (`atk_phys`/`agility`/`defense` scaling) — that remains the combat-modifier/`SkillHandler.effective_value()`
+territory. A buff MAY declare an empty `modifiers` mapping when its
 sole purpose is being detectable as present (a marker buff). A `divert` modifier SHALL be validated
 fail-closed at load: its `target` must be a gauge key, its `fraction` a finite number in (0, 1], its
 `cap` a positive integer, and the row must carry a finite duration; malformed divert rows SHALL make
