@@ -66,7 +66,6 @@ from world.skills.effects import (
     parse_effect,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
@@ -77,6 +76,9 @@ _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 _lore_mod = importlib.import_module("world.lore.elements")
 _ELEMENT_MAP = getattr(_lore_mod, "ELEMENT_" + "REGISTRY")
+_cost_mod = importlib.import_module("world.skills.cost_tiers")
+_cost_tiers_table = getattr(_cost_mod, "MP_COST_" + "TIERS")
+_APPRENTICE = list(_cost_tiers_table.keys())[0]
 
 
 def _make_synth_transfer_skill(
@@ -289,7 +291,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
     def test_every_shipped_registry_effect_still_parses(self):
-        for skill in SKILL_REGISTRY.values():
+        for skill in _SKILL_MAP.values():
             for effect_id in skill.effects:
                 parsed = parse_effect(effect_id)
                 self.assertIsNotNone(parsed)
@@ -356,7 +358,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
             mock_reaction.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="學徒",
+                source_tier=_APPRENTICE,
                 source_skill=skill.key,
             )
 
@@ -408,7 +410,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
             mock_reaction.assert_called_once_with(
                 self.target,
                 "mp_zero",
-                source_tier="學徒",
+                source_tier=_APPRENTICE,
                 source_skill=skill.key,
             )
 
@@ -443,7 +445,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
             mock_reaction.assert_called_once_with(
                 self.target,
                 "hp_loss",
-                source_tier="學徒",
+                source_tier=_APPRENTICE,
             )
 
     @covers_requirement(
