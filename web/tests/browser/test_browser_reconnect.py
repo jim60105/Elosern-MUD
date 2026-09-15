@@ -245,43 +245,57 @@ class ReconnectTest(BrowserAcceptanceTest):
             self.assertNotEqual(state["epoch"], epoch_before)
 
     def test_rejects_prior_generation_and_different_epoch_on_active_socket(self):
-        """The live active store discards foreign generations and epochs."""
+        """The live active store discards foreign generations and epochs.
+
+        Both receives, the envelopes, and the before/after state reads run in
+        ONE page task: a legitimate login-burst snapshot committing between
+        split Python-side reads would advance the revision and turn the
+        unchanged-state assertions into a false rejection failure (the
+        single-evaluate stamping contract, browser_helpers). Building the
+        same-epoch envelope from the live view in-page also keeps its
+        ``revision + 1`` genuinely newer than the current revision.
+        """
         page = self.logged_in_page()
-        state = store_state(page)
-        generation = state["generation"]
-        epoch_active = state["epoch"]
-        revision = state["revision"]
-
-        prior_generation = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": generation - 1,
-                "envelope": snapshot_envelope(
-                    epoch_active,
-                    revision + 1,
-                    {"status": valid_status_panel("X", "y")},
-                ),
-            },
+        result = page.evaluate(
+            """(args) => {
+              const store = window.__elosernBridge.store;
+              const before = store.view;
+              const status = {
+                schema_version: 2, available: true,
+                actor: { name: 'X', identity: 'y', location: null },
+                resources: { hp: {current: 10, maximum: 10},
+                             mp: {current: 10, maximum: 10},
+                             sp: {current: 10, maximum: 10} },
+                conditions: [], disguise_active: false, combat: null,
+              };
+              const env = (epoch, revision) => ({
+                protocol_version: 1, presentation_epoch: epoch,
+                revision: revision, mode: before.mode,
+                panels: { status: status }, layout_version: 1,
+                server_time: before.serverTime,
+              });
+              const generation = before.generation;
+              const prior = store.receive(
+                generation - 1, 'ui_snapshot',
+                [env(before.epoch, before.revision + 1)], {});
+              const foreign = store.receive(
+                generation, 'ui_snapshot', [env(args.freshEpoch, 1)], {});
+              const after = store.view;
+              return {
+                priorReason: prior.reason, foreignReason: foreign.reason,
+                generationBefore: generation, generationAfter: after.generation,
+                epochBefore: before.epoch, epochAfter: after.epoch,
+                revisionBefore: before.revision,
+                revisionAfter: after.revision,
+              };
+            }""",
+            {"freshEpoch": fresh_epoch()},
         )
-        self.assertEqual(prior_generation["reason"], "stale_generation")
-
-        different_epoch = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": generation,
-                "envelope": snapshot_envelope(
-                    fresh_epoch(), 1, {"status": valid_status_panel("X", "y")}
-                ),
-            },
-        )
-        self.assertEqual(different_epoch["reason"], "different_epoch")
-
-        after = store_state(page)
-        self.assertEqual(after["generation"], generation)
-        self.assertEqual(after["epoch"], epoch_active)
-        self.assertEqual(after["revision"], revision)
+        self.assertEqual(result["priorReason"], "stale_generation")
+        self.assertEqual(result["foreignReason"], "different_epoch")
+        self.assertEqual(result["generationAfter"], result["generationBefore"])
+        self.assertEqual(result["epochAfter"], result["epochBefore"])
+        self.assertEqual(result["revisionAfter"], result["revisionBefore"])
 
     def test_retired_epoch_rejected_while_awaiting_first_snapshot(self):
         """A retired epoch is refused as the first snapshot of a new generation.

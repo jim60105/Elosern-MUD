@@ -333,20 +333,27 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         generation = store_state(page)["generation"]
-        revision_before = store_state(page)["revision"]
 
         # A snapshot with an unsupported protocol version is rejected atomically.
+        # The revision pair, the generation, and the receive run in ONE page
+        # task: a legitimate login-burst snapshot committing between split
+        # Python-side reads would advance the revision and fake an atomicity
+        # break (the single-evaluate stamping contract, browser_helpers).
         v2 = snapshot_envelope(
             fresh_epoch(), 1, {"status": valid_status_panel("X", "y")},
             protocol_version=2,
         )
-        rejected = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {"generation": generation, "envelope": v2},
+        outcome = page.evaluate(
+            "(args) => { const s = window.__elosernBridge.store.view;"
+            " const before = s.revision;"
+            " const result = window.__elosernBridge.store.receive("
+            " s.generation, 'ui_snapshot', [args.envelope], {});"
+            " return {accepted: result.accepted, revisionBefore: before,"
+            " revisionAfter: window.__elosernBridge.store.view.revision}; }",
+            {"envelope": v2},
         )
-        self.assertFalse(rejected["accepted"])
-        self.assertEqual(store_state(page)["revision"], revision_before)
+        self.assertFalse(outcome["accepted"])
+        self.assertEqual(outcome["revisionAfter"], outcome["revisionBefore"])
 
         # The server's protocol-error reply locks every graphical mutation.
         page.evaluate(

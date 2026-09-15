@@ -150,26 +150,35 @@ class ActionLockingTest(BrowserAcceptanceTest):
     def test_ordinary_text_works_when_structured_oob_rendering_fails(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        generation = store_state(page)["generation"]
-        revision_before = store_state(page)["revision"]
-
-        # A malformed status panel is rejected atomically: no crash, no state
-        # change, and the store stays active.
+        # A malformed status panel is rejected atomically: the receive runs in
+        # ONE page task with the phase and revision reads around it, so a
+        # legitimate login-burst snapshot can never be mistaken for the
+        # malformed envelope mutating state (the single-evaluate stamping
+        # contract, browser_helpers). No crash, no state change, active.
         malformed = snapshot_envelope(
             fresh_epoch(),
             99,
             {"status": {"schema_version": 1, "available": True}},
         )
-        result = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {"generation": generation, "envelope": malformed},
+        outcome = page.evaluate(
+            "(args) => { const store = window.__elosernBridge.store;"
+            " const before = store.view;"
+            " const result = store.receive("
+            " before.generation, 'ui_snapshot', [args.envelope], {});"
+            " const after = store.view;"
+            " return {accepted: result.accepted, reason: result.reason,"
+            " epochBefore: before.epoch, epochAfter: after.epoch,"
+            " phaseBefore: before.phase, phaseAfter: after.phase,"
+            " revisionBefore: before.revision,"
+            " revisionAfter: after.revision}; }",
+            {"envelope": malformed},
         )
-        self.assertFalse(result["accepted"])
-        self.assertEqual(result["reason"], "invalid")
-        state = store_state(page)
-        self.assertEqual(state["phase"], "active")
-        self.assertEqual(state["revision"], revision_before)
+        self.assertFalse(outcome["accepted"])
+        self.assertEqual(outcome["reason"], "invalid")
+        self.assertEqual(outcome["phaseAfter"], "active")
+        self.assertEqual(outcome["phaseBefore"], "active")
+        self.assertEqual(outcome["epochAfter"], outcome["epochBefore"])
+        self.assertEqual(outcome["revisionAfter"], outcome["revisionBefore"])
 
         # The one-sync renderer recovery guard fires exactly once per episode.
         # Both requests run in one page task: a server snapshot answering the
