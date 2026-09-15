@@ -227,13 +227,14 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         messages = self._run(CmdCombatActions, "")
         joined = "\n".join(messages)
         # Category headings in SkillCategory declaration order: elemental
-        # magic, then martial arts (innate basic_attack), then movement
-        # (innate flee).
+        # magic, then martial arts (which carries the innate flee and
+        # basic_attack rows under the consolidated six-member taxonomy).
         self.assertIn("◆ 元素魔法", joined)
         self.assertIn("◆ 武技", joined)
-        self.assertIn("◆ 移動", joined)
         self.assertLess(joined.index("◆ 元素魔法"), joined.index("◆ 武技"))
-        self.assertLess(joined.index("◆ 武技"), joined.index("◆ 移動"))
+        # The consolidated taxonomy dropped the movement category: it can
+        # never render, even with the innate flee row owned.
+        self.assertNotIn("◆ 移動", joined)
         # Element sub-headings in ELEMENT_REGISTRY order (the borrowed row
         # stays first in the scoped registry; the invented row follows).
         self.assertIn(f"  {_BORROWED_ELEMENT_LABEL}", joined)
@@ -249,9 +250,14 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertLess(joined.index("  沼光"), joined.index("t_gale_jab（風刺）"))
         # The no-group martial-arts category renders no sub-heading: the
         # skill lines follow the heading directly.
-        martial = joined[joined.index("◆ 武技") + len("◆ 武技"):joined.index("◆ 移動")]
+        # "\n目標代號：" is unique as the section header; the bare substring
+        # also occurs inside the opening "可用技能與目標代號：" line.
+        martial = joined[
+            joined.index("◆ 武技") + len("◆ 武技"):joined.index("\n目標代號：")
+        ]
         self.assertNotIn("◆", martial)
         self.assertIn("t_reed_cut（蘆斷）", martial)
+        self.assertIn("flee（合成逃跑）", martial)
         # The innate overlay re-seeds the production-forced basic-attack key
         # with a synthetic row whose label is authored in the helper.
         self.assertIn("basic_attack（合成基本攻擊）", martial)
@@ -262,7 +268,9 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         engage(self.char1, self.monster)
         messages = self._run(CmdCombatActions, "")
         joined = "\n".join(messages)
-        martial = joined[joined.index("◆ 武技"):joined.index("◆ 移動")]
+        martial = joined[
+            joined.index("◆ 武技") + len("◆ 武技"):joined.index("\n目標代號：")
+        ]
         # The martial-arts heading is followed directly by skill lines; no
         # indented sub-heading line sits between them.
         self.assertIn("◆ 武技\n", joined)
