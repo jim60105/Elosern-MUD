@@ -46,7 +46,8 @@ DOWNGRADED_SAMPLE = {
         "QuestPlannerTests": {"QuestRegistryIsolation", "EvenniaTestCase"},
     },
     "world/rules/tests/test_buffs.py": {
-        "BuffIntegrationTests": {"EvenniaTestCase"},
+        "BuffIntegrationTests": {"_BuffFixtureMixin", "EvenniaTestCase"},
+        "RemoveBySelectorTests": {"_BuffFixtureMixin", "EvenniaTestCase"},
     },
     "world/rules/tests/test_combat_modifiers.py": {
         "CombatModifierTests": {"EvenniaTestCase"},

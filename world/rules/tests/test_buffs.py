@@ -179,7 +179,7 @@ class _BuffFixtureMixin(EvenniaTestCase):
         return entity
 
 
-class BuffIntegrationTests(_BuffFixtureMixin):
+class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
     @covers_requirement("buff-handler-integration::buff-tick-is-exposed-as-a-plain-callable-with-no-settlement-order-invented")
     def test_buff_poisoned(self):
         entity = self._entity()
@@ -692,7 +692,7 @@ class BuffIntegrationTests(_BuffFixtureMixin):
         )
 
 
-class RemoveBySelectorTests(_BuffFixtureMixin):
+class RemoveBySelectorTests(_BuffFixtureMixin, EvenniaTestCase):
     """The selector-driven removal (item-effect-model design §5.6, D3)."""
 
     def _polarities(self, entity):
