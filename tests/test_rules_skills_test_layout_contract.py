@@ -63,7 +63,6 @@ SKILL_REGISTRY_CLASS_MODULES = {
     "SkillCategoryClassificationTests": "test_skill_registry.py",
     "FleeCategoryDeclarationTests": "test_skill_registry.py",
     "FireSpellCatalogTests": "test_spell_catalogs.py",
-    "WaterSpellCatalogTests": "test_spell_catalogs.py",
     "EarthSpellCatalogTests": "test_spell_catalogs.py",
     "WindSpellCatalogTests": "test_spell_catalogs.py",
     "LightningSpellCatalogTests": "test_spell_catalogs.py",

@@ -795,7 +795,27 @@ class GaugeTransferPolicy:
             )
         object.__setattr__(self, "caster_recovery_share", share)
 
-        from world.rules.buffs import BUFF_DEFINITIONS
+        import sys
+        valid_keys: frozenset[str]
+        rules_buffs = sys.modules.get("world.rules.buffs")
+        if rules_buffs is not None and hasattr(rules_buffs, "BUFF_DEFINITIONS"):
+            valid_keys = frozenset(rules_buffs.BUFF_DEFINITIONS)
+        else:
+            import yaml
+            from pathlib import Path
+            buffs_path = Path(__file__).parent.parent / "rules" / "rulebook" / "buffs.yaml"
+            if buffs_path.exists():
+                try:
+                    data = yaml.safe_load(buffs_path.read_text(encoding="utf-8"))
+                    valid_keys = frozenset(
+                        entry["key"]
+                        for entry in data
+                        if isinstance(entry, dict) and "key" in entry
+                    )
+                except Exception:
+                    valid_keys = frozenset()
+            else:
+                valid_keys = frozenset()
 
         canon_bonuses: list[tuple[str, int]] = []
         raw_bonus = self.restore_bonus_per_stack
@@ -826,7 +846,7 @@ class GaugeTransferPolicy:
                 )
             if not isinstance(key, str):
                 raise ValueError(f"buff key must be a string, got {key!r}")
-            if key not in BUFF_DEFINITIONS:
+            if key not in valid_keys:
                 raise ValueError(
                     f"unknown buff key {key!r} in restore_bonus_per_stack; must exist in BUFF_DEFINITIONS"
                 )

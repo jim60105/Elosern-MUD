@@ -59,7 +59,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
     def test_registration_declares_exactly_the_traits_surface(self):
         self.assertEqual(
             _EFFECT_HANDLER_SURFACES["damage"],
-            frozenset({"traits"}),
+            frozenset({"traits", "buffs"}),
         )
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")

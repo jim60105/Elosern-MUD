@@ -1096,6 +1096,7 @@ class RollbackTests(
         class OuterExplodingAtomic:
             def __init__(self):
                 self.depth = 0
+                self.exploded = False
 
             def __enter__(self):
                 self.depth += 1
@@ -1103,7 +1104,8 @@ class RollbackTests(
 
             def __exit__(self, exc_type, exc, tb):
                 self.depth -= 1
-                if exc_type is None and self.depth == 0:
+                if exc_type is None and self.depth == 0 and not self.exploded:
+                    self.exploded = True
                     raise RuntimeError("injected outer commit failure")
                 return False
 

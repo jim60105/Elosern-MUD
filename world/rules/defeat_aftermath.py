@@ -1642,7 +1642,14 @@ def run_defeat_aftermath(
     def undo() -> None:
         """Undo every in-process aftermath surface; idempotent on re-run."""
         for restore in reversed(restores):
-            restore()
+            try:
+                restore()
+            except Exception as error:
+                log_warn(
+                    "defeat_aftermath_undo_restore_failed",
+                    exc=error,
+                    context={"char": str(actor.key)},
+                )
         _restore_aftermath_surfaces(
             actor,
             battlefield,

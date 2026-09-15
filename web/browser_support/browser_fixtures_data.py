@@ -436,6 +436,17 @@ def graft_synth_state_reaction_rulebook() -> None:
             modifiers={},
         ),
     )
+    BUFF_DEFINITIONS.setdefault(
+        "suffocated",
+        BuffDefinition(
+            key="suffocated",
+            duration=40,
+            tick_interval=None,
+            stacking="refresh",
+            polarity="debuff",
+            modifiers={},
+        ),
+    )
     # state_reactions.yaml pleasure_gain rows are keyed by the shipped tier
     # vocabulary; re-add those CostTier rows beside the installed t_ rows.
     # Widens spell_tier_for's area band to include 91-110 for future kit
