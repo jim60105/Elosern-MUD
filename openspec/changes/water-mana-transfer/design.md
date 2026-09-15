@@ -1,0 +1,50 @@
+## Context
+
+Delivers the transfer primitives for `docs/lore/skill-trees/water.md` nodes 潮引術 (tide_pull), 回流之環 (ring_of_reflux), 枯海之印 (sigil_of_the_barren_sea), 深淵潮汛 (abyssal_surge), 深淵巨口 (abyssal_maw), 深海神格 (abyssal_heart) against the shared contract in `../water-spell-catalog/design.md`. Predecessor: `water-mp-depletion-reaction` shipped `world/rules/mp_flow.py` (`apply_mp_change`/`remove_mp`, `mp_zero`), the three 潮退 tier-keyed DoT rows and `EACH_CAST_TARGET`/`mp_max_positive`. Existing shapes this mirrors: `DamageEffect` + `DamagePolicy` on `EffectPolicy` (validated immutable policy, trusted `ResolvedEffect` binding in `_resolve_effect_context`), the per-effect `EffectAudience` planning, `_handle_divine_drain`'s dual PendingEffect staging (actor + target snapshots for atomic rollback), and light's recovery-profile snapshot discipline.
+
+## Goals / Non-Goals
+
+**Goals:** One typed family expressing drain, restore, fixed/fraction/all magnitudes, caster recovery share, caster-marker restore bonus, and a data-only regen lock — all paying through the canonical MP writer on both sides so the wave's global-fact semantics hold for transfers.
+
+**Non-Goals:** No catalog rows (change 5), no shield divert (change 3), no `divine_drain` rework, no second scheduler/cooldown system, no water-key branches in generic code, no data-contract tests (ratified NON-GOAL).
+
+## Decisions
+
+### D1 — Magnitude grammar and policy split
+The effect ID carries only direction + base magnitude: `mana_transfer:drain:fixed:5`, `mana_transfer:drain:fraction:0.2`, `mana_transfer:drain:all`, `mana_transfer:restore:fixed:40`. Parsing is strict (closed direction set; `fixed:<positive int>`; `fraction:` finite 0<x≤1; `all` exact) and returns a frozen `ManaTransferEffect(direction, magnitude_mode, magnitude)`. Everything conditional rides `EffectPolicy.mana_transfer = ManaTransferPolicy(...)`: `caster_recovery_share: float` (0≤s≤1), `restore_bonus_per_stack: tuple[(marker_key, per_stack_amount), ...]`. Validation fail-closed like `DamagePolicy`: share out of range, non-finite, bool, or bonus on a drain direction is a construction error; marker keys must be existing `BUFF_DEFINITIONS` keys. Coefficient/potency stage does NOT apply to transfers (a transfer's magnitude is authored absolute MP, the same choice index §3.2 makes for `mana_restore` item magnitudes) — `EffectPolicy.coefficient != 1.0` combined with a transfer policy fails validation, so the registry's existing coefficient-support rule (damage/heal/self_heal only) is extended with an explicit rejection instead of a silent identity.
+
+### D2 — Actual-amount semantics on both legs
+Drain: compute the requested amount from the target's stored current MP at COMMIT time inside the staged closure (fraction → `round(current × f)`, `all` → the drain-all writer entry, fixed → `min(N, current)`); the writer clamps; the caster-share pays `round(actual_drain × share)` through `apply_mp_change` on the caster — a clamped drain therefore shares on the ACTUAL amount, never the requested one (tide_pull's "施法者回收其中一半" is half of what was actually taken). Restore: `amount = base + Σ per_stack × active_stack_count(marker_key, caster)` where the stack query counts the caster's ACTIVE instances of the named marker keys (the 潮退 keys are read via a small helper in buffs.py alongside `entity_active_buffs`; counts come from the same cache-read posture `active_buff_keys_from_storage` uses, extended to per-key counts). Restore pays through the writer's increase leg and clamps at each target's maximum. Both legs stage one `PendingEffect` per mutated entity with the `traits` surface declared, matching `_handle_divine_drain`'s rollback discipline.
+
+### D3 — Regen lock is one marker + one table row + one closed-form multiply
+`mp_regen_lock` buff (duration 60, debuff polarity, empty modifiers) → `combat_modifiers.yaml` row `mp_regen_lock_freeze: {when: {buff_active: mp_regen_lock}, then: {mp_regen_scale: 0}}` → `_settle_gauge_regen` reads `evaluate_combat_modifiers(entity).get(f"{key}_regen_scale", 1.0)` and multiplies `rate` by it inside the EXISTING closed-form computation (per world-clock's requirement that regen stays closed-form; scale 0 leaves `regen_remainder` untouched so the lock neither accrues nor loses carry). Generic key derivation `{gauge}_regen_scale` — any gauge, no water branch; today only the mp row exists. This satisfies 枯海之印's "60 秒內無法恢復 MP" including regen AND the recovery-profile/hp-target path? No — mp recovery profiles don't exist (recovery targets are hp-only), and regen is the only passive mp restorer, so the lock is complete by construction; item `stat: mp` restores are authored direct grants, not regen, and remain legal (lore: 遇水系就跑, not 遇水系道具失效 — recording the boundary explicitly).
+
+### D4 — Zero-MP-cap redirect placement (drowned_surging)
+Ratified: kept OUT of the reaction engine and out of the step-6/cast pipeline. The redirect is a TARGET-STATE GATE ON ONE EFFECT COMPONENT, so it rides the per-effect audience seam exactly as light's `EffectAudience` does: this change adds `EffectPolicy.audience_condition` — one validated declarative gate (closed field set `mp_max_zero`/`mp_positive`, condition-engine posture, construction-time validation) evaluated per resolved target at audience planning, mirrored between preflight and final resolution (the pipeline's existing audience-agreement contract). Change 5 then authors 溺潮 purely as data: `buff_apply:ebbing_maelstrom` (SELECTED, ungated) + a damage-rider buff row (賢者-tier HP DoT rate carrying the 等值水属性傷害 as authored water damage via its own damaging rate) with `audience_condition: mp_max_zero` — the DoT lands on every target; only max-zero targets take the damage equivalent; positive-max holders' suffocation still arrives through the wave's reaction rule when their MP actually reaches zero. Alternative rejected: a DamagePolicy predicate for "target MP max == 0" — `predicate` facts are registry/combat-trait keys, not gauge state, and stretching it would blur the trait system's boundary. Whole-cast rejection via cast conditions was also rejected: 溺潮 must still deliver its DoT to normal targets.
+
+### D5 — Ally-side team marker rides the same vocabulary (no separate change)
+Investigation decision: 深淵潮汛's 回流 marker ("附著一層『回流』：其後 60 秒內任何潮引系節點命中敵方時，施法者額外回收 10 % 流失量") is a DURATION-BOUNDED beneficial marker whose mechanical meaning is exactly one number read at the caster's next drain settlement. That is the combat-modifier bundle's native shape — `paralysis`/`climax` lock actions through the same mechanism — so it ships HERE rather than as a separate evidence-ledger change: buff `mana_reflux` (duration 60, polarity buff, refresh stacking, empty modifiers) → one ordinary row `mana_reflux_share_bonus: {when: {buff_active: mana_reflux}, then: {recovery_share_bonus: 0.1}}` → the transfer handler's caster-share read site folds `evaluate_combat_modifiers(caster).get("recovery_share_bonus", 0.0)` ADDITIVELY into the authored `caster_recovery_share` (share + bonus capped at 1.0 by construction). The per-node "潮引系節點" restriction is carried by the DATA: only nodes authored with a caster share (tide_pull, maw, heart) consume the bundle value, which is precisely the 潮引 family — no family-name branch, no evidence ledger, no second engine. `light-penance-events`' evidence pattern was rejected for this node: it prices a resistance OUTCOME on the perpetrator, not a team-buff window, and reusing it here would force a cross-cast query the marker already models in data.
+
+### D6 — Interface ownership opened/consumed
+| Interface | Owner | Consumers |
+|---|---|---|
+| `mana_transfer:` prefix + `ManaTransferEffect` + `ManaTransferPolicy` | this change | change 5 catalog authoring |
+| caster-share read site (folds `recovery_share_bonus` from the bundle) | this change | `mana_reflux` row; any future share-granting marker |
+| active-marker stack-count query (per-key) | this change (buffs.py) | catalog data (回流之環's 潮退 read) |
+| `mana_reflux` marker + `recovery_share_bonus` bundle value | this change | catalog authors 深淵潮汛's buff_apply data |
+| `mp_regen_lock` + `{gauge}_regen_scale` bundle value + clock multiply | this change | catalog (枯海之印 buff_apply) |
+| `EffectPolicy.audience_condition` (gauge-state gate) + planning filter | this change | catalog authors 溺潮's redirect as pure data |
+
+## Risks / Trade-offs
+
+- Commit-time magnitude read means a same-cast earlier effect changing MP changes the drain base — chosen deliberately (canonical pre-effect inputs apply to state-derived MAGNITUDES; a drain's base is the live pool by lore: 目標魔力越深回收越多), and the delta-vs-snapshot decision is pinned by a behavior test either way.
+- Regen-scale bundle multiplication is a new bundle VALUE kind; the modifier table already carries heterogeneous values (flat ints, percents, `recovery_arousal_scale` float, `actions_per_turn`), so this is one more leaf, not a new mechanism. Consumers agree: preview/preflight never needed regen, so only the clock stage reads it.
+- `fixed:` restore amounts reuse the `mana_restore` 40 magnitude verbatim (lore seam note: 歸還量沿用道具層量級) rather than inventing a second scale.
+
+## Migration Plan
+
+No migrations/aliases. Writer → family + policy → handler → lock rows → synthetic proof, each a reviewable task group. Main-spec sync stays separately authorized.
+
+## Verification contract
+
+Shared wave contract (`../water-spell-catalog/design.md` D7): synthetic skills/state only; tests must fail on plausible bugs — share computed on requested-not-actual drain, double-dispatch of `mp_zero` across a transfer + DoT cascade, restore ignoring marker counts or reading the TARGET's markers instead of the caster's, regen lock that also blocks authored item grants, fraction rounding drift, audience misrouting (drain hitting allies), rollback leaving one leg half-applied. Focused invocation in tasks.md; `MUD_TEST_SETTINGS=1` via tool env.
