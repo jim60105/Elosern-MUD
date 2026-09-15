@@ -75,6 +75,7 @@
       "labels": [
         "world.rules.tests.test_freeform_casting",
         "world.rules.tests.test_friendly_fire",
+        "world.rules.tests.test_gauge_transfer",
         "world.rules.tests.test_golden_combat",
         "world.rules.tests.test_guild_config",
         "world.rules.tests.test_guild_dialogue_turnin",
