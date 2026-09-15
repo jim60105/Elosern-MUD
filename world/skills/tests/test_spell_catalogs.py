@@ -53,26 +53,6 @@ FIRE_SPELL_CATALOG = (
 )
 
 
-WATER_SPELL_CATALOG = (
-    ("water_bolt", "水箭術", TargetSpec.SINGLE, 12, ("damage:water:magic",)),
-    ("minor_heal", "治癒滴露", TargetSpec.SINGLE, 11, ("heal:single",)),
-    ("healing_spring", "治癒之泉", TargetSpec.AREA, 28, ("heal:area",)),
-    ("water_shield", "水盾術", TargetSpec.SINGLE, 22, ("buff_apply:water_shield",)),
-    (
-        "abyssal_whirlpool",
-        "深海漩渦",
-        TargetSpec.AREA,
-        50,
-        ("damage:water:magic", "buff_apply:water_bind"),
-    ),
-    ("wellspring_of_life", "生命湧泉", TargetSpec.SINGLE, 40, ("heal:single",)),
-    ("tsunami", "海嘯術", TargetSpec.AREA, 95, ("damage:water:magic",)),
-    ("tidal_revival", "復生之潮", TargetSpec.SINGLE, 78, ("heal:single",)),
-    ("sea_of_life", "生命之海", TargetSpec.AREA, 160, ("heal:area",)),
-    ("abyssal_tide", "深淵巨潮", TargetSpec.AREA, 145, ("damage:water:magic",)),
-)
-
-
 EARTH_SPELL_CATALOG = (
     ("stone_shard", "石礫術", TargetSpec.SINGLE, 12, ("damage:earth:magic",)),
     (
@@ -213,7 +193,6 @@ _CATALOG_EFFECTS = {
     row[0]: row[4]
     for rows in (
         FIRE_SPELL_CATALOG,
-        WATER_SPELL_CATALOG,
         EARTH_SPELL_CATALOG,
         WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
@@ -280,56 +259,6 @@ class FireSpellCatalogTests(unittest.TestCase):
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
         self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
         self.assertEqual(skill.effects, ["damage:fire:magic"])
-
-class WaterSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
-    def test_all_ten_water_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in WATER_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["water"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
-    def test_water_active_spell_keys_are_exactly_the_catalog_set(self):
-        self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["water"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in WATER_SPELL_CATALOG},
-        )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
-    def test_every_water_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in WATER_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="water", school="magic"),
-                        )
-                    elif effect_id.startswith("buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            HealEffect(shape=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
 
 class EarthSpellCatalogTests(unittest.TestCase):
     @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")

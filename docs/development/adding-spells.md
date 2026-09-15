@@ -176,7 +176,7 @@ _skill(
    - `test_<element>_active_spell_keys_are_exactly_the_catalog_set` — 精確 key 集合（元素已有其他 ACTIVE 技能時記得納入，例如 光含 `light_sword_style`、暗含 `shadow_slash`／`dual_blade_mastery`）
 2. **`world/rules/tests/test_progression.py`**：在 `SpellTierLabelTests` 加 `test_<element>_spell_tier_labels_match_the_catalog`——以 `spell_tier_for` 斷言每個位階的兩個代表魔法得到正確位階標籤（施放門檻已除役，位階是資料標籤）；PASSIVE 技能不放進 `spell_tier_for` 配對。
 3. **`world/rules/tests/test_buffs.py`**：每個新 buff key 恰好一個 `test_buff_<key>`（`buff-handler-integration` 規格有機械式對應檢查）；DoT buff 要實際 `tick_buffs` 驗證扣血。
-4. **traceability 標註**：上述測試以 `tools.spec_traceability.covers_requirement` 標註需求 ID（如 `skill-registry::skill-registry-contains-the-full-水-element-spell-set`）。ID 用 `uv run --locked python -m tools.spec_traceability list` 取得，不要手造。
+4. **traceability 標註**：上述測試以 `tools.spec_traceability.covers_requirement` 標註需求 ID（如 `skill-registry::skill-registry-contains-the-full-火-element-spell-set`）。ID 用 `uv run --locked python -m tools.spec_traceability list` 取得，不要手造。
 
 ### Step 6 — 同步 OpenSpec 工件
 

@@ -65,7 +65,7 @@ SHALL return `False`. The predicate SHALL NOT read entity state.
 
 #### Scenario: Pure damage and heal spells are eligible
 - **WHEN** `is_freeform_eligible` is called for `wind_blade` (`damage:wind:magic`),
-  `tornado_blade`, `sea_of_life` (`heal:area`), and `sacrificial_flame`
+  `tornado_blade`, `mass_heal` (`heal:area`), and `sacrificial_flame`
   (`damage:fire:magic` + `self_heal`)
 - **THEN** each returns `True`
 
@@ -180,7 +180,7 @@ practice staging SHALL observe the scaled amounts exactly as they observe unscal
   `target_defeated` entry and one kill-XP award, exactly as an unscaled lethal hit would
 
 #### Scenario: Scaled healing respects the maximum and knockout rules
-- **WHEN** `sea_of_life` is cast at `scale == 2.0` and its doubled magnitude would exceed a target's
+- **WHEN** `mass_heal` is cast at `scale == 2.0` and its doubled magnitude would exceed a target's
   maximum HP
 - **THEN** the target is restored to its maximum only, the `heal` entry reports the actually applied
   amount, and an entity at zero HP is not revived
