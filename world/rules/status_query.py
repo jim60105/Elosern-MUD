@@ -1415,7 +1415,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
 
     Category order follows ``SkillCategory``'s declaration order; sub-group
     order within ``elemental_magic`` follows ``ELEMENT_REGISTRY``'s declaration
-    order and ``sexual_act`` follows first-seen ``group`` order among the given
+    order; within ``enhancement`` sub-groups follow fixed ``None`` -> ``"天賦"`` ->
+    ``"身法"`` order; and ``sexual_act`` follows first-seen ``group`` order among the given
     keys. Every other category emits exactly one ``group=None`` sub-group, and
     each row's ``label`` is the registry label. Categories and sub-groups with
     zero matching keys are omitted. Keys absent from ``SKILL_REGISTRY`` land in

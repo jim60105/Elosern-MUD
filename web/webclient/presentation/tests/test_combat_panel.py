@@ -1348,7 +1348,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # Three kit rows across three categories: the elemental burst, the
         # martial-template twin, and the kit sexual act (invented line-name
         # sub-group), plus the production-forced innate rows in their kit
-        # categories (movement). Storage order is interleaved so within-group
+        # categories (martial_arts). Storage order is interleaved so within-group
         # order can only come from the grouped listing, not the stored order.
         self.player.db.skills = {
             "active": [_T_MARTIAL_PROBE, T_EMBER, T_ACT],

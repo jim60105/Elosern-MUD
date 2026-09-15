@@ -412,6 +412,8 @@ def group_skill_views(
     Iterates ``SkillCategory`` in declaration order, so category order never
     depends on what the entity happens to own. Within ``elemental_magic``
     sub-groups follow ``ELEMENT_REGISTRY`` declaration order; within
+    ``enhancement`` sub-groups follow the fixed ``None`` -> ``"天賦"`` ->
+    ``"身法"`` order; within
     ``sexual_act`` sub-groups follow first-seen ``group`` order among the
     entity's owned skills; every other category emits exactly one
     ``group=None`` sub-group. A category or sub-group with zero owned skills
