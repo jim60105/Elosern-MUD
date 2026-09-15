@@ -42,6 +42,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from tools.spec_traceability import covers_requirement
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.effects import EffectPolicy, ResolvedEffect
+from world.skills.effects import DamagePolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 
 _cost_mod = importlib.import_module("world.skills.cost_tiers")
@@ -601,6 +602,10 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         with self.assertRaises(ValueError):
             _try_load([{"key": "k", "duration": 60, "modifiers": {"divert": {"target": "defense", "fraction": 0.3, "cap": 30}}}])
 
+        # Malformed: unsupported gauge target (sp)
+        with self.assertRaises(ValueError):
+            _try_load([{"key": "k", "duration": 60, "modifiers": {"divert": {"target": "sp", "fraction": 0.3, "cap": 30}}}])
+
         # Malformed: null duration
         with self.assertRaises(ValueError):
             _try_load([{"key": "k", "duration": None, "modifiers": {"divert": {"target": "mp", "fraction": 0.3, "cap": 30}}}])
@@ -622,3 +627,66 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
                     },
                 }
             ])
+
+    @covers_requirement(
+        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+    )
+    def test_divert_multi_strike_cap_not_exceeded(self):
+        """Scenario: Multi-strike action enforces cumulative divert cap across all strikes."""
+        buff_def = BuffDefinition(
+            key="synth_film_multistrike",
+            duration=60,
+            tick_interval=None,
+            stacking="refresh",
+            modifiers={"divert": {"target": "mp", "fraction": 0.5, "cap": 30}},
+            polarity="buff",
+        )
+        self._register_synth_buff(buff_def)
+        apply_buff(self.defender, buff_def.key, source_skill="synth_cast", source_tier=T_APPRENTICE)
+
+        # Defender has 200 HP, 100 MP
+        self.defender.traits.hp.base = 200
+        self.defender.traits.hp.current = 200
+        self.defender.traits.mp.base = 100
+        self.defender.traits.mp.current = 100
+
+        # Attacker deals 60 post-defense (80 attack - 20 defense)
+        self.attacker.traits.atk_phys.base = 80
+        self.defender.traits.defense.base = 20
+
+        # Two-strike damage policy
+        policy = DamagePolicy(extra_strikes=1, repeat_when="forced_interaction")
+        ctx = {
+            "resolved_effect": ResolvedEffect(policy=EffectPolicy(damage=policy)),
+        }
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.has_action_evidence", return_value=True),
+        ):
+            pending = _handle_damage(
+                self.attacker, [self.defender], "damage:dark:physical", ctx, 1.0
+            )
+
+        # Two strikes staged.
+        # Strike 1: 60 damage -> 50% = 30 MP diverted (cap 30 exhausted). Residual HP = 30.
+        # Strike 2: 60 damage -> cap remaining is 0 -> 0 MP diverted! Residual HP = 60.
+        # Total MP diverted must NOT exceed cap (30).
+        divert_effects = [e for e in pending if e.description.startswith("damage_divert|")]
+        self.assertEqual(len(divert_effects), 1, "Strike 2 must stage no divert effect as cap is exhausted")
+        self.assertEqual(int(divert_effects[0].description.rsplit("|", 1)[1]), 30)
+
+        damage_effects = [e for e in pending if e.description.startswith("damage|")]
+        self.assertEqual(len(damage_effects), 2)
+        self.assertEqual(int(damage_effects[0].description.rsplit("|", 1)[1]), 30)  # 60 - 30
+        self.assertEqual(int(damage_effects[1].description.rsplit("|", 1)[1]), 60)  # 60 - 0
+
+        for eff in pending:
+            eff.apply()
+
+        # Total HP lost = 30 + 60 = 90 -> HP is 200 - 90 = 110
+        self.assertEqual(int(self.defender.traits.hp.current), 110)
+        # Total MP lost = 30 (cap) -> MP is 100 - 30 = 70
+        self.assertEqual(int(self.defender.traits.mp.current), 70)
+        # Consumed budget is exactly 30 (not 60!)
+        self.assertEqual(get_divert_consumed(self.defender.buffs.all[buff_def.key]), 30)

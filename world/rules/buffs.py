@@ -151,6 +151,8 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
             target = divert["target"]
             if target not in GAUGE_KEYS:
                 raise ValueError(f"{path}: buff {key!r} divert target {target!r} must be a gauge key")
+            if target not in ("mp", "hp"):
+                raise ValueError(f"{path}: buff {key!r} divert target {target!r} is not supported (must be 'mp' or 'hp')")
             fraction = divert["fraction"]
             if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not isfinite(fraction) or fraction <= 0 or fraction > 1:
                 raise ValueError(f"{path}: buff {key!r} divert fraction must be a finite number in (0, 1]")
@@ -240,7 +242,7 @@ def update_divert_consumed(buff: Any, consumed: int) -> None:
             buff.handler.buffcache[key]["divert_consumed"] = consumed_int
     try:
         setattr(buff, "divert_consumed", consumed_int)
-    except Exception:
+    except Exception:  # observability: ignore R2: optional write-through on foreign test instances
         pass
 
 

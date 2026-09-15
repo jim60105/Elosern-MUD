@@ -357,6 +357,8 @@ def _handle_damage(
             and has_action_evidence(target, damage_policy.repeat_when, now=now)
         )
         total_strikes = 2 if extra else 1
+        planned_cap_spend: dict[str, int] = {}
+        planned_gauge_spend: dict[str, int] = {}
 
         for _ in range(total_strikes):
             raw_roll = roll_d100()
@@ -400,7 +402,6 @@ def _handle_damage(
                         getattr(b, "buffkey", b.definition_key),
                     )
                 )
-                planned_gauge_spend: dict[str, int] = {}
                 for buff in active_diverts:
                     if residual <= 0:
                         break
@@ -408,11 +409,13 @@ def _handle_damage(
                     target_gauge = spec["target"]
                     fraction = float(spec["fraction"])
                     cap = int(spec["cap"])
+                    buff_id = getattr(buff, "buffkey", buff.definition_key)
                     consumed = get_divert_consumed(buff)
-                    remaining_cap = max(0, cap - consumed)
+                    already_spent_cap = planned_cap_spend.get(buff_id, 0)
+                    remaining_cap = max(0, cap - consumed - already_spent_cap)
                     current_gauge, _ = stored_gauge_pair(target, target_gauge)
-                    already_spent = planned_gauge_spend.get(target_gauge, 0)
-                    available_gauge = max(0, current_gauge - already_spent)
+                    already_spent_gauge = planned_gauge_spend.get(target_gauge, 0)
+                    available_gauge = max(0, current_gauge - already_spent_gauge)
 
                     diverted = min(
                         round(residual * fraction), remaining_cap, available_gauge
@@ -420,7 +423,8 @@ def _handle_damage(
                     diverted = max(0, int(diverted))
                     if diverted > 0:
                         residual -= diverted
-                        planned_gauge_spend[target_gauge] = already_spent + diverted
+                        planned_cap_spend[buff_id] = already_spent_cap + diverted
+                        planned_gauge_spend[target_gauge] = already_spent_gauge + diverted
                         src_skill = getattr(buff, "source_skill", None)
                         src_tier = getattr(buff, "source_tier", None) or "學徒"
                         planned_diverts.append(
@@ -474,12 +478,18 @@ def _handle_damage(
                     g_key=target_gauge,
                     s_skill=src_skill,
                     s_tier=src_tier,
+                    cap=int(BUFF_DEFINITIONS[buff.definition_key].modifiers["divert"]["cap"]),
                 ):
                     def apply_divert() -> None:
+                        cur_consumed = get_divert_consumed(b)
+                        rem_cap = max(0, cap - cur_consumed)
+                        to_pay = min(div, rem_cap)
+                        if to_pay <= 0:
+                            return
                         if g_key == "mp":
                             actual_delta = apply_mp_change(
                                 target,
-                                -div,
+                                -to_pay,
                                 source_skill=s_skill,
                                 source_tier=s_tier,
                             )
@@ -487,14 +497,13 @@ def _handle_damage(
                         elif g_key == "hp":
                             trait = getattr(target.traits, "hp")
                             before = _stored_trait_value(trait)
-                            _apply_hp_delta(target, -div)
+                            _apply_hp_delta(target, -to_pay)
                             after = _stored_trait_value(trait)
                             paid = max(0, int(before - max(0.0, after)))
                         else:
                             raise NotImplementedError(
                                 f"divert target {g_key!r} is not supported"
                             )
-                        cur_consumed = get_divert_consumed(b)
                         update_divert_consumed(b, cur_consumed + paid)
 
                     return apply_divert
