@@ -1,7 +1,9 @@
 ## Purpose
 
 The read-only version-2 `exploration` panel and version-7 `character` panel, the thirteen exact allowlisted exploration adapters, the free-form dialogue composition root with offline degrade, the keyboard-first exploration dock that re-homes the service submenus, minimap movement submission, the client-local portrait-focus seam, and the Node/browser acceptance boundary.
+
 ## Requirements
+
 ### Requirement: The exploration panel is an exact read-only version-2 presentation panel
 The production presentation registry SHALL register panel name `exploration` at schema version 2. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`; `available` SHALL be true and `kind` SHALL be `exploration`. `move` SHALL be a bounded list of at most 12 exit descriptors, each containing exactly `exit_ref`, `label`, `destination`, `enabled`, and nullable `disabled_reason`, where `exit_ref` is the same opaque 1..64-ASCII-character identifier the `local_map` move action uses, `label` is a bounded localized direction/exit label, `destination` is the canonical destination node ID, and `enabled`/`disabled_reason` reflect a currently present, traversable Exit from the actor's location (a locked or absent exit is a disabled row, never omitted, so the player learns it exists). `look` SHALL contain exactly `room`, `entities`, and `objects`: `room` is an exact room descriptor with a room marker for `explore.look`, `entities` is a bounded list of at most 32 present character/NPC/monster descriptors each carrying an opaque identity, bounded display name, bounded kind, and nullable opaque `portrait_ref`, and `objects` is a bounded list of at most 32 present object descriptors carrying an opaque identity and bounded display name. `interact` SHALL be a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, a bounded `affordances` list of at most 8 descriptors, and — only for a scripted dialogue host — a bounded `keywords` list of at most 16 scripted keyword descriptors. An action affordance SHALL contain exactly `kind` (`"action"`), `action_id` (one of the shared affordance vocabulary's action codes — the panel's accepted-action enumeration SHALL be derived from the shared `ACTION_CODE_ALLOWLIST` rather than a private duplicate, which after the possession and delivery vocabularies includes `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.possess`, and `explore.possess_release`, and `explore.deliver`), `label`, `enabled`, and nullable `disabled_reason`. Exactly the `explore.deliver` action affordance additionally carries `params` — the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`) — and every other action affordance SHALL carry no `params` (its dispatch payload is re-derived from the target identity at the dock). A navigation affordance SHALL contain exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`. Navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding `services` submenu. `character`, `quests`, and `inventory` SHALL each be availability entries with exactly `available` (boolean): `character` SHALL be available in exploration mode, and `quests`/`inventory` SHALL be available only when the `services` panel is registered and available. The presenter SHALL build the payload only from canonical room, entity, component, object, and service data, SHALL emit no live object or filesystem reference, SHALL NOT mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and SHALL use the registered common unavailable form outside exploration mode. Rendering the panel for a room whose legal vocabulary entries include a possession affordance SHALL NOT raise inside the presenter: any entry the shared vocabulary may legally emit SHALL be accepted by the panel's own validation, so a bound companion standing in the room can never degrade the panel from within.
 
@@ -119,29 +121,38 @@ in shape to `context_actions`'s `skills` field: each category group SHALL contai
 stable key, a bounded display label, and an ordered array of one or more sub-groups; each sub-group
 SHALL contain a nullable group key, a label that is non-null exactly when the group key is non-null,
 and an ordered array of `{key, label}` skill rows, each bounded the same as the prior version's
-passive-row bounds. Category ordering SHALL follow `SkillCategory`'s declaration order; sub-group
-ordering within `elemental_magic` SHALL follow `ELEMENT_REGISTRY`'s declaration order. A category with
-zero owned skills of that kind (active or passive) SHALL be omitted from the corresponding array
-entirely; a category whose skills carry no `group` SHALL emit exactly one sub-group with a `null`
-group key and label. Within each sub-group, skill rows SHALL be ordered as `SkillHandler.owned_keys()`
-returns them, without alphabetical reordering. The total count of skill rows across every category
-and sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`,
-tracked as independent bounds; these bounds apply to the flattened totals, not to the count of
-top-level category-group entries in either array, which is separately bounded by the number of
-`SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic
-fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning
-skills in every real category plus one unregistered key still renders.
+passive-row bounds. Category ordering SHALL follow `SkillCategory`'s declaration order (six members
+after the Phase B taxonomy consolidation; `movement` and `innate_gift` are no longer categories);
+sub-group ordering within `elemental_magic` SHALL follow `ELEMENT_REGISTRY`'s declaration order;
+sub-group ordering within `enhancement` SHALL follow the fixed order `null` group, then `"天賦"`, then
+`"身法"`, independent of ownership order. A category with zero owned skills of that kind (active or
+passive) SHALL be omitted from the corresponding array entirely; a category whose skills carry no
+`group` SHALL emit exactly one sub-group with a `null` group key and label. Within each sub-group,
+skill rows SHALL be ordered as `SkillHandler.owned_keys()` returns them, without alphabetical
+reordering. The total count of skill rows across every category and sub-group, flattened, SHALL NOT
+exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`, tracked as independent bounds; these
+bounds apply to the flattened totals, not to the count of top-level category-group entries in either
+array, which is separately bounded by the number of `SkillCategory` members plus exactly one — the
+extra slot carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys
+absent from `SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered
+key still renders.
 
 #### Scenario: Innate active skills are visible for the first time
 - **WHEN** the character panel is built for a freshly created character with no imported skill data
-- **THEN** `actives` contains a `movement` category group whose one sub-group lists `flee`, and a
-  `martial_arts` category group whose one sub-group lists `basic_attack` — both previously absent from
-  every out-of-combat listing
+- **THEN** `actives` contains a `martial_arts` category group whose one sub-group lists both `flee`
+  and `basic_attack` (re-homed together by the Phase B taxonomy consolidation; `flee` is no longer
+  presented under a `movement` category)
 
 #### Scenario: Category ordering matches the combat panel's rule
-- **WHEN** an entity owns skills from `movement` and `elemental_magic` only
-- **THEN** the `actives` array lists the `elemental_magic` category group before the `movement`
+- **WHEN** an entity owns skills from `martial_arts` and `elemental_magic` only
+- **THEN** the `actives` array lists the `elemental_magic` category group before the `martial_arts`
   category group, matching `SkillCategory`'s declaration order
+
+#### Scenario: Re-homed acquisition tags render as enhancement sub-groups
+- **WHEN** an entity owns the passive skills `flight` and `elf_longevity`
+- **THEN** `passives` contains no `movement` or `innate_gift` category group, and the `enhancement`
+  category group carries its untagged sub-group (if any), then the `"天賦"` sub-group listing
+  `elf_longevity`, then the `"身法"` sub-group listing `flight`, in that fixed order
 
 #### Scenario: An empty active or passive category is omitted
 - **WHEN** an entity owns no `PASSIVE`-kind skill classified `sexual_act`
@@ -464,4 +475,3 @@ The production action registry SHALL register `explore.practice` with a payload 
 #### Scenario: A failed advance rolls back clock and booking
 - **WHEN** the shared skip advance raises after the booking was recorded
 - **THEN** the clock growth and the booking are both restored, the rejection renders without a partial practice grant, and no skill progression is applied
-

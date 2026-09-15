@@ -182,7 +182,7 @@ def graft_synth_innate_skills() -> None:
             faction_constraint=FactionConstraint.SELF_ONLY,
             usable_out_of_combat=False,
             effects=["disengage:self"],
-            category=SkillCategory.MOVEMENT,
+            category=SkillCategory.MARTIAL_ARTS,
         ),
     )
 

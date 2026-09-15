@@ -17,14 +17,14 @@ from world.rules.movement import charge_movement
 from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import make_skill, synthetic_registries
 
-# A synthetic movement-category skill standing in for any non-flight mobility
+# A synthetic mobility skill standing in for any non-flight mobility
 # skill: the waiver is keyed to the one flight skill, so ANY other owned row
 # must charge normally.
 _DART_STEP = make_skill(
     "t_dart_step",
     label="疾影步",
     description="短促爆发的合成身法。",
-    category=SkillCategory.MOVEMENT,
+    category=SkillCategory.MARTIAL_ARTS,
 )
 
 # The waiver key is hardcoded inside ``world.rules.movement.charge_movement``

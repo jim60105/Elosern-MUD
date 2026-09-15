@@ -590,11 +590,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # The utility SELF caster is disabled in combat: the session context
         # cannot supply its handler's event-context key, so the menu exposes
         # the disabled explanation instead of a cast. flee is the enabled SELF
-        # skill. H3 (design D11): skills tab -> category frame; movement is
-        # single-group and opens the skill frame directly.
+        # skill. H3 (design D11): skills tab -> category frame; martial_arts is
+        # single-group and opens the skill frame directly, then focus lands on flee.
         self._open_skills(page)
-        self._open_category(page, "movement")
-        self._press(page, "Enter")  # single-group -> skill frame (flee)
+        self._open_category(page, "martial_arts")
+        self._focus_skill(page, "martial_arts", "flee")
         self._press(page, "Enter")  # open-skill (flee) -> self-confirm
         self._press(page, "Enter")  # confirm self-cast
 
@@ -1237,17 +1237,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         panel = self._combat_panel(page)
         roles = self._roles()
         # The seeded character owns elemental spells, martial-arts innates,
-        # enhancement, utility, movement, and the unconditionally-owned seed
-        # act; the payload lists only the categories that have owned active
-        # skills, in SkillCategory declaration order (both modes own exactly
-        # this category set).
+        # enhancement, utility, and the unconditionally-owned seed act; the
+        # payload lists only the categories that have owned active skills,
+        # in SkillCategory declaration order (both modes own exactly this
+        # category set; movement is retired and flee is under martial_arts).
         self.assertEqual(
             [category["category"] for category in panel["skills"]],
             [
                 "elemental_magic",
                 "martial_arts",
                 "enhancement",
-                "movement",
                 "utility",
                 "sexual_act",
             ],

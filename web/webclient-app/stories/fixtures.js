@@ -592,18 +592,6 @@ export const SKILLS_SLICE_SAMPLE = {
               cost: { sp: 6 },
               target_spec: "single",
             },
-          ],
-        },
-      ],
-    },
-    {
-      category: "movement",
-      label: "移動",
-      groups: [
-        {
-          group: null,
-          label: null,
-          skills: [
             {
               key: "flee",
               label: "逃跑",
@@ -648,12 +636,12 @@ export const SKILLS_SLICE_SAMPLE = {
             { key: "guard_instinct", label: "防衛本能" },
           ],
         },
+        {
+          group: "天賦",
+          label: "天賦",
+          skills: [{ key: "elf_longevity", label: "精靈長壽" }],
+        },
       ],
-    },
-    {
-      category: "innate_gift",
-      label: "天賦",
-      groups: [{ group: null, label: null, skills: [{ key: "elf_longevity", label: "精靈長壽" }] }],
     },
   ],
 };

@@ -160,8 +160,6 @@
     "elemental_magic",
     "martial_arts",
     "enhancement",
-    "innate_gift",
-    "movement",
     "divine_mystery",
     "utility",
     "sexual_act",
@@ -3551,7 +3549,7 @@
   // The category-group count bound equals len(SkillCategory) plus one on the
   // server: the extra slot is the synthetic "unknown" fallback group that
   // holds keys absent from SKILL_REGISTRY.
-  var CHARACTER_MAX_CATEGORY_GROUPS = 9;
+  var CHARACTER_MAX_CATEGORY_GROUPS = 7;
   var CHARACTER_MAX_KEY = 64;
   var CHARACTER_MAX_LABEL = 128;
   var CHARACTER_MAX_DESCRIPTION = 256;

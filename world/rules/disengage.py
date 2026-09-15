@@ -42,7 +42,7 @@ SKILL_REGISTRY[FLEE_SKILL_KEY] = SkillDef(
     usable_out_of_combat=False,
     element=None,
     effects=["disengage:self"],
-    category=SkillCategory.MOVEMENT,
+    category=SkillCategory.MARTIAL_ARTS,
 )
 
 

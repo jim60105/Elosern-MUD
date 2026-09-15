@@ -129,8 +129,6 @@ _CATEGORY_LABELS = {
     SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
     SkillCategory.MARTIAL_ARTS: "武技",
     SkillCategory.ENHANCEMENT: "強化",
-    SkillCategory.INNATE_GIFT: "天賦",
-    SkillCategory.MOVEMENT: "移動",
     SkillCategory.DIVINE_MYSTERY: "神之秘法",
     SkillCategory.UTILITY: "特殊",
     SkillCategory.SEXUAL_ACT: "性愛行為",
@@ -1417,7 +1415,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
 
     Category order follows ``SkillCategory``'s declaration order; sub-group
     order within ``elemental_magic`` follows ``ELEMENT_REGISTRY``'s declaration
-    order and ``sexual_act`` follows first-seen ``group`` order among the given
+    order; within ``enhancement`` sub-groups follow fixed ``None`` -> ``"天賦"`` ->
+    ``"身法"`` order; and ``sexual_act`` follows first-seen ``group`` order among the given
     keys. Every other category emits exactly one ``group=None`` sub-group, and
     each row's ``label`` is the registry label. Categories and sub-groups with
     zero matching keys are omitted. Keys absent from ``SKILL_REGISTRY`` land in
@@ -1441,6 +1440,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
             continue
         if category is SkillCategory.ELEMENTAL_MAGIC:
             ordered_groups = [group for group in ELEMENT_REGISTRY if group in category_buckets]
+        elif category is SkillCategory.ENHANCEMENT:
+            ordered_groups = [group for group in (None, "天賦", "身法") if group in category_buckets]
         elif category is SkillCategory.SEXUAL_ACT:
             ordered_groups = list(category_buckets)
         else:

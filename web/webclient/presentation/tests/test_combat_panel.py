@@ -41,6 +41,7 @@ from web.webclient.presentation.protocol import (
     check_envelope,
     json_byte_size,
 )
+from world.skills.registry import SkillCategory
 from web.webclient.presentation.registry import (
     PanelUnavailableError,
     build_production_registry,
@@ -555,7 +556,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         # The top-level array is bounded by the number of SkillCategory
         # members, not by MAX_SKILLS.
         panel = _valid_panel(
-            skills=[_valid_category_group() for _ in range(9)]
+            skills=[_valid_category_group() for _ in range(len(SkillCategory) + 1)]
         )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
@@ -1347,7 +1348,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # Three kit rows across three categories: the elemental burst, the
         # martial-template twin, and the kit sexual act (invented line-name
         # sub-group), plus the production-forced innate rows in their kit
-        # categories (movement). Storage order is interleaved so within-group
+        # categories (martial_arts). Storage order is interleaved so within-group
         # order can only come from the grouped listing, not the stored order.
         self.player.db.skills = {
             "active": [_T_MARTIAL_PROBE, T_EMBER, T_ACT],
@@ -1361,7 +1362,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         innate_keys = list(synth_innate_overlay()["skills"])
         self.assertEqual(
             [category["category"] for category in payload["skills"]],
-            ["elemental_magic", "martial_arts", "movement", "sexual_act"],
+            ["elemental_magic", "martial_arts", "sexual_act"],
         )
         elemental = payload["skills"][0]
         self.assertEqual(
@@ -1380,22 +1381,16 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(martial["groups"][0]["label"])
         # The kit act joins the sexual_act category under its invented line
         # name; seed acts the handler still unlocks ride below it.
-        sexual = payload["skills"][3]
+        sexual = payload["skills"][2]
         self.assertEqual(sexual["label"], "性愛行為")
         self.assertEqual(
             [sub_group["group"] for sub_group in sexual["groups"]][0],
             SYNTH_SKILLS[T_ACT].group,
         )
-        # The forced innate flee row lands in the movement category.
-        movement = payload["skills"][2]
-        self.assertEqual(movement["label"], "移動")
-        self.assertIn(
-            innate_keys[1],
-            [skill["key"] for skill in movement["groups"][0]["skills"]],
-        )
+        # Both forced innate rows (basic_attack, flee) land in martial_arts.
         self.assertEqual(
             [skill["key"] for skill in martial["groups"][0]["skills"]],
-            [_T_MARTIAL_PROBE, innate_keys[0]],
+            [_T_MARTIAL_PROBE, innate_keys[1], innate_keys[0]],
         )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")

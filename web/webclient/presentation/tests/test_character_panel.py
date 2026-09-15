@@ -844,14 +844,12 @@ class CharacterSchemaTests(unittest.TestCase):
 
     def test_every_real_category_plus_the_unknown_fallback_fits_the_bound(self):
         # The category-group bound must leave room for the synthetic fallback:
-        # an entity owning skills in all eight SkillCategory members plus one
-        # unregistered key serializes nine category groups and must stay valid.
+        # an entity owning skills in all six SkillCategory members plus one
+        # unregistered key serializes seven category groups and must stay valid.
         categories = [
             "elemental_magic",
             "martial_arts",
             "enhancement",
-            "innate_gift",
-            "movement",
             "divine_mystery",
             "utility",
             "sexual_act",
@@ -1085,8 +1083,8 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
                 T_EMBER,
                 # The kit burst carries no prerequisite edges: the closure is
                 # itself. Innate rows ride the runtime-derived keys.
-                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
                 _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
                 *_unlock_free_act_keys(),
             ],
         )
@@ -1113,13 +1111,13 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.skills = {"active": [], "passive": []}
         payload = self._render()
         # Category order follows SkillCategory declaration order, so
-        # martial_arts (basic_attack) precedes movement (flee); the
+        # martial_arts (flee, basic_attack) is first; the
         # unconditionally-owned acts follow as the sexual_act category.
         self.assertEqual(
             _flattened_keys(payload["actives"]),
             [
-                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
                 _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
                 *_unlock_free_act_keys(),
             ],
         )
@@ -1129,15 +1127,10 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             [row["key"] for group in martial["groups"] for row in group["skills"]],
-            [_innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY")],
-        )
-        movement = next(
-            category for category in payload["actives"]
-            if category["category"] == "movement"
-        )
-        self.assertEqual(
-            [row["key"] for group in movement["groups"] for row in group["skills"]],
-            [_innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY")],
+            [
+                _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+                _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
+            ],
         )
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")

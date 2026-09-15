@@ -30,8 +30,6 @@ _CATEGORY_ORDER = [
     SkillCategory.ELEMENTAL_MAGIC,
     SkillCategory.MARTIAL_ARTS,
     SkillCategory.ENHANCEMENT,
-    SkillCategory.INNATE_GIFT,
-    SkillCategory.MOVEMENT,
     SkillCategory.DIVINE_MYSTERY,
     SkillCategory.UTILITY,
     SkillCategory.SEXUAL_ACT,
@@ -40,9 +38,6 @@ _CATEGORY_ORDER = [
 
 _UNGROUPED_CATEGORIES = (
     SkillCategory.MARTIAL_ARTS,
-    SkillCategory.ENHANCEMENT,
-    SkillCategory.INNATE_GIFT,
-    SkillCategory.MOVEMENT,
     SkillCategory.DIVINE_MYSTERY,
     SkillCategory.UTILITY,
 )
@@ -619,7 +614,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
     def setUpClass(cls):
         import world.rules.disengage  # noqa: F401  (registers flee)
 
-    @covers_requirement("skill-category-registry::skillcategory-enumerates-exactly-eight-presentation-categories")
+    @covers_requirement("skill-category-registry::skillcategory-enumerates-exactly-six-presentation-categories")
     def test_skill_category_declares_the_exact_member_set_in_order(self):
         self.assertEqual(list(SkillCategory), _CATEGORY_ORDER)
         self.assertEqual(
@@ -628,13 +623,13 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "elemental_magic",
                 "martial_arts",
                 "enhancement",
-                "innate_gift",
-                "movement",
                 "divine_mystery",
                 "utility",
                 "sexual_act",
             },
         )
+        self.assertNotIn("movement", {member.value for member in SkillCategory})
+        self.assertNotIn("innate_gift", {member.value for member in SkillCategory})
 
     @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
     def test_constructing_without_category_raises_type_error(self):
@@ -737,7 +732,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             )
         self.assertIn("bad_element", str(caught.exception))
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
     def test_every_registry_key_has_a_valid_category(self):
         for key in SKILL_REGISTRY:
             with self.subTest(key=key):
@@ -747,7 +742,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                     key,
                 )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
     def test_per_category_partition_covers_the_registry_exactly(self):
         per_category = {
             category: {key for key, skill in SKILL_REGISTRY.items() if skill.category is category}
@@ -760,7 +755,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             "a key may appear in only one category",
         )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
     def test_per_category_key_sets_match_the_d4_classification_table(self):
         expected = {
             SkillCategory.MARTIAL_ARTS: {
@@ -769,6 +764,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "light_sword_style",
                 "shadow_slash",
                 "dual_wield_style",
+                "flee",
             },
             SkillCategory.ENHANCEMENT: {
                 "body_enhancement",
@@ -784,13 +780,12 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "concentration",
                 "pain_to_pleasure",
                 "priestly_grace",
-            },
-            SkillCategory.INNATE_GIFT: {
                 "reincarnation_boon_elosia",
                 "reincarnation_boon_yuka",
                 "elf_longevity",
+                "flight",
+                "flash_step",
             },
-            SkillCategory.MOVEMENT: {"flight", "flash_step", "flee"},
             SkillCategory.DIVINE_MYSTERY: {
                 "divine_time_dilation",
                 "divine_space_distortion",
@@ -884,7 +879,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                     keys,
                 )
 
-    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
     def test_every_elemental_magic_group_is_its_own_element_key(self):
         for key, skill in SKILL_REGISTRY.items():
             if skill.category is not SkillCategory.ELEMENTAL_MAGIC:
@@ -895,7 +890,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 self.assertIn(skill.element.key, ELEMENT_REGISTRY)
                 self.assertEqual(skill.group, skill.element.key)
 
-    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
     def test_every_sexual_act_group_is_a_non_empty_string(self):
         sexual_acts = [
             skill
@@ -907,13 +902,47 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             self.assertTrue(skill.group)
             self.assertTrue(skill.group.strip())
 
-    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    def test_enhancement_display_tags_match_closed_vocabulary(self):
+        innate_traits = {"elf_longevity", "reincarnation_boon_elosia", "reincarnation_boon_yuka"}
+        movement_passives = {"flight", "flash_step"}
+        enhancements = [
+            skill for skill in SKILL_REGISTRY.values()
+            if skill.category is SkillCategory.ENHANCEMENT
+        ]
+        self.assertGreaterEqual(len(enhancements), 5)
+        for skill in enhancements:
+            with self.subTest(key=skill.key):
+                if skill.key in innate_traits:
+                    self.assertEqual(skill.group, "天賦")
+                elif skill.key in movement_passives:
+                    self.assertEqual(skill.group, "身法")
+                else:
+                    self.assertIsNone(skill.group)
+
+    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
     def test_every_ungrouped_category_member_declares_null_group(self):
         for key, skill in SKILL_REGISTRY.items():
             if skill.category not in _UNGROUPED_CATEGORIES:
                 continue
             with self.subTest(key=key):
                 self.assertIsNone(skill.group, key)
+
+    @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
+    def test_rehomed_acquired_passives_keep_their_mechanics(self):
+        flight = SKILL_REGISTRY["flight"]
+        self.assertIs(flight.kind, SkillKind.PASSIVE)
+        self.assertEqual(flight.cost, {"mp": 22})
+        self.assertEqual(flight.effects, ["movement:flight"])
+        self.assertEqual(flight.element.key, "wind")
+        self.assertIs(flight.category, SkillCategory.ENHANCEMENT)
+        self.assertEqual(flight.group, "身法")
+
+        yuka = SKILL_REGISTRY["reincarnation_boon_yuka"]
+        self.assertIs(yuka.kind, SkillKind.PASSIVE)
+        self.assertEqual(yuka.effects, ["combat_prediction:武感"])
+        self.assertIs(yuka.category, SkillCategory.ENHANCEMENT)
+        self.assertEqual(yuka.group, "天賦")
 
     @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
     def test_divine_sexual_arts_keeps_its_mechanics_after_reclassification(self):
@@ -956,9 +985,9 @@ class FleeCategoryDeclarationTests(unittest.TestCase):
         import world.rules.disengage  # noqa: F401  (registers flee)
 
     @covers_requirement("universal-action-ownership::flee-declares-its-skill-category-at-its-own-construction-site")
-    def test_flee_is_classified_movement_with_null_group(self):
+    def test_flee_is_classified_martial_arts_with_null_group(self):
         skill = SKILL_REGISTRY["flee"]
-        self.assertIs(skill.category, SkillCategory.MOVEMENT)
+        self.assertIs(skill.category, SkillCategory.MARTIAL_ARTS)
         self.assertIsNone(skill.group)
 
     @covers_requirement("universal-action-ownership::flee-declares-its-skill-category-at-its-own-construction-site")
@@ -1000,7 +1029,7 @@ class FleeCategoryDeclarationTests(unittest.TestCase):
             keyword.value for keyword in call.keywords if keyword.arg == "category"
         )
         self.assertIn(
-            "SkillCategory.MOVEMENT",
+            "SkillCategory.MARTIAL_ARTS",
             ast.unparse(category_value),
         )
 

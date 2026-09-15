@@ -460,8 +460,8 @@ describe("store dispatch + focus", () => {
             context_actions: fx.combatActions({
               skills: [
                 {
-                  category: "innate_gift",
-                  label: "天賦",
+                  category: "martial_arts",
+                  label: "武技",
                   groups: [
                     {
                       group: null,
@@ -512,8 +512,8 @@ describe("store dispatch + focus", () => {
             context_actions: fx.combatActions({
               skills: [
                 {
-                  category: "innate_gift",
-                  label: "天賦",
+                  category: "martial_arts",
+                  label: "武技",
                   groups: [
                     {
                       group: null,
@@ -567,8 +567,8 @@ describe("store dispatch + focus", () => {
             context_actions: fx.combatActions({
               skills: [
                 {
-                  category: "innate_gift",
-                  label: "天賦",
+                  category: "martial_arts",
+                  label: "武技",
                   groups: [
                     {
                       group: null,

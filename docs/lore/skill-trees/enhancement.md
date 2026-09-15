@@ -1,6 +1,6 @@
 # 身心強化：取得條件一覽
 
-身心強化分支底下的每一個技能都是 PASSIVE，持有即生效，沒有人會主動「使用」防禦直覺或身體強化本身，因此不像元素魔法或武藝那樣走 `SkillPrerequisite` 系譜。熟練度機制的前提是有動作可以計次，這個分支從根本上不滿足這個前提。這裡改用**取得條件**取代前置系譜，交代每個技能實際上是怎麼落到一個角色身上的。
+身心強化（`ENHANCEMENT`）是整個遊戲的「取得型被動家族」（Acquired passives），底下的技能絕大多數為 PASSIVE，持有即生效，不走 `SkillPrerequisite` 練習系譜。本分支除了通用被動與倍率鏈外，亦整合了移動增益（「身法」顯示標籤）與先天特質（「天賦」顯示標籤），這裡改用**取得條件**交代每個技能落到角色身上的途徑。
 
 ## 身體強化倍率鏈
 
@@ -30,3 +30,22 @@
 ## 為什麼這樣設計
 
 「跨系譜自動授予」把身心強化從一組孤立的旗標，變成元素魔法與武藝系譜深度的**副產物**。一個把兩條元素系譜都點到大師位階的施法者，理應對魔力運用有更全面的直覺，`precise_mana_control` 就是這份直覺的機制化身。這個機制刻意獨立於 `SkillPrerequisite`（檢查的是其他系譜樹節點的熟練度是否達標，不消耗某個技能的使用次數），下一階段實作時建議另開一張「跨系譜自動授予規則表」獨立維護，不必併入系譜前置圖。
+
+## 身法標籤被動技能（移動豁免）
+
+以下技能機制分類屬於身心強化分支（`category=SkillCategory.ENHANCEMENT`），並以 `group="身法"` 標籤呈現於介面，免除特定移動消耗或限制。詳細力量來源與敘事見 [身法：取得條件一覽](/lore/skill-trees/movement)：
+
+| Key | 名稱 | 效果 | 取得條件權威 |
+| --- | --- | --- | --- |
+| `flight` | 飛行術 | `movement:flight`，免除荒野移動費用 | [身法頁面](/lore/skill-trees/movement) |
+| `flash_step` | 瞬步 | `movement:flash_step`，近距位移 | [身法頁面](/lore/skill-trees/movement) |
+
+## 天賦標籤特質技能（與生俱來／機緣賦予）
+
+以下技能機制分類屬於身心強化分支（`category=SkillCategory.ENHANCEMENT`），並以 `group="天賦"` 標籤呈現於介面，無法透過常規訓練習得。詳細效果與敘事見 [天賦異能：取得條件一覽](/lore/skill-trees/innate-gift)：
+
+| Key | 名稱 | 效果 | 取得條件權威 |
+| --- | --- | --- | --- |
+| `elf_longevity` | 精靈長壽 | `passive_trait:elf_longevity` | [天賦異能頁面](/lore/skill-trees/innate-gift) |
+| `reincarnation_boon_elosia` | 轉生祝福·伊洛希雅 | `growth_rate:practice:100` | [天賦異能頁面](/lore/skill-trees/innate-gift) |
+| `reincarnation_boon_yuka` | 轉生祝福·悠花 | `combat_prediction:武感` | [天賦異能頁面](/lore/skill-trees/innate-gift) |

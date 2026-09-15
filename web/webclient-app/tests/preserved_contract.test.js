@@ -232,8 +232,8 @@ describe("H1 preserved DOM contract (design D6)", () => {
           context_actions: fx.combatActions({
             skills: [
               {
-                category: "innate_gift",
-                label: "先天的",
+                category: "martial_arts",
+                label: "武技",
                 groups: [
                   {
                     group: "攻擊",
