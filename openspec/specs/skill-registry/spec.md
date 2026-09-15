@@ -542,7 +542,7 @@ The light spell family SHALL provide the documented grace and judgment progressi
 - **THEN** ordinary recovery still applies and the mixed spell follows its explicitly separate effect audiences
 
 ### Requirement: Water spell progression composes executable mana-tide behavior
-The water spell family SHALL provide the documented two-root tide/deep-sea progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: MP drain with caster recovery, MP-loss DoT tiers, an MP-diverting damage shield, marker-bonus and area MP restoration with a team share-bonus marker, execution-tier MP removal with bounded regen freeze, a source-qualified depletion reaction with a target-state damage redirect, a devastation area rung, and a two-parent capstone that drains every enemy and restores every ally in one paid cast. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with tip caps from the existing reverse-edge derivation. The superseded dev-era water spells (including the five HP-heal keys) SHALL be deleted wholesale without an alias or deprecation shim, rejecting ordinary casts as unknown skills.
+The water spell family SHALL provide the documented two-root tide/deep-sea progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: MP drain with caster recovery, MP-loss DoT tiers, an MP-diverting damage shield, marker-bonus and area MP restoration with a team share-bonus marker, execution-tier MP removal with bounded regen freeze, a source-qualified depletion reaction with a target-state damage redirect, a devastation area rung, and a two-parent capstone that drains every enemy and restores every ally in one paid cast. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf caps documented as authoring-time data, unconsumed by runtime code). The superseded dev-era water spells (including the five HP-heal keys) SHALL be deleted wholesale without an alias or deprecation shim, rejecting ordinary casts as unknown skills.
 
 #### Scenario: The mana-tide verb is observable at settlement
 - **WHEN** synthetic water compositions mirroring the documented clauses resolve through ordinary action settlement
@@ -550,7 +550,7 @@ The water spell family SHALL provide the documented two-root tide/deep-sea progr
 
 #### Scenario: Two roots, branch, and convergence gate through the lineage engine
 - **WHEN** a synthetic family replicates the documented branching and the two-parent capstone prerequisite shape
-- **THEN** use rejects until every authored threshold is met, capstone attainment follows both terminal branches, and caps stay derived from the shared reverse-edge map
+- **THEN** use rejects until every authored threshold is met, capstone attainment follows both terminal branches, and prerequisite caps stay derived from the shared reverse-edge map
 
 #### Scenario: The family stays non-healing and light stays complementary
 - **WHEN** the water family is exercised against injured allies
