@@ -179,8 +179,8 @@
 | 分支 | 頁面 | 性質 |
 | --- | --- | --- |
 | 武藝 | [martial-arts](/lore/skill-trees/martial-arts) | 完整系譜樹，消耗 SP、位階詞彙獨立於魔法（見習／熟練／精鋭／名家／巨匠／傳奇） |
-| 身心強化 | [enhancement](/lore/skill-trees/enhancement) | 全 PASSIVE，無系譜，改列取得條件，含「跨系譜自動授予」設計 |
-| 身法 | [movement](/lore/skill-trees/movement) | 混合：風元素自我增益走系譜、飛行術／瞬步是 PASSIVE、空間扭曲走神之秘法系譜 |
-| 天賦異能 | [innate-gift](/lore/skill-trees/innate-gift) | 完全無法習得，改列已知類型與取得條件 |
+| 身心強化 | [enhancement](/lore/skill-trees/enhancement) | 取得型被動家族：全 PASSIVE，無系譜，改列取得條件（含「跨系譜自動授予」設計，並收納身法與天賦標籤） |
+| 身法（顯示標籤） | [movement](/lore/skill-trees/movement) | 顯示標籤／跨類別收攏：風元素自我增益走系譜、飛行術／瞬步為身心強化 PASSIVE、空間扭曲走神之秘法系譜 |
+| 天賦異能（顯示標籤） | [innate-gift](/lore/skill-trees/innate-gift) | 顯示標籤：歸入身心強化，完全無法習得，改列已知類型與取得條件 |
 | 雜學秘術 | [utility](/lore/skill-trees/utility) | 三種族可學的技術系譜：鑑定／儲物兩條小型系譜（狀態偽裝、統御術已改歸神之秘法） |
 | 情慾秘術 | [sexual-act](/lore/skill-trees/sexual-act) | 僅說明分類位置與解鎖骨架，不展開招式內容 |

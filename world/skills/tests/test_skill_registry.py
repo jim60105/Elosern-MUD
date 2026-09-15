@@ -614,7 +614,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
     def setUpClass(cls):
         import world.rules.disengage  # noqa: F401  (registers flee)
 
-    @covers_requirement("skill-category-registry::skillcategory-enumerates-exactly-six-presentation-categories")
+    @covers_requirement("skill-category-registry::skillcategory-enumerates-exactly-eight-presentation-categories")
     def test_skill_category_declares_the_exact_member_set_in_order(self):
         self.assertEqual(list(SkillCategory), _CATEGORY_ORDER)
         self.assertEqual(
@@ -732,7 +732,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             )
         self.assertIn("bad_element", str(caught.exception))
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_every_registry_key_has_a_valid_category(self):
         for key in SKILL_REGISTRY:
             with self.subTest(key=key):
@@ -742,7 +742,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                     key,
                 )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_per_category_partition_covers_the_registry_exactly(self):
         per_category = {
             category: {key for key, skill in SKILL_REGISTRY.items() if skill.category is category}
@@ -755,7 +755,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             "a key may appear in only one category",
         )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-six-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_per_category_key_sets_match_the_d4_classification_table(self):
         expected = {
             SkillCategory.MARTIAL_ARTS: {
@@ -879,7 +879,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                     keys,
                 )
 
-    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
     def test_every_elemental_magic_group_is_its_own_element_key(self):
         for key, skill in SKILL_REGISTRY.items():
             if skill.category is not SkillCategory.ELEMENTAL_MAGIC:
@@ -890,7 +890,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 self.assertIn(skill.element.key, ELEMENT_REGISTRY)
                 self.assertEqual(skill.group, skill.element.key)
 
-    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
     def test_every_sexual_act_group_is_a_non_empty_string(self):
         sexual_acts = [
             skill
@@ -902,7 +902,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             self.assertTrue(skill.group)
             self.assertTrue(skill.group.strip())
 
-    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
     def test_enhancement_display_tags_match_closed_vocabulary(self):
         innate_traits = {"elf_longevity", "reincarnation_boon_elosia", "reincarnation_boon_yuka"}
         movement_passives = {"flight", "flash_step"}
@@ -920,7 +920,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 else:
                     self.assertIsNone(skill.group)
 
-    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
     def test_every_ungrouped_category_member_declares_null_group(self):
         for key, skill in SKILL_REGISTRY.items():
             if skill.category not in _UNGROUPED_CATEGORIES:
