@@ -34,32 +34,35 @@ The combat panel's `skills` field SHALL be an ordered array of category groups. 
 SHALL contain the category's stable key, a bounded display label, and an ordered array of one or more
 sub-groups; each sub-group SHALL contain a nullable group key, a label that is non-null exactly when
 the group key is non-null, and an ordered array of skill descriptors. Category ordering SHALL follow
-`SkillCategory`'s declaration order; sub-group ordering within `elemental_magic` SHALL follow
-`ELEMENT_REGISTRY`'s declaration order. A category with zero owned skills SHALL be omitted from the
-array entirely, not emitted with an empty `groups` array; a category whose skills carry no `group`
-SHALL emit exactly one sub-group with a `null` group key and label. The total count of skill
-descriptors across every category and sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound
-of `192` — raised from the previous `32` so the bound clears the current theoretical maximum of 157
-owned active skills (91 base active skills including innate plus 65 registered sexual acts and the
-pre-existing `divine_sexual_arts`) with headroom for catalog growth, while remaining a multiple of
-16 consistent with the presentation-bounds
-family; this bound applies to the flattened total, not to the count of top-level category-group
-entries, which is separately bounded by the number of `SkillCategory` members. Within each sub-group, skill
-descriptors SHALL list each unique owned active `SkillDef` in `SkillHandler.owned_keys()` order after
-passive filtering, including innate skills, without alphabetical reordering. Each skill descriptor
-SHALL contain its stable key, registry label and description, exact resource cost, target
-specification, nullable element key, enabled state, nullable stable disabled reason, ordered valid
-participant IDs, and applicable approved AREA shorthands — byte-identical in shape to schema version
-2's flat descriptor. Participants SHALL be ordered from `player_ids` then `enemy_ids` and SHALL
-contain a positive opaque identity, stable session token, bounded display name, team,
-living/fled/knocked-out state, current/maximum HP, and a nullable server-authored portrait reference.
-`portrait_ref` SHALL equal the opaque art catalog key for that participant when the participant is
-present in the `webclient-art-panel` portrait catalog — including an entry that resolves to a
-placeholder card — and SHALL be `null` only when the participant is absent from that catalog. The
-server SHALL derive the reference from the catalog it actually builds (character named-policy with
-the canonical-age check, generic-monster bestiary archetype, or unavailable placeholder), and the browser SHALL
-NOT construct a portrait subject key or URL from entity data. Lists and strings SHALL have explicit
-bounds and the serialized envelope SHALL remain within the OOB protocol limit.
+`SkillCategory`'s declaration order (six members after the Phase B taxonomy consolidation;
+`movement` and `innate_gift` are no longer categories); sub-group ordering within `elemental_magic`
+SHALL follow `ELEMENT_REGISTRY`'s declaration order; sub-group ordering within `enhancement` SHALL
+follow the fixed order `null` group, then `"天賦"`, then `"身法"`, independent of ownership order. A
+category with zero owned skills SHALL be omitted from the array entirely, not emitted with an empty
+`groups` array; a category whose skills carry no `group` SHALL emit exactly one sub-group with a
+`null` group key and label. The total count of skill descriptors across every category and
+sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound of `192` — raised from the previous
+`32` so the bound clears the current theoretical maximum of 157 owned active skills (91 base active
+skills including innate plus 65 registered sexual acts and the pre-existing `divine_sexual_arts`)
+with headroom for catalog growth, while remaining a multiple of 16 consistent with the
+presentation-bounds family; this bound applies to the flattened total, not to the count of top-level
+category-group entries, which is separately bounded by the number of `SkillCategory` members. Within
+each sub-group, skill descriptors SHALL list each unique owned active `SkillDef` in
+`SkillHandler.owned_keys()` order after passive filtering, including innate skills, without
+alphabetical reordering. Each skill descriptor SHALL contain its stable key, registry label and
+description, exact resource cost, target specification, nullable element key, enabled state,
+nullable stable disabled reason, ordered valid participant IDs, and applicable approved AREA
+shorthands — byte-identical in shape to schema version 2's flat descriptor. Participants SHALL be
+ordered from `player_ids` then `enemy_ids` and SHALL contain a positive opaque identity, stable
+session token, bounded display name, team, living/fled/knocked-out state, current/maximum HP, and a
+nullable server-authored portrait reference. `portrait_ref` SHALL equal the opaque art catalog key
+for that participant when the participant is present in the `webclient-art-panel` portrait catalog —
+including an entry that resolves to a placeholder card — and SHALL be `null` only when the
+participant is absent from that catalog. The server SHALL derive the reference from the catalog it
+actually builds (character named-policy with the canonical-age check, generic-monster bestiary
+archetype, or unavailable placeholder), and the browser SHALL NOT construct a portrait subject key
+or URL from entity data. Lists and strings SHALL have explicit bounds and the serialized envelope
+SHALL remain within the OOB protocol limit.
 
 #### Scenario: Stored skill order and passive exclusion are preserved within each sub-group
 - **WHEN** a player owns active skills `wind_blade`, `fire_ball` in that stored order (both
@@ -69,11 +72,15 @@ bounds and the serialized envelope SHALL remain within the OOB protocol limit.
   their deterministic handler order within their own category's sub-group
 
 #### Scenario: Category ordering is enum order, independent of ownership order
-- **WHEN** an entity owns skills from `movement` and `elemental_magic` only, granted to
-  `entity.db.skills` in an order where the movement skill was imported after the elemental one
-- **THEN** the `skills` array lists the `elemental_magic` category group before the `movement`
-  category group, because `elemental_magic` precedes `movement` in `SkillCategory`'s declaration
+- **WHEN** an entity owns skills from `martial_arts` and `elemental_magic` only, granted to
+  `entity.db.skills` in an order where the martial-arts skill was imported after the elemental one
+- **THEN** the `skills` array lists the `elemental_magic` category group before the `martial_arts`
+  category group, because `elemental_magic` precedes `martial_arts` in `SkillCategory`'s declaration
   order
+
+#### Scenario: The retired category keys are never emitted
+- **WHEN** an entity owns the re-homed acquired passives `flight` and `elf_longevity` and the re-homed innate active `flee`
+- **THEN** no category group carries category `"movement"` or `"innate_gift"` anywhere in the `skills` array; `flee` (ACTIVE, so not passive-filtered) lists under the `martial_arts` category's null sub-group, and the two PASSIVE skills are excluded by passive filtering exactly as any other owned passive
 
 #### Scenario: An owned category with no members is omitted, not emitted empty
 - **WHEN** an entity owns no skill classified `sexual_act`
