@@ -150,6 +150,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_gauge_transfer_modes_parse_into_typed_dataclasses(self):
         # MP modes
         eff1 = parse_effect("gauge_transfer:mp:drain:fixed:5")
@@ -177,6 +178,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_closed_gauge_set_rejects_sp_and_unknown_gauges(self):
         with self.assertRaises(ValueError):
             parse_effect("gauge_transfer:sp:drain:fixed:5")
@@ -190,6 +192,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_hp_restore_rejected_at_parse_and_construction(self):
         # HP restoration is the heal effect's exclusive verb; gauge_transfer:hp:restore is forbidden
         with self.assertRaises(ValueError):
@@ -207,6 +210,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_malformed_modes_and_magnitudes_fail_closed(self):
         malformed = [
             "gauge_transfer:mp:drain",
@@ -229,6 +233,7 @@ class GaugeTransferParseAndValidationTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_gauge_transfer_policy_fail_closed_validation(self):
         # Invalid caster_recovery_share
         with self.assertRaises(ValueError):
@@ -296,6 +301,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_mp_fraction_rounding_on_drain(self):
         """Scenario: Fraction drain rounds to integer, and caster share uses banker's rounding."""
         self.target.traits.mp.current = 33
@@ -322,6 +328,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_mp_drain_half_share_on_clamped_pool(self):
         """Scenario: Half-share on a clamped drain: target has 3 MP, drain requested 5, caster gets half of actual 3."""
         self.target.traits.mp.current = 3
@@ -356,6 +363,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_mp_fraction_maw_empties_proportionally(self):
         """Scenario: Fractional maw empties proportionally: 20% of 100 MP = 20 MP into caster with 1.0 share."""
         self.target.traits.mp.current = 100
@@ -381,6 +389,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_mp_whole_pool_drain_dispatches_one_depletion_event(self):
         """Scenario: Whole-pool drain removes all MP and dispatches one depletion event."""
         self.target.traits.mp.current = 75
@@ -406,6 +415,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_hp_drain_shares_actual_hp_taken(self):
         """Scenario: HP drain with caster share pays on ACTUAL drained HP and dispatches hp_loss."""
         self.target.traits.hp.current = 15
@@ -439,6 +449,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_hp_drain_dead_caster_never_revived(self):
         """Dead caster with 0 HP is never revived by an HP recovery share."""
         self.target.traits.hp.current = 50
@@ -477,6 +488,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_hp_drain_to_zero_settles_single_death(self):
         """Scenario: HP drain-to-zero settles exactly one death through the combat pipeline."""
         self.target.traits.hp.current = 10
@@ -499,6 +511,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_hp_drain_nonlethal_knockout_honored(self):
         """Scenario: HP drain under nonlethal context floors at 1 HP, shares actual loss, no defeat event."""
         self.target.traits.hp.current = 10
@@ -531,6 +544,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
     )
+    @covers_requirement("gauge-transfer-effects::gauge-transfer-is-one-typed-effect-family-with-a-closed-gauge-set-and-validated-magnitude-modes")
     def test_alternate_schools_reuse_the_family(self):
         """Scenario: Non-water synthetic skill reuses gauge_transfer family without element-specific code."""
         self.target.traits.mp.current = 100
@@ -561,6 +575,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::resolution-is-atomic-a-failure-at-any-step-leaves-zero-state-mutated"
     )
+    @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")
     def test_half_applied_leg_rollback_on_commit_failure(self):
         """Scenario: A failed commit restores both legs."""
         self.target.traits.mp.current = 50
@@ -621,6 +636,7 @@ class GaugeTransferRestoreTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::restores-clamp-per-target-and-add-the-caster-s-active-marker-stack-bonus")
     def test_mp_restore_stack_bonus_reads_caster_not_recipient(self):
         """Scenario: Per-stack bonus reads the caster: caster holds markers, recipient gains base + bonus."""
         self.target.traits.mp.current = 10
@@ -661,6 +677,7 @@ class GaugeTransferRestoreTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::restores-clamp-per-target-and-add-the-caster-s-active-marker-stack-bonus")
     def test_mp_restore_overflow_clamps_without_depletion_event(self):
         """Scenario: Overflow clamps at maximum without dispatching depletion."""
         self.target.traits.mp.current = 90
@@ -680,6 +697,7 @@ class GaugeTransferRestoreTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
+    @covers_requirement("gauge-transfer-effects::restores-clamp-per-target-and-add-the-caster-s-active-marker-stack-bonus")
     def test_mp_restore_area_batch_clamping_without_depletion(self):
         """Scenario: Area restore pushes one ally over max while another gains fully without depletion event."""
         ally_a = self.target
@@ -717,6 +735,7 @@ class AudienceConditionTests(GaugeTransferTestBase):
     @covers_requirement(
         "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
     )
+    @covers_requirement("gauge-transfer-effects::a-component-s-audience-gate-selects-its-recipients-by-stored-target-state")
     def test_audience_condition_validation_and_rejection(self):
         # Unknown fact raises
         with self.assertRaises(ValueError):
@@ -740,6 +759,7 @@ class AudienceConditionTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
     )
+    @covers_requirement("gauge-transfer-effects::a-component-s-audience-gate-selects-its-recipients-by-stored-target-state")
     def test_disjoint_subset_proof_drowned_surging_redirect(self):
         """Synthetic disjoint-subset proof: ungated component to all + zero-max rider to matching subset.
 
@@ -789,6 +809,7 @@ class AudienceConditionTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
     )
+    @covers_requirement("gauge-transfer-effects::a-component-s-audience-gate-selects-its-recipients-by-stored-target-state")
     def test_stale_preflight_reevaluates_identical_gate(self):
         """Preflight and final resolution evaluate current stored state identically."""
         target = self.target
@@ -821,6 +842,7 @@ class AudienceConditionTests(GaugeTransferTestBase):
     @covers_requirement(
         "action-resolution-pipeline::audience-planning-agrees-between-preflight-and-final-resolution"
     )
+    @covers_requirement("gauge-transfer-effects::a-component-s-audience-gate-selects-its-recipients-by-stored-target-state")
     def test_gate_composition_with_relation_audiences(self):
         """Scenario: Gate composition with relation audiences filters by relation AND gauge state."""
         from world.rules.combat import Battlefield, BattlefieldActionContext
@@ -927,6 +949,7 @@ class RegenLockAndClockTests(GaugeTransferTestBase):
     @covers_requirement(
         "world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop"
     )
+    @covers_requirement("gauge-transfer-effects::regen-lock-is-a-bounded-marker-consumed-by-the-clock-s-closed-form-regen")
     def test_mp_regen_lock_freezes_regen_and_preserves_remainder(self):
         """Scenario: Locked gauge regenerates nothing while the lock lives."""
         self.target.traits.mp.current = 20
@@ -947,6 +970,7 @@ class RegenLockAndClockTests(GaugeTransferTestBase):
     @covers_requirement(
         "world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop"
     )
+    @covers_requirement("gauge-transfer-effects::regen-lock-is-a-bounded-marker-consumed-by-the-clock-s-closed-form-regen")
     def test_authored_grants_bypass_regen_lock(self):
         """Scenario: Authored grants bypass the lock: direct MP changes work while regen is locked."""
         self.target.traits.mp.current = 20
@@ -959,6 +983,7 @@ class RegenLockAndClockTests(GaugeTransferTestBase):
     @covers_requirement(
         "world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop"
     )
+    @covers_requirement("gauge-transfer-effects::regen-lock-is-a-bounded-marker-consumed-by-the-clock-s-closed-form-regen")
     def test_mp_regen_lock_expiry_resumes_closed_form_regen(self):
         """Scenario: Locked gauge freezes regen, and expiry resumes closed-form regen with remainder intact."""
         self.target.traits.mp.current = 20

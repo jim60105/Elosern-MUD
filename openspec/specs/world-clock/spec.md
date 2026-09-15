@@ -4,7 +4,6 @@ Define the persistent, deterministic game clock, calendar, and sanctioned clock-
 
 ## Requirements
 
-
 ### Requirement: WorldClock persists exactly one integer; every calendar field is derived from it
 `world/rules/clock.py` SHALL provide `WorldClock` with a single persisted field, `tick: int` (total
 elapsed game-seconds since epoch), and a `calendar` property returning a `WorldDateTime` computed
@@ -90,7 +89,12 @@ scan, or `evennia`-wide object search to discover additional entities to settle.
 `min(max, current + rate * elapsed_seconds)`, applied once per `advance()` call per entity, regardless
 of how large `elapsed_seconds` is. This computation SHALL read `elapsed_seconds` from the `advance()`
 call's own argument, never from any wall-clock-timestamp-based mechanism the underlying `GaugeTrait`
-implementation might provide.
+implementation might provide. Each gauge's effective rate SHALL first be multiplied by the entity's
+merged combat-modifier bundle value `{gauge}_regen_scale` (absent means `1.0`, any authored
+non-negative finite scale is legal); a zero scale SHALL freeze that gauge without consuming or
+clobbering its carried sub-unit regen remainder, and gauges with no scale row SHALL compute
+bit-identically to the pre-change form. The scale lookup SHALL be the existing bundle query, and no
+element-, buff- or skill-name branch may participate in the regen stage.
 
 #### Scenario: A large elapsed_seconds value is applied in one step
 - **WHEN** `advance()` is called with `seconds=28800` (8 hours) for an entity whose `hp` gauge has
@@ -101,6 +105,16 @@ implementation might provide.
 #### Scenario: Regen never exceeds the gauge's max
 - **WHEN** `elapsed_seconds * rate` would push a gauge's value past its configured `max`
 - **THEN** the gauge's value is clamped to exactly `max`, never higher
+
+#### Scenario: A zero regen scale freezes without disturbing the remainder
+- **WHEN** a synthetic entity carrying a regen-scale-zero rule advances across two separate advances
+  while its gauge sits below maximum with a nonzero carried remainder
+- **THEN** the gauge value and its remainder are byte-identical after each advance, and a following
+  advance after the scale ends resumes the unchanged closed-form arithmetic including the remainder
+
+#### Scenario: Scaled regen is still one closed-form step
+- **WHEN** a partial regen scale (e.g. `0.5`) is active for a large `elapsed_seconds`
+- **THEN** the gauge reflects `min(max, current + rate * scale * elapsed_seconds)` from one computation
 
 ### Requirement: settle_combat_result is the sanctioned call site for combat-sourced advances
 `world/rules/clock.py` SHALL provide `settle_combat_result(result, entities) -> list[ScheduledEvent]`,
@@ -192,7 +206,6 @@ per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_po
 - **WHEN** `world/rules/rulebook/clock.yaml`'s `converse` value is inspected for any consumer added by
   this change
 - **THEN** no code added by this change reads `command_defaults["converse"]`
-
 
 ### Requirement: World-clock presentation reads never create the singleton
 `world/rules/clock.py` SHALL provide a read-only accessor that returns the existing `WorldClock` or absence without creating a Script or other persistent state. The deterministic server startup lifecycle SHALL explicitly ensure the world-clock singleton before player presentation is accepted. Presentation code SHALL use only the read-only accessor and SHALL NOT call the create-or-read mutation helper.

@@ -42,7 +42,7 @@ natural 100
 `max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`, where
 `roll_multiplier` is `crit_multiplier` if the raw, unmodified `roll_d100()` result equals 100,
 `solid_hit_multiplier` if the margin of success is at least `solid_hit_margin`, and `base_multiplier`
-otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. For a declared conditional policy, the attack component SHALL additionally use the matched attack multiplier once, defense SHALL be zero only when its configured bypass predicate matches, and floor(max_hp * declared_fraction) SHALL be added after defense subtraction on a successful hit. The existing damage floor, freeform magnitude scaling and final floor SHALL follow these components; unconfigured effects retain the ordinary formula. Existing nonlethal projection SHALL apply before defeat/knockout event consumers. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
+otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. For a declared conditional policy, the attack component SHALL additionally use the matched attack multiplier once, defense SHALL be zero only when its configured bypass predicate matches **or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which SHALL validate at construction (an attack multiplier with an empty predicate stays invalid)**, and floor(max_hp * declared_fraction) SHALL be added after defense subtraction on a successful hit. The existing damage floor, freeform magnitude scaling and final floor SHALL follow these components; unconfigured effects retain the ordinary formula. Existing nonlethal projection SHALL apply before defeat/knockout event consumers. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
 100 SHALL NOT cause a miss to become a hit.
 
 #### Scenario: A bare hit uses the base multiplier
@@ -75,6 +75,12 @@ otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defau
 #### Scenario: Freeform scaling follows every damage component
 - **WHEN** a freeform-scaled cast of a skill carrying a maximum-HP component hits
 - **THEN** the declared freeform magnitude scaling applies after the maximum-HP component is added, so the rider is scaled by the same stage rather than remaining unscaled
+
+#### Scenario: Unconditional execution bypass ignores any target's defense
+- **WHEN** a synthetic policy with `bypass_defense=True` and an empty predicate damages a high-defense
+  and a low-defense target, and separately authoring attaches an attack multiplier to an empty predicate
+- **THEN** both hits subtract no defense while the identical coefficient without bypass differs by the
+  targets' defense, and the multiplier-with-empty-predicate authoring still raises at construction
 
 ### Requirement: effective_power combines four effective stats multiplied by max hp
 `world/rules/combat.py` SHALL provide `effective_power(entity) -> float`, computed as the sum of
