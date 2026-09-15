@@ -395,6 +395,55 @@ def graft_synth_defeat_rulebook() -> None:
         )
 
 
+def graft_synth_state_reaction_rulebook() -> None:
+    """Close the state-reaction load seams the t_-only install opens.
+
+    ``world.rules.state_reactions`` validates its shipped YAML at import
+    against the LIVE ``BUFF_DEFINITIONS`` and ``MP_COST_TIERS``. The
+    synthetic install replaces both with t_-only rows, which removes
+    vocabulary the shipped rulebook legitimately names: the
+    ``climax_empowerment`` marker buff (applied by the climax rules) and
+    the six shipped pleasure-gain tier keys. Importing the module after the
+    install then fail-closes, and the browser seed dies inside the first
+    ``apply_buff`` dispatch. Same seam class as
+    ``graft_synth_defeat_rulebook``: graft one authored marker row and
+    restore the shipped tier vocabulary ADDITIVELY (``setdefault``), so kit
+    ``t_``-keyed lookups keep resolving their own rows first.
+
+    Ordering invariant: nothing may import ``world.rules.state_reactions``
+    between the install and this graft (the seed reaches it lazily via the
+    first ``apply_buff``; the server boot imports it as a startup step
+    after ``at_server_init``). The assertion below fails loudly if a future
+    resequencing breaks that.
+    """
+    import sys
+
+    assert "world.rules.state_reactions" not in sys.modules, (
+        "state_reactions was imported before the synth graft; the "
+        "install-time validation already fail-closed against t_-only data"
+    )
+    from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
+    from world.skills.cost_tiers import MP_COST_TIERS, MP_SHIPPED_COST_TIERS
+
+    BUFF_DEFINITIONS.setdefault(
+        "climax_empowerment",
+        BuffDefinition(
+            key="climax_empowerment",
+            duration=None,
+            tick_interval=None,
+            stacking="refresh",
+            polarity="buff",
+            modifiers={},
+        ),
+    )
+    # state_reactions.yaml pleasure_gain rows are keyed by the shipped tier
+    # vocabulary; re-add those CostTier rows beside the installed t_ rows.
+    # Widens spell_tier_for's area band to include 91-110 for future kit
+    # spells (no kit row lands there today); harmless for tier-label reads.
+    for tier_key, tier in MP_SHIPPED_COST_TIERS.items():
+        MP_COST_TIERS.setdefault(tier_key, tier)
+
+
 def synth_next_entry_rank_key() -> str:
     """The rank key exactly one order above the grafted entry rank.
 

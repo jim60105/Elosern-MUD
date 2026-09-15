@@ -35,6 +35,12 @@ MP_COST_TIERS: dict[str, CostTier] = {
     "神格": CostTier(None, None, (180, 220), (200, 260)),
 }
 
+#: Snapshot of the shipped tier rows, taken before the synthetic catalog
+#: install can clear the live mapping. Consumers that validate shipped
+#: rulebook data (e.g. the browser harness's state-reaction graft) restore
+#: vocabulary from here instead of re-declaring the balance table.
+MP_SHIPPED_COST_TIERS: dict[str, CostTier] = dict(MP_COST_TIERS)
+
 
 # Effect prefixes whose magnitude is proportional to the cast's scale.
 _FREEFORM_SCALABLE_PREFIXES = frozenset({"damage", "heal", "self_heal"})

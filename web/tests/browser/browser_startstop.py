@@ -110,6 +110,16 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     from web.browser_support.browser_fixtures_data import graft_synth_defeat_rulebook
 
     graft_synth_defeat_rulebook()
+    # state_reactions validates the shipped climax rulebook at import against
+    # the live buff registry and MP cost tiers; the t_-only install removes
+    # both vocabularies it names, so the seed's first apply_buff dispatch
+    # would die importing it. Graft the marker buff + restore the shipped
+    # tier vocabulary BEFORE any lazy import reaches the module.
+    from web.browser_support.browser_fixtures_data import (
+        graft_synth_state_reaction_rulebook,
+    )
+
+    graft_synth_state_reaction_rulebook()
 
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, so the server installs the shared harness catalog directly
