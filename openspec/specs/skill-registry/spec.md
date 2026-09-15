@@ -39,34 +39,6 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
   (`fire_ball` from `mp=20` to `mp=14`), and every other field (`label`, `target_spec`, `element`, `effects`) unchanged from before
   this change
 
-### Requirement: SKILL_REGISTRY contains the full 水-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 水-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["water"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `water_bolt` | 水箭術 | 學徒 | `TargetSpec.SINGLE` | `mp=12` | `damage:water:magic` |
-| `minor_heal` | 治癒滴露 | 學徒 | `TargetSpec.SINGLE` | `mp=11` | `heal:single` |
-| `healing_spring` | 治癒之泉 | 術師 | `TargetSpec.AREA` | `mp=28` | `heal:area` |
-| `water_shield` | 水盾術 | 術師 | `TargetSpec.SINGLE` | `mp=22` | `buff_apply:water_shield` |
-| `abyssal_whirlpool` | 深海漩渦 | 大師 | `TargetSpec.AREA` | `mp=50` | `damage:water:magic`, `buff_apply:water_bind` |
-| `wellspring_of_life` | 生命湧泉 | 大師 | `TargetSpec.SINGLE` | `mp=40` | `heal:single` |
-| `tsunami` | 海嘯術 | 賢者 | `TargetSpec.AREA` | `mp=95` | `damage:water:magic` |
-| `tidal_revival` | 復生之潮 | 賢者 | `TargetSpec.SINGLE` | `mp=78` | `heal:single` |
-| `sea_of_life` | 生命之海 | 主宰 | `TargetSpec.AREA` | `mp=160` | `heal:area` |
-| `abyssal_tide` | 深淵巨潮 | 主宰 | `TargetSpec.AREA` | `mp=145` | `damage:water:magic` |
-
-#### Scenario: All ten 水 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 水 keys (`water_bolt`, `minor_heal`, `healing_spring`, `water_shield`, `abyssal_whirlpool`, `wellspring_of_life`, `tsunami`, `tidal_revival`, `sea_of_life`, `abyssal_tide`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["water"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY contains the full 土-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 土-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
@@ -568,3 +540,22 @@ The light spell family SHALL provide the documented grace and judgment progressi
 #### Scenario: Ordinary recovery and mixed policy remain distinct
 - **WHEN** ordinary recovery targets an enemy while a mixed spell selects both teams
 - **THEN** ordinary recovery still applies and the mixed spell follows its explicitly separate effect audiences
+
+### Requirement: Water spell progression composes executable mana-tide behavior
+The water spell family SHALL provide the documented two-root tide/deep-sea progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: MP drain with caster recovery, MP-loss DoT tiers, an MP-diverting damage shield, marker-bonus and area MP restoration with a team share-bonus marker, execution-tier MP removal with bounded regen freeze, a source-qualified depletion reaction with a target-state damage redirect, a devastation area rung, and a two-parent capstone that drains every enemy and restores every ally in one paid cast. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with tip caps from the existing reverse-edge derivation. The superseded dev-era water spells (including the five HP-heal keys) SHALL be deleted wholesale without an alias or deprecation shim, rejecting ordinary casts as unknown skills.
+
+#### Scenario: The mana-tide verb is observable at settlement
+- **WHEN** synthetic water compositions mirroring the documented clauses resolve through ordinary action settlement
+- **THEN** the target's MP pool, the caster's recovery, DoT ticks, shield diversion, restoration, suffocation lock, regen freeze and the capstone's enemy-drain/ally-restore all change observable state with one paid cast and atomic rollback
+
+#### Scenario: Two roots, branch, and convergence gate through the lineage engine
+- **WHEN** a synthetic family replicates the documented branching and the two-parent capstone prerequisite shape
+- **THEN** use rejects until every authored threshold is met, capstone attainment follows both terminal branches, and caps stay derived from the shared reverse-edge map
+
+#### Scenario: The family stays non-healing and light stays complementary
+- **WHEN** the water family is exercised against injured allies
+- **THEN** no water node restores HP — MP-family effects only — while HP restoration remains another family's authored behavior
+
+#### Scenario: Retired keys resolve as ordinary rejections
+- **WHEN** a player casts a deleted dev-era key through the ordinary cast surface after replacement
+- **THEN** it rejects with the existing unknown-skill reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast path could land on

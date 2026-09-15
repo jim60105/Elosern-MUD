@@ -152,17 +152,6 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
             }
         )
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
-    def test_water_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("healing_spring", "water_shield"),
-                "大師": ("abyssal_whirlpool", "wellspring_of_life"),
-                "賢者": ("tsunami", "tidal_revival"),
-                "主宰": ("sea_of_life", "abyssal_tide"),
-            }
-        )
-
     @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
     def test_earth_spell_tier_labels_match_the_catalog(self):
         self._assert_labels(
