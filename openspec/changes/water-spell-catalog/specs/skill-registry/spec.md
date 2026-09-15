@@ -21,6 +21,6 @@ The water spell family SHALL provide the documented two-root tide/deep-sea progr
 - **WHEN** the water family is exercised against injured allies
 - **THEN** no water node restores HP — MP-family effects only — while HP restoration remains another family's authored behavior
 
-#### Scenario: Retired keys leave no trace
-- **WHEN** the engine imports the registry and resolves the cast surface after replacement
-- **THEN** no shipped row, buff, preset, or test references a deleted dev-era key, and no alias or redirect row exists for any of them
+#### Scenario: Retired keys resolve as ordinary rejections
+- **WHEN** a player casts a deleted dev-era key through the ordinary cast surface after replacement
+- **THEN** it rejects with the existing unknown-skill reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast path could land on
