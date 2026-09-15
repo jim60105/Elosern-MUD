@@ -10,7 +10,8 @@
 - [ ] 1.1 Confirm both predecessor contracts in design.md D3 are merged and inspect current source/exported references (codegraph/LSP) for the dark registry block, the dev-era buff keys (`dark_atk_down`, `dark_curse`, `dark_corrosion`, `fear`) and every dev-era registry key before editing; if any mechanic from the D1 coverage table is missing, STOP and fix it in its owning behavior change — do not bolt code onto the catalog.
 - [ ] 1.2 Author the 13-node tree exactly per design.md D1 (keys/labels/targets/MP costs/prerequisites/coefficient+policies/effect bindings), deleting `dark_atk_down`'s binding and adding `curse_spread`/`shadow_blight`/`abyssal_apotheosis` wholesale without aliases; verify the two-parent capstone (冥界審判 Lv.10 + 虛空湮滅 Lv.10) validates at registry load through the existing lineage validator and tip caps derive unchanged.
 - [ ] 1.3 Author the dark rulebook rows per D1/D2: `dark_weaken` (−3 atk/15 s), `dark_curse` re-home (−5×3/20 s), `dark_spread` (−8 atk/def/30 s), `dark_apotheosis` (−25 atk/def/90 s), `dark_corrosion` re-home (−12/10 s, 300 s, `caster_share: 1.0`), `dark_corrosion_deep` (−18/10 s, 300 s, `caster_share: 1.0`), `fear` duration 60→40, and the one `fear_locks_actions` modifier row (`actions_per_turn: 0`) — every row ordinary vocabulary, no new grammar beyond the predecessors' shipped clauses.
-- [ ] 1.4 Buff-key census: no dangling `buff_apply:`/`self_buff_apply:` target; `dark_atk_down` gone from buffs.yaml and registry with no alias; `fearless_brooch`'s `immune: [fear]` row untouched (key unchanged); `test_buffs.py`'s dev-era numeric assertions updated to the re-homed values (behavior assertions kept, no row mirroring added).
+- [ ] 1.4 Sync `world/rules/rulebook/status_display.yaml` per design.md D2b (delete `dark_atk_down`; add `dark_weaken`/`dark_spread`/`dark_apotheosis`/`dark_corrosion_deep`/`fear_locks_actions` rows at the table's label/severity conventions) — the shipped import-time coverage check fails closed on any drift between the file and the live buff keys ∪ modifier rule IDs.
+- [ ] 1.5 Buff-key census: no dangling `buff_apply:`/`self_buff_apply:` target; `dark_atk_down` gone from buffs.yaml, registry and status_display.yaml with no alias; `fearless_brooch`'s `immune: [fear]` row untouched (key unchanged); `test_buffs.py`'s dev-era numeric assertions updated to the re-homed values (behavior assertions kept, no row mirroring added); `world/rules/tests/test_status_display.py` green (set equality against the post-change displayable set).
 
 ## 2. Echo-test retirement and docs hygiene
 
@@ -27,7 +28,7 @@
 ### Focused invocation
 
 ```sh
-uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_cost_tiers world.rules.tests.test_skill_lineage world.rules.tests.test_dark_curse_erosion world.rules.tests.test_buffs world.rules.tests.test_combat_modifiers
+uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_cost_tiers world.rules.tests.test_skill_lineage world.rules.tests.test_dark_curse_erosion world.rules.tests.test_buffs world.rules.tests.test_combat_modifiers world.rules.tests.test_status_display
 uv run --locked python -m tools.observability_lint check
 uv run --locked python -m tools.test_data_lint check
 uv run --locked python -m tools.spec_traceability check
