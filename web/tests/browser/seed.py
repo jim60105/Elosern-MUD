@@ -191,6 +191,7 @@ def _art_fixture(character, room) -> None:
         SHIPPED_ART_ARCHETYPE,
         SHIPPED_DIALOGUE_KEY,
         SHIPPED_MONSTER_TIER_KEY,
+        SHIPPED_MONSTER_TIER_ATTR,
         SYNTH_ART_ARCHETYPE,
         SYNTH_DIALOGUE_HOST_KEY,
         SYNTH_DIALOGUE_TABLE_KEY,
