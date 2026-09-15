@@ -107,6 +107,7 @@
         "world.rules.tests.test_monster_sexual_baseline",
         "world.rules.tests.test_movement",
         "world.rules.tests.test_movement_settlement",
+        "world.rules.tests.test_mp_flow",
         "world.rules.tests.test_namegen",
         "world.rules.tests.test_no_combat_branching",
         "world.rules.tests.test_npc_identity",

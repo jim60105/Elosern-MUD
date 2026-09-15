@@ -22,10 +22,10 @@
 
 ## 3. Behavioral evidence and integration
 
-- [ ] 3.1 Implement synthetic behavior tests for every delta scenario: writer clamping/actual-delta, exactly-once crossing, no-dispatch on already-zero/increase/zero-actual, hp-branch regression, cast-cost routed payment to zero (commit + event; rejected cast = no event), DoT tick attribution across partitions, immunity blocking of new mp-DoT grants, rule-layer source filtering (qualified vs unqualified vs missing source), transactional rollback of a reaction-applied marker inside a failing cast and clock advance. Every test must fail on a plausible behavioral error; no source-string or data-echo assertions.
-- [ ] 3.2 Register new non-browser test modules in exactly one `.github/evennia-shards.json` shard and verify the ownership optimization contract test.
-- [ ] 3.3 Exercise the changed engine path with a disposable offline scenario (apply an mp DoT to a synthetic entity, advance the clock to the crossing, observe suffocation lock via the cast gate); delete it only after proof.
-- [ ] 3.4 Run the focused labels below after editing stops; `tools.observability_lint check` in the same batch (state/event paths change); `tools.test_data_lint check`; `tools.spec_traceability check`; `openspec validate water-mp-depletion-reaction --strict`. Obtain canonical IDs via `tools.spec_traceability list` during the separately authorized main-sync and annotate exactly the tests establishing them.
+- [x] 3.1 Implement synthetic behavior tests for every delta scenario: writer clamping/actual-delta, exactly-once crossing, no-dispatch on already-zero/increase/zero-actual, hp-branch regression, cast-cost routed payment to zero (commit + event; rejected cast = no event), DoT tick attribution across partitions, immunity blocking of new mp-DoT grants, rule-layer source filtering (qualified vs unqualified vs missing source), transactional rollback of a reaction-applied marker inside a failing cast and clock advance. Every test must fail on a plausible behavioral error; no source-string or data-echo assertions.
+- [x] 3.2 Register new non-browser test modules in exactly one `.github/evennia-shards.json` shard and verify the ownership optimization contract test.
+- [x] 3.3 Exercise the changed engine path with a disposable offline scenario (apply an mp DoT to a synthetic entity, advance the clock to the crossing, observe suffocation lock via the cast gate); delete it only after proof.
+- [x] 3.4 Run the focused labels below after editing stops; `tools.observability_lint check` in the same batch (state/event paths change); `tools.test_data_lint check`; `tools.spec_traceability check`; `openspec validate water-mp-depletion-reaction --strict`. Obtain canonical IDs via `tools.spec_traceability list` during the separately authorized main-sync and annotate exactly the tests establishing them.
 
 ### Focused invocation
 
