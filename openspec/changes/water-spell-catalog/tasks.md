@@ -26,7 +26,7 @@
 ### Focused invocation
 
 ```sh
-uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_cost_tiers world.rules.tests.test_skill_lineage world.rules.tests.test_water_mana_tide
+uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.skills.tests.test_cost_tiers world.rules.tests.test_skill_lineage world.rules.tests.test_water_mana_tide
 uv run --locked python -m tools.observability_lint check
 uv run --locked python -m tools.test_data_lint check
 uv run --locked python -m tools.spec_traceability check
