@@ -61,6 +61,7 @@ from world.rules.sexual_transitions import apply_event
 from world.rules.spell_conditions import CastCondition, CastConditionSubject
 from world.rules.state_reactions import (
     STATE_REACTION_RULES,
+    compute_state_magnitude,
     dispatch_phase_reaction,
     is_empowered,
     load_state_reaction_rules,
@@ -645,7 +646,7 @@ class PhaseSpellReactionsTests(EvenniaTest):
 
             # Magnitude calculation falls back to standard curve (not 4.0)
             self.actor.sexual.pleasure.base = 25  # 微興奮 -> ordinal 1 -> 3.2 + 0.2 = 3.4
-            mag = _T_KISS_CURVE.compute(self.actor, actor=self.actor)
+            mag = compute_state_magnitude(_T_KISS_CURVE, self.actor, actor=self.actor)
             self.assertAlmostEqual(mag, 3.4, places=5)
 
     @covers_requirement(
@@ -831,16 +832,39 @@ class PhaseSpellReactionsTests(EvenniaTest):
     )
     def test_malformed_peak_or_unresolved_marker_rejected(self):
         """Authoring supplies invalid marker references, bad peak syntax, or contradictory policies raises ValueError."""
-        # Unresolved marker raises
+        # Unresolved marker raises at the rules-side authority (the marker
+        # vocabulary lives with the reaction engine, so the configured-marker
+        # check runs over the registry there, never in the definition module):
+        # a synthetic skill declaring an unconfigured marker is rejected when
+        # the validator walks the registry.
+        from world.rules.state_reactions import validate_skill_markers
+
+        _bad_marker_skill = _skill(
+            "t_unresolved_marker",
+            "合成未註冊標記",
+            "未註冊標記拒絕測試用。",
+            SkillKind.ACTIVE,
+            TargetSpec.SELF,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=["heal:single"],
+            category=SkillCategory.ENHANCEMENT,
+            effect_policies=(
+                EffectPolicy(
+                    magnitude=StateMagnitude(
+                        subject=StateMagnitudeSubject.ACTOR,
+                        field="arousal",
+                        base=1.0,
+                        per_ordinal=0.5,
+                        maximum=3.0,
+                        marker="non_existent_unregistered_marker_xyz",
+                    )
+                ),
+            ),
+        )
         with self.assertRaises(ValueError):
-            StateMagnitude(
-                subject=StateMagnitudeSubject.ACTOR,
-                field="arousal",
-                base=1.0,
-                per_ordinal=0.5,
-                maximum=3.0,
-                marker="non_existent_unregistered_marker_xyz",
-            )
+            validate_skill_markers({"t_unresolved_marker": _bad_marker_skill})
 
         # Marker without maximum raises
         with self.assertRaises(ValueError):

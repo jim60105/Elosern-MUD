@@ -11,8 +11,9 @@ strike counts. Queries are read-only and never mutate storage.
 from collections.abc import Mapping
 from typing import Any
 
+from world.lore.action_evidence import EVIDENCE_KINDS
+
 ACTION_EVIDENCE_ATTR: str = "action_evidence"
-EVIDENCE_KINDS: frozenset[str] = frozenset({"forced_interaction"})
 LIGHT_EVIDENCE_DURATION: int = 60
 
 

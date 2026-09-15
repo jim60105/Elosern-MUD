@@ -235,7 +235,9 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     return getattr(entity.traits, trait_key).value
 
 
-COMBAT_TRAITS_VOCABULARY: frozenset[str] = frozenset({"undead"})
+# Re-export: the closed vocabulary is static lore data (world.lore.combat_traits);
+# this module owns the validation and accessor rules that read it.
+from world.lore.combat_traits import COMBAT_TRAITS_VOCABULARY
 
 
 def validate_combat_traits(traits: Any) -> list[str]:

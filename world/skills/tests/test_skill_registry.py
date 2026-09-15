@@ -176,19 +176,21 @@ class SkillRegistryTests(unittest.TestCase):
             )
 
     @covers_requirement("sexual-act-seeds::a-single-target-sexual-act-cannot-be-self-cast")
-    def test_every_skill_produces_its_own_target_requirement(self):
-        # The shared resolver consumes SkillDef.target_requirement, so the
-        # definition must state all three targeting rules itself: shape and
-        # faction mirror the declared fields, and the self-target prohibition
-        # is carried by exactly the sexual-act category (their SINGLE-target
-        # acts are two-participant by construction). Non-SINGLE sexual acts
-        # legitimately carry forbid_self without ever exercising it — the
-        # resolver reads the flag only in its SINGLE arm.
+    def test_every_skill_states_its_targeting_rule(self):
+        # The shared resolver consumes the rules-side requirement_for(skill),
+        # derived from the definition's declared fields: shape and faction
+        # mirror them, and the self-target prohibition is carried by exactly
+        # the sexual-act category (their SINGLE-target acts are two-participant
+        # by construction). Non-SINGLE sexual acts legitimately carry
+        # forbid_self without ever exercising it — the resolver reads the flag
+        # only in its SINGLE arm.
+        from world.rules.targeting import requirement_for
+
         import world.skills.sexual_acts  # noqa: F401  (import side effect registers the full catalog)
 
         single_sexual_count = 0
         for key, skill in SKILL_REGISTRY.items():
-            requirement = skill.target_requirement
+            requirement = requirement_for(skill)
             with self.subTest(key=key):
                 self.assertIs(requirement.spec, skill.target_spec)
                 self.assertIs(requirement.faction, skill.faction_constraint)

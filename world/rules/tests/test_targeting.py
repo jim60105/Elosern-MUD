@@ -15,6 +15,7 @@ from world.rules.targeting import (
     RoomActionContext,
     TargetRequirement,
     expand_target_shorthand,
+    requirement_for,
     resolve_targets,
     validate_faction,
 )
@@ -126,7 +127,7 @@ class TargetRequirementTests(unittest.TestCase):
         # same reasons.
         room = object()
         actor = _Entity("actor", room)
-        from_skill = SYNTH_ACT_SKILL.target_requirement
+        from_skill = requirement_for(SYNTH_ACT_SKILL)
         direct = TargetRequirement(
             SYNTH_ACT_SKILL.target_spec,
             SYNTH_ACT_SKILL.faction_constraint,
@@ -187,10 +188,31 @@ class ResolverVocabularyTests(unittest.TestCase):
         return names
 
     @covers_requirement("sexual-act-seeds::a-single-target-sexual-act-cannot-be-self-cast")
-    def test_targeting_imports_no_skill_category_vocabulary(self):
+    def test_the_resolver_itself_uses_no_skill_category_vocabulary(self):
+        # The resolver pipeline still consumes the plain requirement value,
+        # never the definition: every resolver function besides the
+        # rules-side derivation (requirement_for, which reads the declared
+        # fields once) must reference none of the definition vocabulary.
         imported = self._imported_names()
-        for forbidden in ("SkillCategory", "SkillDef", "DamageEffect"):
-            self.assertNotIn(forbidden, imported)
+        self.assertTrue({"SkillCategory", "SkillDef"} <= imported)
+        for node in ast.walk(self._targeting_tree()):
+            if not isinstance(node, ast.FunctionDef) or node.name == "requirement_for":
+                continue
+            referenced = {
+                child.id
+                for child in ast.walk(node)
+                if isinstance(child, ast.Name)
+            } | {
+                child.attr
+                for child in ast.walk(node)
+                if isinstance(child, ast.Attribute)
+            }
+            for forbidden in ("SkillCategory", "SkillDef", "DamageEffect"):
+                self.assertNotIn(
+                    forbidden,
+                    referenced,
+                    f"resolver function {node.name!r} touches {forbidden}",
+                )
 
     @covers_requirement("targeting-validation::actioncontext-is-a-shared-protocol-implemented-differently-by-combat-and-non-combat")
     def test_is_in_range_exposes_exactly_actor_and_target(self):
@@ -241,7 +263,7 @@ class TargetingTests(unittest.TestCase):
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [present, absent], RoomActionContext(room))
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, [present, absent]), [present])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), [present, absent]), [present])
 
     @covers_requirement("targeting-validation::out-of-combat-targeting-has-no-hostility-model", "targeting-validation::target-resolution-runs-four-ordered-validations")
     def test_single_reports_presence_before_later_checks(self):
@@ -256,7 +278,7 @@ class TargetingTests(unittest.TestCase):
         )
         request = ActionRequest(actor, skill.key, [absent], RoomActionContext(room))
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [absent])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [absent])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_NOT_PRESENT)
 
     def test_missing_hp_is_not_treated_as_a_living_target(self):
@@ -270,7 +292,7 @@ class TargetingTests(unittest.TestCase):
         )
         request = ActionRequest(actor, skill.key, [item], RoomActionContext(room))
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [item])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [item])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_DEAD)
 
     @covers_requirement("targeting-validation::targeting-rules-are-supplied-by-a-definition-owned-targetrequirement")
@@ -289,7 +311,7 @@ class TargetingTests(unittest.TestCase):
             RoomActionContext(room),
         )
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(room_request.actor, room_request.context, skill.target_requirement, [target])
+            resolve_targets(room_request.actor, room_request.context, requirement_for(skill), [target])
         self.assertIs(
             caught.exception.reason,
             RejectReason.TARGET_FACTION_FORBIDDEN,
@@ -308,7 +330,7 @@ class TargetingTests(unittest.TestCase):
             SelfContext(room),
         )
         self.assertEqual(
-            resolve_targets(self_request.actor, self_request.context, skill.target_requirement, [target]),
+            resolve_targets(self_request.actor, self_request.context, requirement_for(skill), [target]),
             [target],
         )
 
@@ -336,7 +358,7 @@ class TargetingTests(unittest.TestCase):
                 actor, skill.key, [enemy], _Context(relation)
             )
             self.assertEqual(
-                resolve_targets(request.actor, request.context, skill.target_requirement, [enemy]),
+                resolve_targets(request.actor, request.context, requirement_for(skill), [enemy]),
                 [enemy],
                 relation,
             )
@@ -352,7 +374,7 @@ class TargetingTests(unittest.TestCase):
         )
         request = ActionRequest(actor, skill.key, [ally], RoomActionContext(room))
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [ally])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [ally])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_FACTION_FORBIDDEN)
 
 
@@ -387,25 +409,25 @@ class TightenedShapeTests(unittest.TestCase):
         target = self._target()
         request = self._request(actor, skill.key, [target])
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [target])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [target])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
         request = self._request(actor, skill.key, [])
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, []), [])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), []), [])
 
     def test_self_accepts_empty_or_actor_only(self):
         actor = self._actor()
         skill = _T_SELF_SHAPE
         request = self._request(actor, skill.key, [])
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, []), [actor])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), []), [actor])
 
         request = self._request(actor, skill.key, [actor])
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, [actor]), [actor])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), [actor]), [actor])
 
         other = self._target("other")
         request = self._request(actor, skill.key, [other])
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [other])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [other])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
     def test_single_rejects_non_unit_cardinality(self):
@@ -413,7 +435,7 @@ class TightenedShapeTests(unittest.TestCase):
         skill = _T_ZERO_COST_SINGLE
         request = self._request(actor, skill.key, [])
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
     def test_single_rejects_shorthand_even_when_one_target(self):
@@ -434,7 +456,7 @@ class TightenedShapeTests(unittest.TestCase):
         skill = replace(_T_ANY_AREA, faction_constraint=FactionConstraint.ANY)
         request = self._request(actor, skill.key, [target, target])
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [target, target])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [target, target])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
     def test_area_rejects_empty_explicit_input(self):
@@ -442,7 +464,7 @@ class TightenedShapeTests(unittest.TestCase):
         skill = _T_ANY_AREA
         request = self._request(actor, skill.key, [])
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [])
         self.assertIs(caught.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
     def test_area_filters_invalid_candidates_and_keeps_valid(self):
@@ -455,7 +477,7 @@ class TightenedShapeTests(unittest.TestCase):
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [present, absent], RoomActionContext(room))
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, [present, absent]), [present])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), [present, absent]), [present])
 
     def test_area_rejects_when_all_candidates_filtered(self):
         actor = self._actor()
@@ -468,7 +490,7 @@ class TightenedShapeTests(unittest.TestCase):
         )
         request = ActionRequest(actor, skill.key, [dead], RoomActionContext(room))
         with self.assertRaises(RejectedAction) as caught:
-            resolve_targets(request.actor, request.context, skill.target_requirement, [dead])
+            resolve_targets(request.actor, request.context, requirement_for(skill), [dead])
         self.assertIs(caught.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
     @covers_requirement("targeting-validation::combat-shortcuts-are-convenience-ui-not-permission-boundaries")
@@ -484,7 +506,7 @@ class TightenedShapeTests(unittest.TestCase):
         # entities; an ANY skill validates the explicit ally target just like
         # an explicit enemy list, with no shorthand-based permission change.
         request = ActionRequest(actor, skill.key, [ally], RoomActionContext(room))
-        self.assertEqual(resolve_targets(request.actor, request.context, skill.target_requirement, [ally]), [ally])
+        self.assertEqual(resolve_targets(request.actor, request.context, requirement_for(skill), [ally]), [ally])
 
     def test_expand_shorthand_out_of_combat_rejects(self):
         actor = self._actor()
@@ -550,7 +572,7 @@ class ItemSkillResolverParityTests(unittest.TestCase):
         dead = _Entity("dead", room)
         dead.traits.hp.value = 0
         item_requirement = scope_targeting_rule(ItemTargetScope.SINGLE).requirement
-        skill_requirement = _T_ANY_SINGLE.target_requirement
+        skill_requirement = requirement_for(_T_ANY_SINGLE)
         with self.subTest(producer="item"):
             with self.assertRaises(RejectedAction) as item_caught:
                 resolve_targets(

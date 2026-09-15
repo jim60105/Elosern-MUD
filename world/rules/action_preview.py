@@ -47,6 +47,7 @@ from world.rules.targeting import (
     _target_identity,
     candidate_rejection,
     expand_target_shorthand,
+    requirement_for,
 )
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import EffectAudience
@@ -207,16 +208,17 @@ def _valid_candidates(
         # SELF binds the actor regardless of the menu candidate pool; the
         # player-facing facade and wire schema accept no SELF target field.
         failure = candidate_rejection(
-            actor, context, skill.target_requirement, actor
+            actor, context, requirement_for(skill), actor
         )
         if failure is not None:
             return (), failure
         return (actor,), None
     valid: list[Any] = []
     first_failure: tuple[RejectReason, str] | None = None
+    requirement = requirement_for(skill)
     for target in candidates:
         failure = candidate_rejection(
-            actor, context, skill.target_requirement, target
+            actor, context, requirement, target
         )
         if failure is None:
             valid.append(target)
@@ -332,7 +334,7 @@ def revalidate_submission(
             if len(targets) != 1:
                 raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
             failure = candidate_rejection(
-                actor, context, skill.target_requirement, targets[0]
+                actor, context, requirement_for(skill), targets[0]
             )
             if failure is not None:
                 raise RejectedAction(*failure)

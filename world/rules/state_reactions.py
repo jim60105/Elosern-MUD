@@ -13,9 +13,11 @@ list with disjoint action ownership:
 """
 
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 
 from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
+from world.rules.phase_hooks import register_phase_dispatcher
 
 _RULES_PATH = Path(__file__).parent / "rulebook" / "state_reactions.yaml"
 
@@ -187,6 +189,108 @@ def is_empowered(actor: Any, marker: str, rules: list[Rule] | None = None) -> bo
     return True
 
 
+def compute_state_magnitude(magnitude: Any, entity: Any, actor: Any | None = None) -> float:
+    """Interpret one declared ``StateMagnitude`` against live entity state.
+
+    The runtime-rule half of state-derived magnitude: sampling stored
+    arousal/effective-exposure state and consulting empowerment lives here,
+    on the rules side. ``world.skills.effects.StateMagnitude`` keeps only the
+    declarative fields and pure shape validation, so the definition module
+    never reaches into rules or the persistent attribute handler.
+    """
+    from math import isfinite
+
+    from world.lore.sexual_vocab import AROUSAL_LEVELS, EXPOSURE_LEVELS
+    from world.rules.equipment_effects import effective_exposure
+    from world.rules.stored_sexual_reads import StoredLevel
+    from world.rules.sexual_state import PLEASURE_CONFIG
+
+    empowerment_actor = actor if actor is not None else entity
+    if magnitude.marker is not None and is_empowered(empowerment_actor, magnitude.marker):
+        if magnitude.maximum is not None:
+            if not isfinite(magnitude.maximum) or magnitude.maximum <= 0:
+                raise ValueError(
+                    f"StateMagnitude maximum must be positive, got {magnitude.maximum}"
+                )
+            return float(magnitude.maximum)
+
+    field_name = "effective_exposure" if magnitude.field == "exposure" else magnitude.field
+    ordinal = 0
+
+    if field_name == "arousal":
+        sexual = getattr(entity, "__dict__", {}).get("sexual")
+        if sexual is not None:
+            ordinal = sexual.arousal.value
+        else:
+            traits = (
+                entity.attributes.get("sexual_traits", default=None, category="traits")
+                if hasattr(entity, "attributes")
+                else None
+            )
+            if isinstance(traits, Mapping) and "pleasure" in traits:
+                raw = traits["pleasure"]
+                base = raw.get("base") if isinstance(raw, Mapping) else None
+                if isinstance(base, int) and not isinstance(base, bool):
+                    base = min(100, max(0, base))
+                    ordinal = PLEASURE_CONFIG.ordinal_for(base)
+            else:
+                baseline = (
+                    entity.attributes.get("sexual", default=None)
+                    if hasattr(entity, "attributes")
+                    else None
+                )
+                if isinstance(baseline, Mapping) and "arousal" in baseline:
+                    val = baseline["arousal"]
+                    if val in AROUSAL_LEVELS:
+                        ordinal = AROUSAL_LEVELS.index(val)
+    elif field_name == "effective_exposure":
+        eff = effective_exposure(entity)
+        if isinstance(eff, StoredLevel):
+            ordinal = eff.value
+        elif isinstance(eff, str) and eff in EXPOSURE_LEVELS:
+            ordinal = EXPOSURE_LEVELS.index(eff)
+
+    val = magnitude.base + magnitude.per_ordinal * ordinal
+    if magnitude.maximum is not None:
+        val = min(val, magnitude.maximum)
+    if (
+        not isfinite(val)
+        or val < 0
+        or (magnitude.base > 0 and val <= 0)
+    ):
+        raise ValueError(
+            f"StateMagnitude computed non-positive or non-finite value: {val}"
+        )
+    return float(val)
+
+
+def validate_skill_markers(registry: dict[str, Any] | None = None) -> None:
+    """Fail closed when a shipped skill declares an unconfigured marker.
+
+    The configured-marker vocabulary is owned here (buff definitions plus
+    declared reaction rules), so the check runs on the rules side at load:
+    ``world.skills`` validates marker *shape* only, and the authority that
+    knows which markers exist rejects unresolved ones — never from the
+    definition module, which would force a skills→rules import.
+    """
+    if registry is None:
+        from world.skills.registry import SKILL_REGISTRY
+
+        registry = SKILL_REGISTRY
+    for skill_key, skill in registry.items():
+        for policy in skill.effect_policies:
+            for mag in (policy.magnitude, policy.stimulus_bonus):
+                if mag is not None and mag.marker is not None:
+                    if not is_configured_marker(mag.marker):
+                        raise ValueError(
+                            f"skill {skill_key!r} declares unresolved configured "
+                            f"marker {mag.marker!r}"
+                        )
+
+
+validate_skill_markers()
+
+
 def dispatch_phase_reaction(
     entity: Any,
     from_phase: str,
@@ -289,3 +393,10 @@ def dispatch_outcome_reaction(
 
                 if gain > 0:
                     apply_pleasure_gain(entity, gain)
+
+
+# Publish the phase dispatcher into the dependency leaf so the canonical
+# phase setter reaches it without importing this module (F9'): the import is
+# the registration, and the production bootstrap path force-imports this
+# module at server start, making the edge explicit rather than lazy.
+register_phase_dispatcher(dispatch_phase_reaction)

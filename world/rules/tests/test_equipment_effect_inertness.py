@@ -58,6 +58,12 @@ _ALLOWLIST = frozenset(
         # equipment rows carry the P3 adjustment summary, so the presenter
         # consumes the display-text accessor like the other prose surfaces.
         Path("web/webclient/presentation/character.py"),
+        # F6/F7 boundary cutover: the rules-side state-magnitude interpreter
+        # (world.rules.state_reactions.compute_state_magnitude) samples the
+        # effective-exposure accessor for exposure-derived magnitudes — the
+        # gameplay-reader role the world/skills definition module was never
+        # allowed to hold. It is a sanctioned consumer of the accessor only.
+        Path("world/rules/state_reactions.py"),
     }
 )
 _MODULE = "world.rules.equipment_effects"

@@ -413,7 +413,7 @@ def _check_combat_traits(record: dict[str, Any]) -> list[Issue]:
     traits = record.get("combat_traits")
     if traits is None:
         return []
-    from world.rules.traits import COMBAT_TRAITS_VOCABULARY
+    from world.lore.combat_traits import COMBAT_TRAITS_VOCABULARY
 
     if isinstance(traits, (str, bytes)) or not isinstance(traits, Iterable):
         return [Issue("combat_traits", "combat_traits must be a sequence of strings")]

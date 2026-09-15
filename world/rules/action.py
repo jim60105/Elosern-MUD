@@ -61,6 +61,7 @@ from world.rules.targeting import (
     ActionContext,
     Relation,
     expand_target_shorthand,
+    requirement_for,
     resolve_targets,
 )
 from world.skills.cost_tiers import is_freeform_eligible
@@ -400,7 +401,7 @@ def _step3_targeting(
     if skill.target_spec is TargetSpec.SELF and not candidates:
         candidates = [request.actor]
     return resolve_targets(
-        request.actor, request.context, skill.target_requirement, candidates
+        request.actor, request.context, requirement_for(skill), candidates
     )
 
 
@@ -1681,7 +1682,9 @@ def _handle_stimulus(
         base_delta = _stimulus_rng.randint(lo, hi)
         bonus = 0.0
         if recipient is not actor and stimulus_bonus is not None:
-            bonus = stimulus_bonus.compute(actor, actor=actor)
+            from world.rules.state_reactions import compute_state_magnitude
+
+            bonus = compute_state_magnitude(stimulus_bonus, actor, actor=actor)
 
         pleasure_pct = equipment_pleasure_gain(recipient)
         total_gain = max(0, round((base_delta + bonus) * (1 + pleasure_pct / 100)))
@@ -1742,7 +1745,11 @@ def _bind_resolved_effect(
         )
         if entity is not None:
             try:
-                computed_magnitude = policy.magnitude.compute(entity, actor=actor)
+                from world.rules.state_reactions import compute_state_magnitude
+
+                computed_magnitude = compute_state_magnitude(
+                    policy.magnitude, entity, actor=actor
+                )
                 policy = replace(policy, coefficient=computed_magnitude)
             except Exception as error:
                 raise RejectedAction(

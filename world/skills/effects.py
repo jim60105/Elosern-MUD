@@ -403,68 +403,6 @@ class StateMagnitude:
                 raise ValueError(
                     f"StateMagnitude with marker requires positive maximum, got {self.maximum!r}"
                 )
-            from world.rules.state_reactions import is_configured_marker
-
-            if not is_configured_marker(self.marker):
-                raise ValueError(f"unresolved configured marker {self.marker!r}")
-
-    def compute(self, entity: Any, actor: Any | None = None) -> float:
-        """Sample entity state and compute the magnitude value."""
-        from world.lore.sexual_vocab import AROUSAL_LEVELS, EXPOSURE_LEVELS
-        from world.rules.equipment_effects import effective_exposure
-        from world.rules.stored_sexual_reads import StoredLevel
-        from world.rules.sexual_state import PLEASURE_CONFIG
-        from world.rules.state_reactions import is_empowered
-
-        empowerment_actor = actor if actor is not None else entity
-        if self.marker is not None and is_empowered(empowerment_actor, self.marker):
-            if self.maximum is not None:
-                if not isfinite(self.maximum) or self.maximum <= 0:
-                    raise ValueError(f"StateMagnitude maximum must be positive, got {self.maximum}")
-                return float(self.maximum)
-
-        field_name = "effective_exposure" if self.field == "exposure" else self.field
-        ordinal = 0
-
-        if field_name == "arousal":
-            sexual = getattr(entity, "__dict__", {}).get("sexual")
-            if sexual is not None:
-                ordinal = sexual.arousal.value
-            else:
-                traits = (
-                    entity.attributes.get("sexual_traits", default=None, category="traits")
-                    if hasattr(entity, "attributes")
-                    else None
-                )
-                if isinstance(traits, Mapping) and "pleasure" in traits:
-                    raw = traits["pleasure"]
-                    base = raw.get("base") if isinstance(raw, Mapping) else None
-                    if isinstance(base, int) and not isinstance(base, bool):
-                        base = min(100, max(0, base))
-                        ordinal = PLEASURE_CONFIG.ordinal_for(base)
-                else:
-                    baseline = (
-                        entity.attributes.get("sexual", default=None)
-                        if hasattr(entity, "attributes")
-                        else None
-                    )
-                    if isinstance(baseline, Mapping) and "arousal" in baseline:
-                        val = baseline["arousal"]
-                        if val in AROUSAL_LEVELS:
-                            ordinal = AROUSAL_LEVELS.index(val)
-        elif field_name == "effective_exposure":
-            eff = effective_exposure(entity)
-            if isinstance(eff, StoredLevel):
-                ordinal = eff.value
-            elif isinstance(eff, str) and eff in EXPOSURE_LEVELS:
-                ordinal = EXPOSURE_LEVELS.index(eff)
-
-        val = self.base + self.per_ordinal * ordinal
-        if self.maximum is not None:
-            val = min(val, self.maximum)
-        if not isfinite(val) or val < 0 or (self.base > 0 and val <= 0):
-            raise ValueError(f"StateMagnitude computed non-positive or non-finite value: {val}")
-        return float(val)
 
 
 @dataclass(frozen=True)
@@ -553,7 +491,7 @@ class DamagePolicy:
                 f"DamagePolicy predicate must be a sequence of strings, got {type(self.predicate).__name__}"
             )
         from world.lore.elements import ELEMENT_REGISTRY
-        from world.rules.traits import COMBAT_TRAITS_VOCABULARY
+        from world.lore.combat_traits import COMBAT_TRAITS_VOCABULARY
 
         validated_predicate: list[str] = []
         seen: set[str] = set()
@@ -635,7 +573,7 @@ class DamagePolicy:
                 raise ValueError(
                     f"DamagePolicy repeat_when must be a string or None, got {type(self.repeat_when).__name__}"
                 )
-            from world.rules.action_evidence import EVIDENCE_KINDS
+            from world.lore.action_evidence import EVIDENCE_KINDS
 
             if self.repeat_when not in EVIDENCE_KINDS:
                 raise ValueError(

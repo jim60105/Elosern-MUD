@@ -3,7 +3,7 @@
 The resolver consumes a definition-owned ``TargetRequirement`` value — the
 target shape, the faction constraint, and the forbid-self rule — and knows
 nothing about what produced it. Skills reach the pipeline through
-``SkillDef.target_requirement``; any other definition that can describe the
+``requirement_for(skill)``; any other definition that can describe the
 same three rules (for example a usable item's declared scope) constructs a
 requirement directly and reuses the identical presence/alive/range/faction
 pipeline without owning or fabricating a skill. No validator, resolver, or
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
-from world.skills.registry import FactionConstraint, TargetSpec
+from world.skills.registry import FactionConstraint, SkillCategory, SkillDef, TargetSpec
 
 
 # The approved deterministic AREA shorthands accepted in combat.
@@ -30,7 +30,7 @@ class TargetRequirement:
     together: the target shape (``spec``), the faction constraint
     (``faction``, default ``ANY``), and the self-target prohibition
     (``forbid_self``, default ``False``). The definition being acted on
-    produces it — ``SkillDef.target_requirement`` for skills, direct
+    produces it — ``requirement_for(skill)`` for skills, direct
     construction for any other caller — never the calling request. The item
     scopes of the approved item-effect model map onto the four distinct
     shapes covering five scopes: ``SELF``/``SELF_ONLY``, ``SINGLE``/``ANY``,
@@ -41,6 +41,23 @@ class TargetRequirement:
     spec: TargetSpec
     faction: FactionConstraint = FactionConstraint.ANY
     forbid_self: bool = False
+
+
+def requirement_for(skill: SkillDef) -> TargetRequirement:
+    """The targeting rule one skill definition states.
+
+    ``forbid_self`` states the definition's own prohibition on targeting the
+    actor — every ``SEXUAL_ACT`` skill declares it (their SINGLE-target acts
+    are two-participant by construction), and the resolver merely enforces
+    the flag it is given. The derivation lives on the rules side so the
+    definition module never depends on this one; the resolver still consumes
+    the plain value, never the definition.
+    """
+    return TargetRequirement(
+        skill.target_spec,
+        skill.faction_constraint,
+        forbid_self=skill.category is SkillCategory.SEXUAL_ACT,
+    )
 
 
 class Relation(StrEnum):
