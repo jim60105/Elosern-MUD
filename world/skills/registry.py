@@ -25,6 +25,8 @@ from world.skills.effects import (
     DivinePleasureMaxEffect,
     EffectAudience,
     EffectPolicy,
+    GaugeTransferEffect,
+    GaugeTransferPolicy,
     HealEffect,
     InteractionPolicy,
     MarkSubmissionEffect,
@@ -424,6 +426,33 @@ class SkillDef:
                     raise ValueError(
                         f"skill {self.key!r} TARGET-subject magnitude requires SINGLE or SELF target_spec"
                     )
+            if isinstance(parsed, GaugeTransferEffect):
+                if policy.coefficient != 1.0:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support "
+                        f"potency coefficient {policy.coefficient}"
+                    )
+                if policy.damage is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is a GaugeTransferEffect and cannot declare DamagePolicy"
+                    )
+                if policy.magnitude is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} does not support state magnitude"
+                    )
+                if policy.stimulus_bonus is not None:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {effect_id!r} is a GaugeTransferEffect and cannot declare stimulus_bonus"
+                    )
+                if policy.transfer is not None:
+                    if parsed.direction == "drain" and policy.transfer.restore_bonus_per_stack:
+                        raise ValueError(
+                            f"skill {self.key!r} effect {effect_id!r} is a drain and cannot declare restore_bonus_per_stack"
+                        )
+            if policy.transfer is not None and not isinstance(parsed, GaugeTransferEffect):
+                raise ValueError(
+                    f"skill {self.key!r} effect {effect_id!r} is not a GaugeTransferEffect and cannot declare GaugeTransferPolicy"
+                )
 
     def _validate_heal_shape(self) -> None:
         """Reject a heal shape that contradicts the skill's target spec.
