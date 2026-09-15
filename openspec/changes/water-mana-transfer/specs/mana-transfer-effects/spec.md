@@ -30,8 +30,8 @@ A drain SHALL decrease the target through the canonical MP writer — dispatchin
 A restore SHALL move its authored fixed amount plus one bonus per ACTIVE instance of each explicitly declared marker key counted on the CASTER, through the canonical writer's increase leg, clamped at each recipient's MP maximum. Restore SHALL never dispatch a depletion event, SHALL count the caster's own instances (never the recipient's), and SHALL read counts from stored buff state without materializing handlers on preview paths.
 
 #### Scenario: Per-stack bonus reads the caster
-- **WHEN** a synthetic restore with a declared marker bonus runs from a caster holding three active instances while the recipient holds none
-- **THEN** the recipient's pool gains base plus three bonuses and the same cast from a marker-free caster gains base only
+- **WHEN** a synthetic restore with a declared marker bonus runs from a caster holding one active instance of each of three declared marker keys while the recipient holds none
+- **THEN** the recipient's pool gains base plus one bonus per present key and the same cast from a marker-free caster gains base only
 
 #### Scenario: Overflow clamps without loss elsewhere
 - **WHEN** an area restore pushes one ally over their maximum while another gains fully
