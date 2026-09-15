@@ -23,6 +23,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from world.rules.action import (
@@ -143,24 +144,28 @@ class MpFlowTestBase(EvenniaTest):
 class WriterClampingAndDeltaTests(MpFlowTestBase):
     """Scenario: Every authored MP decrease flows through one canonical writer returning the actual change."""
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_decreases_and_returns_signed_actual_delta(self):
         self.target.traits.mp.current = 50
         delta = apply_mp_change(self.target, -20)
         self.assertEqual(delta, -20)
         self.assertEqual(int(self.target.traits.mp.current), 30)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_clamps_at_zero_and_reports_available_amount(self):
         self.target.traits.mp.current = 15
         delta = apply_mp_change(self.target, -50)
         self.assertEqual(delta, -15)
         self.assertEqual(int(self.target.traits.mp.current), 0)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_clamps_at_maximum_and_returns_actual_gain(self):
         self.target.traits.mp.current = 80
         delta = apply_mp_change(self.target, 50)
         self.assertEqual(delta, 20)
         self.assertEqual(int(self.target.traits.mp.current), 100)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_clamped_noop_returns_zero(self):
         self.target.traits.mp.current = 0
         delta = apply_mp_change(self.target, -10)
@@ -172,12 +177,14 @@ class WriterClampingAndDeltaTests(MpFlowTestBase):
         self.assertEqual(delta, 0)
         self.assertEqual(int(self.target.traits.mp.current), 100)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_invalid_delta_type_raises(self):
         for invalid in (5.5, -3.2, True, False, "10"):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(TypeError):
                     apply_mp_change(self.target, invalid)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_apply_mp_change_missing_traits_fails_closed(self):
         class BareObject:
             pass
@@ -185,6 +192,7 @@ class WriterClampingAndDeltaTests(MpFlowTestBase):
         with self.assertRaises(AttributeError):
             apply_mp_change(BareObject(), -10)
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_item_mp_step_routes_through_canonical_writer(self):
         from world.rules.items import GaugeAdjustEffect, ItemEffectStep, ItemStat, _apply_gauge_step
 
@@ -209,6 +217,7 @@ class WriterClampingAndDeltaTests(MpFlowTestBase):
 class ExactlyOnceCrossingTests(MpFlowTestBase):
     """Scenario: MP reaching zero via a decrease dispatches one attributed outcome event exactly once."""
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_dispatches_once_on_crossing_from_positive_to_zero(self):
         self.target.traits.mp.current = 30
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -221,6 +230,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
                 source_skill="synth_skill",
             )
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_does_not_dispatch_when_already_zero(self):
         self.target.traits.mp.current = 0
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -228,6 +238,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
             self.assertEqual(delta, 0)
             mock_dispatch.assert_not_called()
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_does_not_dispatch_on_increase(self):
         self.target.traits.mp.current = 0
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -235,6 +246,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
             self.assertEqual(delta, 20)
             mock_dispatch.assert_not_called()
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_does_not_dispatch_when_delta_leaves_mp_positive(self):
         self.target.traits.mp.current = 50
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -242,6 +254,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
             self.assertEqual(delta, -20)
             mock_dispatch.assert_not_called()
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_dispatches_again_on_renewed_crossing(self):
         self.target.traits.mp.current = 30
         dispatches = []
@@ -269,6 +282,7 @@ class ExactlyOnceCrossingTests(MpFlowTestBase):
 class SourceAttributionTests(MpFlowTestBase):
     """Scenario: Tier fallback matches the hp-loss convention and preserves attribution."""
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_event_carries_authored_source_skill_and_tier(self):
         self.target.traits.mp.current = 40
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -285,6 +299,7 @@ class SourceAttributionTests(MpFlowTestBase):
                 source_skill="synth_custom_drain",
             )
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_event_unattributed_falls_back_to_apprentice_rung(self):
         self.target.traits.mp.current = 20
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -296,6 +311,7 @@ class SourceAttributionTests(MpFlowTestBase):
                 source_skill=None,
             )
 
+    @covers_requirement("mp-state-feedback::mp-reaching-zero-via-a-decrease-dispatches-one-attributed-outcome-event-exactly-once")
     def test_mp_zero_event_resolves_tier_from_elemental_spell(self):
         spell = self._register_synth_skill(
             _make_synth_skill(
@@ -319,6 +335,7 @@ class SourceAttributionTests(MpFlowTestBase):
 class RemoveMpTests(MpFlowTestBase):
     """Scenario: remove_mp is the drain-all writer entry."""
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_remove_mp_drains_all_and_dispatches_crossing(self):
         self.target.traits.mp.current = 45
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -336,6 +353,7 @@ class RemoveMpTests(MpFlowTestBase):
                 source_skill="synth_drain_all",
             )
 
+    @covers_requirement("mp-state-feedback::every-authored-mp-decrease-flows-through-one-canonical-writer-returning-the-actual-change")
     def test_remove_mp_when_already_zero_returns_zero_and_no_dispatch(self):
         self.target.traits.mp.current = 0
         with patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch:
@@ -347,6 +365,7 @@ class RemoveMpTests(MpFlowTestBase):
 class BuffEngineMpRoutingTests(MpFlowTestBase):
     """Scenario: Buff engine mp-target ticks route through the writer with persisted attribution."""
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_buff_rate_mp_tick_routes_through_writer_and_dispatches_on_crossing(self):
         # Register synthetic mp-rate DoT buff
         buff_def = self._register_synth_buff(
@@ -388,6 +407,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
                 source_skill="synth_dot_caster_skill",
             )
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_hp_rate_tick_dispatches_hp_loss_and_never_mp_zero(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
@@ -412,6 +432,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
                 source_tier=T_ADEPT,
             )
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_buff_rate_positive_mp_tick_does_not_dispatch(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
@@ -431,6 +452,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
             self.assertEqual(int(self.target.traits.mp.current), 10)
             mock_dispatch.assert_not_called()
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_buff_cache_persists_grant_time_source_skill_and_source_pk(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
@@ -470,6 +492,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
         self.assertEqual(getattr(buff_instance, "source_pk", None), int(self.actor.pk))
         self.assertEqual(getattr(buff_instance, "source_skill", None), skill.key)
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_reapplication_replaces_source_skill_and_refresh_retains(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
@@ -518,6 +541,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
         self.assertEqual(self.target.buffs.all[buff_def.key].source_skill, skill2.key)
         self.assertEqual(self.target.buffs.all[buff_def.key].source_pk, int(other.pk))
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_load_buff_definitions_rejects_non_integer_mp_rate_delta(self):
         from pathlib import Path
         import tempfile
@@ -547,6 +571,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
 class CastCostDeductionTests(MpFlowTestBase):
     """Scenario: Cast-cost payment is a routed write on the staged deduction."""
 
+    @covers_requirement("mp-state-feedback::cast-cost-payment-is-a-routed-write-on-the-staged-deduction")
     def test_cast_cost_payment_to_zero_dispatches_attributed_mp_zero(self):
         skill = self._register_synth_skill(
             _make_synth_skill(
@@ -579,6 +604,7 @@ class CastCostDeductionTests(MpFlowTestBase):
                 source_skill=skill.key,
             )
 
+    @covers_requirement("mp-state-feedback::cast-cost-payment-is-a-routed-write-on-the-staged-deduction")
     def test_cast_cost_rejection_mutates_no_mp_and_dispatches_no_event(self):
         skill = self._register_synth_skill(
             _make_synth_skill(
@@ -604,6 +630,7 @@ class CastCostDeductionTests(MpFlowTestBase):
             self.assertEqual(int(self.actor.traits.mp.current), 50)
             mock_dispatch.assert_not_called()
 
+    @covers_requirement("mp-state-feedback::cast-cost-payment-is-a-routed-write-on-the-staged-deduction")
     def test_self_cast_cost_payment_to_zero_suffocates_if_qualified(self):
         """Accepted global-fact given: payer and drain victim are not distinguished by rule layer."""
         skill = self._register_synth_skill(
@@ -642,6 +669,7 @@ class CastCostDeductionTests(MpFlowTestBase):
 class RuleLayerSourceFilteringTests(MpFlowTestBase):
     """Scenario: Depletion rules filter the event's source at the rule layer, never by suppressing dispatch."""
 
+    @covers_requirement("mp-state-feedback::depletion-rules-filter-the-event-s-source-at-the-rule-layer-never-by-suppressing-dispatch")
     def test_rule_layer_source_filtering_qualified_vs_unqualified(self):
         drain_skill = self._register_synth_skill(
             _make_synth_skill("synth_qualifying_drain", element="water", cost={"mp": 24})
@@ -674,6 +702,7 @@ class RuleLayerSourceFilteringTests(MpFlowTestBase):
         self.assertEqual(int(self.target.traits.mp.current), 0)
         self.assertIn("suffocated", entity_active_buffs(self.target))
 
+    @covers_requirement("mp-state-feedback::depletion-rules-filter-the-event-s-source-at-the-rule-layer-never-by-suppressing-dispatch")
     def test_event_source_skill_missing_source_fails_closed(self):
         drain_skill = self._register_synth_skill(
             _make_synth_skill("synth_qualifying_drain_2", element="water", cost={"mp": 24})
@@ -689,6 +718,7 @@ class RuleLayerSourceFilteringTests(MpFlowTestBase):
         apply_mp_change(self.target, -10, source_skill=None)
         self.assertNotIn("suffocated", entity_active_buffs(self.target))
 
+    @covers_requirement("mp-state-feedback::depletion-rules-filter-the-event-s-source-at-the-rule-layer-never-by-suppressing-dispatch")
     def test_alternate_synthetic_rule_reuses_event_source_skill(self):
         """Demonstrates alternate non-water source qualifications reuse the same key with no branching."""
         fire_skill = self._register_synth_skill(
@@ -710,6 +740,7 @@ class RuleLayerSourceFilteringTests(MpFlowTestBase):
 class EquipmentImmunityTests(MpFlowTestBase):
     """Scenario: Immune targets never accumulate the drain."""
 
+    @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")
     def test_equipment_immunity_blocks_mp_dot_grant(self):
         self.assertIn("ebbing", BUFF_DEFINITIONS)
 
@@ -736,6 +767,7 @@ class EquipmentImmunityTests(MpFlowTestBase):
 class TransactionalRollbackTests(MpFlowTestBase):
     """Scenario: Reaction cascades stay in the initiating transaction."""
 
+    @covers_requirement("mp-state-feedback::depletion-rules-filter-the-event-s-source-at-the-rule-layer-never-by-suppressing-dispatch")
     def test_action_pipeline_failure_rolls_back_mp_and_reaction_buff(self):
         skill = self._register_synth_skill(
             _make_synth_skill(
@@ -778,6 +810,7 @@ class TransactionalRollbackTests(MpFlowTestBase):
             self.assertEqual(int(self.actor.traits.mp.current), 50)
             self.assertNotIn("suffocated", entity_active_buffs(self.actor))
 
+    @covers_requirement("mp-state-feedback::depletion-rules-filter-the-event-s-source-at-the-rule-layer-never-by-suppressing-dispatch")
     def test_clock_advance_failure_restores_mp_and_reaction_buff(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
