@@ -456,6 +456,60 @@ def active_buff_keys_from_storage(entity) -> set[str]:
     return active
 
 
+def active_stack_count(arg1: Any, arg2: Any) -> int:
+    """Return the total active stacks for a buff definition key on an entity.
+
+    Accepts either (entity, definition_key) or (definition_key, entity) for
+    ergonomics. Reads stored state without materializing entity.buffs if possible,
+    so preview paths remain side-effect-free.
+    """
+    if isinstance(arg1, str) and not isinstance(arg2, str):
+        definition_key, entity = arg1, arg2
+    else:
+        entity, definition_key = arg1, str(arg2)
+
+    from collections.abc import Mapping
+
+    if hasattr(entity, "attributes") and entity.attributes.has("buffs"):
+        cache = entity.attributes.get("buffs", default={})
+        if isinstance(cache, Mapping):
+            total = 0
+            for buff_cache in cache.values():
+                if not isinstance(buff_cache, Mapping):
+                    continue
+                if buff_cache.get("paused"):
+                    continue
+                if buff_cache.get("definition_key") != definition_key:
+                    continue
+                stacks = buff_cache.get("stacks")
+                if not isinstance(stacks, int) or stacks <= 0:
+                    continue
+                remaining = buff_cache.get("remaining_seconds")
+                if isinstance(remaining, int) and remaining <= 0:
+                    continue
+                total += stacks
+            return total
+
+    if hasattr(entity, "buffs") and hasattr(entity.buffs, "all"):
+        total = 0
+        for buff in entity.buffs.all.values():
+            if getattr(buff, "paused", False):
+                continue
+            if getattr(buff, "definition_key", None) != definition_key:
+                continue
+            if getattr(buff, "remaining_seconds", None) is not None and buff.remaining_seconds <= 0:
+                continue
+            stacks = getattr(buff, "stacks", 0)
+            if isinstance(stacks, int) and stacks > 0:
+                total += stacks
+        return total
+
+    return 0
+
+
+active_marker_stack_count = active_stack_count
+
+
 def _active_buff_instances(entity) -> tuple[RulebookBuff, ...]:
     """Return unpaused game-time-unexpired buff instances with positive stacks."""
     return tuple(
