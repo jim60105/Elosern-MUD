@@ -389,6 +389,10 @@ class ClimaxRollbackTests(EvenniaTest):
                 "world.rules.action_preview.evaluate_combat_modifiers_no_create",
                 return_value={},
             ),
+            patch(
+                "world.rules.action.evaluate_combat_modifiers_no_create",
+                return_value={},
+            ),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.settle_combat_result",

@@ -393,7 +393,7 @@ class AdjustedCostResolverTests(EvenniaTestCase):
         # engine's evaluation seam.
         self.actor.traits.mp.current = 9
         with patch(
-            "world.rules.action.evaluate_combat_modifiers",
+            "world.rules.action.evaluate_combat_modifiers_no_create",
             return_value={"mp_cost": "-10%"},
         ):
             result = ActionResolver.resolve(self._request())
@@ -410,7 +410,7 @@ class AdjustedCostResolverTests(EvenniaTestCase):
     def test_sp_reduction_floors_identically_in_check_and_deduction(self):
         self.actor.traits.sp.current = 9
         with patch(
-            "world.rules.action.evaluate_combat_modifiers",
+            "world.rules.action.evaluate_combat_modifiers_no_create",
             return_value={"sp_cost": "-10%"},
         ):
             result = ActionResolver.resolve(self._request(_SP10_ROW))
@@ -426,7 +426,7 @@ class AdjustedCostResolverTests(EvenniaTestCase):
     def test_adjusted_cost_clamps_at_zero_without_negative_staging(self):
         self.actor.traits.mp.current = 0
         with patch(
-            "world.rules.action.evaluate_combat_modifiers",
+            "world.rules.action.evaluate_combat_modifiers_no_create",
             return_value={"mp_cost": "-100%"},
         ):
             result = ActionResolver.resolve(self._request())
@@ -443,7 +443,7 @@ class AdjustedCostResolverTests(EvenniaTestCase):
     def test_fractional_grant_percentage_floors_deterministically(self):
         self.actor.traits.mp.current = 9
         with patch(
-            "world.rules.action.evaluate_combat_modifiers",
+            "world.rules.action.evaluate_combat_modifiers_no_create",
             return_value={"mp_cost": "-5%"},
         ):
             result = ActionResolver.resolve(self._request())
@@ -458,7 +458,7 @@ class AdjustedCostResolverTests(EvenniaTestCase):
     )
     def test_zero_cost_skill_and_unmapped_resource_keys_are_unchanged(self):
         with patch(
-            "world.rules.action.evaluate_combat_modifiers",
+            "world.rules.action.evaluate_combat_modifiers_no_create",
             return_value={"sp_cost": "-10%"},
         ):
             self.assertEqual(_adjusted_costs(self.actor, _ZERO_COST_ROW), {})

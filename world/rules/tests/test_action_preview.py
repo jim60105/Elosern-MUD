@@ -509,7 +509,7 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
                     return_value=value,
                 ),
                 patch(
-                    "world.rules.action.evaluate_combat_modifiers",
+                    "world.rules.action.evaluate_combat_modifiers_no_create",
                     return_value=value,
                 ),
             ):
@@ -586,7 +586,7 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
                 return_value=bundle,
             ),
             patch(
-                "world.rules.action.evaluate_combat_modifiers",
+                "world.rules.action.evaluate_combat_modifiers_no_create",
                 return_value=bundle,
             ),
         ):

@@ -32,32 +32,35 @@ class NoCombatBranchingTests(unittest.TestCase):
     def test_exactly_the_two_sanctioned_battlefield_gates_exist(self):
         """The two-gate contract: exactly two marked combat-state conditionals.
 
-        The only conditionals in ``action.py`` and ``targeting.py`` that read
-        ``context.battlefield`` to distinguish combat from non-combat
-        behaviour are the usable_out_of_combat gate (resolver site) and the
-        damaging-action gate (shared predicate body in ``targeting.py``,
-        consumed by the resolver and the preview). Each carries its marker
-        comment; the shorthand roster guard reads the battlefield through a
-        local binding and is a capability read sanctioned by the
+        The only conditionals that read ``context.battlefield`` to distinguish
+        combat from non-combat behaviour are the usable_out_of_combat gate
+        (resolver site in ``action.py``) and the damaging-action gate (shared
+        predicate body in ``action_gates.py``, consumed by the resolver and
+        the preview). Each carries its marker comment; the shorthand roster
+        guard in ``targeting.py`` reads the battlefield through a local
+        binding and is a capability read sanctioned by the
         battlefield-action-context spec, not a combat-behaviour branch.
         """
         root = Path(__file__).resolve().parents[3]
         action_src = (root / "world/rules/action.py").read_text(encoding="utf-8")
-        targeting_src = (
-            root / "world/rules/targeting.py"
-        ).read_text(encoding="utf-8")
-        # Exactly one `context.battlefield is None` conditional per file, and
-        # none anywhere else in the two scanned modules.
+        gates_src = (root / "world/rules/action_gates.py").read_text(encoding="utf-8")
+        targeting_src = (root / "world/rules/targeting.py").read_text(encoding="utf-8")
+        # Exactly one `context.battlefield is None` conditional at the resolver
+        # gate site and one in the shared gate body; none anywhere else in the
+        # scanned modules (the shorthand roster guard uses a local binding).
         self.assertEqual(
             action_src.count("context.battlefield is None"), 1, "action.py"
         )
         self.assertEqual(
-            targeting_src.count("context.battlefield is None"), 1, "targeting.py"
+            gates_src.count("context.battlefield is None"), 1, "action_gates.py"
+        )
+        self.assertEqual(
+            targeting_src.count("context.battlefield is None"), 0, "targeting.py"
         )
         # Each gate is explicitly marked at its site.
         self.assertIn("Sanctioned combat-state gate 1 of 2", action_src)
         self.assertIn("Sanctioned combat-state gate site 2 of 2", action_src)
-        self.assertIn("Sanctioned combat-state gate body", targeting_src)
+        self.assertIn("Sanctioned combat-state gate body", gates_src)
 
     def test_public_callables_have_no_combat_shaped_parameters(self):
         forbidden = {"in_combat", "combat_state", "turn", "is_combat"}
