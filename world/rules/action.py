@@ -616,6 +616,9 @@ def _handle_buff_apply(
         kwargs["source_pk"] = int(pk)
         if source_skill is not None:
             kwargs["source_skill"] = getattr(source_skill, "key", str(source_skill))
+    if definition is not None and "divert" in definition.modifiers:
+        if source_skill is not None:
+            kwargs.setdefault("source_skill", getattr(source_skill, "key", str(source_skill)))
     if definition is not None and get_recovery_policy(definition) is not None:
         from world.rules.combat_modifiers import evaluate_combat_modifiers
         caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
@@ -736,6 +739,9 @@ def _handle_self_buff_apply(
         kwargs["source_pk"] = int(pk)
         if source_skill is not None:
             kwargs["source_skill"] = getattr(source_skill, "key", str(source_skill))
+    if definition is not None and "divert" in definition.modifiers:
+        if source_skill is not None:
+            kwargs.setdefault("source_skill", getattr(source_skill, "key", str(source_skill)))
     if definition is not None and get_recovery_policy(definition) is not None:
         from world.rules.combat_modifiers import evaluate_combat_modifiers
         caster_mods = evaluate_combat_modifiers(actor) if actor is not None else {}
@@ -2271,6 +2277,7 @@ _ENTRY_TEMPLATES = {
     "pleasure_peak": "{actor} 使 {target} 的快感推至頂點。",
     "gauge_transfer": "{actor} 對 {target} 發動了量表轉移。",
     "gauge_transfer_actor": "",
+    "damage_divert": "",
 }
 
 
@@ -2390,6 +2397,8 @@ def _entries_from_effect(
         # draining themselves.
         return ()
     elif kind == "gauge_transfer_actor":
+        return ()
+    elif kind == "damage_divert":
         return ()
     elif kind == "gauge_transfer":
         data = {
