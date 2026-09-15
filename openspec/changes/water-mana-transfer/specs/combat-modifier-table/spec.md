@@ -11,10 +11,10 @@ marker buffs added by the MP-depletion reaction wave (a suffocation marker, and 
 water wave binds through the table) SHALL join as ordinary `buff_active`-origin rows carrying the
 existing `actions_per_turn: 0` bundle value — no new bundle key, no marker-specific consumer code —
 and every new rule ID SHALL keep the one-unit-test correspondence the table already enforces.
-The mana-transfer wave SHALL extend the merged bundle with exactly two further generic leaf values
+The gauge-transfer wave SHALL extend the merged bundle with exactly two further generic leaf values
 following the existing heterogeneous-value posture: `{gauge}_regen_scale` (a per-gauge regen
 multiplier consumed only by the world-clock regen stage) and `recovery_share_bonus` (an additive
-drain-recovery share bonus consumed only by the mana-transfer caster-share read site). Both SHALL be
+drain-recovery share bonus consumed only by the gauge-transfer caster-share read site, folded gauge-agnostically). Both SHALL be
 produced by ordinary `buff_active`-origin rows, SHALL be absent-by-default rather than defaulted in
 table code, and SHALL NOT introduce a marker-specific consumer, an element name, or a skill key
 anywhere in the table or its evaluation module.

@@ -21,20 +21,20 @@ Final data-only integration of the water wave: the 14-node tree of `docs/lore/sk
 
 | Node (key) | 節點數據 (water.md) | Delivered by |
 |---|---|---|
-| 潮引術 `tide_pull` | 單體 11MP；命中 −5 MP，施法者回收一半，cap 3 | `mana_transfer:drain:fixed:5` + `ManaTransferPolicy(caster_recovery_share=0.5)`; cap = reverse-edge derivation (existing); prerequisite root |
+| 潮引術 `tide_pull` | 單體 11MP；命中 −5 MP，施法者回收一半，cap 3 | `gauge_transfer:mp:drain:fixed:5` + `GaugeTransferPolicy(caster_recovery_share=0.5)`; cap = reverse-edge derivation (existing); prerequisite root |
 | 潮退侵蝕 `ebbing_blight` | 術師 24MP；附加潮退 −5/10 s 60 s，流失不回收 | damage component + `buff_apply:ebbing` (rate {mp,−5} row from change 1); no share (流失量不回收 = no policy) |
 | 水膜護身 `water_shield` | 術師 22MP 單體(自)；受擊 MP 代扣 30 %、上限 30、60 s | `self_buff_apply:water_film` (divert {mp,0.3,cap 30} row from change 3; inert bounds row deleted there) |
-| 回流之環 `ring_of_reflux` | 大師 42MP 單體(友)；恢復 MP 40（`mana_restore` 量級）＋施法者每層潮退 +10 | `mana_transfer:restore:fixed:40` + `ManaTransferPolicy(restore_bonus_per_stack=(ebbing 三 tier keys, +10))` (change 2 caster-side count) |
+| 回流之環 `ring_of_reflux` | 大師 42MP 單體(友)；恢復 MP 40（`mana_restore` 量級）＋施法者每層潮退 +10 | `gauge_transfer:mp:restore:fixed:40` + `GaugeTransferPolicy(restore_bonus_per_stack=(ebbing 三 tier keys, +10))` (change 2 caster-side count) |
 | 溺潮 `drowned_surging` | 賢者 78MP 單體；潮退 −18/10 s 60 s；歸零→窒息 40 s；MP 上限為零→等值水傷 | `buff_apply:ebbing_maelstrom` (change 1 row) + suffocation reaction rule (change 1: `mp_zero` event + `event_source_skill` qualification to this node — the row's authored home; the rule layer, not dispatch, filters source per the global-fact given) + max-zero redirect: `damage:water:magic` component gated by change 2's `audience_condition: mp_max_zero` — **placement: cast/effect composition side, NOT the reaction engine** |
-| 枯海之印 `sigil_of_the_barren_sea` | 主宰 135MP；4.0 處決級（無視防禦）＋移除全部 MP＋60 s 無法恢復 MP | `damage:water:magic` coefficient 4.0 + `DamagePolicy(bypass_defense=True, predicate=())` (unconditional execution bypass shipped change 2) + `mana_transfer:drain:all` + `buff_apply:mp_regen_lock` (change 2 regen-scale-0 row) |
-| 深淵潮汛 `abyssal_surge` | 賢者 82MP 範圍(友)；我方全體 +25 MP，各附著「回流」60 s：其後潮引系命中敵方額外回收 10 % | `mana_transfer:restore:fixed:25` (ALLY audience) + `buff_apply:mana_reflux` (change 2 `recovery_share_bonus: 0.1` bundle row; family scope is DATA — only share-authoring nodes consume the value) |
+| 枯海之印 `sigil_of_the_barren_sea` | 主宰 135MP；4.0 處決級（無視防禦）＋移除全部 MP＋60 s 無法恢復 MP | `damage:water:magic` coefficient 4.0 + `DamagePolicy(bypass_defense=True, predicate=())` (unconditional execution bypass shipped change 2) + `gauge_transfer:mp:drain:all` + `buff_apply:mp_regen_lock` (change 2 regen-scale-0 row) |
+| 深淵潮汛 `abyssal_surge` | 賢者 82MP 範圍(友)；我方全體 +25 MP，各附著「回流」60 s：其後潮引系命中敵方額外回收 10 % | `gauge_transfer:mp:restore:fixed:25` (ALLY audience) + `buff_apply:mana_reflux` (change 2 `recovery_share_bonus: 0.1` bundle row; family scope is DATA — only share-authoring nodes consume the value) |
 | 水箭術 `water_bolt` | 學徒 12MP；1.0 | `damage:water:magic` coefficient 1.0 (root; existing damage stage) |
 | 深流刺 `deep_current_spike` | 術師 24MP；1.4 | coefficient 1.4 |
 | 深海漩渦 `abyssal_whirlpool` | 大師 50MP 範圍；1.4＋潮退 −12/10 s 60 s＋束縛 | coefficient 1.4 + `buff_apply:ebbing_deep` + `buff_apply:water_bind` (bind → `actions_per_turn: 0` lock row shipped change 1; key re-homed, no alias) |
-| 深淵巨口 `abyssal_maw` | 賢者 80MP；2.8，命中吸取目標現有 MP 20 % 轉入施法者 | coefficient 2.8 + `mana_transfer:drain:fraction:0.2` + policy share 1.0 (轉入施法者 = full actual amount returned) |
+| 深淵巨口 `abyssal_maw` | 賢者 80MP；2.8，命中吸取目標現有 MP 20 % 轉入施法者 | coefficient 2.8 + `gauge_transfer:mp:drain:fraction:0.2` + policy share 1.0 (轉入施法者 = full actual amount returned) |
 | 海嘯術 `tsunami` | 賢者 95MP 範圍；2.0 | coefficient 2.0 |
 | 深淵巨潮 `abyssal_tide` | 主宰 145MP 範圍；2.8 毀滅級 | coefficient 2.8 + `DamagePolicy(max_hp_fraction=0.10)` (existing devastation rider) |
-| 深海神格 `abyssal_heart` | 主宰(神格) 230MP；對敵 3.8 毀滅級＋抽乾全體敵方全部 MP；我方全體以 abyssal_surge 全量歸還（取予同源） | take-and-give composite: ENEMIES audience `damage:water:magic` 3.8 + devastation policy + `mana_transfer:drain:all`; ALLIES audience `mana_transfer:restore:fixed:25` (= abyssal_surge 全量, per 節點設計「灌滿」= surge's authored 25, the tree's own cross-reference). Two prerequisites (sigil Lv.10 + tide Lv.10) ride the existing n-ary DAG + capstone gate. Prerequisite note: the tree draws abyssal_surge as a convergence feeder, but the node table's 前置條件 column lists only 枯海之印＋深淵巨潮 — the data column is authority for edges |
+| 深海神格 `abyssal_heart` | 主宰(神格) 230MP；對敵 3.8 毀滅級＋抽乾全體敵方全部 MP；我方全體以 abyssal_surge 全量歸還（取予同源） | take-and-give composite: ENEMIES audience `damage:water:magic` 3.8 + devastation policy + `gauge_transfer:mp:drain:all`; ALLIES audience `gauge_transfer:mp:restore:fixed:25` (= abyssal_surge 全量, per 節點設計「灌滿」= surge's authored 25, the tree's own cross-reference). Two prerequisites (sigil Lv.10 + tide Lv.10) ride the existing n-ary DAG + capstone gate. Prerequisite note: the tree draws abyssal_surge as a convergence feeder, but the node table's 前置條件 column lists only 枯海之印＋深淵巨潮 — the data column is authority for edges |
 
 cap column → existing reverse-edge tip-cap derivation (light's pattern; this change authors no cap field). 位階 labels are display grouping per the existing tier derivation; MP bands match.
 
@@ -45,10 +45,10 @@ Old→new: `water_bolt` kept-but-reauthored (coefficients/prereq added); `water_
 
 | Interface | First owner | Consumers |
 |---|---|---|
-| `world/rules/mp_flow.py` `apply_mp_change`/`remove_mp`; `mp_zero` event; `event_source_skill` when key | water-mp-depletion-reaction | mana-transfer (both legs), divert shield (payment), catalog suffocation rule |
+| `world/rules/mp_flow.py` `apply_mp_change`/`remove_mp`; `mp_zero` event; `event_source_skill` when key | water-mp-depletion-reaction | gauge-transfer (mp legs; hp leg rides the existing hp-loss path), divert shield (payment), catalog suffocation rule |
 | 潮退 tier rows `ebbing`/`ebbing_deep`/`ebbing_maelstrom`; per-key active-stack count query | water-mp-depletion-reaction (rows) / water-mana-transfer (count query) | catalog (節點綁定), ring_of_reflux bonus |
 | `suffocated` marker + `actions_per_turn: 0` rows (suffocation + bind) | water-mp-depletion-reaction | catalog (溺潮/漩渦 data), combat gate consumers |
-| `mana_transfer:` family + `ManaTransferPolicy`; `audience_condition`; unconditional bypass relaxation; `mana_reflux` + `recovery_share_bonus`; `mp_regen_lock` + `{gauge}_regen_scale` | water-mana-transfer | catalog authoring only |
+| `gauge_transfer:` family + `GaugeTransferPolicy`; `audience_condition`; unconditional bypass relaxation; `mana_reflux` + `recovery_share_bonus`; `mp_regen_lock` + `{gauge}_regen_scale` | water-mana-transfer | catalog authoring only |
 | `divert` buff profile + damage-stage consumption + `water_film` key | water-damage-redirect-shield | catalog (`self_buff_apply:water_film`) |
 | 14-node registry block + echo-test retirement + shard manifest final state | water-spell-catalog | — |
 

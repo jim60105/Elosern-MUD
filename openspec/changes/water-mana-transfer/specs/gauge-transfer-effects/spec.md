@@ -1,33 +1,49 @@
 ## ADDED Requirements
 
-### Requirement: Mana transfer is one typed effect family with validated magnitude modes
-A skill SHALL express an MP movement with one typed effect carrying a closed direction (`drain`/`restore`) and exactly one magnitude mode: an authored fixed amount, a finite fraction of the target's current MP in `(0,1]`, or the target's entire pool. Malformed prefixes, unknown directions, out-of-range fractions, non-positive fixed amounts and any potency coefficient attached to a transfer SHALL fail at registry construction. The transfer SHALL not be reinterpreted by any element-, skill- or handler-name branch.
+### Requirement: Gauge transfer is one typed effect family with a closed gauge set and validated magnitude modes
+A skill SHALL express a gauge movement with one typed effect carrying a gauge from the closed set {`mp`, `hp`} (any other gauge, including `sp`, SHALL fail at parse until a consumer exists), one closed direction (`drain`/`restore`), and exactly one magnitude mode: an authored fixed amount, a finite fraction of the target's current value in that gauge in `(0,1]`, or the target's entire pool. Direction legality SHALL be per gauge: `mp` admits both directions; `hp` admits `drain` ONLY — an `hp` restore declaration SHALL be a construction error because HP restoration is the heal effect's exclusive verb. Malformed prefixes, unknown gauges, unknown directions, out-of-range fractions, non-positive fixed amounts and any potency coefficient attached to a transfer SHALL fail at registry construction. The transfer SHALL not be reinterpreted by any element-, skill- or handler-name branch.
 
 #### Scenario: Each mode settles its authored magnitude
-- **WHEN** synthetic drain skills with fixed, fraction and whole-pool modes hit a pool with a known current value
+- **WHEN** synthetic mp drain skills with fixed, fraction and whole-pool modes hit a pool with a known current value
 - **THEN** each moves exactly the authored amount (fraction rounding fixed by the contract) and an invalid authoring is rejected before any cast is possible
+
+#### Scenario: Hp drain is legal and hp restore is rejected at construction
+- **WHEN** a synthetic skill declares an hp drain in each magnitude mode and, separately, an `hp` restore of any mode
+- **THEN** the drains parse and settle against the target's HP under the same magnitude rules, while every hp restore form raises before any cast is possible
+
+#### Scenario: The closed gauge set admits no third axis
+- **WHEN** `parse_effect` is called with an `sp` or otherwise unknown gauge segment
+- **THEN** it raises `ValueError` (and therefore fails at registry load) — the family carries no dead gauge axis
 
 #### Scenario: Alternate schools reuse the family
 - **WHEN** a non-water synthetic skill declares the same prefixes and policies
 - **THEN** it settles identically through the generic parse, policy and handler with no element-specific code
 
-### Requirement: Drains pay through the canonical MP writer on both legs and share on the actual amount
-A drain SHALL decrease the target through the canonical MP writer — dispatching the depletion outcome with the cast as attributed source whenever it zeroes the pool — and SHALL return the configured caster recovery share of the ACTUAL amount drained through the same writer on the caster. A share of a clamped or already-partial drain is computed on what was actually taken, never on the requested amount. Both legs SHALL settle inside the action's staged effects with snapshots so a commit failure restores target and caster together.
+### Requirement: Drains pay through their gauge's canonical writer on both legs and share on the actual amount
+A drain SHALL decrease the target through the canonical writer of its declared gauge — the mp gauge through the MP-depletion wave's canonical MP writer (dispatching the depletion outcome with the cast as attributed source whenever it zeroes the pool), the hp gauge through the existing attributed hp-loss write path the buff rate-tick consumes (dispatching the hp-loss outcome with source attribution and adding no new zero fact) — and SHALL return the configured caster recovery share of the ACTUAL amount drained, in the same gauge, through that gauge's writer on the caster. A share of a clamped or already-partial drain is computed on what was actually taken, never on the requested amount. An hp drain that reaches zero SHALL leave the terminal settlement to the combat/death pipeline's single settlement — exactly one death outcome per crossing, never a second kill path — honoring the same nonlethal knockout projection the combat stage already applies. Both legs SHALL settle inside the action's staged effects with snapshots so a commit failure restores target and caster together.
 
 #### Scenario: Half-share on a clamped drain
-- **WHEN** a synthetic drain of 5 with 50 % caster share hits a pool holding 3
+- **WHEN** a synthetic mp drain of 5 with 50 % caster share hits a pool holding 3
 - **THEN** the target lands at zero, the caster gains exactly 2 (share of the actual 3, not of the requested 5) and the depletion event names the cast once
 
 #### Scenario: Fractional maw empties proportionally
 - **WHEN** a synthetic fraction-of-current drain with 20 % target ratio and full caster return drains a known pool
 - **THEN** the pool loses the contracted share and the caster gains the same actual amount, clamped at the caster's MP maximum
 
+#### Scenario: Hp drain shares the actual HP taken
+- **WHEN** a synthetic hp drain with a caster share hits a target whose remaining HP is below the requested amount
+- **THEN** the caster gains the share of the HP actually removed and the hp-loss outcome carries the attributed source
+
+#### Scenario: Hp drain-to-zero settles exactly one death
+- **WHEN** a synthetic hp drain takes a living target from positive HP to zero
+- **THEN** the combat/death pipeline performs its single terminal settlement for the crossing, the drain contributes no separate zero fact, and one kill attribution results — not two
+
 #### Scenario: A failed commit restores both legs
 - **WHEN** a staged drain-and-share cast fails at a later commit point
-- **THEN** the target's MP, the caster's MP and any reaction-applied marker from the crossing are all restored
+- **THEN** the target's gauge, the caster's gauge and any reaction-applied marker from the crossing are all restored
 
 ### Requirement: Restores clamp per target and add the caster's active marker-stack bonus
-A restore SHALL move its authored fixed amount plus one bonus per ACTIVE instance of each explicitly declared marker key counted on the CASTER, through the canonical writer's increase leg, clamped at each recipient's MP maximum. Restore SHALL never dispatch a depletion event, SHALL count the caster's own instances (never the recipient's), and SHALL read counts from stored buff state without materializing handlers on preview paths.
+An mp restore SHALL move its authored fixed amount plus one bonus per ACTIVE instance of each explicitly declared marker key counted on the CASTER, through the canonical MP writer's increase leg, clamped at each recipient's MP maximum. Restore SHALL never dispatch a depletion event, SHALL count the caster's own instances (never the recipient's), and SHALL read counts from stored buff state without materializing handlers on preview paths. The per-stack bonus is mp-restore-only in practice because the hp gauge admits no restore direction.
 
 #### Scenario: Per-stack bonus reads the caster
 - **WHEN** a synthetic restore with a declared marker bonus runs from a caster holding one active instance of each of three declared marker keys while the recipient holds none
