@@ -55,8 +55,6 @@ CATEGORY_LABELS: dict[SkillCategory, str] = {
     SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
     SkillCategory.MARTIAL_ARTS: "武技",
     SkillCategory.ENHANCEMENT: "強化",
-    SkillCategory.INNATE_GIFT: "天賦",
-    SkillCategory.MOVEMENT: "移動",
     SkillCategory.DIVINE_MYSTERY: "神之秘法",
     SkillCategory.UTILITY: "特殊",
     SkillCategory.SEXUAL_ACT: "性愛行為",
@@ -439,6 +437,21 @@ def group_skill_views(
                     SkillGroupView(
                         group=element_key,
                         label=_element_label(element_key),
+                        skills=members,
+                    )
+                )
+        elif category is SkillCategory.ENHANCEMENT:
+            sub_groups = []
+            for group_key in (None, "天賦", "身法"):
+                members = tuple(
+                    skill for skill in owned if skill.group == group_key
+                )
+                if not members:
+                    continue
+                sub_groups.append(
+                    SkillGroupView(
+                        group=group_key,
+                        label=group_key,
                         skills=members,
                     )
                 )

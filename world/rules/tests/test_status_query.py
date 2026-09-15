@@ -123,18 +123,12 @@ _ROW_PASSIVE = _file_skill(_T_PASSIVE, _MARTIAL_TEMPLATE, category=SkillCategory
 
 _T_REST = ("t_status_enh", "t_status_gift", "t_status_move", "t_status_div", "t_status_util")
 _T_SEX_A, _T_SEX_B = "t_status_sex_a", "t_status_sex_b"
-_ROW_REST = tuple(
-    _file_skill(key, _MARTIAL_TEMPLATE, category=category)
-    for key, category in zip(
-        _T_REST,
-        (
-            SkillCategory.ENHANCEMENT,
-            SkillCategory.INNATE_GIFT,
-            SkillCategory.MOVEMENT,
-            SkillCategory.DIVINE_MYSTERY,
-            SkillCategory.UTILITY,
-        ),
-    )
+_ROW_REST = (
+    _file_skill(_T_REST[0], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT),
+    _file_skill(_T_REST[1], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT, group="天賦"),
+    _file_skill(_T_REST[2], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT, group="身法"),
+    _file_skill(_T_REST[3], _MARTIAL_TEMPLATE, category=SkillCategory.DIVINE_MYSTERY),
+    _file_skill(_T_REST[4], _MARTIAL_TEMPLATE, category=SkillCategory.UTILITY),
 )
 _ROW_SEX_A = _file_skill(
     _T_SEX_A, _MARTIAL_TEMPLATE, category=SkillCategory.SEXUAL_ACT, group="t_sexp_a"

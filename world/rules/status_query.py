@@ -129,8 +129,6 @@ _CATEGORY_LABELS = {
     SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
     SkillCategory.MARTIAL_ARTS: "武技",
     SkillCategory.ENHANCEMENT: "強化",
-    SkillCategory.INNATE_GIFT: "天賦",
-    SkillCategory.MOVEMENT: "移動",
     SkillCategory.DIVINE_MYSTERY: "神之秘法",
     SkillCategory.UTILITY: "特殊",
     SkillCategory.SEXUAL_ACT: "性愛行為",
@@ -1441,6 +1439,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
             continue
         if category is SkillCategory.ELEMENTAL_MAGIC:
             ordered_groups = [group for group in ELEMENT_REGISTRY if group in category_buckets]
+        elif category is SkillCategory.ENHANCEMENT:
+            ordered_groups = [group for group in (None, "天賦", "身法") if group in category_buckets]
         elif category is SkillCategory.SEXUAL_ACT:
             ordered_groups = list(category_buckets)
         else:

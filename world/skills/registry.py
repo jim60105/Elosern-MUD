@@ -123,8 +123,6 @@ class SkillCategory(StrEnum):
     ELEMENTAL_MAGIC = "elemental_magic"
     MARTIAL_ARTS = "martial_arts"
     ENHANCEMENT = "enhancement"
-    INNATE_GIFT = "innate_gift"
-    MOVEMENT = "movement"
     DIVINE_MYSTERY = "divine_mystery"
     UTILITY = "utility"
     SEXUAL_ACT = "sexual_act"
@@ -850,7 +848,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             element="wind",
             effects=["movement:flight"],
-            category=SkillCategory.MOVEMENT,
+            category=SkillCategory.ENHANCEMENT,
+            group="身法",
         ),
         *_elemental_spells(
             "lightning",
@@ -1316,7 +1315,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"sp": 12},
             usable_out_of_combat=True,
             effects=["movement:flash_step"],
-            category=SkillCategory.MOVEMENT,
+            category=SkillCategory.ENHANCEMENT,
+            group="身法",
         ),
         _skill(
             "status_disguise",
@@ -1449,7 +1449,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             usable_out_of_combat=True,
             effects=["passive_trait:elf_longevity"],
-            category=SkillCategory.INNATE_GIFT,
+            category=SkillCategory.ENHANCEMENT,
+            group="天賦",
         ),
         _skill(
             "reincarnation_boon_elosia",
@@ -1459,7 +1460,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             usable_out_of_combat=True,
             effects=["growth_rate:practice:100"],
-            category=SkillCategory.INNATE_GIFT,
+            category=SkillCategory.ENHANCEMENT,
+            group="天賦",
         ),
         _skill(
             "reincarnation_boon_yuka",
@@ -1469,7 +1471,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             usable_out_of_combat=True,
             effects=["combat_prediction:武感"],
-            category=SkillCategory.INNATE_GIFT,
+            category=SkillCategory.ENHANCEMENT,
+            group="天賦",
         ),
         _skill(
             "reincarnation_boon_yuna",

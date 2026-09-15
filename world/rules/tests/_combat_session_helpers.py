@@ -163,7 +163,7 @@ def synth_innate_overlay() -> dict[str, dict[str, object]]:
             faction_constraint=FactionConstraint.SELF_ONLY,
             usable_out_of_combat=False,
             effects=["disengage:self"],
-            category=SkillCategory.MOVEMENT,
+            category=SkillCategory.MARTIAL_ARTS,
         ),
     }
     return {"skills": rows}
