@@ -437,6 +437,7 @@ def graft_synth_state_reaction_rulebook() -> None:
         ),
     )
     BUFF_DEFINITIONS.setdefault(
+        # Must stay in parity with rulebook/buffs.yaml suffocated row.
         "suffocated",
         BuffDefinition(
             key="suffocated",
