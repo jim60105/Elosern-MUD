@@ -14,12 +14,17 @@ list with disjoint action ownership:
 
 from pathlib import Path
 from collections.abc import Mapping
+import math
 from typing import Any
 
 from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
 from world.rules.phase_hooks import register_phase_dispatcher
 
 _RULES_PATH = Path(__file__).parent / "rulebook" / "state_reactions.yaml"
+
+_RECOGNIZED_EVENT_VALUES = frozenset(
+    {"hp_loss", "mp_zero", "negative_buff_added", "physical_hit"}
+)
 
 _RECOGNIZED_WHEN_KEYS = frozenset(
     {
@@ -46,6 +51,18 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
     seen_empowerment_markers: set[str] = set()
 
     for rule in rules:
+        if "event" in rule.when:
+            event_val = rule.when["event"]
+            if (
+                isinstance(event_val, bool)
+                or not isinstance(event_val, str)
+                or event_val not in _RECOGNIZED_EVENT_VALUES
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} has unrecognized or invalid event {event_val!r}; "
+                    f"must be one of {sorted(_RECOGNIZED_EVENT_VALUES)}"
+                )
+
         if "event_source_skill" in rule.when:
             if "event" not in rule.when:
                 raise ValueError(
@@ -64,10 +81,17 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
             )
 
         then_keys = set(rule.then)
-        if then_keys not in ({"apply_buff"}, {"remove_buff"}, {"pleasure_gain"}):
+        if then_keys not in (
+            {"apply_buff"},
+            {"remove_buff"},
+            {"pleasure_gain"},
+            {"counter_damage"},
+            {"apply_buff_to_source"},
+        ):
             raise ValueError(
                 f"state reaction rule {rule.id!r} then clause must declare exactly one of "
-                f"'apply_buff', 'remove_buff', or 'pleasure_gain', got {sorted(then_keys)!r}"
+                f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', or 'apply_buff_to_source', "
+                f"got {sorted(then_keys)!r}"
             )
 
         action_key = next(iter(then_keys))
@@ -89,6 +113,31 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
                         f"multiple state reaction rules declare apply_buff for marker {buff_key!r}"
                     )
                 seen_empowerment_markers.add(buff_key)
+        elif action_key == "counter_damage":
+            coeff = rule.then["counter_damage"]
+            if (
+                isinstance(coeff, bool)
+                or not isinstance(coeff, (int, float))
+                or not math.isfinite(coeff)
+                or coeff <= 0
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} counter_damage must be a finite positive number, got {coeff!r}"
+                )
+        elif action_key == "apply_buff_to_source":
+            buff_key = rule.then["apply_buff_to_source"]
+            if (
+                isinstance(buff_key, bool)
+                or not isinstance(buff_key, str)
+                or not buff_key.strip()
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} apply_buff_to_source value must be a non-empty string, got {buff_key!r}"
+                )
+            if buff_key not in BUFF_DEFINITIONS:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} references unknown buff definition {buff_key!r}"
+                )
         elif action_key == "pleasure_gain":
             gain_val = rule.then["pleasure_gain"]
             if isinstance(gain_val, bool):
@@ -347,10 +396,17 @@ def dispatch_outcome_reaction(
     source_tier: str | None = None,
     rules: list[Rule] | None = None,
     source_skill: str | None = None,
+    *,
+    source: Any = None,
+    nonlethal: bool = False,
+    nonlethal_keys: frozenset[str] = frozenset(),
+    battlefield: Any = None,
+    is_counter: bool = False,
 ) -> None:
-    """Dispatch outcome reactions (hp_loss, negative_buff_added) to matching rules.
+    """Dispatch outcome reactions (hp_loss, mp_zero, negative_buff_added, physical_hit).
 
-    Context provides: entity, event, active_buffs, and sexual fields (climax_phase, arousal).
+    Context provides: entity, event, active_buffs, sexual fields (climax_phase, arousal),
+    source_skill, and source (for source-targeted reactions).
     A pleasure_gain action calculates the gain using the source_tier (falling back to '學徒'
     for non-spell or unspecified sources) and calls canonical apply_pleasure_gain.
 
@@ -364,11 +420,13 @@ def dispatch_outcome_reaction(
     from world.rules.buffs import active_buff_keys_from_storage
 
     active_rules = rules if rules is not None else STATE_REACTION_RULES
+    skill_key = getattr(source_skill, "key", source_skill)
     context: dict[str, Any] = {
         "entity": entity,
         "event": event,
         "active_buffs": active_buff_keys_from_storage(entity),
-        "source_skill": source_skill,
+        "source_skill": skill_key,
+        "source": source,
     }
 
     sexual = getattr(entity, "sexual", None)
@@ -393,8 +451,8 @@ def dispatch_outcome_reaction(
                 from world.rules.buffs import apply_buff
 
                 kwargs: dict[str, Any] = {}
-                if source_skill is not None:
-                    kwargs["source_skill"] = source_skill
+                if skill_key is not None:
+                    kwargs["source_skill"] = skill_key
                 if source_tier is not None:
                     kwargs["source_tier"] = source_tier
                 apply_buff(entity, rule.then["apply_buff"], **kwargs)
@@ -420,6 +478,106 @@ def dispatch_outcome_reaction(
 
                 if gain > 0:
                     apply_pleasure_gain(entity, gain)
+            elif "counter_damage" in rule.then:
+                # Preconditions:
+                # - is_counter guard: counter legs never trigger counter damage (non-recursion).
+                # - living source: dead or unresolvable source produces silent no-write.
+                # Rollback invariant: counter HP writes and battlefield.knocked_out markings
+                # are restorable because the action pipeline unconditionally snapshots the
+                # actor (via the practice effect) and touches the battlefield when nonlethal_keys exist.
+                if is_counter:
+                    continue
+                if source is None:
+                    continue
+                if not hasattr(source, "traits") or not hasattr(source.traits, "hp"):
+                    continue
+                from world.rules.action import _stored_trait_value
+                from world.rules.combat import (
+                    COMBAT_YAML,
+                    _adjusted_attack,
+                    _adjusted_defense,
+                    _apply_hp_delta,
+                    _apply_hp_delta_nonlethal,
+                )
+
+                source_hp_before = _stored_trait_value(source.traits.hp)
+                if source_hp_before <= 0:
+                    continue
+
+                coeff = float(rule.then["counter_damage"])
+                if hasattr(entity, "skills"):
+                    atk_phys = _adjusted_attack(entity, "atk_phys")
+                else:
+                    atk_phys = 0.0
+                source_def = (
+                    _adjusted_defense(source) if hasattr(source, "skills") else 0.0
+                )
+                floor = int(COMBAT_YAML["damage"]["floor"])
+                raw_amount = round(atk_phys * coeff) - source_def
+                counter_amount = int(max(raw_amount, floor))
+
+                src_key = str(getattr(source, "key", ""))
+                is_protected = nonlethal or src_key in nonlethal_keys
+                if not is_protected:
+                    _apply_hp_delta(source, -counter_amount)
+                else:
+                    _apply_hp_delta_nonlethal(source, -counter_amount)
+                    if (
+                        source_hp_before > 0
+                        and source_hp_before - counter_amount <= 0
+                        and src_key in nonlethal_keys
+                    ):
+                        if battlefield is not None and hasattr(
+                            battlefield, "knocked_out"
+                        ):
+                            battlefield.knocked_out.add(src_key)
+
+                source_hp_after = _stored_trait_value(source.traits.hp)
+                source_actual_loss = max(
+                    0, int(source_hp_before - max(0.0, source_hp_after))
+                )
+                if source_actual_loss > 0:
+                    dispatch_outcome_reaction(
+                        source,
+                        "hp_loss",
+                        source_tier=source_tier,
+                        rules=rules,
+                        source_skill=source_skill,
+                        is_counter=True,
+                    )
+            elif "apply_buff_to_source" in rule.then:
+                # Preconditions:
+                # - source must exist and have buffs handler
+                # - dead source produces silent no-write
+                if source is None:
+                    continue
+                if not hasattr(source, "buffs"):
+                    continue
+                if hasattr(source, "traits") and hasattr(source.traits, "hp"):
+                    from world.rules.action import _stored_trait_value
+
+                    if _stored_trait_value(source.traits.hp) <= 0:
+                        continue
+
+                from world.rules.buffs import BUFF_DEFINITIONS, apply_buff
+
+                buff_key = rule.then["apply_buff_to_source"]
+                definition = BUFF_DEFINITIONS.get(buff_key)
+                if definition is None:
+                    continue
+
+                holder_key = str(getattr(entity, "key", ""))
+                instance_key: str | None = None
+                if definition.stacking == "unique_per_source":
+                    instance_key = f"{buff_key}:{holder_key}"
+
+                buff_kwargs: dict[str, Any] = {
+                    "source_key": holder_key,
+                    "source_tier": source_tier or "學徒",
+                }
+                if skill_key is not None:
+                    buff_kwargs["source_skill"] = skill_key
+                apply_buff(source, buff_key, instance_key=instance_key, **buff_kwargs)
 
 
 # Publish the phase dispatcher into the dependency leaf so the canonical

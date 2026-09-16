@@ -450,6 +450,12 @@ def _handle_damage(
                 protected=protected,
                 marked=marked,
                 source_tier=source_tier,
+                school=school,
+                actor=actor,
+                source_skill=source_skill,
+                session_nonlethal=session_nonlethal,
+                nonlethal_keys=nonlethal_keys,
+                battlefield=battlefield,
             ) -> None:
                 if not hit:
                     _noop()
@@ -465,9 +471,21 @@ def _handle_damage(
                 after = _stored_trait_value(target.traits.hp)
                 actual_loss = max(0, int(before - max(0.0, after)))
                 if actual_loss > 0:
+                    skill_key = getattr(source_skill, "key", source_skill)
                     dispatch_outcome_reaction(
                         target, "hp_loss", source_tier=source_tier
                     )
+                    if school == "physical":
+                        dispatch_outcome_reaction(
+                            target,
+                            "physical_hit",
+                            source_tier=source_tier,
+                            source_skill=skill_key,
+                            source=actor,
+                            nonlethal=session_nonlethal,
+                            nonlethal_keys=nonlethal_keys,
+                            battlefield=battlefield,
+                        )
 
             pending.append(
                 PendingEffect(
@@ -541,6 +559,19 @@ def _handle_damage(
                     ),
                 )
             )
+    if (
+        battlefield is not None
+        and nonlethal_keys
+        and not any(e.entity is battlefield for e in pending)
+    ):
+        pending.append(
+            PendingEffect(
+                entity=battlefield,
+                description="knocked_out_mark|battlefield",
+                surfaces=frozenset(),
+                apply=_noop,
+            )
+        )
     return pending
 
 

@@ -1,10 +1,12 @@
-# Declarative phase transition and outcome reactions (light-climax-empowerment / light-cleric-feedback).
+# Declarative phase transition and outcome reactions (light-climax-empowerment / light-cleric-feedback / on-hit-counter-damage).
 #
 # Reactions dispatch once after a successful canonical _apply_climax_phase_set edge,
-# including rulebook and direct-gain callers, or outcome events (hp_loss, negative_buff_added).
+# including rulebook and direct-gain callers, or outcome events (hp_loss, mp_zero, negative_buff_added, physical_hit).
 #
 # Rules evaluate using the shared evaluate_condition condition engine.
-# Allowed actions in then are apply_buff, remove_buff, and pleasure_gain.
+# Allowed actions in then are apply_buff, remove_buff, pleasure_gain, counter_damage, and apply_buff_to_source.
+# Source-targeted actions (counter_damage, apply_buff_to_source) consume the strike's attack source
+# provided by the physical_hit outcome event. The counter's hp_loss dispatch carries the initiating strike's tier.
 
 - id: climax_in_progress_empowerment
   when:

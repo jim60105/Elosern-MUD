@@ -539,7 +539,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(damage_entries[0].data["amount"], 20)
 
         # hp_loss reaction saw only actual loss of 20
-        mock_reaction.assert_called_with(
+        mock_reaction.assert_any_call(
             self.defender, "hp_loss", source_tier=T_APPRENTICE
         )
 
