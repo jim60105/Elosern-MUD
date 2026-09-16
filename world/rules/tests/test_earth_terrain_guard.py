@@ -2,11 +2,6 @@
 
 Covers requirements:
 - skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior
-  (carried forward for the archiver: this ID becomes canonical when the
-  earth-spell-catalog delta syncs into the main skill-registry spec —
-  annotating it now would fail the unknown-requirement-id gate, so the
-  @covers_requirement annotations below follow the terrain-marker /
-  on-hit-counter-damage defer pattern and name only canonical IDs.)
 - terrain-marker::a-ground-marker-buff-row-makes-holding-it-the-canonical-standing-on-it-fact
 - terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield
 - damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event
@@ -273,6 +268,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
 
     # --- Scenario: The defense ladder guards observable stats at settlement
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_self_cast_defense_guard_rises_and_recovers_on_expiry(self):
         """Synthetic self-cast guard raises effective defense through the rule table for its duration and recovers on expiry."""
         skill = self._register(
@@ -298,6 +296,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
             evaluate_combat_modifiers(self.caster).get("defense", 0), 0
         )
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_ally_area_guard_spares_enemies(self):
         """Synthetic ALLIES-audience area guard raises ally settlement defense and spares enemies."""
         skill = self._register(
@@ -319,6 +320,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         self.assertEqual(evaluate_combat_modifiers(self.ally).get("defense"), 12)
         self.assertEqual(evaluate_combat_modifiers(self.foe).get("defense", 0), 0)
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_accuracy_debuff_rung_settles_and_expires(self):
         """Synthetic accuracy debuff enters the to-hit bundle and clears at its duration."""
         skill = self._register(
@@ -343,6 +347,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
 
     # --- Scenario: Fissure hazards burn whoever keeps standing on them
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     @covers_requirement(
         "terrain-marker::a-ground-marker-buff-row-makes-holding-it-the-canonical-standing-on-it-fact"
     )
@@ -381,6 +388,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         tick_buffs(victim, 10)
         self.assertEqual(victim.traits.hp.current, hp_end)
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     @covers_requirement(
         "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
     )
@@ -421,6 +431,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
                 eff.apply()
         return int(before - target.traits.hp.current)
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_synergy_prices_marker_once_and_bypasses_defense_always(self):
         """Parallel marker rungs share one multiplier application; defense is ignored on and off marker."""
         skill = self._register(
@@ -503,6 +516,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         return res, int(attacker_hp - self.caster.traits.hp.current)
 
     @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
+    @covers_requirement(
         "damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event"
     )
     def test_carapace_prices_once_per_landed_physical_strike(self):
@@ -513,6 +529,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         # strike itself; non-recursion is pinned in the dispatch test below)
         self.assertGreater(counter, 0)
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     @covers_requirement(
         "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
     )
@@ -527,6 +546,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
             self.assertEqual(res.outcome, "success", getattr(res, "detail", res))
             self.assertEqual(counter, 0)
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     @covers_requirement(
         "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
     )
@@ -552,6 +574,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
     # --- Scenario: Devastation and execution rungs behave through the shared
     #               policies
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_devastation_rung_and_execution_rung_share_policies(self):
         """A devastation synthetic adds the max-HP rider; an execution synthetic ignores defense — no earth-specific code."""
         target = self.foe
@@ -595,6 +620,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
 
     # --- Scenario: Two roots, branches, and the two-parent capstone gate
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_two_root_branch_convergence_gates(self):
         """A synthetic earth-shaped lineage gates use on every authored threshold and converges on a two-parent capstone."""
         root_guard = self._register(
@@ -665,6 +693,9 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
 
     # --- Scenario: Retired dev-era bindings resolve as ordinary rejections
 
+    @covers_requirement(
+        "skill-registry::earth-spell-progression-composes-executable-terrain-and-guard-behavior"
+    )
     def test_retired_dev_era_bindings_resolve_as_ordinary_rejections(self):
         """Retired bind/root keys reject exactly like never-existing keys through cast and buff paths."""
         for key in ("earth_bind", "earth_root", "never_existed_key"):
