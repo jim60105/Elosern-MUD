@@ -18,7 +18,7 @@
   polarity: debuff
   modifiers: {}
 - key: fear
-  duration: 60
+  duration: 40
   stacking: refresh
   polarity: debuff
   modifiers: {}
@@ -151,23 +151,38 @@
         target: hp
         base: 12
         exposure_percent_per_ordinal: 0.1
-- key: dark_atk_down
-  duration: 60
+- key: dark_weaken
+  duration: 15
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: atk_phys, ceiling: -3}
+- key: dark_curse
+  duration: 20
   stacking: refresh
   polarity: debuff
   modifiers:
     bounds:
       - {target: atk_phys, ceiling: -5}
-      - {target: magic_power, ceiling: -5}
-- key: dark_curse
-  duration: 60
+      - {target: defense, ceiling: -5}
+      - {target: agility, ceiling: -5}
+- key: dark_spread
+  duration: 30
   stacking: refresh
   polarity: debuff
   modifiers:
     bounds:
-      - {target: atk_phys, ceiling: -10}
-      - {target: magic_power, ceiling: -10}
-      - {target: agility, ceiling: -10}
+      - {target: atk_phys, ceiling: -8}
+      - {target: defense, ceiling: -8}
+- key: dark_apotheosis
+  duration: 90
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: atk_phys, ceiling: -25}
+      - {target: defense, ceiling: -25}
 # Defeat aftermath (defeat-aftermath-core D-C2): marker debuff mounted at
 # hostile-defeat settlement. Bounds ceilings on the physical axes only; it
 # never scales regen (the buff engine's rate modifier is an absolute
@@ -205,7 +220,14 @@
   stacking: refresh
   polarity: debuff
   modifiers:
-    rate: {target: hp, delta: -5}
+    rate: {target: hp, delta: -12, caster_share: 1.0}
+- key: dark_corrosion_deep
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -18, caster_share: 1.0}
 - key: focus
   duration: 60
   stacking: refresh

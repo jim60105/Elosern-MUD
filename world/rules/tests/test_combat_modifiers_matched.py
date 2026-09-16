@@ -58,6 +58,7 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
             [
                 "poison_agility_penalty",
                 "fear_agility_and_accuracy_penalty",
+                "fear_locks_actions",
                 "high_arousal_agility_accuracy_penalty",
             ],
         )

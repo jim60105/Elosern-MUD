@@ -400,9 +400,27 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         self.assertIn(definition.key, entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
-    def test_buff_dark_atk_down(self):
-        definition = BUFF_DEFINITIONS["dark_atk_down"]
-        self.assertEqual(definition.duration, 60)
+    def test_buff_dark_weaken(self):
+        definition = BUFF_DEFINITIONS["dark_weaken"]
+        self.assertEqual(definition.duration, 15)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers,
+            {
+                "bounds": [
+                    {"target": "atk_phys", "ceiling": -3},
+                ]
+            },
+        )
+
+        entity = self._entity()
+        apply_buff(entity, "dark_weaken")
+        self.assertIn("dark_weaken", entity_active_buffs(entity))
+
+    def test_buff_dark_curse(self):
+        definition = BUFF_DEFINITIONS["dark_curse"]
+        self.assertEqual(definition.duration, 20)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
         self.assertEqual(
@@ -410,27 +428,8 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
             {
                 "bounds": [
                     {"target": "atk_phys", "ceiling": -5},
-                    {"target": "magic_power", "ceiling": -5},
-                ]
-            },
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "dark_atk_down")
-        self.assertIn("dark_atk_down", entity_active_buffs(entity))
-
-    def test_buff_dark_curse(self):
-        definition = BUFF_DEFINITIONS["dark_curse"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {
-                "bounds": [
-                    {"target": "atk_phys", "ceiling": -10},
-                    {"target": "magic_power", "ceiling": -10},
-                    {"target": "agility", "ceiling": -10},
+                    {"target": "defense", "ceiling": -5},
+                    {"target": "agility", "ceiling": -5},
                 ]
             },
         )
@@ -494,14 +493,15 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
         self.assertEqual(
-            definition.modifiers, {"rate": {"target": "hp", "delta": -5}}
+            definition.modifiers,
+            {"rate": {"target": "hp", "delta": -12, "caster_share": 1.0}},
         )
 
         entity = self._entity()
         apply_buff(entity, "dark_corrosion")
         before = entity.traits.hp.value
         tick_buffs(entity)
-        self.assertEqual(entity.traits.hp.value, before - 5)
+        self.assertEqual(entity.traits.hp.value, before - 12)
         self.assertEqual(entity.buffs.all["dark_corrosion"].tick_interval, 10)
         self.assertIn("dark_corrosion", entity_active_buffs(entity))
 
