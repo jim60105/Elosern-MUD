@@ -9,6 +9,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.monsters import Monster
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.buffs import (
@@ -83,6 +84,9 @@ def _companion(player, key, hp=100, agility=10):
 class TerrainMarkerDefinitionTests(unittest.TestCase):
     """Load-time validation for the marker: ground buff definition clause."""
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-buff-row-makes-holding-it-the-canonical-standing-on-it-fact"
+    )
     def test_marker_ground_loads_carrying_clause(self):
         path = _write_yaml("- key: fissure\n  marker: ground\n")
         definitions = load_buff_definitions(path)
@@ -93,6 +97,9 @@ class TerrainMarkerDefinitionTests(unittest.TestCase):
         definitions = load_buff_definitions(path)
         self.assertIsNone(definitions["ordinary_buff"].marker)
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-buff-row-makes-holding-it-the-canonical-standing-on-it-fact"
+    )
     def test_malformed_marker_clause_fails_closed(self):
         for bad_value in ("fire", "water", "true", "false", "3", "null", "['ground']"):
             with self.subTest(bad_value=bad_value):
@@ -145,6 +152,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
 
         ObjectDB.flush_instance_cache(force=True)
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-buff-row-makes-holding-it-the-canonical-standing-on-it-fact"
+    )
     def test_marker_hazard_damages_holder_while_it_lasts(self):
         """A ground marker damages its holder each tick interval; standing-on-it fact holds until expiry."""
         target = self.monster
@@ -180,6 +190,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         tick_buffs(target, 10)
         self.assertEqual(target.traits.hp.current, 70)
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     def test_pure_remove_ground_markers_removes_only_ground_markers(self):
         """remove_ground_markers removes ground-marker buffs and leaves control buffs untouched."""
         apply_buff(self.player, "t_ground_hazard")
@@ -198,6 +211,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(remove_ground_markers(self.player), 0)
         self.assertEqual(self.player.traits.hp.current, hp_before)
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     def test_fleeing_extinguishes_marker_while_control_buff_persists(self):
         """A fleeing participant steps off the ground hazard at flee settlement; control buff persists."""
         engage(self.player, self.monster)
@@ -218,6 +234,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
         self.assertTrue(matches_target_predicate(self.player, ("buff:t_control_buff",)))
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     def test_knockout_extinguishes_marker_while_control_buff_persists(self):
         """A knocked out participant has ground marker extinguished at round settlement; control buff persists."""
         companion = _companion(self.player, "fellow_fighter", hp=50)
@@ -244,6 +263,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_control_buff", entity_active_buffs(companion))
         self.assertTrue(matches_target_predicate(companion, ("buff:t_control_buff",)))
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     def test_session_end_sweeps_markers_only(self):
         """When a combat session ends, ground markers are swept while non-marker buffs persist."""
         self.monster.traits.hp.base = 1
@@ -269,6 +291,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
         self.assertTrue(matches_target_predicate(self.player, ("buff:t_control_buff",)))
 
+    @covers_requirement(
+        "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     def test_active_holder_keeps_marker_across_rounds(self):
         """A combatant surviving rounds untouched keeps their ground marker across round boundaries until duration expiry."""
         self.monster.traits.hp.base = 1000

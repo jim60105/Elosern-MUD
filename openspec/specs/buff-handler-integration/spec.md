@@ -44,7 +44,10 @@ number in (0, 1] naming the fraction of each tick's actual HP loss credited to t
 caster. The clause SHALL be validated fail-closed at load — rejected on a non-`hp` rate target, on a
 non-negative delta, on a boolean or non-finite or out-of-range value, and on any co-declaration with
 a `recovery` or `scale_from_source` rate — the offending definition key SHALL be named and the load
-SHALL fail. Rows without the clause SHALL keep ticking exactly as before.
+SHALL fail. Rows without the clause SHALL keep ticking exactly as before. Additionally, a definition
+MAY carry one top-level `marker` clause outside `modifiers` whose value belongs to the closed marker
+vocabulary; a malformed value SHALL fail the load naming the offending definition key, and every row
+without the clause SHALL load bit-identically to its pre-clause behavior.
 
 #### Scenario: A rate-of-change buff definition is well-formed
 - **WHEN** `buffs.yaml`'s `poisoned` definition is inspected
@@ -79,6 +82,12 @@ SHALL fail. Rows without the clause SHALL keep ticking exactly as before.
   than one, or non-finite value are loaded
 - **THEN** each raises at load time naming the offending definition key and no definition is
   produced
+
+#### Scenario: A marker clause loads only with a vocabulary value
+- **WHEN** a synthetic row declaring the closed-vocabulary ground marker value is loaded, and
+  separately rows declaring an element name, a boolean, or a number as the marker value are loaded
+- **THEN** the well-formed row loads carrying the validated marker clause and each malformed row
+  raises at load time naming the offending definition key
 
 ### Requirement: A rate-of-change modifier can be conferred from one entity to another as a buff
 instance carrying a source and a scale
