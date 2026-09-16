@@ -141,6 +141,45 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     "a gauge key or the pull-only 'skill_practice' target "
                     "(the retired 'magic_level_growth' target is rejected here)"
                 )
+            if "caster_share" in rate:
+                if has_recovery:
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier cannot declare both recovery and caster_share"
+                    )
+                if has_scale:
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier cannot declare both scale_from_source and caster_share"
+                    )
+                if not has_delta:
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier caster_share requires fixed delta"
+                    )
+                if effective_target != "hp":
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier caster_share target must be 'hp', got {effective_target!r}"
+                    )
+                delta_val = rate["delta"]
+                if (
+                    isinstance(delta_val, bool)
+                    or not isinstance(delta_val, (int, float))
+                    or not isfinite(delta_val)
+                    or delta_val >= 0
+                ):
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier caster_share requires a negative delta, got {delta_val!r}"
+                    )
+                share_val = rate["caster_share"]
+                if (
+                    isinstance(share_val, bool)
+                    or not isinstance(share_val, (int, float))
+                    or not isfinite(share_val)
+                    or share_val <= 0
+                    or share_val > 1
+                ):
+                    raise ValueError(
+                        f"{path}: buff {key!r} rate modifier caster_share must be a finite number in (0, 1], got {share_val!r}"
+                    )
+                rate["caster_share"] = float(share_val)
         divert = modifiers.get("divert")
         if divert is not None:
             if not isinstance(divert, dict):
@@ -269,11 +308,17 @@ class RulebookBuff(BaseBuff):
         if rate and recovery is None:
             source_tier = getattr(self, "source_tier", None) or "學徒"
             source_skill = getattr(self, "source_skill", None)
+            source_pk = None
+            if "caster_share" in rate:
+                source_pk = getattr(self, "source_pk", None)
+                if source_pk is None and hasattr(self, "cache") and isinstance(self.cache, dict):
+                    source_pk = self.cache.get("source_pk")
             _apply_rate_modifier(
                 self.owner,
                 rate,
                 source_tier=source_tier,
                 source_skill=source_skill,
+                source_pk=source_pk,
             )
 
 
@@ -294,11 +339,53 @@ def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
     return _is_damaging_gauge_rate(rate) and isinstance(rate, dict) and rate.get("target") == "hp"
 
 
+def _resolve_source_origin(entity: Any, source_pk: int | None) -> Any | None:
+    """Resolve a tick's cached source dbref to a live entity, or ``None``.
+
+    Consults active battlefields first (roster-then-dbref posture matching
+    upkeep credit resolver), falling back to ObjectDB.
+    """
+    if source_pk is None:
+        return None
+    from world.rules.skip_safety import _active_battlefield_for
+
+    battlefield = _active_battlefield_for(entity)
+    if battlefield is not None:
+        for member in battlefield.roster.values():
+            pk = getattr(member, "pk", None)
+            if isinstance(pk, int) and pk == source_pk:
+                return member
+    from evennia.objects.models import ObjectDB
+
+    return ObjectDB.objects.filter(id=source_pk).first()
+
+
+def _credit_caster_share(origin: Any, amount: int) -> None:
+    """Credit HP to a living origin caster, clamped at max HP, without reviving or dispatching."""
+    if amount <= 0:
+        return
+    traits = getattr(origin, "traits", None)
+    if traits is None or not hasattr(traits, "hp"):
+        return
+    from world.rules.action import stored_gauge_pair
+
+    current_hp, max_hp = stored_gauge_pair(origin, "hp")
+    if current_hp <= 0:
+        return
+    new_hp = min(max_hp, current_hp + amount)
+    hp_trait = origin.traits.hp
+    if hasattr(hp_trait, "current"):
+        hp_trait.current = new_hp
+    else:
+        hp_trait.value = new_hp
+
+
 def _apply_rate_modifier(
     entity,
     rate_mod: dict[str, Any],
     source_tier: str | None = None,
     source_skill: str | None = None,
+    source_pk: int | None = None,
 ) -> None:
     """Apply one rate tick.
 
@@ -349,6 +436,14 @@ def _apply_rate_modifier(
 
             tier = source_tier or "學徒"
             dispatch_outcome_reaction(entity, "hp_loss", source_tier=tier)
+
+        caster_share = rate_mod.get("caster_share")
+        if caster_share is not None and actual_loss > 0 and source_pk is not None:
+            credit = floor(actual_loss * float(caster_share))
+            if credit > 0:
+                origin = _resolve_source_origin(entity, source_pk)
+                if origin is not None:
+                    _credit_caster_share(origin, credit)
 
 
 
