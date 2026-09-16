@@ -601,6 +601,30 @@ def clear_session(
     if record is not None:
         unregister_participants((*record.player_ids, *record.enemy_ids))
 
+    from django.db import transaction
+    from world.rules.buffs import remove_ground_markers
+
+    participants: set[Any] = set()
+    if battlefield is not None:
+        participants.update(battlefield.roster.values())
+    if record is not None:
+        for dbref in (*record.player_ids, *record.enemy_ids):
+            obj = ObjectDB.objects.filter(id=dbref).first()
+            if obj is not None:
+                participants.add(obj)
+    participants.add(actor)
+    for entity in participants:
+        removed = remove_ground_markers(entity)
+        if removed:
+            boundary = {
+                "char": str(entity.pk),
+                "count": removed,
+                "reason": "session_end",
+            }
+            transaction.on_commit(
+                lambda b=boundary: log_info("combat_marker_swept", context=b)
+            )
+
 
 def engage(actor: Any, target: Any) -> dict[str, Any]:
     """Create one persistent hostile session for a present living monster.
@@ -1378,19 +1402,58 @@ def _submit_request(
             notifications += tuple(grant_notifications)
 
             knocked = _knocked_out_ids(logs, battlefield)
+            new_fled_ids = tuple(
+                sorted(
+                    int(battlefield.roster[key].pk)
+                    for key in battlefield.fled
+                    if key in battlefield.roster
+                )
+            )
+            new_knocked_out_ids = tuple(sorted(set(record.knocked_out_ids) | set(knocked)))
             new_record = replace(
                 record,
-                fled_ids=tuple(
-                    sorted(
-                        int(battlefield.roster[key].pk)
-                        for key in battlefield.fled
-                        if key in battlefield.roster
-                    )
-                ),
-                knocked_out_ids=tuple(sorted(set(record.knocked_out_ids) | set(knocked))),
+                fled_ids=new_fled_ids,
+                knocked_out_ids=new_knocked_out_ids,
                 rounds_elapsed=record.rounds_elapsed + gained,
             )
             _persist(actor, new_record)
+
+            from world.rules.buffs import remove_ground_markers
+
+            newly_fled_pks = set(new_fled_ids) - set(record.fled_ids)
+            if newly_fled_pks:
+                for entity in battlefield.roster.values():
+                    if int(entity.pk) in newly_fled_pks:
+                        removed = remove_ground_markers(entity)
+                        if removed:
+                            boundary = {
+                                "char": str(entity.pk),
+                                "count": removed,
+                                "reason": "fled",
+                            }
+                            transaction.on_commit(
+                                lambda b=boundary: log_info(
+                                    "combat_marker_swept", context=b
+                                )
+                            )
+
+            newly_knocked_pks = set(new_knocked_out_ids) - set(record.knocked_out_ids)
+            if newly_knocked_pks:
+                for entity in battlefield.roster.values():
+                    if int(entity.pk) in newly_knocked_pks:
+                        removed = remove_ground_markers(entity)
+                        if removed:
+                            boundary = {
+                                "char": str(entity.pk),
+                                "count": removed,
+                                "reason": "knocked_out",
+                            }
+                            transaction.on_commit(
+                                lambda b=boundary: log_info(
+                                    "combat_marker_swept", context=b
+                                )
+                            )
+
             result = _continue_or_settle(
                 actor, new_record, battlefield, logs, notification_count=len(notifications)
             )
@@ -1757,7 +1820,15 @@ def _settle_with_restore(
 
     extra: dict[str, tuple[bool, Any]] = {
         "active_combat": _attribute_snapshot(actor, "active_combat"),
+        "buffs": _attribute_snapshot(actor, "buffs"),
     }
+    battlefield_buff_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
+    if battlefield is not None:
+        for entity in battlefield.roster.values():
+            if entity is not actor:
+                battlefield_buff_snapshots.append(
+                    (entity, _attribute_snapshot(entity, "buffs"))
+                )
     trait_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
     if record.mode == "guild_exam":
         extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
@@ -1776,6 +1847,8 @@ def _settle_with_restore(
     except Exception:
         for key, snapshot in extra.items():
             _restore_attribute(actor, key, snapshot)
+        for entity, snapshot in battlefield_buff_snapshots:
+            _restore_attribute(entity, "buffs", snapshot)
         for entity, snapshot in trait_snapshots:
             from world.rules.surfaces import restore_traits
 

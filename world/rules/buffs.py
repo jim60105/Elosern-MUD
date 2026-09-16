@@ -36,6 +36,9 @@ class RecoveryRatePolicy:
     exposure_percent_per_ordinal: float = 0.1
 
 
+MARKER_VOCABULARY = frozenset({"ground"})
+
+
 @dataclass(frozen=True)
 class BuffDefinition:
     """Validated setting data for one logical buff."""
@@ -46,6 +49,7 @@ class BuffDefinition:
     stacking: str
     modifiers: dict[str, Any]
     polarity: str = "buff"
+    marker: str | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +213,14 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
         polarity = entry.get("polarity", "buff")
         if polarity not in {"buff", "debuff"}:
             raise ValueError(f"{path}: buff {key!r} has unsupported polarity {polarity!r}")
+        marker = None
+        if "marker" in entry:
+            marker_val = entry["marker"]
+            if isinstance(marker_val, bool) or not isinstance(marker_val, str) or marker_val not in MARKER_VOCABULARY:
+                raise ValueError(
+                    f"{path}: buff {key!r} has invalid marker {marker_val!r}; must be in {sorted(MARKER_VOCABULARY)}"
+                )
+            marker = marker_val
         definitions[key] = BuffDefinition(
             key=key,
             duration=entry.get("duration"),
@@ -216,6 +228,7 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
             stacking=stacking,
             modifiers=dict(modifiers),
             polarity=polarity,
+            marker=marker,
         )
     return definitions
 
@@ -761,6 +774,24 @@ def cleanse_debuffs(entity) -> int:
     semantics. Returns 0 when nothing is active (and writes nothing).
     """
     return remove_by_selector(entity, "negative")
+
+
+def remove_ground_markers(entity) -> int:
+    """Remove every live ground-marker buff on an entity; return the count removed.
+
+    Consults only definitions declaring marker: ground.
+    Never touches non-marker buff instances. Zero damage or revive side effects.
+    """
+    keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if (defn := BUFF_DEFINITIONS.get(buff.definition_key)) is not None
+        and defn.marker == "ground"
+    )
+    if not keys:
+        return 0
+    _remove_buff_keys(entity, keys)
+    return len(keys)
 
 
 def _handle_cleanse(

@@ -1,9 +1,9 @@
 """Pure canonical target-fact readers (combat-target-traits D1).
 
 This module is read-only and never mutates entity state or Evennia storage.
-Facts are read strictly from persistent deterministic data (``combat_traits``
-and ``affinity_elements``); narrative names, race labels, and descriptions
-never imply a combat fact.
+Facts are read strictly from persistent deterministic data (``combat_traits``,
+``affinity_elements``, and live buff instances via ``entity_active_buffs``);
+narrative names, race labels, and descriptions never imply a combat fact.
 """
 
 from collections.abc import Iterable, Sequence
@@ -83,14 +83,24 @@ def matches_target_predicate(entity: Any, predicate: Iterable[str]) -> bool:
     """Return True if the target satisfies any fact declared in predicate.
 
     Empty predicate returns False. Narrative labels, descriptions, or entity
-    names never imply a fact.
+    names never imply a fact. Live buff entries (buff:<key>) match if the target
+    currently holds a live, unexpired, non-paused instance of the definition key.
     """
     if not predicate:
         return False
-    facts = get_target_facts(entity)
-    if not facts:
-        return False
-    for fact in predicate:
-        if fact in facts:
-            return True
+    facts: frozenset[str] | None = None
+    active_buffs: set[str] | None = None
+    for entry in predicate:
+        if entry.startswith("buff:"):
+            if active_buffs is None:
+                from world.rules.buffs import entity_active_buffs
+
+                active_buffs = entity_active_buffs(entity)
+            if entry[5:] in active_buffs:
+                return True
+        else:
+            if facts is None:
+                facts = get_target_facts(entity)
+            if entry in facts:
+                return True
     return False

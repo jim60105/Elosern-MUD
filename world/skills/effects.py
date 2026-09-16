@@ -496,6 +496,7 @@ class DamagePolicy:
     predicate: tuple[str, ...] = ()
     attack_multiplier: float = 1.0
     bypass_defense: bool = False
+    unconditional_defense_bypass: bool = False
     max_hp_fraction: float = 0.0
     repeat_when: str | None = None
     extra_strikes: int = 0
@@ -510,6 +511,7 @@ class DamagePolicy:
         target_facts: Sequence[str] | None = None,
         conditional_multiplier: float | None = None,
         conditional_defense_bypass: bool | None = None,
+        unconditional_defense_bypass: bool = False,
         repeat_when: str | None = None,
         extra_strikes: int | None = None,
     ) -> None:
@@ -529,6 +531,7 @@ class DamagePolicy:
         object.__setattr__(self, "predicate", predicate)
         object.__setattr__(self, "attack_multiplier", attack_multiplier)
         object.__setattr__(self, "bypass_defense", bypass_defense)
+        object.__setattr__(self, "unconditional_defense_bypass", unconditional_defense_bypass)
         object.__setattr__(self, "max_hp_fraction", max_hp_fraction)
         object.__setattr__(self, "repeat_when", repeat_when)
         object.__setattr__(self, "extra_strikes", extra_strikes)
@@ -559,18 +562,26 @@ class DamagePolicy:
                 raise ValueError(
                     f"DamagePolicy predicate entry must be a string, got {type(entry).__name__}: {entry!r}"
                 )
-            if ":" in entry:
-                raise ValueError(
-                    f"DamagePolicy predicate entries must be bare registry keys, not namespaced: {entry!r}"
-                )
             if entry in seen:
                 raise ValueError(
                     f"duplicate DamagePolicy predicate entry: {entry!r}"
                 )
-            if entry not in ELEMENT_REGISTRY and entry not in COMBAT_TRAITS_VOCABULARY:
-                raise ValueError(
-                    f"unknown DamagePolicy predicate fact {entry!r}; must be in ELEMENT_REGISTRY or COMBAT_TRAITS_VOCABULARY"
-                )
+            if ":" in entry:
+                parts = entry.split(":", 1)
+                if parts[0] == "buff":
+                    if parts[1] not in _known_buff_keys():
+                        raise ValueError(
+                            f"unknown DamagePolicy predicate buff definition {parts[1]!r}; must be in BUFF_DEFINITIONS"
+                        )
+                else:
+                    raise ValueError(
+                        f"DamagePolicy predicate entries must be bare registry keys, not namespaced: {entry!r}"
+                    )
+            else:
+                if entry not in ELEMENT_REGISTRY and entry not in COMBAT_TRAITS_VOCABULARY:
+                    raise ValueError(
+                        f"unknown DamagePolicy predicate fact {entry!r}; must be in ELEMENT_REGISTRY or COMBAT_TRAITS_VOCABULARY"
+                    )
             seen.add(entry)
             validated_predicate.append(entry)
         canon_pred = tuple(validated_predicate)
@@ -597,6 +608,16 @@ class DamagePolicy:
         if not isinstance(self.bypass_defense, bool):
             raise ValueError(
                 f"DamagePolicy bypass_defense must be a bool, got {type(self.bypass_defense).__name__}"
+            )
+
+        if not isinstance(self.unconditional_defense_bypass, bool):
+            raise ValueError(
+                f"DamagePolicy unconditional_defense_bypass must be a bool, got {type(self.unconditional_defense_bypass).__name__}"
+            )
+
+        if self.unconditional_defense_bypass and self.bypass_defense:
+            raise ValueError(
+                "DamagePolicy cannot declare both bypass_defense=True and unconditional_defense_bypass=True"
             )
 
         if isinstance(self.max_hp_fraction, bool) or not isinstance(

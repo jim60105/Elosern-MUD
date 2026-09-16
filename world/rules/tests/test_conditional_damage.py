@@ -171,6 +171,58 @@ _T_UNCONDITIONAL_BYPASS = make_skill(
     ),
 )
 
+_T_BUFF_JUDGMENT = make_skill(
+    "t_buff_judgment",
+    element=_T_BASE_DAMAGE.element,
+    effects=("damage:fire:magic",),
+    effect_policies=(
+        EffectPolicy(
+            coefficient=1.0,
+            damage=DamagePolicy(
+                predicate=("buff:focus",),
+                attack_multiplier=1.5,
+                bypass_defense=False,
+                max_hp_fraction=0.0,
+            ),
+        ),
+    ),
+)
+
+_T_COMPOSED_JUDGMENT = make_skill(
+    "t_composed_judgment",
+    element=_T_BASE_DAMAGE.element,
+    effects=("damage:fire:magic",),
+    effect_policies=(
+        EffectPolicy(
+            coefficient=1.0,
+            damage=DamagePolicy(
+                predicate=("undead", "buff:focus"),
+                attack_multiplier=1.5,
+                bypass_defense=False,
+                max_hp_fraction=0.0,
+            ),
+        ),
+    ),
+)
+
+_T_UNCONDITIONAL_BYPASS_BUFF = make_skill(
+    "t_unconditional_bypass_buff",
+    element=_T_BASE_DAMAGE.element,
+    effects=("damage:fire:magic",),
+    effect_policies=(
+        EffectPolicy(
+            coefficient=1.0,
+            damage=DamagePolicy(
+                predicate=("buff:focus",),
+                attack_multiplier=1.5,
+                unconditional_defense_bypass=True,
+                bypass_defense=False,
+                max_hp_fraction=0.0,
+            ),
+        ),
+    ),
+)
+
 _EXTRA_SKILLS = {
     _T_BASE_DAMAGE.key: _T_BASE_DAMAGE,
     _T_JUDGMENT_BURST.key: _T_JUDGMENT_BURST,
@@ -179,6 +231,9 @@ _EXTRA_SKILLS = {
     _T_BYPASS_DEVASTATION.key: _T_BYPASS_DEVASTATION,
     _T_WATER_HUNTER.key: _T_WATER_HUNTER,
     _T_UNCONDITIONAL_BYPASS.key: _T_UNCONDITIONAL_BYPASS,
+    _T_BUFF_JUDGMENT.key: _T_BUFF_JUDGMENT,
+    _T_COMPOSED_JUDGMENT.key: _T_COMPOSED_JUDGMENT,
+    _T_UNCONDITIONAL_BYPASS_BUFF.key: _T_UNCONDITIONAL_BYPASS_BUFF,
 }
 _SCOPE = synthetic_registries("skills", extra={"skills": _EXTRA_SKILLS})
 
@@ -212,6 +267,42 @@ class DamagePolicyValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(predicate=("combat_trait:undead",), attack_multiplier=1.5)
         self.assertIn("bare registry keys, not namespaced", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(predicate=("terrain:cracked",), attack_multiplier=1.5)
+        self.assertIn("bare registry keys, not namespaced", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(predicate=("buff:unknown_buff_xyz",), attack_multiplier=1.5)
+        self.assertIn("unknown DamagePolicy predicate buff definition", str(ctx.exception))
+
+    def test_unconditional_defense_bypass_validation(self):
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(
+                predicate=("dark",),
+                bypass_defense=True,
+                unconditional_defense_bypass=True,
+            )
+        self.assertIn("cannot declare both", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(
+                predicate=("dark",),
+                unconditional_defense_bypass="yes",
+            )
+        self.assertIn("must be a bool", str(ctx.exception))
+
+        policy = DamagePolicy(predicate=(), unconditional_defense_bypass=True)
+        self.assertTrue(policy.unconditional_defense_bypass)
+        self.assertFalse(policy.bypass_defense)
+
+        policy = DamagePolicy(
+            predicate=("dark",),
+            attack_multiplier=1.5,
+            unconditional_defense_bypass=True,
+        )
+        self.assertTrue(policy.unconditional_defense_bypass)
+        self.assertFalse(policy.bypass_defense)
 
     def test_unknown_predicate_fact_raises(self):
         with self.assertRaises(ValueError) as ctx:
@@ -471,6 +562,99 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
 
         # Exactly rider difference
         self.assertEqual(damage_with_rider - damage_base, rider)
+
+    @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching"
+    )
+    def test_dynamic_buff_predicate_matches_while_live(self):
+        """A dynamic buff predicate matches if and only if the target currently holds a live instance."""
+        from world.rules.buffs import apply_buff
+
+        restore_gauges_to_full(self.target)
+        before_hp = _stored_hp(self.target)
+
+        result = self._resolve_cast(_T_BUFF_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_without_buff = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_without_buff, 20)
+
+        apply_buff(self.target, "focus")
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_BUFF_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_with_buff = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_with_buff, 40)
+        self.assertGreater(damage_with_buff, damage_without_buff)
+
+        self.target.buffs.all["focus"].remaining_seconds = 0
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_BUFF_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_expired_buff = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_expired_buff, 20)
+
+    @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching"
+    )
+    def test_dynamic_buff_predicate_composes_any_match_once(self):
+        """Composing a static fact and a buff fact matches ANY-once, not twice."""
+        from world.rules.buffs import apply_buff
+
+        before_hp = _stored_hp(self.target)
+
+        set_combat_traits(self.target, ["undead"])
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_COMPOSED_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_undead_only = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_undead_only, 40)
+
+        set_combat_traits(self.target, [])
+        apply_buff(self.target, "focus")
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_COMPOSED_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_buff_only = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_buff_only, 40)
+
+        set_combat_traits(self.target, ["undead"])
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_COMPOSED_JUDGMENT.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_both = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_both, 40)
+        self.assertEqual(damage_both, damage_undead_only)
+        self.assertEqual(damage_both, damage_buff_only)
+
+    @covers_requirement(
+        "skill-effect-model::conditional-damage-policies-compose-without-double-matching"
+    )
+    def test_unconditional_defense_bypass_bypasses_for_all_targets(self):
+        """unconditional_defense_bypass skips defense subtraction regardless of predicate match, while multiplier remains conditional."""
+        from world.rules.buffs import apply_buff
+
+        self.target.traits.defense.base = 20
+        before_hp = _stored_hp(self.target)
+
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_UNCONDITIONAL_BYPASS_BUFF.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_without_buff = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_without_buff, 40)
+
+        apply_buff(self.target, "focus")
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_UNCONDITIONAL_BYPASS_BUFF.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_with_buff = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_with_buff, 60)
+
+        self.target.db.affinity_elements = []
+        restore_gauges_to_full(self.target)
+        result = self._resolve_cast(_T_EXECUTION_BURST.key, roll=60)
+        self.assertEqual(result.outcome, "success")
+        damage_conditional_not_matched = before_hp - _stored_hp(self.target)
+        self.assertEqual(damage_conditional_not_matched, 20)
 
     @covers_requirement(
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
