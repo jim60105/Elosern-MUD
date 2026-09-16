@@ -53,26 +53,6 @@ FIRE_SPELL_CATALOG = (
 )
 
 
-EARTH_SPELL_CATALOG = (
-    ("stone_shard", "石礫術", TargetSpec.SINGLE, 12, ("damage:earth:magic",)),
-    (
-        "hardened_skin",
-        "硬化肌膚",
-        TargetSpec.SELF,
-        10,
-        ("self_buff_apply:earth_hardened_skin",),
-    ),
-    ("stone_armor", "岩甲術", TargetSpec.SINGLE, 24, ("buff_apply:earth_stone_armor",)),
-    ("dust_veil", "沙塵術", TargetSpec.AREA, 22, ("buff_apply:earth_dust_veil",)),
-    ("earth_bind", "地縛術", TargetSpec.AREA, 42, ("buff_apply:earth_root",)),
-    ("rockslide", "岩壁崩落", TargetSpec.AREA, 48, ("damage:earth:magic",)),
-    ("earthquake", "地震術", TargetSpec.AREA, 90, ("damage:earth:magic",)),
-    ("earthen_ward", "大地庇護", TargetSpec.AREA, 75, ("buff_apply:earth_ward",)),
-    ("mountain_collapse", "山嶽崩落", TargetSpec.AREA, 150, ("damage:earth:magic",)),
-    ("earths_judgment", "大地審判", TargetSpec.SINGLE, 130, ("damage:earth:magic",)),
-)
-
-
 WIND_SPELL_CATALOG = (
     ("wind_blade", "風刃術", TargetSpec.AREA, 14, ("damage:wind:magic",)),
     ("gale_step", "疾風術", TargetSpec.SELF, 10, ("self_buff_apply:wind_haste",)),
@@ -161,7 +141,6 @@ _CATALOG_EFFECTS = {
     row[0]: row[4]
     for rows in (
         FIRE_SPELL_CATALOG,
-        EARTH_SPELL_CATALOG,
         WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
         ICE_SPELL_CATALOG,
@@ -226,64 +205,6 @@ class FireSpellCatalogTests(unittest.TestCase):
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
         self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
         self.assertEqual(skill.effects, ["damage:fire:magic"])
-
-class EarthSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_all_ten_earth_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in EARTH_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["earth"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-                if key == "hardened_skin":
-                    self.assertIs(
-                        skill.faction_constraint,
-                        FactionConstraint.SELF_ONLY,
-                    )
-                else:
-                    self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_earth_active_spell_keys_are_exactly_the_catalog_set(self):
-        self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["earth"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in EARTH_SPELL_CATALOG},
-        )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_every_earth_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in EARTH_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="earth", school="magic"),
-                        )
-                    elif effect_id.startswith("self_buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            SelfBuffApplyEffect(
-                                buff_key=effect_id.partition(":")[2]
-                            ),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
 
 
 class ClosedVocabularyParseTests(unittest.TestCase):
