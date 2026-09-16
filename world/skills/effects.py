@@ -569,9 +569,7 @@ class DamagePolicy:
             if ":" in entry:
                 parts = entry.split(":", 1)
                 if parts[0] == "buff":
-                    from world.rules.buffs import BUFF_DEFINITIONS
-
-                    if parts[1] not in BUFF_DEFINITIONS:
+                    if parts[1] not in _known_buff_keys():
                         raise ValueError(
                             f"unknown DamagePolicy predicate buff definition {parts[1]!r}; must be in BUFF_DEFINITIONS"
                         )

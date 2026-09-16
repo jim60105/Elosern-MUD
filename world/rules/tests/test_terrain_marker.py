@@ -186,14 +186,17 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         apply_buff(self.player, "t_control_buff")
         self.assertIn("t_ground_hazard", entity_active_buffs(self.player))
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
+        hp_before = self.player.traits.hp.current
 
         removed = remove_ground_markers(self.player)
         self.assertEqual(removed, 1)
         self.assertNotIn("t_ground_hazard", entity_active_buffs(self.player))
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
+        self.assertEqual(self.player.traits.hp.current, hp_before)
 
         # Idempotent: second call returns 0 and writes nothing
         self.assertEqual(remove_ground_markers(self.player), 0)
+        self.assertEqual(self.player.traits.hp.current, hp_before)
 
     def test_fleeing_extinguishes_marker_while_control_buff_persists(self):
         """A fleeing participant steps off the ground hazard at flee settlement; control buff persists."""
