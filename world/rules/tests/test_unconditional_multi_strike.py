@@ -6,6 +6,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, ActionResolver, PendingEffect
 from world.rules.action_evidence import has_action_evidence, stage_action_evidence
@@ -53,6 +54,7 @@ _SCOPE = synthetic_registries("skills", extra={"skills": _EXTRA_SKILLS})
 class UnconditionalMultiStrikeConstructionTests(unittest.TestCase):
     """Validation and construction matrix tests for DamagePolicy."""
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_well_formed_shapes_construct(self):
         """WHEN valid policies declare extra strikes with or without predicate, they construct."""
         # Unconditional extra strike
@@ -75,6 +77,7 @@ class UnconditionalMultiStrikeConstructionTests(unittest.TestCase):
         self.assertEqual(p4.extra_strikes, 0)
         self.assertIsNone(p4.repeat_when)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_malformed_shapes_raise_value_error(self):
         """WHEN policies declare invalid extra_strikes or repeat_when combinations, they raise."""
         # Unknown evidence kind
@@ -148,6 +151,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
             event_ctx["nonlethal_keys"] = nonlethal_keys
         return bf, BattlefieldActionContext(bf, event_context=event_ctx)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_roll_matrix_hit_hit_records_two_rolls_and_deals_equal_damage(self):
         """WHEN both rolls hit, exactly two rolls are recorded, equal damage is dealt, and cost/practice paid once."""
         initial_hp = _stored_hp(self.target)
@@ -183,6 +187,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         # Practice awarded exactly once
         mock_practice.assert_called_once()
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_roll_matrix_miss_hit_first_miss_does_not_suppress_second_hit(self):
         """WHEN strike 1 misses and strike 2 hits, strike 2 damages target and both rolls are recorded."""
         initial_hp = _stored_hp(self.target)
@@ -203,6 +208,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(len(damages), 1)
         self.assertEqual(initial_hp - _stored_hp(self.target), damages[0].data["amount"])
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_roll_matrix_hit_miss_first_hit_second_miss(self):
         """WHEN strike 1 hits and strike 2 misses, strike 1 damages target and both rolls are recorded."""
         initial_hp = _stored_hp(self.target)
@@ -223,6 +229,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(len(damages), 1)
         self.assertEqual(initial_hp - _stored_hp(self.target), damages[0].data["amount"])
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_roll_matrix_miss_miss_deals_zero_damage(self):
         """WHEN both strikes miss, zero damage is dealt and target HP is unchanged."""
         initial_hp = _stored_hp(self.target)
@@ -243,6 +250,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(len(damages), 0)
         self.assertEqual(_stored_hp(self.target), initial_hp)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_unconditional_policy_ignores_target_action_evidence(self):
         """WHEN target carries fresh evidence or none, an unconditional policy always resolves two strikes."""
         # Case A: target has no evidence
@@ -268,6 +276,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         rolls_ev = [e for e in res_ev.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(rolls_ev), 2)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_ordered_hp_projection_and_single_terminal_defeat(self):
         """WHEN two strikes cross target HP lethally, exactly one target_defeated entry is emitted."""
         self.target.traits.hp.base = 25
@@ -285,6 +294,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(len(defeats), 1)
         self.assertEqual(defeats[0].target, str(self.target.key))
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_nonlethal_floors_at_1_hp_with_single_knockout_mark(self):
         """WHEN two strikes cross HP in nonlethal combat, HP floors at 1 with exactly one knockout mark."""
         self.target.traits.hp.base = 20
@@ -304,6 +314,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(kos[0].target, str(self.target.key))
         self.assertIn(str(self.target.key), bf.knocked_out)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_atomic_rollback_restores_hp_on_commit_failure(self):
         """WHEN a commit step fails after two strikes, atomic rollback restores HP fully."""
         initial_hp = _stored_hp(self.target)
@@ -326,6 +337,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(_stored_hp(self.target), initial_hp)
 
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_control_skill_without_damage_policy_resolves_single_strike(self):
         """WHEN a policy-free control skill resolves, it executes exactly one strike."""
         bf, ctx = self._make_bf()
