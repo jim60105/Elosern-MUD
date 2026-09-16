@@ -15,8 +15,8 @@
 
 ## 2. Echo-test retirement and docs hygiene
 
-- [ ] 2.1 Remove the dark `DARK_SPELL_CATALOG` table and its test class from `world/skills/tests/test_spell_catalogs.py` and the dark rows from the tier-correspondence table in the cost-tier test, in-file; adjust a `tools/test_data_lint.json` per-file entry only where its file stops naming shipped content as that linter's output decides; verify remaining suites' substantive coverage is untouched (no waivers).
-- [ ] 2.2 Docs check under the node-data authority rule: `docs/lore/skill-trees/dark.md` untouched; `docs/lore/magic-system.md` §3 dark row edited ONLY if a real contradiction surfaces (none found at authoring — record the check); `tests/test_command_docs.py` untouched (no command surface changes); the 2026-08-12 design doc is frozen history — never edited.
+ [x] 2.1 Remove the dark `DARK_SPELL_CATALOG` table and its test class from `world/skills/tests/test_spell_catalogs.py` and the dark rows from the tier-correspondence table in the cost-tier test, in-file; adjust a `tools/test_data_lint.json` per-file entry only where its file stops naming shipped content as that linter's output decides; verify remaining suites' substantive coverage is untouched (no waivers).
+ [x] 2.2 Docs check under the node-data authority rule: `docs/lore/skill-trees/dark.md` untouched; `docs/lore/magic-system.md` §3 dark row edited ONLY if a real contradiction surfaces (none found at authoring — record the check); `tests/test_command_docs.py` untouched (no command surface changes); the 2026-08-12 design doc is frozen history — never edited.
 
 ## 3. Behavioral evidence and integration
 
