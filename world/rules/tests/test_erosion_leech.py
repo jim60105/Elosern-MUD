@@ -73,7 +73,8 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
         return effects
 
     @covers_requirement(
-        "buff-handler-integration::damaging-rate-buffs-persist-a-validated-effect-source-identity-in-the-buff-cache"
+        "buff-handler-integration::damaging-rate-buffs-persist-a-validated-effect-source-identity-in-the-buff-cache",
+        "erosion-leech::a-damaging-hp-rate-tick-credits-its-origin-caster-through-one-clamped-exactly-once-leg",
     )
     def test_full_share_erosion_tick_moves_actual_loss_to_caster(self):
         buff_def = self._register_synth_buff(
@@ -216,6 +217,9 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
         self.assertEqual(records[0].delta, -5)
         self.assertEqual(records[0].source_pk, int(self.caster.pk))
 
+    @covers_requirement(
+        "erosion-leech::leech-origin-is-the-grant-time-snapshot-and-extinguishes-with-either-party",
+    )
     def test_refresh_redirects_credit_to_newest_applier(self):
         buff_def = self._register_synth_buff(
             BuffDefinition(
