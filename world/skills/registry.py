@@ -326,8 +326,9 @@ class SkillDef:
         for policy, parsed, effect_id in zip(
             self.effect_policies, self.parsed_effects, self.effects
         ):
-            if policy.coefficient != 1.0 and not isinstance(
-                parsed, (DamageEffect, HealEffect, SelfHealEffect)
+            if policy.coefficient != 1.0 and not (
+                isinstance(parsed, (DamageEffect, HealEffect))
+                or (isinstance(parsed, SelfHealEffect) and parsed.basis == "stat")
             ):
                 raise ValueError(
                     f"skill {self.key!r} effect {effect_id!r} does not support "
