@@ -344,6 +344,32 @@ class HealEffect:
 class SelfHealEffect:
     """Restore the acting entity's HP, capped at the caster's maximum."""
 
+    basis: Literal["stat", "missing_fraction"] = "stat"
+    fraction: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.basis == "stat":
+            if self.fraction is not None:
+                raise ValueError(
+                    f"stat self_heal takes no fraction argument, got {self.fraction!r}"
+                )
+        elif self.basis == "missing_fraction":
+            if isinstance(self.fraction, bool) or not isinstance(
+                self.fraction, (int, float)
+            ):
+                raise ValueError(
+                    f"missing_fraction must be a number, got {self.fraction!r}"
+                )
+            frac = float(self.fraction)
+            if not isfinite(frac) or not (0.0 < frac <= 1.0):
+                raise ValueError(
+                    f"missing_fraction must be finite in (0, 1], got {self.fraction!r}"
+                )
+            object.__setattr__(self, "fraction", frac)
+        else:
+            raise ValueError(
+                f"SelfHealEffect basis must be 'stat' or 'missing_fraction', got {self.basis!r}"
+            )
 
 @dataclass(frozen=True)
 class DisengageEffect:
@@ -1039,8 +1065,20 @@ def parse_effect(effect_id: str) -> object:
             )
         return HealEffect(shape=shape)
     if prefix == "self_heal":
-        _parse_bare(effect_id, prefix)
-        return SelfHealEffect()
+        if effect_id == "self_heal":
+            return SelfHealEffect()
+        parts = effect_id.split(":")
+        if len(parts) == 3 and parts[1] == "missing_fraction":
+            try:
+                frac_val = float(parts[2])
+            except ValueError as error:
+                raise ValueError(
+                    f"self_heal missing_fraction magnitude must be a number, got {parts[2]!r}"
+                ) from error
+            return SelfHealEffect(basis="missing_fraction", fraction=frac_val)
+        raise ValueError(
+            f"self_heal effect must be 'self_heal' or 'self_heal:missing_fraction:<fraction>', got {effect_id!r}"
+        )
     if prefix == "disengage":
         return DisengageEffect(mode=_parse_single_arg(effect_id, prefix))
     if prefix == "cleanse":

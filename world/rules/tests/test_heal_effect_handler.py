@@ -28,6 +28,7 @@ from world.rules.combat import (
     _heal_magnitude,
     _parse_heal_effect,
 )
+from world.skills.effects import EffectPolicy
 from world.skills.registry import (
     SkillCategory,
     SkillDef,
@@ -113,6 +114,105 @@ class HealEffectHandlerTests(unittest.TestCase):
         pending.apply()
         self.assertEqual(actor.traits.hp.value, 50)
         self.assertEqual(target.traits.hp.value, 100)
+
+    @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
+    def test_self_heal_missing_fraction_reads_caster_gap_and_ignores_target(self):
+        actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
+        target = FakeEntity("target", hp=10, max_hp=100)
+        pending = _handle_self_heal(
+            actor, [target], "self_heal:missing_fraction:0.1", {}, 1.0
+        )[0]
+        # Caster missing HP is 100 - 30 = 70. 70 * 0.1 = 7. Target's gap (90) is ignored.
+        self.assertEqual(pending.description, "self_heal|actor|7")
+        pending.apply()
+        self.assertEqual(actor.traits.hp.value, 37)
+        self.assertEqual(target.traits.hp.value, 10)
+
+    @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
+    def test_self_heal_missing_fraction_clamped_at_max_hp_and_full_hp_stages_zero(self):
+        # Full HP caster stages 0 and raises no exception
+        full_actor = FakeEntity("full", hp=100, max_hp=100)
+        pending_full = _handle_self_heal(
+            full_actor, [], "self_heal:missing_fraction:0.5", {}, 1.0
+        )[0]
+        self.assertEqual(pending_full.description, "self_heal|full|0")
+        pending_full.apply()
+        self.assertEqual(full_actor.traits.hp.value, 100)
+
+        # Near-max caster: fraction 1.0 restores missing gap, capped at max
+        near_full = FakeEntity("near", hp=95, max_hp=100)
+        pending_near = _handle_self_heal(
+            near_full, [], "self_heal:missing_fraction:1.0", {}, 1.0
+        )[0]
+        self.assertEqual(pending_near.description, "self_heal|near|5")
+        pending_near.apply()
+        self.assertEqual(near_full.traits.hp.value, 100)
+
+        # Over-gap scaled cast: gap is 30, fraction 1.0 -> base 30 -> scale 2.0 -> scaled 60.
+        # Restored amount MUST clamp to the missing gap of 30, not 60.
+        scaled_actor = FakeEntity("scaled", hp=70, max_hp=100)
+        pending_over = _handle_self_heal(
+            scaled_actor, [], "self_heal:missing_fraction:1.0", {}, 2.0
+        )[0]
+        self.assertEqual(pending_over.description, "self_heal|scaled|30")
+        pending_over.apply()
+        self.assertEqual(scaled_actor.traits.hp.value, 100)
+
+    @covers_requirement("heal-effect-handler::neither-heal-nor-self-heal-can-revive-a-knocked-out-target")
+    def test_self_heal_missing_fraction_dead_caster_never_revives(self):
+        dead_actor = FakeEntity("dead", hp=0, max_hp=100)
+        pending = _handle_self_heal(
+            dead_actor, [], "self_heal:missing_fraction:0.5", {}, 1.0
+        )[0]
+        self.assertEqual(pending.description, "self_heal|dead|0")
+        pending.apply()
+        self.assertEqual(dead_actor.traits.hp.value, 0)
+
+    @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
+    def test_self_heal_missing_fraction_scale_and_heal_gain_composition(self):
+        actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
+        with patch(
+            "world.rules.combat.evaluate_combat_modifiers",
+            return_value={"heal_gain": "+50%"},
+        ):
+            stat_amount = _heal_magnitude(actor)
+            self.assertGreater(stat_amount, 20)
+            # heal_gain DOES NOT amplify missing_fraction basis:
+            # gap=70 -> base=7 -> scale=0.5 -> scaled_magnitude(7, 0.5) = 4
+            pending_scaled = _handle_self_heal(
+                actor, [], "self_heal:missing_fraction:0.1", {}, 0.5
+            )[0]
+            self.assertEqual(pending_scaled.description, "self_heal|actor|4")
+
+    def test_self_heal_missing_fraction_rejects_non_identity_coefficient_at_construction(self):
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="invalid_missing_fraction_potency",
+                label="Invalid Potency",
+                description="Test",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SELF,
+                cost={},
+                usable_out_of_combat=True,
+                element=None,
+                effects=["self_heal:missing_fraction:0.1"],
+                category=SkillCategory.UTILITY,
+                effect_policies=(EffectPolicy(coefficient=1.5),),
+            )
+        valid = SkillDef(
+            key="valid_stat_self_heal_potency",
+            label="Valid Potency",
+            description="Test",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SELF,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=["self_heal"],
+            category=SkillCategory.UTILITY,
+            effect_policies=(EffectPolicy(coefficient=1.5),),
+        )
+        self.assertEqual(valid.effect_policies[0].coefficient, 1.5)
 
     def test_heal_entries_emit_a_heal_event_with_amount(self):
         actor = FakeEntity("actor")
@@ -279,6 +379,26 @@ class HealResolverIntegrationTests(EvenniaTestCase):
             min(100, 30 + _heal_magnitude(self.actor)),
         )
 
+    @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
+    def test_self_heal_missing_fraction_restores_caster_while_damage_hits_enemy(self):
+        skill = self._grant(
+            ["damage:fire:magic", "self_heal:missing_fraction:0.1"],
+            TargetSpec.SINGLE,
+        )
+        enemy = self.battlefield.roster["enemy"]
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                return_value={},
+            ),
+        ):
+            result = ActionResolver.resolve(self._request(skill, [enemy]))
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(enemy.traits.hp.current, 60)
+        # Caster missing HP is 100 - 30 = 70. 10% is 7. HP becomes 37.
+        self.assertEqual(self.actor.traits.hp.current, 37)
+
     @covers_requirement("heal-effect-handler::neither-heal-nor-self-heal-can-revive-a-knocked-out-target")
     def test_heal_targeting_a_knocked_out_ally_is_rejected_before_the_handler(self):
         skill = self._grant(["heal:single"], TargetSpec.SINGLE)
@@ -316,3 +436,19 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         result = ActionResolver.resolve(self._request(skill, []))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.hp.current, 0)
+
+    @covers_requirement("heal-effect-handler::neither-heal-nor-self-heal-can-revive-a-knocked-out-target")
+    def test_dead_caster_missing_fraction_self_heal_does_not_revive(self):
+        skill = self._grant(["self_heal:missing_fraction:0.2"], TargetSpec.NONE)
+        self.actor.traits.hp.current = 0
+        result = ActionResolver.resolve(self._request(skill, []))
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.traits.hp.current, 0)
+
+    @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
+    def test_full_hp_caster_missing_fraction_self_heal_stages_zero(self):
+        skill = self._grant(["self_heal:missing_fraction:0.1"], TargetSpec.NONE)
+        self.actor.traits.hp.current = 100
+        result = ActionResolver.resolve(self._request(skill, []))
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.traits.hp.current, 100)

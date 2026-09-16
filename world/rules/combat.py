@@ -38,10 +38,17 @@ from world.rules.action_evidence import has_action_evidence
 from world.rules.progression import can_use_skill, scaled_magnitude
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
+from world.rules.state_reactions import dispatch_outcome_reaction
 from world.rules.target_facts import matches_target_predicate
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
-from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
+from world.skills.effects import (
+    DamagePolicy,
+    EffectPolicy,
+    ResolvedEffect,
+    SelfHealEffect,
+    parse_effect,
+)
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -455,8 +462,6 @@ def _handle_damage(
                 after = _stored_trait_value(target.traits.hp)
                 actual_loss = max(0, int(before - max(0.0, after)))
                 if actual_loss > 0:
-                    from world.rules.state_reactions import dispatch_outcome_reaction
-
                     dispatch_outcome_reaction(
                         target, "hp_loss", source_tier=source_tier
                     )
@@ -574,6 +579,13 @@ def _parse_heal_effect(effect_id: str) -> str:
     return parts[1]
 
 
+def _parse_self_heal_effect(effect_id: str) -> SelfHealEffect:
+    parsed = parse_effect(effect_id)
+    if not isinstance(parsed, SelfHealEffect):
+        raise ValueError(f"expected self_heal effect, got {effect_id!r}")
+    return parsed
+
+
 def _restored_amount(entity: Any, amount: int) -> int:
     """Return how much of a heal actually applies to one entity right now.
 
@@ -656,10 +668,17 @@ def _handle_self_heal(
     damages an enemy", so this effect binds the actor instead of ``targets``.
     """
     del targets
-    if effect_id != "self_heal":
-        raise ValueError("self_heal effect takes no argument")
-    coefficient = _extract_effect_coefficient(event_context)
-    amount = scaled_magnitude(_heal_magnitude(actor, coefficient), scale)
+    parsed = _parse_self_heal_effect(effect_id)
+    if parsed.basis == "stat":
+        coefficient = _extract_effect_coefficient(event_context)
+        amount = scaled_magnitude(_heal_magnitude(actor, coefficient), scale)
+    elif parsed.basis == "missing_fraction":
+        current = _stored_trait_value(actor.traits.hp)
+        missing_hp = max(0.0, _max_hp(actor) - current) if current > 0 else 0.0
+        base_amount = int(round(missing_hp * parsed.fraction))
+        amount = scaled_magnitude(base_amount, scale) if base_amount > 0 else 0
+    else:
+        raise ValueError(f"unsupported self_heal basis: {parsed.basis!r}")
     restored = _restored_amount(actor, amount)
     return [
         PendingEffect(

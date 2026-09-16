@@ -202,14 +202,36 @@ class ParseEffectTests(unittest.TestCase):
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_self_heal_parses_into_its_dataclass(self):
-        # The bare prefix IS the whole shipped effect ID (closed vocabulary);
-        # its positive parse assertion lives in the registered skill-registry
-        # content contract. What remains here is the arity boundary.
+        self.assertEqual(
+            parse_effect("self_heal"),
+            SelfHealEffect(basis="stat", fraction=None),
+        )
+        self.assertEqual(
+            parse_effect("self_heal:missing_fraction:0.1"),
+            SelfHealEffect(basis="missing_fraction", fraction=0.1),
+        )
+        self.assertEqual(
+            parse_effect("self_heal:missing_fraction:1.0"),
+            SelfHealEffect(basis="missing_fraction", fraction=1.0),
+        )
         with self.assertRaises(ValueError):
             parse_effect("self_heal:")
 
     def test_malformed_heal_payload_raises(self):
-        for effect in ("heal", "heal:allies", "self_heal:single", "self_heal:area"):
+        for effect in (
+            "heal",
+            "heal:allies",
+            "self_heal:single",
+            "self_heal:area",
+            "self_heal:missing_fraction",
+            "self_heal:missing_fraction:0",
+            "self_heal:missing_fraction:1.5",
+            "self_heal:missing_fraction:-0.1",
+            "self_heal:missing_fraction:abc",
+            "self_heal:missing_fraction:nan",
+            "self_heal:missing_fraction:inf",
+            "self_heal:missing_fraction:0.1:extra",
+        ):
             with self.subTest(effect=effect):
                 with self.assertRaises(ValueError):
                     parse_effect(effect)

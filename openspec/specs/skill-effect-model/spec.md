@@ -36,6 +36,13 @@ payload at parse (and therefore at registry load). The corresponding immutable
 within [0,1], bonus entries naming only existing buff-definition keys, bonuses declared only for
 restore directions, an hp restore direction rejected as a construction error (HP restoration is the
 heal effect's exclusive verb), and no potency coefficient attached to a transfer occurrence.
+`self_heal` SHALL accept exactly two grammar forms on its one recognized prefix: the bare form,
+parsing to the defaulted stat-basis `SelfHealEffect` exactly as before, and
+`self_heal:missing_fraction:<finite fraction in (0,1]>`, parsing to a typed `SelfHealEffect`
+carrying the missing-HP magnitude basis and its validated fraction. Every other `self_heal` payload
+SHALL keep raising `ValueError` (and therefore failing at registry load), and a non-identity potency
+coefficient attached to a `missing_fraction` occurrence SHALL be rejected at skill construction
+(the declared fraction IS the magnitude).
 
 #### Scenario: A known prefix parses into its dataclass
 - **WHEN** `parse_effect("stat_multiply:atk_phys:100")` is called
@@ -82,6 +89,18 @@ heal effect's exclusive verb), and no potency coefficient attached to a transfer
 - **WHEN** authoring attaches a recovery share outside [0,1], a per-stack bonus naming an unknown buff key,
   a bonus on a drain direction, an hp restore declaration, or a non-identity potency coefficient to a transfer policy
 - **THEN** skill construction raises and no cast can be attempted
+
+#### Scenario: Self-heal magnitude modes parse and every other payload fails closed
+- **WHEN** `parse_effect("self_heal")` and `parse_effect("self_heal:missing_fraction:0.1")` are
+  called, and separately `parse_effect("self_heal:missing_fraction")`,
+  `parse_effect("self_heal:missing_fraction:0")`, `parse_effect("self_heal:missing_fraction:1.5")`,
+  `parse_effect("self_heal:missing_fraction:-0.1")`, `parse_effect("self_heal:missing_fraction:abc")`
+  and `parse_effect("self_heal:missing_fraction:0.1:extra")` are called, and authoring attaches a
+  non-identity potency coefficient to a missing-fraction occurrence
+- **THEN** the bare form returns the defaulted stat-basis dataclass, the fraction form returns the
+  typed dataclass carrying the missing-HP basis and its fraction, every malformed form raises
+  `ValueError` before any cast is possible, and the coefficient attachment raises at skill
+  construction
 
 #### Scenario: Every shipped registry effect still parses
 - **WHEN** `SKILL_REGISTRY` is imported after this change and every registered effect string is parsed
