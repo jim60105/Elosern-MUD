@@ -67,6 +67,7 @@
         "world.rules.tests.test_equipment_sexual_effects",
         "world.rules.tests.test_equipment_toggle",
         "world.rules.tests.test_equipment_worn_grace_rules",
+        "world.rules.tests.test_erosion_leech",
         "world.rules.tests.test_event_log"
       ]
     },
