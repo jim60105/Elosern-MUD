@@ -346,7 +346,7 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
     lives in this registered data-contract file.
     """
 
-    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
+    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
     def test_fire_tree_edges_are_as_designed(self):
         expected = {
             "fire_ball": (SkillPrerequisite("fire_arrow", 3),),
@@ -379,7 +379,7 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
             (("crimson_apotheosis", 10),),
         )
 
-    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
+    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
     def test_mastery_passives_stay_out_of_the_graph(self):
         for element_key in ELEMENT_REGISTRY:
             mastery_key = f"{element_key}_mastery"

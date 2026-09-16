@@ -208,7 +208,7 @@ pre-change callable.
 
 #### Scenario: A damaging tick returns one ordered record
 - **WHEN** `tick_buffs(entity, 10)` fires both `poisoned` and `fire_scorch` in one call on a living entity
-- **THEN** it returns two records in application order, each carrying the definition key, the buff cache's `source_pk` (or `None`), delta `-5`, and the entity's HP immediately before that tick applied
+- **THEN** it returns two records in application order, each carrying the definition key, the buff cache's `source_pk` (or `None`), its configured rate delta (`-5` and `-8` respectively), and the entity's HP immediately before that tick applied
 
 #### Scenario: Non-damaging ticks return no records
 - **WHEN** `tick_buffs(entity)` fires only marker buffs or the conferred growth-rate buff

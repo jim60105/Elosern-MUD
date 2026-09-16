@@ -26,6 +26,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
+from tools.spec_traceability import covers_requirement
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
@@ -259,6 +260,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         prof[skill_key] = level * SKILL_PROFICIENCY_XP_PER_LEVEL
         entity.db.skill_proficiency = prof
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_burn_ladder_scorches_at_authored_rung_and_expires(self):
         """Scenario: The burn ladder scorches at the authored rung and expires."""
         skill = self._register(
@@ -299,6 +303,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         tick_buffs(self.foe, 10)
         self.assertEqual(self.foe.traits.hp.current, hp_after_expiry)
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_burning_armor_ignites_physical_attackers_and_nothing_else(self):
         """Scenario: The burning armor ignites physical attackers and nothing else."""
         armor_skill = self._register(
@@ -402,6 +409,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self.assertNotIn("t_synth_armor_mount", entity_active_buffs(self.caster))
         self.assertIn("t_synth_ignite_debuff", entity_active_buffs(self.foe))
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_lava_hazard_burns_while_standing_and_extinguishes_on_exit(self):
         """Scenario: The lava hazard burns whoever keeps standing on it and steps off when they leave."""
         lava_skill = self._register(
@@ -449,6 +459,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         tick_buffs(self.foe, 10)
         self.assertEqual(self.foe.traits.hp.current, hp_mid - 8)
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_execution_rung_ignores_defense_and_immolation_costs_paid_on_cast(self):
         """Scenario: The execution rung ignores defense and the immolation costs are paid on cast."""
         # Execution skill with bypass_defense
@@ -547,6 +560,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         # No healing was applied (no heal/self_heal event in logs, HP did not increase)
         self.assertFalse(any(e.kind in ("heal", "self_heal") for e in res_hit.event_log.entries))
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_capstone_burns_enemies_and_self_as_three_independent_components(self):
         """Scenario: The capstone burns enemies and itself as three independent components."""
         capstone_skill = self._register(
@@ -600,6 +616,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         tick_buffs(self.caster, 10)
         self.assertEqual(self.caster.traits.hp.current, caster_before - 20)
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_branching_and_two_parent_capstone_gate_through_lineage_engine(self):
         """Scenario: Branching and the two-parent capstone gate through the lineage engine."""
         root = self._register(_make_synth_skill("t_tree_root"))
@@ -723,6 +742,9 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self._set_level(self.caster, parent_b.key, 10)
         self.assertTrue(can_use_skill(self.caster, capstone))
 
+    @covers_requirement(
+        "skill-registry::fire-spell-progression-composes-executable-burn-and-immolation-behavior"
+    )
     def test_retired_dev_era_clauses_resolve_as_ordinary_rejections(self):
         """Scenario: Retired dev-era clauses resolve as ordinary rejections."""
         req = ActionRequest(
