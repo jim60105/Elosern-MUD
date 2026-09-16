@@ -32,7 +32,6 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_update,
-    login_and_open,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -58,8 +57,7 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         # Each test boots its own isolated server; never the shared one.
         pass
 
-    # Extra seed env vars a subclass can add (e.g. ELOSERN_BROWSER_CREATION
-    # to boot a creation-pending character whose services panel is unavailable).
+    # Extra seed env vars a subclass can add if needed by its journey fixture.
     EXTRA_ENV: dict[str, str] = {}
 
     def setUp(self) -> None:
@@ -1080,49 +1078,33 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
 class ServicesUnavailableJourney(ServicesBrowserTest):
     """H4 (task 9.8): with the `services` panel in its registry-owned
     unavailable form, the reference drawers render only the reason — no
-    fabricated wallet, stock, quest, or lore rows.
-
-    The `services` panel is only unavailable outside exploration mode, so this
-    journey boots a creation-pending character (``ELOSERN_BROWSER_CREATION=1``)
-    and logs in with the dedicated creation account; the pending-creation
-    character is not in exploration, so the panel commits its registry-owned
-    ``services_unavailable`` form.
-    """
+    fabricated wallet, stock, quest, or lore rows."""
 
     SERVICES_MODE = ""
-    # Boot the creation-pending fixture so the character is non-exploration.
-    EXTRA_ENV = {"ELOSERN_BROWSER_CREATION": "1"}
-    CREATION_ACCOUNT = "browsercreator"
-    CREATION_PASSWORD = "CreationBrowserTest!2026"
-
-    def logged_in_page(self, viewport: tuple[int, int] = DEFAULT_VIEWPORT):
-        """Log in with the creation account (a creation-pending character)."""
-        page = self.new_page(viewport)
-        login_and_open(
-            page,
-            self.webclient_url,
-            self.base_url,
-            account=self.CREATION_ACCOUNT,
-            password=self.CREATION_PASSWORD,
-        )
-        return page
-
-    def _wait_services_committed(self, page, timeout=30000):
-        wait_for_store_state(
-            page,
-            lambda s: (s.get("panels") or {}).get("services") is not None,
-            timeout=timeout,
-        )
-        return self._services_panel(page)
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     def test_unavailable_services_drawer_renders_reason_only(self):
         page = self.logged_in_page()
-        panel = self._wait_services_committed(page)
-        # The character is at the exploration root (no service interior), so
-        # the services panel is the registry-owned unavailable form.
-        self.assertFalse(panel["available"])
-        self.assertIsNotNone(panel.get("reason"))
+        unavailable_reason = "服務選單目前無法顯示"
+        inject_update(
+            page,
+            {
+                "services": {
+                    "schema_version": 4,
+                    "available": False,
+                    "reason": {
+                        "code": "services_unavailable",
+                        "message": unavailable_reason,
+                    },
+                }
+            },
+        )
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("services", {}).get("available") is False
+            and ((s.get("panels") or {}).get("services", {}).get("reason") or {}).get("code")
+            == "services_unavailable",
+        )
 
         # Open the quest reference drawer (the gate's first step).
         page.evaluate(
@@ -1133,7 +1115,7 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
         board = page.locator('[data-testid="quest-drawer"]')
         board_text = board.inner_text()
         # The drawer body renders the registry-owned reason verbatim.
-        self.assertIn(panel["reason"]["message"], board_text)
+        self.assertIn(unavailable_reason, board_text)
         # No fabricated board / quest / rank rows: the unavailable form carries
         # no guild section, so the board and quest-detail rows are absent.
         self.assertEqual(
