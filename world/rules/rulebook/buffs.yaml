@@ -11,7 +11,54 @@
   stacking: refresh
   polarity: debuff
   modifiers:
-    rate: {target: hp, delta: -5}
+    rate: {target: hp, delta: -8}
+# 灼熱裝甲反灼（fire-spell-catalog D1/D2）：被點燃的攻擊者承受的 DoT
+- key: fire_ignite
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -8}
+# 灼熱裝甲（fire-spell-catalog D1/D2）：empty-modifier self mount，點燃本體是
+# state_reactions.yaml 的 physical_hit 規則，生與 buff 實例同存亡。
+- key: fire_scorching_armor
+  duration: 60
+  stacking: refresh
+  modifiers: {}
+# 熔岩術地形標記（fire-spell-catalog D1/D3）：marker: ground 危害地形
+- key: fire_lava
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  marker: ground
+  modifiers:
+    rate: {target: hp, delta: -12}
+# 燔祭焰施法代價（fire-spell-catalog D1）：自身灼燒 DoT
+- key: fire_sacrifice_burn
+  duration: 120
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -12}
+# 紅蓮神格施法代價（fire-spell-catalog D1）：自身灼燒 DoT
+- key: fire_crimson_self
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -20}
+# 紅蓮神格對敵（fire-spell-catalog D1）：敵方全體灼燒 DoT
+- key: fire_crimson_burn
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -40}
 - key: paralysis
   duration: 30
   stacking: refresh

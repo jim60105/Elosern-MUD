@@ -29,6 +29,24 @@
 - code: fire_scorch
   label: 灼燒
   severity: harmful
+- code: fire_ignite
+  label: 點燃
+  severity: harmful
+- code: fire_scorching_armor
+  label: 灼熱裝甲
+  severity: beneficial
+- code: fire_lava
+  label: 熔岩
+  severity: harmful
+- code: fire_sacrifice_burn
+  label: 燔祭自灼
+  severity: harmful
+- code: fire_crimson_self
+  label: 紅蓮自灼
+  severity: harmful
+- code: fire_crimson_burn
+  label: 紅蓮業火
+  severity: harmful
 - code: water_film
   label: 水膜
   severity: beneficial

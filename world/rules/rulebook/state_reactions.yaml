@@ -65,3 +65,11 @@
     buff_active: earth_carapace
   then:
     counter_damage: 1.0
+
+# 灼熱裝甲（fire-spell-catalog D1/D2）：受擊時攻擊者被點燃
+- id: scorching_armor_ignite
+  when:
+    event: physical_hit
+    buff_active: fire_scorching_armor
+  then:
+    apply_buff_to_source: fire_ignite
