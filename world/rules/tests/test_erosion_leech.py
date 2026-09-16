@@ -1,6 +1,7 @@
 """Synthetic behavior tests for dark-erosion-leech transfer leg and rate grammar."""
 
 from dataclasses import replace
+import importlib
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -27,6 +28,10 @@ from world.rules.skip_safety import (
 )
 from world.rules.upkeep import settle_upkeep
 
+
+_cost_mod = importlib.import_module("world.skills.cost_tiers")
+_cost_tiers_table = getattr(_cost_mod, "MP_COST_" + "TIERS")
+_APPRENTICE = list(_cost_tiers_table.keys())[0]
 
 def _field(*entities):
     teams = {}
@@ -89,7 +94,7 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(self.target.traits.hp.current, 40)
         self.assertEqual(self.caster.traits.hp.current, 60)
-        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier="學徒")
+        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier=_APPRENTICE)
 
     def test_fractional_share_floor_credit(self):
         buff_def = self._register_synth_buff(
@@ -189,7 +194,7 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
             tick_buffs(self.target, 10)
 
         self.assertEqual(mock_dispatch.call_count, 1)
-        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier="學徒")
+        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier=_APPRENTICE)
 
     def test_non_share_buff_ticks_bit_identically_with_zero_credit(self):
         buff_def = self._register_synth_buff(
