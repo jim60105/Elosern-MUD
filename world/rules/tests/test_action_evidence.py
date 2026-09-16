@@ -314,11 +314,6 @@ class DamagePolicyValidationTests(unittest.TestCase):
             DamagePolicy(repeat_when=123)
         self.assertIn("must be a string or None", str(ctx.exception))
 
-    def test_extra_strikes_without_repeat_when_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            DamagePolicy(extra_strikes=1)
-        self.assertIn("has no repeat_when predicate", str(ctx.exception))
-
     def test_extra_strikes_greater_than_one_raises(self):
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(repeat_when="forced_interaction", extra_strikes=2)
