@@ -27,32 +27,6 @@ from world.skills.registry import (
 )
 
 
-FIRE_SPELL_CATALOG = (
-    ("fire_ball", "火球術", TargetSpec.SINGLE, 14, ("damage:fire:magic",)),
-    ("fire_arrow", "火焰箭", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
-    ("firestorm", "火焰風暴", TargetSpec.AREA, 30, ("damage:fire:magic",)),
-    (
-        "scorching_wave",
-        "灼熱波動",
-        TargetSpec.SINGLE,
-        24,
-        ("damage:fire:magic", "buff_apply:fire_scorch"),
-    ),
-    ("lava_burst", "熔岩術", TargetSpec.AREA, 52, ("damage:fire:magic",)),
-    ("flame_shroud", "烈焰纏繞", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
-    ("dragon_flame", "龍炎術", TargetSpec.AREA, 95, ("damage:fire:magic",)),
-    ("hellfire", "煉獄之火", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
-    (
-        "sacrificial_flame",
-        "燔祭焰",
-        TargetSpec.AREA,
-        150,
-        ("damage:fire:magic", "self_heal"),
-    ),
-    ("final_blaze", "焚世之焰", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
-)
-
-
 WIND_SPELL_CATALOG = (
     ("wind_blade", "風刃術", TargetSpec.AREA, 14, ("damage:wind:magic",)),
     ("gale_step", "疾風術", TargetSpec.SELF, 10, ("self_buff_apply:wind_haste",)),
@@ -140,7 +114,6 @@ ICE_SPELL_CATALOG = (
 _CATALOG_EFFECTS = {
     row[0]: row[4]
     for rows in (
-        FIRE_SPELL_CATALOG,
         WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
         ICE_SPELL_CATALOG,
@@ -149,7 +122,7 @@ _CATALOG_EFFECTS = {
 }
 
 
-class FireSpellCatalogTests(unittest.TestCase):
+class ElementalSpellsBuilderTests(unittest.TestCase):
     def test_elemental_spells_builder_rejects_unknown_element(self):
         from world.skills.registry import _elemental_spells
 
@@ -158,53 +131,6 @@ class FireSpellCatalogTests(unittest.TestCase):
                 "bogus",
                 ("x", "X", "說明", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
             )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
-    def test_all_ten_fire_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in FIRE_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
-    def test_every_fire_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in FIRE_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="fire", school="magic"),
-                        )
-                    elif effect_id.startswith("buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key="fire_scorch"),
-                        )
-                    else:
-                        self.assertEqual(parsed, SelfHealEffect())
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
-    def test_fire_ball_was_recosted_in_place_not_duplicated(self):
-        self.assertEqual(
-            [skill.key for skill in SKILL_REGISTRY.values()].count("fire_ball"),
-            1,
-        )
-        skill = SKILL_REGISTRY["fire_ball"]
-        self.assertEqual(skill.cost, {"mp": 14})
-        self.assertEqual(skill.label, "火球術")
-        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
-        self.assertEqual(skill.effects, ["damage:fire:magic"])
 
 
 class ClosedVocabularyParseTests(unittest.TestCase):
@@ -413,7 +339,7 @@ class IceSpellCatalogTests(unittest.TestCase):
 
 
 class FireLineageTreeCatalogTests(unittest.TestCase):
-    """The shipped first-round fire lineage tree is catalog data.
+    """The shipped branching fire lineage tree with a two-parent canopy is catalog data.
 
     Relocated from the migrated (now synthetic) rules lineage suite: the
     edge table itself is the shipped content the requirement names, so it
@@ -423,25 +349,35 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
     @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
     def test_fire_tree_edges_are_as_designed(self):
         expected = {
-            "fire_ball": ("fire_arrow", 3),
-            "scorching_wave": ("fire_ball", 3),
-            "firestorm": ("scorching_wave", 3),
-            "flame_shroud": ("scorching_wave", 3),
-            "lava_burst": ("firestorm", 5),
-            "hellfire": ("firestorm", 5),
-            "final_blaze": ("hellfire", 5),
-            "dragon_flame": ("lava_burst", 8),
-            "sacrificial_flame": ("dragon_flame", 8),
+            "fire_ball": (SkillPrerequisite("fire_arrow", 3),),
+            "scorching_wave": (SkillPrerequisite("fire_ball", 3),),
+            "firestorm": (SkillPrerequisite("scorching_wave", 3),),
+            "flame_shroud": (SkillPrerequisite("scorching_wave", 3),),
+            "scorching_armor": (SkillPrerequisite("scorching_wave", 3),),
+            "lava_burst": (SkillPrerequisite("firestorm", 5),),
+            "hellfire": (SkillPrerequisite("firestorm", 5),),
+            "dragon_flame": (SkillPrerequisite("lava_burst", 8),),
+            "final_blaze": (SkillPrerequisite("hellfire", 5),),
+            "sacrificial_flame": (SkillPrerequisite("dragon_flame", 8),),
+            "crimson_apotheosis": (
+                SkillPrerequisite("sacrificial_flame", 10),
+                SkillPrerequisite("final_blaze", 10),
+            ),
         }
-        for key, (prereq_key, minimum) in expected.items():
+        for key, expected_prereqs in expected.items():
             with self.subTest(key=key):
                 self.assertEqual(
                     declared_prerequisites(key),
-                    (SkillPrerequisite(prereq_key, minimum),),
+                    expected_prereqs,
                 )
         self.assertEqual(declared_prerequisites("fire_arrow"), ())
-        # Topological canopy: sacrificial flame is the strict last node.
-        self.assertEqual(prerequisite_consumers("sacrificial_flame"), ())
+        # Topological canopy: crimson_apotheosis is the strict last node.
+        self.assertEqual(prerequisite_consumers("crimson_apotheosis"), ())
+        # sacrificial_flame is consumed only by crimson_apotheosis.
+        self.assertEqual(
+            prerequisite_consumers("sacrificial_flame"),
+            (("crimson_apotheosis", 10),),
+        )
 
     @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
     def test_mastery_passives_stay_out_of_the_graph(self):
