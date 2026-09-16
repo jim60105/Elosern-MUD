@@ -80,21 +80,54 @@
   modifiers:
     bounds: {target: defense, ceiling: 5}
 - key: earth_dust_veil
-  duration: 60
+  duration: 20
   stacking: refresh
   polarity: debuff
   modifiers:
     bounds: {target: accuracy, ceiling: -5}
-- key: earth_root
-  duration: 30
-  stacking: refresh
-  polarity: debuff
-  modifiers: {}
 - key: earth_ward
   duration: 60
   stacking: refresh
   modifiers:
-    bounds: {target: defense, ceiling: 5}
+    bounds: {target: defense, ceiling: 12}
+# 磐石壁壘（earth-spell-catalog D1）：護甲路線的全體防禦 rung。
+- key: earth_bedrock
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 8}
+# 荊棘反甲（earth-spell-catalog D2）：empty-modifier mount，反傷本體是
+# state_reactions.yaml 的 physical_hit 規則，生與 buff 實例同存亡。
+- key: earth_carapace
+  duration: 60
+  stacking: refresh
+  modifiers: {}
+# 裂縫地形標記（earth-spell-catalog D5）：平行 duration 列；standing-on-it
+# 事實由 terrain-marker 的 marker: ground 子句供應，束縛/定身 stays ice's。
+- key: earth_fissure
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  marker: ground
+  modifiers:
+    rate: {target: hp, delta: -12}
+- key: earth_fissure_quake
+  duration: 40
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  marker: ground
+  modifiers:
+    rate: {target: hp, delta: -12}
+- key: earth_fissure_apex
+  duration: 90
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  marker: ground
+  modifiers:
+    rate: {target: hp, delta: -40}
 - key: wind_haste
   duration: 60
   stacking: refresh

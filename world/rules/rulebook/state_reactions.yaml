@@ -55,3 +55,13 @@
       賢者: 18
       主宰: 28
       神格: 40
+
+# 荊棘反甲（earth-spell-catalog D2）：the first live rule on the shipped
+# physical_hit event — holder-gated through buff_active on the empty-modifier
+# earth_carapace mount; the counter lives and dies with the buff instance.
+- id: thorned_carapace_counter
+  when:
+    event: physical_hit
+    buff_active: earth_carapace
+  then:
+    counter_damage: 1.0

@@ -68,12 +68,24 @@
 - code: earth_dust_veil
   label: 沙塵迷眼
   severity: harmful
-- code: earth_root
-  label: 地縛
-  severity: harmful
 - code: earth_ward
   label: 大地庇護
   severity: beneficial
+- code: earth_bedrock
+  label: 磐石壁壘
+  severity: beneficial
+- code: earth_carapace
+  label: 荊棘反甲
+  severity: beneficial
+- code: earth_fissure
+  label: 裂縫
+  severity: harmful
+- code: earth_fissure_quake
+  label: 裂縫·地震
+  severity: harmful
+- code: earth_fissure_apex
+  label: 裂縫·神格
+  severity: harmful
 - code: wind_haste
   label: 疾風
   severity: beneficial
