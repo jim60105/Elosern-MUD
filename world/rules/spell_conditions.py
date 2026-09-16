@@ -120,3 +120,54 @@ def evaluate_interaction_policy(
                         RejectReason.CAST_CONDITION_UNMET,
                         f"target {getattr(target, 'key', repr(target))} is not action capable",
                     )
+
+
+def is_strike_class(skill: Any) -> bool:
+    """Classify a skill as a single-target physical strike (design D2/D4).
+
+    A classification over shipped vocabulary only: ``TargetSpec.SINGLE`` with
+    at least one physical-school ``damage:`` effect and no magic-school
+    ``damage:`` effect. Permissive on malformed/unknown-element damage
+    strings — they are treated as not-a-damage-effect rather than raising, so
+    a valid skill is never wrongly classified as a strike.
+    """
+    from world.skills.registry import TargetSpec
+
+    if getattr(skill, "target_spec", None) is not TargetSpec.SINGLE:
+        return False
+    has_physical = False
+    for effect in getattr(skill, "effects", ()):
+        if not isinstance(effect, str) or not effect.startswith("damage:"):
+            continue
+        parts = effect.split(":")
+        if len(parts) != 3:
+            continue
+        school = parts[2]
+        if school == "magic":
+            return False
+        if school == "physical":
+            has_physical = True
+    return has_physical
+
+
+def evaluate_displaced_gate(actor: Any, targets: list[Any], skill: Any) -> None:
+    """Reject a single-target physical strike naming a displaced target (design D2/D4).
+
+    The target-side gate only: the holder's own marker is intentionally NOT
+    rejected here (the self-return clear is staged at resolution commit), so
+    a rejected climb-back toward an unreachable target consumes nothing.
+    """
+    if not is_strike_class(skill):
+        return
+    from world.rules.buffs import has_positional_marker
+
+    for target in targets:
+        if target is actor:
+            continue
+        if has_positional_marker(target):
+            from world.rules.action import RejectReason, RejectedAction
+
+            raise RejectedAction(
+                RejectReason.CAST_CONDITION_UNMET,
+                f"target {getattr(target, 'key', repr(target))} is displaced",
+            )

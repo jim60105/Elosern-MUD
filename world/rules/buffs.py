@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 try:
     from evennia.contrib.rpg.buffs import BaseBuff
-except Exception:  # pragma: no cover - fallback when django settings not loaded
+except Exception:  # pragma: no cover # observability: ignore R2: fallback when django settings not loaded
     class BaseBuff:  # type: ignore[no-redef]
         pass
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
@@ -36,7 +36,7 @@ class RecoveryRatePolicy:
     exposure_percent_per_ordinal: float = 0.1
 
 
-MARKER_VOCABULARY = frozenset({"ground"})
+MARKER_VOCABULARY = frozenset({"ground", "positional"})
 
 
 @dataclass(frozen=True)
@@ -530,6 +530,61 @@ def apply_buff(
         return
     if definition.stacking == "unique_per_source" and "source_key" not in data:
         raise ValueError(f"buff {definition_key!r} requires source_key")
+    if definition.marker == "positional":
+        battlefield = data.pop("battlefield", None)
+        event_context = data.pop("event_context", None)
+        # Design D3: refuse mounting on an impossible recipient, zero writes.
+        traits = getattr(entity, "traits", None)
+        if traits is not None and hasattr(traits, "hp"):
+            from world.rules.action import _stored_trait_value
+
+            try:
+                if _stored_trait_value(traits.hp) <= 0:
+                    return
+            except Exception:  # observability: ignore R2: fail-closed default on unreadable hp
+                pass
+        if battlefield is None and getattr(entity, "pk", None) is not None:
+            if isinstance(event_context, dict):
+                battlefield = event_context.get("battlefield")
+            from world.rules.skip_safety import _active_battlefield_for
+
+            battlefield = _active_battlefield_for(entity)
+        if battlefield is not None:
+            roster_key = str(getattr(entity, "key", ""))
+            if roster_key in getattr(battlefield, "fled", ()):
+                return
+            is_ko = getattr(battlefield, "is_knocked_out", None)
+            if callable(is_ko) and is_ko(roster_key):
+                return
+            if roster_key in getattr(battlefield, "knocked_out", ()):
+                return
+            from world.rules.combat_session import CombatSessionError, read_session
+
+            try:
+                record = read_session(entity) if hasattr(getattr(entity, "db", None), "active_combat") else None
+            except (CombatSessionError, AttributeError):  # observability: ignore R2: non-player or unparseable session falls back to unrecorded
+                record = None
+            if record is not None:
+                pk = getattr(entity, "pk", None)
+                if pk in record.fled_ids or pk in record.knocked_out_ids:
+                    return
+        # Design D5: mounting a positional row first sweeps the recipient's
+        # ground markers (blown off the hazard), logged on commit.
+        swept = remove_ground_markers(entity)
+        if swept:
+            from django.db import transaction
+
+            from world.observability import log_info
+
+            boundary: dict[str, Any] = {
+                "char": str(getattr(entity, "pk", "")),
+                "count": swept,
+                "reason": "displaced_mount",
+            }
+            transaction.on_commit(lambda b=boundary: log_info("combat_marker_swept", context=b))
+    # These mount-path consult inputs must never persist into any buff's cache.
+    data.pop("battlefield", None)
+    data.pop("event_context", None)
     target_key = instance_key or definition_key
     existing = (
         entity.buffs.all.get(target_key)
@@ -616,6 +671,25 @@ def active_buff_keys_from_storage(entity) -> set[str]:
         if isinstance(definition_key, str):
             active.add(definition_key)
     return active
+
+
+def has_positional_marker(entity: Any) -> bool:
+    """Return the canonical out-of-position fact (design D1/D2).
+
+    True iff the entity carries a live (unpaused, unexpired) instance of a
+    definition declaring ``marker: positional`` — the fact consults only the
+    clause, never element/skill/definition-key identity.
+    """
+    if hasattr(entity, "attributes") and entity.attributes.has("buffs"):
+        active_keys = active_buff_keys_from_storage(entity)
+    elif hasattr(entity, "buffs"):
+        active_keys = entity_active_buffs(entity)
+    else:
+        return False
+    return any(
+        (defn := BUFF_DEFINITIONS.get(key)) is not None and defn.marker == "positional"
+        for key in active_keys
+    )
 
 
 def active_stack_count(arg1: Any, arg2: Any) -> int:
@@ -787,6 +861,24 @@ def remove_ground_markers(entity) -> int:
         for buff in _active_buff_instances(entity)
         if (defn := BUFF_DEFINITIONS.get(buff.definition_key)) is not None
         and defn.marker == "ground"
+    )
+    if not keys:
+        return 0
+    _remove_buff_keys(entity, keys)
+    return len(keys)
+
+
+def remove_positional_markers(entity) -> int:
+    """Remove every live positional-marker buff on an entity; return the count removed.
+
+    Consults only definitions declaring marker: positional.
+    Never touches non-marker buff instances. Zero damage or revive side effects.
+    """
+    keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if (defn := BUFF_DEFINITIONS.get(buff.definition_key)) is not None
+        and defn.marker == "positional"
     )
     if not keys:
         return 0

@@ -421,11 +421,13 @@ def _step4a_spell_conditions(
 ) -> None:
     from world.rules.spell_conditions import (
         evaluate_cast_conditions,
+        evaluate_displaced_gate,
         evaluate_interaction_policy,
     )
 
     evaluate_cast_conditions(request.actor, targets, skill)
     evaluate_interaction_policy(request.actor, targets, request.context, skill)
+    evaluate_displaced_gate(request.actor, targets, skill)
 
 
 def _resist_pending_effect(target: Any, verdict: Any) -> PendingEffect:
@@ -654,6 +656,9 @@ def _handle_buff_apply(
             kwargs["source_pk"] = int(pk)
         elif getattr(actor, "id", None) and isinstance(actor.id, int) and actor.id > 0:
             kwargs["source_pk"] = int(actor.id)
+    battlefield = context.get("battlefield")
+    if battlefield is not None:
+        kwargs["battlefield"] = battlefield
     pending: list[PendingEffect] = []
     for target in targets:
         if (
@@ -775,6 +780,9 @@ def _handle_self_buff_apply(
         pk = getattr(actor, "pk", None)
         if isinstance(pk, int) and not isinstance(pk, bool) and pk > 0:
             kwargs["source_pk"] = int(pk)
+    battlefield = context.get("battlefield")
+    if battlefield is not None:
+        kwargs["battlefield"] = battlefield
     if (
         definition is not None
         and definition.polarity == "debuff"
@@ -2245,6 +2253,7 @@ def _apply_practice(
 
 _ENTRY_TEMPLATES = {
     "resource_spend": "{actor} 消耗了資源。",
+    "self_return_clear": "{actor} 重整架勢，重返戰鬥位置。",
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
@@ -2549,7 +2558,12 @@ def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
     targets: list[str] = []
     for effect in pending:
         if effect.description.startswith(
-            ("resource_spend|", "combat_kill_xp|", "knocked_out_mark|")
+            (
+                "resource_spend|",
+                "combat_kill_xp|",
+                "knocked_out_mark|",
+                "self_return_clear|",  # Design D4: actor clearing own marker must not appear as target
+            )
         ):
             continue
         key = effect.description.split("|", 2)[1]
@@ -2946,6 +2960,26 @@ class ActionResolver:
                     skill,
                     targets,
                     routed_targets=routed_targets,
+                )
+            from world.rules.buffs import (
+                has_positional_marker,
+                remove_positional_markers,
+            )
+            from world.rules.spell_conditions import is_strike_class
+
+            if is_strike_class(skill) and has_positional_marker(request.actor):
+                # Design D4: the self-return clear is staged BEFORE the
+                # strike's damage leg, on the ``buffs`` surface only —
+                # ``_commit`` snapshots that surface before any pending
+                # effect applies, so a failed settlement restores it.
+                pending.insert(
+                    0,
+                    PendingEffect(
+                        request.actor,
+                        f"self_return_clear|{_entity_key(request.actor)}",
+                        frozenset({"buffs"}),
+                        lambda actor=request.actor: remove_positional_markers(actor),
+                    ),
                 )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             delivered_recipients: list[Any] = []
