@@ -387,12 +387,12 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
 
         # Sourceless write does NOT trigger ignite
-        dispatch_outcome_reaction(self.caster, "physical_hit", "學徒", source=None)
+        dispatch_outcome_reaction(self.caster, "physical_hit", source=None)
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
 
         # Dead attacker does NOT receive ignite
         self.foe2.traits.hp.current = 0
-        dispatch_outcome_reaction(self.caster, "physical_hit", "學徒", source=self.foe2)
+        dispatch_outcome_reaction(self.caster, "physical_hit", source=self.foe2)
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
         self.foe2.traits.hp.current = 1000
 
