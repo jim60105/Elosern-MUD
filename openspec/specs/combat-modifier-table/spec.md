@@ -23,6 +23,12 @@ drain-recovery share bonus consumed only by the gauge-transfer caster-share read
 produced by ordinary `buff_active`-origin rows, SHALL be absent-by-default rather than defaulted in
 table code, and SHALL NOT introduce a marker-specific consumer, an element name, or a skill key
 anywhere in the table or its evaluation module.
+The dark wave's psychological-stillness marker SHALL join the same way: the `fear` marker's
+「無法行動」 clause ships as one ordinary `buff_active: fear` row carrying `actions_per_turn: 0`
+alongside the pre-existing `fear` agility/accuracy row, and `fear` SHALL remain an buffs key
+INDEPENDENT of the ice wave's physical-still keys — no row, condition or consumer may equate,
+alias, or cross-match `fear` with any ice stillness key; their distinction is authoring-side
+narrative only.
 
 #### Scenario: The seed table contains both condition origins
 - **WHEN** `world/rules/rulebook/combat_modifiers.yaml` is loaded
@@ -48,6 +54,14 @@ anywhere in the table or its evaluation module.
 - **THEN** each bundle contains exactly its one new leaf value from its row, the third bundle lacks
   both keys entirely (absent, not zero, for `regen_scale`), and every pre-existing leaf value is
   merged unchanged
+
+#### Scenario: Fear locks actions and stays key-independent of physical stillness
+- **WHEN** one synthetic entity holds `fear` and another holds an ice physical-still marker, and each
+  key is cleansed separately
+- **THEN** the feared entity's merged bundle reports `actions_per_turn: 0` through the ordinary
+  `buff_active` row while the feared entity still also carries its agility/accuracy values, removing
+  either key restores exactly that entity's action without touching the other key's state, and no
+  table row matches one key against the other's condition
 
 ### Requirement: evaluate_combat_modifiers() is a pure query that never writes to entity state
 `world/rules/combat_modifiers.py` SHALL provide `evaluate_combat_modifiers(entity)`, returning a merged

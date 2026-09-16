@@ -159,34 +159,6 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-### Requirement: SKILL_REGISTRY contains the full 暗-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 暗-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["dark"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `shadow_bolt` | 暗影箭 | 學徒 | `TargetSpec.SINGLE` | `mp=14` | `damage:dark:magic` |
-| `weaken` | 衰弱術 | 學徒 | `TargetSpec.SINGLE` | `mp=11` | `buff_apply:dark_atk_down` |
-| `curse` | 詛咒術 | 術師 | `TargetSpec.SINGLE` | `mp=26` | `buff_apply:dark_curse` |
-| `dark_burst` | 闇裂術 | 術師 | `TargetSpec.AREA` | `mp=29` | `damage:dark:magic` |
-| `dark_corrosion_domain` | 闇蝕領域 | 大師 | `TargetSpec.AREA` | `mp=47` | `damage:dark:magic`, `buff_apply:dark_corrosion` |
-| `shadow_torture` | 暗影之刑 | 大師 | `TargetSpec.SINGLE` | `mp=41` | `damage:dark:magic`, `buff_apply:dark_corrosion` |
-| `abyss_devour` | 深淵吞噬 | 賢者 | `TargetSpec.SINGLE` | `mp=85` | `damage:dark:magic` |
-| `dark_dominion` | 黑暗支配 | 賢者 | `TargetSpec.AREA` | `mp=72` | `buff_apply:fear` |
-| `void_annihilation` | 虛空湮滅 | 主宰 | `TargetSpec.AREA` | `mp=155` | `damage:dark:magic` |
-| `underworld_judgment` | 冥界審判 | 主宰 | `TargetSpec.SINGLE` | `mp=135` | `damage:dark:magic` |
-
-#### Scenario: All ten 暗 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 暗 keys (`shadow_bolt`, `weaken`, `curse`, `dark_burst`, `dark_corrosion_domain`, `shadow_torture`, `abyss_devour`, `dark_dominion`, `void_annihilation`, `underworld_judgment`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["dark"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY exists at the exact path change 4 forward-declared
 `world/skills/registry.py` SHALL define a module-level `SKILL_REGISTRY: dict[str, SkillDef]` importable
 as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and symbol name change 4
@@ -559,3 +531,30 @@ The water spell family SHALL provide the documented two-root tide/deep-sea progr
 #### Scenario: Retired keys resolve as ordinary rejections
 - **WHEN** a player casts a deleted dev-era key through the ordinary cast surface after replacement
 - **THEN** it rejects with the existing unknown-skill reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast path could land on
+
+### Requirement: Dark spell progression composes executable curse and erosion behavior
+The dark spell family SHALL provide the documented two-root curse/erosion progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: stat-debuff ladders on authored axes and durations, a psychological action lock on one buffs key independent of any physical-stillness key, damage-bearing erosion DoTs whose every actual tick loss is transferred in full to the grant-time origin caster and extinguished with either party's death, an execution rung that ignores defense, a devastation area rung, cast-time self-recovery keyed to a declared fraction of the caster's own missing HP, and a two-parent capstone stacking damage, devastation, a wide stat debuff and self-recovery as independent effect components. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf cap unchanged).
+
+#### Scenario: The curse ladder weakens observable stats at settlement
+- **WHEN** synthetic dark debuff compositions mirroring the authored axes and durations resolve through ordinary action settlement and the clock advances
+- **THEN** the victims' effective stats drop by the authored amounts for the authored durations and recover on expiry, and the feared victim's next turn is skipped by the shared action-lock consumer until the marker ends — while a physically-stilled victim's distinct key is untouched by the fear key and vice versa
+
+#### Scenario: Erosion transfers its whole loss to the origin caster
+- **WHEN** a synthetic damage-plus-erosion composition ticks a victim over several intervals, including one area composition with per-victim origins and one interval where the caster is dead or the victim reaches its HP floor
+- **THEN** each living origin caster gains exactly the HP each of their victims actually lost, no credit flows after either party's death or the buff's expiry, and the victim's single loss dispatch and the round's death settlement are unchanged
+
+#### Scenario: Recovery rides the caster's own missing HP, never the victim's
+- **WHEN** a synthetic damage-plus-missing-fraction-self-recovery composition resolves from a wounded caster against a fuller enemy
+- **THEN** the caster recovers exactly the authored fraction of their own missing HP clamped at their maximum, the enemy's HP state never enters the amount, and a dead caster revives nothing
+
+#### Scenario: Execution and devastation rungs behave through the shared policies
+- **WHEN** synthetic execution-rung and devastation-rung dark compositions hit a high-defense target and a mixed area
+- **THEN** the execution rung ignores defense subtraction while the ordinary rung does not, and the devastation rung adds its authored maximum-HP fraction on hit through the existing rider with no dark-specific code
+
+#### Scenario: Two roots, branch, and convergence gate through the lineage engine
+- **WHEN** a synthetic family replicates the documented branching and the two-parent capstone prerequisite shape
+- **THEN** use rejects until every authored threshold is met, capstone attainment follows both terminal branches, and prerequisite caps stay derived from the shared reverse-edge map
+
+#### Scenario: Retired dev-era bindings resolve as ordinary rejections
+- **WHEN** a caller references a deleted dev-era buff binding or casts a never-existing key through the ordinary cast surface after replacement
+- **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
