@@ -83,6 +83,24 @@ class BuffDefinitionValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_buff_definitions(path)
 
+    @covers_requirement(
+        "buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate"
+    )
+    def test_marker_clause_validation(self):
+        path = _write_yaml("- key: a\n  marker: ground\n")
+        self.assertEqual(load_buff_definitions(path)["a"].marker, "ground")
+
+        path = _write_yaml("- key: a\n")
+        self.assertIsNone(load_buff_definitions(path)["a"].marker)
+
+        for bad_marker in ("fire", "true", "3", "null"):
+            with self.subTest(bad_marker=bad_marker):
+                path = _write_yaml(f"- key: offending_buff\n  marker: {bad_marker}\n")
+                with self.assertRaises(ValueError) as ctx:
+                    load_buff_definitions(path)
+                self.assertIn("offending_buff", str(ctx.exception))
+                self.assertIn("invalid marker", str(ctx.exception))
+
     def test_selector_word_definition_key_is_rejected(self):
         """A buffs.yaml key may never collide with a remove_by_selector word."""
         for selector in ("all", "positive", "negative"):
