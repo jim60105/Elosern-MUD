@@ -521,7 +521,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
             )
             with (
                 patch("world.rules.combat.roll_d100", return_value=50),
-                patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_reaction,
+                patch("world.rules.combat.dispatch_outcome_reaction") as mock_reaction,
             ):
                 result = ActionResolver.resolve(req)
 
