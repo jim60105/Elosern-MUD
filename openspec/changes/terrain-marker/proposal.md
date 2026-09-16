@@ -1,0 +1,31 @@
+## Why
+
+The earth tree's terrain line (`docs/lore/skill-trees/earth.md`: 地裂術, 地震術, 大地神格 and the 大地審判 synergy) requires a *ground-hazard marker* the game cannot express today: there is no terrain/position marker primitive anywhere in `world/rules` (in-combat position is binary — present vs fled), and `DamagePolicy.predicate` reads only static target facts (affinity + combat traits via `world/rules/target_facts.py`), so a rule like 「對站在裂縫標記上的目標額外 +0.6」 is inexpressible. Constitution §4.2 allocates 困難地形標記的召出 to earth, but the primitive must be generic element-agnostic mechanic vocabulary — fire's future scorching ground and any later element's hazard ride the same fact, and no element key may ever appear in generic code. This change owns the marker fact, the marker-buff lifecycle, and the dynamic-fact predicate seam; the earth rows themselves belong to `earth-spell-catalog`.
+
+## What Changes
+
+- **Batch declaration.** This change lands FIRST in the earth wave; `on-hit-counter-damage` is file-disjoint and may run concurrently; `earth-spell-catalog` depends on this change. See `## Batch` below.
+- Add a rulebook-declarable **marker-hazard buff family**: one validated optional top-level clause on the `buffs.yaml` definition grammar (design.md D1 fixes the exact spelling — `marker: ground`, a closed-vocabulary string outside the closed `modifiers` key set) declaring that holding the buff IS the canonical「站在其上」fact. The hazard's damage rides the shipped damaging rate-row vocabulary bit-identically (DoT rows are catalog data, authored later); this change ships zero live rows — inert-but-valid vocabulary, exactly the dark-erosion-leech precedent.
+- Define the marker lifecycle: world-second durations (the catalog authors 60 s/40 s/90 s), ordinary refresh stacking, and **battlefield-exit extinguishment** — the marker ends with the session for its holder when the holder flees, is knocked out, or the combat session ends, so a ground hazard never follows an entity out of the battlefield while an ordinary (non-marker) buff's cross-combat persistence is untouched.
+- Extend `DamagePolicy.predicate` with a validated namespaced dynamic-fact entry `buff:<definition-key>` (the target currently holds that live buff instance) — a strict superset of the shipped conditional-damage requirement: every existing static-fact scenario is preserved verbatim, bare entries keep their exact vocabulary and rejection rules, and the new form composes with `attack_multiplier`/`bypass_defense`/`max_hp_fraction` under the same any-match-once semantics. `matches_target_predicate` consults the target's live buff set only for `buff:`-named entries; predicate validation accepts `buff:<key>` only for keys present in `BUFF_DEFINITIONS` and keeps rejecting every other namespaced form (the shipped `test_namespaced_predicate_entries_raise` contract is superseded only for this one namespaced family). Additionally, a policy with a non-empty predicate may declare the independent `unconditional_defense_bypass` boolean so an unconditional 處決級 (earth's 大地審判 shape) composes with a conditional synergy multiplier in ONE component (the shipped conditional `bypass_defense` semantics unchanged).
+- No second rules engine: everything is a validated extension of the existing declarative surfaces (`buffs.yaml`, `DamagePolicy`, `target_facts` reader) — no element, skill or buff-key branches in generic code.
+
+## Capabilities
+
+### New Capabilities
+- `terrain-marker`: the generic ground-hazard marker primitive — validated marker-hazard clause on the buff-definition grammar, the standing-on-it fact, world-second duration/refresh semantics, and battlefield-exit (flee/knockout/session-end) extinguishment scoped to marker rows only.
+
+### Modified Capabilities
+- `buff-handler-integration`: the buff-definition requirement is extended so a definition MAY declare one validated closed-vocabulary marker clause naming its row a ground-hazard marker (strict superset of the rate/bounds/divert/decay/clamp definition vocabulary and the shipped `caster_share` clause; every existing scenario preserved verbatim; rows without the clause load and tick bit-identically).
+- `skill-effect-model`: the conditional-damage requirement is extended so a validated damage policy may additionally match a dynamic「target holds buff \<key\>」fact through a namespaced `buff:<key>` predicate entry, applied once per strike like any other matched fact (strict superset; all existing static-fact scenarios preserved verbatim).
+
+## Impact
+
+`world/rules/buffs.py` (definition-clause validation + marker-exit removal hook); `world/rules/combat_session.py` (flee/knockout/session-end removal call site for live marker instances); `world/rules/target_facts.py` + `world/skills/effects.py` (`DamagePolicy.__post_init__` validation + `matches_target_predicate` dynamic lookup); `world/rules/rulebook/buffs.yaml` untouched by this change (marker rows are `earth-spell-catalog` data); new focused behavior test modules registered in `.github/evennia-shards.json`; traceability ledger hygiene stays in the separately authorized main-sync. `openspec list --json` returned an empty change set at authoring time — the dark wave is fully archived, no active-change file conflicts; the earth wave's ordering is declared in `earth-spell-catalog/design.md`. One engineer-day.
+
+This turn creates planning artifacts only. Do not apply, archive, sync main specs, create feature branches or merge until requested.
+
+## Batch
+
+- depends-on: none (wave-first; owns the terrain-marker fact + marker buff lifecycle + DamagePolicy predicate extension)
+- (code conflicts: `world/rules/combat.py` is SHARED with `on-hit-counter-damage` — both touch `_handle_damage` (this change's `unconditional_defense_bypass` read at the policy-decision hunk; that change's `physical_hit` dispatch leg in the staged `apply()`), ~85 lines apart but the same function: the supervisor must SEQUENCE the two merges (terrain-marker first is fine — the hunks are textually disjoint but same-file). Otherwise file-disjoint: this change owns `world/rules/buffs.py`, `world/rules/target_facts.py`, `world/skills/effects.py`, `world/rules/combat_session.py`; that change owns `world/rules/state_reactions.py`/`.yaml`; `earth-spell-catalog` authors `buffs.yaml`/`registry.py`/`state_reactions.yaml` data only, strictly after both.)
