@@ -101,15 +101,6 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     from web.browser_support.browser_fixtures_data import graft_synth_combat_modifier
 
     graft_synth_combat_modifier()
-    # The defeat-aftermath rulebook validates its marker buffs against the
-    # live buff registry on the FIRST lazy import (inside the first round
-    # submit), and monster behaviour resolves every monster's threat tier
-    # through the frozen shipped-keyed archetype table. Graft the authored
-    # marker buffs and one archetype mapping per live kit tier so the
-    # settlement paths answer instead of raising mid-submit.
-    from web.browser_support.browser_fixtures_data import graft_synth_defeat_rulebook
-
-    graft_synth_defeat_rulebook()
     # state_reactions validates the shipped climax rulebook at import against
     # the live buff registry and MP cost tiers; the t_-only install removes
     # both vocabularies it names, so the seed's first apply_buff dispatch
@@ -120,6 +111,15 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     )
 
     graft_synth_state_reaction_rulebook()
+    # The defeat-aftermath rulebook validates its marker buffs against the
+    # live buff registry on the FIRST lazy import (inside the first round
+    # submit), and monster behaviour resolves every monster's threat tier
+    # through the frozen shipped-keyed archetype table. Graft the authored
+    # marker buffs and one archetype mapping per live kit tier so the
+    # settlement paths answer instead of raising mid-submit.
+    from web.browser_support.browser_fixtures_data import graft_synth_defeat_rulebook
+
+    graft_synth_defeat_rulebook()
 
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, so the server installs the shared harness catalog directly

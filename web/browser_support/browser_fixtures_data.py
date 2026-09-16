@@ -437,6 +437,18 @@ def graft_synth_state_reaction_rulebook() -> None:
         ),
     )
     BUFF_DEFINITIONS.setdefault(
+        # Must stay in parity with rulebook/buffs.yaml earth_carapace row.
+        "earth_carapace",
+        BuffDefinition(
+            key="earth_carapace",
+            duration=60,
+            tick_interval=None,
+            stacking="refresh",
+            polarity="buff",
+            modifiers={},
+        ),
+    )
+    BUFF_DEFINITIONS.setdefault(
         # Must stay in parity with rulebook/buffs.yaml suffocated row.
         "suffocated",
         BuffDefinition(
