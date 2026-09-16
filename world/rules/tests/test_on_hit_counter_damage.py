@@ -13,6 +13,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from world.rules.action import ActionRequest, ActionResolver, PendingEffect
@@ -147,6 +148,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
     # Requirement 1: A qualifying physical strike dispatches one source-attributed on-hit event
     # -------------------------------------------------------------------------
 
+    @covers_requirement(
+        "damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event"
+    )
     def test_landed_physical_hit_fires_event_once_with_source(self):
         """Scenario: A landed physical hit fires the event once with its source.
 
@@ -191,6 +195,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self.assertLess(self.target.traits.hp.current, 200)
             self.assertIn("synth_hit_received", entity_active_buffs(self.target))
 
+    @covers_requirement(
+        "damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event"
+    )
     def test_non_qualifying_writes_stay_silent(self):
         """Scenario: Non-qualifying writes stay silent.
 
@@ -276,6 +283,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self.assertTrue(len(records) > 0)
             self.assertNotIn("synth_should_never_apply", entity_active_buffs(self.target))
 
+    @covers_requirement(
+        "damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event"
+    )
     def test_unknown_event_value_fails_load_closed(self):
         """Scenario: An unknown event value fails the load closed.
 
@@ -305,6 +315,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
         # Shipped rules validate cleanly
         validate_state_reaction_rules(STATE_REACTION_RULES)
 
+    @covers_requirement(
+        "damage-state-feedback::a-qualifying-physical-strike-dispatches-one-source-attributed-on-hit-event"
+    )
     def test_multi_strike_policy_fires_per_qualifying_strike(self):
         """Scenario: Multi-strike policies fire per qualifying strike.
 
@@ -397,6 +410,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
     # Requirement 2: Source-targeted reaction actions settle once, in-transaction, without recursion
     # -------------------------------------------------------------------------
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_thorn_counter_returns_coefficient_priced_damage_to_attacker(self):
         """Scenario: A thorn-shaped counter returns coefficient-priced damage to the attacker.
 
@@ -461,6 +477,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # Attacker's hp_loss reaction fired once (+25 pleasure)
             self.assertEqual(self.actor.sexual.pleasure.base, 25)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_counters_cannot_chain(self):
         """Scenario: Counters cannot chain.
 
@@ -514,6 +533,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # Target HP must be exactly 110 (200 - 90), proving no secondary counter settled (which would be 70)
             self.assertEqual(target_hp_after_strike, 110)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_counter_settles_and_rolls_back_with_its_round(self):
         """Scenario: The counter settles and rolls back with its round.
 
@@ -576,6 +598,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self.assertEqual(self.actor.traits.hp.current, actor_hp_before)
             self.assertEqual(self.target.traits.hp.current, target_hp_before)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_ignite_shaped_source_buff_rides_same_event_as_data(self):
         """Scenario: An ignite-shaped source buff rides the same event as data.
 
@@ -665,6 +690,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             dispatch_outcome_reaction(self.target, "physical_hit", source=dead_actor)
             self.assertNotIn(expected_instance_key, dead_actor.buffs.all)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_malformed_source_actions_fail_load_closed(self):
         """Scenario: Malformed source actions fail the rule load closed.
 
@@ -737,6 +765,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             ])
         self.assertIn("mixed_actions", str(ctx.exception))
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_protected_source_floors_at_one_with_knockout_mark(self):
         """Test that a nonlethal-protected attacker taking fatal counter damage floors at 1 HP
 
@@ -808,6 +839,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self.assertEqual(int(self.actor.traits.hp.current), 1)
             self.assertNotIn(str(self.actor.key), bf2.knocked_out)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_dead_source_counter_produces_silent_no_write(self):
         """Test that counter damage against an already-dead source is a silent no-write."""
         passive = self._register_synth_skill(
@@ -830,6 +864,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # Actor stays at 0, never revives
             self.assertEqual(int(self.actor.traits.hp.current), 0)
 
+    @covers_requirement(
+        "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
+    )
     def test_killing_blow_against_holder_still_triggers_counter(self):
         """Test that a strike that kills the reactor still triggers the counter damage against the attacker."""
         passive = self._register_synth_skill(
