@@ -69,33 +69,34 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 硬化肌膚（earth-spell-catalog D1）：timed-defense mount（light-sustained-
+# recovery D3 先例）——actual +3 資料在 combat_modifiers.yaml 的 buff_active 列。
 - key: earth_hardened_skin
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 3}
+  modifiers: {}
+# 岩甲術 mount；+5 資料在 combat_modifiers.yaml。
 - key: earth_stone_armor
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 5}
+  modifiers: {}
+# 沙塵術 mount；命中 −5 資料在 combat_modifiers.yaml（fear 先例的 accuracy 詞彙）。
 - key: earth_dust_veil
   duration: 20
   stacking: refresh
   polarity: debuff
-  modifiers:
-    bounds: {target: accuracy, ceiling: -5}
+  modifiers: {}
+# 大地庇護 mount；+12 資料在 combat_modifiers.yaml。
 - key: earth_ward
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 12}
-# 磐石壁壘（earth-spell-catalog D1）：護甲路線的全體防禦 rung。
+  modifiers: {}
+# 磐石壁壘（earth-spell-catalog D1）：護甲路線的全體防禦 rung mount；+8 資料在
+# combat_modifiers.yaml。
 - key: earth_bedrock
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 8}
+  modifiers: {}
 # 荊棘反甲（earth-spell-catalog D2）：empty-modifier mount，反傷本體是
 # state_reactions.yaml 的 physical_hit 規則，生與 buff 實例同存亡。
 - key: earth_carapace

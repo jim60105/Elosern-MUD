@@ -557,6 +557,33 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "light_blessing")
         self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 18})
 
+    # 土護甲路線計時階梯（earth-spell-catalog）：correspondence gate 僅要求每條
+    # rule id 有一個具名測試；結算行為由 test_earth_terrain_guard 的合成階梯覆蓋。
+    def test_rule_earth_hardened_skin_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "earth_hardened_skin")
+        self.assertIn("defense", evaluate_combat_modifiers(entity))
+
+    def test_rule_earth_stone_armor_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "earth_stone_armor")
+        self.assertIn("defense", evaluate_combat_modifiers(entity))
+
+    def test_rule_earth_bedrock_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "earth_bedrock")
+        self.assertIn("defense", evaluate_combat_modifiers(entity))
+
+    def test_rule_earth_ward_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "earth_ward")
+        self.assertIn("defense", evaluate_combat_modifiers(entity))
+
+    def test_rule_earth_dust_veil_accuracy_penalty(self):
+        entity = self._entity()
+        apply_buff(entity, "earth_dust_veil")
+        self.assertIn("accuracy", evaluate_combat_modifiers(entity))
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()

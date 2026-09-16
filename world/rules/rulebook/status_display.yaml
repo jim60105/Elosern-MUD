@@ -215,3 +215,18 @@
 - code: light_blessing_defense_bonus
   label: 女神降福防禦提升
   severity: beneficial
+- code: earth_hardened_skin_defense_bonus
+  label: 硬化肌膚防禦提升
+  severity: beneficial
+- code: earth_stone_armor_defense_bonus
+  label: 岩甲防禦提升
+  severity: beneficial
+- code: earth_bedrock_defense_bonus
+  label: 磐石壁壘防禦提升
+  severity: beneficial
+- code: earth_ward_defense_bonus
+  label: 大地庇護防禦提升
+  severity: beneficial
+- code: earth_dust_veil_accuracy_penalty
+  label: 沙塵迷眼命中下降
+  severity: harmful
