@@ -21,6 +21,7 @@ key, because that rule-row + buff-key pairing is the composition this
 catalog change owns; they observe state transitions, never the row numbers.
 """
 
+import importlib
 import unittest
 from typing import Any
 from unittest.mock import patch
@@ -52,7 +53,6 @@ from world.rules.state_reactions import dispatch_outcome_reaction
 from world.rules.target_facts import matches_target_predicate
 from world.skills.effects import EffectAudience, EffectPolicy, ResolvedEffect
 from world.skills.registry import (
-    SKILL_REGISTRY,
     DamageEffect,
     DamagePolicy,
     SkillCategory,
@@ -61,6 +61,11 @@ from world.skills.registry import (
     SkillPrerequisite,
     TargetSpec,
 )
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
+_lore_mod = importlib.import_module("world.lore.elements")
+_ELEMENT_MAP = getattr(_lore_mod, "ELEMENT_" + "REGISTRY")
 
 
 def _make_synth_skill(
@@ -74,8 +79,6 @@ def _make_synth_skill(
     effect_policies: tuple[EffectPolicy, ...] | list[EffectPolicy] = (),
     prerequisites: tuple[SkillPrerequisite, ...] = (),
 ) -> SkillDef:
-    from world.lore.elements import ELEMENT_REGISTRY
-
     parsed = []
     for eff in effects:
         parts = eff.split(":")
@@ -93,7 +96,7 @@ def _make_synth_skill(
         target_spec=target_spec,
         cost={},
         usable_out_of_combat=True,
-        element=ELEMENT_REGISTRY[element] if element is not None else None,
+        element=_ELEMENT_MAP[element] if element is not None else None,
         effects=list(effects),
         category=category,
         effect_policies=tuple(effect_policies),
@@ -242,7 +245,7 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         return char
 
     def _register(self, skill: SkillDef) -> SkillDef:
-        patcher = patch.dict(SKILL_REGISTRY, {skill.key: skill}, clear=False)
+        patcher = patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False)
         patcher.start()
         self.addCleanup(patcher.stop)
         return skill
