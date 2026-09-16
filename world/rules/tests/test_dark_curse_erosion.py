@@ -184,6 +184,15 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
     @covers_requirement("skill-registry::dark-spell-progression-composes-executable-curse-and-erosion-behavior")
     def test_erosion_transfers_loss_to_origin_caster_including_area_and_dead_silence(self):
         """Scenario: Erosion transfers its whole loss to the origin caster."""
+        from world.rules.skip_safety import (
+            register_active_battlefield,
+            unregister_active_battlefield,
+        )
+
+        register_active_battlefield(self.bf)
+        self.addCleanup(unregister_active_battlefield, self.caster)
+        self.addCleanup(unregister_active_battlefield, self.target)
+        self.addCleanup(unregister_active_battlefield, self.other)
         # Wounded caster: 50 / 200 HP
         self.caster.traits.hp.current = 50
         self.target.traits.hp.current = 200
