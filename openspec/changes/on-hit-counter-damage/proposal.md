@@ -1,0 +1,30 @@
+## Why
+
+The earth tree's 荊棘反甲 (`thorned_carapace`: 「受到物理攻擊時反彈 1.0 係數的傷害」) needs an **on-hit counter-damage primitive that does not exist**: the reaction engine (`world/rules/state_reactions.py`/`.yaml`) has no on-physical-hit event — its outcome events are `hp_loss`, `mp_zero`, `negative_buff_added` — and its `then` vocabulary (`apply_buff`/`remove_buff`/`pleasure_gain`) can only write to the reacting entity itself, never to the attack's source. Fire's planned 灼熱反甲 (`scorching_armor`, on-hit ignite on the attacker) needs the same event with a source-targeted buff action, and §4.2's border clause routes it through this vocabulary, not a rebound-verb borrow. Per the user-ratified naming requirement this change owns the **generic element-agnostic on-hit reaction seam**: a new outcome event carrying the attack source, and source-targeted then-actions — so scorching_armor later authors as pure data with zero new trigger vocabulary. The `thorned_carapace` row itself belongs to `earth-spell-catalog`.
+
+## What Changes
+
+- **Batch declaration.** This change is wave-first (sequenced AFTER `terrain-marker`'s merge — the two share `world/rules/combat.py`'s `_handle_damage`, disjoint hunks); `earth-spell-catalog` depends on this change. See `## Batch` below.
+- Add one new outcome event **`physical_hit`** dispatched by the shipped damage handler on the target exactly when a physical-school strike lands positive actual HP loss — carrying the attack's source entity and source tier through the existing `dispatch_outcome_reaction` path. Magic-school hits, misses, zero-actual-loss crossings, buff rate ticks and divert legs dispatch nothing new; every existing event keeps its dispatch points byte-identically.
+- Grow the reaction `then` vocabulary with two **source-targeted actions**: `counter_damage: <coefficient>` (one untargeted, unhindered counter strike settling physical damage onto the event's source with the holder's attack power × the declared coefficient, no hit roll, no to-hit, defense subtracted ordinarily) and `apply_buff_to_source: <definition-key>` (applies the named loaded buff to the source through the shipped `apply_buff` entry point, riding grant-time actor attribution). Both validate fail-closed at rule load (coefficient finite positive; buff key must exist in `BUFF_DEFINITIONS`); every existing then-shape is preserved verbatim.
+- Pin the settlement invariants in the reaction engine: the counter strike settles inside the same round/action commit transaction as the initiating damage (snapshot/restore rollback covers it), dispatches its victim's ordinary `hp_loss` outcome exactly once, and **never dispatches `physical_hit`** — counters and source-applied buffs cannot re-trigger counters (no recursion loop). A source that is dead, fled-or-unresolvable, or immune to the applied debuff at the dispatch point contributes nothing beyond the shipped no-write postures; a counter strike that would kill the source floors through the existing nonlethal policy where that policy already protects it.
+- No second rules engine: the event and the two actions are declarative extensions of the existing `state_reactions.yaml` surfaces (new recognized `when.event` value + two new validated `then` keys) — no element, skill or buff-key branches in generic code. The rule loader additionally gains a CLOSED event-value vocabulary (`hp_loss`, `mp_zero`, `negative_buff_added`, `physical_hit`) with unknown-event rejection naming the rule — today only `when` KEYS are validated and an unknown event value loads silently and never fires; closing that enum is scoped here.
+
+## Capabilities
+
+### New Capabilities
+None.
+
+### Modified Capabilities
+- `damage-state-feedback`: the outcome-reaction capability gains the `physical_hit` event — dispatched exactly once per qualifying physical strike with the attack source attached — and the `then` vocabulary gains the validated source-targeted `counter_damage` and `apply_buff_to_source` actions with their same-transaction, exactly-once, non-recursive settlement semantics (strict superset; every existing scenario preserved verbatim).
+
+## Impact
+
+`world/rules/combat.py` (`_handle_damage` commit leg dispatches `physical_hit` for qualifying physical strikes; the counter-action settlement leg invoked from the reaction dispatch), `world/rules/state_reactions.py` (event vocabulary + `then` validation + the two source-targeted action executors), `world/rules/rulebook/state_reactions.yaml` header comment (vocabulary doc; this change ships zero live rules — inert-but-valid vocabulary, the `caster_share` precedent); new focused behavior test modules registered in `.github/evennia-shards.json`; traceability ledger hygiene stays in the separately authorized main-sync. `openspec list --json` returned an empty change set at authoring time — the dark wave is fully archived, no active-change file conflicts; the earth wave's ordering is declared in `earth-spell-catalog/design.md`. One engineer-day.
+
+This turn creates planning artifacts only. Do not apply, archive, sync main specs, create feature branches or merge until requested.
+
+## Batch
+
+- depends-on: none (wave-first; owns the on-hit event + source-targeted action vocabulary)
+- (code conflicts: `world/rules/combat.py` is SHARED with `terrain-marker` — both touch `_handle_damage` (this change's `physical_hit` dispatch leg in the staged `apply()`; that change's `unconditional_defense_bypass` read at the policy-decision hunk), ~85 lines apart but the same function: the supervisor must SEQUENCE the two merges (`terrain-marker` first — the hunks are textually disjoint but same-file). Otherwise file-disjoint: that change owns `world/rules/buffs.py`, `world/rules/target_facts.py`, `world/skills/effects.py`, `world/rules/combat_session.py`; this change owns `world/rules/state_reactions.py`/`.yaml`; `earth-spell-catalog` authors `buffs.yaml`/`registry.py`/`state_reactions.yaml` data only, strictly after both — fire's future `scorching_armor` is pure data over `physical_hit` + `apply_buff_to_source`, no new trigger event.)
