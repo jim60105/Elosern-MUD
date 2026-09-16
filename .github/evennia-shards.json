@@ -6,6 +6,7 @@
       "labels": [
         "world.rules.tests.test_account_roster",
         "world.rules.tests.test_action_evidence",
+        "world.rules.tests.test_unconditional_multi_strike",
         "world.rules.tests.test_action_pipeline_atomicity",
         "world.rules.tests.test_action_pipeline_rejections",
         "world.rules.tests.test_action_preview",
