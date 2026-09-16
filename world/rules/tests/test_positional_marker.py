@@ -124,6 +124,9 @@ class PositionalMarkerDefinitionTests(unittest.TestCase):
     """Load-time validation for marker: positional buff definition clause."""
 
     @covers_requirement(
+        "positional-marker::a-positional-marker-buff-row-makes-holding-it-the-canonical-out-of-position-fact"
+    )
+    @covers_requirement(
         "buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate"
     )
     def test_marker_positional_loads_carrying_clause(self):
@@ -139,6 +142,9 @@ class PositionalMarkerDefinitionTests(unittest.TestCase):
         definitions = load_buff_definitions(path)
         self.assertEqual(definitions["fissure"].marker, "ground")
 
+    @covers_requirement(
+        "positional-marker::a-positional-marker-buff-row-makes-holding-it-the-canonical-out-of-position-fact"
+    )
     @covers_requirement(
         "buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate"
     )
@@ -243,6 +249,9 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         malformed = SimpleNamespace(target_spec=TargetSpec.SINGLE, effects=["damage:unknown_element"])
         self.assertFalse(is_strike_class(malformed))
 
+    @covers_requirement(
+        "positional-marker::a-displaced-holder-is-unreachable-to-single-target-physical-strikes-in-both-directions"
+    )
     def test_displaced_target_cannot_be_selected_for_strike_but_magic_and_area_hit(self):
         """An attacker selecting a displaced target is rejected for strike-class but magic/area resolve normally."""
         apply_buff(self.monster, "t_displaced_hazard")
@@ -281,6 +290,9 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(res_area.outcome, "success")
         self.assertLess(self.monster.traits.hp.current, hp_before_area)
 
+    @covers_requirement(
+        "positional-marker::the-holder-s-own-single-target-strike-is-the-self-return-act"
+    )
     def test_displaced_holder_own_strike_is_self_return_act(self):
         """Displaced actor's strike against reachable target clears marker before strike resolves."""
         apply_buff(self.player, "t_displaced_hazard")
@@ -370,6 +382,9 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(has_positional_marker(self.player))
         self.assertTrue(has_positional_marker(bystander))
 
+    @covers_requirement(
+        "positional-marker::a-displaced-holder-is-unreachable-to-single-target-physical-strikes-in-both-directions"
+    )
     def test_two_displaced_holders_cannot_strike_each_other_and_neither_consumed(self):
         """Two displaced entities striking each other reject at target-side gate first, consuming neither marker."""
         apply_buff(self.player, "t_displaced_hazard")
@@ -392,6 +407,9 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(has_positional_marker(self.player))
         self.assertTrue(has_positional_marker(self.monster))
 
+    @covers_requirement(
+        "positional-marker::the-holder-s-own-single-target-strike-is-the-self-return-act"
+    )
     def test_failed_settlement_restores_positional_marker_from_snapshot(self):
         """If a self-returning strike fails commit, the pre-commit snapshot restores the positional marker."""
         apply_buff(self.player, "t_displaced_hazard")
@@ -496,6 +514,9 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
         self.assertNotIn("t_displaced_hazard", entity_active_buffs(self.player))
 
     @covers_requirement(
+        "positional-marker::mounting-a-positional-marker-sweeps-the-holder-s-ground-markers-and-refuses-impossible-mounts"
+    )
+    @covers_requirement(
         "buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate"
     )
     def test_mounting_positional_marker_sweeps_ground_markers_first(self):
@@ -519,6 +540,9 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
         self.assertEqual(swept_events[0][1]["count"], 1)
         self.assertEqual(swept_events[0][1]["reason"], "displaced_mount")
 
+    @covers_requirement(
+        "positional-marker::mounting-a-positional-marker-sweeps-the-holder-s-ground-markers-and-refuses-impossible-mounts"
+    )
     @covers_requirement(
         "buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate"
     )
@@ -559,6 +583,9 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
         apply_buff(dummy, "t_displaced_hazard")
 
     @covers_requirement(
+        "positional-marker::a-positional-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
+    @covers_requirement(
         "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
     )
     def test_exit_sweeps_extinguish_both_marker_classes(self):
@@ -595,6 +622,9 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
         self.assertNotIn("t_ground_hazard", entity_active_buffs(comp_ground))
         self.assertIn("t_control_buff", entity_active_buffs(comp_ground))
 
+    @covers_requirement(
+        "positional-marker::a-positional-marker-extinguishes-when-its-holder-leaves-the-battlefield"
+    )
     @covers_requirement(
         "terrain-marker::a-ground-marker-extinguishes-when-its-holder-leaves-the-battlefield"
     )
@@ -673,6 +703,9 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
 
         ObjectDB.flush_instance_cache(force=True)
 
+    @covers_requirement(
+        "positional-marker::deterministic-single-target-attackers-skip-displaced-candidates"
+    )
     def test_basic_attack_request_skips_displaced_enemy(self):
         """_basic_attack_request excludes displaced enemies; returns None if all enemies are displaced."""
         bf = Battlefield(
@@ -697,6 +730,9 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         req_none = _basic_attack_request(self.player, bf, record)
         self.assertIsNone(req_none)
 
+    @covers_requirement(
+        "positional-marker::deterministic-single-target-attackers-skip-displaced-candidates"
+    )
     @covers_requirement(
         "monster-action-policy::target-selection-differs-by-archetype-and-is-deterministic-under-a-fixed-seed"
     )
@@ -743,6 +779,9 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         self.assertEqual(req_caster.skill_key, _SYNTH_MAGIC_SINGLE_SKILL.key)
         self.assertEqual(req_caster.targets, [self.player])
 
+    @covers_requirement(
+        "positional-marker::deterministic-single-target-attackers-skip-displaced-candidates"
+    )
     def test_default_attack_policy_scopes_displaced_exclusion_to_strike_class(self):
         """default_attack_policy excludes displaced for strike skills, but retains displaced for magic skills."""
         npc = create_object(NPC, key="delegated_npc", location=self.room)
