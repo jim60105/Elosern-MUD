@@ -360,11 +360,13 @@ def _handle_damage(
         marked: list[str] = []
         extra = (
             damage_policy is not None
-            and damage_policy.repeat_when is not None
             and damage_policy.extra_strikes > 0
-            and has_action_evidence(target, damage_policy.repeat_when, now=now)
+            and (
+                damage_policy.repeat_when is None
+                or has_action_evidence(target, damage_policy.repeat_when, now=now)
+            )
         )
-        total_strikes = 2 if extra else 1
+        total_strikes = 1 + damage_policy.extra_strikes if extra else 1
         planned_cap_spend: dict[str, int] = {}
         planned_gauge_spend: dict[str, int] = {}
 

@@ -314,11 +314,6 @@ class DamagePolicyValidationTests(unittest.TestCase):
             DamagePolicy(repeat_when=123)
         self.assertIn("must be a string or None", str(ctx.exception))
 
-    def test_extra_strikes_without_repeat_when_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            DamagePolicy(extra_strikes=1)
-        self.assertIn("has no repeat_when predicate", str(ctx.exception))
-
     def test_extra_strikes_greater_than_one_raises(self):
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(repeat_when="forced_interaction", extra_strikes=2)
@@ -678,7 +673,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             event_ctx["nonlethal_keys"] = nonlethal_keys
         return bf, BattlefieldActionContext(bf, event_context=event_ctx)
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_first_miss_second_hit_deals_damage_and_records_both_rolls(self):
         """WHEN strike 1 misses and strike 2 hits on an eligible target, only strike 2 damages HP and both rolls are recorded."""
         # Mark target with fresh forced_interaction evidence
@@ -712,7 +707,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertGreater(damage_entries[0].data["amount"], 0)
         self.assertEqual(initial_hp - _stored_hp(self.target), damage_entries[0].data["amount"])
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_ineligible_target_has_only_one_strike(self):
         """WHEN recent evidence is missing or expired, only the ordinary single strike occurs."""
         # Target has no evidence
@@ -744,7 +739,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         roll_entries2 = [e for e in result2.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(roll_entries2), 1)
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_ordered_hp_projection_and_single_defeat_entry(self):
         """Two strikes crossing target HP emit exactly one target_defeated entry."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -770,7 +765,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertEqual(len(defeat_entries), 1)
         self.assertEqual(defeat_entries[0].target, str(self.target.key))
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_repeated_damage_floors_at_1_hp_with_single_knockout_in_nonlethal(self):
         """In nonlethal combat, two strikes crossing target HP floor at 1 with one knockout mark."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -799,7 +794,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         # Battlefield knockout mark recorded
         self.assertIn(str(self.target.key), bf.knocked_out)
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_atomic_rollback_restores_hp_and_evidence(self):
         """A failed commit after two strikes restores target HP and evidence atomically."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -833,7 +828,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         # Evidence is restored
         self.assertTrue(has_action_evidence(self.target, "forced_interaction", now=100))
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_second_synthetic_configuration_proves_policy_reuse(self):
         """A second synthetic physical skill uses the same generic repeat_when mechanism."""
         eff = stage_action_evidence(self.target, "forced_interaction", event_time=80, duration=60)
@@ -855,7 +850,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         damage_entries = [e for e in result.event_log.entries if e.kind == "damage"]
         self.assertEqual(len(damage_entries), 2)
 
-    @covers_requirement("skill-effect-model::a-conditional-follow-up-strike-repeats-damage-without-repeating-the-action")
+    @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_area_mixed_eligibility_targets(self):
         """In an AREA cast, only the target carrying evidence receives the extra strike."""
         target2 = create_object(PlayerCharacter, key="target_clean")

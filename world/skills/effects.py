@@ -491,6 +491,13 @@ class DamagePolicy:
     max_hp_fraction is a devastation rider: when non-zero, floor(max_hp * max_hp_fraction)
     is added after defense subtraction on any successful hit, regardless of whether
     a predicate is configured or matched. On a miss, zero total damage is dealt.
+
+    Extra strikes may be configured in two shapes:
+    - Evidence-conditional: repeat_when names a recognized action evidence kind,
+      requiring extra_strikes=1 (resolved only when the target carries fresh evidence).
+    - Unconditional: extra_strikes=1 with repeat_when=None (always resolves the
+      extra strike on successful action resolution).
+    In either shape, total_strikes = 1 + extra_strikes when active.
     """
 
     predicate: tuple[str, ...] = ()
@@ -664,10 +671,6 @@ class DamagePolicy:
         if self.extra_strikes not in (0, 1):
             raise ValueError(
                 f"DamagePolicy extra_strikes cannot exceed 1, got {self.extra_strikes}"
-            )
-        if self.repeat_when is None and self.extra_strikes != 0:
-            raise ValueError(
-                "DamagePolicy specifies extra_strikes > 0 but has no repeat_when predicate"
             )
         if self.repeat_when is not None and self.extra_strikes != 1:
             raise ValueError(
