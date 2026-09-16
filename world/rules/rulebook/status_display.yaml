@@ -68,12 +68,24 @@
 - code: earth_dust_veil
   label: 沙塵迷眼
   severity: harmful
-- code: earth_root
-  label: 地縛
-  severity: harmful
 - code: earth_ward
   label: 大地庇護
   severity: beneficial
+- code: earth_bedrock
+  label: 磐石壁壘
+  severity: beneficial
+- code: earth_carapace
+  label: 荊棘反甲
+  severity: beneficial
+- code: earth_fissure
+  label: 裂縫
+  severity: harmful
+- code: earth_fissure_quake
+  label: 裂縫·地震
+  severity: harmful
+- code: earth_fissure_apex
+  label: 裂縫·神格
+  severity: harmful
 - code: wind_haste
   label: 疾風
   severity: beneficial
@@ -203,3 +215,18 @@
 - code: light_blessing_defense_bonus
   label: 女神降福防禦提升
   severity: beneficial
+- code: earth_hardened_skin_defense_bonus
+  label: 硬化肌膚防禦提升
+  severity: beneficial
+- code: earth_stone_armor_defense_bonus
+  label: 岩甲防禦提升
+  severity: beneficial
+- code: earth_bedrock_defense_bonus
+  label: 磐石壁壘防禦提升
+  severity: beneficial
+- code: earth_ward_defense_bonus
+  label: 大地庇護防禦提升
+  severity: beneficial
+- code: earth_dust_veil_accuracy_penalty
+  label: 沙塵迷眼命中下降
+  severity: harmful

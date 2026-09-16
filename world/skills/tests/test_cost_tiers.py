@@ -152,17 +152,6 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
             }
         )
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_earth_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("stone_armor", "dust_veil"),
-                "大師": ("earth_bind", "rockslide"),
-                "賢者": ("earthquake", "earthen_ward"),
-                "主宰": ("mountain_collapse", "earths_judgment"),
-            }
-        )
-
     @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
     def test_wind_spell_tier_labels_match_the_catalog(self):
         self._assert_labels(

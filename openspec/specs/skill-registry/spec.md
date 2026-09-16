@@ -39,34 +39,6 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
   (`fire_ball` from `mp=20` to `mp=14`), and every other field (`label`, `target_spec`, `element`, `effects`) unchanged from before
   this change
 
-### Requirement: SKILL_REGISTRY contains the full 土-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 土-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["earth"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `stone_shard` | 石礫術 | 學徒 | `TargetSpec.SINGLE` | `mp=12` | `damage:earth:magic` |
-| `hardened_skin` | 硬化肌膚 | 學徒 | `TargetSpec.SELF` | `mp=10` | `self_buff_apply:earth_hardened_skin` |
-| `stone_armor` | 岩甲術 | 術師 | `TargetSpec.SINGLE` | `mp=24` | `buff_apply:earth_stone_armor` |
-| `dust_veil` | 沙塵術 | 術師 | `TargetSpec.AREA` | `mp=22` | `buff_apply:earth_dust_veil` |
-| `earth_bind` | 地縛術 | 大師 | `TargetSpec.AREA` | `mp=42` | `buff_apply:earth_root` |
-| `rockslide` | 岩壁崩落 | 大師 | `TargetSpec.AREA` | `mp=48` | `damage:earth:magic` |
-| `earthquake` | 地震術 | 賢者 | `TargetSpec.AREA` | `mp=90` | `damage:earth:magic` |
-| `earthen_ward` | 大地庇護 | 賢者 | `TargetSpec.AREA` | `mp=75` | `buff_apply:earth_ward` |
-| `mountain_collapse` | 山嶽崩落 | 主宰 | `TargetSpec.AREA` | `mp=150` | `damage:earth:magic` |
-| `earths_judgment` | 大地審判 | 主宰 | `TargetSpec.SINGLE` | `mp=130` | `damage:earth:magic` |
-
-#### Scenario: All ten 土 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 土 keys (`stone_shard`, `hardened_skin`, `stone_armor`, `dust_veil`, `earth_bind`, `rockslide`, `earthquake`, `earthen_ward`, `mountain_collapse`, `earths_judgment`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["earth"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY contains the full 風-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 風-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, the tier-appropriate
@@ -557,4 +529,35 @@ The dark spell family SHALL provide the documented two-root curse/erosion progre
 
 #### Scenario: Retired dev-era bindings resolve as ordinary rejections
 - **WHEN** a caller references a deleted dev-era buff binding or casts a never-existing key through the ordinary cast surface after replacement
+- **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
+
+### Requirement: Earth spell progression composes executable terrain-and-guard behavior
+The earth spell family SHALL provide the documented two-root 護甲/地形 progression as executable skill behavior using the common effect, audience, policy, buff, reaction, modifier and lineage mechanisms: a fixed-defense ladder on the defense axis at authored ceilings and durations, an accuracy debuff rung, ground-hazard marker rows whose standing-on-it fact is the live marker instance and whose damage ticks at the authored DoT rungs and durations, the ice slow-rung key reused as pure consumer data beside every fissure, a synergy strike priced once on a standing-on-the-marker target while ignoring defense unconditionally for every target, devastation area rungs, an on-physical-hit counter settlement at the authored coefficient mounted by a detectable self-buff and silent against magic attackers, and a two-parent capstone stacking damage, devastation, the top-rung full-field marker and the slow rung as independent effect components — with the retired bind node's 束縛 verb staying exclusively ice's.
+
+#### Scenario: The defense ladder guards observable stats at settlement
+- **WHEN** synthetic earth self-cast and ally-area defense compositions mirroring the authored ceilings and durations resolve through ordinary action settlement and the clock advances
+- **THEN** each guardian's effective defense rises by exactly the authored amount for the authored duration, ally-area casts spare enemies, and defense recovers on expiry
+
+#### Scenario: Fissure hazards burn whoever keeps standing on them
+- **WHEN** a synthetic area composition applies a marker hazard plus the reused slow rung to a victim and the clock ticks past several intervals, then the victim flees the battlefield mid-duration and separately the hazard expires while its holder stays fighting
+- **THEN** the standing victim loses exactly the authored per-interval DoT and carries the authored agility debuff, the hazard stops ticking the moment the holder leaves the battlefield while a non-marker buff of the holder persists unchanged, and expiry ends both the ticking and the standing-on-it fact
+
+#### Scenario: The synergy strike prices the marker once and bypasses defense always
+- **WHEN** a synthetic execution composition declaring the marker-fact predicate, a conditional multiplier and the unconditional bypass strikes the same high-defense target while standing on a fissure and while not, plus a target standing on a parallel-duration fissure rung
+- **THEN** both marker rungs receive the same single multiplier application with defense ignored, the off-marker strike still ignores defense at base coefficient without the multiplier, and no strike receives the multiplier twice
+
+#### Scenario: The carapace returns physical pain and ignores everything else
+- **WHEN** a synthetic self-buff carrier of the counter rule is struck by a landed physical attack, a magic attack, a missed swing, and a damaging tick
+- **THEN** only the physical attacker takes the holder's effective attack times the authored coefficient minus its defense exactly once, the attacker's own counter rule does not chain, and the tick and magic paths move no HP back to any attacker
+
+#### Scenario: Devastation and execution rungs behave through the shared policies
+- **WHEN** synthetic devastation and execution earth compositions hit a mixed area and a high-defense single target
+- **THEN** the devastation rung adds its authored maximum-HP fraction on hit through the existing rider and the execution rung ignores defense subtraction, with no earth-specific code
+
+#### Scenario: Two roots, branches, and the two-parent capstone gate through the lineage engine
+- **WHEN** a synthetic family replicates the documented two-root branching, both branch points, and the two-parent capstone prerequisite shape
+- **THEN** use rejects until every authored threshold is met, capstone attainment follows both terminal branches, and prerequisite caps stay derived from the shared reverse-edge map
+
+#### Scenario: Retired dev-era bindings resolve as ordinary rejections
+- **WHEN** a caller references the deleted bind node or its control binding, or casts a never-existing key through the ordinary cast surface after replacement
 - **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on

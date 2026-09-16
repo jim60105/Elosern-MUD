@@ -121,3 +121,21 @@
 - id: light_blessing_defense_bonus
   when: {buff_active: light_blessing}
   then: {defense: 18}
+# 土護甲路線的計時階梯（earth-spell-catalog D1）：timed defense/accuracy 依
+# light-sustained-recovery D3 走本表（bounds 是呈現/上限詞彙、無結算消費者）；
+# buff 列為 mount，數值在此。
+- id: earth_hardened_skin_defense_bonus
+  when: {buff_active: earth_hardened_skin}
+  then: {defense: 3}
+- id: earth_stone_armor_defense_bonus
+  when: {buff_active: earth_stone_armor}
+  then: {defense: 5}
+- id: earth_bedrock_defense_bonus
+  when: {buff_active: earth_bedrock}
+  then: {defense: 8}
+- id: earth_ward_defense_bonus
+  when: {buff_active: earth_ward}
+  then: {defense: 12}
+- id: earth_dust_veil_accuracy_penalty
+  when: {buff_active: earth_dust_veil}
+  then: {accuracy: -5}

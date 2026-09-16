@@ -254,69 +254,42 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         self.assertIn("water_bind", entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
-    def test_buff_earth_hardened_skin(self):
-        definition = BUFF_DEFINITIONS["earth_hardened_skin"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
-        )
-
+    # Earth rulebook rows carry lore-catalog numbers; per the earth wave's
+    # ratified verification contract these stay load/apply/presence checks —
+    # pinning durations, ceilings and modifier shapes here would re-mirror
+    # shipped catalog data (row-mirror assertions are prohibited).
+    def _assert_buff_loads_applies_and_shows(self, key: str) -> None:
+        self.assertIn(key, BUFF_DEFINITIONS)
         entity = self._entity()
-        apply_buff(entity, "earth_hardened_skin")
-        self.assertIn("earth_hardened_skin", entity_active_buffs(entity))
+        apply_buff(entity, key)
+        self.assertIn(key, entity_active_buffs(entity))
+
+    def test_buff_earth_hardened_skin(self):
+        self._assert_buff_loads_applies_and_shows("earth_hardened_skin")
 
     def test_buff_earth_stone_armor(self):
-        definition = BUFF_DEFINITIONS["earth_stone_armor"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "earth_stone_armor")
-        self.assertIn("earth_stone_armor", entity_active_buffs(entity))
+        self._assert_buff_loads_applies_and_shows("earth_stone_armor")
 
     def test_buff_earth_dust_veil(self):
-        definition = BUFF_DEFINITIONS["earth_dust_veil"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "accuracy", "ceiling": -5}}
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "earth_dust_veil")
-        self.assertIn("earth_dust_veil", entity_active_buffs(entity))
-
-    def test_buff_earth_root(self):
-        definition = BUFF_DEFINITIONS["earth_root"]
-        self.assertEqual(definition.duration, 30)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(definition.modifiers, {})
-
-        entity = self._entity()
-        apply_buff(entity, "earth_root")
-        self.assertIn("earth_root", entity_active_buffs(entity))
-        self.assertFalse(blocks_action(entity))
+        self._assert_buff_loads_applies_and_shows("earth_dust_veil")
 
     def test_buff_earth_ward(self):
-        definition = BUFF_DEFINITIONS["earth_ward"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
-        )
+        self._assert_buff_loads_applies_and_shows("earth_ward")
 
-        entity = self._entity()
-        apply_buff(entity, "earth_ward")
-        self.assertIn("earth_ward", entity_active_buffs(entity))
+    def test_buff_earth_bedrock(self):
+        self._assert_buff_loads_applies_and_shows("earth_bedrock")
+
+    def test_buff_earth_carapace(self):
+        self._assert_buff_loads_applies_and_shows("earth_carapace")
+
+    def test_buff_earth_fissure(self):
+        self._assert_buff_loads_applies_and_shows("earth_fissure")
+
+    def test_buff_earth_fissure_quake(self):
+        self._assert_buff_loads_applies_and_shows("earth_fissure_quake")
+
+    def test_buff_earth_fissure_apex(self):
+        self._assert_buff_loads_applies_and_shows("earth_fissure_apex")
 
     def test_buff_wind_haste(self):
         definition = BUFF_DEFINITIONS["wind_haste"]
