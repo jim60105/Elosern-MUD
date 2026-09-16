@@ -118,6 +118,7 @@
         "world.rules.tests.test_npc_intents",
         "world.rules.tests.test_npc_schedule_runtime",
         "world.rules.tests.test_npc_schedules",
+        "world.rules.tests.test_on_hit_counter_damage",
         "world.rules.tests.test_ordered_level_trait",
         "world.rules.tests.test_overwhelm_compression",
         "world.rules.tests.test_overwhelm_resolution",
