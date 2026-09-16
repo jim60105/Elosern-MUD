@@ -101,17 +101,26 @@
 - code: light_blessing
   label: 女神降福
   severity: beneficial
-- code: dark_atk_down
+- code: dark_weaken
   label: 衰弱
   severity: harmful
 - code: dark_curse
   label: 詛咒
+  severity: harmful
+- code: dark_spread
+  label: 詛咒擴散
+  severity: harmful
+- code: dark_apotheosis
+  label: 深淵神格侵蝕
   severity: harmful
 - code: defeat_weak
   label: 擊敗虛弱
   severity: warning
 - code: dark_corrosion
   label: 腐蝕
+  severity: harmful
+- code: dark_corrosion_deep
+  label: 深層侵蝕
   severity: harmful
 - code: paralysis_locks_actions
   label: 麻痺鎖定行動
@@ -125,6 +134,9 @@
 - code: fear_agility_and_accuracy_penalty
   label: 恐懼敏捷與準度減損
   severity: harmful
+- code: fear_locks_actions
+  label: 恐懼鎖定行動
+  severity: critical
 - code: high_arousal_agility_accuracy_penalty
   label: 高度興奮敏捷與準度減損
   severity: warning

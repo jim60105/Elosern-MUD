@@ -11,7 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import apply_buff
+from world.rules.buffs import apply_buff, remove_by_selector
 from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers,
@@ -71,7 +71,16 @@ class CombatModifierTests(EvenniaTestCase):
         entity = self._entity()
         apply_buff(entity, "fear")
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"agility": "-15%", "accuracy": -10}
+            evaluate_combat_modifiers(entity),
+            {"actions_per_turn": 0, "agility": "-15%", "accuracy": -10},
+        )
+
+    def test_rule_fear_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "fear")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"actions_per_turn": 0, "agility": "-15%", "accuracy": -10},
         )
 
     def test_rule_focus_accuracy_boost(self):
@@ -468,7 +477,7 @@ class CombatModifierTests(EvenniaTestCase):
         active = set(entity.buffs.all)
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": "-25%", "accuracy": -10},
+            {"actions_per_turn": 0, "agility": "-25%", "accuracy": -10},
         )
         self.assertEqual(active, set(entity.buffs.all))
         self.assertEqual(
@@ -547,6 +556,30 @@ class CombatModifierTests(EvenniaTestCase):
         entity = self._entity()
         apply_buff(entity, "light_blessing")
         self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 18})
+
+    @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
+    def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
+        feared = self._entity()
+        stilled = self._entity()
+        apply_buff(feared, "fear")
+        apply_buff(stilled, "paralysis")
+
+        feared_mods = evaluate_combat_modifiers(feared)
+        self.assertEqual(feared_mods.get("actions_per_turn"), 0)
+        self.assertEqual(feared_mods.get("agility"), "-15%")
+        self.assertEqual(feared_mods.get("accuracy"), -10)
+
+        stilled_mods = evaluate_combat_modifiers(stilled)
+        self.assertEqual(stilled_mods.get("actions_per_turn"), 0)
+        self.assertNotIn("agility", stilled_mods)
+        self.assertNotIn("accuracy", stilled_mods)
+
+        remove_by_selector(feared, "fear")
+        self.assertEqual(evaluate_combat_modifiers(feared), {})
+        self.assertEqual(evaluate_combat_modifiers(stilled), {"actions_per_turn": 0})
+
+        remove_by_selector(stilled, "paralysis")
+        self.assertEqual(evaluate_combat_modifiers(stilled), {})
 
 
 class ApplyCostModifierTests(unittest.TestCase):

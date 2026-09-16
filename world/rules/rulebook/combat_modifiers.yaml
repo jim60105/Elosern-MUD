@@ -19,6 +19,9 @@
 - id: fear_agility_and_accuracy_penalty
   when: {buff_active: fear}
   then: {agility: "-15%", accuracy: -10}
+- id: fear_locks_actions
+  when: {buff_active: fear}
+  then: {actions_per_turn: 0}
 - id: focus_accuracy_boost
   when: {buff_active: focus}
   then: {accuracy: 10}

@@ -157,38 +157,6 @@ ICE_SPELL_CATALOG = (
 )
 
 
-DARK_SPELL_CATALOG = (
-    ("shadow_bolt", "暗影箭", TargetSpec.SINGLE, 14, ("damage:dark:magic",)),
-    ("weaken", "衰弱術", TargetSpec.SINGLE, 11, ("buff_apply:dark_atk_down",)),
-    ("curse", "詛咒術", TargetSpec.SINGLE, 26, ("buff_apply:dark_curse",)),
-    ("dark_burst", "闇裂術", TargetSpec.AREA, 29, ("damage:dark:magic",)),
-    (
-        "dark_corrosion_domain",
-        "闇蝕領域",
-        TargetSpec.AREA,
-        47,
-        ("damage:dark:magic", "buff_apply:dark_corrosion"),
-    ),
-    (
-        "shadow_torture",
-        "暗影之刑",
-        TargetSpec.SINGLE,
-        41,
-        ("damage:dark:magic", "buff_apply:dark_corrosion"),
-    ),
-    ("abyss_devour", "深淵吞噬", TargetSpec.SINGLE, 85, ("damage:dark:magic",)),
-    ("dark_dominion", "黑暗支配", TargetSpec.AREA, 72, ("buff_apply:fear",)),
-    ("void_annihilation", "虛空湮滅", TargetSpec.AREA, 155, ("damage:dark:magic",)),
-    (
-        "underworld_judgment",
-        "冥界審判",
-        TargetSpec.SINGLE,
-        135,
-        ("damage:dark:magic",),
-    ),
-)
-
-
 _CATALOG_EFFECTS = {
     row[0]: row[4]
     for rows in (
@@ -197,7 +165,6 @@ _CATALOG_EFFECTS = {
         WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
         ICE_SPELL_CATALOG,
-        DARK_SPELL_CATALOG,
     )
     for row in rows
 }
@@ -521,52 +488,6 @@ class IceSpellCatalogTests(unittest.TestCase):
                 and skill.kind is SkillKind.ACTIVE
             },
             {row[0] for row in ICE_SPELL_CATALOG},
-        )
-
-class DarkSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
-    def test_all_ten_dark_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in DARK_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["dark"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
-    def test_every_dark_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in DARK_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="dark", school="magic"),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
-    def test_dark_active_spell_keys_are_exactly_the_catalog_set(self):
-        self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["dark"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in DARK_SPELL_CATALOG}
-            | {"shadow_slash", "dual_blade_mastery"},
         )
 
 

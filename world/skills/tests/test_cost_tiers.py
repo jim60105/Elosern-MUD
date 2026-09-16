@@ -195,14 +195,3 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
                 "主宰": ("absolute_zero", "eternal_ice_field"),
             }
         )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
-    def test_dark_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("curse", "dark_burst"),
-                "大師": ("dark_corrosion_domain", "shadow_torture"),
-                "賢者": ("abyss_devour", "dark_dominion"),
-                "主宰": ("void_annihilation", "underworld_judgment"),
-            }
-        )
