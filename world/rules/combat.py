@@ -22,6 +22,7 @@ from world.rules.buffs import (
     TickRecord,
     _active_buff_instances,
     get_divert_consumed,
+    has_positional_marker,
     tick_buffs,
     update_divert_consumed,
 )
@@ -794,6 +795,13 @@ def default_attack_policy(
     )
     if skill_key is None:
         return None
+    skill = SKILL_REGISTRY[skill_key]
+    from world.rules.spell_conditions import is_strike_class
+
+    if is_strike_class(skill):
+        candidates = [c for c in candidates if not has_positional_marker(c)]
+        if not candidates:
+            return None
     target = min(
         candidates,
         key=lambda candidate: (_stored_hp(candidate), candidate.key),

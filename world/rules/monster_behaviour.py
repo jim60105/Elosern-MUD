@@ -321,11 +321,28 @@ def monster_behaviour_policy(
         return ActionRequest(entity, skill.key, "all-enemies", context)
     if not single_skills:
         return None
-    target = _choose_target(entity, enemies, profile.target_strategy)
-    skill = _choose_skill(
-        entity,
-        single_skills,
-        profile.skill_choice,
-        target,
-    )
+
+    from world.rules.buffs import has_positional_marker
+    from world.rules.spell_conditions import is_strike_class
+
+    # Selection hygiene (design D6): a SINGLE-target kit that is exclusively
+    # strike-class excludes displaced candidates; a monster owning magic-
+    # school SINGLE damage keeps the full set and, against a displaced
+    # target, selects only its gate-allowed (non-strike) skills. State-only
+    # and dice-free; resolution-time gating stays the single authority.
+    has_magic_single = any(not is_strike_class(skill) for skill in single_skills)
+    if not has_magic_single:
+        candidates = [enemy for enemy in enemies if not has_positional_marker(enemy)]
+        if not candidates:
+            return None
+    else:
+        candidates = enemies
+    target = _choose_target(entity, candidates, profile.target_strategy)
+    if has_positional_marker(target):
+        eligible_skills = [skill for skill in single_skills if not is_strike_class(skill)]
+        if not eligible_skills:
+            return None
+    else:
+        eligible_skills = single_skills
+    skill = _choose_skill(entity, eligible_skills, profile.skill_choice, target)
     return ActionRequest(entity, skill.key, [target], context)

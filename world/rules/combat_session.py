@@ -491,6 +491,8 @@ def _basic_attack_request(
     record: CombatSessionRecord,
 ) -> ActionRequest | None:
     """Return a deterministic ``basic_attack`` against the lowest-HP living enemy."""
+    from world.rules.buffs import has_positional_marker
+
     enemy_keys = next(
         (
             members
@@ -506,6 +508,7 @@ def _basic_attack_request(
         and key not in battlefield.fled
         and not battlefield.is_knocked_out(key)
         and _stored_trait_value(battlefield.roster[key].traits.hp) > 0
+        and not has_positional_marker(battlefield.roster[key])
     ]
     if not candidates:
         return None
@@ -602,7 +605,7 @@ def clear_session(
         unregister_participants((*record.player_ids, *record.enemy_ids))
 
     from django.db import transaction
-    from world.rules.buffs import remove_ground_markers
+    from world.rules.buffs import remove_ground_markers, remove_positional_markers
 
     participants: set[Any] = set()
     if battlefield is not None:
@@ -614,7 +617,7 @@ def clear_session(
                 participants.add(obj)
     participants.add(actor)
     for entity in participants:
-        removed = remove_ground_markers(entity)
+        removed = remove_ground_markers(entity) + remove_positional_markers(entity)
         if removed:
             boundary = {
                 "char": str(entity.pk),
@@ -1418,13 +1421,13 @@ def _submit_request(
             )
             _persist(actor, new_record)
 
-            from world.rules.buffs import remove_ground_markers
+            from world.rules.buffs import remove_ground_markers, remove_positional_markers
 
             newly_fled_pks = set(new_fled_ids) - set(record.fled_ids)
             if newly_fled_pks:
                 for entity in battlefield.roster.values():
                     if int(entity.pk) in newly_fled_pks:
-                        removed = remove_ground_markers(entity)
+                        removed = remove_ground_markers(entity) + remove_positional_markers(entity)
                         if removed:
                             boundary = {
                                 "char": str(entity.pk),
@@ -1441,7 +1444,7 @@ def _submit_request(
             if newly_knocked_pks:
                 for entity in battlefield.roster.values():
                     if int(entity.pk) in newly_knocked_pks:
-                        removed = remove_ground_markers(entity)
+                        removed = remove_ground_markers(entity) + remove_positional_markers(entity)
                         if removed:
                             boundary = {
                                 "char": str(entity.pk),

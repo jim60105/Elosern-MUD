@@ -1,4 +1,9 @@
-## ADDED Requirements
+# positional-marker Specification
+
+## Purpose
+Defines the generic out-of-position marker primitive: a validated `marker: positional` clause on the buff-definition grammar making holder presence the canonical out-of-position fact, a bidirectional single-target physical strike reachability gate with self-return mechanics, battlefield-exit extinguishment, and ground-marker sweep on mount.
+
+## Requirements
 
 ### Requirement: A positional-marker buff row makes holding it the canonical out-of-position fact
 A buff definition MAY declare the closed-vocabulary `marker: positional` clause at definition load — the second value of the shipped closed marker vocabulary beside `ground`. A row that declares it SHALL be a positional marker whose canonical「失去位置／被擊退出位」fact is exactly the holder carrying a live (unexpired, non-paused) instance of that definition — there is no separate position, tile, or room state, and no generic code SHALL read an element, skill or definition-key identity to honor the clause. Positional rows compose with the shipped definition vocabulary without restriction (a positional row may additionally carry `rate`, `bounds` or an empty `modifiers` mapping); a row without the clause SHALL load, apply, tick and expire bit-identically to its pre-clause behavior. The clause value SHALL stay validated fail-closed at load — a value outside the two-member closed vocabulary, a non-string, or a boolean SHALL name the offending definition key and fail the load.
@@ -64,7 +69,7 @@ A live positional-marker instance SHALL end — through the existing buff-remova
 - **THEN** the positional fact stays true every round until its own duration elapses or a self-return strike clears it
 
 ### Requirement: Deterministic single-target attackers skip displaced candidates
-The deterministic strike-candidate selections that build scripted combat actions — the session basic-attack target picker, the delegated default attack policy, and the monster single-target selection path — SHALL exclude positional-marker holders from their candidate sets, falling back to no-target/no-action when every living enemy is displaced (that combatant skips its attack exactly like the every-enemy-fled case). The AREA shorthand candidate set SHALL keep displaced candidates. The exclusion SHALL be state-only and dice-free (fixed-seed reproducibility preserved), SHALL be selection hygiene rather than permission (resolution-time gating stays the single authority), and SHALL not alter any other selection metric or tie-break.
+The deterministic strike-candidate selections that build scripted combat actions — the session basic-attack target picker, the delegated default attack policy's strike-class candidate selection, and the monster single-target selection path — SHALL exclude positional-marker holders from their candidate sets, falling back to no-target/no-action when every living enemy is displaced (that combatant skips its attack exactly like the every-enemy-fled case). The AREA shorthand candidate set SHALL keep displaced candidates. The exclusion SHALL be state-only and dice-free (fixed-seed reproducibility preserved), SHALL be selection hygiene rather than permission (resolution-time gating stays the single authority), and SHALL not alter any other selection metric or tie-break.
 
 #### Scenario: A basic-attacker with one displaced enemy holds its swing
 - **WHEN** a session combatant whose only living enemy is displaced reaches its basic-attack step
