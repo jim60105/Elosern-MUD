@@ -67,7 +67,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 45)
+        self.assertEqual(len(loaded), 57)
         self.assertEqual(
             set(loaded),
             {
@@ -603,7 +603,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
-    """The 45-key bijection plus the ten new items' trade identity."""
+    """The 57-key bijection plus the ten new items' trade identity."""
 
     NEW_ITEM_KEYS = (
         "purified_pendant",
@@ -630,7 +630,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 45)
+        self.assertEqual(len(enum_values), 57)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():

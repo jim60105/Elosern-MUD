@@ -201,7 +201,7 @@ class EquipmentHandlerTests(EvenniaTestCase):
         ItemDefinition(
             key="t_unstocked_staff",
             display_name_zh="測試未上架法杖",
-            price_table_key="mundane_weapon",
+            price_table_key="t_unstocked_staff",
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
