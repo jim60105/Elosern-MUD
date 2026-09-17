@@ -74,7 +74,8 @@
         "world.rules.tests.test_event_log",
         "world.rules.tests.test_fire_burn_immolation",
         "world.rules.tests.test_ice_stillness_behavior",
-        "world.rules.tests.test_positional_marker"
+        "world.rules.tests.test_positional_marker",
+        "world.rules.tests.test_turn_order_control"
       ]
     },
     {

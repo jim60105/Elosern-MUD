@@ -80,6 +80,185 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         for call in decay.call_args_list:
             self.assertEqual(call.args[1], 6)
 
+    def test_count_of_two_provisions_two_slots_in_order(self):
+        battlefield = self.battlefield()
+        calls = []
+
+        def provider(entity, field):
+            calls.append(entity.key)
+            return None
+
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            run_round(battlefield, provider)
+        self.assertEqual(calls, ["fast", "fast", "slow"])
+
+    def test_mid_round_defeat_cuts_remaining_slots_with_no_event(self):
+        battlefield = self.battlefield()
+        calls = []
+
+        def provider(entity, field):
+            calls.append(entity.key)
+            if entity.key == "fast":
+                entity.traits.hp._data["current"] = 0
+            return None
+
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs = run_round(battlefield, provider)
+        self.assertEqual(calls, ["fast", "slow"])
+        skipped = [entry for log in logs for entry in log.entries if entry.kind == "action_skipped"]
+        self.assertEqual(skipped, [])
+
+    def test_runaway_fuse_clamps_over_provisioned_bundle(self):
+        battlefield = self.battlefield()
+        calls = []
+
+        def provider(entity, field):
+            calls.append(entity.key)
+            return None
+
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 5} if entity.key == "fast" else {},
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            run_round(battlefield, provider)
+        self.assertEqual(calls, ["fast", "fast", "fast", "slow"])
+
+    def test_chance_bearing_zero_skips_on_losing_roll_and_acts_on_winning_roll(self):
+        battlefield1 = self.battlefield()
+        calls1 = []
+
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
+            ),
+            patch(
+                "world.rules.combat.matched_combat_modifiers",
+                side_effect=lambda entity: (("rule_chance", {"actions_per_turn": 0, "chance": 15}),) if entity.key == "fast" else (),
+            ),
+            patch("world.rules.combat.roll_d100", return_value=10),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs1 = run_round(battlefield1, lambda entity, field: calls1.append(entity.key) or None)
+
+        self.assertEqual(calls1, ["slow"])
+        skip_entries = [e for log in logs1 for e in log.entries if e.kind == "action_skipped"]
+        self.assertEqual(len(skip_entries), 1)
+        self.assertEqual(skip_entries[0].actor, "fast")
+        self.assertEqual(skip_entries[0].data, {"chance": 15, "roll": 10})
+
+        battlefield2 = self.battlefield()
+        calls2 = []
+
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
+            ),
+            patch(
+                "world.rules.combat.matched_combat_modifiers",
+                side_effect=lambda entity: (("rule_chance", {"actions_per_turn": 0, "chance": 15}),) if entity.key == "fast" else (),
+            ),
+            patch("world.rules.combat.roll_d100", return_value=20),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs2 = run_round(battlefield2, lambda entity, field: calls2.append(entity.key) or None)
+
+        self.assertEqual(calls2, ["fast", "slow"])
+        skip_entries2 = [e for log in logs2 for e in log.entries if e.kind == "action_skipped"]
+        self.assertEqual(skip_entries2, [])
+
+    def test_certainty_coexisting_with_chance_skips_and_highest_chance_wins(self):
+        battlefield = self.battlefield()
+        calls = []
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.matched_combat_modifiers",
+                side_effect=lambda entity: (
+                    ("lock_rule", {"actions_per_turn": 0}),
+                    ("chance_rule", {"actions_per_turn": 0, "chance": 15}),
+                ) if entity.key == "fast" else (),
+            ),
+            patch("world.rules.combat.roll_d100") as mock_roll,
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs = run_round(battlefield, lambda entity, field: calls.append(entity.key) or None)
+        mock_roll.assert_not_called()
+        self.assertEqual(calls, ["slow"])
+        self.assertEqual(logs[0].entries[0].kind, "action_skipped")
+        self.assertEqual(logs[0].entries[0].data, {})
+
+        battlefield2 = self.battlefield()
+        calls2 = []
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.matched_combat_modifiers",
+                side_effect=lambda entity: (
+                    ("chance_15", {"actions_per_turn": 0, "chance": 15}),
+                    ("chance_30", {"actions_per_turn": 0, "chance": 30}),
+                ) if entity.key == "fast" else (),
+            ),
+            patch("world.rules.combat.roll_d100", return_value=25),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs2 = run_round(battlefield2, lambda entity, field: calls2.append(entity.key) or None)
+        self.assertEqual(calls2, ["slow"])
+        self.assertEqual(logs2[0].entries[0].data, {"chance": 30, "roll": 25})
+
+    def test_action_lock_dominates_coexisting_grant(self):
+        battlefield = self.battlefield()
+        calls = []
+        with (
+            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 1} if entity.key == "fast" else {},
+            ),
+            patch(
+                "world.rules.combat.matched_combat_modifiers",
+                side_effect=lambda entity: (
+                    ("lock_rule", {"actions_per_turn": 0}),
+                    ("grant_rule", {"actions_per_turn": 1}),
+                ) if entity.key == "fast" else (),
+            ),
+            patch("world.rules.combat.ActionResolver.resolve") as resolve,
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs = run_round(battlefield, lambda entity, field: calls.append(entity.key) or None)
+        self.assertEqual(calls, ["slow"])
+        resolve.assert_not_called()
+        self.assertEqual(logs[0].entries[0].kind, "action_skipped")
+
     def test_default_policy_does_not_retry_an_unaffordable_skill(self):
         battlefield = self.battlefield()
         actor = battlefield.roster["fast"]
