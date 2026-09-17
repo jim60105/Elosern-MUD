@@ -5,11 +5,11 @@
 
 ## 2. Inspect-only registry entries
 
-- [ ] 2.1 Register the 6 foods — `kingdom_rye_hardtack` / `adventurer_field_ration` on the `meal` band, and `imperial_candied_fruit` / `beastfolk_smoked_jerky` / `harbor_lobster_bisque` / `elven_candied_blossom` on `specialty_food` — each `ItemKind.FOOD` + `ItemIconKey.FOOD`, sellable, with the codex summary. Verify the registry imports, which runs `ItemPresentation` validation on every summary.
-- [ ] 2.2 Register the 5 non-mechanical remedies — `miners_bracing_broth`, `beastfolk_herbal_salve`, `passion_draught` on `potion`; `spirit_dew`, `elven_tear` on `material` — each `ItemKind.POTION` + `ItemIconKey.POTION`, sellable, declaring neither `use_mechanics` nor `equipment_slot`. Verify the registry imports.
-- [ ] 2.3 Register the 4 tools — `enchanted_compass`, `dungeon_flare_talisman`, `beastfolk_signal_conch`, `camp_ward_kit` — on the `tool` band as `ItemKind.TOOL` + `ItemIconKey.TOOL`, sellable. Verify the registry imports.
-- [ ] 2.4 Register the 6 materials — `goblin_ear`, `slime_residue`, `earth_drake_scale`, `troll_fang`, `elven_essence`, `ancient_dragon_heart` — on the `material` band as `ItemKind.MATERIAL` + `ItemIconKey.MATERIAL`, sellable. Verify the registry imports.
-- [ ] 2.5 Register the 3 curios — `family_crest_token`, `ancient_mystery_key`, `elven_child_toy` — as `ItemKind.MISC` + `ItemIconKey.MISC`, non-sellable on the `relic` band. Verify the registry imports.
+- [x] 2.1 Register the 6 foods — `kingdom_rye_hardtack` / `adventurer_field_ration` on the `meal` band, and `imperial_candied_fruit` / `beastfolk_smoked_jerky` / `harbor_lobster_bisque` / `elven_candied_blossom` on `specialty_food` — each `ItemKind.FOOD` + `ItemIconKey.FOOD`, sellable, with the codex summary. Verify the registry imports, which runs `ItemPresentation` validation on every summary.
+- [x] 2.2 Register the 5 non-mechanical remedies — `miners_bracing_broth`, `beastfolk_herbal_salve`, `passion_draught` on `potion`; `spirit_dew`, `elven_tear` on `material` — each `ItemKind.POTION` + `ItemIconKey.POTION`, sellable, declaring neither `use_mechanics` nor `equipment_slot`. Verify the registry imports.
+- [x] 2.3 Register the 4 tools — `enchanted_compass`, `dungeon_flare_talisman`, `beastfolk_signal_conch`, `camp_ward_kit` — on the `tool` band as `ItemKind.TOOL` + `ItemIconKey.TOOL`, sellable. Verify the registry imports.
+- [x] 2.4 Register the 6 materials — `goblin_ear`, `slime_residue`, `earth_drake_scale`, `troll_fang`, `elven_essence`, `ancient_dragon_heart` — on the `material` band as `ItemKind.MATERIAL` + `ItemIconKey.MATERIAL`, sellable. Verify the registry imports.
+- [x] 2.5 Register the 3 curios — `family_crest_token`, `ancient_mystery_key`, `elven_child_toy` — as `ItemKind.MISC` + `ItemIconKey.MISC`, non-sellable on the `relic` band. Verify the registry imports.
 
 ## 3. Shape-derived behavior
 
