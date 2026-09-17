@@ -956,30 +956,33 @@ def run_round(
         ):
             continue
         modifiers = evaluate_combat_modifiers(entity)
-        matched = matched_combat_modifiers(entity)
-        zero_rules = [adj for _, adj in matched if adj.get("actions_per_turn") == 0]
+        if "actions_per_turn" in modifiers:
+            matched = matched_combat_modifiers(entity)
+            zero_rules = [adj for _, adj in matched if adj.get("actions_per_turn") == 0]
 
-        if zero_rules or modifiers.get("actions_per_turn", 1) == 0:
-            certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
-            if certain:
-                logs.append(_action_skipped_event_log(entity))
-                continue
-            max_chance = max(int(adj["chance"]) for adj in zero_rules)
-            roll = roll_d100()
-            if roll <= max_chance:
-                logs.append(
-                    _action_skipped_event_log(
-                        entity, data={"chance": max_chance, "roll": roll}
+            if zero_rules or modifiers.get("actions_per_turn") == 0:
+                certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
+                if certain:
+                    logs.append(_action_skipped_event_log(entity))
+                    continue
+                max_chance = max(int(adj["chance"]) for adj in zero_rules)
+                roll = roll_d100()
+                if roll <= max_chance:
+                    logs.append(
+                        _action_skipped_event_log(
+                            entity, data={"chance": max_chance, "roll": roll}
+                        )
                     )
-                )
-                continue
-            count = max(1, int(modifiers.get("actions_per_turn", 1)))
+                    continue
+                count = max(1, int(modifiers.get("actions_per_turn", 1)))
+            else:
+                raw_count = modifiers.get("actions_per_turn", 1)
+                if raw_count == 0:
+                    logs.append(_action_skipped_event_log(entity))
+                    continue
+                count = max(1, int(raw_count))
         else:
-            raw_count = modifiers.get("actions_per_turn", 1)
-            if raw_count == 0:
-                logs.append(_action_skipped_event_log(entity))
-                continue
-            count = max(1, int(raw_count))
+            count = 1
 
         count = min(count, _MAX_ACTIONS_PER_TURN)
 
