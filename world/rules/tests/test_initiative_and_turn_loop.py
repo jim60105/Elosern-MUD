@@ -199,6 +199,10 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         with (
             patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
             patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
+            ),
+            patch(
                 "world.rules.combat.matched_combat_modifiers",
                 side_effect=lambda entity: (
                     ("lock_rule", {"actions_per_turn": 0}),
@@ -219,6 +223,10 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         calls2 = []
         with (
             patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers",
+                side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
+            ),
             patch(
                 "world.rules.combat.matched_combat_modifiers",
                 side_effect=lambda entity: (
