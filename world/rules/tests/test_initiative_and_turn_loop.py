@@ -59,7 +59,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         with patch("world.rules.combat.roll_d100", side_effect=[1, 100]):
             self.assertEqual(roll_initiative(battlefield), ["slow", "fast"])
 
-    @covers_requirement("combat-resolution::actions-per-turn-0-skips-a-combatant-s-turn-before-actionresolver-is-called")
+    @covers_requirement("combat-resolution::the-turn-loop-consumes-actions-per-turn-as-the-round-s-action-count-with-zero-skipping-before-actionresolver-is-called")
     def test_action_lock_skips_resolver_and_upkeep_runs(self):
         battlefield = self.battlefield()
         with (
@@ -144,6 +144,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             run_round(battlefield, provider)
         self.assertEqual(calls, ["fast", "fast", "fast", "slow"])
 
+    @covers_requirement("combat-resolution::a-declared-action-loss-chance-gates-the-round-skip-with-one-recorded-roll")
     def test_chance_bearing_zero_skips_on_losing_roll_and_acts_on_winning_roll(self):
         battlefield1 = self.battlefield()
         calls1 = []

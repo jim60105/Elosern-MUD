@@ -28,6 +28,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -107,6 +108,7 @@ class OrderFoldTests(unittest.TestCase):
         BUFF_DEFINITIONS.pop("synth_advance", None)
         BUFF_DEFINITIONS.pop("synth_retreat", None)
 
+    @covers_requirement("combat-resolution::the-round-loop-folds-declarative-in-round-order-operations-into-its-sequence")
     def test_advance_to_head_reorders_tail_preserving_relative_order(self):
         # Initial rolled initiative: fast, mid, slow
         # slow carries advance_to_head
@@ -124,6 +126,7 @@ class OrderFoldTests(unittest.TestCase):
         # slow was advanced ahead of the remaining tail; fast and mid kept their relative order
         self.assertEqual(calls, ["slow", "fast", "mid"])
 
+    @covers_requirement("combat-resolution::the-round-loop-folds-declarative-in-round-order-operations-into-its-sequence")
     def test_retreat_to_tail_pushes_combatant_behind_remaining_tail(self):
         # Initial rolled initiative: fast, mid, slow
         # fast carries retreat_to_tail
@@ -188,6 +191,7 @@ class OrderFoldTests(unittest.TestCase):
         # Clean rolled order
         self.assertEqual(calls_r2, ["fast", "mid", "slow"])
 
+    @covers_requirement("combat-resolution::the-round-loop-folds-declarative-in-round-order-operations-into-its-sequence")
     def test_relocation_never_changes_action_count(self):
         # fast has actions_per_turn = 2 and is retreated to tail
         self._attach_marker(self.fast, self.retreat_def)
@@ -242,6 +246,7 @@ class OrderFoldTests(unittest.TestCase):
 class BuffDefinitionRoundOrderValidationTests(unittest.TestCase):
     """Load validation tests for the round_order clause on buff definitions."""
 
+    @covers_requirement("buff-handler-integration::buff-definitions-may-declare-a-validated-in-round-order-operation")
     def test_well_formed_round_order_loads_successfully(self):
         yaml_content = """
 - key: synth_advance_test
@@ -357,6 +362,7 @@ class StateReactionMarkOrderOpTests(EvenniaTestCase):
         )
         validate_state_reaction_rules([rule])
 
+    @covers_requirement("damage-state-feedback::the-outcome-reaction-vocabulary-grows-one-declarative-order-marker-action")
     def test_mark_order_op_dispatch_marks_source(self):
         attacker = self._character("attacker")
         reactor = self._character("reactor")
