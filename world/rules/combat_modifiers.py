@@ -30,7 +30,11 @@ _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml"
 
 
 def validate_combat_modifier_rules(rules: list[Rule]) -> None:
-    """Preflight every ``equipment_worn`` condition against the item registry.
+    """Preflight every ``equipment_worn`` condition and validate declared ``chance`` locks.
+
+    A declared ``chance`` is legal only alongside ``actions_per_turn: 0`` as an
+    integer percentage in [0, 100]. Booleans, non-integers, out-of-range values,
+    and declarations without a zero-lock fail closed naming the rule id.
 
     Runs at the combat rulebook's load site, before any rule matching or
     startup mirroring: an ``equipment_worn`` value must be a string naming an
@@ -43,6 +47,20 @@ def validate_combat_modifier_rules(rules: list[Rule]) -> None:
     exactly the failure mode this preflight exists to prevent.)
     """
     for rule in rules:
+        if "chance" in rule.then:
+            chance_val = rule.then["chance"]
+            if (
+                isinstance(chance_val, bool)
+                or not isinstance(chance_val, int)
+                or not (0 <= chance_val <= 100)
+                or "actions_per_turn" not in rule.then
+                or isinstance(rule.then["actions_per_turn"], bool)
+                or rule.then["actions_per_turn"] != 0
+            ):
+                raise ValueError(
+                    f"rule {rule.id!r}: chance must be an integer in 0-100 and only declared alongside actions_per_turn: 0, "
+                    f"got chance={chance_val!r} with then={rule.then!r}"
+                )
         if "equipment_worn" not in rule.when:
             continue
         value = rule.when["equipment_worn"]

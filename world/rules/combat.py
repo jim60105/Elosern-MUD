@@ -31,6 +31,7 @@ from world.rules.combat_modifiers import (
     adjusted_agility,
     apply_cost_modifier,
     evaluate_combat_modifiers,
+    matched_combat_modifiers,
 )
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
@@ -58,6 +59,8 @@ COMBAT_YAML = yaml.safe_load(
         encoding="utf-8"
     )
 )
+
+_MAX_ACTIONS_PER_TURN: int = 3
 
 
 def _extract_effect_coefficient(event_context: dict[str, Any] | None) -> float:
@@ -816,16 +819,56 @@ def default_attack_policy(
     )
 
 
-def _action_skipped_event_log(entity: Any) -> EventLog:
+def _action_skipped_event_log(
+    entity: Any, data: dict[str, Any] | None = None
+) -> EventLog:
     key = str(entity.key)
     entry = EventEntry(
         kind="action_skipped",
         actor=key,
         target=None,
-        data={},
+        data=dict(data) if data is not None else {},
         text_template="{actor} 無法行動。",
     )
     return EventLog(key, "", (), (entry,), 0)
+
+
+def _entity_round_order_op(entity: Any) -> str | None:
+    """Return the active round_order action verb for entity, or None.
+
+    Scans active buff instances in apply order; the last declared round_order
+    marker instance wins.
+    """
+    from world.rules.buffs import BUFF_DEFINITIONS, _active_buff_instances
+
+    last_op: str | None = None
+    for buff in _active_buff_instances(entity):
+        definition = BUFF_DEFINITIONS.get(buff.definition_key)
+        if definition is None or not definition.round_order:
+            continue
+        last_op = definition.round_order.get("action")
+    return last_op
+
+
+def _fold_round_order(remaining: list[str], battlefield: Battlefield) -> list[str]:
+    """Fold pending in-round order operations across the remaining not-yet-acted tail."""
+    order = list(remaining)
+    for key in list(order):
+        if (
+            key not in battlefield.roster
+            or key in battlefield.fled
+            or battlefield.is_knocked_out(key)
+        ):
+            continue
+        entity = battlefield.roster[key]
+        if _stored_hp(entity) <= 0:
+            continue
+        op = _entity_round_order_op(entity)
+        if op == "advance_to_head":
+            order = [key] + [k for k in order if k != key]
+        elif op == "retreat_to_tail":
+            order = [k for k in order if k != key] + [key]
+    return order
 
 
 def _end_of_round_upkeep(
@@ -890,12 +933,21 @@ def run_round(
     ``notifications_sink`` collects player-facing notification lines staged
     by committed effects (e.g. title grant toasts) for delivery by the outer
     settlement boundary after its commit; ``run_round`` itself never sends.
+
+    The entire round resolution stays within one outer database transaction
+    (the session's existing boundary); multiple action slots provisioned for a
+    single combatant execute sequentially inside that same transaction.
     """
     logs: list[EventLog] = []
     order = roll_initiative(battlefield)
     if first_actor is not None and first_actor in order:
         order = [first_actor] + [key for key in order if key != first_actor]
-    for key in order:
+    remaining = list(order)
+    while remaining:
+        remaining = _fold_round_order(remaining, battlefield)
+        key = remaining.pop(0)
+        if key not in battlefield.roster:
+            continue
         entity = battlefield.roster[key]
         if (
             key in battlefield.fled
@@ -904,40 +956,74 @@ def run_round(
         ):
             continue
         modifiers = evaluate_combat_modifiers(entity)
-        if modifiers.get("actions_per_turn", 1) == 0:
-            logs.append(_action_skipped_event_log(entity))
-            continue
-        request = action_provider(entity, battlefield)
-        if request is None:
-            continue
-        if isinstance(request, ItemUseRequest):
-            # The battlefield doubles as the action context (design D2):
-            # every scope — self, single, and group — resolves against the
-            # same roster presence/relation/range validators a skill's
-            # targets pass. The resulting multi-entity journal rides the
-            # existing sink, whose restore() walks every captured entity
-            # (design D3), so the outer rollback contract already covers
-            # companion traits, buffs, and sexual state.
-            item_result = resolve_item_use(
-                request,
-                in_combat=True,
-                context=BattlefieldActionContext(battlefield),
-            )
-            if item_result.outcome == "success":
-                if item_result.journal is not None and journal_sink is not None:
-                    journal_sink.append(item_result.journal)
-                if item_result.event_log is not None:
-                    logs.append(item_result.event_log)
-            continue
-        result = ActionResolver.resolve(request)
-        if result.outcome == "success" and result.event_log is not None:
-            logs.append(result.event_log)
-        # The action provider is a duck-typed seam: a result without the
-        # notification field (an injected double, or a pre-notification
-        # provider) simply stages nothing.
-        notifications = getattr(result, "notifications", ())
-        if notifications and notifications_sink is not None:
-            notifications_sink.extend(notifications)
+        if "actions_per_turn" in modifiers:
+            matched = matched_combat_modifiers(entity)
+            zero_rules = [adj for _, adj in matched if adj.get("actions_per_turn") == 0]
+
+            if zero_rules or modifiers.get("actions_per_turn") == 0:
+                certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
+                if certain:
+                    logs.append(_action_skipped_event_log(entity))
+                    continue
+                max_chance = max(int(adj["chance"]) for adj in zero_rules)
+                roll = roll_d100()
+                if roll <= max_chance:
+                    logs.append(
+                        _action_skipped_event_log(
+                            entity, data={"chance": max_chance, "roll": roll}
+                        )
+                    )
+                    continue
+                count = max(1, int(modifiers.get("actions_per_turn", 1)))
+            else:
+                raw_count = modifiers.get("actions_per_turn", 1)
+                if raw_count == 0:
+                    logs.append(_action_skipped_event_log(entity))
+                    continue
+                count = max(1, int(raw_count))
+        else:
+            count = 1
+
+        count = min(count, _MAX_ACTIONS_PER_TURN)
+
+        for _ in range(count):
+            if (
+                key in battlefield.fled
+                or battlefield.is_knocked_out(key)
+                or _stored_hp(entity) <= 0
+            ):
+                break
+            request = action_provider(entity, battlefield)
+            if request is None:
+                continue
+            if isinstance(request, ItemUseRequest):
+                # The battlefield doubles as the action context (design D2):
+                # every scope — self, single, and group — resolves against the
+                # same roster presence/relation/range validators a skill's
+                # targets pass. The resulting multi-entity journal rides the
+                # existing sink, whose restore() walks every captured entity
+                # (design D3), so the outer rollback contract already covers
+                # companion traits, buffs, and sexual state.
+                item_result = resolve_item_use(
+                    request,
+                    in_combat=True,
+                    context=BattlefieldActionContext(battlefield),
+                )
+                if item_result.outcome == "success":
+                    if item_result.journal is not None and journal_sink is not None:
+                        journal_sink.append(item_result.journal)
+                    if item_result.event_log is not None:
+                        logs.append(item_result.event_log)
+                continue
+            result = ActionResolver.resolve(request)
+            if result.outcome == "success" and result.event_log is not None:
+                logs.append(result.event_log)
+            # The action provider is a duck-typed seam: a result without the
+            # notification field (an injected double, or a pre-notification
+            # provider) simply stages nothing.
+            notifications = getattr(result, "notifications", ())
+            if notifications and notifications_sink is not None:
+                notifications_sink.extend(notifications)
     records_by_key = _end_of_round_upkeep(battlefield)
     logs.extend(
         settle_upkeep(
