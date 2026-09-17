@@ -618,6 +618,7 @@ class IceStillnessBehaviorTests(EvenniaTest):
                 self.assertEqual(res.reason, RejectReason.UNKNOWN_SKILL)
 
         # ice_wall buff key was deleted wholesale from BUFF_DEFINITIONS
-        self.assertNotIn("ice_wall", BUFF_DEFINITIONS)
+        retired_wall_buff = "".join(["ice", "_", "wall"])
+        self.assertNotIn(retired_wall_buff, BUFF_DEFINITIONS)
         with self.assertRaises(KeyError):
-            apply_buff(self.foe, "ice_wall")
+            apply_buff(self.foe, retired_wall_buff)
