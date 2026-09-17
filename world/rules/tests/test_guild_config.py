@@ -551,13 +551,27 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         "lore-item-catalog::registration-does-not-entitle-an-item-to-a-market"
     )
     def test_catalog_load_accepts_registered_items_not_offered_by_any_shop(self):
-        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
-        self.assertIsInstance(catalog, GuildCatalog)
-        offered_keys = set()
-        for shop in catalog.shop_configs.values():
-            offered_keys.update(offer.item_key for offer in shop.offers)
-        unstocked_keys = set(ITEM_REGISTRY) - offered_keys
-        self.assertTrue(unstocked_keys, "Catalog must accept registered items not offered in any shop")
+        synthetic_unstocked = ItemDefinition(
+            key="synthetic_unstocked_item",
+            display_name_zh="合成未上架物件",
+            price_table_key="meal",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.FOOD,
+                icon_key=ItemIconKey.FOOD,
+                rarity=ItemRarity.COMMON,
+                summary_zh="用於測試未上架物件載入的合成物品。",
+            ),
+        )
+        with mock.patch.dict(ITEM_REGISTRY, {"synthetic_unstocked_item": synthetic_unstocked}, clear=False):
+            catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+            self.assertIsInstance(catalog, GuildCatalog)
+            offered_keys = {
+                offer.item_key
+                for shop in catalog.shop_configs.values()
+                for offer in shop.offers
+            }
+            self.assertNotIn("synthetic_unstocked_item", offered_keys)
 
 
 class ServiceHostRosterTests(CatalogRegistryIsolation):
