@@ -57,6 +57,11 @@ class ItemPresentationTests(unittest.TestCase):
                 "beastfolk_signal_conch", "camp_ward_kit", "goblin_ear", "slime_residue",
                 "earth_drake_scale", "troll_fang", "elven_essence", "ancient_dragon_heart",
                 "family_crest_token", "ancient_mystery_key", "elven_child_toy",
+                "beastfolk_warhammer", "beastfolk_repeating_bow", "beastfolk_war_spear",
+                "beastfolk_twin_claws", "beastfolk_spirit_wand", "elven_longbow",
+                "dragon_lair_trophy_blade", "beastfolk_heavy_hide_armor",
+                "beastfolk_stalker_garb", "elven_forest_veil", "beastfolk_tribal_totem",
+                "beastfolk_gale_earring",
             }
         )
         for key, definition in ITEM_REGISTRY.items():

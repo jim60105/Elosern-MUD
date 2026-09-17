@@ -67,7 +67,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 45)
+        self.assertEqual(len(loaded), 57)
         self.assertEqual(
             set(loaded),
             {
@@ -575,9 +575,37 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::registration-and-tradeability-are-independent"
+    )
+    def test_unstocked_equipment_item_loads_clean(self):
+        registry, document = self._two_entry_setup()
+        self.assertNotIn("wooden_club", SHOP_REGISTRY["altoria_general_store"].offered_item_keys)
+        rules = self._validate(registry, document)
+        self.assertIn(EquipmentModifierKey.WOODEN_CLUB, rules)
+        self.assertEqual(rules[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 3)
+        from world.rules.guild_config import validate_shop_configs
+        economy_path = Path(__file__).parents[1] / "rulebook" / "guild_economy.yaml"
+        raw_economy = yaml.safe_load(economy_path.read_text(encoding="utf-8"))
+        configs = validate_shop_configs(raw_economy["shops"])
+        self.assertFalse(
+            any(offer.item_key == "wooden_club" for offer in configs["altoria_general_store"].offers)
+        )
+
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
+    def test_rulebook_load_rejects_over_budget_entry(self):
+        registry, document = self._two_entry_setup()
+        document["effects"]["wooden_club"] = {"adjustments": {"defense": 10}}
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            self._validate(registry, document)
+        self.assertIn("defense", str(caught.exception))
+        self.assertIn("4", str(caught.exception))
+
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
-    """The 45-key bijection plus the ten new items' trade identity."""
+    """The 57-key bijection plus the ten Church/Kingdom items' trade identity."""
 
     NEW_ITEM_KEYS = (
         "purified_pendant",
@@ -604,7 +632,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 45)
+        self.assertEqual(len(enum_values), 57)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():
