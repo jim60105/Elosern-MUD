@@ -134,11 +134,23 @@
 - code: ice_slow
   label: 遲緩
   severity: harmful
-- code: ice_wall
-  label: 冰牆
-  severity: beneficial
+- code: ice_wall_frost
+  label: 霜牆
+  severity: harmful
+- code: ice_frost_mire
+  label: 泥沼
+  severity: harmful
 - code: ice_freeze
   label: 凍結
+  severity: harmful
+- code: ice_freeze_tundra
+  label: 凍結·凍土
+  severity: harmful
+- code: ice_freeze_nightfall
+  label: 凍結·長夜
+  severity: harmful
+- code: ice_freeze_apotheosis
+  label: 凍結·神格
   severity: harmful
 - code: ice_prison
   label: 定身
@@ -275,3 +287,24 @@
 - code: wind_haste_domain_agility
   label: 神速領域敏捷提升
   severity: beneficial
+- code: ice_freeze_locks_actions
+  label: 凍結鎖定行動
+  severity: critical
+- code: ice_freeze_tundra_locks_actions
+  label: 凍土凍結鎖定行動
+  severity: critical
+- code: ice_freeze_nightfall_locks_actions
+  label: 長夜凍結鎖定行動
+  severity: critical
+- code: ice_freeze_apotheosis_locks_actions
+  label: 永凍神格鎖定行動
+  severity: critical
+- code: ice_prison_locks_actions
+  label: 定身鎖定行動
+  severity: critical
+- code: ice_slow_agility_penalty
+  label: 遲緩敏捷下降
+  severity: harmful
+- code: ice_frost_mire_agility_penalty
+  label: 泥沼敏捷下降
+  severity: harmful
