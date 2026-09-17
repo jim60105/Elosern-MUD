@@ -20,6 +20,7 @@ import importlib
 from typing import Any
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -352,6 +353,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 1: The slow ladder moves the real agility consumers and expires
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_slow_ladder_moves_real_agility_consumers_and_expires(self):
         """Synthetic slow ladder rungs apply flat agility penalties that recover upon expiry."""
         skill_slow = self._register(
@@ -392,6 +396,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 2: Every freeze and 定身 rung locks all actions for exactly its authored duration
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_every_freeze_and_prison_rung_locks_all_actions_for_exact_duration(self):
         """Synthetic freeze and prison rungs lock actions_per_turn: 0 for authored durations and expire cleanly."""
         rungs = [
@@ -436,6 +443,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 3: The stillness synergy prices the marker once across both lock families
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_stillness_synergy_prices_marker_once_across_both_lock_families(self):
         """Stillness synergy prices 1.5x multiplier once across any freeze or prison fact, never twice, silent on non-stillness."""
         synergy_pred = (
@@ -486,6 +496,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 4: The frost footprint holds whoever occupies it and releases those who leave
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_frost_footprint_holds_occupant_and_releases_on_exit(self):
         """Ground-marker footprint holds the occupying fact and slow, and extinguishes on battlefield exit."""
         apply_buff(self.foe, "t_ice_wall_footprint")
@@ -508,6 +521,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 5: The execution and devastation rungs settle at their authored rungs
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_execution_and_devastation_rungs_settle_at_authored_rungs(self):
         """Execution bypasses high defense unconditionally; devastation adds max HP fraction on landed hit, 0 on miss."""
         # Execution policy
@@ -541,6 +557,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 6: Two roots, cross-route convergence and two-parent capstone gate through lineage engine
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_two_roots_branching_and_two_parent_canopy_gate_through_lineage(self):
         """Synthetic two-root lineage gates progression independently and unlocks canopy only with both parents."""
         # Build synthetic tree
@@ -609,6 +628,9 @@ class IceStillnessBehaviorTests(EvenniaTest):
 
     # --- Scenario 7: Retired dev-era clauses resolve as ordinary rejections
 
+    @covers_requirement(
+        "skill-registry::ice-spell-progression-composes-executable-physical-stillness-behavior"
+    )
     def test_retired_dev_era_clauses_resolve_as_ordinary_rejections(self):
         """Retired buff keys and never-existing skills reject as ordinary rejections without alias."""
         for key in ("never_existed_ice_key", "retired_ice_defensive_wall"):

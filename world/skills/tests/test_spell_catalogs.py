@@ -172,6 +172,9 @@ class IceLineageTreeCatalogTests(unittest.TestCase):
     lives in this registered data-contract file.
     """
 
+    @covers_requirement(
+        "skill-lineage::the-ice-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
     def test_ice_tree_edges_are_as_designed(self):
         expected = {
             "ice_wall": (SkillPrerequisite("frost_breath", 3),),
@@ -222,6 +225,9 @@ class IceLineageTreeCatalogTests(unittest.TestCase):
         self.assertEqual(prerequisite_consumers("frost_mire"), ())
         self.assertEqual(prerequisite_consumers("crystal_shatter"), ())
 
+    @covers_requirement(
+        "skill-lineage::the-ice-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
     def test_mastery_passives_stay_out_of_the_graph(self):
         for element_key in ELEMENT_REGISTRY:
             mastery_key = f"{element_key}_mastery"

@@ -33,34 +33,6 @@ retired, and the lineage gate that replaces it reads the registry tree, not the 
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-### Requirement: SKILL_REGISTRY contains the full 冰-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 冰-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["ice"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `ice_shard` | 冰錐術 | 學徒 | `TargetSpec.SINGLE` | `mp=13` | `damage:ice:magic` |
-| `frost_breath` | 凍結之息 | 學徒 | `TargetSpec.SINGLE` | `mp=11` | `buff_apply:ice_slow` |
-| `ice_wall` | 冰牆術 | 術師 | `TargetSpec.SINGLE` | `mp=25` | `buff_apply:ice_wall` |
-| `frost_arrow_rain` | 冷凍箭雨 | 術師 | `TargetSpec.AREA` | `mp=28` | `damage:ice:magic` |
-| `permafrost_domain` | 永凍領域 | 大師 | `TargetSpec.AREA` | `mp=48` | `buff_apply:ice_freeze` |
-| `ice_prison` | 冰封監牢 | 大師 | `TargetSpec.SINGLE` | `mp=44` | `buff_apply:ice_prison` |
-| `blizzard` | 暴風雪 | 賢者 | `TargetSpec.AREA` | `mp=88` | `damage:ice:magic` |
-| `absolute_tundra` | 絕對凍土 | 賢者 | `TargetSpec.AREA` | `mp=82` | `damage:ice:magic`, `buff_apply:ice_freeze` |
-| `absolute_zero` | 絕對零度 | 主宰 | `TargetSpec.SINGLE` | `mp=140` | `damage:ice:magic`, `buff_apply:ice_freeze` |
-| `eternal_ice_field` | 長夜冰原 | 主宰 | `TargetSpec.AREA` | `mp=158` | `damage:ice:magic`, `buff_apply:ice_freeze` |
-
-#### Scenario: All ten 冰 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 冰 keys (`ice_shard`, `frost_breath`, `ice_wall`, `frost_arrow_rain`, `permafrost_domain`, `ice_prison`, `blizzard`, `absolute_tundra`, `absolute_zero`, `eternal_ice_field`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["ice"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY exists at the exact path change 4 forward-declared
 `world/skills/registry.py` SHALL define a module-level `SKILL_REGISTRY: dict[str, SkillDef]` importable
 as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and symbol name change 4
@@ -556,4 +528,35 @@ The wind spell family SHALL provide the documented 動作與閃避 progression a
 
 #### Scenario: Retired dev-era keys resolve as ordinary rejections
 - **WHEN** a caller casts a never-existing wind key through the ordinary cast surface after replacement, or applies the retired dev-era mobility buff keys
+- **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
+
+### Requirement: Ice spell progression composes executable physical-stillness behavior
+The ice spell family SHALL provide the documented physical-stillness progression as executable skill behavior using the common effect, audience, policy, buff, modifier and lineage mechanisms: a timed slow ladder settling through the shared merged-modifier bundle on the real agility consumers at the authored rungs and durations with the reused family key re-homed without alias; freeze and 定身 rungs that reduce the holder to zero actions per turn through the shared rule-table action-lock mechanism at authored durations, each rung a distinct key locked by its own rule row so rungs differentiate by duration and identity rather than by a second mechanism; a stillness-marker synergy strike whose damage policy references the family's live stillness-instance facts and prices a single OR-matched multiplier when ANY referenced stillness fact holds — across both the freeze and the 定身 action-lock families — and no multiplier at all when none holds; a frost-wall/mire footprint authored as ground-marker rows whose occupying fact is the live marker instance carrying the first-rung slow mount on the holder, with the shared battlefield-exit extinguishment; a 處決級 execution rung that ignores defense; 毀滅級 devastation riders adding the shipped maximum-HP fraction on any landed hit; a two-root branching lineage whose two route chains converge only at the two-parent capstone through the shared progression mechanics; and the retired dev-era rows — including the off-tree defensive buff — resolving as unknown definitions with no alias or deprecated path.
+
+#### Scenario: The slow ladder moves the real agility consumers and expires
+- **WHEN** a synthetic ice composition applying the authored first-rung slow mounts on a victim and a second synthetic composition applies the authored heaviest rung, and the clock advances past several durations
+- **THEN** the holder's effective agility as read by the to-hit/flee/overwhelm consumers drops by exactly the authored flat amount while the mount is live and recovers fully on expiry, the two rungs are distinct authored amounts, and no other entity's stats change
+
+#### Scenario: Every freeze and 定身 rung locks all actions for exactly its authored duration
+- **WHEN** synthetic compositions mount each authored freeze rung and the 定身 rung on victims and the clock advances to just before and then past each rung's expiry
+- **THEN** every locked holder resolves zero actions per turn for exactly its authored duration through the shared action-lock consumer, adjacent entities are unaffected, control-immunity is honored exactly as the shipped lock consumers honor it, and each holder acts again the moment its own rung expires — with the different rungs independently held, refreshed and expired
+
+#### Scenario: The stillness synergy prices the marker once across both lock families
+- **WHEN** a synthetic synergy composition declaring the family's stillness-instance predicate strikes a target carrying one authored freeze rung, separately a target carrying the 定身 key, separately a target carrying two referenced stillness facts at once, and separately a target carrying none
+- **THEN** each stillness-carrying target's damage takes the authored multiplier exactly once (never twice when two facts hold), the non-stilled target's damage settles at base coefficient, and a non-stillness buff (e.g. a slow mount or an unrelated marker) never triggers the multiplier
+
+#### Scenario: The frost footprint holds whoever occupies it and releases those who leave
+- **WHEN** a synthetic wall/mire composition mounts the authored ground-marker footprint plus the first-rung slow on a target and the clock ticks past several intervals, then the holder flees the battlefield mid-duration, and separately the footprint expires while its holder stays fighting
+- **THEN** the occupying holder carries the live footprint fact and the first-rung slow for the authored duration, the footprint's sustained effect ticks at its authored rung while held, the footprint stops applying the moment the holder leaves the battlefield while the holder's non-marker buffs persist unchanged, and expiry ends both facts
+
+#### Scenario: The execution and devastation rungs settle at their authored rungs
+- **WHEN** a synthetic 處決級 composition strikes a high-defense target, and separately a synthetic 毀滅級 area composition strikes full-HP targets under the shipped fraction rung, once landing and once missing
+- **THEN** the execution strike's final damage skips the defense subtraction entirely, each devastated target takes the authored coefficient damage plus exactly the shipped fraction of its maximum HP on a landed hit, and a missed devastation strike deals zero total damage
+
+#### Scenario: Two roots, the cross-route convergence and the two-parent capstone gate through the lineage engine
+- **WHEN** a synthetic family replicates the documented two-root shape — the slow-line chain with its branch point and terminal leaf, and the imprisonment-line chain with its branch point and terminal leaf — plus the two-parent capstone prerequisite shape consuming one parent from each route
+- **THEN** use rejects until every authored threshold is met, the capstone unlocks only when BOTH authored parents reach their authored thresholds, each route progresses independently, and prerequisite caps stay derived from the shared reverse-edge map with leaves at the shared tip cap
+
+#### Scenario: Retired dev-era clauses resolve as ordinary rejections
+- **WHEN** a caller casts a never-existing ice key through the ordinary cast surface after replacement, or a previously declared defensive-wall buff key is referenced as an effect binding
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
