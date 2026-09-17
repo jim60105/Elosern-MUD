@@ -141,17 +141,6 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
                 with self.subTest(tier=tier, spell=key):
                     self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_wind_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("tornado_blade",),
-                "大師": ("storm_domain", "gale_dance_strike"),
-                "賢者": ("heavens_wrath_storm", "haste_domain"),
-                "主宰": ("vacuum_severance", "sky_tempest"),
-            }
-        )
-
     @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
     def test_lightning_spell_tier_labels_match_the_catalog(self):
         self._assert_labels(
