@@ -27,20 +27,6 @@ from world.skills.registry import (
 )
 
 
-WIND_SPELL_CATALOG = (
-    ("wind_blade", "風刃術", TargetSpec.AREA, 14, ("damage:wind:magic",)),
-    ("gale_step", "疾風術", TargetSpec.SELF, 10, ("self_buff_apply:wind_haste",)),
-    ("flight", "飛行術", TargetSpec.SELF, 22, ("movement:flight",)),
-    ("tornado_blade", "龍捲風刃", TargetSpec.SINGLE, 26, ("damage:wind:magic",)),
-    ("storm_domain", "暴風領域", TargetSpec.AREA, 50, ("damage:wind:magic",)),
-    ("gale_dance_strike", "疾風刃舞", TargetSpec.SINGLE, 40, ("damage:wind:magic",)),
-    ("heavens_wrath_storm", "天譴風暴", TargetSpec.AREA, 90, ("damage:wind:magic",)),
-    ("haste_domain", "神速領域", TargetSpec.AREA, 70, ("buff_apply:wind_haste_domain",)),
-    ("vacuum_severance", "真空斬滅", TargetSpec.SINGLE, 130, ("damage:wind:magic",)),
-    ("sky_tempest", "蒼穹暴風", TargetSpec.AREA, 150, ("damage:wind:magic",)),
-)
-
-
 LIGHTNING_SPELL_CATALOG = (
     ("spark_shock", "電擊術", TargetSpec.SINGLE, 13, ("damage:lightning:magic",)),
     (
@@ -114,7 +100,6 @@ ICE_SPELL_CATALOG = (
 _CATALOG_EFFECTS = {
     row[0]: row[4]
     for rows in (
-        WIND_SPELL_CATALOG,
         LIGHTNING_SPELL_CATALOG,
         ICE_SPELL_CATALOG,
     )
@@ -156,83 +141,6 @@ class ClosedVocabularyParseTests(unittest.TestCase):
     def test_self_heal_bare_prefix_parses_into_its_dataclass(self):
         self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
 
-
-class WindSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_all_ten_wind_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in WIND_SPELL_CATALOG:
-            with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["wind"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-                if key == "flight":
-                    self.assertIs(skill.kind, SkillKind.PASSIVE)
-                    self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                elif key == "gale_step":
-                    self.assertIs(skill.kind, SkillKind.ACTIVE)
-                    self.assertIs(skill.faction_constraint, FactionConstraint.SELF_ONLY)
-                else:
-                    self.assertIs(skill.kind, SkillKind.ACTIVE)
-                    self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_every_wind_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in WIND_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="wind", school="magic"),
-                        )
-                    elif effect_id.startswith("self_buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            SelfBuffApplyEffect(
-                                buff_key=effect_id.partition(":")[2]
-                            ),
-                        )
-                    elif effect_id.startswith("buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    else:
-                        self.assertEqual(parsed, MovementEffect(mode="flight"))
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_wind_active_spell_keys_are_exactly_the_catalog_set(self):
-        self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["wind"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in WIND_SPELL_CATALOG} - {"flight"},
-        )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_wind_blade_and_flight_was_recosted_in_place_not_duplicated(self):
-        keys = [skill.key for skill in SKILL_REGISTRY.values()]
-        self.assertEqual(keys.count("wind_blade"), 1)
-        self.assertEqual(keys.count("flight"), 1)
-        wind_blade = SKILL_REGISTRY["wind_blade"]
-        self.assertEqual(wind_blade.cost, {"mp": 14})
-        self.assertEqual(wind_blade.label, "風刃術")
-        self.assertIs(wind_blade.target_spec, TargetSpec.AREA)
-        self.assertIs(wind_blade.element, ELEMENT_REGISTRY["wind"])
-        self.assertEqual(wind_blade.effects, ["damage:wind:magic"])
-        flight = SKILL_REGISTRY["flight"]
-        self.assertEqual(flight.cost, {"mp": 22})
-        self.assertIs(flight.kind, SkillKind.PASSIVE)
-        self.assertEqual(flight.effects, ["movement:flight"])
 
 class LightningSpellCatalogTests(unittest.TestCase):
     @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
@@ -386,3 +294,67 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
             with self.subTest(mastery_key=mastery_key):
                 self.assertEqual(prerequisite_consumers(mastery_key), ())
                 self.assertEqual(declared_prerequisites(mastery_key), ())
+
+
+class WindLineageTreeCatalogTests(unittest.TestCase):
+    """The shipped branching wind lineage tree with a two-parent canopy is catalog data.
+
+    The edge table itself is the shipped content the requirement names, so it
+    lives in this registered data-contract file.
+    """
+
+    @covers_requirement(
+        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
+    def test_wind_tree_edges_are_as_designed(self):
+        expected = {
+            "gale_chain_step": (SkillPrerequisite("gale_step", 3),),
+            "afterimage_step": (SkillPrerequisite("gale_chain_step", 3),),
+            "haste_domain": (SkillPrerequisite("afterimage_step", 5),),
+            "tornado_blade": (SkillPrerequisite("wind_blade", 3),),
+            "storm_domain": (SkillPrerequisite("tornado_blade", 3),),
+            "gale_dance_strike": (SkillPrerequisite("tornado_blade", 3),),
+            "heavens_wrath_storm": (SkillPrerequisite("storm_domain", 5),),
+            "sky_rending_slash": (SkillPrerequisite("gale_dance_strike", 8),),
+            "sky_tempest": (SkillPrerequisite("heavens_wrath_storm", 8),),
+            "vacuum_severance": (SkillPrerequisite("sky_rending_slash", 8),),
+            "sky_apotheosis": (
+                SkillPrerequisite("sky_tempest", 10),
+                SkillPrerequisite("vacuum_severance", 10),
+            ),
+        }
+        for key, expected_prereqs in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(
+                    declared_prerequisites(key),
+                    expected_prereqs,
+                )
+        self.assertEqual(declared_prerequisites("gale_step"), ())
+        self.assertEqual(declared_prerequisites("wind_blade"), ())
+        # Topological canopy: sky_apotheosis is consumed by nothing.
+        self.assertEqual(prerequisite_consumers("sky_apotheosis"), ())
+        # Both Lv.8 parents are consumed only by sky_apotheosis at threshold 10.
+        self.assertEqual(
+            prerequisite_consumers("sky_tempest"),
+            (("sky_apotheosis", 10),),
+        )
+        self.assertEqual(
+            prerequisite_consumers("vacuum_severance"),
+            (("sky_apotheosis", 10),),
+        )
+        # Branch point: tornado_blade feeds exactly two children at threshold 3.
+        self.assertEqual(
+            set(prerequisite_consumers("tornado_blade")),
+            {("storm_domain", 3), ("gale_dance_strike", 3)},
+        )
+        # Mobility leaf: haste_domain is consumed by nothing.
+        self.assertEqual(prerequisite_consumers("haste_domain"), ())
+
+    @covers_requirement(
+        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
+    def test_wind_passives_stay_out_of_the_graph(self):
+        for passive_key in ("wind_mastery", "flight"):
+            with self.subTest(passive_key=passive_key):
+                self.assertEqual(prerequisite_consumers(passive_key), ())
+                self.assertEqual(declared_prerequisites(passive_key), ())

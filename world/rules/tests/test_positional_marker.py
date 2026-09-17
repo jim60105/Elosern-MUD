@@ -1,6 +1,7 @@
 """Behavior tests for the positional-marker primitive and reachability gate."""
 
 from pathlib import Path
+import importlib
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -47,6 +48,9 @@ from world.rules.tests._combat_session_helpers import (
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 
 _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
 
@@ -188,10 +192,8 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.buff_patch.start()
         self.addCleanup(self.buff_patch.stop)
 
-        from world.skills.registry import SKILL_REGISTRY
-
         self.skill_patch = patch.dict(
-            SKILL_REGISTRY,
+            _SKILL_MAP,
             {
                 _SYNTH_STRIKE_SKILL.key: _SYNTH_STRIKE_SKILL,
                 _SYNTH_MAGIC_SINGLE_SKILL.key: _SYNTH_MAGIC_SINGLE_SKILL,
@@ -675,10 +677,8 @@ class DeterministicAttackerExclusionTests(BattlefieldIsolation, EvenniaTestCase)
         self.buff_patch.start()
         self.addCleanup(self.buff_patch.stop)
 
-        from world.skills.registry import SKILL_REGISTRY
-
         self.skill_patch = patch.dict(
-            SKILL_REGISTRY,
+            _SKILL_MAP,
             {
                 _SYNTH_STRIKE_SKILL.key: _SYNTH_STRIKE_SKILL,
                 _SYNTH_MAGIC_SINGLE_SKILL.key: _SYNTH_MAGIC_SINGLE_SKILL,

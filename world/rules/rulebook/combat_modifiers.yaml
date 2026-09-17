@@ -139,3 +139,17 @@
 - id: earth_dust_veil_accuracy_penalty
   when: {buff_active: earth_dust_veil}
   then: {accuracy: -5}
+# 風機動路線的計時階梯（wind-spell-catalog D1/D3/D4）：timed agility 依
+# 本表結算（bounds 為呈現詞彙、無結算消費者）；buff 列為 mount，數值在此。
+- id: wind_gale_step_agility
+  when: {buff_active: gale_step_haste}
+  then: {agility_flat: 3}
+- id: wind_gale_chain_step_agility
+  when: {buff_active: gale_chain_step_haste}
+  then: {agility_flat: 5}
+- id: wind_afterimage_agility_accuracy
+  when: {buff_active: afterimage_step_haste}
+  then: {agility_flat: 8, accuracy: -10}
+- id: wind_haste_domain_agility
+  when: {buff_active: haste_domain_haste}
+  then: {agility_flat: 12}

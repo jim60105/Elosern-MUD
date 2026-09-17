@@ -584,6 +584,28 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "earth_dust_veil")
         self.assertIn("accuracy", evaluate_combat_modifiers(entity))
 
+    def test_rule_wind_gale_step_agility(self):
+        entity = self._entity()
+        apply_buff(entity, "gale_step_haste")
+        self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
+
+    def test_rule_wind_gale_chain_step_agility(self):
+        entity = self._entity()
+        apply_buff(entity, "gale_chain_step_haste")
+        self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
+
+    def test_rule_wind_afterimage_agility_accuracy(self):
+        entity = self._entity()
+        apply_buff(entity, "afterimage_step_haste")
+        mods = evaluate_combat_modifiers(entity)
+        self.assertIn("agility_flat", mods)
+        self.assertIn("accuracy", mods)
+
+    def test_rule_wind_haste_domain_agility(self):
+        entity = self._entity()
+        apply_buff(entity, "haste_domain_haste")
+        self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()

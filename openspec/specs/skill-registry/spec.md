@@ -5,42 +5,6 @@ registry contract used to validate imported active and passive skill keys.
 
 ## Requirements
 
-### Requirement: SKILL_REGISTRY contains the full 風-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 風-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["wind"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Nine
-of the ten declare `SkillKind.ACTIVE`; `flight` stays `SkillKind.PASSIVE` per `movement-skill-waiver`.
-Each spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `wind_blade` | 風刃術 | 學徒 | `TargetSpec.AREA` | `mp=14` | `damage:wind:magic` |
-| `gale_step` | 疾風術 | 學徒 | `TargetSpec.SELF` | `mp=10` | `self_buff_apply:wind_haste` |
-| `flight` | 飛行術 | 術師 | `TargetSpec.SELF` | `mp=22` | `movement:flight` |
-| `tornado_blade` | 龍捲風刃 | 術師 | `TargetSpec.SINGLE` | `mp=26` | `damage:wind:magic` |
-| `storm_domain` | 暴風領域 | 大師 | `TargetSpec.AREA` | `mp=50` | `damage:wind:magic` |
-| `gale_dance_strike` | 疾風刃舞 | 大師 | `TargetSpec.SINGLE` | `mp=40` | `damage:wind:magic` |
-| `heavens_wrath_storm` | 天譴風暴 | 賢者 | `TargetSpec.AREA` | `mp=90` | `damage:wind:magic` |
-| `haste_domain` | 神速領域 | 賢者 | `TargetSpec.AREA` | `mp=70` | `buff_apply:wind_haste_domain` |
-| `vacuum_severance` | 真空斬滅 | 主宰 | `TargetSpec.SINGLE` | `mp=130` | `damage:wind:magic` |
-| `sky_tempest` | 蒼穹暴風 | 主宰 | `TargetSpec.AREA` | `mp=150` | `damage:wind:magic` |
-
-#### Scenario: All ten 風 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 風 keys (`wind_blade`, `gale_step`, `flight`, `tornado_blade`, `storm_domain`, `gale_dance_strike`, `heavens_wrath_storm`, `haste_domain`, `vacuum_severance`, `sky_tempest`)
-- **THEN** each key is present with its documented kind (nine `SkillKind.ACTIVE`; `flight` stays
-  `SkillKind.PASSIVE` per `movement-skill-waiver`), `element=ELEMENT_REGISTRY["wind"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
-#### Scenario: The pre-existing 風 anchor skill(s) were recosted per §4.3, not duplicated
-- **WHEN** `SKILL_REGISTRY` is inspected for `wind_blade` and `flight`
-- **THEN** each is present exactly once (no duplicate key), with its `cost["mp"]` updated
-  (`wind_blade` from `mp=24` to `mp=14`; `flight` from `mp=10` to `mp=22`), and every other field (`label`, `target_spec`, `element`, `effects`) unchanged from before
-  this change
-
 ### Requirement: SKILL_REGISTRY contains the full 雷-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 雷-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
@@ -557,4 +521,39 @@ The fire spell family SHALL provide the documented HP・消滅 progression as ex
 
 #### Scenario: Retired dev-era clauses resolve as ordinary rejections
 - **WHEN** a caller casts a never-existing fire key through the ordinary cast surface after replacement, or a previously declared fire skill's off-tree healing clause is referenced as an effect binding
+- **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
+
+### Requirement: Wind spell progression composes executable speed-and-knockback behavior
+The wind spell family SHALL provide the documented 動作與閃避 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, and lineage mechanisms: timed self/ally agility ladder rungs mounted as detectable buffs and settled through the shared merged combat-modifier bundle so the authored flat agility adjustments move the real agility-driven consumers (to-hit both poles, overwhelm estimation, resist scoring, flee contest) for exactly the authored durations and then stop; a same-axis bipolar rung whose mount raises its holder's agility while lowering its holder's attack accuracy through one validated modifier rule; an area ally rung whose agility adjustment lands on allies only, its defender-side term acting as evasion against incoming single-target strikes; knockback area rungs mounting the positional-marker rows at their authored world-second durations on enemy audiences through the same-settlement effect component (never a reflected or delayed reaction rule), with the shipped cross-primitive ground-marker sweep and the impossible-recipient refusals observing through the real casts; an unconditional two-roll single-target rung settling two independent strikes for one paid cast through the shared ordered-projection settlement; a 處決級 execution rung ignoring defense subtraction; devastation rungs at the shipped fraction magnitude; and the two-root branching lineage gating every rung through the shared prerequisite engine with the two-parent canopy unlocking only at both authored thresholds.
+
+#### Scenario: The agility ladder speeds its holder on the real consumers and expires
+- **WHEN** a synthetic self-cast composition mounts the authored ladder rung and the holder resolves physical exchanges and a flee contest against a control twin, then the clock advances past the authored duration
+- **THEN** the holder's effective agility adjustment equals the authored flat rung on every agility-driven consumer for exactly the authored duration, the control twin without the mount is unmoved, and after expiry every consumer reads base values with the holder's non-buff state unchanged
+
+#### Scenario: The bipolar rung trades accuracy for speed on its holder alone
+- **WHEN** a synthetic carrier of the authored bipolar mount attacks and is attacked while a control twin fights the same opponents under fixed rolls
+- **THEN** the carrier's own strikes carry the authored accuracy penalty while its defender-side agility raises its dodge threshold, the control twin shows neither pole, and the mount's non-holder state is untouched
+
+#### Scenario: The ally domain speeds allies and skips enemies
+- **WHEN** a synthetic area ally composition mounts its authored agility rung on a mixed battlefield of allies and enemies
+- **THEN** every ally holder reads the authored flat agility adjustment on the merged bundle, no enemy reads any part of it, and an enemy's incoming single-target strikes against the allies resolve against the raised dodge thresholds
+
+#### Scenario: The knockback storms hurl enemies out of position and sweep their footing
+- **WHEN** a synthetic knockback area composition lands on enemies — one carrying a live ground-marker hazard and an ordinary buff, one defeated mid-settlement, and allied targets — and afterwards a displaced victim's ally attempts a single-target physical strike on it while a magic cast at it resolves
+- **THEN** each living enemy target carries the authored positional row at its authored world-second duration with the out-of-position fact true, the ground-marker victim's hazard instance is swept at mount while its ordinary buff persists, the defeated recipient is refused, allies carry nothing, the follow-up melee strike against the displaced victim is gated, and the magic cast lands normally
+
+#### Scenario: The unconditional flurry resolves two independent strikes for one cast
+- **WHEN** a synthetic 連續兩次判定 composition strikes one target under each fixed roll pair (hit-hit, miss-hit, hit-miss, miss-miss) and separately crosses the target's remaining HP on the second roll
+- **THEN** exactly two independent rolls are recorded with the authored coefficient on each landing strike, resources and practice are paid once, HP settles through the ordered projection with a single terminal defeat entry, and a policy-free single-strike control on the same target still rolls once
+
+#### Scenario: The execution and devastation rungs settle at their authored rungs
+- **WHEN** a synthetic 處決級 composition strikes a high-defense target and separately the authored devastation composition strikes a full-HP target under the shipped fraction rung
+- **THEN** the execution strike's damage skips defense subtraction entirely at the authored coefficient, and the devastation strike adds the authored fraction-of-max term exactly like the shipped devastation rungs
+
+#### Scenario: The two roots branch and the canopy gates on both parents
+- **WHEN** synthetic progressions grind the mobility root chain and the destruction root's branch chains, then attempt the canopy before one authored parent reaches its threshold
+- **THEN** each root progresses independently through the shared prerequisite engine, the branch point admits both authored children once met, the canopy rejects while either authored parent is below its threshold and admits only when both are met, and prerequisite caps stay derived from the shared reverse-edge map with leaves at the shared tip cap
+
+#### Scenario: Retired dev-era keys resolve as ordinary rejections
+- **WHEN** a caller casts a never-existing wind key through the ordinary cast surface after replacement, or applies the retired dev-era mobility buff keys
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
