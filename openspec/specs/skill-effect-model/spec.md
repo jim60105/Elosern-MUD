@@ -222,7 +222,7 @@ A damage effect SHALL support a validated target-fact predicate, conditional att
 - **THEN** both strikes ignore defense subtraction while only the marker-standing strike receives the declared multiplier, a predicate-bearing `bypass_defense=True` policy keeps bypassing only on a static-predicate match, an empty-predicate `bypass_defense=True` policy keeps bypassing unconditionally, and a policy declaring both bypass fields True is rejected at construction
 
 ### Requirement: A follow-up strike repeats damage on evidence or unconditionally without repeating the action
-A validated damage policy SHALL permit one extra independent strike — either against a target with matching recent evidence (the evidence-conditional shape: `repeat_when` naming a recognized evidence kind) or unconditionally on every successful action resolution (the predicate-free shape: an extra-strike declaration with no `repeat_when`). Each strike SHALL have an independent hit roll and the same coefficient/policy. The first miss SHALL NOT suppress the second strike. The action SHALL pay resources/time and award eligible practice once, project ordered damage correctly, and retain both rolls while emitting at most one terminal defeat or knockout for a target. The extra-strike count SHALL stay capped at one; every other shipped `DamagePolicy` validation SHALL stay fail-closed exactly as before, and the construction rule 「an extra strike requires `repeat_when`」 SHALL be retired so the predicate-free shape is legal vocabulary for any element.
+A validated damage policy SHALL permit up to two extra independent strikes — either against a target with matching recent evidence (the evidence-conditional shape: `repeat_when` naming a recognized evidence kind, pinned to exactly one extra strike) or unconditionally on every successful action resolution (the predicate-free shape: an extra-strike declaration of one or two with no `repeat_when`). Each strike SHALL have an independent hit roll and the same coefficient/policy. No strike's miss SHALL suppress any later strike. The action SHALL pay resources/time and award eligible practice once, project ordered damage correctly across every strike, and retain all rolls while emitting at most one terminal defeat or knockout for a target regardless of the declared count. The extra-strike count SHALL stay within the closed set {0, 1, 2} of ADDITIONAL strikes (total strikes = 1 + the declared count); every other shipped `DamagePolicy` validation SHALL stay fail-closed exactly as before — the unknown-evidence-kind rejection, the boolean-count rejection, and the 「`repeat_when` requires `extra_strikes` of exactly one」 pin included — and the construction rule 「an extra strike requires `repeat_when`」 SHALL stay retired so the predicate-free shape is legal vocabulary for any element.
 
 #### Scenario: A first miss does not suppress the second roll
 - **WHEN** fixed rolls make the first strike miss and the follow-up hit on an eligible target under an evidence-conditional policy
@@ -242,7 +242,19 @@ A validated damage policy SHALL permit one extra independent strike — either a
 
 #### Scenario: The predicate-free shape is validated like every other policy
 - **WHEN** policies declare an extra strike with a valid evidence kind, with no predicate, with an unknown evidence kind, with a boolean or out-of-cap strike count, or with `repeat_when` and a strike count other than one
-- **THEN** the two well-formed shapes construct (conditional and unconditional), and each malformed combination still raises at construction exactly as before the widening
+- **THEN** the well-formed shapes construct (conditional and unconditional at each legal count), and each malformed combination — a boolean count, a count above the closed set, any count alongside an unknown evidence kind, or `repeat_when` with a count other than one — still raises at construction exactly as before the widening
+
+#### Scenario: Two extra strikes resolve three independent rolls in one paid cast
+- **WHEN** a synthetic unconditional policy declares two extra strikes against one living target under fixed rolls covering an all-hit sweep and a hit-miss-hit sweep
+- **THEN** exactly three independent hit rolls are recorded in order, each landing strike deals the same coefficient/policy damage with ordered HP projection across the sweep, resources and practice move once, and per-strike diversion planning keeps honoring the shipped cap and gauge ledgers across all three strikes
+
+#### Scenario: The terminal emission stays singular across the widest sweep
+- **WHEN** three strikes together cross an unprotected target's lethal threshold, and separately cross a protected companion's floor under the nonlethal policy
+- **THEN** the unprotected crossing produces at most one defeat credit for the cast and the protected crossing floors HP at 1 with exactly one knockout mark, no per-strike duplication of either terminal surface
+
+#### Scenario: A three-strike sweep rolls back as one unit
+- **WHEN** a later commit step fails midway through a three-strike settlement
+- **THEN** every staged strike's HP movement, diversion spending, and evidence are restored to the pre-cast state
 
 ### Requirement: Peak effects and marker-selected state maxima are validated typed behavior
 Effect authoring SHALL accept a peak effect with declared recipient policy and an optional marker-bound maximum on a state-derived magnitude. Unknown effect syntax, invalid marker references and contradictory recipient policies SHALL fail before runtime. These declarations SHALL use the same behavior for synthetic spells of any element.
