@@ -235,6 +235,11 @@ def validate_shop_configs(raw: Any) -> dict[str, ShopConfig]:
         if shop_key in configs:
             raise _error(f"duplicate shop_key {shop_key!r} in shops")
         shop = SHOP_REGISTRY[shop_key]
+        for offered_key in shop.offered_item_keys:
+            if offered_key not in ITEM_REGISTRY:
+                raise _error(
+                    f"shops.{shop_key}.offered_item_keys contains unknown item_key {offered_key!r}"
+                )
         offered_keys = set(shop.offered_item_keys)
         from world.rules.clock import CLOCK_YAML
 

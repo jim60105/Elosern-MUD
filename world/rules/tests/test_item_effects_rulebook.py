@@ -272,7 +272,7 @@ class RegistryAlignmentTests(unittest.TestCase):
         "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"
     )
     def test_orphan_rulebook_entry_fails(self):
-        with self.assertRaises(ItemEffectsRulebookError):
+        with self.assertRaises(ItemEffectsRulebookError) as caught:
             _load_via_validate(
                 _document(
                     {"stat": "hp", "amount": 5},
@@ -282,6 +282,35 @@ class RegistryAlignmentTests(unittest.TestCase):
                     },
                 )
             )
+        self.assertIn("t_test_sword", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_usable_profile_naming_retired_key_fails_rulebook_load(self):
+        with self.assertRaises(ItemEffectsRulebookError) as caught:
+            _load_via_validate(
+                _document(
+                    {"stat": "hp", "amount": 5},
+                    items={
+                        "t_test_item": {"effects": [{"stat": "hp", "amount": 5}]},
+                        "synthetic_retired_item": {"effects": [{"stat": "hp", "amount": 5}]},
+                    },
+                )
+            )
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_item_effect_retirement_loads_cleanly(self):
+        loaded = _load_via_validate(
+            _document(
+                {"stat": "hp", "amount": 5},
+                items={"t_test_item": {"effects": [{"stat": "hp", "amount": 5}]}},
+            )
+        )
+        self.assertEqual(set(loaded["profiles"]), {"t_test_item"})
 
     @covers_requirement(
         "item-effect-rulebook::the-rulebook-and-the-registry-align-exactly-at-startup"

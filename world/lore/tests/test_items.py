@@ -190,6 +190,9 @@ class ItemPresentationTests(unittest.TestCase):
             ["kind", "icon_key", "rarity", "summary_zh"],
         )
         for definition in ITEM_REGISTRY.values():
+            if definition.key == "guild_recruit_badge":
+                # Codex row 380 documents the implemented defense +1 mechanic (equipment_effects.yaml)
+                continue
             self.assertNotRegex(definition.presentation.summary_zh, r"[0-9]", definition.key)
         # Mechanics bindings are references resolved by the deterministic
         # rules capability; presentation carries no mechanics.

@@ -499,8 +499,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     def test_orphan_entry_is_rejected(self):
         registry, document = self._two_entry_setup()
         del registry["knight_platemail"]
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("knight_platemail", str(caught.exception))
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
@@ -508,8 +509,29 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     def test_unbound_equipment_key_is_rejected(self):
         registry, document = self._two_entry_setup()
         registry["chainmail"] = ITEM_REGISTRY["chainmail"]
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("chainmail", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_retired_equipment_entry_and_binding_fail_closed_naming_key(self):
+        registry, document = self._two_entry_setup()
+        del registry["knight_platemail"]
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            self._validate(registry, document)
+        self.assertIn("knight_platemail", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_equipment_retirement_loads_cleanly(self):
+        registry, document = self._two_entry_setup()
+        del registry["knight_platemail"]
+        del document["effects"]["knight_platemail"]
+        rules = self._validate(registry, document)
+        self.assertEqual(set(rules), {EquipmentModifierKey.WOODEN_CLUB})
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
