@@ -306,8 +306,18 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         # Ally carries nothing
         self.assertNotIn("displaced", entity_active_buffs(ally))
 
+        # Synthetic physical strike skill (is_strike_class)
+        strike_phys = self._register(
+            _make_synth_skill(
+                "t_synth_phys_strike",
+                effects=["damage:wind:physical"],
+                target_spec=TargetSpec.SINGLE,
+            )
+        )
+        grant_lineage(self.actor, [storm_skill.key, strike_phys.key])
+
         # Follow-up single-target physical strike against displaced victim is gated
-        strike_req = ActionRequest(self.actor, "basic_attack", [target1], ctx)
+        strike_req = ActionRequest(self.actor, strike_phys.key, [target1], ctx)
         pre = ActionResolver.preflight(strike_req)
         self.assertEqual(pre.outcome, "rejected")
         self.assertEqual(pre.reason, RejectReason.CAST_CONDITION_UNMET)

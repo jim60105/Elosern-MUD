@@ -63,7 +63,7 @@ SKILL_REGISTRY_CLASS_MODULES = {
     "SkillCategoryClassificationTests": "test_skill_registry.py",
     "FleeCategoryDeclarationTests": "test_skill_registry.py",
     "ElementalSpellsBuilderTests": "test_spell_catalogs.py",
-    "WindSpellCatalogTests": "test_spell_catalogs.py",
+    "WindLineageTreeCatalogTests": "test_spell_catalogs.py",
     "LightningSpellCatalogTests": "test_spell_catalogs.py",
     "IceSpellCatalogTests": "test_spell_catalogs.py",
     # The shipped-content cast classes retired when the cast suite migrated (light/water synthetic behavior precedent)
