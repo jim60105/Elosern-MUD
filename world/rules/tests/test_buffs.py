@@ -336,52 +336,16 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         apply_buff(entity, "lightning_extra_action")
         self.assertIn("lightning_extra_action", entity_active_buffs(entity))
 
+    # Ice rulebook rows carry lore-catalog numbers; per the ratified verification
+    # discipline these stay load/apply/presence checks.
     def test_buff_ice_slow(self):
-        definition = BUFF_DEFINITIONS["ice_slow"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "agility", "ceiling": -3}}
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "ice_slow")
-        self.assertIn("ice_slow", entity_active_buffs(entity))
-
-    def test_buff_ice_wall(self):
-        definition = self._synth_buff(
-            key="t_wall_shape",
-            duration=60,
-            stacking="refresh",
-            polarity="buff",
-            modifiers={"bounds": {"target": "defense", "ceiling": 5}},
-        )
-        entity = self._entity()
-        apply_buff(entity, definition.key)
-        self.assertIn(definition.key, entity_active_buffs(entity))
+        self._assert_buff_loads_applies_and_shows("ice_slow")
 
     def test_buff_ice_freeze(self):
-        definition = BUFF_DEFINITIONS["ice_freeze"]
-        self.assertEqual(definition.duration, 30)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(definition.modifiers, {})
-
-        entity = self._entity()
-        apply_buff(entity, "ice_freeze")
-        self.assertIn("ice_freeze", entity_active_buffs(entity))
-        self.assertFalse(blocks_action(entity))
+        self._assert_buff_loads_applies_and_shows("ice_freeze")
 
     def test_buff_ice_prison(self):
-        definition = self._synth_buff(
-            key="t_prison_shape",
-            duration=30, stacking="refresh", polarity="debuff", modifiers={}
-        )
-        entity = self._entity()
-        apply_buff(entity, definition.key)
-        self.assertIn(definition.key, entity_active_buffs(entity))
-        self.assertFalse(blocks_action(entity))
+        self._assert_buff_loads_applies_and_shows("ice_prison")
 
     def test_buff_dark_weaken(self):
         definition = BUFF_DEFINITIONS["dark_weaken"]

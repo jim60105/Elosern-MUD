@@ -153,3 +153,27 @@
 - id: wind_haste_domain_agility
   when: {buff_active: haste_domain_haste}
   then: {agility_flat: 12}
+# 冰系物理性靜止與減速階梯（ice-spell-catalog D1/D3/D7）：
+# 凍結與定身由本表 declarative rules 結算 actions_per_turn: 0；
+# 遲緩與泥沼減速由 agility_flat 結算。
+- id: ice_freeze_locks_actions
+  when: {buff_active: ice_freeze}
+  then: {actions_per_turn: 0}
+- id: ice_freeze_tundra_locks_actions
+  when: {buff_active: ice_freeze_tundra}
+  then: {actions_per_turn: 0}
+- id: ice_freeze_nightfall_locks_actions
+  when: {buff_active: ice_freeze_nightfall}
+  then: {actions_per_turn: 0}
+- id: ice_freeze_apotheosis_locks_actions
+  when: {buff_active: ice_freeze_apotheosis}
+  then: {actions_per_turn: 0}
+- id: ice_prison_locks_actions
+  when: {buff_active: ice_prison}
+  then: {actions_per_turn: 0}
+- id: ice_slow_agility_penalty
+  when: {buff_active: ice_slow}
+  then: {agility_flat: -3}
+- id: ice_frost_mire_agility_penalty
+  when: {buff_active: ice_frost_mire}
+  then: {agility_flat: -8}

@@ -227,19 +227,43 @@
   stacking: refresh
   modifiers:
     bounds: {target: actions_per_turn, ceiling: 1}
+# 冰系物理性靜止與減速階梯（ice-spell-catalog D1/D3/D6/D7）：
+# 遲緩與泥沼為減速 mount，凍結與定身為 actions_per_turn: 0 的 lock mount。
 - key: ice_slow
+  duration: 15
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: ice_wall_frost
   duration: 60
   stacking: refresh
   polarity: debuff
-  modifiers:
-    bounds: {target: agility, ceiling: -3}
-- key: ice_wall
+  marker: ground
+  modifiers: {}
+- key: ice_frost_mire
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 5}
+  polarity: debuff
+  marker: ground
+  modifiers: {}
 - key: ice_freeze
   duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: ice_freeze_tundra
+  duration: 40
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+# ice_freeze_nightfall: absolute_zero 與 eternal_ice_field 共享之主宰 60 秒凍結 rung (D6b)
+- key: ice_freeze_nightfall
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: ice_freeze_apotheosis
+  duration: 90
   stacking: refresh
   polarity: debuff
   modifiers: {}

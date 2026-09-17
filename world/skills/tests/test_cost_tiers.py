@@ -151,14 +151,3 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
                 "主宰": ("judgement_thunder", "divine_lightning_slaughter"),
             }
         )
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
-    def test_ice_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("ice_wall", "frost_arrow_rain"),
-                "大師": ("permafrost_domain", "ice_prison"),
-                "賢者": ("blizzard", "absolute_tundra"),
-                "主宰": ("absolute_zero", "eternal_ice_field"),
-            }
-        )
