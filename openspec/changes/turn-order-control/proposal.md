@@ -1,0 +1,42 @@
+## Why
+
+The lightning tree's sovereign verb is 回合 — 「額外行動、行動順序操控、麻痺＝跳過對手回合」 (index.md §4.2's 雷 row — 同軸雙極合法 per §4.1 clause 3: 雷同時擁有己方額外行動與剝奪敵方行動). Two shipped gaps make the verb inexpressible at master 06b68fef:
+
+1. **EXTRA ACTION has no consumer.** `run_round()` reads `evaluate_combat_modifiers(entity)`'s `actions_per_turn` only as an `== 0` skip (`world/rules/combat.py:907`); a value > 1 is never read anywhere in the codebase (the only other consumers are `action_preview.py:169`'s `== 0` gate and the display bounds). The dev-era `lightning_extra_action` buff row's `bounds: {target: actions_per_turn, ceiling: 1}` is the ad084c9-type display-only illusion, and thunder_gods_haste's 「本回合獲得一次額外行動機會」 has nothing to ride.
+2. **IN-ROUND REORDERING has no primitive.** `roll_initiative()` rolls exactly once per round (`combat.py:744-754`, `run_round:895`); the shipped `first_actor` seam is opening-only, move-to-head-only, and its own docstring disclaims everything lightning needs (「never re-rolls, re-scores… never grants the named combatant an additional action, and never skips another combatant」). The lore REQUIRES in-round rewriting: lightning_flicker 「雷直接改寫行動順序」 (self advance) and thunder_apotheosis 「命中的目標本回合行動順序被推到最後」 (push-hit-targets-to-tail mid-cast).
+
+Both are element-agnostic round mechanics — 雷's 回合 verb, but generic vocabulary with zero element keys, exactly the displaced-knockback / unconditional-multi-strike posture the wind wave shipped.
+
+## What Changes
+
+- **Batch declaration.** FIRST in the lightning wave; `multi-strike-cap-widening` follows, then the data-only `lightning-spell-catalog` (machine-readable `depends-on:` and combat.py hunk-sequencing notes below).
+- **Extra-action consumption (MODIFIED strict superset).** The round loop's provisioning leg consumes `actions_per_turn` as the combatant's action count for that round: the `== 0` skip leg stays verbatim (skip + `action_skipped` event + no `ActionResolver` call, no origin branch), and a resolved count ≥ 1 provisions exactly that many provider calls within the same round transaction — the existing exactly-one round transaction is never widened; extra actions are one more provider call at the combatant's existing sequence position, each slot re-passing the shipped liveness predicate before the provider call so defeat/KO/flee mid-round cuts the remaining slots; the `None`-provider, `ItemUseRequest`, notification-sink, nonlethal and party invariants ride verbatim. A count of 1 (every shipped row) is byte-identical to today.
+- **In-round turn-order vocabulary (NEW requirement).** Deterministic positional operations on the current round's sequence, expressed as data: buff definitions carry an optional load-validated `round_order: {action: advance_to_head | retreat_to_tail}` clause, and the outcome-reaction `then` vocabulary gains one marker verb `mark_order_op:<buff-definition-key>` (holder-gated through the shipped `physical_hit` + `buff_active` composition, exactly the `scorching_armor_ignite` shape). `run_round()` folds pending ops into its local order snapshot before each combatant's turn: an op from a live marker instance on a not-yet-acted combatant relocates that key (advance → head of the remaining tail; retreat → end), same-key last-op-wins, already-acted or absent keys are silent no-ops, and effect handlers NEVER mutate the sequence — the marker rows are the single declarative source. `roll_initiative()` and the `first_actor` seam stay untouched (lightning's catalog consumes the seam itself for the 神格 cast-order nuance if needed; this change adds nothing to it).
+- **Probability-gated action loss (the static_ward design decision, design D4).** A narrow `chance: <0-100 int>` may ride the `actions_per_turn: 0` of ONE lock rule — consumed ONLY by the round loop's per-round gate (one seeded `roll_d100()` per gated combatant per round, recorded replayably in the existing `action_skipped` event data); `evaluate_combat_modifiers` stays a documented pure read and never rolls; `action_preview`'s `actions_per_turn == 0` pin is unchanged (advisory for chance rows, resolution stays authoritative). The closed-set alternative (a deterministic once-per-hit micro-rung with no probability) was rejected; the lore's 「15% 機率」 ships as honest declared chance, not a deviated guarantee.
+- Ships ZERO live lightning rows — inert-but-valid vocabulary over synthetic rows only (the ratified discipline: zero data-catalog tests, behavior contracts on synthetic rows). The `lightning-spell-catalog` change authors every real row over the grammar shipped here.
+
+## Capabilities
+
+### New Capabilities
+None. (The in-round ordering requirement lands inside the existing `combat-resolution` capability — it is the same round loop's contract.)
+
+### Modified Capabilities
+- `combat-resolution`:
+  - MODIFIED 「actions_per_turn: 0 skips a combatant's turn before ActionResolver is called」 → strict superset: the loop provisions `actions_per_turn` actions (skip-at-zero leg verbatim including the no-origin-branch pin; ≥1 = that many provider calls in the same round transaction with mid-round defeat cutting remaining slots). Canonical ID `combat-resolution::actions-per-turn-0-skips-a-combatant-s-turn-before-actionresolver-is-called` — the delta renames the requirement heading to the superset wording; the supervisor syncs main at archive.
+  - ADDED 「The round loop consumes declarative in-round order operations and declared action-loss chance」 — the positional fold + the seeded per-round chance gate, one requirement, no element keys.
+- `buff-handler-integration`: ADDED 「Buff definitions may declare a validated in-round order operation」 — the `round_order` load-time clause (shape validation, fail closed, inert without a consumer declaration; the `marker: ground`/`marker: positional` load-clause precedent).
+- `damage-state-feedback`: ADDED 「The outcome-reaction vocabulary grows one declarative order-operation action」 — the `then` verb `mark_order_op:<buff-definition-key>`, validated fail-closed at rule load beside the shipped `counter_damage`/`apply_buff_to_source` recognition (the requirement family that owns the outcome-reaction vocabulary extension surface: `damage-state-feedback`'s source-targeted-actions requirement is where `physical_hit`, `apply_buff_to_source` and `counter_damage` landed).
+
+## Impact
+
+`world/rules/combat.py` — `run_round()` (action-count leg ~907-934; the order-snapshot fold ~895-899; the chance gate beside the existing skip leg); `roll_initiative()` and `first_actor` UNTOUCHED. `world/rules/buffs.py` — the `round_order` load clause beside `marker` (buffs.py ~216-232 area). `world/rules/state_reactions.py` — the `mark_order_op` then-verb + `validate_state_reaction_rules` recognition. `world/rules/rulebook/combat_modifiers.yaml` — ZERO live row changes (the `chance` key is load-validated grammar with no shipped user yet; every existing lock rule stays verbatim). `.github/evennia-shards.json` — this change registers the wave's first new test module. Test surfaces: `world/rules/tests/test_combat*.py` round-loop pins (the N==1 byte-identity), a new focused behavior module for ordering/chance.
+
+Sequencing: `run_round`'s provisioning hunk is disjoint from `multi-strike-cap-widening`'s `_handle_damage` hunk (~400 lines away, same file — the supervisor sequences merges per the declared queue). This change owns the file's round-loop + roll_initiative-adjacent hunks; the data change touches none of its hunks.
+
+This turn creates planning artifacts only. Do not apply, archive, sync main specs, create feature branches or merge until requested.
+
+## Batch
+
+- depends-on: (none — first in the wave)
+  - code conflicts: `world/rules/combat.py` SHARED with `multi-strike-cap-widening` — this change edits `run_round()` (~lines 895-940); that change edits `_handle_damage()`'s strike loop (~lines 361-373) — textually disjoint hunks, same file: the supervisor sequences the two merges, this change FIRST per the declared queue; either order applies cleanly. `.github/evennia-shards.json` — three changes each append one test module; manifest edits sequence under supervisor.
+- `multi-strike-cap-widening` depends on nothing functional in this change (independent grammar), but queues second for hunk sequencing; `lightning-spell-catalog` depends-on BOTH (it authors `thunder_gods_haste`'s extra-action rows, `static_ward`/`lightning_flicker`/`thunder_apotheosis`'s order rows, and `thunder_combo`'s three-strike policy over the grammars shipped by changes 1 and 2).
