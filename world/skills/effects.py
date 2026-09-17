@@ -495,9 +495,10 @@ class DamagePolicy:
     Extra strikes may be configured in two shapes:
     - Evidence-conditional: repeat_when names a recognized action evidence kind,
       requiring extra_strikes=1 (resolved only when the target carries fresh evidence).
-    - Unconditional: extra_strikes=1 with repeat_when=None (always resolves the
-      extra strike on successful action resolution).
-    In either shape, total_strikes = 1 + extra_strikes when active.
+    - Unconditional: extra_strikes in (1, 2) with repeat_when=None (always resolves the
+      extra strikes on successful action resolution).
+    In either shape, total_strikes = 1 + extra_strikes when active (evidence-conditional
+    stays exactly one; predicate-free admits one or two; total = 1 + N).
     """
 
     predicate: tuple[str, ...] = ()
@@ -668,9 +669,9 @@ class DamagePolicy:
             raise ValueError(
                 f"DamagePolicy extra_strikes must be an int, got {type(self.extra_strikes).__name__}"
             )
-        if self.extra_strikes not in (0, 1):
+        if self.extra_strikes not in (0, 1, 2):
             raise ValueError(
-                f"DamagePolicy extra_strikes cannot exceed 1, got {self.extra_strikes}"
+                f"DamagePolicy extra_strikes must be in (0, 1, 2), got {self.extra_strikes}"
             )
         if self.repeat_when is not None and self.extra_strikes != 1:
             raise ValueError(
