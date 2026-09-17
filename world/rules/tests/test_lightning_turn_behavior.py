@@ -24,6 +24,8 @@ from unittest.mock import MagicMock, patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
+
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 
@@ -142,6 +144,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         self.addCleanup(patcher.stop)
         return skill
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_extra_action_grant_provisions_slots_while_live_and_one_after_lapse(self):
         """Scenario: The extra-action grant provisions its second slot while live and one after lapse."""
         fast = _player("fast")
@@ -184,6 +187,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # Lapsed combatant receives exactly one slot, slow receives one
         self.assertEqual(calls, ["fast", "slow"])
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_ward_micro_rung_marks_melee_attackers_and_chance_decides(self):
         """Scenario: The ward micro-rung marks melee attackers and the declared chance decides."""
         ward_carrier = self.actor
@@ -267,6 +271,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         self.assertEqual(calls, [str(fast.key)])
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_self_advance_and_canopy_tail_push_relocate_only_still_to_act(self):
         """Scenario: The self advance and the canopy tail-push relocate only the still-to-act."""
         p1 = _player("p1")
@@ -315,6 +320,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # Execution order: p4, p1, p3, p2.
         self.assertEqual(calls, ["p4", "p1", "p3", "p2"])
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_paralysis_ladder_locks_at_authored_rungs_on_family_keys(self):
         """Scenario: The paralysis ladder locks at the authored rungs on family keys."""
         target = self.target
@@ -342,6 +348,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         self.assertNotIn("paralysis_enhanced", entity_active_buffs(target))
         self.assertEqual(evaluate_combat_modifiers(target), {})
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_three_strike_rung_lands_three_judgments_in_one_paid_cast(self):
         """Scenario: The three-strike 多段 rung lands three judgments in one paid cast."""
         target = _monster("combo_target", hp=2000)
@@ -391,6 +398,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # MP paid exactly once (46 MP)
         self.assertEqual(initial_mp - self.actor.traits.mp.current, 46)
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_execution_and_devastation_rungs_price_their_clauses(self):
         """Scenario: The execution and devastation rungs price their clauses."""
         high_def_target = _player("high_def_target")
@@ -494,6 +502,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # Devastation adds 10% of 2000 max HP = 200 damage
         self.assertEqual(dev_dmg - non_dev_dmg, 200)
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_branching_and_two_parent_capstone_gate_through_lineage_engine(self):
         """Scenario: Branching and the two-parent capstone gate through the lineage engine."""
         # Root 1: 先制路線
@@ -586,6 +595,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         self.actor.db.skill_proficiency[slaughter.key] = 10 * SKILL_PROFICIENCY_XP_PER_LEVEL
         self.assertTrue(can_use_skill(self.actor, canopy))
 
+    @covers_requirement("skill-registry::lightning-spell-progression-composes-executable-turn-order-behavior")
     def test_retired_dev_era_clauses_resolve_as_ordinary_rejections(self):
         """Scenario: Retired dev-era clauses resolve as ordinary rejections."""
         bf = Battlefield(

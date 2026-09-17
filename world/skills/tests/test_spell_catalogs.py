@@ -72,6 +72,9 @@ class LightningLineageTreeCatalogTests(unittest.TestCase):
     lives in this registered data-contract file.
     """
 
+    @covers_requirement(
+        "skill-lineage::the-lightning-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
     def test_lightning_tree_edges_are_as_designed(self):
         expected = {
             "lightning_flicker": (SkillPrerequisite("static_ward", 3),),
