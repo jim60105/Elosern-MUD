@@ -1,7 +1,7 @@
 // Local item-icon map (redesign-inventory-item-grid, task 1.1): a closed
 // table keyed by the services-v2 `presentation.icon_key` vocabulary
 // (mirrors the server's `world/lore/items.py` ItemIconKey: food, potion,
-// weapon, armor, accessory, ammunition, tool, material, misc). Each entry
+// weapon, armor, accessory, ammunition, tool, material, misc, toy). Each entry
 // is an inline SVG path (24x24 viewBox, stroke-based, same idiom as
 // `dock-icons.js`) plus a Traditional Chinese accessible label. No URL, no
 // HTML, no emoji, no raw SVG strings — the view layer owns its own icon
@@ -27,7 +27,7 @@ export const ITEM_ICONS = {
 export const UNKNOWN_ITEM_ICON = { label: "未知", d: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 9a3 3 0 1 1 3 3v1M12 17v.01" };
 
 // The closed kind vocabulary mirrors the icon-key vocabulary (the server's
-// ItemKind and ItemIconKey share the same nine values), so kind words reuse
+// ItemKind and ItemIconKey share the same ten values), so kind words reuse
 // the icon labels.
 export const KIND_LABELS = Object.fromEntries(
   Object.entries(ITEM_ICONS).map(([key, entry]) => [key, entry.label]),

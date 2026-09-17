@@ -225,7 +225,7 @@ class EquipmentHandlerTests(EvenniaTestCase):
         ItemDefinition(
             key="t_pleasure_ring_a",
             display_name_zh="測試歡愉戒指甲",
-            price_table_key="intimacy_tool",
+            price_table_key="t_pleasure_ring_a",
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.ACCESSORY,
@@ -234,7 +234,7 @@ class EquipmentHandlerTests(EvenniaTestCase):
         ItemDefinition(
             key="t_pleasure_ring_b",
             display_name_zh="測試歡愉戒指乙",
-            price_table_key="intimacy_tool",
+            price_table_key="t_pleasure_ring_b",
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.ACCESSORY,

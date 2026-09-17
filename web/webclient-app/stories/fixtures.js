@@ -1342,8 +1342,8 @@ export const SERVICES_PANEL_SAMPLE = {
 };
 
 // The services v2 panel whose inventory rows all carry committed
-// presentation metadata (redesign-inventory-item-grid): the row set covers
-// every closed `ItemIconKey`/`ItemKind` value (food, potion, weapon, armor,
+// presentation metadata (redesign-inventory-item-grid): the row set originally
+// covered every closed `ItemIconKey`/`ItemKind` value (food, potion, weapon, armor,
 // accessory, ammunition, tool, material, misc) and every closed rarity
 // (common, uncommon, rare, epic, legendary). The presentation objects mirror
 // the server's registry (`world/lore/items.py`).

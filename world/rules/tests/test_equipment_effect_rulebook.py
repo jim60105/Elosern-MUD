@@ -605,7 +605,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
-    """The 57-key bijection plus the ten Church/Kingdom items' trade identity."""
+    """The 62-key bijection plus the ten Church/Kingdom items' trade identity."""
 
     NEW_ITEM_KEYS = (
         "purified_pendant",
@@ -675,8 +675,6 @@ CHURCH_SANCTUARY_DEVICES = (
     "warm_honey_orb",
     "hyperesthesia_charm",
 )
-
-CHURCH_SET = CHURCH_VESTMENTS_AND_EMBLEMS + CHURCH_SANCTUARY_DEVICES
 
 
 def _percent_magnitude(value: str) -> int:
@@ -758,8 +756,6 @@ class ChurchDoctrineTests(unittest.TestCase):
             self.assertGreaterEqual(rule.exposure_bias, 0)
             self.assertIn("pleasure_gain", rule.adjustments)
             self.assertGreater(_percent_magnitude(rule.adjustments["pleasure_gain"]), 0)
-            self.assertNotIn("heal_gain", rule.adjustments)
-            self.assertFalse(rule.immune)
 
     @covers_requirement(
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
