@@ -18,6 +18,7 @@ from world.lore.items import (
     ItemRarity,
 )
 from world.rules.equipment import toggle_equipment
+from world.rules.equipment_effects import equipment_adjustments
 from world.skills.equipment import (
     ACCESSORY_MAX_SLOTS,
     EquipmentSlot,
@@ -192,3 +193,27 @@ class EquipmentHandlerTests(EvenniaTestCase):
                 entity.db.equipment = malformed
                 self.assertFalse(dual_wielding_from_storage(entity))
                 self.assertFalse(entity.equipment.is_dual_wielding)
+
+    @covers_requirement(
+        "equipment-effects::registration-and-tradeability-are-independent"
+    )
+    @_items(
+        ItemDefinition(
+            key="t_unstocked_staff",
+            display_name_zh="測試未上架法杖",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=_PRESENTATION,
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.WOODEN_CLUB,
+        )
+    )
+    def test_unstocked_equipment_item_equips_and_applies_adjustments(self):
+        entity = self._entity()
+        self._hold(entity, "t_unstocked_staff")
+        result = toggle_equipment(entity, "t_unstocked_staff")
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(entity.equipment.slot_contents(EquipmentSlot.WEAPON_MAIN), "t_unstocked_staff")
+        adjustments = equipment_adjustments(entity)
+        self.assertEqual(adjustments.get("atk_phys"), 3)
+        self.assertEqual(adjustments.get("agility_flat"), -2)

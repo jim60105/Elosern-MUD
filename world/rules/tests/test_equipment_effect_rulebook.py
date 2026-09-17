@@ -575,6 +575,32 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::registration-and-tradeability-are-independent"
+    )
+    def test_unstocked_equipment_item_loads_clean(self):
+        registry, document = self._two_entry_setup()
+        self.assertNotIn("wooden_club", SHOP_REGISTRY["altoria_general_store"].offered_item_keys)
+        rules = self._validate(registry, document)
+        self.assertIn(EquipmentModifierKey.WOODEN_CLUB, rules)
+        self.assertEqual(rules[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 3)
+        from world.rules.guild_config import validate_shop_configs
+        economy_path = Path(__file__).parents[1] / "rulebook" / "guild_economy.yaml"
+        raw_economy = yaml.safe_load(economy_path.read_text(encoding="utf-8"))
+        configs = validate_shop_configs(raw_economy["shops"])
+        self.assertNotIn("wooden_club", configs["altoria_general_store"].offers)
+
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
+    def test_rulebook_load_rejects_over_budget_entry(self):
+        registry, document = self._two_entry_setup()
+        document["effects"]["wooden_club"] = {"adjustments": {"defense": 10}}
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            self._validate(registry, document)
+        self.assertIn("defense", str(caught.exception))
+        self.assertIn("4", str(caught.exception))
+
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
     """The 45-key bijection plus the ten new items' trade identity."""
