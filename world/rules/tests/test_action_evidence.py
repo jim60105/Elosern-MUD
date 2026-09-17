@@ -317,7 +317,11 @@ class DamagePolicyValidationTests(unittest.TestCase):
     def test_extra_strikes_greater_than_one_raises(self):
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(repeat_when="forced_interaction", extra_strikes=2)
-        self.assertIn("cannot exceed 1", str(ctx.exception))
+        self.assertIn("requires extra_strikes=1", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(repeat_when="forced_interaction", extra_strikes=3)
+        self.assertIn("must be in (0, 1, 2)", str(ctx.exception))
 
     def test_extra_strikes_zero_with_repeat_when_raises(self):
         with self.assertRaises(ValueError) as ctx:
