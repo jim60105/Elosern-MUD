@@ -87,8 +87,12 @@ class EquipmentModifierKey(StrEnum):
     APOTHECARY_BEADS = "apothecary_beads"
     ARCHMAGE_MENDING_ROBE = "archmage_mending_robe"
     ASHEN_SCIMITAR = "ashen_scimitar"
+    BEASTFOLK_GALE_EARRING = "beastfolk_gale_earring"
+    BEASTFOLK_HEAVY_HIDE_ARMOR = "beastfolk_heavy_hide_armor"
     BEASTFOLK_REPEATING_BOW = "beastfolk_repeating_bow"
     BEASTFOLK_SPIRIT_WAND = "beastfolk_spirit_wand"
+    BEASTFOLK_STALKER_GARB = "beastfolk_stalker_garb"
+    BEASTFOLK_TRIBAL_TOTEM = "beastfolk_tribal_totem"
     BEASTFOLK_TWIN_CLAWS = "beastfolk_twin_claws"
     BEASTFOLK_WAR_SPEAR = "beastfolk_war_spear"
     BEASTFOLK_WARHAMMER = "beastfolk_warhammer"
@@ -98,6 +102,7 @@ class EquipmentModifierKey(StrEnum):
     DARK_ELF_KIMONO = "dark_elf_kimono"
     DARK_ELF_NINJA_GARB = "dark_elf_ninja_garb"
     DRAGON_LAIR_TROPHY_BLADE = "dragon_lair_trophy_blade"
+    ELVEN_FOREST_VEIL = "elven_forest_veil"
     ELVEN_LONGBOW = "elven_longbow"
     ELVEN_TRADITIONAL_ROBE = "elven_traditional_robe"
     ENTICING_LACE_SET = "enticing_lace_set"
@@ -1464,6 +1469,77 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
             ),
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
             modifier_key=EquipmentModifierKey.DRAGON_LAIR_TROPHY_BLADE,
+        ),
+        # Regional equipment: Armor and Accessories (land-lore-regional-equipment)
+        ItemDefinition(
+            key="beastfolk_heavy_hide_armor",
+            display_name_zh="獸人厚甲",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="以獸皮與鐵片疊層縫製的部族重甲，犧牲機動換取硬度。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_HEAVY_HIDE_ARMOR,
+        ),
+        ItemDefinition(
+            key="beastfolk_stalker_garb",
+            display_name_zh="獸人輕行衣",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人暗殺者慣用的貼身輕甲，幾乎不影響身法。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_STALKER_GARB,
+        ),
+        ItemDefinition(
+            key="elven_forest_veil",
+            display_name_zh="精靈森林輕紗",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.LEGENDARY,
+                summary_zh="精靈以晨露編織的輕紗長裙，傳統服飾的精靈分支款式，精靈村商店應季上架的季節限定品。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.ELVEN_FOREST_VEIL,
+        ),
+        ItemDefinition(
+            key="beastfolk_tribal_totem",
+            display_name_zh="獸人部族圖騰",
+            price_table_key="jewelry",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ACCESSORY,
+                icon_key=ItemIconKey.ACCESSORY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="以獵得的獸爪製成的部族圖騰項飾，力量與防禦並重。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_TRIBAL_TOTEM,
+        ),
+        ItemDefinition(
+            key="beastfolk_gale_earring",
+            display_name_zh="獸人疾風耳環",
+            price_table_key="jewelry",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ACCESSORY,
+                icon_key=ItemIconKey.ACCESSORY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人以自身耳形為靈感打造的耳環，象徵族群的速度自豪。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_GALE_EARRING,
         ),
     )
 }

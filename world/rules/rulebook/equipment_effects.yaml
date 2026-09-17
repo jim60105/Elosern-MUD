@@ -21,10 +21,18 @@ effects:
     adjustments: {magic_power: 8, mp_cost: "-12%"}
   ashen_scimitar:
     adjustments: {atk_phys: 4, agility: 2}
+  beastfolk_gale_earring:
+    adjustments: {agility: "+4%"}
+  beastfolk_heavy_hide_armor:
+    adjustments: {defense: 6, agility: "-8%"}
   beastfolk_repeating_bow:
     adjustments: {atk_phys: 3, agility: 4}
   beastfolk_spirit_wand:
     adjustments: {magic_power: 5, mp_cost: "-6%"}
+  beastfolk_stalker_garb:
+    adjustments: {defense: 2, agility: "+6%"}
+  beastfolk_tribal_totem:
+    adjustments: {atk_phys: 2, defense: 2}
   beastfolk_twin_claws:
     adjustments: {atk_phys: 6, defense: -2}
   beastfolk_war_spear:
@@ -45,6 +53,9 @@ effects:
     adjustments: {defense: 5, agility: 5}
   dragon_lair_trophy_blade:
     adjustments: {atk_phys: 9, magic_power: 3}
+  elven_forest_veil:
+    adjustments: {defense: 4, pleasure_gain: "+15%"}
+    exposure_bias: 1
   elven_longbow:
     adjustments: {atk_phys: 6, agility: 3}
   elven_traditional_robe:
