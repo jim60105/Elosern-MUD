@@ -283,7 +283,7 @@ Religious and revealing existing garments are aligned to canon:
 
 - 朝聖者銅符 (accessory, uncommon): `pleasure_gain +10%`, `heal_gain +5%`.
 - 黑色女僕裝 (armor, uncommon): `exposure_bias +1`, `pleasure_gain +10%`.
-- 精靈傳統服飾 / 黑暗精靈傳統服飾 / 黑暗精靈戰鬥服飾: sexual fields assigned per
+- 精靈傳統服飾 / 精靈短袍傳統服飾 / 精靈戰鬥服飾: sexual fields assigned per
   each branch's lore positioning (values finalized in the implementation table
   under the budget check).
 - 受洗聖水 (consumable): its item-effect rulebook entry becomes a cleanse
@@ -301,9 +301,9 @@ Religious and revealing existing garments are aligned to canon:
 | 大術師補綴長袍 | armor / epic | `mp_cost −12%`, `magic_level +8` |
 | 誘蠱蕾絲內衣 | armor / uncommon | `pleasure_gain +15%`, `exposure_bias +1` |
 | 迷情絲頸環 | accessory / epic | `pleasure_gain +25%`, `defense −3` |
-| 修女聖袍 | armor / uncommon | `exposure_bias +1`, `pleasure_gain +15%`, `heal_gain +10%` |
+| 修女聖袍 | armor / rare | `exposure_bias +1`, `pleasure_gain +20%`, `heal_gain +10%`, `defense −4` |
 | 光輝聖徽 | accessory / rare | `heal_gain +20%`, immune `dark_curse`, `pleasure_gain +10%` |
-| 聖女聖袍 | armor / epic | `exposure_bias +2`, `pleasure_gain +25%`, `heal_gain +25%`, `defense −3` |
+| 聖女聖袍 | armor / legendary | `exposure_bias +2`, `pleasure_gain +30%`, `heal_gain +25%`, `defense −5` |
 
 ### 10.3 光明教會 (Church of Light) design constraints
 

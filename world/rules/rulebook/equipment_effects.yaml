@@ -92,10 +92,10 @@ effects:
   royal_signet_ring:
     adjustments: {atk_phys: 3, sp_cost: "-5%"}
   saintess_vestments:
-    adjustments: {defense: -3, pleasure_gain: "+25%", heal_gain: "+25%"}
+    adjustments: {defense: -5, pleasure_gain: "+30%", heal_gain: "+25%"}
     exposure_bias: 2
   sister_vestments:
-    adjustments: {pleasure_gain: "+15%", heal_gain: "+10%"}
+    adjustments: {defense: -4, pleasure_gain: "+20%", heal_gain: "+10%"}
     exposure_bias: 1
   shadow_blade:
     adjustments: {atk_phys: 12, agility: 3}

@@ -25,6 +25,7 @@ from world.lore.items import (
     ITEM_REGISTRY,
     EquipmentModifierKey,
     ItemDefinition,
+    ItemRarity,
 )
 from world.lore.shops import SHOP_REGISTRY
 from world.rules.buffs import BUFF_DEFINITIONS
@@ -682,6 +683,25 @@ class ChurchDoctrineTests(unittest.TestCase):
     def test_named_church_set_satisfies_doctrine(self):
         check_church_doctrine(EQUIPMENT_EFFECT_RULES)
 
+    def test_sister_vestments_numbers_refused_at_uncommon_rarity(self):
+        document = _canonical_document()
+        registry = {
+            definition.key: definition
+            for definition in ITEM_REGISTRY.values()
+            if definition.equipment_slot is not None
+        }
+        registry["sister_vestments"] = replace(
+            registry["sister_vestments"],
+            presentation=replace(
+                registry["sister_vestments"].presentation,
+                rarity=ItemRarity.UNCOMMON,
+            ),
+        )
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            validate_equipment_effect_rules(document, registry, BUFF_DEFINITIONS)
+        self.assertIn("sister_vestments.pleasure_gain", str(caught.exception))
+        self.assertIn("soft_percent budget", str(caught.exception))
+
     def _expect_violation(self, key: str, mutate) -> None:
         original = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey(key)]
         deviant = replace(original, **mutate(original))
@@ -775,7 +795,9 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         # Explicit empty entry renders nothing.
         self.assertEqual(equipment_adjustment_text("storage_pouch"), "")
         # P4-only vocabulary (pleasure_gain/exposure_bias) stays absent.
-        self.assertEqual(equipment_adjustment_text("sister_vestments"), "治療 +10%")
+        self.assertEqual(
+            equipment_adjustment_text("sister_vestments"), "防禦 −4｜治療 +10%"
+        )
 
 
 if __name__ == "__main__":
