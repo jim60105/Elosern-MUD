@@ -42,6 +42,6 @@
 
 ## 7. Gate
 
-- [ ] 7.1 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
-- [ ] 7.2 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.rules.tests.test_equipment_effect_rulebook`, `world.rules.tests.test_item_effects_rulebook`, `world.rules.tests.test_guild_config`, `world.lore.tests.test_starting_kits`, `world.lore.tests.test_player_presets` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
-- [ ] 7.3 Run `openspec validate replace-temp-item-data --strict` and verify it reports the change as valid.
+- [x] 7.1 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
+- [x] 7.2 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.rules.tests.test_equipment_effect_rulebook`, `world.rules.tests.test_item_effects_rulebook`, `world.rules.tests.test_guild_config`, `world.lore.tests.test_starting_kits`, `world.lore.tests.test_player_presets` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
+- [x] 7.3 Run `openspec validate replace-temp-item-data --strict` and verify it reports the change as valid.
