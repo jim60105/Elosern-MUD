@@ -22,4 +22,4 @@ The lore codex's seven usable 性玩具 are exactly that path's first real users
 - `world/lore/items.py` — 7 `ItemDefinition` entries carrying `ItemUseMechanics`.
 - `world/rules/rulebook/item_effects.yaml` — 7 new profiles. The loader closes this file against the registry's usable set in both directions, so the two edits are inseparable.
 - Tests: three behavior tests on synthetic items, the two existing roster literals, and any existing literal pinning the shipped usable-item set.
-- Depends on `add-toy-item-category` for the `toy` presentation vocabulary and the `intimacy_tool` price band, and shares `world/lore/items.py` and the two roster literals with all three earlier slices.
+- Depends on `add-toy-item-category` for the `toy` presentation vocabulary and the `intimacy_tool` price band, and shares `world/lore/items.py` and the two roster literals with all three earlier changes.

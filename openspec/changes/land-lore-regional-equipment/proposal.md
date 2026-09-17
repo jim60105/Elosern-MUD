@@ -23,4 +23,4 @@ These 12 are the second slice of `docs/lore/items.md`. They are still data — t
 - `world/rules/rulebook/equipment_effects.yaml` — 12 new effect entries.
 - Tests with hard-coded roster assertions: `world/lore/tests/test_items.py`, `world/rules/tests/test_guild_config.py`, and the equipment-effect rulebook tests that pin the bound key set (`EquipmentModifierKey` goes from 45 members to 57).
 - No shop file changes; `world/lore/shops.py` and `guild_economy.yaml` are untouched.
-- Depends on `land-lore-inspect-only-items`, which introduces the `lore-item-catalog` capability this change builds on and moves the same two roster literals.
+- Runs after `replace-temp-item-data` and `land-lore-inspect-only-items`; it shares `world/lore/items.py` and the same two roster literals with both.

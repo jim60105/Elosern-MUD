@@ -2,7 +2,7 @@
 
 See `proposal.md` — Why. Three constraints shape everything below.
 
-`ITEM_REGISTRY` is a Python dict of frozen dataclasses, not a data file. "Data change" therefore still means editing `world/lore/items.py`, and two already-registered data-contract tests pin the roster by hand: `world/lore/tests/test_items.py` asserts the exact key set, and `world/rules/tests/test_guild_config.py` asserts a literal registry count. Both must move with the roster, and both are the reason the four codex slices cannot land in parallel.
+`ITEM_REGISTRY` is a Python dict of frozen dataclasses, not a data file. "Data change" therefore still means editing `world/lore/items.py`, and two already-registered data-contract tests pin the roster by hand: `world/lore/tests/test_items.py` asserts the exact key set, and `world/rules/tests/test_guild_config.py` asserts a literal registry count. Both must move with the roster, and both are the reason the codex slices cannot land in parallel.
 
 Shop offers are validated by a two-sided join. `world/lore/shops.py` holds the offered keys, `world/rules/rulebook/guild_economy.yaml` holds the numbers, and `world/rules/guild_config.py` rejects a key present in one and absent from the other, a buy price outside the item's `PRICE_TABLE` band, a sell price above buy, and stock outside `0 <= initial <= max`. Adding an offer is always a paired edit, and the loader is the gate.
 
@@ -19,7 +19,7 @@ Shop offers are validated by a two-sided join. `world/lore/shops.py` holds the o
 - Growing the existing data-echo assertions beyond the mechanical update they need. The two registered contract tests get their literals moved and nothing more.
 - Any new closed-vocabulary member, rulebook verb, or settlement path. If a task needs one, it belongs to a later slice.
 - New storefronts. The codex routes several goods through the 聖所器具商店 and 精靈村商店, neither of which exists; that is its own change.
-- Re-tuning the 45 equipment entries already in `equipment_effects.yaml`. Where the codex and the rulebook disagree on a number, `docs/lore/items.md` line 7 already declares the rulebook authoritative for tuned values.
+- Re-tuning or re-texting the 58 shipped entries. `replace-temp-item-data` runs first and finalises them; this change only adds.
 
 ## Decisions
 
@@ -27,7 +27,7 @@ Shop offers are validated by a two-sided join. `world/lore/shops.py` holds the o
 
 **The codex is not checked by a test.** An earlier draft of this design had a test parse `docs/lore/items.md` and diff it against `ITEM_REGISTRY`. That is precisely the game-data contract test `AGENTS.md` steers away from: it would echo registry content, name shipped keys, and need a ledger entry, and it would have added a Markdown grammar to maintain. It is dropped. The codex↔registry agreement is a review responsibility, and the properties that actually matter mechanically — a resolvable price band, an in-band shop price, a complete equipment binding, a budget-legal adjustment — are all already enforced by loaders that fail closed at startup. A wrong item name is a lore bug a reader catches; a wrong number is a startup failure nobody can ship past.
 
-**The new capability specifies shape, not roster.** `lore-item-catalog` states what follows from an item declaring no mechanics, from declaring itself non-sellable, and from being registered but unstocked. Every one of those requirements is satisfiable and testable with a synthetic item, so the capability's tests never name a shipped key. The roster itself — which 24 items exist — is implementation work in `tasks.md`, not a requirement.
+**The capability specifies shape, not roster.** `lore-item-catalog` — opened by `replace-temp-item-data` with the retirement invariant — gains here what follows from an item declaring no mechanics, from declaring itself non-sellable, and from being registered but unstocked. Every one of those requirements is satisfiable and testable with a synthetic item, so the capability's tests never name a shipped key. The roster itself — which 24 items exist — is implementation work in `tasks.md`, not a requirement.
 
 **Curios land as non-sellable on the keepsake band.** The codex says the 雜物 category has no trade meaning and publishes no reference price for it, but `price_table_key` is mandatory. The shipped `guild_recruit_badge` already sets the precedent: non-sellable on the `relic` band, where the 999999 floor reads as "not a market price". The alternative — inventing a zero-value band — would create a band that no reference price ever uses. The behavioral consequence is specified: non-sellability, not band choice, is what blocks the trade.
 

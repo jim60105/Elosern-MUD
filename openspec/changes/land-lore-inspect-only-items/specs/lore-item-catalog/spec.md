@@ -1,7 +1,3 @@
-## Purpose
-
-Holds the behavioral invariants that follow from an item's declared mechanical shape, independent of which items the world happens to contain: what an item with no mechanics may and may not do, what non-sellability costs, and what registration does and does not entitle an item to.
-
 ## ADDED Requirements
 
 ### Requirement: An item declaring no mechanics is inert

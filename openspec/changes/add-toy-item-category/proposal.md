@@ -28,4 +28,4 @@ This is the third slice of `docs/lore/items.md` and the only one that needs a vo
 - `world/rules/rulebook/equipment_effects.yaml` — 5 new effect entries.
 - `web/webclient-app/components/item-icons.js` — one new icon entry, which also supplies the category's Traditional Chinese label through the existing derived `KIND_LABELS`.
 - Tests: a new Python-side cross-language vocabulary check, the closed-vocabulary literals in `world/lore/tests/test_items.py`, the hand-typed `ICON_KEYS` array in `web/webclient-app/tests/world/item_icons.test.js`, the two existing roster literals, and the Church doctrine coverage test.
-- Shares `world/lore/items.py` and the two roster literals with `land-lore-inspect-only-items` and `land-lore-regional-equipment`, so it runs after both.
+- Shares `world/lore/items.py` and the two roster literals with `replace-temp-item-data`, `land-lore-inspect-only-items`, and `land-lore-regional-equipment`, so it runs after all three.

@@ -2,7 +2,7 @@
 
 `docs/lore/items.md` is the world-building source of truth for the item catalog, and it was just reconciled against the shipped code: every entry now carries a stable `key`, a price band that its reference price actually fits, and a rarity whose budget its numbers respect. The registry it describes has not caught up — `ITEM_REGISTRY` holds 58 items that were authored early to get the economy running, and 48 catalogued items have no data at all.
 
-This change lands the easiest and largest slice: the 24 inspect-only items (food, non-mechanical remedies, tools, materials, curios). They carry no use mechanics and no equipment slot, so they need no rulebook entry and no new vocabulary member — they are pure identity data plus the one price band the food tier needs. Landing them first establishes the catalog contract that the equipment and sex-toy slices then extend.
+With the provisional data replaced by `replace-temp-item-data`, this change lands the easiest and largest slice: the 24 inspect-only items (food, non-mechanical remedies, tools, materials, curios). They carry no use mechanics and no equipment slot, so they need no rulebook entry and no new vocabulary member — they are pure identity data plus the one price band the food tier needs. Landing them first establishes the catalog contract that the equipment and sex-toy slices then extend.
 
 ## What Changes
 
@@ -16,10 +16,8 @@ This change lands the easiest and largest slice: the 24 inspect-only items (food
 
 ## Capabilities
 
-### New Capabilities
-- `lore-item-catalog`: the behavioral invariants that follow from an item's declared mechanical shape — what an item with no mechanics may and may not do, what non-sellability blocks, and what registration does and does not entitle an item to. It specifies shape, not roster: every requirement is satisfiable and testable with a synthetic item, so nothing in it names shipped content.
-
 ### Modified Capabilities
+- `lore-item-catalog`: gains three shape-derived invariants alongside the retirement invariant `replace-temp-item-data` opened it with — what an item with no mechanics may and may not do, what non-sellability blocks, and what registration does and does not entitle an item to. Every one is satisfiable and testable with a synthetic item, so nothing in it names shipped content.
 - `lore-registries`: the `PRICE_TABLE` requirement enumerates the bands it must cover; it gains the regional-delicacy band.
 
 ## Impact
@@ -32,3 +30,4 @@ This change lands the easiest and largest slice: the 24 inspect-only items (food
 - Two already-registered data-contract tests get their literals moved and nothing more: `world/lore/tests/test_items.py` (exact key set) and `world/rules/tests/test_guild_config.py` (literal registry count). No ledger entry is added to `tools/test_data_freeze.json`.
 - Three new behavior tests on synthetic fixtures, added to existing test modules so `.github/evennia-shards.json` is untouched.
 - No consumer of `ITEM_REGISTRY` changes shape; every new entry is inspect-only, which is the one item form every existing consumer already handles.
+- Runs after `replace-temp-item-data`, which opens the `lore-item-catalog` capability and finalises the 58 shipped entries this change adds beside.
