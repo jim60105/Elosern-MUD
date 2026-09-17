@@ -588,7 +588,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         economy_path = Path(__file__).parents[1] / "rulebook" / "guild_economy.yaml"
         raw_economy = yaml.safe_load(economy_path.read_text(encoding="utf-8"))
         configs = validate_shop_configs(raw_economy["shops"])
-        self.assertNotIn("wooden_club", configs["altoria_general_store"].offers)
+        self.assertFalse(
+            any(offer.item_key == "wooden_club" for offer in configs["altoria_general_store"].offers)
+        )
 
     @covers_requirement(
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
@@ -603,7 +605,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
-    """The 57-key bijection plus the ten new items' trade identity."""
+    """The 57-key bijection plus the ten Church/Kingdom items' trade identity."""
 
     NEW_ITEM_KEYS = (
         "purified_pendant",
