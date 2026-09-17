@@ -39,7 +39,7 @@ from world.rules.tests._guild_service_probes import (
     synth_shop_config,
 )
 from world.skills.equipment import list_items
-from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS, make_item
 
 T_SHOP = next(iter(SYNTH_SHOPS))
 _T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
@@ -191,6 +191,79 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             sell(self.player, self.merchant_npc, _T_PASS, 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
         self.assertEqual(self.player.db.inventory, [_T_PASS])
+
+    @covers_requirement(
+        "lore-item-catalog::a-non-sellable-item-never-reaches-a-merchant-transaction"
+    )
+    def test_non_sellable_item_refuses_trade_and_outranks_shop_listing(self):
+        self.player.db.wallet = 100
+        self.player.db.inventory = [_T_PASS]
+        # Selling an unsellable item is refused, wallet and inventory unchanged
+        with self.assertRaises(TradeError) as ctx:
+            sell(self.player, self.merchant_npc, _T_PASS, 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+        self.assertEqual(self.player.db.wallet, 100)
+        self.assertEqual(self.player.db.inventory, [_T_PASS])
+
+        # Even if a synthetic shop's offers explicitly list the unsellable key:
+        config_with_pass = synth_shop_config(
+            T_SHOP,
+            (_T_SPRAY, _T_FANG, _T_APPLE, _T_KNIFE, _T_PASS),
+            offer_rules=(
+                synth_offer_rule(_T_SPRAY, max_stock=20),
+                synth_offer_rule(_T_FANG, max_stock=3),
+                synth_offer_rule(_T_APPLE, max_stock=20),
+                synth_offer_rule(_T_KNIFE, max_stock=20, initial_stock=1),
+                synth_offer_rule(_T_PASS, max_stock=10, initial_stock=5),
+            ),
+        )
+        install_synthetic_catalog(
+            self, synth_catalog(shop_configs={T_SHOP: config_with_pass})
+        )
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            # Selling is still refused by item sellability
+            with self.assertRaises(TradeError) as ctx:
+                sell(self.player, self.merchant_npc, _T_PASS, 1)
+            self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+            self.assertEqual(self.player.db.wallet, 100)
+            self.assertEqual(self.player.db.inventory, [_T_PASS])
+
+            # Buying is also refused by item sellability
+            with self.assertRaises(TradeError) as ctx:
+                buy(self.player, self.merchant_npc, _T_PASS, 1)
+            self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+            self.assertEqual(self.player.db.wallet, 100)
+            self.assertEqual(self.player.db.inventory, [_T_PASS])
+
+    @covers_requirement(
+        "lore-item-catalog::registration-does-not-entitle-an-item-to-a-market"
+    )
+    def test_unstocked_registered_item_functional_and_refuses_buy_as_not_offered(self):
+        unstocked_key = "t_unstocked_item"
+        unstocked_def = make_item(
+            unstocked_key,
+            display_name_zh="合成未上架信物",
+            price_table_key="t_ironbite_steel",
+        )
+        live_item_registry()[unstocked_key] = unstocked_def
+
+        # Can be granted into inventory and inspected
+        self.player.db.inventory = [unstocked_key]
+        self.assertIn(unstocked_key, self.player.db.inventory)
+        item = live_item_registry()[unstocked_key]
+        self.assertEqual(item.display_name_zh, "合成未上架信物")
+        self.assertTrue(item.presentation.summary_zh)
+
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            # Buying the unstocked registered item is refused with NOT_OFFERED
+            with self.assertRaises(TradeError) as ctx:
+                buy(self.player, self.merchant_npc, unstocked_key, 1)
+            self.assertEqual(ctx.exception.args[0], TradeReason.NOT_OFFERED)
+
+            # Distinct from an unknown key which produces UNKNOWN_ITEM
+            with self.assertRaises(TradeError) as ctx_unknown:
+                buy(self.player, self.merchant_npc, "completely_unknown_key", 1)
+            self.assertEqual(ctx_unknown.exception.args[0], TradeReason.UNKNOWN_ITEM)
 
     def test_closed_shop_rejects_trade(self):
         with patch("world.rules.economy.get_world_clock", return_value=WorldClock(3 * 3600)):

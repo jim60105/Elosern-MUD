@@ -179,6 +179,9 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
     quantity = _require_positive_quantity(quantity)
     if item_key not in ITEM_REGISTRY:
         raise TradeError(TradeReason.UNKNOWN_ITEM, item_key)
+    definition = ITEM_REGISTRY[item_key]
+    if not definition.sellable:
+        raise TradeError(TradeReason.UNSELLABLE, item_key)
     merchant = _require_local_merchant(actor, merchant_host)
     shop_key = merchant.shop_key
     offer = _offer_rule(shop_key, item_key)

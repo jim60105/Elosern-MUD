@@ -113,6 +113,7 @@ class CmdBuy(_ShopCommandBase):
                 TradeReason.UNKNOWN_ITEM: "商店不賣這個物品。",
                 TradeReason.NOT_OFFERED: "商店沒有這個商品。",
                 TradeReason.INSUFFICIENT_FUNDS: "你的銅幣不足。",
+                TradeReason.UNSELLABLE: "這個物品無法購買。",
                 TradeReason.INSUFFICIENT_STOCK: "商店庫存不足。",
                 TradeReason.BAD_QUANTITY: "數量必須是正整數。",
             }.get(reason, f"購買失敗：{error}")

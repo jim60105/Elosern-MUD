@@ -25,6 +25,9 @@ class PriceEntry:
 PRICE_TABLE: dict[str, PriceEntry] = {
     "inn_stay": PriceEntry("inn_stay", "普通旅館一晚", 20, 20, "One ordinary inn night."),
     "meal": PriceEntry("meal", "普通餐食", 5, 10, "One ordinary meal."),
+    "specialty_food": PriceEntry(
+        "specialty_food", "特產食品", 10, 100, "Regional specialty food delicacies."
+    ),
     "potion": PriceEntry("potion", "魔法藥劑", 50, 500, "A common magical potion."),
     "plain_sword": PriceEntry("plain_sword", "普通劍", 100, 500, "An ordinary sword."),
     "magic_weapon": PriceEntry(
