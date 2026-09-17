@@ -303,6 +303,9 @@ class WindLineageTreeCatalogTests(unittest.TestCase):
     lives in this registered data-contract file.
     """
 
+    @covers_requirement(
+        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
     def test_wind_tree_edges_are_as_designed(self):
         expected = {
             "gale_chain_step": (SkillPrerequisite("gale_step", 3),),
@@ -347,6 +350,9 @@ class WindLineageTreeCatalogTests(unittest.TestCase):
         # Mobility leaf: haste_domain is consumed by nothing.
         self.assertEqual(prerequisite_consumers("haste_domain"), ())
 
+    @covers_requirement(
+        "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
     def test_wind_passives_stay_out_of_the_graph(self):
         for passive_key in ("wind_mastery", "flight"):
             with self.subTest(passive_key=passive_key):

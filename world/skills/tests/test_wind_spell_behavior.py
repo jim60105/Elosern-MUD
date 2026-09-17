@@ -20,6 +20,7 @@ catalog pins).
 import importlib
 import unittest
 from unittest.mock import patch
+from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -133,6 +134,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         self.addCleanup(patcher.stop)
         return skill
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_agility_ladder_speeds_holder_and_expires(self):
         """Scenario: The agility ladder speeds its holder on the real consumers and expires."""
         base_agi = adjusted_agility(self.actor)
@@ -160,6 +164,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
                 self.assertNotIn(buff_key, entity_active_buffs(self.actor))
                 self.assertEqual(adjusted_agility(self.actor), base_agi)
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_bipolar_rung_trades_accuracy_for_speed_on_holder_alone(self):
         """Scenario: The bipolar rung trades accuracy for speed on its holder alone."""
         opponent = _monster("bipolar_target", hp=100)
@@ -189,6 +196,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         # Control twin has neither pole
         self.assertEqual(evaluate_combat_modifiers(self.control), {})
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_ally_domain_speeds_allies_and_skips_enemies(self):
         """Scenario: The ally domain speeds allies and skips enemies."""
         ally = _player("wind_ally")
@@ -240,6 +250,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         _, margin_vs_unbuffed_ally = _to_hit(enemy, ally, 50)
         self.assertEqual(margin_vs_buffed_ally, margin_vs_unbuffed_ally - 12)
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_knockback_storms_hurl_enemies_and_sweep_footing(self):
         """Scenario: The knockback storms hurl enemies out of position and sweep their footing."""
         # Setup: living enemy with high HP so it survives the damage leg
@@ -338,6 +351,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         self.assertEqual(magic_res.outcome, "success")
         self.assertLess(target1.traits.hp.current, hp_before)
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_unconditional_flurry_resolves_two_strikes_for_one_cast(self):
         """Scenario: The unconditional flurry resolves two independent strikes for one cast."""
         target = _monster("flurry_target", hp=1000)
@@ -403,6 +419,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         ctrl_rolls = [e for e in res_ctrl.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(ctrl_rolls), 1)
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_execution_and_devastation_rungs_settle_at_authored_rungs(self):
         """Scenario: The execution and devastation rungs settle at their authored rungs."""
         # High defense target with ample HP
@@ -511,6 +530,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         # Devastation adds 10% max HP (0.10 * 2000 = 200)
         self.assertEqual(dev_dmg - non_dev_dmg, 200)
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_two_roots_branch_and_canopy_gates_on_both_parents(self):
         """Scenario: The two roots branch and the canopy gates on both parents."""
         # Build synthetic 2-root wind-shaped tree
@@ -603,6 +625,9 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         self.actor.db.skill_proficiency[parent_b.key] = 10 * SKILL_PROFICIENCY_XP_PER_LEVEL
         self.assertTrue(can_use_skill(self.actor, canopy))
 
+    @covers_requirement(
+        "skill-registry::wind-spell-progression-composes-executable-speed-and-knockback-behavior"
+    )
     def test_retired_dev_era_keys_resolve_as_ordinary_rejections(self):
         """Scenario: Retired dev-era keys resolve as ordinary rejections."""
         # Retired buff keys are completely gone from BUFF_DEFINITIONS
