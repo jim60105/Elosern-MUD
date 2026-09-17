@@ -81,7 +81,7 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        self.assertEqual(len(ITEM_REGISTRY), 58)
+        self.assertEqual(len(ITEM_REGISTRY), 82)
         self.assertTrue(
             {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
         )
@@ -546,6 +546,18 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
                 validate_shop_configs([shop_raw])
             self.assertIn("synthetic_absent_band_item", str(caught.exception))
             self.assertIn("has no price-table entry", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::registration-does-not-entitle-an-item-to-a-market"
+    )
+    def test_catalog_load_accepts_registered_items_not_offered_by_any_shop(self):
+        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        self.assertIsInstance(catalog, GuildCatalog)
+        offered_keys = set()
+        for shop in catalog.shop_configs.values():
+            offered_keys.update(offer.item_key for offer in shop.offers)
+        unstocked_keys = set(ITEM_REGISTRY) - offered_keys
+        self.assertTrue(unstocked_keys, "Catalog must accept registered items not offered in any shop")
 
 
 class ServiceHostRosterTests(CatalogRegistryIsolation):

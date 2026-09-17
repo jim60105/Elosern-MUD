@@ -50,6 +50,13 @@ class ItemPresentationTests(unittest.TestCase):
                 "apothecary_beads", "archmage_mending_robe", "enticing_lace_set",
                 "passion_silk_choker", "sister_vestments", "radiant_holy_emblem",
                 "saintess_vestments",
+                "kingdom_rye_hardtack", "adventurer_field_ration", "imperial_candied_fruit",
+                "beastfolk_smoked_jerky", "harbor_lobster_bisque", "elven_candied_blossom",
+                "miners_bracing_broth", "beastfolk_herbal_salve", "passion_draught",
+                "spirit_dew", "elven_tear", "enchanted_compass", "dungeon_flare_talisman",
+                "beastfolk_signal_conch", "camp_ward_kit", "goblin_ear", "slime_residue",
+                "earth_drake_scale", "troll_fang", "elven_essence", "ancient_dragon_heart",
+                "family_crest_token", "ancient_mystery_key", "elven_child_toy",
             }
         )
         for key, definition in ITEM_REGISTRY.items():

@@ -27,6 +27,10 @@ from world.lore.items import (
 )
 from world.rules.clock import EventSourceRegistration, WorldClock, _EVENT_SOURCES
 from world.rules.equipment import materialize_registry_object, registry_key_for_object
+from world.rules.equipment import (
+    EquipmentToggleReason,
+    toggle_equipment,
+)
 from world.rules.buffs import apply_buff, entity_active_buffs
 from world.rules.item_effects import (
     GaugeAdjustEffect,
@@ -208,6 +212,45 @@ class ItemUsePreflightTests(_ItemUseTestCase):
         self.assertIs(preflight.reason, ItemUseReason.HP_FULL)
         self.assertIsNone(preflight.plan)
         self.assert_state_unchanged(before)
+
+    @covers_requirement(
+        "lore-item-catalog::an-item-declaring-no-mechanics-is-inert"
+    )
+    def test_inert_item_refuses_mechanics_and_remains_intact(self):
+        inert_item = make_item(
+            "t_inert_sample",
+            display_name_zh="合成無機制物件",
+            price_table_key="t_mossmeals",
+        )
+        self.register_fixture(inert_item)
+        self.hurt(10)
+        self.actor.db.inventory = ["t_inert_sample"]
+        before = self.canonical_state()
+
+        # Scenario 1: Using an inert item is refused by name, no gauge changes, item stays in inventory
+        settlement = use_item(self.actor, "t_inert_sample")
+        self.assertEqual(settlement.result.outcome, "rejected")
+        self.assertIs(settlement.result.reason, ItemUseReason.NOT_USABLE)
+        self.assert_state_unchanged(before)
+
+        # Preflight also reports NOT_USABLE directly
+        preflight = preflight_item_use(
+            ItemUseRequest(self.actor, "t_inert_sample"), in_combat=False
+        )
+        self.assertIs(preflight.reason, ItemUseReason.NOT_USABLE)
+        self.assert_state_unchanged(before)
+
+        # Scenario 2: Equipping an inert item is refused by name, equipment state unchanged
+        toggle_result = toggle_equipment(self.actor, "t_inert_sample")
+        self.assertEqual(toggle_result.outcome, "rejected")
+        self.assertIs(toggle_result.reason, EquipmentToggleReason.NOT_EQUIPMENT)
+        self.assert_state_unchanged(before)
+
+        # Scenario 3: An inert item is still a first-class inventory object
+        self.assertEqual(inert_item.display_name_zh, "合成無機制物件")
+        self.assertTrue(inert_item.presentation.summary_zh)
+        self.assertIsNone(inert_item.use_mechanics)
+        self.assertIsNone(inert_item.equipment_slot)
 
     def test_missing_ownership_rejects_without_effect(self):
         self.hurt(10)

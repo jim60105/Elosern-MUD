@@ -13,17 +13,17 @@
 
 ## 3. Shape-derived behavior
 
-- [ ] 3.1 Using a synthetic item that declares no mechanics, assert using it is refused with the not-usable reason with no gauge movement and no inventory change, and that equipping it is refused with the not-equipment reason with equipment state unchanged. Annotate with `covers_requirement` for the inert-item requirement. Verify with `world.rules.tests.test_item_use`.
-- [ ] 3.2 Using a synthetic non-sellable item, assert selling it to a merchant is refused with wallet and inventory unchanged, and that the refusal still holds when a synthetic shop lists that key. Annotate for the non-sellable requirement. Verify with `world.rules.tests.test_guild_config` or the focused shop-command label, whichever owns merchant transactions.
-- [ ] 3.3 Using a synthetic registered item that no synthetic shop offers, assert it can be granted into inventory and then inspected, equipped, or used per its shape, that buying it is refused for not being offered — distinct from the unknown-key refusal — and that catalog validation accepts the state. Annotate for the registration-does-not-entitle requirement. Verify with the same focused labels.
-- [ ] 3.4 Add the three tests to existing test modules rather than creating new ones, so `.github/evennia-shards.json` needs no edit. If a new module proves unavoidable, register it in exactly one shard in this change and verify with `tests.test_evennia_test_optimization_contract`.
-- [ ] 3.5 Obtain the canonical requirement IDs with `uv run --locked python -m tools.spec_traceability list` and confirm each annotation uses a literal ID. Verify with `uv run --locked python -m tools.spec_traceability check`.
+- [x] 3.1 Using a synthetic item that declares no mechanics, assert using it is refused with the not-usable reason with no gauge movement and no inventory change, and that equipping it is refused with the not-equipment reason with equipment state unchanged. Annotate with `covers_requirement` for the inert-item requirement. Verify with `world.rules.tests.test_item_use`.
+- [x] 3.2 Using a synthetic non-sellable item, assert selling it to a merchant is refused with wallet and inventory unchanged, and that the refusal still holds when a synthetic shop lists that key. Annotate for the non-sellable requirement. Verify with `world.rules.tests.test_guild_config` or the focused shop-command label, whichever owns merchant transactions.
+- [x] 3.3 Using a synthetic registered item that no synthetic shop offers, assert it can be granted into inventory and then inspected, equipped, or used per its shape, that buying it is refused for not being offered — distinct from the unknown-key refusal — and that catalog validation accepts the state. Annotate for the registration-does-not-entitle requirement. Verify with the same focused labels.
+- [x] 3.4 Add the three tests to existing test modules rather than creating new ones, so `.github/evennia-shards.json` needs no edit. If a new module proves unavoidable, register it in exactly one shard in this change and verify with `tests.test_evennia_test_optimization_contract`.
+- [x] 3.5 Obtain the canonical requirement IDs with `uv run --locked python -m tools.spec_traceability list` and confirm each annotation uses a literal ID. Verify with `uv run --locked python -m tools.spec_traceability check`.
 
 ## 4. Existing roster assertions
 
-- [ ] 4.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster. Do not add assertions — this is a literal update to a test that already exists. Verify with `world.lore.tests.test_items`.
-- [ ] 4.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
-- [ ] 4.3 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate still passes with no new ledger entry required.
+- [x] 4.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster. Do not add assertions — this is a literal update to a test that already exists. Verify with `world.lore.tests.test_items`.
+- [x] 4.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
+- [x] 4.3 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate still passes with no new ledger entry required.
 
 ## 5. Shop stock
 
