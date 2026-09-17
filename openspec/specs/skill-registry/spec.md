@@ -5,34 +5,6 @@ registry contract used to validate imported active and passive skill keys.
 
 ## Requirements
 
-### Requirement: SKILL_REGISTRY contains the full 雷-element spell set
-`world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 雷-element spells from design doc
-§4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
-`TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["lightning"]`, and
-an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
-spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
-retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
-
-| Key | 名稱 | 位階 | TargetSpec | Cost | effects |
-|---|---|---|---|---|---|
-| `spark_shock` | 電擊術 | 學徒 | `TargetSpec.SINGLE` | `mp=13` | `damage:lightning:magic` |
-| `static_ward` | 靜電護罩 | 學徒 | `TargetSpec.SELF` | `mp=10` | `self_buff_apply:lightning_static_ward` |
-| `chain_lightning` | 雷鎖術 | 術師 | `TargetSpec.AREA` | `mp=27` | `damage:lightning:magic` |
-| `paralyzing_bolt` | 麻痺電擊 | 術師 | `TargetSpec.SINGLE` | `mp=24` | `damage:lightning:magic`, `buff_apply:paralysis` |
-| `thunder_combo` | 雷霆連擊 | 大師 | `TargetSpec.SINGLE` | `mp=46` | `damage:lightning:magic` |
-| `lightning_strike` | 落雷術 | 大師 | `TargetSpec.AREA` | `mp=50` | `damage:lightning:magic` |
-| `heavens_thunder` | 天雷降臨 | 賢者 | `TargetSpec.AREA` | `mp=92` | `damage:lightning:magic` |
-| `thunder_gods_haste` | 雷神之速 | 賢者 | `TargetSpec.SELF` | `mp=68` | `self_buff_apply:lightning_extra_action` |
-| `judgement_thunder` | 審判雷霆 | 主宰 | `TargetSpec.SINGLE` | `mp=135` | `damage:lightning:magic` |
-| `divine_lightning_slaughter` | 神雷滅殺 | 主宰 | `TargetSpec.AREA` | `mp=155` | `damage:lightning:magic` |
-
-#### Scenario: All ten 雷 spell keys exist with correct kind, target, and cost
-- **WHEN** `SKILL_REGISTRY` is inspected for the ten 雷 keys (`spark_shock`, `static_ward`, `chain_lightning`, `paralyzing_bolt`, `thunder_combo`, `lightning_strike`, `heavens_thunder`, `thunder_gods_haste`, `judgement_thunder`, `divine_lightning_slaughter`)
-- **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["lightning"]`, the
-  `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
-  and a nonempty `effects` list matching this change's `design.md`
-
 ### Requirement: SKILL_REGISTRY exists at the exact path change 4 forward-declared
 `world/skills/registry.py` SHALL define a module-level `SKILL_REGISTRY: dict[str, SkillDef]` importable
 as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and symbol name change 4
@@ -559,4 +531,39 @@ The ice spell family SHALL provide the documented physical-stillness progression
 
 #### Scenario: Retired dev-era clauses resolve as ordinary rejections
 - **WHEN** a caller casts a never-existing ice key through the ordinary cast surface after replacement, or a previously declared defensive-wall buff key is referenced as an effect binding
+- **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
+
+### Requirement: Lightning spell progression composes executable turn-order behavior
+The lightning spell family SHALL provide the documented 回合 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, reaction and lineage mechanisms: an extra-action grant mounted as a detectable self-only buff and settled through the turn loop's action-count consumption at the authored duration; in-round order rewriting as declarative position markers only — a self advance mounted by its authoring node and tail retreats reaching the melee attackers of the two detection mounts through the shared outcome-reaction vocabulary and the struck victims of the 神格 canopy through the enemy-audience effect leg, each settled through the round loop's declarative fold at authored keys with already-acted combatants untouchable; the 麻痺 ladder locking every action through the shipped rule-table path at the authored 20/30-second rungs on family-owned keys with the shipped marker-path inventory untouched; a declared-chance micro-rung whose one recorded per-round roll decides the skip; a 多段 rung resolving three independent strikes under the widened cap with the shipped once-paid and single-terminal-emission discipline; a 處決級 execution rung that ignores defense; 毀滅級 devastation rungs; and a two-root branching lineage whose two 主宰 routes converge only at the two-parent 神格 canopy. All numeric values are authored data pinned at load/apply/presence, never re-derived by generic code.
+
+#### Scenario: The extra-action grant provisions its second slot while live and one after lapse
+- **WHEN** a synthetic self-only grant composition mounts the authored extra-action row and the round loop next provisions that combatant while the mount is live, and separately the mount is allowed to lapse before the next provisioning
+- **THEN** the live-mount combatant receives exactly two action slots at its sequence position within the one round settlement, the lapsed combatant receives exactly one, and no other combatant's slot count changes at either provisioning
+
+#### Scenario: The ward micro-rung marks melee attackers and the declared chance decides
+- **WHEN** a synthetic ward carrier is struck by a landed physical attack from a living attacker, then by a magic attack, a missed swing and a sourceless write, and separately the marked attacker is gated by the authored declared-chance lock under fixed losing and winning dice
+- **THEN** only the qualifying physical attacker carries the live retreat-marker instance attributed to the ward holder refreshed per qualifying strike, the magic/miss/sourceless paths apply nothing, the losing dice produce the skip event recording the authored chance and the consumed roll while the winning dice let the marked attacker act, and the marker itself mutates no initiative sequence
+
+#### Scenario: The self advance and the canopy tail-push relocate only the still-to-act
+- **WHEN** a synthetic self-advance composition mounts its authored advance row on a caster whose round slot has not arrived, and a synthetic canopy area composition strikes victims some of whom have already acted this round
+- **THEN** the caster acts ahead of every combatant still to act that round, each struck not-yet-acted victim moves behind them, already-acted victims keep their completed turns, every other relative order is unchanged, and the following round re-rolls clean
+
+#### Scenario: The paralysis ladder locks at the authored rungs on family keys
+- **WHEN** a synthetic single-target composition applies the authored base 麻痺 row and another applies the authored enhanced rung, and the clock advances to each authored expiry
+- **THEN** each holder's every action attempt resolves zero actions through the rule-table path for exactly its authored duration, the shipped marker-path inventory is unchanged throughout, and expiry restores action resolution
+
+#### Scenario: The three-strike 多段 rung lands three judgments in one paid cast
+- **WHEN** a synthetic 多段 composition with the authored count of two extra strikes and coefficient strikes one target under fixed rolls covering an all-hit sweep and a miss-interrupted sweep
+- **THEN** exactly three independent rolls are recorded in order with the same authored coefficient per landing strike, resources and practice move once, and at most one terminal defeat or knockout emits regardless of which strikes cross a threshold
+
+#### Scenario: The execution and devastation rungs price their clauses
+- **WHEN** a synthetic 處決級 composition strikes a high-defense target, and a synthetic 毀滅級 area composition strikes a mixed battlefield
+- **THEN** the execution strike skips defense subtraction entirely and each devastation victim takes the authored coefficient plus its authored maximum-HP share with allies untouched
+
+#### Scenario: Branching and the two-parent capstone gate through the lineage engine
+- **WHEN** a synthetic family replicates the documented two-root chains, the authored branch points and the two-parent canopy prerequisite shape
+- **THEN** use rejects until every authored threshold is met, the canopy unlocks only when BOTH authored parents reach their authored thresholds, each route progresses independently, and prerequisite caps stay derived from the shared reverse-edge map with leaves at the shared tip cap
+
+#### Scenario: Retired dev-era clauses resolve as ordinary rejections
+- **WHEN** a caller casts a never-existing lightning key through the ordinary cast surface after replacement, or references the retired bounds-illusion payloads as effect bindings
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on

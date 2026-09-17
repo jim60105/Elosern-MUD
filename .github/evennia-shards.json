@@ -76,7 +76,8 @@
         "world.rules.tests.test_ice_stillness_behavior",
         "world.rules.tests.test_positional_marker",
         "world.rules.tests.test_turn_order_control",
-        "world.rules.tests.test_multi_strike_cap_widening"
+        "world.rules.tests.test_multi_strike_cap_widening",
+        "world.rules.tests.test_lightning_turn_behavior"
       ]
     },
     {

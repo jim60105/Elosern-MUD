@@ -16,6 +16,7 @@ from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers,
     evaluate_combat_modifiers_no_create,
+    matched_combat_modifiers,
 )
 from world.rules.rulebook.schema import evaluate_condition, load_rules
 from world.skills.handler import ConferredSkillGrant
@@ -54,6 +55,34 @@ class CombatModifierTests(EvenniaTestCase):
         entity = self._entity()
         apply_buff(entity, "water_bind")
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_thunder_gods_haste_grants_action(self):
+        entity = self._entity()
+        apply_buff(entity, "lightning_extra_action")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 2})
+
+    def test_rule_paralysis_enhanced_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "paralysis_enhanced")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_static_ward_micro_stun(self):
+        entity = self._entity()
+        apply_buff(entity, "static_ward_stun")
+        matched = dict(matched_combat_modifiers(entity))
+        self.assertIn("static_ward_micro_stun", matched)
+        self.assertEqual(
+            matched["static_ward_micro_stun"], {"actions_per_turn": 0, "chance": 15}
+        )
+
+    def test_rule_flicker_micro_stun(self):
+        entity = self._entity()
+        apply_buff(entity, "flicker_stun")
+        matched = dict(matched_combat_modifiers(entity))
+        self.assertIn("flicker_micro_stun", matched)
+        self.assertEqual(
+            matched["flicker_micro_stun"], {"actions_per_turn": 0, "chance": 30}
+        )
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_rule_mp_regen_lock_freeze(self):
@@ -604,6 +633,44 @@ class CombatModifierTests(EvenniaTestCase):
     def test_rule_wind_haste_domain_agility(self):
         entity = self._entity()
         apply_buff(entity, "haste_domain_haste")
+        self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
+
+    # Ice stillness ladder and slows (ice-spell-catalog): the correspondence
+    # gate only requires one named test per rule id; settlement behavior is
+    # covered by test_ice_stillness_behavior.
+    def test_rule_ice_freeze_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_freeze")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_ice_freeze_tundra_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_freeze_tundra")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_ice_freeze_nightfall_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_freeze_nightfall")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_ice_freeze_apotheosis_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_freeze_apotheosis")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_ice_prison_locks_actions(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_prison")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+
+    def test_rule_ice_slow_agility_penalty(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_slow")
+        self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
+
+    def test_rule_ice_frost_mire_agility_penalty(self):
+        entity = self._entity()
+        apply_buff(entity, "ice_frost_mire")
         self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")

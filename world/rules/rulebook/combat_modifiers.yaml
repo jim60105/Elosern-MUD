@@ -177,3 +177,19 @@
 - id: ice_frost_mire_agility_penalty
   when: {buff_active: ice_frost_mire}
   then: {agility_flat: -8}
+# 雷系先制與跳回合階梯（lightning-spell-catalog D2/D3/D4）：
+# thunder_gods_haste 依 turn-order-control 結算 actions_per_turn: 2；
+# 強化麻痺由 actions_per_turn: 0 結算；
+# 靜電護罩與雷光連閃微階由 chance 機率鎖定行動結算。
+- id: thunder_gods_haste_grants_action
+  when: {buff_active: lightning_extra_action}
+  then: {actions_per_turn: 2}
+- id: paralysis_enhanced_locks_actions
+  when: {buff_active: paralysis_enhanced}
+  then: {actions_per_turn: 0}
+- id: static_ward_micro_stun
+  when: {buff_active: static_ward_stun}
+  then: {actions_per_turn: 0, chance: 15}
+- id: flicker_micro_stun
+  when: {buff_active: flicker_stun}
+  then: {actions_per_turn: 0, chance: 30}

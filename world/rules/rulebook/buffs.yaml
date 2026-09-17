@@ -60,6 +60,11 @@
   modifiers:
     rate: {target: hp, delta: -40}
 - key: paralysis
+  duration: 20
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: paralysis_enhanced
   duration: 30
   stacking: refresh
   polarity: debuff
@@ -217,16 +222,52 @@
   polarity: debuff
   marker: positional
   modifiers: {}
+# 雷系先制與過載階梯（lightning-spell-catalog D1/D2/D3/D4/D5）：
+# static_ward 與 flicker 為近戰受擊反擊 mount，advance 為先制行動順序改寫，
+# retreat 為受擊者或神格目標的行動順序後推 marker，extra_action 為追加行動 mount。
 - key: lightning_static_ward
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: defense, ceiling: 3}
-- key: lightning_extra_action
+  polarity: buff
+  modifiers: {}
+- key: lightning_flicker_ward
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: actions_per_turn, ceiling: 1}
+  polarity: buff
+  modifiers: {}
+- key: flicker_advance
+  duration: 12
+  stacking: refresh
+  polarity: buff
+  round_order:
+    action: advance_to_head
+  modifiers: {}
+- key: static_ward_stun
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  round_order:
+    action: retreat_to_tail
+  modifiers: {}
+- key: flicker_stun
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  round_order:
+    action: retreat_to_tail
+  modifiers: {}
+- key: apotheosis_retreat
+  duration: 6
+  stacking: refresh
+  polarity: debuff
+  round_order:
+    action: retreat_to_tail
+  modifiers: {}
+- key: lightning_extra_action
+  duration: 12
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 # 冰系物理性靜止與減速階梯（ice-spell-catalog D1/D3/D6/D7）：
 # 遲緩與泥沼為減速 mount，凍結與定身為 actions_per_turn: 0 的 lock mount。
 - key: ice_slow

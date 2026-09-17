@@ -73,3 +73,19 @@
     buff_active: fire_scorching_armor
   then:
     apply_buff_to_source: fire_ignite
+
+# 靜電護罩（lightning-spell-catalog D3）：近戰受擊時反擊麻痺微階
+- id: static_ward_micro_mark
+  when:
+    event: physical_hit
+    buff_active: lightning_static_ward
+  then:
+    mark_order_op: static_ward_stun
+
+# 雷光連閃（lightning-spell-catalog D3）：近戰受擊時反擊提升版麻痺微階
+- id: flicker_micro_mark
+  when:
+    event: physical_hit
+    buff_active: lightning_flicker_ward
+  then:
+    mark_order_op: flicker_stun

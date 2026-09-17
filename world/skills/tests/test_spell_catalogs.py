@@ -27,49 +27,8 @@ from world.skills.registry import (
 )
 
 
-LIGHTNING_SPELL_CATALOG = (
-    ("spark_shock", "電擊術", TargetSpec.SINGLE, 13, ("damage:lightning:magic",)),
-    (
-        "static_ward",
-        "靜電護罩",
-        TargetSpec.SELF,
-        10,
-        ("self_buff_apply:lightning_static_ward",),
-    ),
-    ("chain_lightning", "雷鎖術", TargetSpec.AREA, 27, ("damage:lightning:magic",)),
-    (
-        "paralyzing_bolt",
-        "麻痺電擊",
-        TargetSpec.SINGLE,
-        24,
-        ("damage:lightning:magic", "buff_apply:paralysis"),
-    ),
-    ("thunder_combo", "雷霆連擊", TargetSpec.SINGLE, 46, ("damage:lightning:magic",)),
-    ("lightning_strike", "落雷術", TargetSpec.AREA, 50, ("damage:lightning:magic",)),
-    ("heavens_thunder", "天雷降臨", TargetSpec.AREA, 92, ("damage:lightning:magic",)),
-    (
-        "thunder_gods_haste",
-        "雷神之速",
-        TargetSpec.SELF,
-        68,
-        ("self_buff_apply:lightning_extra_action",),
-    ),
-    ("judgement_thunder", "審判雷霆", TargetSpec.SINGLE, 135, ("damage:lightning:magic",)),
-    (
-        "divine_lightning_slaughter",
-        "神雷滅殺",
-        TargetSpec.AREA,
-        155,
-        ("damage:lightning:magic",),
-    ),
-)
-
-
-_CATALOG_EFFECTS = {
-    row[0]: row[4]
-    for row in LIGHTNING_SPELL_CATALOG
-}
-
+# Retained for callers importing _CATALOG_EFFECTS; elemental catalogs have migrated to behavior specs.
+_CATALOG_EFFECTS: dict[str, tuple[str, ...]] = {}
 
 class ElementalSpellsBuilderTests(unittest.TestCase):
     def test_elemental_spells_builder_rejects_unknown_element(self):
@@ -106,63 +65,70 @@ class ClosedVocabularyParseTests(unittest.TestCase):
         self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
 
 
-class LightningSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
-    def test_all_ten_lightning_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in LIGHTNING_SPELL_CATALOG:
+class LightningLineageTreeCatalogTests(unittest.TestCase):
+    """The shipped branching lightning lineage tree with a two-parent canopy is catalog data.
+
+    The edge table itself is the shipped content the requirement names, so it
+    lives in this registered data-contract file.
+    """
+
+    @covers_requirement(
+        "skill-lineage::the-lightning-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
+    )
+    def test_lightning_tree_edges_are_as_designed(self):
+        expected = {
+            "lightning_flicker": (SkillPrerequisite("static_ward", 3),),
+            "thunder_combo": (SkillPrerequisite("lightning_flicker", 3),),
+            "thunder_gods_haste": (SkillPrerequisite("thunder_combo", 5),),
+            "thunder_shatter_strike": (SkillPrerequisite("thunder_combo", 5),),
+            "judgement_thunder": (SkillPrerequisite("thunder_gods_haste", 8),),
+            "chain_lightning": (SkillPrerequisite("spark_shock", 3),),
+            "paralyzing_bolt": (SkillPrerequisite("spark_shock", 3),),
+            "lightning_strike": (SkillPrerequisite("chain_lightning", 3),),
+            "thunder_prison": (SkillPrerequisite("paralyzing_bolt", 3),),
+            "heavens_thunder": (SkillPrerequisite("lightning_strike", 5),),
+            "divine_lightning_slaughter": (SkillPrerequisite("heavens_thunder", 8),),
+            "thunder_apotheosis": (
+                SkillPrerequisite("judgement_thunder", 10),
+                SkillPrerequisite("divine_lightning_slaughter", 10),
+            ),
+        }
+        for key, expected_prereqs in expected.items():
             with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["lightning"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-                if key in ("static_ward", "thunder_gods_haste"):
-                    self.assertIs(
-                        skill.faction_constraint,
-                        FactionConstraint.SELF_ONLY,
-                    )
-                else:
-                    self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
-    def test_every_lightning_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in LIGHTNING_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="lightning", school="magic"),
-                        )
-                    elif effect_id.startswith("self_buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            SelfBuffApplyEffect(
-                                buff_key=effect_id.partition(":")[2]
-                            ),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
-    def test_lightning_active_spell_keys_are_exactly_the_catalog_set(self):
+                self.assertEqual(
+                    declared_prerequisites(key),
+                    expected_prereqs,
+                )
+        self.assertEqual(declared_prerequisites("static_ward"), ())
+        self.assertEqual(declared_prerequisites("spark_shock"), ())
+        # Topological canopy: thunder_apotheosis is consumed by nothing.
+        self.assertEqual(prerequisite_consumers("thunder_apotheosis"), ())
+        # Both Lv.10 parents are consumed only by thunder_apotheosis at threshold 10.
         self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["lightning"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in LIGHTNING_SPELL_CATALOG},
+            prerequisite_consumers("judgement_thunder"),
+            (("thunder_apotheosis", 10),),
         )
+        self.assertEqual(
+            prerequisite_consumers("divine_lightning_slaughter"),
+            (("thunder_apotheosis", 10),),
+        )
+        # Branch points: spark_shock feeds exactly two children at threshold 3.
+        self.assertEqual(
+            set(prerequisite_consumers("spark_shock")),
+            {("chain_lightning", 3), ("paralyzing_bolt", 3)},
+        )
+        # thunder_combo feeds exactly two children at threshold 5.
+        self.assertEqual(
+            set(prerequisite_consumers("thunder_combo")),
+            {("thunder_gods_haste", 5), ("thunder_shatter_strike", 5)},
+        )
+        # Terminal leaves have empty consumers.
+        self.assertEqual(prerequisite_consumers("thunder_shatter_strike"), ())
+        self.assertEqual(prerequisite_consumers("thunder_prison"), ())
+
+    def test_lightning_passives_stay_out_of_the_graph(self):
+        self.assertEqual(prerequisite_consumers("lightning_mastery"), ())
+        self.assertEqual(declared_prerequisites("lightning_mastery"), ())
 
 
 class IceLineageTreeCatalogTests(unittest.TestCase):

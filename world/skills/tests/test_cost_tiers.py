@@ -141,13 +141,3 @@ class SpellTierLabelCatalogTests(unittest.TestCase):
                 with self.subTest(tier=tier, spell=key):
                     self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
-    def test_lightning_spell_tier_labels_match_the_catalog(self):
-        self._assert_labels(
-            {
-                "術師": ("chain_lightning", "paralyzing_bolt"),
-                "大師": ("thunder_combo", "lightning_strike"),
-                "賢者": ("heavens_thunder", "thunder_gods_haste"),
-                "主宰": ("judgement_thunder", "divine_lightning_slaughter"),
-            }
-        )
