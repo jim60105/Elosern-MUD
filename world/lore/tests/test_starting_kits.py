@@ -142,6 +142,24 @@ class SubraceStartingKitTests(unittest.TestCase):
         )
 
     @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_starting_kit_naming_retired_item_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            _validate_starting_kit(
+                "human_plains",
+                SubraceStartingKit("human_plains", (("synthetic_retired_sword", 1),)),
+            )
+        self.assertIn("synthetic_retired_sword", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_kit_retirement_leaves_kit_valid(self):
+        kit = SubraceStartingKit("human_plains", (("plain_sword", 1), ("leather_armor", 1)))
+        _validate_starting_kit("human_plains", kit)
+
+    @covers_requirement(
         "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
     )
     def test_coverage_validation_rejects_missing_and_unknown_subraces(self):

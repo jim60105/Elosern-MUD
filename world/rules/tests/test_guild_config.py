@@ -436,6 +436,69 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         with self.assertRaises(GuildConfigError):
             validate_quest_rewards(mutated, QUEST_DEFINITION_REGISTRY)
 
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_shop_offering_retired_item_fails_catalog_load(self):
+        raw = raw_rulebook()
+        synthetic_shop = dict(raw["shops"][0])
+        synthetic_shop["offers"] = list(synthetic_shop["offers"]) + [
+            {
+                "item_key": "synthetic_retired_item",
+                "buy_copper": 100,
+                "sell_copper": 50,
+                "max_stock": 5,
+                "initial_stock": 1,
+                "restock_quantity": 1,
+            }
+        ]
+        with mock.patch("world.rules.guild_config.load_config", return_value={**raw, "shops": [synthetic_shop]}):
+            with self.assertRaises(GuildConfigError) as caught:
+                load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+            self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_shop_offered_keys_naming_retired_item_fails_catalog_load(self):
+        from world.lore.shops import ShopDefinition
+        synthetic_shop = ShopDefinition(
+            key="synthetic_shop",
+            merchant_component_key="merchant",
+            host_name="測試老闆",
+            host_title="測試頭銜",
+            offered_item_keys=("synthetic_retired_key",),
+        )
+        with mock.patch.dict(SHOP_REGISTRY, {"synthetic_shop": synthetic_shop}, clear=False):
+            shop_raw = {
+                "shop_key": "synthetic_shop",
+                "open_hour": 8,
+                "close_hour": 20,
+                "restock_hour": 6,
+                "offers": [],
+            }
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([shop_raw])
+            self.assertIn("synthetic_retired_key", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_quest_reward_naming_retired_item_is_rejected(self):
+        raw = raw_rulebook()["quest_rewards"]
+        mutated_items = [{"item_key": "synthetic_retired_item", "quantity": 1}]
+        mutated = [{**raw[0], "reward": {**raw[0]["reward"], "items": mutated_items}}]
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_quest_rewards(mutated, QUEST_DEFINITION_REGISTRY)
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_retirement_leaves_catalog_load_clean(self):
+        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        self.assertIsInstance(catalog, GuildCatalog)
+
 
 class ServiceHostRosterTests(CatalogRegistryIsolation):
     """Declarative service-host roster parsing and batch validation (tasks 1.2/4.1)."""

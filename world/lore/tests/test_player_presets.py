@@ -2,6 +2,7 @@
 Tests for immutable registration presets."""
 
 import unittest
+from dataclasses import replace
 
 from tools.spec_traceability import covers_requirement
 
@@ -138,6 +139,24 @@ class PlayerPresetTests(unittest.TestCase):
         _validate_preset_starting_items(
             {"x": make(starting_items=(("healing_potion", 2), ("plain_sword", 1)))}
         )
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_preset_naming_retired_item_is_rejected(self):
+        from world.lore.player_presets import _validate_preset_starting_items
+        preset = PLAYER_PRESET_REGISTRY["violet_altoria"]
+        bad_preset = replace(preset, starting_items=(("synthetic_retired_item", 1),))
+        with self.assertRaises(ValueError) as caught:
+            _validate_preset_starting_items({"violet_altoria": bad_preset})
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_preset_retirement_leaves_preset_valid(self):
+        from world.lore.player_presets import _validate_preset_starting_items
+        _validate_preset_starting_items(PLAYER_PRESET_REGISTRY)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_starting_equipment_validation_rejects_the_five_invalid_declarations(self):

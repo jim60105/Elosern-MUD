@@ -153,6 +153,66 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
                 with self.assertRaises(QuestDefinitionError):
                     register(quest(key, stages=(QuestStage(0, objective),)))
 
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_quest_objective_naming_retired_item_is_rejected(self):
+        acquire_bad = quest(
+            "bad-acquire",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ACQUIRE,
+                        item_key="synthetic_retired_item",
+                        quantity=1,
+                    ),
+                ),
+            ),
+        )
+        with self.assertRaises(QuestDefinitionError) as caught:
+            register(acquire_bad)
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+        deliver_bad = quest(
+            "bad-deliver",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.DELIVER,
+                        item_key="synthetic_retired_item",
+                        quantity=1,
+                        destination=None,
+                        requires_bound_targets=True,
+                    ),
+                ),
+            ),
+        )
+        with self.assertRaises(QuestDefinitionError) as caught:
+            register(deliver_bad)
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_quest_retirement_leaves_registration_valid(self):
+        valid_quest = quest(
+            "valid-acquire-test",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ACQUIRE,
+                        item_key="healing_potion",
+                        quantity=1,
+                    ),
+                ),
+            ),
+        )
+        register(valid_quest)
+        self.assertIn("valid-acquire-test", QUEST_DEFINITION_REGISTRY)
+
     @covers_requirement("quest-blueprint::reach-and-escort-objectives-accept-only-quantity-one")
     def test_reach_and_escort_quantity_must_be_exactly_one(self):
         invalid = (

@@ -325,8 +325,8 @@ shops:
         initial_stock: 1
         restock_quantity: 1
       - item_key: sister_vestments
-        buy_copper: 1800
-        sell_copper: 900
+        buy_copper: 3000
+        sell_copper: 1500
         max_stock: 5
         initial_stock: 2
         restock_quantity: 2

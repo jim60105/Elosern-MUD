@@ -25,6 +25,7 @@ from world.lore.items import (
     ITEM_REGISTRY,
     EquipmentModifierKey,
     ItemDefinition,
+    ItemRarity,
 )
 from world.lore.shops import SHOP_REGISTRY
 from world.rules.buffs import BUFF_DEFINITIONS
@@ -499,8 +500,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     def test_orphan_entry_is_rejected(self):
         registry, document = self._two_entry_setup()
         del registry["knight_platemail"]
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("knight_platemail", str(caught.exception))
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
@@ -508,8 +510,29 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     def test_unbound_equipment_key_is_rejected(self):
         registry, document = self._two_entry_setup()
         registry["chainmail"] = ITEM_REGISTRY["chainmail"]
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("chainmail", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_retired_equipment_entry_and_binding_fail_closed_naming_key(self):
+        registry, document = self._two_entry_setup()
+        del registry["knight_platemail"]
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            self._validate(registry, document)
+        self.assertIn("knight_platemail", str(caught.exception))
+
+    @covers_requirement(
+        "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
+    )
+    def test_completed_equipment_retirement_loads_cleanly(self):
+        registry, document = self._two_entry_setup()
+        del registry["knight_platemail"]
+        del document["effects"]["knight_platemail"]
+        rules = self._validate(registry, document)
+        self.assertEqual(set(rules), {EquipmentModifierKey.WOODEN_CLUB})
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
@@ -660,6 +683,25 @@ class ChurchDoctrineTests(unittest.TestCase):
     def test_named_church_set_satisfies_doctrine(self):
         check_church_doctrine(EQUIPMENT_EFFECT_RULES)
 
+    def test_sister_vestments_numbers_refused_at_uncommon_rarity(self):
+        document = _canonical_document()
+        registry = {
+            definition.key: definition
+            for definition in ITEM_REGISTRY.values()
+            if definition.equipment_slot is not None
+        }
+        registry["sister_vestments"] = replace(
+            registry["sister_vestments"],
+            presentation=replace(
+                registry["sister_vestments"].presentation,
+                rarity=ItemRarity.UNCOMMON,
+            ),
+        )
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            validate_equipment_effect_rules(document, registry, BUFF_DEFINITIONS)
+        self.assertIn("sister_vestments.pleasure_gain", str(caught.exception))
+        self.assertIn("soft_percent budget", str(caught.exception))
+
     def _expect_violation(self, key: str, mutate) -> None:
         original = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey(key)]
         deviant = replace(original, **mutate(original))
@@ -753,7 +795,9 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         # Explicit empty entry renders nothing.
         self.assertEqual(equipment_adjustment_text("storage_pouch"), "")
         # P4-only vocabulary (pleasure_gain/exposure_bias) stays absent.
-        self.assertEqual(equipment_adjustment_text("sister_vestments"), "治療 +10%")
+        self.assertEqual(
+            equipment_adjustment_text("sister_vestments"), "防禦 −4｜治療 +10%"
+        )
 
 
 if __name__ == "__main__":
