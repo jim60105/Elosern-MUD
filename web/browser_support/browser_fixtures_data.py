@@ -401,14 +401,22 @@ def graft_synth_state_reaction_rulebook() -> None:
     ``world.rules.state_reactions`` validates its shipped YAML at import
     against the LIVE ``BUFF_DEFINITIONS`` and ``MP_COST_TIERS``. The
     synthetic install replaces both with t_-only rows, which removes
-    vocabulary the shipped rulebook legitimately names: the
-    ``climax_empowerment`` marker buff (applied by the climax rules) and
-    the six shipped pleasure-gain tier keys. Importing the module after the
-    install then fail-closes, and the browser seed dies inside the first
+    vocabulary the shipped rulebook legitimately names: every buff key the
+    shipped reaction rules reference (markers, counters, ignite/ward marks)
+    and the six shipped pleasure-gain tier keys. Importing the module after
+    the install then fail-closes, and the browser seed dies inside the first
     ``apply_buff`` dispatch. Same seam class as
-    ``graft_synth_defeat_rulebook``: graft one authored marker row and
-    restore the shipped tier vocabulary ADDITIVELY (``setdefault``), so kit
-    ``t_``-keyed lookups keep resolving their own rows first.
+    ``graft_synth_defeat_rulebook``: restore both vocabularies ADDITIVELY
+    (``setdefault``), so kit ``t_``-keyed lookups keep resolving their own
+    rows first.
+
+    The buff rows are DERIVED, not hand-listed: every buff key named by a
+    ``then`` action of the shipped ``state_reactions.yaml`` is re-grafted
+    from its shipped ``buffs.yaml`` definition (parsed through the real
+    loader, so duration/polarity/round_order parity is structural, not a
+    comment promise). Per-wave hand-listing repeatedly drifted (light
+    marker, earth carapace, water suffocation, fire ignite, lightning
+    wards each needed a follow-up graft); this closes the seam class.
 
     Ordering invariant: nothing may import ``world.rules.state_reactions``
     between the install and this graft (the seed reaches it lazily via the
@@ -417,49 +425,41 @@ def graft_synth_state_reaction_rulebook() -> None:
     resequencing breaks that.
     """
     import sys
+    from pathlib import Path
 
     assert "world.rules.state_reactions" not in sys.modules, (
         "state_reactions was imported before the synth graft; the "
         "install-time validation already fail-closed against t_-only data"
     )
-    from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
+    import yaml
+
+    from world.rules.buffs import BUFF_DEFINITIONS, load_buff_definitions
     from world.skills.cost_tiers import MP_COST_TIERS, MP_SHIPPED_COST_TIERS
 
-    BUFF_DEFINITIONS.setdefault(
-        "climax_empowerment",
-        BuffDefinition(
-            key="climax_empowerment",
-            duration=None,
-            tick_interval=None,
-            stacking="refresh",
-            polarity="buff",
-            modifiers={},
-        ),
+    rulebook_dir = Path(__file__).resolve().parents[2] / "world" / "rules" / "rulebook"
+    reactions_raw = yaml.safe_load(
+        (rulebook_dir / "state_reactions.yaml").read_text(encoding="utf-8")
     )
-    BUFF_DEFINITIONS.setdefault(
-        # Must stay in parity with rulebook/buffs.yaml earth_carapace row.
-        "earth_carapace",
-        BuffDefinition(
-            key="earth_carapace",
-            duration=60,
-            tick_interval=None,
-            stacking="refresh",
-            polarity="buff",
-            modifiers={},
-        ),
-    )
-    BUFF_DEFINITIONS.setdefault(
-        # Must stay in parity with rulebook/buffs.yaml suffocated row.
-        "suffocated",
-        BuffDefinition(
-            key="suffocated",
-            duration=40,
-            tick_interval=None,
-            stacking="refresh",
-            polarity="debuff",
-            modifiers={},
-        ),
-    )
+    shipped_buffs = load_buff_definitions(rulebook_dir / "buffs.yaml")
+    for rule in reactions_raw or []:
+        when = rule.get("when") or {}
+        then = rule.get("then") or {}
+        referenced: set[str] = set()
+        # then-actions are validated at import; when.buff_active mounts are
+        # resolved against BUFF_DEFINITIONS at dispatch.
+        mount = when.get("buff_active")
+        if isinstance(mount, str):
+            referenced.add(mount)
+        for action in ("apply_buff", "remove_buff", "apply_buff_to_source", "mark_order_op"):
+            buff_key = then.get(action)
+            if not isinstance(buff_key, str):
+                continue
+            referenced.add(buff_key)
+        for buff_key in referenced:
+            # A referenced key missing from shipped buffs.yaml is a rulebook
+            # bug; the real loader's dict access fails loudly here instead of
+            # silently leaving the import-time validation to fail later.
+            BUFF_DEFINITIONS.setdefault(buff_key, shipped_buffs[buff_key])
     # state_reactions.yaml pleasure_gain rows are keyed by the shipped tier
     # vocabulary; re-add those CostTier rows beside the installed t_ rows.
     # Widens spell_tier_for's area band to include 91-110 for future kit

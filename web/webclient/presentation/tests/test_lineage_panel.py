@@ -257,7 +257,17 @@ class PresenterTests(InjectedRegistryMixin):
     """
 
     def _inject_ladder_chains(self, count: int, depth: int, fat_text: int = 0):
-        """Inject ``count`` linear chains of ``depth`` skills each."""
+        """Inject ``count`` linear chains of ``depth`` skills each.
+
+        The injected chains are PREPENDED to the registry: truncation drops
+        TRAILING chains, so a fixture that needs its chains inside the
+        kept window (the chain-cap and byte-budget stages) must sit ahead of
+        the baseline shipped chains instead of queueing behind them.
+        Tail-adding silently degraded the byte-pressure fixture once the
+        shipped registry grew past the window: stage three then only saw
+        thin baseline chains and never dropped. tearDown restores the
+        captured canonical mapping regardless.
+        """
         registry_extras: dict[str, SkillDef] = {}
         for chain_index in range(count):
             root = f"lr{chain_index}_0"
@@ -268,7 +278,9 @@ class PresenterTests(InjectedRegistryMixin):
                     key, prereq=f"lr{chain_index}_{depth_index - 1}"
                 )
         registry = _live_skill_registry()
+        registry.clear()
         registry.update(registry_extras)
+        registry.update(self.canonical)
         validate_prerequisite_graph(registry)
         if fat_text:
             for key in registry_extras:
