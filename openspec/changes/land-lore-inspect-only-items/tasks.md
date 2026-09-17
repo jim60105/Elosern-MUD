@@ -33,6 +33,6 @@
 
 ## 6. Documentation and gate
 
-- [ ] 6.1 Add one line to the 雜物 section of `docs/lore/items.md` recording that the category lands as non-sellable on the `relic` band, mirroring 公會見習徽記.
-- [ ] 6.2 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.lore.tests.test_economy`, `world.rules.tests.test_guild_config`, `world.rules.tests.test_item_use` — plus the registry-iterating validators in `world.lore.tests.test_starting_kits` and `world.quests`. Do not run the full suite.
-- [ ] 6.3 Run `openspec validate land-lore-inspect-only-items --strict` and verify it reports the change as valid.
+- [x] 6.1 Add one line to the 雜物 section of `docs/lore/items.md` recording that the category lands as non-sellable on the `relic` band, mirroring 公會見習徽記.
+- [x] 6.2 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.lore.tests.test_economy`, `world.rules.tests.test_guild_config`, `world.rules.tests.test_item_use` — plus the registry-iterating validators in `world.lore.tests.test_starting_kits` and `world.quests`. Do not run the full suite.
+- [x] 6.3 Run `openspec validate land-lore-inspect-only-items --strict` and verify it reports the change as valid.
