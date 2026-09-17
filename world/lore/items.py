@@ -38,6 +38,7 @@ class ItemKind(StrEnum):
     TOOL = "tool"
     MATERIAL = "material"
     MISC = "misc"
+    TOY = "toy"
 
 
 class ItemIconKey(StrEnum):
@@ -56,6 +57,7 @@ class ItemIconKey(StrEnum):
     TOOL = "tool"
     MATERIAL = "material"
     MISC = "misc"
+    TOY = "toy"
 
 
 class ItemRarity(StrEnum):

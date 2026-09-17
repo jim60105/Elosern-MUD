@@ -17,6 +17,7 @@ export const ITEM_ICONS = {
   tool: { label: "工具", d: "M13 3l8 8-4 4-8-8zM3 21l9-9" },
   material: { label: "素材", d: "M4 14l2-5h12l2 5v4H4v-4z" },
   misc: { label: "雜項", d: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2" },
+  toy: { label: "情趣道具", d: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" },
 };
 
 // The neutral unknown-item fallback: used when `presentation` is null OR when
