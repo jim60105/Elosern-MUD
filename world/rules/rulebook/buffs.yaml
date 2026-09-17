@@ -176,16 +176,47 @@
   marker: ground
   modifiers:
     rate: {target: hp, delta: -40}
-- key: wind_haste
+# 疾風術 mount（wind-spell-catalog D1/D6）：agility +3 在 combat_modifiers.yaml。
+- key: gale_step_haste
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: agility, ceiling: 3}
-- key: wind_haste_domain
+  modifiers: {}
+# 疾風連步 mount；agility +5 在 combat_modifiers.yaml。
+- key: gale_chain_step_haste
   duration: 60
   stacking: refresh
-  modifiers:
-    bounds: {target: agility, ceiling: 5}
+  modifiers: {}
+# 神速殘影 mount；agility +8, accuracy -10 在 combat_modifiers.yaml。
+- key: afterimage_step_haste
+  duration: 60
+  stacking: refresh
+  modifiers: {}
+# 神速領域 mount；agility +12 在 combat_modifiers.yaml。
+- key: haste_domain_haste
+  duration: 60
+  stacking: refresh
+  modifiers: {}
+# 暴風領域擊退標記（wind-spell-catalog D1/D2）：marker: positional
+- key: displaced
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  marker: positional
+  modifiers: {}
+# 蒼穹暴風擊退標記
+- key: displaced_tempest
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  marker: positional
+  modifiers: {}
+# 天穹神格擊退標記
+- key: displaced_apotheosis
+  duration: 90
+  stacking: refresh
+  polarity: debuff
+  marker: positional
+  modifiers: {}
 - key: lightning_static_ward
   duration: 60
   stacking: refresh

@@ -104,12 +104,27 @@
 - code: earth_fissure_apex
   label: 裂縫·神格
   severity: harmful
-- code: wind_haste
+- code: gale_step_haste
   label: 疾風
   severity: beneficial
-- code: wind_haste_domain
+- code: gale_chain_step_haste
+  label: 疾風連步
+  severity: beneficial
+- code: afterimage_step_haste
+  label: 神速殘影
+  severity: beneficial
+- code: haste_domain_haste
   label: 神速領域
   severity: beneficial
+- code: displaced
+  label: 擊退
+  severity: harmful
+- code: displaced_tempest
+  label: 擊退·暴風
+  severity: harmful
+- code: displaced_apotheosis
+  label: 擊退·神格
+  severity: harmful
 - code: lightning_static_ward
   label: 靜電護罩
   severity: beneficial
@@ -248,3 +263,15 @@
 - code: earth_dust_veil_accuracy_penalty
   label: 沙塵迷眼命中下降
   severity: harmful
+- code: wind_gale_step_agility
+  label: 疾風敏捷提升
+  severity: beneficial
+- code: wind_gale_chain_step_agility
+  label: 疾風連步敏捷提升
+  severity: beneficial
+- code: wind_afterimage_agility_accuracy
+  label: 神速殘影敏捷提升
+  severity: beneficial
+- code: wind_haste_domain_agility
+  label: 神速領域敏捷提升
+  severity: beneficial

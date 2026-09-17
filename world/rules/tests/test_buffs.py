@@ -288,31 +288,26 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
     def test_buff_earth_fissure_apex(self):
         self._assert_buff_loads_applies_and_shows("earth_fissure_apex")
 
-    def test_buff_wind_haste(self):
-        definition = BUFF_DEFINITIONS["wind_haste"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "agility", "ceiling": 3}}
-        )
+    def test_buff_gale_step_haste(self):
+        self._assert_buff_loads_applies_and_shows("gale_step_haste")
 
-        entity = self._entity()
-        apply_buff(entity, "wind_haste")
-        self.assertIn("wind_haste", entity_active_buffs(entity))
+    def test_buff_gale_chain_step_haste(self):
+        self._assert_buff_loads_applies_and_shows("gale_chain_step_haste")
 
-    def test_buff_wind_haste_domain(self):
-        definition = BUFF_DEFINITIONS["wind_haste_domain"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "agility", "ceiling": 5}}
-        )
+    def test_buff_afterimage_step_haste(self):
+        self._assert_buff_loads_applies_and_shows("afterimage_step_haste")
 
-        entity = self._entity()
-        apply_buff(entity, "wind_haste_domain")
-        self.assertIn("wind_haste_domain", entity_active_buffs(entity))
+    def test_buff_haste_domain_haste(self):
+        self._assert_buff_loads_applies_and_shows("haste_domain_haste")
+
+    def test_buff_displaced(self):
+        self._assert_buff_loads_applies_and_shows("displaced")
+
+    def test_buff_displaced_tempest(self):
+        self._assert_buff_loads_applies_and_shows("displaced_tempest")
+
+    def test_buff_displaced_apotheosis(self):
+        self._assert_buff_loads_applies_and_shows("displaced_apotheosis")
 
     def test_buff_lightning_static_ward(self):
         definition = BUFF_DEFINITIONS["lightning_static_ward"]
