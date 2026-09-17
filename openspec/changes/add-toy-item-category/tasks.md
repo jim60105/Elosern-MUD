@@ -9,8 +9,8 @@
 
 ## 2. Price band
 
-- [ ] 2.1 Add an `intimacy_tool` `PriceEntry` (`情趣器具`, 50–20000 copper) to `PRICE_TABLE` in `world/lore/economy.py`, and verify the currency tests still pass.
-- [ ] 2.2 Add a behavior test that a synthetic usable item and a synthetic equipment item naming the same band both resolve the same `PriceEntry`, covering the one-band-two-shapes requirement. Verify with `world.rules.tests.test_guild_config`.
+- [x] 2.1 Add an `intimacy_tool` `PriceEntry` (`情趣器具`, 50–20000 copper) to `PRICE_TABLE` in `world/lore/economy.py`, and verify the currency tests still pass.
+- [x] 2.2 Add a behavior test that a synthetic usable item and a synthetic equipment item naming the same band both resolve the same `PriceEntry`, covering the one-band-two-shapes requirement. Verify with `world.rules.tests.test_guild_config`.
 
 ## 3. Wearable devices
 
