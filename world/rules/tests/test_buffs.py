@@ -310,31 +310,10 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         self._assert_buff_loads_applies_and_shows("displaced_apotheosis")
 
     def test_buff_lightning_static_ward(self):
-        definition = BUFF_DEFINITIONS["lightning_static_ward"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "lightning_static_ward")
-        self.assertIn("lightning_static_ward", entity_active_buffs(entity))
+        self._assert_buff_loads_applies_and_shows("lightning_static_ward")
 
     def test_buff_lightning_extra_action(self):
-        definition = BUFF_DEFINITIONS["lightning_extra_action"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers,
-            {"bounds": {"target": "actions_per_turn", "ceiling": 1}},
-        )
-
-        entity = self._entity()
-        apply_buff(entity, "lightning_extra_action")
-        self.assertIn("lightning_extra_action", entity_active_buffs(entity))
+        self._assert_buff_loads_applies_and_shows("lightning_extra_action")
 
     # Ice rulebook rows carry lore-catalog numbers; per the ratified verification
     # discipline these stay load/apply/presence checks.

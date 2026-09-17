@@ -129,7 +129,9 @@ class ScannerTests(unittest.TestCase):
         registry = importlib.import_module("world.skills.registry")
         sample = getattr(registry, CATALOG_SYMBOL)
         keys = {k for k in sample if isinstance(k, str)}
-        self.assertTrue(keys & UNIVERSE.tokens, "catalog keys must appear in the universe")
+        # raw (pre-deny) tokens: a deny entry subtracts from the flagged set but
+        # never from the derived universe — catalog keys must still appear there.
+        self.assertTrue(keys & UNIVERSE.raw_tokens, "catalog keys must appear in the universe")
         self.assertGreater(len(UNIVERSE.tokens), 500)
         self.assertIn(CATALOG_SYMBOL, UNIVERSE.symbols)
 
