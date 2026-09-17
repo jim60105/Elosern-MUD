@@ -342,6 +342,114 @@ shops:
         max_stock: 2
         initial_stock: 1
         restock_quantity: 1
+      - item_key: kingdom_rye_hardtack
+        buy_copper: 8
+        sell_copper: 4
+        max_stock: 20
+        initial_stock: 20
+        restock_quantity: 5
+      - item_key: adventurer_field_ration
+        buy_copper: 10
+        sell_copper: 5
+        max_stock: 20
+        initial_stock: 20
+        restock_quantity: 5
+      - item_key: imperial_candied_fruit
+        buy_copper: 15
+        sell_copper: 8
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: beastfolk_smoked_jerky
+        buy_copper: 20
+        sell_copper: 10
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: harbor_lobster_bisque
+        buy_copper: 25
+        sell_copper: 12
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: elven_candied_blossom
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: miners_bracing_broth
+        buy_copper: 50
+        sell_copper: 25
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: beastfolk_herbal_salve
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: passion_draught
+        buy_copper: 300
+        sell_copper: 150
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: spirit_dew
+        buy_copper: 6000
+        sell_copper: 3000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: enchanted_compass
+        buy_copper: 200
+        sell_copper: 100
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: dungeon_flare_talisman
+        buy_copper: 150
+        sell_copper: 75
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: beastfolk_signal_conch
+        buy_copper: 250
+        sell_copper: 125
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: camp_ward_kit
+        buy_copper: 300
+        sell_copper: 150
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: goblin_ear
+        buy_copper: 20
+        sell_copper: 10
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: slime_residue
+        buy_copper: 20
+        sell_copper: 10
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: earth_drake_scale
+        buy_copper: 1200
+        sell_copper: 600
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: troll_fang
+        buy_copper: 2000
+        sell_copper: 1000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
 # Declarative service-host roster (declarative-service-hosts D7). One row per
 # permanent service NPC: `anchor_room` is a placement-only room tag (the
 # service-anchoring change owns its anchoring semantics); `service_id` is the

@@ -27,9 +27,9 @@
 
 ## 5. Shop stock
 
-- [ ] 5.1 Add the 18 stocked keys to `altoria_general_store.offered_item_keys` in `world/lore/shops.py` — the 6 foods, the 3 `potion`-band remedies plus `spirit_dew`, the 4 tools, and the 4 materials other than `elven_essence` and `ancient_dragon_heart`. Verify `world/lore/shops.py` imports, since its validators run at import.
-- [ ] 5.2 Add the 18 matching offers to `shops.altoria_general_store.offers` in `world/rules/rulebook/guild_economy.yaml` using the codex reference prices, with stock depth deep for `common` and single-unit for `rare` and above. Verify with `world.rules.tests.test_guild_config`.
-- [ ] 5.3 Verify the two-sided join rejects a one-sided edit: temporarily remove one offer from the YAML, confirm loading raises naming the missing key, then restore it.
+- [x] 5.1 Add the 18 stocked keys to `altoria_general_store.offered_item_keys` in `world/lore/shops.py` — the 6 foods, the 3 `potion`-band remedies plus `spirit_dew`, the 4 tools, and the 4 materials other than `elven_essence` and `ancient_dragon_heart`. Verify `world/lore/shops.py` imports, since its validators run at import.
+- [x] 5.2 Add the 18 matching offers to `shops.altoria_general_store.offers` in `world/rules/rulebook/guild_economy.yaml` using the codex reference prices, with stock depth deep for `common` and single-unit for `rare` and above. Verify with `world.rules.tests.test_guild_config`.
+- [x] 5.3 Verify the two-sided join rejects a one-sided edit: temporarily remove one offer from the YAML, confirm loading raises naming the missing key, then restore it.
 
 ## 6. Documentation and gate
 
