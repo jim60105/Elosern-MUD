@@ -37,6 +37,7 @@ class RecoveryRatePolicy:
 
 
 MARKER_VOCABULARY = frozenset({"ground", "positional"})
+ROUND_ORDER_VOCABULARY = frozenset({"advance_to_head", "retreat_to_tail"})
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class BuffDefinition:
     modifiers: dict[str, Any]
     polarity: str = "buff"
     marker: str | None = None
+    round_order: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +223,21 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     f"{path}: buff {key!r} has invalid marker {marker_val!r}; must be in {sorted(MARKER_VOCABULARY)}"
                 )
             marker = marker_val
+        round_order = None
+        if "round_order" in entry:
+            ro_val = entry["round_order"]
+            if (
+                isinstance(ro_val, bool)
+                or not isinstance(ro_val, dict)
+                or set(ro_val.keys()) != {"action"}
+                or isinstance(ro_val["action"], bool)
+                or not isinstance(ro_val["action"], str)
+                or ro_val["action"] not in ROUND_ORDER_VOCABULARY
+            ):
+                raise ValueError(
+                    f"{path}: buff {key!r} has invalid round_order {ro_val!r}; must be a mapping with action in {sorted(ROUND_ORDER_VOCABULARY)}"
+                )
+            round_order = dict(ro_val)
         definitions[key] = BuffDefinition(
             key=key,
             duration=entry.get("duration"),
@@ -229,6 +246,7 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
             modifiers=dict(modifiers),
             polarity=polarity,
             marker=marker,
+            round_order=round_order,
         )
     return definitions
 
