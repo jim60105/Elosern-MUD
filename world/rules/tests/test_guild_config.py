@@ -15,11 +15,13 @@ from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import (
     ITEM_REGISTRY,
+    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
     ItemPresentation,
     ItemRarity,
+    ItemUseMechanics,
     SUMMARY_MAX,
 )
 from world.lore.shops import SHOP_REGISTRY
@@ -45,6 +47,7 @@ from world.rules.guild_offers import (
     GuildQuestOffer,
     register_guild_offer,
 )
+from world.skills.equipment import EquipmentSlot
 from world.skills.registry import SKILL_REGISTRY
 
 RULEBOOK = Path(__file__).resolve().parents[2] / "rules" / "rulebook" / "guild_economy.yaml"
@@ -81,7 +84,7 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        self.assertEqual(len(ITEM_REGISTRY), 94)
+        self.assertEqual(len(ITEM_REGISTRY), 99)
         self.assertTrue(
             {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
         )
@@ -134,6 +137,43 @@ class ItemDefinitionTests(unittest.TestCase):
             self.assertEqual(changed, baseline)
         finally:
             ITEM_REGISTRY["meal"] = original
+
+    @covers_requirement(
+        "lore-registries::currency-is-an-integer-count-of-\u9285-with-no-floats-in-the-money-path"
+    )
+    def test_one_band_serves_both_mechanical_shapes_of_category(self):
+        usable_item = ItemDefinition(
+            key="synthetic_usable_toy",
+            display_name_zh="測試情趣消耗品",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="測試用的情趣消耗品。",
+            ),
+            use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=False),
+        )
+        equipment_item = ItemDefinition(
+            key="synthetic_equipment_toy",
+            display_name_zh="測試情趣穿戴品",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="測試用的情趣穿戴品。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.PILGRIM_MEDALLION,
+        )
+        usable_band = PRICE_TABLE[usable_item.price_table_key]
+        equipment_band = PRICE_TABLE[equipment_item.price_table_key]
+        self.assertIs(usable_band, equipment_band)
+        self.assertEqual(usable_band.min_copper, 50)
+        self.assertEqual(usable_band.max_copper, 20_000)
 
 
 class OfferDefinitionTests(CatalogRegistryIsolation):

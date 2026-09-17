@@ -4,7 +4,9 @@ Registry contract tests for the immutable item presentation metadata."""
 from tools.spec_traceability import covers_requirement
 
 import unittest
+import re
 from dataclasses import fields
+from pathlib import Path
 
 from world.lore.items import (
     ITEM_REGISTRY,
@@ -18,6 +20,24 @@ from world.lore.items import (
     SUMMARY_MAX,
 )
 from world.skills.equipment import EquipmentSlot
+
+
+def _extract_client_item_icons_keys(js_path: Path) -> set[str]:
+    """Extract keys from ITEM_ICONS object literal in item-icons.js.
+
+    Fails loud on missing file, missing object literal, or zero extracted keys.
+    """
+    if not js_path.is_file():
+        raise FileNotFoundError(f"Missing client item-icons.js at {js_path}")
+    content = js_path.read_text(encoding="utf-8")
+    match = re.search(r"export\s+const\s+ITEM_ICONS\s*=\s*\{(.*?)\n\};", content, re.DOTALL)
+    if not match:
+        raise ValueError(f"Could not locate ITEM_ICONS object literal in {js_path}")
+    block = match.group(1)
+    keys = set(re.findall(r"^\s*([a-z_]+)\s*:\s*\{", block, re.MULTILINE))
+    if not keys:
+        raise ValueError(f"Extracted zero keys from ITEM_ICONS in {js_path}")
+    return keys
 
 
 class ItemPresentationTests(unittest.TestCase):
@@ -62,6 +82,8 @@ class ItemPresentationTests(unittest.TestCase):
                 "dragon_lair_trophy_blade", "beastfolk_heavy_hide_armor",
                 "beastfolk_stalker_garb", "elven_forest_veil", "beastfolk_tribal_totem",
                 "beastfolk_gale_earring",
+                "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
+                "warmth_rune_egg", "tremor_crystal",
             }
         )
         for key, definition in ITEM_REGISTRY.items():
@@ -111,6 +133,7 @@ class ItemPresentationTests(unittest.TestCase):
                 ItemKind.TOOL,
                 ItemKind.MATERIAL,
                 ItemKind.MISC,
+                ItemKind.TOY,
             },
         )
         self.assertEqual(
@@ -125,6 +148,7 @@ class ItemPresentationTests(unittest.TestCase):
                 ItemIconKey.TOOL,
                 ItemIconKey.MATERIAL,
                 ItemIconKey.MISC,
+                ItemIconKey.TOY,
             },
         )
         self.assertEqual(
@@ -136,6 +160,33 @@ class ItemPresentationTests(unittest.TestCase):
                 ItemRarity.EPIC,
                 ItemRarity.LEGENDARY,
             },
+        )
+
+    @covers_requirement(
+        "item-presentation-metadata::item-presentation-keys-are-safe-closed-renderer-contracts"
+    )
+    def test_client_item_icons_map_matches_server_vocabulary(self):
+        """Verify client ITEM_ICONS keys exactly match server ItemIconKey enum.
+
+        Note: ICON_KEYS in web/webclient-app/tests/world/item_icons.test.js is a third
+        hand-maintained mirror that must be updated alongside the map.
+        """
+        js_path = (
+            Path(__file__).resolve().parents[3]
+            / "web"
+            / "webclient-app"
+            / "components"
+            / "item-icons.js"
+        )
+        try:
+            client_keys = _extract_client_item_icons_keys(js_path)
+        except Exception as exc:
+            self.fail(f"Failed to extract client item icons keys: {exc}")
+        server_keys = {member.value for member in ItemIconKey}
+        self.assertEqual(
+            client_keys,
+            server_keys,
+            f"Client icon map keys do not match ItemIconKey: {client_keys ^ server_keys}",
         )
 
     @covers_requirement(

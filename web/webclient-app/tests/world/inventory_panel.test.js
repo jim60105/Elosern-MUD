@@ -5,6 +5,12 @@ import { nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import InventoryPanel from "../../components/InventoryPanel.vue";
 import {
+  itemIconLabel,
+  itemIconPath,
+  unknownItemLabel,
+  unknownItemPath,
+} from "../../components/item-icons.js";
+import {
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
@@ -114,6 +120,53 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     expect(w.get('[data-testid="inventory-panel__unknown--item_iron_sword"]').text()).toBe("未知");
     expect(w.get('[data-testid="inventory-panel__name--item_iron_sword"]').text()).toBe("鐵劍");
     expect(w.get('[data-testid="inventory-panel__count--item_iron_sword"]').text()).toBe("1");
+  });
+
+  it("renders mapped icon glyph and label for presentation, and fallback only for absent presentation (add-toy-item-category)", async () => {
+    const services = {
+      ...SERVICES_PANEL_SAMPLE,
+      inventory: {
+        wallet: 100,
+        rows: [
+          {
+            item_key: "synth_mapped",
+            display_name: "測試玩具",
+            held: 1,
+            equipped: false,
+            presentation: {
+              kind: "toy",
+              icon_key: "toy",
+              rarity: "uncommon",
+              summary: "測試玩具說明。",
+            },
+          },
+          {
+            item_key: "synth_absent",
+            display_name: "無說明物品",
+            held: 1,
+            equipped: false,
+            presentation: null,
+          },
+        ],
+      },
+    };
+    const w = mountPanel({ services });
+    const mappedTile = w.get('[data-testid="inventory-panel__tile--synth_mapped"]');
+    const absentTile = w.get('[data-testid="inventory-panel__tile--synth_absent"]');
+
+    // Mapped row renders that key's own glyph and label (via kindWord/inspector)
+    const mappedIconPath = mappedTile.get(".inventory-panel__icon path").attributes("d");
+    expect(mappedIconPath).toBe(itemIconPath("toy"));
+    expect(w.find('[data-testid="inventory-panel__unknown--synth_mapped"]').exists()).toBe(false);
+
+    mappedTile.trigger("pointerenter");
+    await nextTick();
+    expect(w.get('[data-testid="inventory-panel__inspector-kind"]').text()).toBe(itemIconLabel("toy"));
+
+    // Absent presentation renders the neutral unknown-item fallback glyph and label
+    const absentIconPath = absentTile.get(".inventory-panel__icon path").attributes("d");
+    expect(absentIconPath).toBe(unknownItemPath());
+    expect(w.get('[data-testid="inventory-panel__unknown--synth_absent"]').text()).toBe(unknownItemLabel());
   });
 
   it("shows the inspector with the identical committed content for hover and focus", async () => {

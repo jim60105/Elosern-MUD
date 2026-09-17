@@ -371,7 +371,8 @@ that returns an `int`, a frozen `PriceEntry` dataclass with integer `min_copper`
 every purchasing-power reference in `world_info.md` (inn stay, meal, potion, plain sword, magic
 weapon, commoner annual income, adventurer annual income) plus every band the lore item codex
 assigns to a catalogued item, including the regional-delicacy band that separates named local
-foods from an ordinary meal.
+foods from an ordinary meal and the intimacy-device band shared by the codex's wearable and
+usable 性玩具 entries.
 
 #### Scenario: Conversion constants match the documented rate
 - **WHEN** `to_copper(gold=1)`, `to_copper(silver=1)`, and `to_copper(copper=1)` are each called
@@ -389,6 +390,10 @@ foods from an ordinary meal.
 #### Scenario: An item naming an absent band fails the catalog load
 - **WHEN** an item definition names a price-table key that `PRICE_TABLE` does not define
 - **THEN** the shop-catalog load raises for that item rather than defaulting to an unbounded price
+
+#### Scenario: One band serves both mechanical shapes of a category
+- **WHEN** a usable item and an equipment item both name the intimacy-device band
+- **THEN** both resolve the same `PriceEntry`, so a category's two mechanical shapes never require separate bands
 
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
 This requirement fixes only the concrete human selections in the starting-kit registry; the

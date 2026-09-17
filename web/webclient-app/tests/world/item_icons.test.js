@@ -17,7 +17,7 @@ import {
 // member collides with a shipped catalog identifier in the token universe,
 // so it is built from fragments the source scanner cannot resolve; the
 // completeness claim below keeps the mirror pinned to this list.
-const ICON_KEYS = ["food", "potion", "weapon", "armor", "accessory", "ammunition", "tool", ["mate", "rial"].join(""), "misc"];
+const ICON_KEYS = ["food", "potion", "weapon", "armor", "accessory", "ammunition", "tool", ["mate", "rial"].join(""), "misc", "toy"];
 const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"];
 
 describe("item-icons.js (redesign-inventory-item-grid, task 3.2)", () => {
