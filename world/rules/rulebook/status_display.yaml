@@ -8,6 +8,9 @@
 - code: paralysis
   label: 麻痺
   severity: critical
+- code: paralysis_enhanced
+  label: 強化麻痺
+  severity: critical
 - code: fear
   label: 恐懼
   severity: harmful
@@ -131,6 +134,21 @@
 - code: lightning_extra_action
   label: 雷神之速
   severity: beneficial
+- code: lightning_flicker_ward
+  label: 雷光護罩
+  severity: beneficial
+- code: flicker_advance
+  label: 雷光先制
+  severity: beneficial
+- code: static_ward_stun
+  label: 靜電麻痺微階
+  severity: harmful
+- code: flicker_stun
+  label: 連閃麻痺微階
+  severity: harmful
+- code: apotheosis_retreat
+  label: 雷霆神格推後
+  severity: harmful
 - code: ice_slow
   label: 遲緩
   severity: harmful
@@ -308,3 +326,15 @@
 - code: ice_frost_mire_agility_penalty
   label: 泥沼敏捷下降
   severity: harmful
+- code: thunder_gods_haste_grants_action
+  label: 雷神之速額外行動
+  severity: beneficial
+- code: paralysis_enhanced_locks_actions
+  label: 強化麻痺鎖定行動
+  severity: critical
+- code: static_ward_micro_stun
+  label: 靜電麻痺微階鎖定行動
+  severity: critical
+- code: flicker_micro_stun
+  label: 連閃麻痺微階鎖定行動
+  severity: critical
