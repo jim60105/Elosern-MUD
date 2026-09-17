@@ -87,10 +87,11 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
             {"pleasure_gain"},
             {"counter_damage"},
             {"apply_buff_to_source"},
+            {"mark_order_op"},
         ):
             raise ValueError(
                 f"state reaction rule {rule.id!r} then clause must declare exactly one of "
-                f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', or 'apply_buff_to_source', "
+                f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', 'apply_buff_to_source', or 'mark_order_op', "
                 f"got {sorted(then_keys)!r}"
             )
 
@@ -137,6 +138,25 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
             if buff_key not in BUFF_DEFINITIONS:
                 raise ValueError(
                     f"state reaction rule {rule.id!r} references unknown buff definition {buff_key!r}"
+                )
+        elif action_key == "mark_order_op":
+            buff_key = rule.then["mark_order_op"]
+            if (
+                isinstance(buff_key, bool)
+                or not isinstance(buff_key, str)
+                or not buff_key.strip()
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} mark_order_op value must be a non-empty string, got {buff_key!r}"
+                )
+            if buff_key not in BUFF_DEFINITIONS:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} references unknown buff definition {buff_key!r}"
+                )
+            defn = BUFF_DEFINITIONS[buff_key]
+            if not getattr(defn, "round_order", None):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} references buff definition {buff_key!r} which does not declare round_order"
                 )
         elif action_key == "pleasure_gain":
             gain_val = rule.then["pleasure_gain"]
@@ -564,6 +584,39 @@ def dispatch_outcome_reaction(
                 buff_key = rule.then["apply_buff_to_source"]
                 definition = BUFF_DEFINITIONS.get(buff_key)
                 if definition is None:
+                    continue
+
+                holder_key = str(getattr(entity, "key", ""))
+                instance_key: str | None = None
+                if definition.stacking == "unique_per_source":
+                    instance_key = f"{buff_key}:{holder_key}"
+
+                buff_kwargs: dict[str, Any] = {
+                    "source_key": holder_key,
+                    "source_tier": source_tier or "學徒",
+                }
+                if skill_key is not None:
+                    buff_kwargs["source_skill"] = skill_key
+                apply_buff(source, buff_key, instance_key=instance_key, **buff_kwargs)
+            elif "mark_order_op" in rule.then:
+                # Preconditions:
+                # - source must exist and have buffs handler
+                # - dead source produces silent no-write
+                if source is None:
+                    continue
+                if not hasattr(source, "buffs"):
+                    continue
+                if hasattr(source, "traits") and hasattr(source.traits, "hp"):
+                    from world.rules.action import _stored_trait_value
+
+                    if _stored_trait_value(source.traits.hp) <= 0:
+                        continue
+
+                from world.rules.buffs import BUFF_DEFINITIONS, apply_buff
+
+                buff_key = rule.then["mark_order_op"]
+                definition = BUFF_DEFINITIONS.get(buff_key)
+                if definition is None or not getattr(definition, "round_order", None):
                     continue
 
                 holder_key = str(getattr(entity, "key", ""))
