@@ -28,10 +28,10 @@
 
 ## 5. Existing roster assertions
 
-- [ ] 5.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster, alongside the vocabulary literals from 1.3. Verify with `world.lore.tests.test_items`.
-- [ ] 5.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
-- [ ] 5.3 Move any literal bound-key set in the equipment-effect rulebook tests, and verify the two-sided close reports no unbound key and no orphan with `world.rules.tests.test_equipment_effect_rulebook`.
-- [ ] 5.4 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
+- [x] 5.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster, alongside the vocabulary literals from 1.3. Verify with `world.lore.tests.test_items`.
+- [x] 5.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
+- [x] 5.3 Move any literal bound-key set in the equipment-effect rulebook tests, and verify the two-sided close reports no unbound key and no orphan with `world.rules.tests.test_equipment_effect_rulebook`.
+- [x] 5.4 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
 
 ## 6. Verification
 

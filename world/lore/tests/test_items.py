@@ -82,6 +82,8 @@ class ItemPresentationTests(unittest.TestCase):
                 "dragon_lair_trophy_blade", "beastfolk_heavy_hide_armor",
                 "beastfolk_stalker_garb", "elven_forest_veil", "beastfolk_tribal_totem",
                 "beastfolk_gale_earring",
+                "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
+                "warmth_rune_egg", "tremor_crystal",
             }
         )
         for key, definition in ITEM_REGISTRY.items():
