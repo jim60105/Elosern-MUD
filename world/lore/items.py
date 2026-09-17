@@ -97,6 +97,8 @@ class EquipmentModifierKey(StrEnum):
     CRESCENT_EARRING = "crescent_earring"
     DARK_ELF_KIMONO = "dark_elf_kimono"
     DARK_ELF_NINJA_GARB = "dark_elf_ninja_garb"
+    DRAGON_LAIR_TROPHY_BLADE = "dragon_lair_trophy_blade"
+    ELVEN_LONGBOW = "elven_longbow"
     ELVEN_TRADITIONAL_ROBE = "elven_traditional_robe"
     ENTICING_LACE_SET = "enticing_lace_set"
     FEARLESS_BROOCH = "fearless_brooch"
@@ -1433,6 +1435,35 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
             ),
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
             modifier_key=EquipmentModifierKey.BEASTFOLK_SPIRIT_WAND,
+        ),
+        # Regional equipment: Elven and Trophy Weapons (land-lore-regional-equipment)
+        ItemDefinition(
+            key="elven_longbow",
+            display_name_zh="精靈長弓",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.RARE,
+                summary_zh="精靈以自產弓術淬鍊而成的長弓，箭無虛發。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.ELVEN_LONGBOW,
+        ),
+        ItemDefinition(
+            key="dragon_lair_trophy_blade",
+            display_name_zh="龍之巢穴戰利品劍",
+            price_table_key="magic_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.EPIC,
+                summary_zh="深入龍之巢穴討伐後才可能取得的鍛龍鱗劍，帶著淡淡硫磺氣息。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.DRAGON_LAIR_TROPHY_BLADE,
         ),
     )
 }

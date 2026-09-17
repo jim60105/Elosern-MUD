@@ -43,6 +43,10 @@ effects:
     exposure_bias: 1
   dark_elf_ninja_garb:
     adjustments: {defense: 5, agility: 5}
+  dragon_lair_trophy_blade:
+    adjustments: {atk_phys: 9, magic_power: 3}
+  elven_longbow:
+    adjustments: {atk_phys: 6, agility: 3}
   elven_traditional_robe:
     adjustments: {defense: 3, pleasure_gain: "+20%"}
     exposure_bias: 2
