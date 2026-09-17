@@ -499,6 +499,54 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertIsInstance(catalog, GuildCatalog)
 
+    @covers_requirement(
+        "lore-registries::currency-is-an-integer-count-of-銅-with-no-floats-in-the-money-path"
+    )
+    def test_item_naming_absent_price_band_fails_catalog_load(self):
+        from world.lore.shops import ShopDefinition
+
+        synthetic_item = ItemDefinition(
+            key="synthetic_absent_band_item",
+            display_name_zh="合成無頻帶物品",
+            price_table_key="undefined_band",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.FOOD,
+                icon_key=ItemIconKey.FOOD,
+                rarity=ItemRarity.COMMON,
+                summary_zh="用於測試不存在價格帶的合成物品。",
+            ),
+        )
+        synthetic_shop = ShopDefinition(
+            key="synthetic_band_shop",
+            merchant_component_key="merchant",
+            host_name="測試老闆",
+            host_title="測試頭銜",
+            offered_item_keys=("synthetic_absent_band_item",),
+        )
+        shop_raw = {
+            "shop_key": "synthetic_band_shop",
+            "open_hour": 8,
+            "close_hour": 20,
+            "restock_hour": 6,
+            "offers": [
+                {
+                    "item_key": "synthetic_absent_band_item",
+                    "buy_copper": 100,
+                    "sell_copper": 50,
+                    "max_stock": 5,
+                    "initial_stock": 1,
+                    "restock_quantity": 1,
+                }
+            ],
+        }
+        with mock.patch.dict(ITEM_REGISTRY, {"synthetic_absent_band_item": synthetic_item}, clear=False), \
+             mock.patch.dict(SHOP_REGISTRY, {"synthetic_band_shop": synthetic_shop}, clear=False):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([shop_raw])
+            self.assertIn("synthetic_absent_band_item", str(caught.exception))
+            self.assertIn("has no price-table entry", str(caught.exception))
+
 
 class ServiceHostRosterTests(CatalogRegistryIsolation):
     """Declarative service-host roster parsing and batch validation (tasks 1.2/4.1)."""

@@ -1,7 +1,7 @@
 ## 1. Price band
 
-- [ ] 1.1 Add a `specialty_food` `PriceEntry` (`特產食品`, 10–100 copper) to `PRICE_TABLE` in `world/lore/economy.py`. Verify with the focused label `world.lore.tests.test_economy`.
-- [ ] 1.2 Add a behavior test covering the absent-band refusal: build a synthetic item definition naming an undefined price-table key, run it through shop-catalog validation, and assert the load raises naming that item rather than accepting an unbounded price. Verify with `world.rules.tests.test_guild_config`.
+- [x] 1.1 Add a `specialty_food` `PriceEntry` (`特產食品`, 10–100 copper) to `PRICE_TABLE` in `world/lore/economy.py`. Verify with the focused label `world.lore.tests.test_economy`.
+- [x] 1.2 Add a behavior test covering the absent-band refusal: build a synthetic item definition naming an undefined price-table key, run it through shop-catalog validation, and assert the load raises naming that item rather than accepting an unbounded price. Verify with `world.rules.tests.test_guild_config`.
 
 ## 2. Inspect-only registry entries
 

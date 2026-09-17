@@ -369,7 +369,9 @@ integer constants, a `to_copper(gold: int = 0, silver: int = 0, copper: int = 0)
 that returns an `int`, a frozen `PriceEntry` dataclass with integer `min_copper` and
 `max_copper: int | None` fields, and a module-level `PRICE_TABLE: dict[str, PriceEntry]` covering
 every purchasing-power reference in `world_info.md` (inn stay, meal, potion, plain sword, magic
-weapon, commoner annual income, adventurer annual income).
+weapon, commoner annual income, adventurer annual income) plus every band the lore item codex
+assigns to a catalogued item, including the regional-delicacy band that separates named local
+foods from an ordinary meal.
 
 #### Scenario: Conversion constants match the documented rate
 - **WHEN** `to_copper(gold=1)`, `to_copper(silver=1)`, and `to_copper(copper=1)` are each called
@@ -383,6 +385,10 @@ weapon, commoner annual income, adventurer annual income).
 #### Scenario: Price table entries never have max below min
 - **WHEN** every `PriceEntry` with a non-`None` `max_copper` is inspected
 - **THEN** `max_copper >= min_copper`
+
+#### Scenario: An item naming an absent band fails the catalog load
+- **WHEN** an item definition names a price-table key that `PRICE_TABLE` does not define
+- **THEN** the shop-catalog load raises for that item rather than defaulting to an unbounded price
 
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
 This requirement fixes only the concrete human selections in the starting-kit registry; the
