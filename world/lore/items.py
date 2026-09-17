@@ -87,6 +87,11 @@ class EquipmentModifierKey(StrEnum):
     APOTHECARY_BEADS = "apothecary_beads"
     ARCHMAGE_MENDING_ROBE = "archmage_mending_robe"
     ASHEN_SCIMITAR = "ashen_scimitar"
+    BEASTFOLK_REPEATING_BOW = "beastfolk_repeating_bow"
+    BEASTFOLK_SPIRIT_WAND = "beastfolk_spirit_wand"
+    BEASTFOLK_TWIN_CLAWS = "beastfolk_twin_claws"
+    BEASTFOLK_WAR_SPEAR = "beastfolk_war_spear"
+    BEASTFOLK_WARHAMMER = "beastfolk_warhammer"
     BLACK_MAID_DRESS = "black_maid_dress"
     CHAINMAIL = "chainmail"
     CRESCENT_EARRING = "crescent_earring"
@@ -1357,6 +1362,77 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 rarity=ItemRarity.COMMON,
                 summary_zh="精靈孩童隨手製作的簡陋玩具，若被外人拾獲，通常代表附近有精靈幼體活動——世界觀提醒：精靈幼體對其他種族十分危險，因為他們不擅控制力道、不分是非。",
             ),
+        ),
+        # Regional equipment: 5 Beastfolk Weapons (land-lore-regional-equipment)
+        ItemDefinition(
+            key="beastfolk_warhammer",
+            display_name_zh="獸人重鎚",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="部族鍛爐打造的巨型戰鎚，非獸人臂力難以掄動。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_WARHAMMER,
+        ),
+        ItemDefinition(
+            key="beastfolk_repeating_bow",
+            display_name_zh="獸人連射短弓",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人擅用的輕量連射短弓，講求速度而非單發威力。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_REPEATING_BOW,
+        ),
+        ItemDefinition(
+            key="beastfolk_war_spear",
+            display_name_zh="獸人陣地長槍",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人部族列陣時使用的長槍，攻守兼備。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_WAR_SPEAR,
+        ),
+        ItemDefinition(
+            key="beastfolk_twin_claws",
+            display_name_zh="獸人雙爪刃",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人綁縛於指節的鋒利爪刃，高攻但幾乎不設防禦。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_TWIN_CLAWS,
+        ),
+        ItemDefinition(
+            key="beastfolk_spirit_wand",
+            display_name_zh="獸人導靈短杖",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人以魔力見長所用的短杖，罕見的獸人法具。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_SPIRIT_WAND,
         ),
     )
 }

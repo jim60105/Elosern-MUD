@@ -21,6 +21,16 @@ effects:
     adjustments: {magic_power: 8, mp_cost: "-12%"}
   ashen_scimitar:
     adjustments: {atk_phys: 4, agility: 2}
+  beastfolk_repeating_bow:
+    adjustments: {atk_phys: 3, agility: 4}
+  beastfolk_spirit_wand:
+    adjustments: {magic_power: 5, mp_cost: "-6%"}
+  beastfolk_twin_claws:
+    adjustments: {atk_phys: 6, defense: -2}
+  beastfolk_war_spear:
+    adjustments: {atk_phys: 5, defense: 2}
+  beastfolk_warhammer:
+    adjustments: {atk_phys: 6, agility: "-6%"}
   black_maid_dress:
     adjustments: {pleasure_gain: "+10%"}
     exposure_bias: 1
