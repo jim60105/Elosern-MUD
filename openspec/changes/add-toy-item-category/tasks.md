@@ -35,7 +35,7 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Using two synthetic accessory-slot items carrying pleasure adjustments, assert both equip at once and both adjustments reach the shared accessor against the five-slot cap. Verify with `world.skills.tests.test_equipment`.
-- [ ] 6.2 Run the focused Vitest file for `item-icons.js` and the inventory panel — not the whole Vitest suite — and verify both the alignment case and the fallback case pass.
-- [ ] 6.3 Run the focused Python labels touched by this change — `world.lore.tests.test_items`, `world.lore.tests.test_economy`, `world.rules.tests.test_equipment_effect_rulebook`, `world.rules.tests.test_guild_config`, `world.skills.tests.test_equipment` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
-- [ ] 6.4 Run `openspec validate add-toy-item-category --strict` and verify it reports the change as valid.
+- [x] 6.1 Using two synthetic accessory-slot items carrying pleasure adjustments, assert both equip at once and both adjustments reach the shared accessor against the five-slot cap. Verify with `world.skills.tests.test_equipment`.
+- [x] 6.2 Run the focused Vitest file for `item-icons.js` and the inventory panel — not the whole Vitest suite — and verify both the alignment case and the fallback case pass.
+- [x] 6.3 Run the focused Python labels touched by this change — `world.lore.tests.test_items`, `world.lore.tests.test_economy`, `world.rules.tests.test_equipment_effect_rulebook`, `world.rules.tests.test_guild_config`, `world.skills.tests.test_equipment` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
+- [x] 6.4 Run `openspec validate add-toy-item-category --strict` and verify it reports the change as valid.

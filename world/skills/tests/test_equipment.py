@@ -18,7 +18,7 @@ from world.lore.items import (
     ItemRarity,
 )
 from world.rules.equipment import toggle_equipment
-from world.rules.equipment_effects import equipment_adjustments
+from world.rules.equipment_effects import equipment_adjustments, equipment_pleasure_gain
 from world.skills.equipment import (
     ACCESSORY_MAX_SLOTS,
     EquipmentSlot,
@@ -217,3 +217,44 @@ class EquipmentHandlerTests(EvenniaTestCase):
         adjustments = equipment_adjustments(entity)
         self.assertEqual(adjustments.get("atk_phys"), 3)
         self.assertEqual(adjustments.get("agility_flat"), -2)
+
+    @covers_requirement(
+        "equipment-effects::equipment-adjustments-reach-every-consumer-through-one-accessor"
+    )
+    @_items(
+        ItemDefinition(
+            key="t_pleasure_ring_a",
+            display_name_zh="測試歡愉戒指甲",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=_PRESENTATION,
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.PILGRIM_MEDALLION,
+        ),
+        ItemDefinition(
+            key="t_pleasure_ring_b",
+            display_name_zh="測試歡愉戒指乙",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=_PRESENTATION,
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
+        ),
+    )
+    def test_multiple_accessories_with_pleasure_gain_stack_adjustments(self):
+        entity = self._entity()
+        self._hold(entity, "t_pleasure_ring_a", "t_pleasure_ring_b")
+        res_a = toggle_equipment(entity, "t_pleasure_ring_a")
+        res_b = toggle_equipment(entity, "t_pleasure_ring_b")
+        self.assertEqual(res_a.outcome, "success")
+        self.assertEqual(res_b.outcome, "success")
+
+        worn_accessories = entity.equipment.slot_contents(EquipmentSlot.ACCESSORY)
+        self.assertEqual(worn_accessories, ["t_pleasure_ring_a", "t_pleasure_ring_b"])
+        self.assertLessEqual(len(worn_accessories), ACCESSORY_MAX_SLOTS)
+
+        # Both adjustments stack into the single pleasure accessor (+10% + +5% = 15)
+        self.assertEqual(equipment_pleasure_gain(entity), 15)
+        # Pleasure gain deliberately does not ride the combat bundle
+        adjustments = equipment_adjustments(entity)
+        self.assertNotIn("pleasure_gain", adjustments)
