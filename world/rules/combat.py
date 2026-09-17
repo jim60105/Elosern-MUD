@@ -513,7 +513,11 @@ def _handle_damage(
                     cap=int(BUFF_DEFINITIONS[buff.definition_key].modifiers["divert"]["cap"]),
                 ):
                     def apply_divert() -> None:
-                        cur_consumed = get_divert_consumed(b)
+                        buff_key = getattr(b, "buffkey", getattr(b, "definition_key", None))
+                        live_buff = b
+                        if hasattr(target, "buffs") and hasattr(target.buffs, "all"):
+                            live_buff = target.buffs.all.get(buff_key, b)
+                        cur_consumed = get_divert_consumed(live_buff)
                         rem_cap = max(0, cap - cur_consumed)
                         to_pay = min(div, rem_cap)
                         if to_pay <= 0:
@@ -536,7 +540,9 @@ def _handle_damage(
                             raise NotImplementedError(
                                 f"divert target {g_key!r} is not supported"
                             )
-                        update_divert_consumed(b, cur_consumed + paid)
+                        update_divert_consumed(live_buff, cur_consumed + paid)
+                        if live_buff is not b:
+                            update_divert_consumed(b, cur_consumed + paid)
 
                     return apply_divert
 

@@ -77,6 +77,11 @@ class UnconditionalMultiStrikeConstructionTests(unittest.TestCase):
         self.assertEqual(p4.extra_strikes, 0)
         self.assertIsNone(p4.repeat_when)
 
+        # Unconditional two extra strikes
+        p5 = DamagePolicy(extra_strikes=2)
+        self.assertEqual(p5.extra_strikes, 2)
+        self.assertIsNone(p5.repeat_when)
+
     @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_malformed_shapes_raise_value_error(self):
         """WHEN policies declare invalid extra_strikes or repeat_when combinations, they raise."""
@@ -95,15 +100,15 @@ class UnconditionalMultiStrikeConstructionTests(unittest.TestCase):
             DamagePolicy(extra_strikes=True)
         self.assertIn("must be an int", str(ctx.exception))
 
-        # Out-of-cap extra_strikes > 1
+        # Out-of-cap extra_strikes > 2
         with self.assertRaises(ValueError) as ctx:
-            DamagePolicy(extra_strikes=2)
-        self.assertIn("cannot exceed 1", str(ctx.exception))
+            DamagePolicy(extra_strikes=3)
+        self.assertIn("must be in (0, 1, 2)", str(ctx.exception))
 
         # Negative extra_strikes
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(extra_strikes=-1)
-        self.assertIn("cannot exceed 1", str(ctx.exception))
+        self.assertIn("must be in (0, 1, 2)", str(ctx.exception))
 
         # repeat_when requiring extra_strikes=1
         with self.assertRaises(ValueError) as ctx:
@@ -112,7 +117,11 @@ class UnconditionalMultiStrikeConstructionTests(unittest.TestCase):
 
         with self.assertRaises(ValueError) as ctx:
             DamagePolicy(repeat_when="forced_interaction", extra_strikes=2)
-        self.assertIn("cannot exceed 1", str(ctx.exception))
+        self.assertIn("requires extra_strikes=1", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            DamagePolicy(repeat_when="forced_interaction", extra_strikes=3)
+        self.assertIn("must be in (0, 1, 2)", str(ctx.exception))
 
 
 @_SCOPE
