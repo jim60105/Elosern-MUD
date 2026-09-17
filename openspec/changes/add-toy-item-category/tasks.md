@@ -14,10 +14,10 @@
 
 ## 3. Wearable devices
 
-- [ ] 3.1 Add `EquipmentModifierKey` members and `ItemDefinition` entries for `nymph_buds_clamp`, `warm_honey_orb`, `hyperesthesia_charm` — `ItemKind.TOY`, `ItemIconKey.TOY`, `uncommon`, `EquipmentSlot.ACCESSORY`, `intimacy_tool` band, sellable. Verify the registry imports.
-- [ ] 3.2 Add the three matching `equipment_effects.yaml` entries — clamp `pleasure_gain: "+8%", sp_cost: "+5%"`, orb `defense: -1, pleasure_gain: "+8%"`, charm `pleasure_gain: "+8%", sp_cost: "+5%"`. Verify the rulebook loads and the budget test confirms all values sit inside the `uncommon` ceilings of soft-percent 15 and percent 8.
-- [ ] 3.3 Add `warmth_rune_egg` (`uncommon`, `pleasure_gain: "+8%"`) and `tremor_crystal` (`rare`, `pleasure_gain: "+10%"`) the same way, and verify the crystal loads inside the `rare` soft-percent ceiling of 20.
-- [ ] 3.4 Confirm by review that none of the five entries declares an attached buff, immunity, or status key, so the retired 催情霧 status is not reintroduced. No test: a rulebook entry's own fields are registry content, and the loader already rejects an attached buff naming an undefined status.
+- [x] 3.1 Add `EquipmentModifierKey` members and `ItemDefinition` entries for `nymph_buds_clamp`, `warm_honey_orb`, `hyperesthesia_charm` — `ItemKind.TOY`, `ItemIconKey.TOY`, `uncommon`, `EquipmentSlot.ACCESSORY`, `intimacy_tool` band, sellable. Verify the registry imports.
+- [x] 3.2 Add the three matching `equipment_effects.yaml` entries — clamp `pleasure_gain: "+8%", sp_cost: "+5%"`, orb `defense: -1, pleasure_gain: "+8%"`, charm `pleasure_gain: "+8%", sp_cost: "+5%"`. Verify the rulebook loads and the budget test confirms all values sit inside the `uncommon` ceilings of soft-percent 15 and percent 8.
+- [x] 3.3 Add `warmth_rune_egg` (`uncommon`, `pleasure_gain: "+8%"`) and `tremor_crystal` (`rare`, `pleasure_gain: "+10%"`) the same way, and verify the crystal loads inside the `rare` soft-percent ceiling of 20.
+- [x] 3.4 Confirm by review that none of the five entries declares an attached buff, immunity, or status key, so the retired 催情霧 status is not reintroduced. No test: a rulebook entry's own fields are registry content, and the loader already rejects an attached buff naming an undefined status.
 
 ## 4. Church doctrine
 

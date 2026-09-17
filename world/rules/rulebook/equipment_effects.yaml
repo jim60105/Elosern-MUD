@@ -78,6 +78,8 @@ effects:
     adjustments: {atk_phys: 4, agility: 2}
   hunting_throwing_axe:
     adjustments: {atk_phys: 2, agility: -1}
+  hyperesthesia_charm:
+    adjustments: {pleasure_gain: "+8%", sp_cost: "+5%"}
   iron_dagger:
     adjustments: {atk_phys: 1}
   iron_shield:
@@ -93,6 +95,8 @@ effects:
     adjustments: {magic_power: 3, mp_cost: "-8%"}
   magic_sword:
     adjustments: {atk_phys: 8, magic_power: 6}
+  nymph_buds_clamp:
+    adjustments: {pleasure_gain: "+8%", sp_cost: "+5%"}
   passion_silk_choker:
     adjustments: {defense: -3, pleasure_gain: "+25%"}
   pilgrim_medallion:
@@ -135,6 +139,12 @@ effects:
     adjustments: {atk_phys: 4, agility: 2}
   # Utility equipment: explicitly no combat or social effects (D1).
   storage_pouch: {}
+  tremor_crystal:
+    adjustments: {pleasure_gain: "+10%"}
+  warm_honey_orb:
+    adjustments: {defense: -1, pleasure_gain: "+8%"}
+  warmth_rune_egg:
+    adjustments: {pleasure_gain: "+8%"}
   wolf_fang_necklace:
     adjustments: {atk_phys: 3}
   wooden_club:

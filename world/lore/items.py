@@ -115,6 +115,7 @@ class EquipmentModifierKey(StrEnum):
     GUILD_RECRUIT_BADGE = "guild_recruit_badge"
     HUNTERS_LONGBOW = "hunters_longbow"
     HUNTING_THROWING_AXE = "hunting_throwing_axe"
+    HYPERESTHESIA_CHARM = "hyperesthesia_charm"
     IRON_DAGGER = "iron_dagger"
     IRON_SHIELD = "iron_shield"
     KNIGHT_BLADE = "knight_blade"
@@ -122,6 +123,7 @@ class EquipmentModifierKey(StrEnum):
     LEATHER_ARMOR = "leather_armor"
     MAGE_ROBE = "mage_robe"
     MAGIC_SWORD = "magic_sword"
+    NYMPH_BUDS_CLAMP = "nymph_buds_clamp"
     PASSION_SILK_CHOKER = "passion_silk_choker"
     PILGRIM_MEDALLION = "pilgrim_medallion"
     PLAIN_SWORD = "plain_sword"
@@ -140,6 +142,9 @@ class EquipmentModifierKey(StrEnum):
     SILVER_HAIRPIN = "silver_hairpin"
     STEEL_FANG_DAGGER = "steel_fang_dagger"
     STORAGE_POUCH = "storage_pouch"
+    TREMOR_CRYSTAL = "tremor_crystal"
+    WARM_HONEY_ORB = "warm_honey_orb"
+    WARMTH_RUNE_EGG = "warmth_rune_egg"
     WOLF_FANG_NECKLACE = "wolf_fang_necklace"
     WOODEN_CLUB = "wooden_club"
 
@@ -1542,6 +1547,77 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.BEASTFOLK_GALE_EARRING,
+        ),
+        # Wearable intimacy accessories (add-toy-item-category)
+        ItemDefinition(
+            key="nymph_buds_clamp",
+            display_name_zh="花蒂銀夾",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="聖所銀匠打的細銀乳夾，服儀的一部分，夾住之後每一口呼吸、每一步走動都被反覆輕錐，癢得發燙也摘不下手。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.NYMPH_BUDS_CLAMP,
+        ),
+        ItemDefinition(
+            key="warm_honey_orb",
+            display_name_zh="暖蜜魔導珠",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="聖所器具店常見貨色裡的蜜色魔導珠，以體溫為動力源源不絕地暖磨最敏感的那處，一戴就是一整日。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.WARM_HONEY_ORB,
+        ),
+        ItemDefinition(
+            key="hyperesthesia_charm",
+            display_name_zh="尖銳觸感之飾",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="聖所販售的祝禱掛飾，效果直白：佩戴期間皮膚的觸感被整體放大，衣料摩擦都變成細密的電流，平日無感的輕觸都會一路鑽進神經，從早到晚渾身不對勁。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.HYPERESTHESIA_CHARM,
+        ),
+        ItemDefinition(
+            key="warmth_rune_egg",
+            display_name_zh="恆溫魔法卵",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="刻入恆溫魔法陣的鵝卵石小卵，含在體內便持續溫熱下體、催出潤澤，外頭沒人看得出來。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.WARMTH_RUNE_EGG,
+        ),
+        ItemDefinition(
+            key="tremor_crystal",
+            display_name_zh="恆振晶",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.RARE,
+                summary_zh="精靈匠作的乳色魔導晶，刻著人類學者讀不懂的微振術式，貼身藏好便能以恆定微顫終日刺激花心，術式撐到下次造訪精靈村前從不停歇。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.TREMOR_CRYSTAL,
         ),
     )
 }
