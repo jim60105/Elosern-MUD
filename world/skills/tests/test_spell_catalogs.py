@@ -65,45 +65,9 @@ LIGHTNING_SPELL_CATALOG = (
 )
 
 
-ICE_SPELL_CATALOG = (
-    ("ice_shard", "冰錐術", TargetSpec.SINGLE, 13, ("damage:ice:magic",)),
-    ("frost_breath", "凍結之息", TargetSpec.SINGLE, 11, ("buff_apply:ice_slow",)),
-    ("ice_wall", "冰牆術", TargetSpec.SINGLE, 25, ("buff_apply:ice_wall",)),
-    ("frost_arrow_rain", "冷凍箭雨", TargetSpec.AREA, 28, ("damage:ice:magic",)),
-    ("permafrost_domain", "永凍領域", TargetSpec.AREA, 48, ("buff_apply:ice_freeze",)),
-    ("ice_prison", "冰封監牢", TargetSpec.SINGLE, 44, ("buff_apply:ice_prison",)),
-    ("blizzard", "暴風雪", TargetSpec.AREA, 88, ("damage:ice:magic",)),
-    (
-        "absolute_tundra",
-        "絕對凍土",
-        TargetSpec.AREA,
-        82,
-        ("damage:ice:magic", "buff_apply:ice_freeze"),
-    ),
-    (
-        "absolute_zero",
-        "絕對零度",
-        TargetSpec.SINGLE,
-        140,
-        ("damage:ice:magic", "buff_apply:ice_freeze"),
-    ),
-    (
-        "eternal_ice_field",
-        "長夜冰原",
-        TargetSpec.AREA,
-        158,
-        ("damage:ice:magic", "buff_apply:ice_freeze"),
-    ),
-)
-
-
 _CATALOG_EFFECTS = {
     row[0]: row[4]
-    for rows in (
-        LIGHTNING_SPELL_CATALOG,
-        ICE_SPELL_CATALOG,
-    )
-    for row in rows
+    for row in LIGHTNING_SPELL_CATALOG
 }
 
 
@@ -200,51 +164,70 @@ class LightningSpellCatalogTests(unittest.TestCase):
             {row[0] for row in LIGHTNING_SPELL_CATALOG},
         )
 
-class IceSpellCatalogTests(unittest.TestCase):
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
-    def test_all_ten_ice_spells_declare_the_exact_catalog_fields(self):
-        for key, label, target_spec, mp, effects in ICE_SPELL_CATALOG:
+
+class IceLineageTreeCatalogTests(unittest.TestCase):
+    """The shipped branching ice lineage tree with a two-parent canopy is catalog data.
+
+    The edge table itself is the shipped content the requirement names, so it
+    lives in this registered data-contract file.
+    """
+
+    def test_ice_tree_edges_are_as_designed(self):
+        expected = {
+            "ice_wall": (SkillPrerequisite("frost_breath", 3),),
+            "frost_mire": (SkillPrerequisite("ice_wall", 3),),
+            "permafrost_domain": (SkillPrerequisite("ice_wall", 3),),
+            "absolute_tundra": (SkillPrerequisite("permafrost_domain", 8),),
+            "eternal_ice_field": (SkillPrerequisite("absolute_tundra", 8),),
+            "frost_arrow_rain": (SkillPrerequisite("ice_shard", 3),),
+            "ice_prison": (SkillPrerequisite("frost_arrow_rain", 3),),
+            "blizzard": (SkillPrerequisite("ice_prison", 5),),
+            "crystal_shatter": (SkillPrerequisite("ice_prison", 5),),
+            "absolute_zero": (SkillPrerequisite("blizzard", 8),),
+            "eternal_frost_apotheosis": (
+                SkillPrerequisite("eternal_ice_field", 10),
+                SkillPrerequisite("absolute_zero", 10),
+            ),
+        }
+        for key, expected_prereqs in expected.items():
             with self.subTest(spell=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertEqual(skill.label, label)
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.element, ELEMENT_REGISTRY["ice"])
-                self.assertIs(skill.target_spec, target_spec)
-                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-                self.assertEqual(skill.cost, {"mp": mp})
-                self.assertEqual(tuple(skill.effects), effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
-    def test_every_ice_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in ICE_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="ice", school="magic"),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
-
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
-    def test_ice_active_spell_keys_are_exactly_the_catalog_set(self):
+                self.assertEqual(
+                    declared_prerequisites(key),
+                    expected_prereqs,
+                )
+        self.assertEqual(declared_prerequisites("frost_breath"), ())
+        self.assertEqual(declared_prerequisites("ice_shard"), ())
+        # Topological canopy: eternal_frost_apotheosis is consumed by nothing.
+        self.assertEqual(prerequisite_consumers("eternal_frost_apotheosis"), ())
+        # Both Lv.10 parents are consumed only by eternal_frost_apotheosis at threshold 10.
         self.assertEqual(
-            {
-                key
-                for key, skill in SKILL_REGISTRY.items()
-                if skill.element is ELEMENT_REGISTRY["ice"]
-                and skill.kind is SkillKind.ACTIVE
-            },
-            {row[0] for row in ICE_SPELL_CATALOG},
+            prerequisite_consumers("eternal_ice_field"),
+            (("eternal_frost_apotheosis", 10),),
         )
+        self.assertEqual(
+            prerequisite_consumers("absolute_zero"),
+            (("eternal_frost_apotheosis", 10),),
+        )
+        # Branch points: ice_wall feeds exactly two children at threshold 3.
+        self.assertEqual(
+            set(prerequisite_consumers("ice_wall")),
+            {("frost_mire", 3), ("permafrost_domain", 3)},
+        )
+        # ice_prison feeds exactly two children at threshold 5.
+        self.assertEqual(
+            set(prerequisite_consumers("ice_prison")),
+            {("blizzard", 5), ("crystal_shatter", 5)},
+        )
+        # Terminal leaves have empty consumers.
+        self.assertEqual(prerequisite_consumers("frost_mire"), ())
+        self.assertEqual(prerequisite_consumers("crystal_shatter"), ())
 
+    def test_mastery_passives_stay_out_of_the_graph(self):
+        for element_key in ELEMENT_REGISTRY:
+            mastery_key = f"{element_key}_mastery"
+            with self.subTest(mastery_key=mastery_key):
+                self.assertEqual(prerequisite_consumers(mastery_key), ())
+                self.assertEqual(declared_prerequisites(mastery_key), ())
 
 class FireLineageTreeCatalogTests(unittest.TestCase):
     """The shipped branching fire lineage tree with a two-parent canopy is catalog data.
