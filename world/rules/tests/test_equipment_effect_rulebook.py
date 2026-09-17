@@ -663,20 +663,30 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
 
 
-CHURCH_SET = (
+CHURCH_VESTMENTS_AND_EMBLEMS = (
     "sister_vestments",
     "radiant_holy_emblem",
     "saintess_vestments",
     "pilgrim_medallion",
 )
 
+CHURCH_SANCTUARY_DEVICES = (
+    "nymph_buds_clamp",
+    "warm_honey_orb",
+    "hyperesthesia_charm",
+)
+
+CHURCH_SET = CHURCH_VESTMENTS_AND_EMBLEMS + CHURCH_SANCTUARY_DEVICES
+
 
 def _percent_magnitude(value: str) -> int:
     return int(value[:-1])
 
 
-def check_church_doctrine(rules, keys=CHURCH_SET) -> None:
-    """Raise ValueError when one named Church item breaks canon doctrine.
+def check_church_vestments_and_emblems(
+    rules, keys=CHURCH_VESTMENTS_AND_EMBLEMS
+) -> None:
+    """Raise ValueError when one named Church vestment or emblem breaks doctrine.
 
     Canon (坦露與歡愉為正向、光之治療與淨化): non-negative exposure bias and
     pleasure, at least one of heal_gain or an immunity, no suppression
@@ -699,6 +709,31 @@ def check_church_doctrine(rules, keys=CHURCH_SET) -> None:
             )
 
 
+def check_church_sanctuary_devices(
+    rules, keys=CHURCH_SANCTUARY_DEVICES
+) -> None:
+    """Raise ValueError when one named Church sanctuary device breaks doctrine.
+
+    Sanctuary devices: non-negative exposure_bias, positive pleasure_gain,
+    no suppression values. Healing-or-immunity is NOT required.
+    """
+    for key in keys:
+        rule = rules[EquipmentModifierKey(key)]
+        if rule.exposure_bias < 0:
+            raise ValueError(f"{key}: negative exposure_bias suppresses canon")
+        pleasure = rule.adjustments.get("pleasure_gain")
+        if pleasure is None or _percent_magnitude(pleasure) <= 0:
+            raise ValueError(
+                f"{key}: non-positive or absent pleasure_gain breaks sanctuary canon"
+            )
+
+
+def check_church_doctrine(rules) -> None:
+    """Raise ValueError when any named Church item breaks canon doctrine."""
+    check_church_vestments_and_emblems(rules, CHURCH_VESTMENTS_AND_EMBLEMS)
+    check_church_sanctuary_devices(rules, CHURCH_SANCTUARY_DEVICES)
+
+
 class ChurchDoctrineTests(unittest.TestCase):
     def _with_rule(self, key: str, rule: EquipmentEffectRule) -> dict:
         rules = dict(EQUIPMENT_EFFECT_RULES)
@@ -709,7 +744,55 @@ class ChurchDoctrineTests(unittest.TestCase):
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
     )
     def test_named_church_set_satisfies_doctrine(self):
+        check_church_vestments_and_emblems(EQUIPMENT_EFFECT_RULES)
+        check_church_sanctuary_devices(EQUIPMENT_EFFECT_RULES)
         check_church_doctrine(EQUIPMENT_EFFECT_RULES)
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_sanctuary_devices_satisfy_doctrine_without_healing(self):
+        check_church_sanctuary_devices(EQUIPMENT_EFFECT_RULES)
+        for key in CHURCH_SANCTUARY_DEVICES:
+            rule = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey(key)]
+            self.assertGreaterEqual(rule.exposure_bias, 0)
+            self.assertIn("pleasure_gain", rule.adjustments)
+            self.assertGreater(_percent_magnitude(rule.adjustments["pleasure_gain"]), 0)
+            self.assertNotIn("heal_gain", rule.adjustments)
+            self.assertFalse(rule.immune)
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_vestment_cannot_borrow_sanctuary_device_healing_exemption(self):
+        rule = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey.SISTER_VESTMENTS]
+        deviant = replace(
+            rule,
+            adjustments=MappingProxyType(
+                {k: v for k, v in rule.adjustments.items() if k != "heal_gain"}
+            ),
+            immune=(),
+        )
+        deviant_rules = self._with_rule("sister_vestments", deviant)
+        # Sanctuary-device check passes for this rule in isolation:
+        check_church_sanctuary_devices(deviant_rules, keys=("sister_vestments",))
+        # But Church doctrine verification still fails because sister_vestments is in the vestment set:
+        with self.assertRaises(ValueError) as caught:
+            check_church_vestments_and_emblems(deviant_rules)
+        self.assertIn("sister_vestments", str(caught.exception))
+        self.assertIn("healing canon", str(caught.exception))
+        with self.assertRaises(ValueError):
+            check_church_doctrine(deviant_rules)
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_imperial_and_elven_items_are_excluded_from_church_subsets(self):
+        church_items = set(CHURCH_VESTMENTS_AND_EMBLEMS) | set(
+            CHURCH_SANCTUARY_DEVICES
+        )
+        self.assertNotIn("warmth_rune_egg", church_items)
+        self.assertNotIn("tremor_crystal", church_items)
 
     def test_sister_vestments_numbers_refused_at_uncommon_rarity(self):
         document = _canonical_document()

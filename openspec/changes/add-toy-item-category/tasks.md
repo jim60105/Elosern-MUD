@@ -21,10 +21,10 @@
 
 ## 4. Church doctrine
 
-- [ ] 4.1 Update the `Doctrine coverage for the named Church set` test to check the vestment-and-emblem sub-set (`sister_vestments`, `radiant_holy_emblem`, `saintess_vestments`, `pilgrim_medallion`) for non-negative bias and pleasure plus healing-or-immunity, and verify it passes unchanged against the shipped four.
-- [ ] 4.2 Add sanctuary-device coverage for `nymph_buds_clamp`, `warm_honey_orb`, `hyperesthesia_charm` — non-negative bias, positive `pleasure_gain`, no suppression, no healing obligation — and verify it passes.
-- [ ] 4.3 Add the negative case: a deviant copy that moves a vestment key into the sanctuary sub-set still fails, proving membership comes from the named list and not from the rulebook.
-- [ ] 4.4 Verify `warmth_rune_egg` and `tremor_crystal` are excluded from both sub-sets, matching their Imperial and elven provenance.
+- [x] 4.1 Update the `Doctrine coverage for the named Church set` test to check the vestment-and-emblem sub-set (`sister_vestments`, `radiant_holy_emblem`, `saintess_vestments`, `pilgrim_medallion`) for non-negative bias and pleasure plus healing-or-immunity, and verify it passes unchanged against the shipped four.
+- [x] 4.2 Add sanctuary-device coverage for `nymph_buds_clamp`, `warm_honey_orb`, `hyperesthesia_charm` — non-negative bias, positive `pleasure_gain`, no suppression, no healing obligation — and verify it passes.
+- [x] 4.3 Add the negative case: a deviant copy that moves a vestment key into the sanctuary sub-set still fails, proving membership comes from the named list and not from the rulebook.
+- [x] 4.4 Verify `warmth_rune_egg` and `tremor_crystal` are excluded from both sub-sets, matching their Imperial and elven provenance.
 
 ## 5. Existing roster assertions
 
