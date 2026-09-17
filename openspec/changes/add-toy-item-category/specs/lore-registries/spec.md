@@ -24,10 +24,10 @@ usable 性玩具 entries.
 - **WHEN** every `PriceEntry` with a non-`None` `max_copper` is inspected
 - **THEN** `max_copper >= min_copper`
 
-#### Scenario: Every band a catalogued item names exists
-- **WHEN** every registered item's price-table key is resolved against `PRICE_TABLE`
-- **THEN** each one resolves to a `PriceEntry`, with no catalogued item naming an absent band
+#### Scenario: An item naming an absent band fails the catalog load
+- **WHEN** an item definition names a price-table key that `PRICE_TABLE` does not define
+- **THEN** the shop-catalog load raises for that item rather than defaulting to an unbounded price
 
-#### Scenario: One band spans both intimacy-device shapes
-- **WHEN** the codex's wearable and usable 性玩具 reference prices are checked against the intimacy-device band
-- **THEN** every one of them lies inside that single band, so the category's two mechanical shapes never need separate bands
+#### Scenario: One band serves both mechanical shapes of a category
+- **WHEN** a usable item and an equipment item both name the intimacy-device band
+- **THEN** both resolve the same `PriceEntry`, so a category's two mechanical shapes never require separate bands

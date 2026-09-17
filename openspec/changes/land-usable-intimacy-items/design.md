@@ -15,6 +15,7 @@ The loader closes `item_effects.yaml` against the registry's usable set in both 
 - Keep every magnitude traceable to a number the intimacy system already uses, so nothing here becomes an independent balance knob.
 
 **Non-Goals:**
+- **New game-data contract tests.** No test added here names a device, its price, or its declared amount. The one property worth asserting — that the magnitudes are the intimacy system's own stimulus values rather than invented ones — is checked by reading the band from the rulebook, not by hard-coding three numbers.
 - Any status effect. The codex's earlier 「催情霧」 was retired in favour of a plain pleasure gain precisely so this slice would need no status-rulebook edit.
 - Duration, cooldown, or lingering-sensitivity modelling. The codex's flavour text describes effects lasting an evening; the mechanical model is a single instantaneous gain, and the document deliberately does not claim otherwise.
 - Storefronts, for the third time. Same follow-up.
@@ -33,7 +34,8 @@ The loader closes `item_effects.yaml` against the registry's usable set in both 
 
 ## Risks / Trade-offs
 
-- **First shipped use of the pleasure write path means an unexercised integration could surface here.** → The path is covered by synthetic-item tests in `world/rules/tests/test_item_use.py` and `test_item_combat_turn.py`, including the zero-floor and mid-band cases. The remaining risk is the preflight's fail-closed read of an unmaterialised intimacy record, so the verification group uses a device on an entity that has never had intimacy state touched.
+- **First shipped use of the pleasure write path means an unexercised integration could surface here.** → The path is covered by synthetic-item tests in `world/rules/tests/test_item_use.py` and `test_item_combat_turn.py`, including the zero-floor and mid-band cases. The remaining risk is the preflight's fail-closed read of an unmaterialised intimacy record, so the verification group uses a synthetic device on an entity that has never had intimacy state touched.
+- **Three behavior requirements describe paths that only these items will use.** → That is the point: they are written against item *shape*, not against these seven keys, so they hold for any future non-consuming or combat-barred item and their tests need no shipped content.
 - **A reusable item is a new lifecycle for the rollback journal.** → The journal already captures gauges, statuses, and intimacy state per touched entity, and skips the mirror-deletion step for a non-consuming use. The verification group asserts inventory count is unchanged after a successful reusable use and after a rolled-back one.
 - **Seven more unstocked items, in a category that now has twelve.** → The intimacy category ships complete as data and reachable only by grant until the 聖所 and elven storefronts land. That follow-up is named in the codex and is the single largest remaining gap in the item work.
 - **Pleasure is a gauge players may not want raised by accident.** → Every device here is self-scoped and player-initiated; nothing in this slice lets one entity raise another's pleasure.

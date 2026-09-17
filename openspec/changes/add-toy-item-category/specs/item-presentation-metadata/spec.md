@@ -17,6 +17,6 @@ client does not yet know, and SHALL NOT be reachable by any registered item.
 - **WHEN** the client's icon-map keys are compared against the server's icon-key vocabulary
 - **THEN** the two sets are equal, with every entry carrying inline path data and a Traditional Chinese label
 
-#### Scenario: No registered item falls back to the unknown glyph
-- **WHEN** every registered item's icon key is resolved through the client icon map
-- **THEN** each resolves to a mapped entry, and the unknown-item fallback is reached only by an absent presentation
+#### Scenario: The fallback is reachable only by an unknown or absent key
+- **WHEN** the client renders one payload carrying a mapped icon key and one carrying an absent presentation
+- **THEN** the first renders that key's own glyph and label and the second renders the unknown-item fallback

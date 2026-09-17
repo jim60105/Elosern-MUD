@@ -11,12 +11,13 @@ This change lands the easiest and largest slice: the 24 inspect-only items (food
 - Stock 18 of them in the existing Altoria general store (`SHOP_REGISTRY` offered keys plus `guild_economy.yaml` offers), with stock depth scaled to rarity.
 - Leave 6 out of the store on lore grounds: 精靈之淚 and 精靈體液 reach humans by gift rather than trade, 古龍心臟 has no trade record on the continent, and the three curios are non-sellable narrative props.
 - Record in `docs/lore/items.md` that the 雜物 category lands as `sellable = false` on the `relic` band, mirroring the shipped `guild_recruit_badge`.
-- No behavior change: no new enum member, no rulebook verb, no settlement path is touched.
+- Specify three shape-derived behavioral invariants — inert items refuse mechanics by name, non-sellability outranks a shop listing, and an unstocked item is still fully functional — each covered by a synthetic-fixture test.
+- No behavior change to the engine: no new enum member, no rulebook verb, no settlement path is touched. **No new game-data contract test is added**; the codex stays a reviewed design document and the mechanical guarantees stay with the loaders that already fail closed.
 
 ## Capabilities
 
 ### New Capabilities
-- `lore-item-catalog`: the contract binding the shipped item catalog to the lore item codex — which items exist, what identity and price band each carries, and which of them a shop actually stocks. Later slices of the codex extend this capability rather than scattering roster facts across the mechanics capabilities that own item *shape*.
+- `lore-item-catalog`: the behavioral invariants that follow from an item's declared mechanical shape — what an item with no mechanics may and may not do, what non-sellability blocks, and what registration does and does not entitle an item to. It specifies shape, not roster: every requirement is satisfiable and testable with a synthetic item, so nothing in it names shipped content.
 
 ### Modified Capabilities
 - `lore-registries`: the `PRICE_TABLE` requirement enumerates the bands it must cover; it gains the regional-delicacy band.
@@ -28,5 +29,6 @@ This change lands the easiest and largest slice: the 24 inspect-only items (food
 - `world/lore/shops.py` — 18 new keys in the general store's `offered_item_keys`.
 - `world/rules/rulebook/guild_economy.yaml` — 18 new shop offers.
 - `docs/lore/items.md` — one clarifying line in the 雜物 section.
-- Tests with hard-coded roster assertions: `world/lore/tests/test_items.py` (exact key set), `world/rules/tests/test_guild_config.py` (`len(ITEM_REGISTRY) == 58`).
+- Two already-registered data-contract tests get their literals moved and nothing more: `world/lore/tests/test_items.py` (exact key set) and `world/rules/tests/test_guild_config.py` (literal registry count). No ledger entry is added to `tools/test_data_freeze.json`.
+- Three new behavior tests on synthetic fixtures, added to existing test modules so `.github/evennia-shards.json` is untouched.
 - No consumer of `ITEM_REGISTRY` changes shape; every new entry is inspect-only, which is the one item form every existing consumer already handles.

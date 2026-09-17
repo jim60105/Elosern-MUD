@@ -1,10 +1,8 @@
-## 1. Budget contract test
+## 1. Unstocked-equipment behavior
 
-- [ ] 1.1 Hand-transcribe the codex's equipment adjustments into a literal test fixture of `(item_key, field, value, budget_column)` tuples covering all 45 shipped equipment items, taking each value from the codex row and each column from the field-to-column mapping in the codex's seventh layer. Do NOT parse the adjustment cells — the fixture is reviewed as data. Verify the fixture reproduces `equipment_effects.yaml` exactly for the 42 items where codex and rulebook agree.
-- [ ] 1.2 Record the three known divergences (`sister_vestments`, `saintess_vestments`, `silver_feather_earring`) as an explicit allow-list in the fixture with a comment pointing at the codex's "rulebook is authoritative for tuned values" clause, and verify the test passes with exactly those three exempted and no others.
-- [ ] 1.3 Add the assertion that every fixture value fits its budget column at the item's registered rarity, and verify it passes for all 45 shipped items.
-- [ ] 1.4 Add a negative case: an over-budget synthetic tuple fails the assertion, proving the check is live.
-- [ ] 1.5 Extend the fixture with the 12 new items' tuples as each group lands in section 2-4, and verify the fixture stays exhaustive — an item in the rulebook with no fixture tuple fails the test.
+- [ ] 1.1 Using a synthetic equipment item that no synthetic shop offers, assert the rulebook loads with no unbound key and no orphan, that no validator reports a missing offer, and that granting and equipping it applies its adjustments through the shared accessor. Annotate with `covers_requirement` for the registration-and-tradeability requirement. Verify with `world.rules.tests.test_equipment_effect_rulebook` and `world.skills.tests.test_equipment`.
+- [ ] 1.2 Add a negative case proving the budget gate is live: a synthetic rulebook entry whose value exceeds its rarity's ceiling must fail the load naming the field and the ceiling. Verify with `world.rules.tests.test_equipment_effect_rulebook`.
+- [ ] 1.3 Add both tests to existing test modules so `.github/evennia-shards.json` needs no edit, and confirm the annotation IDs against `uv run --locked python -m tools.spec_traceability list`. Verify with `uv run --locked python -m tools.spec_traceability check`.
 
 ## 2. Beastfolk weapons
 
@@ -23,15 +21,14 @@
 - [ ] 4.2 Add `elven_forest_veil` — `legendary`, `EquipmentSlot.ARMOR`, `armor` band — with `adjustments: {defense: 4, pleasure_gain: "+15%"}` and top-level `exposure_bias: 1`. Verify the bias is authored as a sibling of `adjustments`, not inside it, and that the load accepts it.
 - [ ] 4.3 Add `beastfolk_tribal_totem` (`uncommon`, `EquipmentSlot.ACCESSORY`, `jewelry` band, `atk_phys: 2, defense: 2`) and `beastfolk_gale_earring` (`uncommon`, `jewelry` band, `agility: "+4%"`). Verify the earring's percent-typed `agility` is checked against the `percent` column, not `flat`.
 
-## 5. Roster assertions
+## 5. Existing roster assertions
 
-- [ ] 5.1 Update the exact key set in `world/lore/tests/test_items.py` to 94 keys and verify the metadata test passes.
-- [ ] 5.2 Update the registry count in `world/rules/tests/test_guild_config.py` to 94 and verify its price-identity test passes.
-- [ ] 5.3 Update any equipment-effect rulebook test that pins the bound key set, and verify the two-sided close still reports no unbound key and no orphan.
-- [ ] 5.4 Add a test asserting none of the twelve regional keys appears in any shop's offered keys, and verify it passes.
+- [ ] 5.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster. Literal update only, no added assertions. Verify with `world.lore.tests.test_items`.
+- [ ] 5.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
+- [ ] 5.3 Move any literal bound-key set in the equipment-effect rulebook tests, and verify the two-sided close reports no unbound key and no orphan with `world.rules.tests.test_equipment_effect_rulebook`.
+- [ ] 5.4 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
 
 ## 6. Verification
 
-- [ ] 6.1 Equip one item per slot from the new roster in a test — a main-hand weapon, the armor, and an accessory — and verify the adjustments reach the shared accessor with the expected values.
-- [ ] 6.2 Run the full test suite and verify no regression in equipment toggle, inventory, presentation, or shop validation.
-- [ ] 6.3 Run `openspec validate land-lore-regional-equipment --strict` and verify it reports the change as valid.
+- [ ] 6.1 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.rules.tests.test_equipment_effect_rulebook`, `world.rules.tests.test_guild_config`, `world.skills.tests.test_equipment`, `world.rules.tests.test_equipment_toggle`. Do not run the full suite.
+- [ ] 6.2 Run `openspec validate land-lore-regional-equipment --strict` and verify it reports the change as valid.

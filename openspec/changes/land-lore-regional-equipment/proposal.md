@@ -9,14 +9,13 @@ These 12 are the second slice of `docs/lore/items.md`. They are still data — t
 - Register 12 equipment items from the codex: 7 weapons (5 beastfolk, 1 elven, 1 dungeon trophy), 3 armors (2 beastfolk, 1 elven), 2 beastfolk accessories.
 - Add the 12 matching `EquipmentModifierKey` members and the 12 matching `equipment_effects.yaml` entries, keeping the enum member value equal to the item key as the loader requires.
 - Keep all 12 registry-only: none is added to any shop. Their provenance is the Beastfolk Kingdom, the elven villages, and a dungeon, none of which the Altoria general store reaches.
-- Extend the `lore-item-catalog` roster contract to cover equipment: every equipment item's codex numbers must fit its rarity budget, and the binding must be complete on both sides.
-- No behavior change: no new vocabulary member, no new adjustment field, no new budget column, no settlement path touched.
+- No behavior change to the engine: no new vocabulary member, no new adjustment field, no new budget column, no settlement path touched.
+- **No new game-data contract test.** Budget legality is already enforced by the rulebook loader at startup, which fails the server on a wrong number; a test re-asserting the codex's published values would only echo registry content.
 
 ## Capabilities
 
 ### Modified Capabilities
-- `lore-item-catalog`: the roster contract gains the equipment slice — bindings complete on both sides, codex numbers inside the rarity budget, and an explicit statement that regional goods stay registry-only until their storefronts exist.
-- `equipment-effects`: the capability currently names one concrete roster ("the ten designed equipment items") and requires it to be tradeable. It gains a second, parallel roster requirement for the regional pieces, which are deliberately *not* tradeable — so the tradeability of a new roster becomes a stated per-roster decision rather than an implied rule.
+- `equipment-effects`: the capability currently names one concrete roster ("the ten designed equipment items") and requires it to be tradeable, which reads as a general rule. It gains a requirement making registration and tradeability independent — a bound, budget-checked, unstocked piece is a valid shipped state, and each roster states its own stocking decision from its lore provenance.
 
 ## Impact
 
@@ -24,4 +23,4 @@ These 12 are the second slice of `docs/lore/items.md`. They are still data — t
 - `world/rules/rulebook/equipment_effects.yaml` — 12 new effect entries.
 - Tests with hard-coded roster assertions: `world/lore/tests/test_items.py`, `world/rules/tests/test_guild_config.py`, and the equipment-effect rulebook tests that pin the bound key set (`EquipmentModifierKey` goes from 45 members to 57).
 - No shop file changes; `world/lore/shops.py` and `guild_economy.yaml` are untouched.
-- Depends on `land-lore-inspect-only-items`, which introduces the catalog contract test this change extends and moves the same two roster assertions.
+- Depends on `land-lore-inspect-only-items`, which introduces the `lore-item-catalog` capability this change builds on and moves the same two roster literals.

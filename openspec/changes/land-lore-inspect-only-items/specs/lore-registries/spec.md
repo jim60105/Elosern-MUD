@@ -23,6 +23,6 @@ foods from an ordinary meal.
 - **WHEN** every `PriceEntry` with a non-`None` `max_copper` is inspected
 - **THEN** `max_copper >= min_copper`
 
-#### Scenario: Every band a catalogued item names exists
-- **WHEN** every registered item's price-table key is resolved against `PRICE_TABLE`
-- **THEN** each one resolves to a `PriceEntry`, with no catalogued item naming an absent band
+#### Scenario: An item naming an absent band fails the catalog load
+- **WHEN** an item definition names a price-table key that `PRICE_TABLE` does not define
+- **THEN** the shop-catalog load raises for that item rather than defaulting to an unbounded price
