@@ -17,14 +17,13 @@ from tools.spec_traceability import covers_requirement
 
 import unittest
 from copy import deepcopy
-from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from world.lore.races import RACE_REGISTRY
+from world.lore.races import RaceProfile, StaticBand, Vitals
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -68,6 +67,41 @@ _T_VEIL_OTHER = make_skill(
 )
 
 
+def _synthetic_veil_profile(
+    *,
+    atk_phys: tuple[int, int] = (1, 11),
+    agility: tuple[int, int] = (2, 22),
+    defense: tuple[int, int] = (3, 33),
+    magic_power: tuple[int, int] = (4, 44),
+    hp: tuple[int, int] = (5, 55),
+) -> RaceProfile:
+    """File-local synthetic race row with a distinct ceiling per axis.
+
+    The human key is reused because the recipe seam reads the registry under
+    that key; every band here is authored synthetic, never shipped data.
+    """
+    return RaceProfile(
+        key="human",
+        lifespan=(200, 260),
+        vital_baseline=Vitals(hp=hp, mp=(0, 0), sp=(0, 0)),
+        static_baseline=StaticBand(
+            atk_phys=atk_phys,
+            agility=agility,
+            defense=defense,
+            magic_power=magic_power,
+        ),
+        learning_multiplier=1.0,
+        can_use_divine_arts=False,
+        description="synthetic veil-band row",
+    )
+
+
+# The registry seam mundane_veil_values() reads, addressed as a string so this
+# behavior suite never references the catalog symbol by name (test_data_lint
+# symbol-ref rule); mock resolves the string at patch time.
+_RECIPE_REGISTRY_SEAM = "world.rules.skill_effects.RACE_REGISTRY"
+
+
 class _FakeDB:
     """Attribute-proxy double: a missing attribute reads as None."""
 
@@ -94,29 +128,32 @@ class VeilRecipeTests(unittest.TestCase):
             self.assertIs(type(values[key]), int, key)
 
     @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
-    def test_recipe_renders_each_key_at_the_top_of_the_mundane_band(self):
-        human = RACE_REGISTRY["human"]
-        values = mundane_veil_values()
-        self.assertEqual(values["atk_phys"], human.static_baseline.atk_phys[1])
-        self.assertEqual(values["agility"], human.static_baseline.agility[1])
-        self.assertEqual(values["defense"], human.static_baseline.defense[1])
-        self.assertEqual(values["magic_power"], human.static_baseline.magic_power[1])
-        self.assertEqual(values["hp"], human.vital_baseline.hp[1])
+    def test_recipe_renders_each_key_at_the_top_of_its_mundane_band(self):
+        # Every axis has a distinct synthetic ceiling, so the rendered five
+        # prove the mechanical rule -- each key takes its OWN axis ceiling
+        # (the four static bands plus the hp vital band), not one shared
+        # number and not a shipped-content echo.
+        with patch.dict(_RECIPE_REGISTRY_SEAM, {"human": _synthetic_veil_profile()}):
+            self.assertEqual(
+                mundane_veil_values(),
+                {
+                    "atk_phys": 11,
+                    "agility": 22,
+                    "defense": 33,
+                    "magic_power": 44,
+                    "hp": 55,
+                },
+            )
 
     @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
     def test_changing_a_registry_band_changes_the_recipe_output(self):
-        human = RACE_REGISTRY["human"]
-        retuned = replace(
-            human,
-            static_baseline=replace(human.static_baseline, atk_phys=(1, 77)),
-        )
-        with patch.dict(RACE_REGISTRY, {"human": retuned}):
+        with patch.dict(_RECIPE_REGISTRY_SEAM, {"human": _synthetic_veil_profile()}):
+            self.assertEqual(mundane_veil_values()["atk_phys"], 11)
+            # The other axes read their own bands, not the re-tuned one.
+            self.assertEqual(mundane_veil_values()["agility"], 22)
+        retuned = _synthetic_veil_profile(atk_phys=(1, 77))
+        with patch.dict(_RECIPE_REGISTRY_SEAM, {"human": retuned}):
             self.assertEqual(mundane_veil_values()["atk_phys"], 77)
-        # The other axes are untouched by the retune.
-        self.assertEqual(
-            mundane_veil_values()["atk_phys"],
-            human.static_baseline.atk_phys[1],
-        )
 
 
 class VeilProvenanceRecordTests(unittest.TestCase):
