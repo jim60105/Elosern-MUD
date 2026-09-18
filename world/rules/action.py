@@ -1013,6 +1013,37 @@ def _handle_divine_mystery(
     return []
 
 
+def _stage_apply_event(
+    recipients: list[Any],
+    event_name: str,
+    sexual_context: dict[str, Any],
+) -> list[PendingEffect]:
+    """Stage one deferred ``apply_event`` call per recipient.
+
+    The ``apply_event`` import stays deferred to match the module's existing
+    cycle-avoidance discipline; an unavailable rules module rejects the action
+    rather than staging a commit-time crash. ``sexual_context`` is built by
+    each caller so the pair-event handler's resolution order — act resolution
+    before any context read — stays byte-identical.
+    """
+    try:
+        from world.rules.sexual_transitions import apply_event
+    except ImportError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual-transition rules are unavailable (change 7b)",
+        ) from error
+    return [
+        PendingEffect(
+            r,
+            f"sexual_transition|{_entity_key(r)}|{event_name}",
+            frozenset(),
+            lambda r=r: apply_event(r, event_name, **sexual_context),
+        )
+        for r in recipients
+    ]
+
+
 def _handle_sexual_event(
     actor: Any,
     targets: list[Any],
@@ -1038,28 +1069,11 @@ def _handle_sexual_event(
             RejectReason.EFFECT_RESOLUTION_FAILED,
             "sexual_event requires an event name",
         )
-    try:
-        from world.rules.sexual_transitions import apply_event
-    except ImportError as error:
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "sexual-transition rules are unavailable (change 7b)",
-        ) from error
-    sexual_context = dict(context.get("sexual", {}))
-    recipients = participants(actor, targets)
-    return [
-        PendingEffect(
-            target,
-            f"sexual_transition|{_entity_key(target)}|{event_name}",
-            frozenset(),
-            lambda target=target: apply_event(
-                target,
-                event_name,
-                **sexual_context,
-            ),
-        )
-        for target in recipients
-    ]
+    return _stage_apply_event(
+        participants(actor, targets),
+        event_name,
+        dict(context.get("sexual", {})),
+    )
 
 
 def _handle_actor_sexual_event(
@@ -1094,26 +1108,7 @@ def _handle_actor_sexual_event(
         and not observers_present(actor, targets, context)
     ):
         return []
-    try:
-        from world.rules.sexual_transitions import apply_event
-    except ImportError as error:
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "sexual-transition rules are unavailable (change 7b)",
-        ) from error
-    sexual_context = dict(context.get("sexual", {}))
-    return [
-        PendingEffect(
-            actor,
-            f"sexual_transition|{_entity_key(actor)}|{event_name}",
-            frozenset(),
-            lambda: apply_event(
-                actor,
-                event_name,
-                **sexual_context,
-            ),
-        )
-    ]
+    return _stage_apply_event([actor], event_name, dict(context.get("sexual", {})))
 
 
 def _handle_target_sexual_event(
@@ -1150,28 +1145,11 @@ def _handle_target_sexual_event(
             RejectReason.EFFECT_RESOLUTION_FAILED,
             "sexual_event_target requires an event name",
         )
-    try:
-        from world.rules.sexual_transitions import apply_event
-    except ImportError as error:
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "sexual-transition rules are unavailable (change 7b)",
-        ) from error
-    sexual_context = dict(context.get("sexual", {}))
-    return [
-        PendingEffect(
-            target,
-            f"sexual_transition|{_entity_key(target)}|{event_name}",
-            frozenset(),
-            lambda target=target: apply_event(
-                target,
-                event_name,
-                **sexual_context,
-            ),
-        )
-        for target in targets
-        if target is not actor
-    ]
+    return _stage_apply_event(
+        [target for target in targets if target is not actor],
+        event_name,
+        dict(context.get("sexual", {})),
+    )
 
 
 def _handle_act_pair_event(
@@ -1198,26 +1176,7 @@ def _handle_act_pair_event(
     event_name = pair_event_name(actor, targets, act)
     if event_name is None:
         return []
-    try:
-        from world.rules.sexual_transitions import apply_event
-    except ImportError as error:
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "sexual-transition rules are unavailable (change 7b)",
-        ) from error
-    return [
-        PendingEffect(
-            participant,
-            f"sexual_transition|{_entity_key(participant)}|{event_name}",
-            frozenset(),
-            lambda participant=participant: apply_event(
-                participant,
-                event_name,
-                **sexual_context,
-            ),
-        )
-        for participant in participants(actor, targets)
-    ]
+    return _stage_apply_event(participants(actor, targets), event_name, sexual_context)
 
 
 def _resolve_act(effect_id: str) -> Any:

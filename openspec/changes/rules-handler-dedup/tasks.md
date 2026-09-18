@@ -40,10 +40,10 @@
 
 ## 2. Sexual event family
 
-- [ ] 2.1 Add `_stage_apply_event(recipients, event_name, context)` per design D3 (lambda
+- [x] 2.1 Add `_stage_apply_event(recipients, event_name, context)` per design D3 (lambda
   capture `r=r`; ImportError → `RejectedAction(EFFECT_RESOLUTION_FAILED,
   "sexual-transition rules are unavailable (change 7b)")` text byte-identical).
-- [ ] 2.2 Rewrite `_handle_sexual_event` (979-1025), `_handle_actor_sexual_event`
+- [x] 2.2 Rewrite `_handle_sexual_event` (979-1025), `_handle_actor_sexual_event`
   (1028-1079, observer gate stays BEFORE the staging call), `_handle_target_sexual_event`
   (1082-1137, recipients `targets` minus actor), `_handle_act_pair_event` (1141+ ,
   pair resolution + `None` short-circuit stay). Each keeps its own event-name parse and
