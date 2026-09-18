@@ -481,6 +481,31 @@ class ItemUseSettlementTests(_ItemUseTestCase):
         self.assertEqual(after["inventory"], before["inventory"])
         self.assertEqual(after["contents"], before["contents"])
 
+    @covers_requirement(
+        "lore-item-catalog::a-non-consuming-use-settles-without-spending-the-item"
+    )
+    def test_non_consuming_item_preserves_inventory_and_advances_clock(self):
+        # Scenario 1: A reusable item survives its own use
+        self.register_fixture(_fixture_item("t_reusable_device", consumable=False))
+        self.hurt(HEAL_AMOUNT + 5)
+        self.actor.db.inventory = ["t_reusable_device"]
+        clock = WorldClock()
+        settlement = use_item(self.actor, "t_reusable_device", clock=clock)
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertEqual(list_items(self.actor), ["t_reusable_device"])
+        self.assertEqual(clock.tick, ITEM_USE_SECONDS)
+
+        # Scenario 2: A consuming item is spent
+        self.hurt(HEAL_AMOUNT + 5)
+        self.actor.db.inventory = ["t_moss_tonic", "t_moss_tonic"]
+        consuming_clock = WorldClock()
+        consuming_settlement = use_item(
+            self.actor, "t_moss_tonic", clock=consuming_clock
+        )
+        self.assertEqual(consuming_settlement.result.outcome, "success")
+        self.assertEqual(list_items(self.actor), ["t_moss_tonic"])
+        self.assertEqual(consuming_clock.tick, ITEM_USE_SECONDS)
+
     def test_healing_clamps_at_maximum_and_reports_actual_amount(self):
         self.hurt(5)
         self.actor.db.inventory = ["t_moss_tonic"]
@@ -949,18 +974,48 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual(entry.data["amount"], -10)
         self.assertIn("失去", entry.text_template)
 
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
     def test_pleasure_gain_uses_the_shared_writer(self):
+        # Scenario 1: A pleasure gain needs no status vocabulary
+        profile = live_item_effect_profiles()[_PLEASURE_UP_KEY]
+        self.assertEqual(len(profile.effects), 1)
+        self.assertIs(profile.effects[0].stat, ItemStat.PLEASURE)
+        self.assertFalse(hasattr(profile.effects[0], "status"))
+        self.assertFalse(hasattr(profile.effects[0], "remove_status"))
+
+        # Scenario 2: A device's stimulation drives the same cascade as a skill's
         self.set_pleasure(60)
+        self.actor.sexual.wetness.value = 1
+        wetness_before = self.actor.sexual.wetness.value
+        self.assertEqual(self.actor.sexual.arousal.level, "高度")
         self.actor.db.inventory = [_PLEASURE_UP_KEY]
         result = resolve_item_use(
             ItemUseRequest(self.actor, _PLEASURE_UP_KEY), in_combat=False
         )
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.pleasure(), 90)
+        self.assertEqual(self.actor.sexual.arousal.level, "極限")
+        self.assertEqual(self.actor.sexual.wetness.value, wetness_before + 1)
         (entry,) = result.event_log.entries
         self.assertEqual(entry.data["amount"], 30)
         self.assertIn("提升", entry.text_template)
 
+        # Clamped near-ceiling case: reported amount is actual gauge delta, not declared
+        self.set_pleasure(85)
+        self.actor.db.inventory = [_PLEASURE_UP_KEY]
+        clamped_result = resolve_item_use(
+            ItemUseRequest(self.actor, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertEqual(clamped_result.outcome, "success")
+        self.assertEqual(self.pleasure(), 100)
+        (clamped_entry,) = clamped_result.event_log.entries
+        self.assertEqual(clamped_entry.data["amount"], 15)
+
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
     def test_pleasure_full_at_the_ceiling_rejects_consumption(self):
         self.set_pleasure(100)
         self.actor.db.inventory = [_PLEASURE_UP_KEY]
@@ -981,6 +1036,41 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         )
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, ItemUseReason.PLEASURE_FULL)
+
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
+    def test_unmaterialized_intimacy_state_preflight_allows_and_settles_gain(self):
+        # Task 5.1: unmaterialised intimacy state
+        from typeclasses.npcs import NPC
+        fresh = create_object(NPC, key="t_unmaterialized_npc")
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        fresh.location = self.actor.location
+        fresh.db.inventory = [_PLEASURE_UP_KEY]
+        # Assert sexual_traits is unmaterialized before the call
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+        self.assertNotIn("sexual", fresh.__dict__)
+
+        # Preflight's fail-closed read does not reject it
+        preflight = preflight_item_use(
+            ItemUseRequest(fresh, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertTrue(preflight.allowed)
+        self.assertIsNone(preflight.reason)
+
+        # Still unmaterialized after preflight!
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+
+        # Settlement raises pleasure through the shared writer
+        result = resolve_item_use(
+            ItemUseRequest(fresh, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(int(fresh.sexual.pleasure.base), 30)
+        (entry,) = result.event_log.entries
+        self.assertEqual(entry.data["stat"], "pleasure")
+        self.assertEqual(entry.data["amount"], 30)
 
 
 class RemovalSelectorSettlementTests(_MultiEffectTestCase):
@@ -1219,6 +1309,57 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
         self.assertEqual(self.actor.sexual.wetness.level, wetness_before)
         self.assertEqual(self.actor.sexual.climax_phase.level, phase_before)
         self.assertEqual(list_items(self.actor), [_PLEASURE_UP_KEY])
+
+    @covers_requirement(
+        "lore-item-catalog::a-non-consuming-use-settles-without-spending-the-item"
+    )
+    def test_non_consuming_use_rollback_restores_all_surfaces_and_inventory(self):
+        # Scenario 3: A rolled-back reusable use leaves nothing behind
+        from world.rules.item_effects import ItemTargetScope
+        reusable_pleasure = _fixture_item("t_reusable_pleasure", consumable=False)
+        reusable_profile = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.PLEASURE, amount=30, scope=ItemTargetScope.SELF
+                ),
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=20, scope=ItemTargetScope.SELF
+                ),
+            )
+        )
+        self.register_fixture(reusable_pleasure, reusable_profile)
+        self.hurt(30)
+        self.set_pleasure(60)
+        self.actor.sexual.wetness.value = 1
+        hp_before = int(self.actor.traits.hp.current)
+        pleasure_before = self.pleasure()
+        wetness_before = self.actor.sexual.wetness.value
+        phase_before = self.actor.sexual.climax_phase.level
+        self.actor.db.inventory = ["t_reusable_pleasure"]
+
+        from world.rules import items as items_module
+        real_gauge = items_module._apply_gauge_step
+        step_count = 0
+        def fail_on_second_step(step):
+            nonlocal step_count
+            step_count += 1
+            if step_count > 1:
+                raise RuntimeError("mid-settlement failure")
+            return real_gauge(step)
+
+        with patch(
+            "world.rules.items._apply_gauge_step",
+            side_effect=fail_on_second_step,
+        ), self.assertRaises(RuntimeError):
+            resolve_item_use(
+                ItemUseRequest(self.actor, "t_reusable_pleasure"), in_combat=False
+            )
+
+        self.assertEqual(int(self.actor.traits.hp.current), hp_before)
+        self.assertEqual(self.pleasure(), pleasure_before)
+        self.assertEqual(self.actor.sexual.wetness.value, wetness_before)
+        self.assertEqual(self.actor.sexual.climax_phase.level, phase_before)
+        self.assertEqual(list_items(self.actor), ["t_reusable_pleasure"])
 
     def test_post_drain_fault_restores_pleasure_and_buffs(self):
         self.hurt(50)
