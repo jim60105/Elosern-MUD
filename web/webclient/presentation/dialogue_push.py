@@ -21,68 +21,35 @@ today's truth. Fire-and-forget by contract: a cleared character with no live
 watcher is a silent no-op; every failure is isolated per watcher and bounded-
 logged so a callback exception never escapes the on-commit chain or suppresses
 later watchers; correctness is re-established by the next snapshot regardless.
+The fan-out discipline itself lives in
+:func:`web.webclient.presentation.push.make_panel_pusher`; this shell keeps
+the seam and supplies the collaborators.
 """
-
-from typing import Any
 
 from world.observability import log_warn
 
 from web.webclient.presentation.coordinator import publish_panel_update
 from web.webclient.presentation.ingress import build_presentation_context
+from web.webclient.presentation.push import PanelPushDeps, make_panel_pusher
 from web.webclient.presentation.registry import build_production_registry
 from web.webclient.presentation.watchers import watchers_for
 
 __all__ = ["push_dialogue_update"]
 
 
-def push_dialogue_update(player: Any) -> None:
-    """Re-render and push the ``dialogue`` panel to every live watcher of ``player``.
+def _deps() -> PanelPushDeps:
+    """Resolve the fan-out collaborators from this module's globals.
 
-    Fire-and-forget by contract: a player with no live webclient watcher is a
-    silent no-op, and one bad session never suppresses the others or raises
-    into the deferred clear callback.
+    Read per call so identity-based test patches on this module's names keep
+    intercepting the shared factory body.
     """
-    try:
-        watchers = watchers_for(player)
-    except Exception as error:
-        log_warn(
-            "dialogue_push_watchers_failed",
-            context={"surface": "presentation", "char": str(getattr(player, "pk", "?"))},
-            exc=error,
-        )
-        return
-    if not watchers:
-        return
-    try:
-        registry = build_production_registry()
-    except Exception as error:
-        # A registry-construction defect must degrade to a bounded diagnostic
-        # (party_push precedent): raising from an on-commit callback would
-        # surface in the caller and skip later commit callbacks.
-        log_warn(
-            "dialogue_push_failed",
-            context={"surface": "presentation", "char": str(getattr(player, "pk", "?"))},
-            exc=error,
-        )
-        return
-    for session, epoch in watchers:
-        try:
-            context = build_presentation_context(session, player)
-            payload = registry.render("dialogue", context)
-            publish_panel_update(
-                session,
-                player,
-                {"dialogue": payload},
-                context=context,
-                expected_epoch=epoch,
-            )
-        except Exception as error:
-            log_warn(
-                "dialogue_push_failed",
-                context={
-                    "surface": "presentation",
-                    "char": str(getattr(player, "pk", "?")),
-                    "session": str(getattr(session, "sessid", "?")),
-                },
-                exc=error,
-            )
+    return PanelPushDeps(
+        watchers_for=watchers_for,
+        build_registry=build_production_registry,
+        build_context=build_presentation_context,
+        publish=publish_panel_update,
+        log_warn=log_warn,
+    )
+
+
+push_dialogue_update = make_panel_pusher("dialogue", "dialogue", _deps)

@@ -10,7 +10,7 @@
 
 ## 1. Panel pusher factory
 
-- [ ] 1.1 Create `web/webclient/presentation/push.py` with
+- [x] 1.1 Create `web/webclient/presentation/push.py` with
   `make_panel_pusher(panel_key: str, event_prefix: str) -> Callable[[Any], None]` whose body
   is the shared fan-out currently repeated in `party_push.py`/`dialogue_push.py`/
   `lore_codex_push.py`: watchers lookup → `{prefix}_push_watchers_failed` on failure;
@@ -19,7 +19,7 @@
   → `{prefix}_push_failed` (with `"session"` context key) on failure. Import `log_warn` in
   `push.py` via `from world.observability import log_warn`; keep the per-module docstrings'
   seam rationale on the shells. Verify: `uv run --locked python -m compileall -q web/webclient/presentation/push.py`.
-- [ ] 1.2 Rewrite `web/webclient/presentation/party_push.py` as a thin shell: keep the module
+- [x] 1.2 Rewrite `web/webclient/presentation/party_push.py` as a thin shell: keep the module
   docstring, module-level `from world.observability import log_warn` re-import (test patch
   target), and `push_party_update = make_panel_pusher("party", "party")`. The existing test
   patches `web.webclient.presentation.party_push.log_warn` and
@@ -35,15 +35,15 @@
   receives a `deps` provider reading the shell module's globals). Pick the simplest shape
   that keeps every existing patch target live. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_party_panel`.
-- [ ] 1.3 Same shell treatment for `dialogue_push.py` (`("dialogue", "dialogue")`) and
+- [x] 1.3 Same shell treatment for `dialogue_push.py` (`("dialogue", "dialogue")`) and
   `lore_codex_push.py` (`("lore_codex", "lore_codex")`). Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_dialogue_panel` and
   `... web.webclient.presentation.tests.test_lore_codex_panel`.
-- [ ] 1.4 Leave `art_push.py` untouched on its own signal-subscriber path (it fans out over
+- [x] 1.4 Leave `art_push.py` untouched on its own signal-subscriber path (it fans out over
   SESSION_HANDLER sessions with a coordinator, not watchers_for — NOT a member of the identical
   trio), but do not duplicate any new shared code it doesn't need. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_art_push`.
-- [ ] 1.5 Diff-check the extracted trio: `git diff` must show the three shells containing no
+- [x] 1.5 Diff-check the extracted trio: `git diff` must show the three shells containing no
   remaining fan-out logic and the factory containing exactly one copy; confirm the six
   produced event-id strings (party/dialogue/lore_codex × two event templates) are generated
   only via the factory prefix and no literal `{prefix}_push*` string survives in any shell
