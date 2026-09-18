@@ -95,10 +95,10 @@
 
 ## 4. Wave close-out verification
 
-- [ ] 4.1 `uv run --locked python -m tools.spec_traceability check` passes unchanged (no
+- [x] 4.1 `uv run --locked python -m tools.spec_traceability check` passes unchanged (no
   requirement moved, no annotation detached).
-- [ ] 4.2 `uv run --locked python -m tools.observability_lint check` passes and
+- [x] 4.2 `uv run --locked python -m tools.observability_lint check` passes and
   `git diff --stat tools/observability_freeze.json` shows no additions (shrink-only rule).
-- [ ] 4.3 Shard contract still green without manifest edits:
+- [x] 4.3 Shard contract still green without manifest edits:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
-- [ ] 4.4 `git diff --check` clean; no change under `docs/game/` (no command surface touched).
+- [x] 4.4 `git diff --check` clean; no change under `docs/game/` (no command surface touched).
