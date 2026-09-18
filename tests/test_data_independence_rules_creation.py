@@ -1,12 +1,14 @@
 """Repository contract: the rules creation/progression migration stays closed.
 
 The migrate-rules-creation-progression-tests-off-real-data change removed
-every ledger exemption for the twenty-one ``world/rules/tests`` modules it
-migrated (including the two zero-findings debt files, which migrated by
-entry removal alone). This contract re-derives the gate over exactly those
-files: none may carry a ledger DEBT exemption again, and all must report
-zero lint findings — so a future edit that reintroduces a shipped identifier
-cannot silently re-register debt.
+every ledger exemption for the ``world/rules/tests`` modules it migrated
+(including the two zero-findings debt files, which migrated by entry removal
+alone). ``test_conferral_action.py`` left the closure when
+``conferral-grant-store`` retired the module's event-context contract in the
+same branch. This contract re-derives the gate over exactly the remaining
+files: none may carry a ledger DEBT exemption again, and all must report zero
+lint findings — so a future edit that reintroduces a shipped identifier cannot
+silently re-register debt.
 
 Annotated with the canonical requirement id added when this change's delta
 is archived/synced into ``openspec/specs``.
@@ -24,7 +26,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MIGRATED_FILES = (
     "world/rules/tests/test_character_creation.py",
     "world/rules/tests/test_cmd_cast.py",
-    "world/rules/tests/test_conferral_action.py",
     "world/rules/tests/test_creation_messages.py",
     "world/rules/tests/test_creation_wizard.py",
     "world/rules/tests/test_divine_mystery_gate.py",
