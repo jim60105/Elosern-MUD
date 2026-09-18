@@ -367,10 +367,14 @@ See D6. `ConferredSkillGrant` becomes `{source_key: str, skill_key: str, scale: 
 that resolve a continuous-valued typed effect (§3.1's `StatMultiplyEffect`, `growth_rate`'s existing
 class, and the new `skill_owned` rule-table adjustments) each independently check
 `entity.skills.conferred_grants()` for a grant referencing a skill whose parsed effect they know how
-to scale, and fold in `resolved_value * grant.scale`. No change to the existing
-`confer_skill_key`/`confer_scale`/`confer_trait_keys` event-context contract is required beyond
-dropping the now-redundant explicit `trait_keys` (derivable from the referenced skill's own typed
-effect).
+to scale, and fold in `resolved_value * grant.scale`. The conferral-grant-store change supersedes
+the old `confer_skill_key`/`confer_scale`/`confer_trait_keys` event-context contract entirely: the
+scale is read from the conferring node's own `EffectPolicy.coefficient`, the granted set is derived
+from the caster's directly-owned conferrable skills (never caller-chosen), the store is keyed by
+`(source_key, skill_key)` so a repeated conferral replaces rather than compounds, and the source
+must directly own what it confers (`validate_source_owns_skill` at the resolver boundary, where the
+actor exists — the write primitive itself still takes string identities and performs no ownership
+interrogation, design D2).
 
 ---
 

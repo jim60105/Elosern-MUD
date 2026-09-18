@@ -58,7 +58,7 @@ class ConferredSkillTests(EvenniaTestCase):
         entity.db.skills = {"active": [], "passive": []}
         return entity
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_fractional_grant_scales_the_source_skill_multiplier(self):
         entity = self._entity()
         entity.traits.atk_phys.base = 60
@@ -69,7 +69,14 @@ class ConferredSkillTests(EvenniaTestCase):
             entity.skills.effective_value("atk_phys"), round(60 * multiplier * 0.1)
         )
 
-    def test_grant_write_does_not_check_source_or_ownership(self):
+    def test_write_primitive_takes_string_identities_and_skips_unknown_keys(self):
+        # Design D2: the write primitive receives string identities and has no
+        # entity to interrogate, so ownership is enforced where the actor
+        # exists — at the resolver boundary, whose derived set only ever
+        # contains directly-owned keys (validate_source_owns_skill is covered
+        # by world.rules.tests.test_conferral_cast). An unrecognized key is
+        # still written verbatim because such a grant contributes nothing at
+        # read time.
         entity = self._entity()
         before = entity.traits.atk_phys.value
         record_conferred_grant(entity, "unknown source", "unknown skill", 0.5)
@@ -102,23 +109,23 @@ class ConferredSkillTests(EvenniaTestCase):
         self.assertIs(raised.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
         self.assertEqual(entity.skills.conferred_grants(), [])
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_disguise_gate_type_skill_is_rejected(self):
         self._assert_gate_type_rejected(_T_GATE_DISGUISE.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_sexual_mastery_gate_type_skill_is_rejected(self):
         self._assert_gate_type_rejected(_T_GATE_SEXUAL.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_damage_only_skill_is_rejected_as_a_silent_no_op(self):
         self._assert_gate_type_rejected(_T_DAMAGE_ONLY.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_flavor_only_skill_is_rejected_as_a_silent_no_op(self):
         self._assert_gate_type_rejected(_T_FLAVOR_ONLY.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_continuous_effect_skills_remain_conferrable(self):
         entity = self._entity()
         record_conferred_grant(entity, "t_synth_source", _T_GRANT.key, 0.5)

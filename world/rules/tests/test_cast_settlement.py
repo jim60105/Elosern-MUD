@@ -33,7 +33,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SkillCategory, TargetSpec
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
 from world.tests.synthetic_data import make_skill
 
 from ._combat_session_helpers import open_synthetic_scope
@@ -74,6 +74,20 @@ _T_PRAYER = make_skill(
     cost={},
     effects=[],
 )
+# The passive the conferral caster must own for the derived set to be
+# non-empty: the cast path now derives what it grants from direct ownership.
+_T_GRANTABLE = make_skill(
+    "t_grantable_echo",
+    label="授予目標被動",
+    description="測試用的可傳授被動。",
+    kind=SkillKind.PASSIVE,
+    target_spec=TargetSpec.SELF,
+    cost={},
+    usable_out_of_combat=True,
+    element=None,
+    effects=["stat_multiply:defense:2.0"],
+    category=SkillCategory.ENHANCEMENT,
+)
 
 
 def _raising_stage():
@@ -110,6 +124,7 @@ class _CastSettlementTestCase(EvenniaTest):
                     _T_SHROUD.key: _T_SHROUD,
                     _T_GRANT.key: _T_GRANT,
                     _T_PRAYER.key: _T_PRAYER,
+                    _T_GRANTABLE.key: _T_GRANTABLE,
                 }
             },
         )
@@ -479,7 +494,9 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
         # The kit's shipped-utility mirror carries the same ``set_disguise``
         # effect, so the guard must supply its declared context too.
         "t_rock_quietus": {"disguise": {"atk_phys": 60}},
-        "t_grant_echo": {"confer_skill_key": "t_steady_stride", "confer_scale": 0.1},
+        # The conferral derives its set from the caster's own ownership and
+        # its scale from the node's policy: no event-context keys exist.
+        "t_grant_echo": {},
     }
 
     def _cast_vocabulary(self):
@@ -517,7 +534,10 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
         companion = create_object(PlayerCharacter, key="companion", location=self.room1)
         companion.race = "human"
         companion.apply_race_baseline()
-        caster.db.skills = {"active": list(vocabulary), "passive": []}
+        caster.db.skills = {
+            "active": list(vocabulary),
+            "passive": [_T_GRANTABLE.key],
+        }
         allowed = {id(caster), id(companion)}
         live = getattr(
             importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"

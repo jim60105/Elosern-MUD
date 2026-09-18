@@ -19,6 +19,7 @@ from world.rules.action import (
     RejectReason,
     SNAPSHOTTED_SURFACES,
     UnsnapshottedSurfaceError,
+    _bind_resolved_effect,
     _EFFECT_HANDLERS,
     _commit,
     _handle_sexual_event,
@@ -30,6 +31,7 @@ from world.rules.action import (
     register_effect_handler,
 )
 from world.rules.targeting import RoomActionContext
+from world.skills.effects import EffectPolicy
 from world.skills.registry import (
     FactionConstraint,
     SkillCategory,
@@ -185,11 +187,33 @@ class LandedEffectHandlerTests(EvenniaTest):
         self.assertIn("focus", self.entity.buffs.all)
 
     def test_conferred_growth_rate_uses_landed_buff_seam(self):
+        # The scale now comes from the occurrence's own policy; bind the
+        # resolved effect exactly as the resolution pipeline does.
+        skill = SkillDef(
+            key="test_growth_confer",
+            label="測試成長授予",
+            description="測試用：成長率授予。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={},
+            usable_out_of_combat=True,
+            element="light",
+            effects=["confer_growth_rate"],
+            faction_constraint=FactionConstraint.ANY,
+            category=SkillCategory.DIVINE_MYSTERY,
+            effect_policies=(EffectPolicy(coefficient=0.5),),
+        )
         effects = _handle_confer_growth_rate(
             self.entity,
             [self.entity],
             "confer_growth_rate",
-            {"confer_scale": 0.5},
+            _bind_resolved_effect(
+                {},
+                skill,
+                0,
+                actor=self.entity,
+                targets=[self.entity],
+            ),
             1.0,
         )
         effects = [

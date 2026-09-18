@@ -47,14 +47,17 @@ None.
 
 ## Impact
 
-`world/skills/registry.py` (`_validate_effect_policies` allow-list);
+`world/skills/registry.py` (`_validate_effect_policies` allow-list; the one shipped conferral node
+`dominion_art` declares its lore-priced 0.10 scale so the newly-castable verb records grants at the
+priced strength — no new registry entries and no catalog nodes land here, `divine-mystery-catalog`
+remains the sole author of the tree's remaining data);
 `world/rules/skill_effects.py` (replace-by-key write, source-ownership validation, derived set);
 `world/rules/action.py` (`_handle_confer_skill_partial`, `_handle_confer_growth_rate` and both
-registrations); `world/rules/action_preview.py` only if the shared preview needs more than the
-now-empty required-context table (verify, do not assume); tests plus `.github/evennia-shards.json`.
+registrations; preflight rejects a conferral whose derived set is empty, mirroring resolution);
+`world/rules/action_preview.py` (the shared preview mirrors that rejection, so no surface advertises
+a conferral that can never resolve); tests plus `.github/evennia-shards.json`.
 `docs/lore/skill-trees/divine-mystery.md` §2, §6 and §7 were amended while this change was authored so
-the design source of truth already describes the derived set and the coefficient gate. No registry
-data and no catalog node lands in this change.
+the design source of truth already describes the derived set and the coefficient gate.
 
 ## Batch
 
