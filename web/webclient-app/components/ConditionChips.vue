@@ -9,6 +9,7 @@
 // scrollable in-island disclosure that collapses on re-activation or
 // Escape (H4 re-points this control at the character-status drawer).
 import { computed, ref } from "vue";
+import { conditionLabel } from "../lib/condition_label.js";
 
 const props = defineProps({
   // The committed `status.conditions[]` array (icon-only chips).
@@ -47,19 +48,10 @@ function toggleOverflow() {
 // reachable by pointer and by keyboard.
 const activeCode = ref(null);
 
-function chipName(condition) {
-  const parts = [condition.label ?? condition.code];
-  if (typeof condition.remaining_seconds === "number") {
-    parts.push(`剩 ${condition.remaining_seconds} 秒`);
-  }
-  const mods = condition.modifiers;
-  if (mods && typeof mods === "object") {
-    for (const [key, value] of Object.entries(mods)) {
-      parts.push(`${key} ${value}`);
-    }
-  }
-  return parts.join("，");
-}
+// The accessible chip name is the shared condition label rule (the same
+// label, duration, and modifier prose the character-status drawer roster
+// renders) — one copy in lib/condition_label.js.
+const chipName = conditionLabel;
 
 function onChipKeydown(event) {
   if (event.key === "Escape" && overflowOpen.value) {
