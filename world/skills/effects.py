@@ -145,6 +145,32 @@ class DisguiseEffect:
     """Replace the target's displayed stats with a disguise override."""
 
 
+class RevealStrength(StrEnum):
+    """Closed vocabulary of reveal strengths (divine-veil-reveal D3).
+
+    The two strengths are the whole grammar: a mundane reveal pierces a
+    veil of mundane provenance only, and the true-name reveal pierces a veil
+    of either provenance. There is deliberately no third strength.
+    """
+
+    MUNDANE_ONLY = "mundane_only"
+    ANY_PROVENANCE = "any_provenance"
+
+
+@dataclass(frozen=True)
+class RevealDisguiseEffect:
+    """Lift a target's veil when its provenance falls within the strength.
+
+    The bare prefix parses at ``MUNDANE_ONLY`` (clears a mundane veil and
+    leaves a divine one in place); ``reveal_disguise:true_name`` parses at
+    ``ANY_PROVENANCE`` (clears a veil of either provenance). The two closed
+    forms are validated at parse so an authoring mistake fails at registry
+    load rather than at cast.
+    """
+
+    strength: RevealStrength
+
+
 @dataclass(frozen=True)
 class BuffApplyEffect:
     """Apply one definition-keyed buff to every target."""
@@ -1029,6 +1055,15 @@ def parse_effect(effect_id: str) -> object:
     if prefix == "set_disguise":
         _parse_bare(effect_id, prefix)
         return DisguiseEffect()
+    if prefix == "reveal_disguise":
+        if effect_id == "reveal_disguise":
+            return RevealDisguiseEffect(strength=RevealStrength.MUNDANE_ONLY)
+        if effect_id == "reveal_disguise:true_name":
+            return RevealDisguiseEffect(strength=RevealStrength.ANY_PROVENANCE)
+        raise ValueError(
+            f"reveal_disguise effect must be 'reveal_disguise' or "
+            f"'reveal_disguise:true_name', got {effect_id!r}"
+        )
     if prefix == "buff_apply":
         return BuffApplyEffect(buff_key=_parse_single_arg(effect_id, prefix))
     if prefix == "self_buff_apply":
