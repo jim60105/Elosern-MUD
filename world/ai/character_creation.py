@@ -39,10 +39,9 @@ from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai.guardrail import (
+    GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
-    register_degrade_fallback,
-    register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.ai.schemas.registry import (
@@ -325,6 +324,12 @@ _VALIDATORS: dict[str, Any] = {
     "persona_exact_shape": _validate_persona,
 }
 
+_HOOKS = GuardrailHooks(
+    layer="character_creation",
+    fallback=_degrade_fallback,
+    validators=_VALIDATORS,
+)
+
 
 def _cap_string(value: str) -> str:
     if len(value) <= MAX_CONCEPT_LENGTH:
@@ -479,33 +484,9 @@ def _require_registered() -> None:
         )
 
 
-def _uninstall_fallback() -> None:
-    if guardrail._degrade_fallbacks.get("character_creation") is _degrade_fallback:
-        del guardrail._degrade_fallbacks["character_creation"]
-
-
-def _uninstall_validator(name: str) -> None:
-    validators = guardrail._semantic_validators.get("character_creation", {})
-    if validators.get(name) is _VALIDATORS[name]:
-        del validators[name]
-
-
 def _uninstall_schema() -> None:
     if _OUTPUT_SCHEMAS.get("character_creation") is CHARACTER_CREATION_OUTPUT_SCHEMA:
         del _OUTPUT_SCHEMAS["character_creation"]
-
-
-def _uninstall_all_own_hooks() -> None:
-    """Remove every character_creation hook that is this module's own (by identity).
-
-    Used for rollback so a partial-failure registration can never leave a
-    half-installed layer behind. Foreign hooks with the same names are left
-    untouched.
-    """
-    _uninstall_fallback()
-    for name in _VALIDATORS:
-        _uninstall_validator(name)
-    _uninstall_schema()
 
 
 def register_character_creation() -> None:
@@ -521,17 +502,12 @@ def register_character_creation() -> None:
     if _is_registered():
         return
     try:
-        if guardrail._degrade_fallbacks.get("character_creation") is not _degrade_fallback:
-            register_degrade_fallback("character_creation", _degrade_fallback)
-        for name, validator in _VALIDATORS.items():
-            validators = guardrail._semantic_validators.get("character_creation", {})
-            if validators.get(name) is validator:
-                continue
-            register_semantic_validator("character_creation", name, validator)
+        _HOOKS.install()
         if _OUTPUT_SCHEMAS.get("character_creation") is not CHARACTER_CREATION_OUTPUT_SCHEMA:
             register_output_schema("character_creation", CHARACTER_CREATION_OUTPUT_SCHEMA)
     except (GuardrailRegistrationError, DuplicateSchemaError):
-        _uninstall_all_own_hooks()
+        _HOOKS.uninstall_own()
+        _uninstall_schema()
         raise
 
 

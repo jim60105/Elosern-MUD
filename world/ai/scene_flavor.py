@@ -32,10 +32,9 @@ from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai.guardrail import (
+    GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
-    register_degrade_fallback,
-    register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.prompts.loader import PromptUnavailableError, render_prompt
@@ -121,6 +120,12 @@ _VALIDATORS: dict[str, Callable[[Any], list[str]]] = {
     "flavor_no_digits": _validate_no_digits,
 }
 
+_HOOKS = GuardrailHooks(
+    layer="scene_builder",
+    fallback=_degrade_fallback,
+    validators=_VALIDATORS,
+)
+
 
 def _cap_string(value: str) -> str:
     if len(value) <= MAX_FIELD_LENGTH:
@@ -176,29 +181,6 @@ def _require_registered() -> None:
         )
 
 
-def _uninstall_fallback() -> None:
-    if guardrail._degrade_fallbacks.get("scene_builder") is _degrade_fallback:
-        del guardrail._degrade_fallbacks["scene_builder"]
-
-
-def _uninstall_validator(name: str) -> None:
-    validators = guardrail._semantic_validators.get("scene_builder", {})
-    if validators.get(name) is _VALIDATORS[name]:
-        del validators[name]
-
-
-def _uninstall_all_own_hooks() -> None:
-    """Remove every scene-flavor hook that is this module's own (by identity).
-
-    Used for rollback so a partial-failure registration can never leave a
-    half-installed scene-flavor state behind. Foreign hooks with the same names
-    are left untouched.
-    """
-    _uninstall_fallback()
-    for name in _VALIDATORS:
-        _uninstall_validator(name)
-
-
 def register_scene_flavor() -> None:
     """Install the scene-flavor layer's guardrail hooks atomically and idempotently.
 
@@ -211,15 +193,9 @@ def register_scene_flavor() -> None:
     if _is_registered():
         return
     try:
-        if guardrail._degrade_fallbacks.get("scene_builder") is not _degrade_fallback:
-            register_degrade_fallback("scene_builder", _degrade_fallback)
-        for name, validator in _VALIDATORS.items():
-            validators = guardrail._semantic_validators.get("scene_builder", {})
-            if validators.get(name) is validator:
-                continue
-            register_semantic_validator("scene_builder", name, validator)
+        _HOOKS.install()
     except GuardrailRegistrationError:
-        _uninstall_all_own_hooks()
+        _HOOKS.uninstall_own()
         raise
 
 

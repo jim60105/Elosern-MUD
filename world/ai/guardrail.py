@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from jsonschema import Draft7Validator
@@ -63,6 +64,54 @@ def register_degrade_fallback(layer: str, fallback: DegradeFallback) -> None:
 def _require_layer(layer: str) -> None:
     if layer not in LAYER_NAMES:
         raise UnknownLayerError(layer)
+
+
+@dataclass(frozen=True)
+class GuardrailHooks:
+    """One layer's guardrail hooks, installed and rolled back as a unit.
+
+    Encapsulates the skip-if-identity registration dance every layer used to
+    hand-roll: the degrade fallback is registered only when the registry holds
+    a different object (``is not`` this hook's own), and each semantic
+    validator only when the entry is not this hook's own — so a second call is
+    a no-op and foreign hooks with the same names are never overridden. Layer
+    keys are validated by ``_require_layer`` inside the registrar functions.
+
+    On a partial failure (``GuardrailRegistrationError``, e.g. a foreign hook
+    already holds one of the names) every hook this object installed is
+    removed by identity before the error re-raises, so a layer is never left
+    half-registered and foreign hooks stay untouched. The layer modules keep
+    their public ``register_*`` functions and data declarations; this helper
+    is the single copy of the mutation dance.
+    """
+
+    layer: str
+    fallback: DegradeFallback
+    validators: Mapping[str, SemanticValidator]
+
+    def install(self) -> None:
+        """Register the layer's fallback and validators; roll back own hooks on failure."""
+        try:
+            if _degrade_fallbacks.get(self.layer) is not self.fallback:
+                register_degrade_fallback(self.layer, self.fallback)
+            for name, validator in self.validators.items():
+                registered = _semantic_validators.get(self.layer, {})
+                if registered.get(name) is validator:
+                    continue
+                register_semantic_validator(self.layer, name, validator)
+        except GuardrailRegistrationError:
+            self.uninstall_own()
+            raise
+
+    def uninstall_own(self) -> None:
+        """Delete only the hooks whose object is this module's own."""
+        fallbacks = _degrade_fallbacks
+        if fallbacks.get(self.layer) is self.fallback:
+            del fallbacks[self.layer]
+        validators = _semantic_validators.get(self.layer, {})
+        for name, validator in self.validators.items():
+            if validators.get(name) is validator:
+                del validators[name]
 
 
 def _degrade(layer: str) -> Any:

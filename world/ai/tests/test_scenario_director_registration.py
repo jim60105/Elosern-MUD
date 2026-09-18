@@ -61,6 +61,10 @@ class ScenarioDirectorRegistrationTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::hook-registration-is-atomic-idempotent-and-boot-tolerant")
     def test_partial_hook_failure_leaves_no_scenario_director_hooks(self):
+        from world.ai.guardrail import (
+            register_semantic_validator as _register_semantic_validator,
+        )
+
         calls = {"count": 0}
 
         def flaky_validator(layer, name, validator):
@@ -69,9 +73,9 @@ class ScenarioDirectorRegistrationTests(unittest.TestCase):
                 raise GuardrailRegistrationError(
                     f"semantic validator {layer}.{name} already registered"
                 )
-            return guardrail.register_semantic_validator(layer, name, validator)
+            return _register_semantic_validator(layer, name, validator)
 
-        with patch("world.ai.scenario_director.register_semantic_validator", flaky_validator):
+        with patch("world.ai.guardrail.register_semantic_validator", flaky_validator):
             with self.assertRaises(GuardrailRegistrationError):
                 register_scenario_director()
         self.assertNotIn("scenario_director", guardrail._degrade_fallbacks)

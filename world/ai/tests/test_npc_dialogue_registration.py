@@ -200,6 +200,10 @@ class RegistrationGateTests(unittest.TestCase):
 
     @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
     def test_partial_hook_registration_failure_leaves_no_npc_dialogue_hooks(self):
+        from world.ai.guardrail import (
+            register_semantic_validator as _register_semantic_validator,
+        )
+
         calls = {"count": 0}
 
         def flaky_validator(layer, name, validator):
@@ -208,9 +212,9 @@ class RegistrationGateTests(unittest.TestCase):
                 raise GuardrailRegistrationError(
                     f"semantic validator {layer}.{name} already registered"
                 )
-            return guardrail.register_semantic_validator(layer, name, validator)
+            return _register_semantic_validator(layer, name, validator)
 
-        with patch("world.ai.npc_dialogue.register_semantic_validator", flaky_validator):
+        with patch("world.ai.guardrail.register_semantic_validator", flaky_validator):
             with self.assertRaises(GuardrailRegistrationError):
                 register_npc_dialogue()
         self.assertNotIn("npc_dialogue", guardrail._degrade_fallbacks)

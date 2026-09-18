@@ -25,10 +25,9 @@ from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai.guardrail import (
+    GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
-    register_degrade_fallback,
-    register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.prompts.loader import PromptUnavailableError, render_prompt
@@ -107,6 +106,12 @@ _VALIDATORS: dict[str, Callable[[Any], list[str]]] = {
     "prose_has_cjk": _validate_has_cjk,
     "prose_no_template_placeholder": _validate_no_template_placeholder,
 }
+
+_HOOKS = GuardrailHooks(
+    layer="narrator",
+    fallback=_degrade_fallback,
+    validators=_VALIDATORS,
+)
 
 
 def _cap_string(value: str) -> str:
@@ -327,30 +332,6 @@ def _require_registered() -> None:
         )
 
 
-def _uninstall_fallback() -> None:
-    if guardrail._degrade_fallbacks.get("narrator") is _degrade_fallback:
-        del guardrail._degrade_fallbacks["narrator"]
-
-
-def _uninstall_validator(name: str) -> None:
-    validators = guardrail._semantic_validators.get("narrator", {})
-    if validators.get(name) is _VALIDATORS[name]:
-        del validators[name]
-
-
-def _uninstall_all_own_hooks() -> None:
-    """Remove every narrator hook that is this module's own (by identity).
-
-    Used for rollback so a partial-failure registration can never leave a
-    half-installed narrator state behind, regardless of whether the hooks were
-    installed by the failing call or pre-existed from an earlier attempt.
-    Foreign hooks with the same names are left untouched.
-    """
-    _uninstall_fallback()
-    for name in _VALIDATORS:
-        _uninstall_validator(name)
-
-
 def register_narrator(
     template_renderer: Callable[[Sequence[Any]], str],
 ) -> None:
@@ -369,15 +350,9 @@ def register_narrator(
     if _is_registered():
         return
     try:
-        if guardrail._degrade_fallbacks.get("narrator") is not _degrade_fallback:
-            register_degrade_fallback("narrator", _degrade_fallback)
-        for name, validator in _VALIDATORS.items():
-            validators = guardrail._semantic_validators.get("narrator", {})
-            if validators.get(name) is validator:
-                continue
-            register_semantic_validator("narrator", name, validator)
+        _HOOKS.install()
     except GuardrailRegistrationError:
-        _uninstall_all_own_hooks()
+        _HOOKS.uninstall_own()
         raise
     global _template_renderer
     _template_renderer = template_renderer

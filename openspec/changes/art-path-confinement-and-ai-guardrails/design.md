@@ -44,7 +44,7 @@ helper — the strict function refuses the same input (returns `None` → same 4
 # world/ai/guardrail.py
 @dataclass(frozen=True)
 class GuardrailHooks:
-    layer: LayerName            # existing _require_layer validation applies
+    layer: str                  # validated by _require_layer inside the registrars
     fallback: DegradeFallback
     validators: Mapping[str, SemanticValidator]
 

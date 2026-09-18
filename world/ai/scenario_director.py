@@ -35,10 +35,9 @@ from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai.guardrail import (
+    GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
-    register_degrade_fallback,
-    register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.ai.schemas.registry import (
@@ -1037,6 +1036,12 @@ _VALIDATORS: dict[str, Any] = {
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 
+_HOOKS = GuardrailHooks(
+    layer="scenario_director",
+    fallback=_degrade_fallback,
+    validators=_VALIDATORS,
+)
+
 
 _CONTEXT_KEYS = ("requested_type", "allowed_rank", "issuer_branch", "anchor", "note")
 # Optional keys dropped (in this order) if the serialized context still
@@ -1150,32 +1155,9 @@ def _require_registered() -> None:
         )
 
 
-def _uninstall_fallback() -> None:
-    if guardrail._degrade_fallbacks.get("scenario_director") is _degrade_fallback:
-        del guardrail._degrade_fallbacks["scenario_director"]
-
-
-def _uninstall_validator(name: str) -> None:
-    validators = guardrail._semantic_validators.get("scenario_director", {})
-    if validators.get(name) is _VALIDATORS[name]:
-        del validators[name]
-
-
 def _uninstall_schema() -> None:
     if _OUTPUT_SCHEMAS.get("scenario_director") is SCENARIO_DIRECTOR_OUTPUT_SCHEMA:
         del _OUTPUT_SCHEMAS["scenario_director"]
-
-
-def _uninstall_all_own_hooks() -> None:
-    """Remove every scenario_director hook belonging to this module (by identity).
-
-    Foreign hooks with the same names are left untouched, so a partial-failure
-    registration can never leave the layer half-installed.
-    """
-    _uninstall_fallback()
-    for name in _VALIDATORS:
-        _uninstall_validator(name)
-    _uninstall_schema()
 
 
 def register_scenario_director() -> None:
@@ -1190,17 +1172,12 @@ def register_scenario_director() -> None:
     if _is_registered():
         return
     try:
-        if guardrail._degrade_fallbacks.get("scenario_director") is not _degrade_fallback:
-            register_degrade_fallback("scenario_director", _degrade_fallback)
-        for name, validator in _VALIDATORS.items():
-            validators = guardrail._semantic_validators.get("scenario_director", {})
-            if validators.get(name) is validator:
-                continue
-            register_semantic_validator("scenario_director", name, validator)
+        _HOOKS.install()
         if _OUTPUT_SCHEMAS.get("scenario_director") is not SCENARIO_DIRECTOR_OUTPUT_SCHEMA:
             register_output_schema("scenario_director", SCENARIO_DIRECTOR_OUTPUT_SCHEMA)
     except (GuardrailRegistrationError, DuplicateSchemaError):
-        _uninstall_all_own_hooks()
+        _HOOKS.uninstall_own()
+        _uninstall_schema()
         raise
 
 
