@@ -58,7 +58,7 @@ class ConferredSkillTests(EvenniaTestCase):
         entity.db.skills = {"active": [], "passive": []}
         return entity
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_fractional_grant_scales_the_source_skill_multiplier(self):
         entity = self._entity()
         entity.traits.atk_phys.base = 60
@@ -109,23 +109,23 @@ class ConferredSkillTests(EvenniaTestCase):
         self.assertIs(raised.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
         self.assertEqual(entity.skills.conferred_grants(), [])
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_disguise_gate_type_skill_is_rejected(self):
         self._assert_gate_type_rejected(_T_GATE_DISGUISE.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_sexual_mastery_gate_type_skill_is_rejected(self):
         self._assert_gate_type_rejected(_T_GATE_SEXUAL.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_damage_only_skill_is_rejected_as_a_silent_no_op(self):
         self._assert_gate_type_rejected(_T_DAMAGE_ONLY.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_flavor_only_skill_is_rejected_as_a_silent_no_op(self):
         self._assert_gate_type_rejected(_T_FLAVOR_ONLY.key)
 
-    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
+    @covers_requirement("skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-\u7d71\u5fa1\u8853")
     def test_continuous_effect_skills_remain_conferrable(self):
         entity = self._entity()
         record_conferred_grant(entity, "t_synth_source", _T_GRANT.key, 0.5)
