@@ -20,10 +20,10 @@
 
 ## 4. Existing roster assertions
 
-- [ ] 4.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster. Literal update only. Verify with `world.lore.tests.test_items`.
-- [ ] 4.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
-- [ ] 4.3 Move any existing literal pinning the shipped usable-item set, including in `world/rules/tests/test_shipped_item_use_regression.py`, and verify the bi-directional close still reports no missing profile and no orphan with `world.rules.tests.test_item_effects_rulebook`.
-- [ ] 4.4 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
+- [x] 4.1 Move the exact key set in the existing registered data-contract test `world/lore/tests/test_items.py` to the new roster. Literal update only. Verify with `world.lore.tests.test_items`.
+- [x] 4.2 Move the literal registry count in `world/rules/tests/test_guild_config.py` to match. Verify with `world.rules.tests.test_guild_config`.
+- [x] 4.3 Move any existing literal pinning the shipped usable-item set, including in `world/rules/tests/test_shipped_item_use_regression.py`, and verify the bi-directional close still reports no missing profile and no orphan with `world.rules.tests.test_item_effects_rulebook`.
+- [x] 4.4 Run `uv run --locked python -m tools.test_data_lint check` and verify the gate passes with no new ledger entry.
 
 ## 5. Unmaterialised-state check
 

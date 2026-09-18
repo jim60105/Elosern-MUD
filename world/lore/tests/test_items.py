@@ -84,6 +84,9 @@ class ItemPresentationTests(unittest.TestCase):
                 "beastfolk_gale_earring",
                 "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
                 "warmth_rune_egg", "tremor_crystal",
+                "aphrodisiac_bath_salts", "slime_lube_gel", "hot_kiss_potion",
+                "spark_candy", "embracing_vine", "kiss_of_goddess_mist",
+                "censer_of_desire",
             }
         )
         for key, definition in ITEM_REGISTRY.items():
