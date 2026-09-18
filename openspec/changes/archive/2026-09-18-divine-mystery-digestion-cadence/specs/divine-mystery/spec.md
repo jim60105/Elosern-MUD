@@ -1,10 +1,12 @@
 ## ADDED Requirements
 
 ### Requirement: Divine Mystery practice accrues at most once per world-calendar day
-Practice accrual for an ACTIVE skill whose `SkillCategory` is `DIVINE_MYSTERY` SHALL be claimed per
-actor, per skill, per world-calendar day: the first accrual of a calendar day awards normally and
-every further accrual of that same skill on that same day SHALL award nothing and report that nothing
-was claimed. The calendar day SHALL be derived from the world clock's own calendar constants, never
+Resolution practice accrual for an ACTIVE skill whose `SkillCategory` is `DIVINE_MYSTERY` SHALL be
+claimed per actor, per skill, per world-calendar day: the first use-driven accrual of a calendar day
+awards normally and every further use-driven accrual of that same skill on that same day SHALL award
+nothing and report that nothing was claimed. The cadence governs the use-driven resolution pathway
+only; declared booked practice (`grant_study_practice_xp`) is not a use and accrues exactly as it
+does today. The calendar day SHALL be derived from the world clock's own calendar constants, never
 from wall-clock time. The claim SHALL be scoped by skill category only; a skill that declares
 `requires_divine_arts` but is NOT in the `DIVINE_MYSTERY` category SHALL accrue exactly as it does
 today. The claim SHALL be persisted on the actor and SHALL be restored together with the actor's

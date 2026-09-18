@@ -27,6 +27,8 @@ from world.rules.combat_session import (
     submit_player_action,
     to_storage,
 )
+from world.rules.progression import SKILL_PRACTICE_XP_PER_USE
+from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import SYNTH_SKILLS
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
@@ -48,6 +50,17 @@ _T_CONFER = replace(
     label="授予試探",
     effects=["confer_skill_partial"],
 )
+# The digestion-cadence carrier (divine-mystery §3): a zero-cost
+# DIVINE_MYSTERY round skill whose practice the daily claim gates. Zero
+# effects on purpose — the round's practice stage is the only thing under
+# test, and the target stays alive so the round reports ``round`` rather
+# than a terminal outcome.
+_T_DIVINE_PROBE = replace(
+    SYNTH_SKILLS["t_cinder_cleave"],
+    key="t_divine_cadence_probe",
+    label="消化節拍試探",
+    category=SkillCategory.DIVINE_MYSTERY,
+)
 
 
 def _open_scope(case):
@@ -63,6 +76,7 @@ def _open_scope(case):
                 **synth_innate_overlay()["skills"],
                 _T_DISGUISE.key: _T_DISGUISE,
                 _T_CONFER.key: _T_CONFER,
+                _T_DIVINE_PROBE.key: _T_DIVINE_PROBE,
             }
         },
     )
@@ -684,3 +698,85 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
 
 # Sentinel used to prove no EventLog was created; kept local to avoid import.
 _EVENT_LOGS_SENTINEL = ()
+
+
+class DigestionCadenceRoundRollbackTests(BattlefieldIsolation, EvenniaTestCase):
+    """The combat-round rollback face restores the cadence day claim too.
+
+    The round reaches the claim through ``_snapshot_touched`` ->
+    ``_snapshot_entity_state`` (the ``progression`` surface) — a different
+    mechanism from the settlement's ``_ENTITY_SURFACES`` tuple — so the
+    rollback is proven on both faces (divine-mystery-digestion-cadence 3.3).
+    """
+
+    def setUp(self):
+        _open_scope(self)
+        super().setUp()
+        self.room = create_object(Room, key="cadence arena")
+        self.player = _player()
+        self.player.location = self.room
+        grant_lineage(self.player, [_T_DIVINE_PROBE.key])
+        self.player.db.skill_proficiency = {_T_DIVINE_PROBE.key: 0.0}
+        self.player.db.skill_practice_day = {_T_DIVINE_PROBE.key: -1}
+        self.monster = _monster("cadence goblin", hp=100)
+        self.monster.location = self.room
+        # A real persisted world clock at day ordinal 2: the round's practice
+        # stages read the day through ``read_world_clock``, so the whole
+        # combat path exercises the real day derivation (ordinal 2, never the
+        # raw tick) instead of the no-clock day-0 fallback.
+        from world.rules.clock import _DAY_SECONDS, get_world_clock
+
+        singleton = get_world_clock()
+        singleton._script.db.tick = 2 * _DAY_SECONDS + 7200
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_settlement_failure_restores_the_day_claim_and_retry_accrues(self):
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        # The zero-effect probe kills nothing, so no round is naturally
+        # terminal: force the round cap to 0 so the first round ends and the
+        # settlement (the failure point the suite injects into) actually
+        # runs, after the practice stage already resolved and committed.
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session._round_cap", return_value=0),
+            patch(
+                "world.rules.combat_session.settle_combat_result",
+                side_effect=RuntimeError("clock write failed"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(
+                    self.player, _T_DIVINE_PROBE.key, [self.monster]
+                )
+        # Round effects, session metadata, clock tick, practice XP, and the
+        # day claim all rolled back together to their pre-round values (the
+        # zero-effect probe dealt no damage, so the monster is untouched).
+        self.assertEqual(self.monster.traits.hp.current, 100)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(
+            self.player.db.skill_proficiency, {_T_DIVINE_PROBE.key: 0.0}
+        )
+        self.assertEqual(
+            self.player.db.skill_practice_day, {_T_DIVINE_PROBE.key: -1}
+        )
+        # The same-day retry runs the round again: the rollback gave the day
+        # back, so the practice stage accrues and records the real ordinal 2.
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session._round_cap", return_value=0),
+        ):
+            result = submit_player_action(
+                self.player, _T_DIVINE_PROBE.key, [self.monster]
+            )
+        self.assertEqual(result["outcome"], "cap")
+        self.assertEqual(
+            self.player.db.skill_proficiency,
+            {_T_DIVINE_PROBE.key: SKILL_PRACTICE_XP_PER_USE},
+        )
+        self.assertEqual(
+            self.player.db.skill_practice_day, {_T_DIVINE_PROBE.key: 2}
+        )

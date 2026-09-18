@@ -1,6 +1,6 @@
 """Deterministic skill-practice progression and freeform scaling rules."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from math import floor, isfinite
 from pathlib import Path
 from typing import Any
@@ -621,6 +621,79 @@ def restore_practice_dedupe(
     _dedupe_seen.update(seen)
 
 
+# Digestion-cadence day claims (divine-mystery design §3): for ACTIVE skills
+# in ``SkillCategory.DIVINE_MYSTERY`` one practice accrual per actor per skill
+# per world-calendar day. The day identity is a monotonic absolute ordinal
+# derived from the world clock's own calendar, persisted on the actor as
+# ``entity.db.skill_practice_day`` ({skill_key: day_ordinal}) so a reload does
+# not reset the brake and a rolled-back commit restores it with the
+# proficiency it guards.
+
+
+def practice_day_ordinal(calendar: "WorldDateTime") -> int:
+    """Return the absolute world-calendar day ordinal of one calendar instant.
+
+    The digestion-cadence day identity (divine-mystery §3): strictly
+    monotonic over ``WorldDateTime``'s calendar fields, with the ring size
+    taken from the world clock's own ``clock.yaml`` constants
+    (``days_per_season`` x ``seasons_per_year``) — the derivation reads the
+    rulebook, never a literal and never wall-clock time. Two instants share
+    an ordinal exactly when they fall on the same world-calendar day, so the
+    ordinal stays correct if tick length is ever retuned.
+    """
+    from world.rules.clock import CLOCK_YAML
+
+    days_per_year = (
+        CLOCK_YAML["days_per_season"] * CLOCK_YAML["seasons_per_year"]
+    )
+    return (
+        calendar.year * days_per_year
+        + calendar.season_index * CLOCK_YAML["days_per_season"]
+        + calendar.day_in_season
+        - 1
+    )
+
+
+def _current_practice_day() -> int:
+    """Return the current world-calendar day ordinal, or 0 with no clock yet.
+
+    Read through ``read_world_clock()`` with a deferred import, the same
+    discipline as :func:`_current_tick`: a pure/unit context (no persisted
+    singleton) still gets the zero-day bucket without creating one.
+    """
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    return practice_day_ordinal(clock.calendar) if clock is not None else 0
+
+
+def _practice_day_claims(entity: Any) -> dict[str, int]:
+    """Return the actor's persisted ``{skill_key: day_ordinal}`` claim map.
+
+    Read pair of the digestion-cadence store: a missing or empty
+    ``entity.db.skill_practice_day`` reads as an empty map, so any actor that
+    never accrued a divine-mystery skill (or a stub without the attribute)
+    is unclaimed.
+    """
+    raw = getattr(entity.db, "skill_practice_day", None)
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _mark_practice_day(entity: Any, skill_key: str, day: int) -> None:
+    """Persist today's claim for one skill (write pair of the store).
+
+    Called only on the award path of a use that passes the claim gates: a
+    refused award (day-blocked or tick-blocked) never consumes the day. The
+    accepted D5 saturation case still claims, since a cancelled-by-cap award
+    is indistinguishable from an award at the cap (the call is made, nothing
+    accrues either way). Copy-on-write keeps the stored mapping free of
+    aliasing with any reader's copy.
+    """
+    claims = _practice_day_claims(entity)
+    claims[skill_key] = day
+    entity.db.skill_practice_day = claims
+
+
 def _practice_growth_factors(entity: Any, skill: SkillDef) -> float:
     """Return the shared growth-factor composite for one skill's practice.
 
@@ -696,6 +769,12 @@ def grant_skill_practice_xp(
     so it has no practice), for a ``nonlethal``/simulated context (a guild
     examination is a simulation and grants no growth of any kind), and when
     the per-tick dedupe already holds this ``(actor, skill, target)`` triple.
+    An ACTIVE skill in ``SkillCategory.DIVINE_MYSTERY`` additionally passes
+    the digestion-cadence claim (divine-mystery §3): at most one use-driven
+    accrual per actor per skill per world-calendar day. The day gate is
+    evaluated BEFORE the per-tick claim, so a day-blocked use occupies no
+    tick claim it could not turn into an award, and the day is recorded only
+    on the path that actually awards, so a refused award never consumes it.
     Otherwise the closed-form amount flows through
     :func:`award_practice_xp`, the only writer, which clamps at the derived
     cap. Reads no school and no magic stat.
@@ -714,9 +793,16 @@ def grant_skill_practice_xp(
     skill = SKILL_REGISTRY.get(skill_key)
     if skill is None or skill.kind is not SkillKind.ACTIVE:
         return False
+    day: int | None = None
+    if skill.category is SkillCategory.DIVINE_MYSTERY:
+        day = _current_practice_day()
+        if _practice_day_claims(entity).get(skill_key) == day:
+            return False
     amount = practice_xp_amount(entity, skill)
     if not _claim_practice(entity, skill_key, target):
         return False
+    if skill.category is SkillCategory.DIVINE_MYSTERY:
+        _mark_practice_day(entity, skill_key, day)
     candidates = unlock_candidates_for(skill_key) if unlocks_out is not None else ()
     was_usable = (
         {candidate.key: can_use_skill(entity, candidate) for candidate in candidates}

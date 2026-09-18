@@ -351,6 +351,7 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("buffs", None),
     ("skill_grants", None),
     ("skill_proficiency", None),
+    ("skill_practice_day", None),
     ("practice_booking", None),
 ) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
 
