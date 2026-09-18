@@ -1,8 +1,7 @@
 <script>
 import { computed, h, nextTick, onMounted, onUpdated, ref, watch } from "vue";
-import NarrativeMarkup from "../lib/narrative_markup.js";
+import { lineText, narrativeLineNodes } from "../lib/narrative_line_nodes.js";
 import UnreadIndicator from "./UnreadIndicator.vue";
-import { renderNarrativeTokens } from "./narrative-renderer.js";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
 import { faceObjectPosition } from "./face-rect.js";
 
@@ -67,12 +66,7 @@ export default {
     // renders no log control in the dialogue variant).
     const dialogueVariant = computed(() => props.mode === "dialogue" && !!props.dialogue);
 
-    const BOX_DRAWING = /[─-╿]/;
     const AT_BOTTOM_SLACK = 8;
-
-    function lineText(line) {
-      return line && line.text == null ? "" : String(line.text);
-    }
 
     // Announce-once invariant (design risk §): the `.dlg` box renders the
     // SAME committed line the narrative stream already carries. The variant
@@ -140,42 +134,6 @@ export default {
         ? lines.slice(0, -1)
         : [...lines.slice(0, -1), { ...last, text: remainder }];
     });
-
-    // One line → the vnodes that render it: a divider plus a literal `.inp`
-    // line for player input, a pipeline-rendered line for everything else.
-    function lineNodes(line, index) {
-      const kind = line && line.kind;
-      const text = lineText(line);
-      const nodes = [];
-      if (kind === "in") {
-        if (index > 0) {
-          nodes.push(
-            h("div", {
-              key: `${index}-divider`,
-              class: "narrative-divider",
-              "data-testid": "narrative-divider",
-            }),
-          );
-        }
-        nodes.push(
-          h("div", { key: index, class: "narrative-line inp", "data-line-kind": "in" }, [text]),
-        );
-        return nodes;
-      }
-      const lineClass = kind || "out";
-      const classes = ["narrative-line", lineClass];
-      if (BOX_DRAWING.test(text)) {
-        classes.push("map-art");
-      }
-      nodes.push(
-        h(
-          "div",
-          { key: index, class: classes.join(" "), "data-line-kind": lineClass },
-          renderNarrativeTokens(NarrativeMarkup.tokenize(text)),
-        ),
-      );
-      return nodes;
-    }
 
     function atBottom() {
       const el = scrollRoot.value;
@@ -492,7 +450,10 @@ export default {
               onScroll,
             },
             [
-              ...renderedLines.value.flatMap((line, index) => lineNodes(line, index)),
+              // One line → the vnodes that render it: a divider plus a
+              // literal `.inp` line for player input, a pipeline-rendered
+              // line for everything else (shared lib/narrative_line_nodes.js).
+              ...renderedLines.value.flatMap((line, index) => narrativeLineNodes(line, index)),
               // The dialogue variant sits at the stream tail: the box REPLACES
               // the caption's duplicate stream tail for that exchange, so the
               // auto-scroll that keeps the latest exchange in view keeps the
