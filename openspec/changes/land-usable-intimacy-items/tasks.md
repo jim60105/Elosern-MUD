@@ -5,9 +5,9 @@
 
 ## 2. Consuming devices
 
-- [ ] 2.1 Register `aphrodisiac_bath_salts`, `slime_lube_gel`, `hot_kiss_potion` — `ItemKind.TOY`, `ItemIconKey.TOY`, `uncommon`, `intimacy_tool` band, sellable, `ItemUseMechanics(consumable=True, combat_allowed=False)`. Verify the registry imports and the item-effect loader fails, naming the three missing profiles — confirming the two-sided close is live.
-- [ ] 2.2 Add their three `item_effects.yaml` profiles, each `stat: pleasure` with the gentle amount and no explicit scope. Verify the loader now closes cleanly.
-- [ ] 2.3 Register `spark_candy` (`uncommon`, consuming) with the moderate amount, and verify the loader closes.
+- [x] 2.1 Register `aphrodisiac_bath_salts`, `slime_lube_gel`, `hot_kiss_potion` — `ItemKind.TOY`, `ItemIconKey.TOY`, `uncommon`, `intimacy_tool` band, sellable, `ItemUseMechanics(consumable=True, combat_allowed=False)`. Verify the registry imports and the item-effect loader fails, naming the three missing profiles — confirming the two-sided close is live.
+- [x] 2.2 Add their three `item_effects.yaml` profiles, each `stat: pleasure` with the gentle amount and no explicit scope. Verify the loader now closes cleanly.
+- [x] 2.3 Register `spark_candy` (`uncommon`, consuming) with the moderate amount, and verify the loader closes.
 
 ## 3. Reusable devices
 

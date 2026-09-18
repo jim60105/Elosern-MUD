@@ -1619,5 +1619,70 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.TREMOR_CRYSTAL,
         ),
+        # Usable intimacy devices (land-usable-intimacy-items)
+        ItemDefinition(
+            key="aphrodisiac_bath_salts",
+            display_name_zh="催情浴鹽",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="浴場的招牌入浴劑，泡完整個皮膚的敏感度輕飄飄地抬高整個晚上，冒險歸來的定番享受。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=True,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
+            key="spark_candy",
+            display_name_zh="微電跳蛋糖",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="含在嘴裡就對舌頭送微電流的神奇糖果，電流順著神經一路麻到下半身；外表和普通糖果無異，不知情的孩子常常誤食，附魔師公會因此被投訴過很多次。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=True,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
+            key="slime_lube_gel",
+            display_name_zh="史萊姆潤滑凝膠",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="〔素材〕史萊姆黏液的下游製品：滅菌處理過的黏液分裝包，滑潤持久怎麼塗都不會乾，讓摩擦的每一寸都變成放大的觸感。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=True,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
+            key="hot_kiss_potion",
+            display_name_zh="熱吻藥水",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="喝下去從舌頭一路暖到小腹的粉紅藥劑；鍊金坊的正經生意，櫃檯前永遠站著情侶和新婚夫妻。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=True,
+                combat_allowed=False,
+            ),
+        ),
     )
 }
