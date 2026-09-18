@@ -11,7 +11,8 @@ import unittest
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import (
     DamageEffect,
-    DivineMysteryEffect,
+    HealEffect,
+    SelfHealEffect,
     SexualMasteryEffect,
 )
 from world.skills.registry import (
@@ -21,7 +22,10 @@ from world.skills.registry import (
     SkillDef,
     SkillKind,
     TargetSpec,
+    prerequisite_consumers,
+    validate_prerequisite_graph,
 )
+from world.rules.progression import proficiency_cap
 
 from .test_spell_catalogs import _CATALOG_EFFECTS
 
@@ -302,9 +306,20 @@ class SkillRegistryTests(unittest.TestCase):
             for skill in SKILL_REGISTRY.values()
             if "set_disguise" in skill.effects
         ]
-        self.assertEqual(len(conferral), 1)
-        self.assertEqual(len(disguises), 1)
-        self.assertTrue(all(skill.kind is SkillKind.ACTIVE for skill in conferral + disguises))
+        # The divine-mystery tree ships a conferral ladder and a veil line,
+        # each rooted in an ACTIVE cast skill the sample cards own. The two
+        # sample-card roots must stay inside those families.
+        self.assertGreaterEqual(len(conferral), 1)
+        self.assertGreaterEqual(len(disguises), 1)
+        self.assertTrue(
+            all(skill.kind is SkillKind.ACTIVE for skill in conferral + disguises)
+        )
+        self.assertIn(
+            "dominion_art", {skill.key for skill in conferral}
+        )
+        self.assertIn(
+            "status_disguise", {skill.key for skill in disguises}
+        )
 
         boons = [
             skill
@@ -545,66 +560,101 @@ class SkillContentCompletionTests(unittest.TestCase):
         self.assertEqual(skill.effects, ["damage:light:physical"])
         self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
 
-class DivineMysteryRegistryTests(unittest.TestCase):
-    @covers_requirement("skill-registry::divine-sexual-mastery-and-divine-sexual-arts-exist-as-distinct-skills", "divine-mystery::unmechanized-divine-mysteries-are-explicitly-declared-not-silently-missing")
-    def test_divine_mystery_family_ships_mechanized_and_flavor_entries(self):
-        mastery = SKILL_REGISTRY["divine_sexual_mastery"]
-        self.assertIs(mastery.kind, SkillKind.PASSIVE)
-        self.assertEqual(mastery.effects, ["sexual_magic_mastery"])
 
-        arts = SKILL_REGISTRY["divine_sexual_arts"]
-        self.assertIs(arts.kind, SkillKind.ACTIVE)
-        self.assertIs(arts.target_spec, TargetSpec.SINGLE)
-        self.assertTrue(arts.usable_out_of_combat)
-        self.assertEqual(arts.cost, {})
-        self.assertEqual(arts.effects, ["sexual_event_target:stimulus_applied"])
+class DivineMysteryFamilyInvariantTests(unittest.TestCase):
+    """Category-wide family invariants of the shipped divine-mystery tree.
 
-        disguised = SKILL_REGISTRY["status_disguise"]
-        self.assertIn("神之秘法", disguised.label)
-        self.assertEqual(disguised.effects, ["set_disguise"])
-        self.assertTrue(disguised.requires_divine_arts)
-        # Single-node known mysteries carry the same cast-time blood gate as
-        # the transmitted four: divine race only, mechanically enforced.
-        self.assertTrue(SKILL_REGISTRY["dominion_art"].requires_divine_arts)
+    Property assertions over every current and future member of the
+    ``DIVINE_MYSTERY`` category — never a per-row listing of keys and
+    labels — establishing the family boundary the redesigned lore mandates
+    (docs/lore/skill-trees/divine-mystery.md section 0.1): zero resource
+    cost, mandatory divine-blood gating, and no damage or healing effect.
+    The delta spec's cost and no-combat-verb scenarios receive their
+    traceability annotations when this change's specs archive.
+    """
 
-        for key, name in (
-            ("divine_time_dilation", "時間加速"),
-            ("divine_space_distortion", "空間扭曲"),
-            ("divine_matter_transmutation", "物質轉換"),
-            ("divine_life_extension", "生命延續"),
-        ):
+    def _members(self):
+        return [
+            (key, skill)
+            for key, skill in SKILL_REGISTRY.items()
+            if skill.category is SkillCategory.DIVINE_MYSTERY
+        ]
+
+    @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
+    def test_every_member_is_bloodline_gated(self):
+        for key, skill in self._members():
             with self.subTest(skill=key):
-                skill = SKILL_REGISTRY[key]
-                self.assertIs(skill.kind, SkillKind.ACTIVE)
-                self.assertIs(skill.target_spec, TargetSpec.NONE)
-                self.assertTrue(skill.usable_out_of_combat)
-                self.assertEqual(skill.effects, [f"divine_mystery:{name}"])
-                self.assertEqual(
-                    skill.parsed_effects,
-                    (DivineMysteryEffect(name=name, mechanized=False),),
-                )
+                self.assertTrue(skill.requires_divine_arts, key)
 
+    def test_every_member_declares_an_empty_resource_cost(self):
+        for key, skill in self._members():
+            with self.subTest(skill=key):
+                self.assertEqual(skill.cost, {}, key)
+
+    def test_no_member_declares_a_damage_or_healing_effect(self):
+        for key, skill in self._members():
+            with self.subTest(skill=key):
+                for effect in skill.parsed_effects:
+                    self.assertNotIsInstance(
+                        effect,
+                        (DamageEffect, HealEffect, SelfHealEffect),
+                        key,
+                    )
+
+
+class DivineMysteryLineageTreeTests(unittest.TestCase):
+    """The shipped divine-mystery graph: three chains and the capstone.
+
+    The registry's load-time validator already accepted the graph at import
+    (a dangling edge, cycle, or out-of-range threshold would have raised
+    before any test ran). These assertions pin the derived caps the
+    redesign prices (lore section 2): the three chain ends are consumed by
+    the capstone at Lv.10, so each derives tip cap 10, the leaves nobody
+    consumes cap at the canopy default, and the roots cap at the maximum
+    edge that consumes them. The load-time reverse-edge cache is rebuilt
+    against the current registry in ``setUp`` so the assertions stay
+    order-independent within the suite.
+    """
+
+    def setUp(self):
+        validate_prerequisite_graph(SKILL_REGISTRY)
+
+    def test_each_chain_end_derives_the_capstone_threshold_as_its_cap(self):
         for key in (
-            "divine_sexual_mastery",
-            "divine_sexual_arts",
-            "divine_time_dilation",
-            "divine_space_distortion",
-            "divine_matter_transmutation",
-            "divine_life_extension",
-            "status_disguise",
-            "dominion_art",
+            "sovereign_investiture",
+            "undying_tutelage",
+            "true_name_sight",
+            "dominion_recall",
+            "bestowed_veil",
         ):
-            with self.subTest(gated=key):
-                self.assertTrue(
-                    SKILL_REGISTRY[key].requires_divine_arts,
+            with self.subTest(key=key):
+                self.assertEqual(proficiency_cap(key), 10, key)
+
+    def test_chain_ends_are_consumed_only_by_the_capstone_at_ten(self):
+        for key in (
+            "sovereign_investiture",
+            "undying_tutelage",
+            "true_name_sight",
+        ):
+            with self.subTest(key=key):
+                self.assertEqual(
+                    prerequisite_consumers(key),
+                    (("crown_apotheosis", 10),),
                     key,
                 )
-        self.assertFalse(
-            SKILL_REGISTRY["reincarnation_boon_yuna"].requires_divine_arts
-        )
+
+    def test_chain_roots_derive_the_maximum_consuming_threshold(self):
+        for key, threshold in (
+            ("dominion_art", 3),
+            ("mentors_covenant", 3),
+            ("status_disguise", 3),
+        ):
+            with self.subTest(key=key):
+                self.assertEqual(proficiency_cap(key), threshold, key)
+
 
 class SkillCategoryClassificationTests(unittest.TestCase):
-    """Structural proof that the 118-skill classification partition is exact.
+    """Structural proof that the skill classification partition is exact.
 
     The suite imports ``world.rules.disengage`` so ``flee`` is registered
     before these tests run, matching how the registry exists at runtime.
@@ -787,12 +837,18 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "flash_step",
             },
             SkillCategory.DIVINE_MYSTERY: {
-                "divine_time_dilation",
-                "divine_space_distortion",
-                "divine_matter_transmutation",
-                "divine_life_extension",
-                "status_disguise",
                 "dominion_art",
+                "dominion_recall",
+                "shared_dominion",
+                "sovereign_investiture",
+                "mentors_covenant",
+                "chorus_of_ages",
+                "undying_tutelage",
+                "status_disguise",
+                "bestowed_veil",
+                "unveiling_eye",
+                "true_name_sight",
+                "crown_apotheosis",
             },
             SkillCategory.UTILITY: set(),
             SkillCategory.SEXUAL_ACT: {
