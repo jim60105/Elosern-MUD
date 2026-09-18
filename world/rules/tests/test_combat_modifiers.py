@@ -311,30 +311,35 @@ class CombatModifierTests(EvenniaTestCase):
 
     def test_rule_sister_vestment_grace(self):
         # 修女聖袍 (sister_vestments) + arousal >= 中等 (35..59) → defense +4.
+        # Codex row: equipment defense -4 (docs/lore/items.md), so the merged
+        # bundle at grace-on is exactly -4 + 4 = 0; the robe's own heal_gain
+        # +10% merges beside it.
         entity = self._wearing_grace(armor="sister_vestments")
         entity.sexual.pleasure.base = 40
-        # The robe's own equipment heal_gain +10% merges beside the grace.
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": 4, "heal_gain": "+10%"}
+            evaluate_combat_modifiers(entity), {"defense": 0, "heal_gain": "+10%"}
         )
-        # Same habit at 平靜 arousal: no grace.
+        # Same habit at 平靜 arousal: no grace, the equipment -4 remains.
         entity.sexual.pleasure.base = 0
-        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+10%"})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"defense": -4, "heal_gain": "+10%"}
+        )
         # Same arousal without the habit: no grace.
         self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
 
     def test_rule_saintess_vestment_grace(self):
         # 聖女聖袍 (saintess_vestments) + arousal >= 中等 → defense +6 on top
-        # of the robe's own equipment defense -3; the merged bundle is +3.
+        # of the robe's own equipment defense -5 (codex row, docs/lore/items.md);
+        # the merged bundle is +1.
         entity = self._wearing_grace(armor="saintess_vestments")
         entity.sexual.pleasure.base = 40
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": 3, "heal_gain": "+25%"}
+            evaluate_combat_modifiers(entity), {"defense": 1, "heal_gain": "+25%"}
         )
         entity.sexual.pleasure.base = 0
-        # Equipment defense -3 still applies without the grace.
+        # Equipment defense -5 still applies without the grace.
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": -3, "heal_gain": "+25%"}
+            evaluate_combat_modifiers(entity), {"defense": -5, "heal_gain": "+25%"}
         )
 
     def test_rule_holy_emblem_grace(self):
