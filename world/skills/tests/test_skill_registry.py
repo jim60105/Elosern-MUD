@@ -592,12 +592,39 @@ class DivineMysteryFamilyInvariantTests(unittest.TestCase):
                 self.assertEqual(skill.cost, {}, key)
 
     def test_no_member_declares_a_damage_or_healing_effect(self):
+        # The family vocabulary is closed: conferral, revocation, veil and
+        # reveal effects only — plus the retained inert flavor form (design
+        # D6 keeps the prefix and its handler registered for a future node).
+        # A damage/heal/self-heal verb is the observable violation; the
+        # isinstance whitelist also refuses any other cast verb a future
+        # node could smuggle in.
+        from world.skills.effects import (
+            ConferGrowthRateEffect,
+            ConferralEffect,
+            DisguiseEffect,
+            DivineMysteryEffect,
+            RevealDisguiseEffect,
+            RevokeGrantsEffect,
+        )
+
         for key, skill in self._members():
             with self.subTest(skill=key):
                 for effect in skill.parsed_effects:
                     self.assertNotIsInstance(
                         effect,
                         (DamageEffect, HealEffect, SelfHealEffect),
+                        key,
+                    )
+                    self.assertIsInstance(
+                        effect,
+                        (
+                            ConferralEffect,
+                            ConferGrowthRateEffect,
+                            RevokeGrantsEffect,
+                            DisguiseEffect,
+                            RevealDisguiseEffect,
+                            DivineMysteryEffect,
+                        ),
                         key,
                     )
 
