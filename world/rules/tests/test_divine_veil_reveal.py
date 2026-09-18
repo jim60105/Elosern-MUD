@@ -104,6 +104,10 @@ class _FakeEntity:
 class RevealPrimitiveTests(unittest.TestCase):
     """The deterministic-core write clears only veils its strength covers."""
 
+    @covers_requirement(
+        "skill-handler::the-disguise-layer-has-a-provenance-scoped-"
+        "reveal-primitive"
+    )
     @covers_requirement("disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds")
     def test_mundane_strength_lifts_an_authored_mundane_veil(self):
         entity = _FakeEntity()
