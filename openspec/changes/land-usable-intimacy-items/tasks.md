@@ -32,5 +32,5 @@
 
 ## 6. Gate
 
-- [ ] 6.1 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.rules.tests.test_item_use`, `world.rules.tests.test_item_effects_rulebook`, `world.rules.tests.test_item_combat_turn`, `world.rules.tests.test_shipped_item_use_regression`, `world.rules.tests.test_guild_config` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
-- [ ] 6.2 Run `openspec validate land-usable-intimacy-items --strict` and verify it reports the change as valid.
+- [x] 6.1 Run the focused labels touched by this change — `world.lore.tests.test_items`, `world.rules.tests.test_item_use`, `world.rules.tests.test_item_effects_rulebook`, `world.rules.tests.test_item_combat_turn`, `world.rules.tests.test_shipped_item_use_regression`, `world.rules.tests.test_guild_config` — plus `uv run --locked python -m tools.spec_traceability check`. Do not run the full suite.
+- [x] 6.2 Run `openspec validate land-usable-intimacy-items --strict` and verify it reports the change as valid.
