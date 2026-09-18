@@ -26,11 +26,6 @@ from typing import Any
 
 from world.observability import log_warn
 
-from web.webclient.presentation.coordinator import publish_panel_update
-from web.webclient.presentation.ingress import build_presentation_context
-from web.webclient.presentation.registry import build_production_registry
-from web.webclient.presentation.watchers import watchers_for
-
 __all__ = ["PanelPushDeps", "make_panel_pusher"]
 
 
