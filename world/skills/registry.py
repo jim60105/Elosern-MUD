@@ -20,6 +20,8 @@ from world.skills.effects import (
     ActorSexualEventEffect,
     ClampShameEffect,
     ClimaxExtensionStageEffect,
+    ConferGrowthRateEffect,
+    ConferralEffect,
     DamageEffect,
     DamagePolicy,
     DivinePleasureMaxEffect,
@@ -279,9 +281,9 @@ class SkillDef:
         of the same length as ``effects``. Any other input must be a tuple of
         ``EffectPolicy`` instances matching the effect count exactly (an
         all-default tuple re-normalizes if ``effects`` length changed via
-        ``replace()``), and only supported effect kinds (damage and healing)
-        may declare a
-        non-identity coefficient.
+        ``replace()``), and only supported effect kinds (damage, healing,
+        and the two conferral classes) may declare a non-identity
+        coefficient — which doubles as the conferral scale.
         """
         if self.effect_policies is None or (
             isinstance(self.effect_policies, tuple) and len(self.effect_policies) == 0
@@ -327,7 +329,15 @@ class SkillDef:
             self.effect_policies, self.parsed_effects, self.effects
         ):
             if policy.coefficient != 1.0 and not (
-                isinstance(parsed, (DamageEffect, HealEffect))
+                isinstance(
+                    parsed,
+                    (
+                        DamageEffect,
+                        HealEffect,
+                        ConferralEffect,
+                        ConferGrowthRateEffect,
+                    ),
+                )
                 or (isinstance(parsed, SelfHealEffect) and parsed.basis == "stat")
             ):
                 raise ValueError(
@@ -2849,6 +2859,11 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["confer_skill_partial"],
+            # The lore prices this root at 一成 (0.10): the scale is the
+            # per-occurrence coefficient the conferral handlers now read, so
+            # the shipped verb records grants at the priced strength from the
+            # moment the mechanism becomes castable.
+            effect_policies=(EffectPolicy(coefficient=0.1),),
             category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
