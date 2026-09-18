@@ -30,6 +30,7 @@ from world.rules.clock import (
     _refresh_advance_entity_caches,
     _restore_advance_location,
     _restore_clock_tick,
+    _restore_registry_attribute,
     _snapshot_clock_tick,
     build_advance_snapshot_registry,
     get_world_clock,
@@ -206,36 +207,15 @@ def _restore_attribute_direct(
     category: str | None,
     snapshot: tuple[bool, Any],
 ) -> None:
-    """Restore one attribute surface, degrading to a cache reset on failure.
+    """Restore one registry attribute surface through the shared clock helper.
 
-    Writes the snapshot value directly instead of through the shared
-    ``restore_attribute`` deepcopy: a registry surface may embed live database
-    objects (the instance contract's ``owned_entities``), which plain
-    ``deepcopy`` cannot copy; Evennia's ``attributes.add`` re-encodes through
-    ``dbserialize`` and handles them natively. Mirrors the sibling's registry
-    restore so a regular rollback never depends on cache invalidation.
+    Delegates to ``clock._restore_registry_attribute`` with the cast-side
+    stage tag so the ``rollback_restore_failed`` event keeps its
+    ``cast_registry_attribute`` boundary identity.
     """
-    existed, value = snapshot
-    try:
-        if existed:
-            obj.attributes.add(key, value, category=category)
-        else:
-            obj.attributes.remove(key, category=category)
-    except Exception as error:
-        try:
-            obj.attributes.reset_cache()
-        except Exception:  # observability: ignore R2: cache invalidation is best-effort; the restore failure itself is logged below
-            pass
-        log_warn(
-            "rollback_restore_failed",
-            exc=error,
-            context={
-                "stage": "cast_registry_attribute",
-                "obj": str(obj),
-                "key": key,
-                "category": category,
-            },
-        )
+    _restore_registry_attribute(
+        obj, key, category, snapshot, stage="cast_registry_attribute"
+    )
 
 
 def _restore_settlement_state(

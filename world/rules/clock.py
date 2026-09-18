@@ -487,6 +487,8 @@ def _restore_registry_attribute(
     key: str,
     category: str | None,
     snapshot: tuple[bool, Any],
+    *,
+    stage: str = "advance_registry_attribute",
 ) -> None:
     """Restore one registry attribute, degrading to a cache reset on failure.
 
@@ -494,7 +496,8 @@ def _restore_registry_attribute(
     ``restore_attribute`` deepcopy: a contract surface may embed live database
     objects (the instance contract's ``owned_entities``), which plain
     ``deepcopy`` cannot copy; Evennia's ``attributes.add`` re-encodes through
-    ``dbserialize`` and handles them natively.
+    ``dbserialize`` and handles them natively. The ``stage`` tag identifies
+    the rollback boundary in the failure event's context.
     """
     existed, value = snapshot
     try:
@@ -511,7 +514,7 @@ def _restore_registry_attribute(
             "rollback_restore_failed",
             exc=error,
             context={
-                "stage": "advance_registry_attribute",
+                "stage": stage,
                 "obj": str(obj),
                 "key": key,
                 "category": category,
@@ -552,7 +555,11 @@ def _restore_advance_registry(
             continue
         for key, category in snapshot.attributes:
             _restore_registry_attribute(
-                obj, key, category, snapshot.attributes[(key, category)]
+                obj,
+                key,
+                category,
+                snapshot.attributes[(key, category)],
+                stage="advance_registry_attribute",
             )
         if snapshot.location is not None:
             existed, target_pk = snapshot.location

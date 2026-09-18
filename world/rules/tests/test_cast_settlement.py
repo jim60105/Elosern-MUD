@@ -433,6 +433,28 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         self.assertEqual(field.fled, set())
         self.assertEqual(field.knocked_out, set())
 
+    def test_restore_warn_carries_the_cast_registry_stage_tag(self):
+        """A failing registry-attribute restore logs the cast-side stage tag."""
+        clock = WorldClock()
+        self.char1.db.disguised_stats = {"atk_phys": 1}
+        snapshot = _snapshot_settlement_state(self._request(), clock)
+        # Diverge the surface so the restore must write the snapshot back,
+        # where the injected write failure emits the cast-side tag.
+        self.char1.db.disguised_stats = {"atk_phys": 99}
+        with (
+            patch("world.rules.clock.log_warn") as warn,
+            patch.object(
+                self.char1.attributes,
+                "add",
+                side_effect=RuntimeError("injected restore write failure"),
+            ),
+        ):
+            _restore_settlement_state(snapshot, clock)
+        warn.assert_called()
+        (event,), kwargs = warn.call_args
+        self.assertEqual(event, "rollback_restore_failed")
+        self.assertEqual(kwargs["context"]["stage"], "cast_registry_attribute")
+
 
 class CastSettlementCallbackOwnedCoverageTests(_CastSettlementTestCase):
     """The merged registry covers callback-owned surfaces in the cast boundary
