@@ -32,6 +32,7 @@ from twisted.internet import threads
 from world.art import gallery_kinds
 from world.art.cutout import CutoutError, applies_to, remove_background
 from world.art.formats import encode
+from world.art.paths import resolved_under_store_root
 from world.art.queue import (
     claim,
     is_gallery_job,
@@ -112,33 +113,21 @@ def _store_root() -> Path:
     return Path(settings.ART_STORE_ROOT)
 
 
-def _resolved_under_root(path: Path) -> Path | None:
-    """Return the symlink-resolved path if it stays inside the store root."""
-    try:
-        resolved = path.resolve()
-    except OSError:  # observability: ignore R2: confinement probe; None result is the caller's bounded-failure signal
-        return None
-    root = _store_root().resolve()
-    if resolved == root or root not in resolved.parents:
-        return None
-    return resolved
-
-
 def _write_temp(identity: str, png_bytes: bytes) -> str:
     """Write the PNG to a unique temporary file inside the store directory.
 
     The final atomic replace onto ``identity`` happens later in
     ``settle_generated`` (under the queue lock, only while the claim is still
     current), so a stale or failed generation never touches the record's prior
-    valid output. The identity must resolve inside the store root (the
-    symlink-resolved under-root check) or the write is rejected before any file
-    is created.
+    valid output. The identity must resolve strictly under the store root
+    (``world.art.paths.resolved_under_store_root``, which also refuses any
+    symlinked component) or the write is rejected before any file is created.
     """
-    target = _store_root() / identity
-    if _resolved_under_root(target) is None:
+    if resolved_under_store_root(identity) is None:
         raise WorkerStoreError(
             f"output identity {identity!r} resolves outside the store root"
         )
+    target = _store_root() / identity
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(
         dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
@@ -368,11 +357,10 @@ def _cleanup_prior_output(identity: str) -> None:
     unreferenced orphan (cleaned by the next regeneration) and NEVER reverts
     the committed transition.
     """
-    path = _store_root() / identity
-    if _resolved_under_root(path) is None:
+    if resolved_under_store_root(identity) is None:
         return
     try:
-        path.unlink(missing_ok=True)
+        (_store_root() / identity).unlink(missing_ok=True)
     except OSError as error:
         log_warn("art_cleanup_failed", context={"identity": identity}, exc=error)
 
