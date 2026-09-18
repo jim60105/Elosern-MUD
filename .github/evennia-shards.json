@@ -36,6 +36,7 @@
         "world.rules.tests.test_combat_session_targeting",
         "world.rules.tests.test_combat_view",
         "world.rules.tests.test_conferral_cast",
+        "world.rules.tests.test_conferral_revocation",
         "world.rules.tests.test_creation_messages",
         "world.rules.tests.test_creation_wizard",
         "world.rules.tests.test_conditional_damage",

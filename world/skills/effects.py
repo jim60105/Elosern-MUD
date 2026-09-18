@@ -165,6 +165,12 @@ class ConferGrowthRateEffect:
 
 
 @dataclass(frozen=True)
+class RevokeGrantsEffect:
+    """Remove every conferral on one target: all skill grants and every
+    ``conferred_growth_rate`` buff instance, whatever their source."""
+
+
+@dataclass(frozen=True)
 class SexualEventEffect:
     """Resolve one rule-driven sexual transition by name."""
 
@@ -1030,6 +1036,9 @@ def parse_effect(effect_id: str) -> object:
     if prefix == "confer_growth_rate":
         _parse_bare(effect_id, prefix)
         return ConferGrowthRateEffect()
+    if prefix == "revoke_grants":
+        _parse_bare(effect_id, prefix)
+        return RevokeGrantsEffect()
     if prefix == "sexual_event":
         return SexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_event_actor":

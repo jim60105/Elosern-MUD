@@ -810,6 +810,27 @@ def growth_rate_multiplier(entity) -> float:
     return multiplier
 
 
+def clear_conferred_growth_rates(entity) -> int:
+    """Remove every live conferred growth-rate buff instance; return the count.
+
+    Selection resolves against live buff **instances**, so distinct instance
+    keys (one per conferring source) all lose their instances — revocation is
+    total, never per-source. Every removal routes through the same
+    ``dispel=True`` external-removal path the cleanse handler and the
+    ``remove_by_selector`` vocabulary use; nothing is written when no
+    conferred instance is live (``0`` is a legitimate outcome, not an error).
+    """
+    keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if buff.definition_key == "conferred_growth_rate"
+    )
+    if not keys:
+        return 0
+    _remove_buff_keys(entity, keys)
+    return len(keys)
+
+
 def _remove_buff_keys(entity, keys: tuple[str, ...]) -> None:
     """Dispel one active buff instance per key; missing keys are no-ops.
 

@@ -92,6 +92,24 @@ def record_conferred_grant(
     entity.db.skill_grants = grants
 
 
+def revoke_conferred_grants(entity: Any) -> None:
+    """Clear every conferral on one target: all skill grants and every
+    conferred growth-rate buff instance, whatever their source.
+
+    Total by design (design D1/D2): both writes ride one call so no caller
+    can clear half the conferral vocabulary. The grant write is skipped when
+    the store holds nothing — an absent attribute stays absent and an
+    already-empty list stays untouched — and the buff clear writes nothing
+    when no conferred instance is live, so revocation of a target with
+    nothing conferred is a clean no-op that changes no stored state.
+    """
+    from world.rules.buffs import clear_conferred_growth_rates
+
+    if entity.db.skill_grants:
+        entity.db.skill_grants = []
+    clear_conferred_growth_rates(entity)
+
+
 def validate_source_owns_skill(actor: Any, skill_key: str) -> None:
     """Reject conferral of a skill the source does not directly own.
 
