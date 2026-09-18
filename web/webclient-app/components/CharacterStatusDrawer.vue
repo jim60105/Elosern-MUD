@@ -19,6 +19,7 @@
 // render no breakdown element at all.
 import { computed, ref, watch } from "vue";
 import { gaugeRatio } from "./vitals.js";
+import { conditionLabel } from "../lib/condition_label.js";
 
 const props = defineProps({
   // The committed `status` v1 panel payload (vitals + conditions).
@@ -144,19 +145,10 @@ function gaugeRatioPct(gauge) {
 // between revisions) and every derived modifier value.
 const conditions = computed(() => (Array.isArray(props.status?.conditions) ? props.status.conditions : []));
 
-function conditionName(condition) {
-  const parts = [condition.label ?? condition.code];
-  if (typeof condition.remaining_seconds === "number") {
-    parts.push(`剩 ${condition.remaining_seconds} 秒`);
-  }
-  const mods = condition.modifiers;
-  if (mods && typeof mods === "object") {
-    for (const [key, value] of Object.entries(mods)) {
-      parts.push(`${key} ${value}`);
-    }
-  }
-  return parts.join("，");
-}
+// The condition prose is the shared label rule (the same label, duration,
+// and modifier text the H2 chips carry in their accessible names) — one
+// copy in lib/condition_label.js.
+const conditionName = conditionLabel;
 
 // The `character` body (task 5.3): render the trait table (true values only),
 // equipment, disguise, guild and persona. When the panel is unavailable,

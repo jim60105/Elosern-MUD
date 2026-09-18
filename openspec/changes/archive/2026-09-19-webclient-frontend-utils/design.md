@@ -49,9 +49,11 @@ function readPanel(rs, key) {
 }
 ```
 
-and replace the five `(rs.panels && rs.panels.X) || null` lines. The `available`/`Array.isArray`
-guards stay verbatim at each read site. Keeping it non-exported avoids inviting callers
-outside `buildView`.
+and replace the four `(rs.panels && rs.panels.X) || null` reads inside `buildView`
+(party, objectives, roster, exploration). The vitals read already goes through the
+`panels = rs.panels || {}` alias (`panels.status`), a different shape, and stays where it
+is. The `available`/`Array.isArray` guards stay verbatim at each read site. Keeping it
+non-exported avoids inviting callers outside `buildView`.
 
 ## Risks / Trade-offs
 

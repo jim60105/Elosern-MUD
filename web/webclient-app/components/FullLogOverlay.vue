@@ -8,8 +8,7 @@
 // control is the single one-action escape hatch (MODIFIED
 // webclient-desktop-shell: the complete log is reachable in one action).
 import { h, ref } from "vue";
-import NarrativeMarkup from "../lib/narrative_markup.js";
-import { renderNarrativeTokens } from "./narrative-renderer.js";
+import { narrativeLineNodes } from "../lib/narrative_line_nodes.js";
 import { createFocusTrap } from "./focus-trap.js";
 
 export default {
@@ -75,50 +74,6 @@ export default {
 
     expose({ focusSelf });
 
-    // The same line mapping as the feed: a divider plus a literal `.inp`
-    // line for player input, a pipeline-rendered line for everything else,
-    // and the monospace stack for box-drawing lines. One renderer, no
-    // second markup path (design D4).
-    const BOX_DRAWING = /[\u2500-\u257f]/;
-
-    function lineText(line) {
-      return line && line.text == null ? "" : String(line.text);
-    }
-
-    function lineNodes(line, index) {
-      const kind = line && line.kind;
-      const text = lineText(line);
-      const nodes = [];
-      if (kind === "in") {
-        if (index > 0) {
-          nodes.push(
-            h("div", {
-              key: `${index}-divider`,
-              class: "narrative-divider",
-              "data-testid": "narrative-divider",
-            }),
-          );
-        }
-        nodes.push(
-          h("div", { key: index, class: "narrative-line inp", "data-line-kind": "in" }, [text]),
-        );
-        return nodes;
-      }
-      const lineClass = kind || "out";
-      const classes = ["narrative-line", lineClass];
-      if (BOX_DRAWING.test(text)) {
-        classes.push("map-art");
-      }
-      nodes.push(
-        h(
-          "div",
-          { key: index, class: classes.join(" "), "data-line-kind": lineClass },
-          renderNarrativeTokens(NarrativeMarkup.tokenize(text)),
-        ),
-      );
-      return nodes;
-    }
-
     return () =>
       h(
         "div",
@@ -145,7 +100,12 @@ export default {
             },
             "關閉",
           ),
-          ...props.lines.flatMap((line, index) => lineNodes(line, index)),
+          // The same line mapping as the feed: a divider plus a literal
+          // `.inp` line for player input, a pipeline-rendered line for
+          // everything else, and the monospace stack for box-drawing lines.
+          // One renderer, no second markup path (design D4) — shared
+          // lib/narrative_line_nodes.js.
+          ...props.lines.flatMap((line, index) => narrativeLineNodes(line, index)),
         ],
       );
   },

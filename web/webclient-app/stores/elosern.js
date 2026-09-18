@@ -148,6 +148,16 @@ function connectionStatusFor(connected, loggedIn, phase) {
   return "connecting";
 }
 
+// The defensive panel read (webclient-frontend-utils): the committed panel
+// for `key`, or null when the panels map (or the key) is absent. The helper
+// returns the raw panel-or-null ONLY — the per-field `available`/type guards
+// stay at each read because the predicates genuinely differ (e.g.
+// `available === true` for party/objectives/roster vs `available !== false`
+// for vitals/exploration).
+function readPanel(rs, key) {
+  return (rs.panels && rs.panels[key]) || null;
+}
+
 // The focus-frame items from the committed `context_actions` panel: the
 // exploration form's affordances (action + navigation entries) or the combat
 // form's participants (target entries).
@@ -1963,14 +1973,14 @@ export const useElosernStore = defineStore("elosern", () => {
 
     // Party read model (webclient-align-05-party-hud): committed party slots
     // from the available `party` panel (empty array when unavailable or absent).
-    const partyPanel = (rs.panels && rs.panels.party) || null;
+    const partyPanel = readPanel(rs, "party");
     const partyAvailable = !!partyPanel && partyPanel.available === true;
     const partySlots = partyAvailable && Array.isArray(partyPanel.slots) ? partyPanel.slots : [];
 
     // Objectives read model (webclient-align-09-objective-tracker-ui): committed
     // tracked quest rows from the available `objectives` panel (empty array when
     // unavailable or absent).
-    const objectivesPanel = (rs.panels && rs.panels.objectives) || null;
+    const objectivesPanel = readPanel(rs, "objectives");
     const objectivesAvailable = !!objectivesPanel && objectivesPanel.available === true;
     const objectivesRows =
       objectivesAvailable && Array.isArray(objectivesPanel.rows) ? objectivesPanel.rows : [];
@@ -1978,7 +1988,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // Roster read model (webclient-character-roster, multichar-02-roster-read-model):
     // committed account roster rows and capacity/lock facts (empty/default when
     // unavailable or absent).
-    const rosterPanel = (rs.panels && rs.panels.roster) || null;
+    const rosterPanel = readPanel(rs, "roster");
     const rosterAvailable = !!rosterPanel && rosterPanel.available === true;
     const rosterCharacters =
       rosterAvailable && Array.isArray(rosterPanel.characters) ? rosterPanel.characters : [];
@@ -1999,7 +2009,7 @@ export const useElosernStore = defineStore("elosern", () => {
 
     // Committed exploration interact targets (webclient-align-05-party-hud):
     // exposed so the party drawer can resolve invite/leave preconditions.
-    const explorationPanel = (rs.panels && rs.panels.exploration) || null;
+    const explorationPanel = readPanel(rs, "exploration");
     const explorationInteract =
       explorationPanel && explorationPanel.available !== false && Array.isArray(explorationPanel.interact)
         ? explorationPanel.interact
