@@ -37,10 +37,9 @@ from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai.guardrail import (
+    GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
-    register_degrade_fallback,
-    register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.ai.schemas.registry import (
@@ -386,6 +385,12 @@ _VALIDATORS: dict[str, Any] = {
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 
+_HOOKS = GuardrailHooks(
+    layer="npc_dialogue",
+    fallback=_degrade_fallback,
+    validators=_VALIDATORS,
+)
+
 
 def _cap_string(value: str) -> str:
     if len(value) <= MAX_FIELD_LENGTH:
@@ -575,33 +580,9 @@ def _require_registered() -> None:
         )
 
 
-def _uninstall_fallback() -> None:
-    if guardrail._degrade_fallbacks.get("npc_dialogue") is _degrade_fallback:
-        del guardrail._degrade_fallbacks["npc_dialogue"]
-
-
-def _uninstall_validator(name: str) -> None:
-    validators = guardrail._semantic_validators.get("npc_dialogue", {})
-    if validators.get(name) is _VALIDATORS[name]:
-        del validators[name]
-
-
 def _uninstall_schema() -> None:
     if _OUTPUT_SCHEMAS.get("npc_dialogue") is NPC_DIALOGUE_OUTPUT_SCHEMA:
         del _OUTPUT_SCHEMAS["npc_dialogue"]
-
-
-def _uninstall_all_own_hooks() -> None:
-    """Remove every npc_dialogue hook that is this module's own (by identity).
-
-    Used for rollback so a partial-failure registration can never leave a
-    half-installed layer behind. Foreign hooks with the same names are left
-    untouched.
-    """
-    _uninstall_fallback()
-    for name in _VALIDATORS:
-        _uninstall_validator(name)
-    _uninstall_schema()
 
 
 def register_npc_dialogue() -> None:
@@ -617,17 +598,12 @@ def register_npc_dialogue() -> None:
     if _is_registered():
         return
     try:
-        if guardrail._degrade_fallbacks.get("npc_dialogue") is not _degrade_fallback:
-            register_degrade_fallback("npc_dialogue", _degrade_fallback)
-        for name, validator in _VALIDATORS.items():
-            validators = guardrail._semantic_validators.get("npc_dialogue", {})
-            if validators.get(name) is validator:
-                continue
-            register_semantic_validator("npc_dialogue", name, validator)
+        _HOOKS.install()
         if _OUTPUT_SCHEMAS.get("npc_dialogue") is not NPC_DIALOGUE_OUTPUT_SCHEMA:
             register_output_schema("npc_dialogue", NPC_DIALOGUE_OUTPUT_SCHEMA)
     except (GuardrailRegistrationError, DuplicateSchemaError):
-        _uninstall_all_own_hooks()
+        _HOOKS.uninstall_own()
+        _uninstall_schema()
         raise
 
 

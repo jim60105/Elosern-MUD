@@ -44,7 +44,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
@@ -56,6 +56,9 @@ from world.ai.guardrail import (
     GuardrailRegistrationError,
     guarded_call,
     register_degrade_fallback,
+)
+from world.ai.immutable import (
+    reject_mutable_containers as _reject_mutable_containers,
 )
 from world.ai.profiles import get_profile
 from world.ai.schemas import ChatRequestDescriptor
@@ -129,22 +132,6 @@ class OptionsValidationError(ValueError):
     def __init__(self, code: str, message: str):
         self.code = code
         super().__init__(message)
-
-
-def _reject_mutable_containers(value: Any, path: str) -> None:
-    """Reject any ``dict``/``list`` nested under ``value`` so immutability is
-    enforced by construction, not only by the frozen dataclass."""
-    if isinstance(value, (dict, list)):
-        raise TypeError(f"{path} holds a mutable dict/list container")
-    if isinstance(value, tuple):
-        for index, item in enumerate(value):
-            _reject_mutable_containers(item, f"{path}[{index}]")
-    elif is_dataclass(value):
-        for dataclass_field in fields(value):
-            _reject_mutable_containers(
-                getattr(value, dataclass_field.name),
-                f"{path}.{dataclass_field.name}",
-            )
 
 
 def _validate_params_shape(params: Mapping[str, Any], path: str) -> None:

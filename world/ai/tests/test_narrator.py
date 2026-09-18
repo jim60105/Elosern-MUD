@@ -379,6 +379,10 @@ class NarratorRegistrationTests(unittest.TestCase):
 
     @covers_requirement("narrator::narrator-preserves-the-single-writer-and-transport-boundaries")
     def test_partial_hook_registration_failure_leaves_no_narrator_hooks(self):
+        from world.ai.guardrail import (
+            register_semantic_validator as _register_semantic_validator,
+        )
+
         calls = {"count": 0}
 
         def flaky_validator(layer, name, validator):
@@ -387,9 +391,9 @@ class NarratorRegistrationTests(unittest.TestCase):
                 raise GuardrailRegistrationError(
                     f"semantic validator {layer}.{name} already registered"
                 )
-            return guardrail.register_semantic_validator(layer, name, validator)
+            return _register_semantic_validator(layer, name, validator)
 
-        with patch("world.ai.narrator.register_semantic_validator", flaky_validator):
+        with patch("world.ai.guardrail.register_semantic_validator", flaky_validator):
             with self.assertRaises(GuardrailRegistrationError):
                 register_narrator(_join_renderer)
         self.assertNotIn("narrator", guardrail._degrade_fallbacks)

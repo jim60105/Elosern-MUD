@@ -65,21 +65,6 @@ _GALLERY_KINDS = {
 }
 
 
-def _store_root() -> Path:
-    return Path(settings.ART_STORE_ROOT)
-
-
-def _resolved_under_root(path: Path) -> Path | None:
-    try:
-        resolved = path.resolve()
-    except OSError:
-        return None
-    root = _store_root().resolve()
-    if resolved == root or root not in resolved.parents:
-        return None
-    return resolved
-
-
 def _referenced_by_done_record(identity: str) -> bool:
     for record in ArtAssetRecord.objects.all():
         if (
@@ -170,10 +155,7 @@ def art_media(request, identity: str):
         raise Http404
     if not _referenced_by_done_record(identity):
         raise Http404
-    target = _store_root() / identity
-    if target.is_symlink():
-        raise Http404
-    resolved = _resolved_under_root(target)
+    resolved = resolved_under_store_root(identity)
     if resolved is None or not resolved.is_file():
         raise Http404
     return _serve(resolved)
