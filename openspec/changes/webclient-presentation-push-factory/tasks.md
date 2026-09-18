@@ -77,14 +77,14 @@
 
 ## 3. Protocol field validators
 
-- [ ] 3.1 Move the byte-identical `_require_exit_ref` (and its ASCII check) into
+- [x] 3.1 Move the byte-identical `_require_exit_ref` (and its ASCII check) into
   `protocol_validation.py` as `require_exit_ref(value, field, error_cls)`; `MAX_EXIT_REF_CHARS`
   stays defined where it is today or moves with it — keep the constants importable from
   their current modules if any test imports them (check first:
   `grep "_require_exit_ref\|MAX_EXIT_REF_CHARS" web/webclient -r`). The two copies in
   `presentation/local_map.py:86` and `presentation/exploration.py:116` become delegates or
   direct imports.
-- [ ] 3.2 Keep `_require_node_id` in BOTH modules with their divergent semantics — local_map
+- [x] 3.2 Keep `_require_node_id` in BOTH modules with their divergent semantics — local_map
   lets `decode_node`'s `KnowledgeError` escape; exploration wraps it in
   `ProtocolValidationError`. Factor only the shared shape check into
   `protocol_validation.py::require_node_id_shape(value, field, error_cls, max_chars)`; each
