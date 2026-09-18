@@ -863,3 +863,32 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         self.assertEqual(script.db.tick, before_tick)
         self.assertEqual(self.player.db.quest_log, before_log)
         self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
+
+    def test_restore_warn_carries_the_advance_registry_stage_tag(self):
+        """A failing registry-attribute restore logs the advance-side stage tag."""
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import get_world_clock
+
+        self._accept_due()
+        sync_quest_runtime()
+        clock = get_world_clock()
+        registry = build_advance_snapshot_registry(
+            clock, 2 * self.hours, AdvanceSource.SKIP, [self.player]
+        )
+        # The quest-log surface is registered in the snapshot, so the restore
+        # hits the failing add path and the warn carries the advance-side tag.
+        with (
+            patch("world.rules.clock.log_warn") as warn,
+            patch.object(
+                self.player.attributes,
+                "add",
+                side_effect=RuntimeError("injected restore write failure"),
+            ),
+        ):
+            _restore_advance_registry(registry, [self.player])
+        warn.assert_called()
+        (event,), kwargs = warn.call_args
+        self.assertEqual(event, "rollback_restore_failed")
+        self.assertEqual(
+            kwargs["context"]["stage"], "advance_registry_attribute"
+        )
