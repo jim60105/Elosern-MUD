@@ -12,6 +12,14 @@ is exercised through the real ``grant_skill_practice_xp`` entry point. One
 ``EvenniaTest`` class drives the resolve-level ``_commit`` rollback, which
 needs real Attribute storage. No shipped-catalog names and no data-contract
 tagging anywhere in this module (test-data-independence).
+
+Traceability note for the archive/sync step: the delta requirement
+``Divine Mystery practice accrues at most once per world-calendar day``
+(canonical id ``divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day``)
+does not exist in the main-spec traceability index until this change is
+synced, so the cadence-scenario tests below carry the skill-lineage main-spec
+IDs they substantively establish instead. When the delta lands in
+``openspec/specs/``, add that id to the six cadence-scenario tests here.
 """
 
 import unittest
@@ -25,8 +33,10 @@ from world.rules import progression
 from world.rules.action import CommitFailed, PendingEffect, _commit
 from world.rules.clock import WorldDateTime, _DAY_SECONDS
 from world.rules.progression import (
+    PRACTICE_XP_PER_STUDY_HOUR,
     SKILL_PRACTICE_XP_PER_USE,
     SKILL_PROFICIENCY_XP_PER_LEVEL,
+    grant_study_practice_xp,
     practice_claim_key,
     practice_day_ordinal,
     proficiency_cap,
@@ -255,6 +265,20 @@ class DigestionCadenceTests(_Scoped):
         # category: the 情慾秘術 divine line keeps today's behavior.
         self.assertFalse(hasattr(actor.db, "skill_practice_day"))
 
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_booked_study_is_not_a_use_and_accrues_without_the_day_claim(self):
+        # The amendment scopes the cadence to the use-driven resolution
+        # pathway: declared booked practice accrues exactly as before, twice
+        # in one day, and never materializes a day claim.
+        actor = _entity((_T_MYSTERY_1.key,), race="t_duskmari")
+        self.assertTrue(grant_study_practice_xp(actor, _T_MYSTERY_1.key, hours=1))
+        self.assertTrue(grant_study_practice_xp(actor, _T_MYSTERY_1.key, hours=1))
+        self.assertEqual(
+            actor.db.skill_proficiency[_T_MYSTERY_1.key],
+            2 * PRACTICE_XP_PER_STUDY_HOUR,
+        )
+        self.assertFalse(hasattr(actor.db, "skill_practice_day"))
+
     @covers_requirement("skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick")
     def test_day_blocked_use_takes_no_per_tick_claim(self):
         actor = _entity((_T_MYSTERY_1.key,), race="t_duskmari")
@@ -309,6 +333,10 @@ class DigestionCadenceResolveRollbackTests(EvenniaTest):
         self.char1.apply_race_baseline()
         self.char1.db.skills = {"active": [_T_MYSTERY_1.key], "passive": []}
         self.char1.db.skill_proficiency = {_T_MYSTERY_1.key: 0.0}
+        # The -1 sentinel works because no world-clock singleton exists in
+        # this EvenniaTest, so the real day is the fallback ordinal 0: a
+        # retry claim of 0 provably overwrites the sentinel rather than
+        # matching it, which is what proves the rollback gave the day back.
         self.char1.db.skill_practice_day = {_T_MYSTERY_1.key: -1}
 
     def _practice_effect(self) -> PendingEffect:

@@ -682,9 +682,12 @@ def _practice_day_claims(entity: Any) -> dict[str, int]:
 def _mark_practice_day(entity: Any, skill_key: str, day: int) -> None:
     """Persist today's claim for one skill (write pair of the store).
 
-    Called only on the award path of a use that actually accrues, so a
-    refused award never consumes the day (digestion-cadence D5). Copy-on-write
-    keeps the stored mapping free of aliasing with any reader's copy.
+    Called only on the award path of a use that passes the claim gates: a
+    refused award (day-blocked or tick-blocked) never consumes the day. The
+    accepted D5 saturation case still claims, since a cancelled-by-cap award
+    is indistinguishable from an award at the cap (the call is made, nothing
+    accrues either way). Copy-on-write keeps the stored mapping free of
+    aliasing with any reader's copy.
     """
     claims = _practice_day_claims(entity)
     claims[skill_key] = day
