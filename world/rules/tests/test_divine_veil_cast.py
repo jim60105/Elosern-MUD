@@ -122,12 +122,18 @@ class VeilRecipeTests(unittest.TestCase):
 class VeilProvenanceRecordTests(unittest.TestCase):
     """The record beside the display mapping and its mundane default."""
 
-    @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
+    @covers_requirement(
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+        "skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits",
+    )
     def test_absent_record_reads_as_mundane(self):
         entity = _FakeEntity()
         self.assertEqual(disguise_provenance_of(entity), DISGUISE_PROVENANCE_MUNDANE)
 
-    @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
+    @covers_requirement(
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+        "skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits",
+    )
     def test_divine_record_reads_divine_and_every_other_value_reads_mundane(self):
         entity = _FakeEntity()
         record_disguise_provenance(entity, DISGUISE_PROVENANCE_DIVINE)
@@ -137,14 +143,20 @@ class VeilProvenanceRecordTests(unittest.TestCase):
         entity.db.disguise_provenance = "foreign"
         self.assertEqual(disguise_provenance_of(entity), DISGUISE_PROVENANCE_MUNDANE)
 
-    @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
+    @covers_requirement(
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+        "skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits",
+    )
     def test_divine_write_records_provenance_beside_the_derived_mapping(self):
         entity = _FakeEntity()
         apply_divine_disguise(entity)
         self.assertEqual(entity.db.disguised_stats, mundane_veil_values())
         self.assertEqual(entity.db.disguise_provenance, DISGUISE_PROVENANCE_DIVINE)
 
-    @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
+    @covers_requirement(
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+        "skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits",
+    )
     def test_clear_removes_the_layer_and_its_provenance_together(self):
         entity = _FakeEntity()
         apply_divine_disguise(entity)
@@ -152,7 +164,10 @@ class VeilProvenanceRecordTests(unittest.TestCase):
         self.assertIsNone(entity.db.disguised_stats)
         self.assertEqual(disguise_provenance_of(entity), DISGUISE_PROVENANCE_MUNDANE)
 
-    @covers_requirement("skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
+    @covers_requirement(
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+        "skill-handler::the-狀態偽裝-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits",
+    )
     def test_narrow_write_primitive_only_touches_the_display_mapping(self):
         entity = _FakeEntity()
         apply_disguise_effect(entity, {"atk_phys": 60})
@@ -334,7 +349,10 @@ class DivineVeilRollbackTests(_VeilCastTestCase):
             lambda: (_ for _ in ()).throw(RuntimeError("injected")),
         )
 
-    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    @covers_requirement(
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces",
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+    )
     def test_apply_path_rolls_back_layer_and_provenance_byte_equal(self):
         before = _snapshot_touched(self.caster, frozenset({"traits"}))
         effects = [
@@ -356,7 +374,10 @@ class DivineVeilRollbackTests(_VeilCastTestCase):
         self.assertIsNone(self.caster.db.disguised_stats)
         self.assertFalse(self.caster.attributes.has("disguise_provenance"))
 
-    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    @covers_requirement(
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces",
+        "disguised-stats-boundary::the-disguise-layer-records-the-provenance-of-the-veil-it-holds",
+    )
     def test_lift_path_rolls_back_layer_and_provenance_byte_equal(self):
         apply_divine_disguise(self.target)
         before = _snapshot_touched(self.target, frozenset({"traits"}))
