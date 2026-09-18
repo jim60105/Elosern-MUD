@@ -124,6 +124,11 @@ class ClearConferredGrowthRatesTests(EvenniaTest):
         entity.db.skills = {"active": [], "passive": []}
         return entity
 
+    def test_clear_with_nothing_conferred_returns_zero_and_writes_nothing(self):
+        entity = self._entity()
+        self.assertEqual(clear_conferred_growth_rates(entity), 0)
+        self.assertEqual(entity_active_buffs(entity), set())
+
     def test_clear_removes_both_sources_growth_rates_and_keeps_unrelated_buff(self):
         entity = self._entity()
         grant_conferred_growth_rate(entity, "t_src_a", 0.5)
@@ -247,6 +252,20 @@ class RevocationCastPathTests(EvenniaTest):
             )
         )
         self.assertEqual(result.outcome, "success")
+        # The staged revocation narrated one target-scoped entry through the
+        # registered ``grants_revoked`` template (the resolver also stages the
+        # universal skill-practice line every cast narrates).
+        revoke_entries = [
+            entry
+            for entry in result.event_log.entries
+            if entry.kind == "grants_revoked"
+        ]
+        self.assertEqual(len(revoke_entries), 1)
+        entry = revoke_entries[0]
+        self.assertEqual(entry.kind, "grants_revoked")
+        self.assertEqual(entry.actor, str(caster.key))
+        self.assertEqual(entry.target, str(target.key))
+        self.assertIn("收回", entry.text_template)
         self.assertEqual(target.skills.conferred_grants(), [])
         self.assertEqual(growth_rate_multiplier(target), 1.0)
         self.assertEqual(entity_active_buffs(target), {_UNRELATED_BUFF})
