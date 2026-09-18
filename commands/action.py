@@ -168,16 +168,7 @@ class CmdCast(Command):
         if active_context is not None:
             context = active_context
         else:
-            context = RoomActionContext(
-                self.caller.location,
-                {
-                    "disguise": dict(
-                        self.caller.db.disguised_stats or {}
-                    )
-                }
-                if skill_key == "status_disguise"
-                else {},
-            )
+            context = RoomActionContext(self.caller.location, {})
         if (
             skill_key == FLEE_SKILL_KEY
             and isinstance(context, BattlefieldActionContext)

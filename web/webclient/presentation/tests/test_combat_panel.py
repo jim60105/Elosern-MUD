@@ -85,9 +85,8 @@ _T_MARTIAL_PROBE = "t_combat_martial_probe"
 _T_RECOVERY_STATE = next(state for state in SESSION_STATES if state != "ready")
 
 def _t_context_skill(base_key: str, key: str, label: str, effects):
-    """A kit-row twin whose effects demand handler-only event context."""
+    """A file-local kit-row twin for the handler-context seam."""
     return replace(SYNTH_SKILLS[base_key], key=key, label=label, effects=list(effects))
-
 
 def _presenter_scope_extra():
     """One skills overlay: innates plus this file's probe rows."""
@@ -1479,37 +1478,33 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-combat-menu::combat-menu-availability-reflects-handler-context")
     def test_context_requiring_skills_are_disabled_in_the_menu(self):
         # File-local kit-row twins probing the menu's availability mirror:
-        # the disguise handler still requires a supplied context key, while
-        # the conferral handler derives everything from ownership and the
-        # node's policy (this caster owns nothing conferrable).
+        # the disguise handler derives its values and casts from an empty
+        # context since divine-veil-cast-path (enabled in combat), while
+        # an effect handler declaring required context is reflected as
+        # disabled with missing_effect_context when that context is absent.
         self.player.db.skills = {
             "active": ["t_combat_disguise_probe", "t_combat_confer_probe"],
             "passive": [],
         }
         engage(self.player, self.monster)
-        payload = self.registry.render(
-            "context_actions",
-            PresentationContext(actor=self.player, protocol_version=1),
-        )
-        by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
-        # Only the disguise half still requires a supplied context key; the
-        # menu reflects that rejection verbatim.
-        disguise = by_key["t_combat_disguise_probe"]
-        self.assertFalse(disguise["enabled"])
-        self.assertEqual(
-            disguise["disabled_reason"]["code"], "missing_effect_context"
-        )
-        self.assertTrue(disguise["disabled_reason"]["message"].strip())
-        # The conferral half derives its scale and set from the caster's own
-        # ownership: this caster owns nothing conferrable, so preflight and
-        # the shared preview reject the empty derived set instead of asking
-        # for context keys that no longer exist.
-        confer = by_key["t_combat_confer_probe"]
-        self.assertFalse(confer["enabled"])
-        self.assertEqual(
-            confer["disabled_reason"]["code"], "effect_resolution_failed"
-        )
-        self.assertTrue(confer["disabled_reason"]["message"].strip())
+        with patch.dict(
+            "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+            {"confer_skill_partial": frozenset({"confer_skill_key"})},
+        ):
+            payload = self.registry.render(
+                "context_actions",
+                PresentationContext(actor=self.player, protocol_version=1),
+            )
+            by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
+            disguise = by_key["t_combat_disguise_probe"]
+            self.assertTrue(disguise["enabled"])
+            self.assertIsNone(disguise["disabled_reason"])
+            confer = by_key["t_combat_confer_probe"]
+            self.assertFalse(confer["enabled"])
+            self.assertEqual(
+                confer["disabled_reason"]["code"], "missing_effect_context"
+            )
+            self.assertTrue(confer["disabled_reason"]["message"].strip())
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_panel_advertises_freeform_scales_only_for_masters(self):

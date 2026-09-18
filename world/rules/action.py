@@ -54,8 +54,11 @@ from world.rules.sexual_act_effects import (
     resolve_part,
 )
 from world.rules.skill_effects import (
-    apply_disguise_effect,
+    apply_divine_disguise,
+    clear_disguise_effect,
     derive_conferrable_skills,
+    disguise_provenance_of,
+    DISGUISE_PROVENANCE_DIVINE,
     record_conferred_grant,
 )
 from world.rules.targeting import (
@@ -595,21 +598,33 @@ def _handle_set_disguise(
     context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
-    del scale
-    values = _require_context(context, "set_disguise")
-    overrides = values["disguise"]
-    if not isinstance(overrides, dict):
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "set_disguise requires event_context.disguise",
-        )
+    """Stage one veil write or lift from the derived recipe.
+
+    The veil's displayed values are derived from the race registry, never
+    supplied through ``event_context``. A cast at another entity always
+    applies the derived veil. A cast at the actor toggles only against a
+    veil this verb itself placed: a DIVINE veil is lifted, while a mundane
+    veil (an authored declaration) or an unveiled state is refreshed, so a
+    caster is never trapped behind their own face and never strips the
+    authored disguise their character card starts the game wearing.
+    """
+    del scale, context
     target = targets[0]
+    if target is actor and disguise_provenance_of(target) == DISGUISE_PROVENANCE_DIVINE:
+        return [
+            PendingEffect(
+                target,
+                f"disguise_lifted|{_entity_key(target)}",
+                frozenset(),
+                lambda: clear_disguise_effect(target),
+            )
+        ]
     return [
         PendingEffect(
             target,
             f"disguise_set|{_entity_key(target)}",
             frozenset(),
-            lambda: apply_disguise_effect(target, overrides),
+            lambda: apply_divine_disguise(target),
         )
     ]
 
@@ -1586,7 +1601,7 @@ register_effect_handler(
     "set_disguise",
     _handle_set_disguise,
     frozenset({"traits"}),
-    requires_event_context=frozenset({"disguise"}),
+    requires_event_context=frozenset(),
 )
 register_effect_handler(
     "buff_apply",
@@ -2297,6 +2312,7 @@ _ENTRY_TEMPLATES = {
     "self_return_clear": "{actor} 重整架勢，重返戰鬥位置。",
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
+    "disguise_lifted": "{actor} 解除了 {target} 的偽裝狀態。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
@@ -2671,6 +2687,7 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
     return {
         "traits": _attribute_snapshot(entity, "traits", "traits"),
         "disguised_stats": _attribute_snapshot(entity, "disguised_stats"),
+        "disguise_provenance": _attribute_snapshot(entity, "disguise_provenance"),
         "sexual_traits": _attribute_snapshot(
             entity,
             "sexual_traits",
@@ -2727,6 +2744,7 @@ def _restore_attribute(
 def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     _restore_attribute(entity, "traits", snapshot["traits"], "traits")
     _restore_attribute(entity, "disguised_stats", snapshot["disguised_stats"])
+    _restore_attribute(entity, "disguise_provenance", snapshot["disguise_provenance"])
     _restore_attribute(
         entity,
         "sexual_traits",

@@ -672,7 +672,13 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.combat_session import read_session
 
         clock = WorldClock()
-        with patch("world.rules.clock.get_world_clock", return_value=clock):
+        with (
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch.dict(
+                "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+                {"set_disguise": frozenset({"disguise"})},
+            ),
+        ):
             result = submit_player_action(
                 self.player, _T_DISGUISE.key, [self.monster]
             )

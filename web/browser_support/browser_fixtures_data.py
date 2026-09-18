@@ -1097,9 +1097,10 @@ def rarity_word(rarity: str) -> str:
 #: is the panel's intra-group row order: the borrowed-element group carries
 #: the deep canopy cast ``t_ember_comet`` first (``grant_lineage`` closes its
 #: prereq ``t_ember_burst`` in BEHIND it, the shipped fire tree's exact
-#: two-row shape), the utility group carries the context-less disabled row
-#: BEFORE the NONE-shape cast carrier so the disabled row is the frame's
-#: first focus in both modes.
+#: two-row shape), the utility group carries the context-disabled row
+#: (a ``confer_skill_partial`` carrier whose declared event context the
+#: combat session never supplies) BEFORE the NONE-shape cast carrier so the
+#: disabled row is the frame's first focus in both modes.
 SYNTH_COMBAT_ACTIVE_SKILLS = (
     "t_ember_comet",
     "t_glowmire_bloom",

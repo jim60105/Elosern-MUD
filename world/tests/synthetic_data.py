@@ -426,20 +426,23 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         effects=["self_buff_apply:t_moss_veil"],
         category=SkillCategory.UTILITY,
     ),
-    # Context-less utility NONE row: mirrors the shipped utility skill whose
-    # effect handler declares a required event_context key the combat session
-    # never supplies, so the combat menu must expose it disabled with the
-    # missing-context explanation (effect-context-validation seam).
+    # Utility row whose effect handler declares a required event_context key
+    # the combat session never supplies, so the combat menu must expose it
+    # disabled with the missing-context explanation (effect-context-validation
+    # seam). Mirrors the shipped confer handler: after divine-veil-cast-path
+    # made ``set_disguise`` context-free, the seam's demo row rides
+    # ``confer_skill_partial`` instead (the disguised caster row keeps its
+    # place as the panel's first-owned utility row).
     "t_rock_quietus": SkillDef(
         key="t_rock_quietus",
-        label="岩中寂語",
-        description="以岩層深處的寂靜偽裝自身的狀態。",
+        label="岩中授語",
+        description="以岩層深處的寂靜，將沉穩的步伐授與目標。",
         kind=SkillKind.ACTIVE,
-        target_spec=TargetSpec.SELF,
+        target_spec=TargetSpec.SINGLE,
         cost={},
         usable_out_of_combat=True,
         element=None,
-        effects=["set_disguise"],
+        effects=["confer_skill_partial"],
         category=SkillCategory.UTILITY,
     ),
 }

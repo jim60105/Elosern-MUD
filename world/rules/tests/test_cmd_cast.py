@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -24,6 +25,7 @@ from world.rules.combat_session import SessionReason
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
 from world.rules.targeting import RoomActionContext
 from world.tests.synthetic_data import (
+    SYNTH_RACES,
     make_act,
     make_act_skill,
     make_skill,
@@ -44,6 +46,12 @@ _MIRROR_VEIL = make_skill(
     effects=["set_disguise"],
 )
 
+# The veil recipe derives its displayed values from ``RACE_REGISTRY["human"]``
+# at cast time, so the scoped races catalog must carry a human row for the
+# disguise cast tests: a kit row re-keyed to the canonical name, never the
+# shipped human profile.
+_SCOPE_HUMAN_ROW = replace(SYNTH_RACES["t_duskmari"], key="human")
+
 # A synthetic resistible forced act: same paired SkillDef/SexualActDef shape
 # as any catalog act, with the resistible flag the coercion scan keys on.
 _SYNTH_FORCED_ACT = make_act("t_snare_murmur", resistible=True)
@@ -63,6 +71,7 @@ _SYNTH_FORCED_ACT_SKILL = make_act_skill(
     "races",
     "skills",
     extra={
+        "races": {"human": _SCOPE_HUMAN_ROW},
         "skills": {
             **synth_innate_overlay()["skills"],
             _MIRROR_VEIL.key: _MIRROR_VEIL,
@@ -79,7 +88,8 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             "passive": [],
         }
         self.char1.db.disguised_stats = {"atk_phys": 1}
-        # The disguise handler reads its overrides from the action context.
+        # The extra context key is now inert: the disguise handler derives
+        # its displayed values from the race registry.
         self.char1.ndb.action_context = RoomActionContext(
             self.char1.location, {"disguise": {"atk_phys": 1}}
         )

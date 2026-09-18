@@ -136,7 +136,6 @@ _STORM = make_skill(
     prerequisites=(SkillPrerequisite("t_prev_pulse", 3),),
 )
 
-
 def _scope_extra() -> dict[str, dict[str, object]]:
     """Innate rows (runtime basic-attack/flee keys) + all local rows."""
     extra = synth_innate_overlay()
@@ -349,8 +348,9 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
-        # SELF shape is validated with the disguise context supplied, exactly
-        # as the out-of-combat cast path does (commands/action.py).
+        # SELF shape is validated with the disguise skill castable in combat
+        # on an empty event context; the extra (now ignored) disguise key is
+        # tolerated exactly like any other unreserved context key.
         self.player.db.skills = {"active": [_DISGUISE.key], "passive": []}
         disguise_context = BattlefieldActionContext(
             context.battlefield,
@@ -411,29 +411,37 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_context_requiring_skills_are_disabled_in_combat(self):
         self.player.db.skills = {
-            "active": [_DISGUISE.key],
+            "active": [_DOMINION.key],
             "passive": [],
         }
         context = self._context()
-        # SELF submits an empty list, the exact shape the combat menu sends.
-        # The conferral prefix now derives its scale and set from the
-        # caster's own ownership, so only the disguise half of this test
-        # still depends on a supplied context key.
-        preview = preview_skill(
-            self.player, _DISGUISE.key, context, [self.monster]
-        )
-        self.assertFalse(preview.enabled)
-        self.assertIs(preview.reason, RejectReason.MISSING_EFFECT_CONTEXT)
-        result = revalidate_submission(
-            self.player, _DISGUISE.key, context, []
-        )
-        self.assertFalse(result.enabled)
-        self.assertIs(result.reason, RejectReason.MISSING_EFFECT_CONTEXT)
-        preflight = ActionResolver.preflight(
-            ActionRequest(self.player, _DISGUISE.key, [], context)
-        )
-        self.assertEqual(preflight.outcome, "rejected")
-        self.assertIs(preflight.reason, RejectReason.MISSING_EFFECT_CONTEXT)
+        with patch.dict(
+            "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+            {"confer_skill_partial": frozenset({"confer_skill_key"})},
+        ):
+            preview = preview_skill(
+                self.player, _DOMINION.key, context, [self.monster]
+            )
+            self.assertFalse(preview.enabled)
+            self.assertIs(
+                preview.reason, RejectReason.MISSING_EFFECT_CONTEXT
+            )
+            result = revalidate_submission(
+                self.player, _DOMINION.key, context, [self.monster]
+            )
+            self.assertFalse(result.enabled)
+            self.assertIs(
+                result.reason, RejectReason.MISSING_EFFECT_CONTEXT
+            )
+            preflight = ActionResolver.preflight(
+                ActionRequest(
+                    self.player, _DOMINION.key, [self.monster], context
+                )
+            )
+            self.assertEqual(preflight.outcome, "rejected")
+            self.assertIs(
+                preflight.reason, RejectReason.MISSING_EFFECT_CONTEXT
+            )
 
     def test_context_requiring_skills_resolve_with_supplied_context(self):
         # The conferral handler derives its scale and set from the caster's

@@ -31,6 +31,7 @@ from world.rules.clock import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
+from world.rules.skill_effects import mundane_veil_values
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
@@ -145,12 +146,7 @@ class _CastSettlementTestCase(EvenniaTest):
         actor=None,
     ):
         actor = actor or self.char1
-        if event_context is None:
-            event_context = (
-                {"disguise": dict(actor.db.disguised_stats or {})}
-                if skill_key == _T_DISGUISE.key
-                else {}
-            )
+        event_context = {} if event_context is None else event_context
         return ActionRequest(
             actor=actor,
             skill_key=skill_key,
@@ -190,14 +186,16 @@ class OutOfCombatCastSettlementTests(_CastSettlementTestCase):
         self.assertEqual(
             self.char1.db.skill_proficiency, {_T_DISGUISE.key: expected_xp}
         )
-        self.assertEqual(self.char1.db.disguised_stats, {"atk_phys": 1})
+        # The veil's displayed values are derived from the race registry, not
+        # re-applied from an authored record (divine-veil-cast-path).
+        self.assertEqual(self.char1.db.disguised_stats, mundane_veil_values())
         # A fresh read after the outer commit sees the same values.
         self.char1.flush_cached_instance(self.char1)
         fresh = search_object(self.char1.key)[0]
         self.assertEqual(
             fresh.db.skill_proficiency, {_T_DISGUISE.key: expected_xp}
         )
-        self.assertEqual(fresh.db.disguised_stats, {"atk_phys": 1})
+        self.assertEqual(fresh.db.disguised_stats, mundane_veil_values())
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
     def test_clock_callback_failure_rolls_back_disguise_and_practice_in_cache_and_rows(self):
@@ -489,15 +487,10 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
     the shipped catalogue.
     """
 
-    _CONTEXTS = {
-        "t_face_veil": {"disguise": {"atk_phys": 60}},
-        # The kit's shipped-utility mirror carries the same ``set_disguise``
-        # effect, so the guard must supply its declared context too.
-        "t_rock_quietus": {"disguise": {"atk_phys": 60}},
-        # The conferral derives its set from the caster's own ownership and
-        # its scale from the node's policy: no event-context keys exist.
-        "t_grant_echo": {},
-    }
+    # Both set_disguise and confer_skill_partial declare empty required
+    # event_context sets since divine-veil-cast-path and conferral-grant-store:
+    # no synthetic active skill requires caller-supplied context keys.
+    _CONTEXTS = {}
 
     def _cast_vocabulary(self):
         from world.skills.effects import DamageEffect as _Damage
