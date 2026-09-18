@@ -84,6 +84,9 @@ _DISGUISE = make_skill(
 )
 _DISGUISE_MP10 = replace(_DISGUISE, key="t_prev_disguise_mp10", cost={"mp": 10})
 _DISGUISE_SP10 = replace(_DISGUISE, key="t_prev_disguise_sp10", cost={"sp": 10})
+# The conferrable passive the dominion preflight half needs: preflight now
+# derives the conferred set, so a caster must own something conferrable for
+# the no-context conferral to pass it.
 _CONFERRABLE = make_skill(
     "t_prev_grantable",
     label="預覽傳授",
@@ -408,46 +411,37 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_context_requiring_skills_are_disabled_in_combat(self):
         self.player.db.skills = {
-            "active": [_DISGUISE.key, _DOMINION.key],
+            "active": [_DISGUISE.key],
             "passive": [],
         }
         context = self._context()
-        # SELF submits an empty list; SINGLE submits one live candidate, the
-        # exact shapes the combat menu sends.
-        submitted = {
-            _DISGUISE.key: [],
-            _DOMINION.key: [self.monster],
-        }
-        for skill_key, targets in submitted.items():
-            with self.subTest(skill_key=skill_key):
-                preview = preview_skill(
-                    self.player, skill_key, context, [self.monster]
-                )
-                self.assertFalse(preview.enabled)
-                self.assertIs(
-                    preview.reason, RejectReason.MISSING_EFFECT_CONTEXT
-                )
-                result = revalidate_submission(
-                    self.player, skill_key, context, targets
-                )
-                self.assertFalse(result.enabled)
-                self.assertIs(
-                    result.reason, RejectReason.MISSING_EFFECT_CONTEXT
-                )
-                preflight = ActionResolver.preflight(
-                    ActionRequest(
-                        self.player, skill_key, targets, context
-                    )
-                )
-                self.assertEqual(preflight.outcome, "rejected")
-                self.assertIs(
-                    preflight.reason, RejectReason.MISSING_EFFECT_CONTEXT
-                )
+        # SELF submits an empty list, the exact shape the combat menu sends.
+        # The conferral prefix now derives its scale and set from the
+        # caster's own ownership, so only the disguise half of this test
+        # still depends on a supplied context key.
+        preview = preview_skill(
+            self.player, _DISGUISE.key, context, [self.monster]
+        )
+        self.assertFalse(preview.enabled)
+        self.assertIs(preview.reason, RejectReason.MISSING_EFFECT_CONTEXT)
+        result = revalidate_submission(
+            self.player, _DISGUISE.key, context, []
+        )
+        self.assertFalse(result.enabled)
+        self.assertIs(result.reason, RejectReason.MISSING_EFFECT_CONTEXT)
+        preflight = ActionResolver.preflight(
+            ActionRequest(self.player, _DISGUISE.key, [], context)
+        )
+        self.assertEqual(preflight.outcome, "rejected")
+        self.assertIs(preflight.reason, RejectReason.MISSING_EFFECT_CONTEXT)
 
     def test_context_requiring_skills_resolve_with_supplied_context(self):
+        # The conferral handler derives its scale and set from the caster's
+        # own ownership and the node's policy, so the dominion half needs a
+        # conferrable passive but no event-context keys at all.
         self.player.db.skills = {
             "active": [_DISGUISE.key, _DOMINION.key],
-            "passive": [],
+            "passive": [_CONFERRABLE.key],
         }
         context = self._context()
         disguise_context = BattlefieldActionContext(
@@ -463,13 +457,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(preflight.outcome, "success")
 
-        dominion_context = BattlefieldActionContext(
-            context.battlefield,
-            event_context={
-                "confer_skill_key": _CONFERRABLE.key,
-                "confer_scale": 0.1,
-            },
-        )
+        dominion_context = BattlefieldActionContext(context.battlefield, {})
         preflight = ActionResolver.preflight(
             ActionRequest(
                 self.player, _DOMINION.key, [self.monster], dominion_context

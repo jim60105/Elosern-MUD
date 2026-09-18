@@ -44,12 +44,6 @@ _T_DISGUISE = replace(
     label="偽裝試探",
     effects=["set_disguise"],
 )
-_T_CONFER = replace(
-    SYNTH_SKILLS["t_hush_mend"],
-    key="t_confer_probe",
-    label="授予試探",
-    effects=["confer_skill_partial"],
-)
 # The digestion-cadence carrier (divine-mystery §3): a zero-cost
 # DIVINE_MYSTERY round skill whose practice the daily claim gates. Zero
 # effects on purpose — the round's practice stage is the only thing under
@@ -75,7 +69,6 @@ def _open_scope(case):
             "skills": {
                 **synth_innate_overlay()["skills"],
                 _T_DISGUISE.key: _T_DISGUISE,
-                _T_CONFER.key: _T_CONFER,
                 _T_DIVINE_PROBE.key: _T_DIVINE_PROBE,
             }
         },
@@ -671,7 +664,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::preflight-rejects-missing-handler-context-before-any-round-cost")
     def test_missing_effect_context_rejects_without_a_round_or_enemy_action(self):
         self.player.db.skills = {
-            "active": [_T_DISGUISE.key, _T_CONFER.key],
+            "active": [_T_DISGUISE.key],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -680,20 +673,16 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
 
         clock = WorldClock()
         with patch("world.rules.clock.get_world_clock", return_value=clock):
-            for skill_key in (_T_DISGUISE.key, _T_CONFER.key):
-                with self.subTest(skill_key=skill_key):
-                    result = submit_player_action(
-                        self.player, skill_key, [self.monster]
-                    )
-                    self.assertEqual(result["outcome"], "rejected")
-                    self.assertIs(
-                        result["reason"], RejectReason.MISSING_EFFECT_CONTEXT
-                    )
-                    self.assertEqual(
-                        read_session(self.player).rounds_elapsed, 0
-                    )
-                    self.assertEqual(clock.tick, 0)
-                    self.assertEqual(self.monster.traits.hp.current, 100)
+            result = submit_player_action(
+                self.player, _T_DISGUISE.key, [self.monster]
+            )
+            self.assertEqual(result["outcome"], "rejected")
+            self.assertIs(
+                result["reason"], RejectReason.MISSING_EFFECT_CONTEXT
+            )
+            self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+            self.assertEqual(clock.tick, 0)
+            self.assertEqual(self.monster.traits.hp.current, 100)
 
 
 # Sentinel used to prove no EventLog was created; kept local to avoid import.
