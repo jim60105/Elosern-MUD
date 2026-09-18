@@ -27,7 +27,7 @@ import json
 import re
 import zlib
 from random import Random
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -38,6 +38,9 @@ from world.ai.guardrail import (
     GuardrailHooks,
     GuardrailRegistrationError,
     guarded_call,
+)
+from world.ai.immutable import (
+    reject_mutable_containers as _reject_mutable_containers,
 )
 from world.ai.schemas import ChatRequestDescriptor
 from world.ai.schemas.registry import (
@@ -98,22 +101,6 @@ class BlueprintLocationLayer(StrEnum):
     ANCHOR = "anchor"
     GRID = "grid"
     INSTANCE = "instance"
-
-
-def _reject_mutable_containers(value: Any, path: str) -> None:
-    """Reject any ``dict``/``list`` nested under ``value`` so immutability is
-    enforced by construction, not only by the frozen dataclass."""
-    if isinstance(value, dict) or isinstance(value, list):
-        raise TypeError(f"{path} holds a mutable dict/list container")
-    if isinstance(value, tuple):
-        for index, item in enumerate(value):
-            _reject_mutable_containers(item, f"{path}[{index}]")
-    elif is_dataclass(value):
-        for dataclass_field in fields(value):
-            _reject_mutable_containers(
-                getattr(value, dataclass_field.name),
-                f"{path}.{dataclass_field.name}",
-            )
 
 
 @dataclass(frozen=True)
