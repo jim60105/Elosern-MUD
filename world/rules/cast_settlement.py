@@ -53,6 +53,7 @@ from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("traits", "traits"),
     ("disguised_stats", None),
+    ("disguise_provenance", None),
     ("sexual_traits", "traits"),
     ("virgin", "sexual_state"),
     ("experience_types", "sexual_state"),

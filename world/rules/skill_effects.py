@@ -7,6 +7,7 @@ validated ownership, resources, and targets. Keeping writes under
 
 from typing import Any
 
+from world.lore.races import RACE_REGISTRY
 from world.skills.effects import (
     DisguiseEffect,
     RuleTableEffect,
@@ -134,3 +135,65 @@ def derive_conferrable_skills(actor: Any) -> list[str]:
 def apply_disguise_effect(entity: Any, overrides: dict[str, int]) -> None:
     """Persist display-only overrides after deterministic resolution."""
     entity.db.disguised_stats = dict(overrides)
+
+
+# Provenance vocabulary of the disguise layer (divine-mystery cast vs any
+# authored origin). ``divine-veil-reveal`` consumes this record; an entity
+# without one reads as mundane.
+DISGUISE_PROVENANCE_DIVINE = "divine"
+DISGUISE_PROVENANCE_MUNDANE = "mundane"
+
+
+def mundane_veil_values() -> dict[str, int]:
+    """The deterministic displayed combat five at the mundane ceilings.
+
+    Each of the five keys a veil displays renders at the top of the
+    corresponding mundane band the race registry declares for ``human``: the
+    four static axes read ``static_baseline`` and ``hp`` reads the
+    ``vital_baseline`` ceiling. No balance constant is duplicated here — a
+    registry retune flows into every fresh veil automatically.
+    """
+    human = RACE_REGISTRY["human"]
+    static = human.static_baseline
+    return {
+        "atk_phys": static.atk_phys[1],
+        "agility": static.agility[1],
+        "defense": static.defense[1],
+        "magic_power": static.magic_power[1],
+        "hp": human.vital_baseline.hp[1],
+    }
+
+
+def disguise_provenance_of(entity: Any) -> str:
+    """The provenance of the veil the layer currently holds.
+
+    Any value other than the divine marker — an absent record, a None shell
+    default, or a foreign string — reads as mundane, so every pre-existing
+    authored veil is correct without a migration.
+    """
+    value = entity.db.disguise_provenance
+    if value == DISGUISE_PROVENANCE_DIVINE:
+        return DISGUISE_PROVENANCE_DIVINE
+    return DISGUISE_PROVENANCE_MUNDANE
+
+
+def record_disguise_provenance(entity: Any, provenance: str) -> None:
+    """Record the provenance of the veil just written onto ``entity``."""
+    entity.db.disguise_provenance = provenance
+
+
+def clear_disguise_effect(entity: Any) -> None:
+    """Lift a disguise layer and its provenance record in one operation."""
+    del entity.db.disguised_stats
+    del entity.db.disguise_provenance
+
+
+def apply_divine_disguise(entity: Any) -> None:
+    """Write a divine veil: the derived mapping plus its provenance.
+
+    Composes the narrow display write with the provenance record so the
+    single-staged effect keeps ``apply_disguise_effect``'s own source free of
+    trait expressions while still writing the record beside the mapping.
+    """
+    apply_disguise_effect(entity, mundane_veil_values())
+    record_disguise_provenance(entity, DISGUISE_PROVENANCE_DIVINE)

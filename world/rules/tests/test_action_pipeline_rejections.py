@@ -24,6 +24,7 @@ from world.rules.action import (
 from world.rules.action_preview import preview_skill
 from world.rules.action_gates import damage_requires_battlefield
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.skill_effects import mundane_veil_values
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 
@@ -309,7 +310,9 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
     def test_success_commits_disguise_and_emits_log(self):
         result = self.resolve()
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.db.disguised_stats, {"atk_phys": 1})
+        # The handler derives the displayed values from the race registry; the
+        # supplied (now ignored) context key never reaches the layer.
+        self.assertEqual(self.actor.db.disguised_stats, mundane_veil_values())
         self.assertEqual(result.time_cost_seconds, 6)
         self.assertEqual(result.event_log.entries[0].kind, "disguise_set")
 

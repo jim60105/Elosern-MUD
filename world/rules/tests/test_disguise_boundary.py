@@ -25,9 +25,12 @@ FORBIDDEN_MODULES = (
 # own authored card during activation; the typeclass shell init is the
 # storage convention entity-traits declared, and the status_disguise runtime
 # write is bound by the skill-handler capability's own requirement — neither
-# authors a preset/import declaration. Snapshot/restore machinery re-assigns
-# previously recorded values through its own helpers and so never appears as
-# a raw assignment below. Anything outside this ledger fails the scan.
+# authors a preset/import declaration. The provenance record
+# (``disguise_provenance``) is written by the same classified runtime module
+# beside the display mapping (divine-veil-cast-path). Snapshot/restore
+# machinery re-assigns previously recorded values through its own helpers and
+# so never appears as a raw assignment below. Anything outside this ledger
+# fails the scan.
 ASSIGNED_BY = {
     "world/imports/loader.py": "import-record seeder",
     "world/rules/character_creation.py": "preset-activation seeder",
@@ -55,6 +58,7 @@ class DisguiseBoundaryTests(EvenniaTest):
                 source = path.read_text(encoding="utf-8")
                 self.assertNotIn("disguised_stats", source, relative_path)
                 self.assertNotIn("get_display_value", source, relative_path)
+                self.assertNotIn("disguise_provenance", source, relative_path)
 
     @covers_requirement("disguised-stats-boundary::disguised-stats-is-stored-separately-from-traithandler", "disguised-stats-boundary::get-display-value-is-the-single-sanctioned-accessor-for-a-possibly-disguised-stat")
     def test_accessor_changes_display_without_changing_true_values(self):
