@@ -51,7 +51,7 @@
 
 ## 2. Creation validators
 
-- [ ] 2.1 Create `web/webclient/presentation/protocol_validation.py` with
+- [x] 2.1 Create `web/webclient/presentation/protocol_validation.py` with
   `validate_background(value, error_cls, max_length)` and
   `validate_affinity_elements(value, race_key, error_cls, *, empty_as_none: bool)`
   reproducing the UNION of both current behaviors: the presentation copy
@@ -62,16 +62,16 @@
   `tuple(...)`), and each shell raises with its own `error_cls`
   (`ProtocolValidationError` / `CreationActionError`). Error message texts stay byte-identical
   per site — the messages are already identical between the copies, keep them as-is.
-- [ ] 2.2 Point `presentation/creation.py::_validate_background` and
+- [x] 2.2 Point `presentation/creation.py::_validate_background` and
   `_validate_affinity_elements` at the shared helpers (keep the private names as thin
   delegates; `test_creation_panel.py` patches `_validate_affinity` — not these two — so no
   test change is expected). Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_creation_panel`.
-- [ ] 2.3 Point `actions/creation_actions.py::_validate_background` and
+- [x] 2.3 Point `actions/creation_actions.py::_validate_background` and
   `_validate_affinity_elements` at the same helpers with `CreationActionError`,
   `empty_as_none=True`, tuple return, no global bound. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.actions.tests.test_creation_actions`.
-- [ ] 2.4 Add focused Vitest-free unit coverage is NOT needed (Python behavior, already
+- [x] 2.4 Add focused Vitest-free unit coverage is NOT needed (Python behavior, already
   covered by both suites). Instead run both suites together plus the actions package:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.actions web.webclient.presentation.tests.test_creation_panel`.
 
