@@ -27,9 +27,10 @@ from .browser_helpers import (
     store_state,
     wait_for_presentation_settled,
 )
+from .harness import ManagedServerTearDownMixin
 
 
-class CombatMenuBrowserTest(BrowserAcceptanceTest):
+class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Engages a fixture monster and drives the combat dock with the keyboard.
 
     Each test boots its own dedicated isolated server: an active combat session
@@ -51,14 +52,6 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
     def setUpClass(cls) -> None:
         # Each test boots its own isolated server; never the shared one.
         pass
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _engage(self, page):
         """Engage the boot mode's first living combat monster through the

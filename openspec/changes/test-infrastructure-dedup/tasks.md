@@ -53,9 +53,9 @@
 
 ## 3. Browser harness mixins
 
-- [ ] 3.1 Add `ManagedServerTearDownMixin` (variant-b order per design D3) and
+- [x] 3.1 Add `ManagedServerTearDownMixin` (variant-b order per design D3) and
   `wait_command_field_released(page, timeout=30000)` to `web/tests/browser/harness.py`.
-- [ ] 3.2 Convert the identical-tearDown browser classes to the mixin; keep a 3-line
+- [x] 3.2 Convert the identical-tearDown browser classes to the mixin; keep a 3-line
   variant-a override in `test_browser_action_feedback.py` and `test_browser_creation.py`
   (the two whose order reads `server` before `super().tearDown()`). Delete the two
   `_wait_command_field_released` copies (`test_browser_input_narrative.py:60`,

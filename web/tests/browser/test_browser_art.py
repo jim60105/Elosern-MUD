@@ -25,6 +25,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
+from .harness import ManagedServerTearDownMixin
 from .seed import FIXTURE_VALID_PNG
 
 # The art fixture's archetype/display pair for the CURRENT boot mode (kit
@@ -152,7 +153,7 @@ SCENE_PLACEHOLDER_DOM = {
 }
 
 
-class ArtSceneBrowserTest(BrowserAcceptanceTest):
+class ArtSceneBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Scene renderer journeys on a per-test isolated server.
 
     Each test boots its own isolated server so the seeded art mode (done /
@@ -172,15 +173,6 @@ class ArtSceneBrowserTest(BrowserAcceptanceTest):
     def setUpClass(cls) -> None:
         # Each test boots its own isolated server; never the shared one.
         pass
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
-
 
 class ArtDoneSceneTest(ArtSceneBrowserTest):
     """A done scene renders the same-origin media URL and full view."""

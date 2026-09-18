@@ -27,7 +27,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 
 
@@ -41,7 +41,7 @@ def _connected_active(state: dict) -> bool:
     return bool(state.get("connected")) and state.get("phase") == "active"
 
 
-class ExplorationBrowserTest(BrowserAcceptanceTest):
+class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with the exploration fixture."""
 
     @classmethod
@@ -62,14 +62,6 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _live_exploration_panel(self, page):
         # The panels mapping can be observed mid-snapshot-adoption without the

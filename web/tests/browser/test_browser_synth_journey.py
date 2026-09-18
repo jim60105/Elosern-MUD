@@ -17,10 +17,10 @@ from __future__ import annotations
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import login_and_open, store_state, wait_for_store_state
 from . import fixtures
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 
 
-class SynthJourneySmokeTest(BrowserAcceptanceTest):
+class SynthJourneySmokeTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """One isolated server booted with the synthetic services fixture."""
 
     @classmethod
@@ -37,14 +37,6 @@ class SynthJourneySmokeTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def test_shop_stock_rows_resolve_synthetic_keys_end_to_end(self):
         # The offered kit item keys are pinned HERE (not via the support

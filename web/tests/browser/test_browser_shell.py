@@ -18,6 +18,7 @@ from .browser_helpers import (
     wait_for_narrative_settled,
     wait_for_store_state,
 )
+from .harness import wait_command_field_released
 
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
@@ -38,31 +39,6 @@ def _wait_field_focused(page, timeout=30000):
                 "document.getElementById('inputfield')"
             ),
             "description": "#inputfield focused",
-        },
-        timeout=timeout,
-    )
-
-
-def _wait_command_field_released(page, timeout=30000):
-    """Gate on the action dock holding focus after the command field's Escape.
-
-    H5 (webclient-hud-05-overlays-and-command-line): the command line is
-    permanently present, so the release path is focus restoration to
-    ``#action-dock`` — not a surface close (the field is never closed).
-    """
-    wait_for_store_state(
-        page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": "#action-dock",
-            "predicate": (
-                "() => { const d = document.querySelector('[data-testid=\"command-line\"]');"
-                " const dock = document.getElementById('action-dock');"
-                " return d && dock && "
-                "(document.activeElement === dock || "
-                "(document.activeElement && dock.contains(document.activeElement))); }"
-            ),
-            "description": "command field released: #action-dock focused, command line still present",
         },
         timeout=timeout,
     )
@@ -265,14 +241,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # restores action-dock focus; the command line itself is never
         # closed (it is permanently present, design D1).
         page.keyboard.press("Escape")
-        _wait_command_field_released(page)
+        wait_command_field_released(page)
         focus_action_dock(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
         page.keyboard.type("look")
         narrative_before_cancel = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.keyboard.press("Escape")
-        _wait_command_field_released(page)
+        wait_command_field_released(page)
         self.assertEqual(
             page.locator('[data-testid="narrative-feed"]').inner_text(),
             narrative_before_cancel,

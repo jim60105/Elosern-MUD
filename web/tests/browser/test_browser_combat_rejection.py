@@ -29,9 +29,10 @@ from .browser_helpers import (
     wait_for_presentation_settled,
     wait_for_store_state,
 )
+from .harness import ManagedServerTearDownMixin
 
 
-class CombatRejectionBrowserTest(BrowserAcceptanceTest):
+class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Drives real combat sessions through the action dock and asserts rejections.
 
     Each test boots its own dedicated isolated server: an active combat session
@@ -47,14 +48,6 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _engage(self, page):
         target = combat_journey_values()["engage_target"]
@@ -152,7 +145,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(panel["session"]["session_id"], session_id)
 
 
-class CombatReconnectBrowserTest(BrowserAcceptanceTest):
+class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Active-combat disconnect/reconnect without intent replay.
 
     Each test boots its own dedicated isolated server: an abnormal transport
@@ -168,14 +161,6 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]

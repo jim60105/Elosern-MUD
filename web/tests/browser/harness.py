@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import fixtures
+from .browser_helpers import wait_for_store_state
 
 SERVER_PIDFILE = fixtures.PROJECT_ROOT / "server" / "server.pid"
 PORTAL_PIDFILE = fixtures.PROJECT_ROOT / "server" / "portal.pid"
@@ -501,3 +502,53 @@ def _shutdown_shared_server() -> None:
             _shared_server.stop()
         finally:
             _shared_server = None
+
+
+class ManagedServerTearDownMixin:
+    """``tearDown`` that stops a per-test managed server after the base run.
+
+    Suites that boot one dedicated isolated server per test (``self.server``
+    in ``setUp``) must stop it during teardown. The default order is
+    byte-order (b): run the base teardown first, then stop the server. Two
+    suites (``test_browser_action_feedback`` and ``test_browser_creation``)
+    instead read the attribute BEFORE the base teardown (byte-order (a));
+    their ``tearDown`` overrides snapshot the attribute first and hand the
+    snapshot to :meth:`_stop_managed_server`.
+    """
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self._stop_managed_server(getattr(self, "server", None))
+
+    def _stop_managed_server(self, server) -> None:
+        """Stop ``server`` (a per-test ``ManagedServer``) and drop the ref."""
+        if server is not None:
+            try:
+                server.stop()
+            finally:
+                self.server = None
+
+
+def wait_command_field_released(page, timeout=30000):
+    """Gate on the action dock holding focus after Escape from the field.
+
+    H5 (webclient-hud-05-overlays-and-command-line): the command line is
+    permanently present — the release path is focus restoration to
+    ``#action-dock`` (design D2); the field is never closed (design D1).
+    """
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#action-dock",
+            "predicate": (
+                "() => { const d = document.querySelector('[data-testid=\"command-line\"]');"
+                " const dock = document.getElementById('action-dock');"
+                " return d && dock && "
+                "(document.activeElement === dock || "
+                "(document.activeElement && dock.contains(document.activeElement))); }"
+            ),
+            "description": "command field released: #action-dock focused, command line still present",
+        },
+        timeout=timeout,
+    )
