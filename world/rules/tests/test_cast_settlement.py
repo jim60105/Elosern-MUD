@@ -33,7 +33,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import TargetSpec
+from world.skills.registry import SkillCategory, TargetSpec
 from world.tests.synthetic_data import make_skill
 
 from ._combat_session_helpers import open_synthetic_scope
@@ -62,6 +62,17 @@ _T_GRANT = make_skill(
     effects=["confer_skill_partial"],
     target_spec=TargetSpec.SINGLE,
     cost={},
+)
+# The digestion-cadence carrier (divine-mystery §3): a zero-cost
+# DIVINE_MYSTERY row whose practice the daily claim gates. Zero effects —
+# the settlement boundary is the only thing under test.
+_T_PRAYER = make_skill(
+    "t_dawn_prayer",
+    label="黎明禱言",
+    category=SkillCategory.DIVINE_MYSTERY,
+    target_spec=TargetSpec.SELF,
+    cost={},
+    effects=[],
 )
 
 
@@ -98,6 +109,7 @@ class _CastSettlementTestCase(EvenniaTest):
                     _T_DISGUISE.key: _T_DISGUISE,
                     _T_SHROUD.key: _T_SHROUD,
                     _T_GRANT.key: _T_GRANT,
+                    _T_PRAYER.key: _T_PRAYER,
                 }
             },
         )
@@ -533,6 +545,108 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
                     allowed,
                     f"{skill_key}: {effect.description} writes outside the superset",
                 )
+
+
+class DigestionCadenceSettlementRollbackTests(_CastSettlementTestCase):
+    """A rolled-back out-of-combat settlement restores the day claim too.
+
+    The cadence claim rides the same ``_ENTITY_SURFACES`` tuple as
+    ``skill_proficiency``, so a failed outer settlement must restore it
+    byte-for-byte in cache AND rows — and a same-day retry must accrue
+    because the rollback gave the day back.
+    """
+
+    def _seed_day_clock(self):
+        """A real persisted world clock at day ordinal 2.
+
+        The practice grants inside the settlement read the day through
+        ``read_world_clock``: the seeded singleton makes the whole
+        settlement path exercise the real day derivation (ordinal 2, not the
+        raw tick 172800 + 7200) instead of the no-clock day-0 fallback.
+        """
+        from world.rules.clock import _DAY_SECONDS, get_world_clock
+
+        singleton = get_world_clock()
+        singleton._script.db.tick = 2 * _DAY_SECONDS + 7200
+
+    def _seed_caster(self, claimed_day: int):
+        self.char1.db.skills = {"active": [_T_PRAYER.key], "passive": []}
+        self.char1.db.skill_proficiency = {_T_PRAYER.key: 0.0}
+        self.char1.db.skill_practice_day = {_T_PRAYER.key: claimed_day}
+        self._seed_day_clock()
+
+    def _failing_clock(self):
+        clock = WorldClock()
+        clock._persist = lambda tick: (_ for _ in ()).throw(
+            RuntimeError("simulated persist failure")
+        )
+        return clock
+
+    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    def test_rolled_back_settlement_restores_the_day_claim_and_retry_accrues(self):
+        self._seed_caster(claimed_day=-1)
+        clock = self._failing_clock()
+        with self.assertRaises(RuntimeError):
+            settle_out_of_combat_cast(
+                self._request(skill_key=_T_PRAYER.key), clock=clock
+            )
+        self.assertEqual(clock.tick, 0)
+        # Byte-equal restore, in cache and in rows: the failed commit did
+        # not burn the day.
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {_T_PRAYER.key: 0.0}
+        )
+        self.assertEqual(
+            self.char1.db.skill_practice_day, {_T_PRAYER.key: -1}
+        )
+        self.assertEqual(
+            self._raw_attribute(self.char1, "skill_proficiency"),
+            {_T_PRAYER.key: 0.0},
+        )
+        self.assertEqual(
+            self._raw_attribute(self.char1, "skill_practice_day"),
+            {_T_PRAYER.key: -1},
+        )
+        # Same world-calendar day: the retry accrues because the rollback
+        # gave the day back, and records the REAL day ordinal (2).
+        retry = settle_out_of_combat_cast(
+            self._request(skill_key=_T_PRAYER.key), clock=WorldClock()
+        )
+        self.assertEqual(retry.result.outcome, "success")
+        expected_xp = SKILL_PRACTICE_XP_PER_USE * _learning_multiplier("human")
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {_T_PRAYER.key: expected_xp}
+        )
+        self.assertEqual(self.char1.db.skill_practice_day, {_T_PRAYER.key: 2})
+
+    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    def test_an_already_claimed_day_survives_rollback_and_retry_stays_blocked(self):
+        # The actor already used the mystery earlier today (claim == day 2):
+        # the settlement resolves, but the practice stage awards nothing.
+        self._seed_caster(claimed_day=2)
+        with self.assertRaises(RuntimeError):
+            settle_out_of_combat_cast(
+                self._request(skill_key=_T_PRAYER.key), clock=self._failing_clock()
+            )
+        self.assertEqual(
+            self.char1.db.skill_practice_day, {_T_PRAYER.key: 2}
+        )
+        self.assertEqual(
+            self._raw_attribute(self.char1, "skill_practice_day"),
+            {_T_PRAYER.key: 2},
+        )
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {_T_PRAYER.key: 0.0}
+        )
+        retry = settle_out_of_combat_cast(
+            self._request(skill_key=_T_PRAYER.key), clock=WorldClock()
+        )
+        self.assertEqual(retry.result.outcome, "success")
+        # Still day 2: the retry awards nothing and leaves the claim intact.
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {_T_PRAYER.key: 0.0}
+        )
+        self.assertEqual(self.char1.db.skill_practice_day, {_T_PRAYER.key: 2})
 
 
 if __name__ == "__main__":
