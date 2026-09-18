@@ -51,9 +51,9 @@
 
 ## 3. Wave close-out verification
 
-- [ ] 3.1 `uv run --locked python -m tools.spec_traceability check` passes unchanged.
-- [ ] 3.2 `uv run --locked python -m tools.observability_lint check` passes;
+- [x] 3.1 `uv run --locked python -m tools.spec_traceability check` passes unchanged.
+- [x] 3.2 `uv run --locked python -m tools.observability_lint check` passes;
   `git diff tools/observability_freeze.json` shows no additions.
-- [ ] 3.3 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
+- [x] 3.3 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
   green without manifest edits.
-- [ ] 3.4 `git diff --check` clean.
+- [x] 3.4 `git diff --check` clean.
