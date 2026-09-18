@@ -54,7 +54,7 @@
 
 ## 3. Divine four-member family
 
-- [ ] 3.1 Add `_stage_non_actor_targets(targets, actor, tag, apply_for)`; rewrite
+- [x] 3.1 Add `_stage_non_actor_targets(targets, actor, tag, apply_for)`; rewrite
   `_handle_divine_pleasure_max` (1311-1350, two-call lambda + `|100` tag),
   `_handle_saturate_sensitivity` (1508-1537), `_handle_mark_submission` (1587-1619,
   `str(actor.id)` NOT `_entity_key(actor)`), `_handle_restore_purity` (1622-1650) as

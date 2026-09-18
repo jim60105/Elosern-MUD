@@ -1304,6 +1304,27 @@ def _handle_sexual_counter_effect(
     return pending
 
 
+def _stage_non_actor_targets(
+    targets: list[Any],
+    actor: Any,
+    tag: Callable[[Any], str],
+    apply_for: Callable[[Any], Callable[[], None]],
+) -> list[PendingEffect]:
+    """Stage one divine mutator per non-actor target.
+
+    The actor is excluded explicitly even when present in the resolved
+    ``targets`` list: the ``"all"`` AREA shorthand has no self-exclusion, and
+    the resist gate keeps an actor present without rolling a contest for it.
+    ``apply_for`` is invoked at staging time so each staged effect closes over
+    its own target.
+    """
+    return [
+        PendingEffect(target, tag(target), frozenset(), apply_for(target))
+        for target in targets
+        if target is not actor
+    ]
+
+
 def _handle_divine_pleasure_max(
     actor: Any,
     targets: list[Any],
@@ -1329,22 +1350,15 @@ def _handle_divine_pleasure_max(
     (a fully or partially resisted cast) is an ordinary outcome.
     """
     del context, scale, effect_id
-    pending: list[PendingEffect] = []
-    for target in targets:
-        if target is actor:
-            continue
-        pending.append(
-            PendingEffect(
-                target,
-                f"divine_pleasure_max|{_entity_key(target)}|100",
-                frozenset(),
-                lambda target=target: (
-                    apply_pleasure_gain(target, 100),
-                    apply_pleasure_gain(target, 0),
-                ),
-            )
-        )
-    return pending
+    return _stage_non_actor_targets(
+        targets,
+        actor,
+        lambda target: f"divine_pleasure_max|{_entity_key(target)}|100",
+        lambda target: lambda: (
+            apply_pleasure_gain(target, 100),
+            apply_pleasure_gain(target, 0),
+        ),
+    )
 
 
 def _handle_pleasure_peak(
@@ -1517,19 +1531,12 @@ def _handle_saturate_sensitivity(
     an ordinary outcome, never a rejection.
     """
     del context, scale, effect_id
-    pending: list[PendingEffect] = []
-    for target in targets:
-        if target is actor:
-            continue
-        pending.append(
-            PendingEffect(
-                target,
-                f"divine_saturate_sensitivity|{_entity_key(target)}",
-                frozenset(),
-                lambda target=target: target.sexual.saturate_sensitivity(),
-            )
-        )
-    return pending
+    return _stage_non_actor_targets(
+        targets,
+        actor,
+        lambda target: f"divine_saturate_sensitivity|{_entity_key(target)}",
+        lambda target: lambda: target.sexual.saturate_sensitivity(),
+    )
 
 
 def _handle_clamp_shame(
@@ -1598,21 +1605,12 @@ def _handle_mark_submission(
     ``targets`` list (a resisted cast) is an ordinary outcome.
     """
     del context, scale, effect_id
-    pending: list[PendingEffect] = []
-    for target in targets:
-        if target is actor:
-            continue
-        pending.append(
-            PendingEffect(
-                target,
-                f"divine_mark_submission|{_entity_key(target)}",
-                frozenset(),
-                lambda target=target: target.sexual.mark_submission(
-                    str(actor.id)
-                ),
-            )
-        )
-    return pending
+    return _stage_non_actor_targets(
+        targets,
+        actor,
+        lambda target: f"divine_mark_submission|{_entity_key(target)}",
+        lambda target: lambda: target.sexual.mark_submission(str(actor.id)),
+    )
 
 
 def _handle_restore_purity(
@@ -1630,19 +1628,12 @@ def _handle_restore_purity(
     is an ordinary outcome, never a rejection.
     """
     del context, scale, effect_id
-    pending: list[PendingEffect] = []
-    for target in targets:
-        if target is actor:
-            continue
-        pending.append(
-            PendingEffect(
-                target,
-                f"divine_restore_purity|{_entity_key(target)}",
-                frozenset(),
-                lambda target=target: target.sexual.restore_purity(),
-            )
-        )
-    return pending
+    return _stage_non_actor_targets(
+        targets,
+        actor,
+        lambda target: f"divine_restore_purity|{_entity_key(target)}",
+        lambda target: lambda: target.sexual.restore_purity(),
+    )
 
 
 def _drain_resources(actor: Any, amount: int) -> None:
