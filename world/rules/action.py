@@ -60,6 +60,7 @@ from world.rules.skill_effects import (
     disguise_provenance_of,
     DISGUISE_PROVENANCE_DIVINE,
     record_conferred_grant,
+    revoke_conferred_grants,
 )
 from world.rules.targeting import (
     ActionContext,
@@ -888,6 +889,34 @@ def _handle_confer_growth_rate(
     ]
 
 
+def _handle_revoke_grants(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Stage one total conferral revocation per target.
+
+    The single staged effect clears BOTH halves of the conferral vocabulary
+    (skill grants and conferred growth-rate buffs) under the two declared
+    ``skill_grants``/``buffs`` surfaces, so a failed commit restores both
+    stores from the same snapshot/restore face (design D1). Revocation is
+    unconditional and total: no payload, no source filter, no skill filter
+    (design D2/D3).
+    """
+    del scale
+    return [
+        PendingEffect(
+            target,
+            f"grants_revoked|{_entity_key(target)}",
+            frozenset(),
+            lambda target=target: revoke_conferred_grants(target),
+        )
+        for target in targets
+    ]
+
+
 def _handle_divine_mystery(
     actor: Any,
     targets: list[Any],
@@ -1622,6 +1651,12 @@ register_effect_handler(
     requires_event_context=frozenset(),
 )
 register_effect_handler(
+    "revoke_grants",
+    _handle_revoke_grants,
+    frozenset({"skill_grants", "buffs"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
     "sexual_event",
     _handle_sexual_event,
     frozenset({"sexual", "traits", "buffs"}),
@@ -2314,6 +2349,7 @@ _ENTRY_TEMPLATES = {
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "disguise_lifted": "{actor} 解除了 {target} 的偽裝狀態。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
+    "grants_revoked": "{actor} 收回了 {target} 身上的一切授予。",
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
     "equipment_immune": "{target} 的裝備抵銷了{actor} 施加的負面效果——{target} 對此免疫。",
