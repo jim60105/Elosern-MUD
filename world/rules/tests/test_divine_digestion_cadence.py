@@ -16,10 +16,8 @@ tagging anywhere in this module (test-data-independence).
 Traceability note for the archive/sync step: the delta requirement
 ``Divine Mystery practice accrues at most once per world-calendar day``
 (canonical id ``divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day``)
-does not exist in the main-spec traceability index until this change is
-synced, so the cadence-scenario tests below carry the skill-lineage main-spec
-IDs they substantively establish instead. When the delta lands in
-``openspec/specs/``, add that id to the six cadence-scenario tests here.
+is synced to ``openspec/specs/divine-mystery/spec.md`` and is carried across
+the six cadence-scenario tests below beside the lineage IDs they establish.
 """
 
 import unittest
@@ -197,7 +195,10 @@ class DigestionCadenceTests(_Scoped):
         day_patch.start()
         self.addCleanup(day_patch.stop)
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+    )
     def test_second_same_day_use_accrues_nothing(self):
         actor = _entity((_T_MYSTERY_1.key,), race="t_duskmari")
         first = SimpleNamespace(pk=100, key="t1")
@@ -215,7 +216,10 @@ class DigestionCadenceTests(_Scoped):
         )
         self.assertEqual(actor.db.skill_practice_day, {_T_MYSTERY_1.key: 47})
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+    )
     def test_next_calendar_day_accrues_again(self):
         actor = _entity((_T_MYSTERY_1.key,), race="t_duskmari")
         self.assertTrue(progression.grant_skill_practice_xp(actor, _T_MYSTERY_1.key))
@@ -229,7 +233,10 @@ class DigestionCadenceTests(_Scoped):
         )
         self.assertEqual(actor.db.skill_practice_day, {_T_MYSTERY_1.key: 48})
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+    )
     def test_each_mystery_holds_its_own_day(self):
         actor = _entity((_T_MYSTERY_1.key, _T_MYSTERY_2.key), race="t_duskmari")
         self.assertTrue(progression.grant_skill_practice_xp(actor, _T_MYSTERY_1.key))
@@ -246,7 +253,10 @@ class DigestionCadenceTests(_Scoped):
             {_T_MYSTERY_1.key: 47, _T_MYSTERY_2.key: 47},
         )
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+    )
     def test_divine_arts_skill_outside_the_category_accrues_twice_in_one_day(self):
         actor = _entity((_T_DIVINE_LINE.key,), race="t_duskmari")
         first = SimpleNamespace(pk=200, key="t1")
@@ -279,7 +289,10 @@ class DigestionCadenceTests(_Scoped):
         )
         self.assertFalse(hasattr(actor.db, "skill_practice_day"))
 
-    @covers_requirement("skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick",
+    )
     def test_day_blocked_use_takes_no_per_tick_claim(self):
         actor = _entity((_T_MYSTERY_1.key,), race="t_duskmari")
         first = SimpleNamespace(pk=300, key="t1")
@@ -357,7 +370,10 @@ class DigestionCadenceResolveRollbackTests(EvenniaTest):
             lambda: (_ for _ in ()).throw(RuntimeError("injected")),
         )
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement(
+        "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+    )
     def test_failed_commit_restores_the_day_claim_and_same_day_retry_accrues(self):
         with self.assertRaises(CommitFailed):
             _commit(

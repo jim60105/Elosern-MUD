@@ -103,6 +103,11 @@ accrue. A resolution carrying the simulated marker (a guild examination's
 `event_context["simulated"]`) SHALL accrue nothing. Accrual SHALL NOT read the actor's school or any
 magic stat.
 
+Exactly one category-scoped exception SHALL exist: an ACTIVE skill in `SkillCategory.DIVINE_MYSTERY`
+additionally passes a per-world-calendar-day claim before accruing. That rule and its scenarios are
+owned by the `divine-mystery` capability and SHALL NOT be restated here; no other category carries a
+cadence of any kind.
+
 #### Scenario: A physical skill accrues like a spell
 - **WHEN** an ACTIVE sword skill resolves successfully for an elf (learning x10) with no affinity and no growth buff
 - **THEN** `db.skill_proficiency[skill_key]` increases by exactly `SKILL_PRACTICE_XP_PER_USE × 10.0`
@@ -123,6 +128,11 @@ magic stat.
 #### Scenario: Rolled-back resolutions restore proficiency
 - **WHEN** a successful resolution's later pending effect fails and the action snapshot restores
 - **THEN** `db.skill_proficiency` is byte-equal to its pre-action value
+
+#### Scenario: A non-divine category carries no daily brake
+- **WHEN** an ACTIVE skill outside `SkillCategory.DIVINE_MYSTERY` resolves successfully many times
+  across one world-calendar day on distinct ticks
+- **THEN** every resolution accrues, because the cadence applies to that one category only
 
 ### Requirement: Practice saturates at the derived tip cap
 For any skill `S`, `cap(S)` SHALL equal the maximum `min_proficiency` over all edges consuming `S`
