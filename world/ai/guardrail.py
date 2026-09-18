@@ -78,11 +78,12 @@ class GuardrailHooks:
     keys are validated by ``_require_layer`` inside the registrar functions.
 
     On a partial failure (``GuardrailRegistrationError``, e.g. a foreign hook
-    already holds one of the names) every hook this object installed is
-    removed by identity before the error re-raises, so a layer is never left
-    half-registered and foreign hooks stay untouched. The layer modules keep
-    their public ``register_*`` functions and data declarations; this helper
-    is the single copy of the mutation dance.
+    already holds one of the names) every own hook is removed by identity —
+    regardless of whether it was installed by the failing call or
+    pre-existed from an earlier attempt — before the error re-raises, so a
+    layer is never left half-registered and foreign hooks stay untouched.
+    The layer modules keep their public ``register_*`` functions and data
+    declarations; this helper is the single copy of the mutation dance.
     """
 
     layer: str
