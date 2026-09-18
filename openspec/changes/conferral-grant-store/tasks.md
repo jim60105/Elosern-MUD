@@ -26,6 +26,13 @@
 - [ ] 2.4 Tests: a cast with no conferral keys in `event_context` resolves and writes one grant per
       conferrable owned skill at the declared coefficient; a caster with nothing conferrable is
       rejected; a caller-supplied `confer_scale` is ignored.
+- [ ] 2.5 Declare the lore-priced 0.10 coefficient on the shipped `dominion_art` row so the
+      newly-castable verb records grants at the priced strength (amends proposal Impact: no new
+      registry entries land here; `divine-mystery-catalog` stays the sole author of the tree's
+      remaining data).
+- [ ] 2.6 Preflight and the shared preview reject a conferral whose derived set is empty with the
+      same `EFFECT_RESOLUTION_FAILED` as resolution, so no surface advertises a cast that can never
+      resolve; pin both in tests.
 
 ## 3. Preview parity
 
@@ -61,3 +68,15 @@
 - [ ] 6.3 Run `uv run --locked python -m tools.spec_traceability check` and
       `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
 - [ ] 6.4 `openspec validate conferral-grant-store --strict`.
+
+## 7. Main-spec truthfulness
+
+- [ ] 7.1 Restate the two `action-resolution-pipeline` requirements whose conferral scenarios this
+      change renders false (the registry's 統御術 `event_context` scenario and the preflight's
+      "missing dominion context" scenario), so the main spec stays coherent after the archive sync.
+- [ ] 7.2 Note for the archive phase: `world/skills/tests/test_conferral.py` carries six
+      `covers_requirement` annotations on the retired requirement
+      (`skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-統御術`);
+      at sync they must re-point to the ADDED requirement's canonical ID
+      (`skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-its-caster-owns-統御術`)
+      so the traceability gate stays green post-archive.
