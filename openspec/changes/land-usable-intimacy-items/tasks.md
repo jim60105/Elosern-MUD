@@ -27,8 +27,8 @@
 
 ## 5. Unmaterialised-state check
 
-- [ ] 5.1 Use a synthetic pleasure-raising item on an entity whose intimacy state has never been materialised, and verify the preflight's fail-closed read does not reject it and the gauge rises through the shared writer. Verify with `world.rules.tests.test_item_use`.
-- [ ] 5.2 Use a synthetic pleasure-raising item on an entity whose gauge is already at its ceiling, and verify the use is rejected with the full-gauge reason and the item is not consumed. Verify with `world.rules.tests.test_item_use`.
+- [x] 5.1 Use a synthetic pleasure-raising item on an entity whose intimacy state has never been materialised, and verify the preflight's fail-closed read does not reject it and the gauge rises through the shared writer. Verify with `world.rules.tests.test_item_use`.
+- [x] 5.2 Use a synthetic pleasure-raising item on an entity whose gauge is already at its ceiling, and verify the use is rejected with the full-gauge reason and the item is not consumed. Verify with `world.rules.tests.test_item_use`.
 
 ## 6. Gate
 

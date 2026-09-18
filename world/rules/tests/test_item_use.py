@@ -1037,6 +1037,41 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, ItemUseReason.PLEASURE_FULL)
 
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
+    def test_unmaterialized_intimacy_state_preflight_allows_and_settles_gain(self):
+        # Task 5.1: unmaterialised intimacy state
+        from typeclasses.npcs import NPC
+        fresh = create_object(NPC, key="t_unmaterialized_npc")
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        fresh.location = self.actor.location
+        fresh.db.inventory = [_PLEASURE_UP_KEY]
+        # Assert sexual_traits is unmaterialized before the call
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+        self.assertNotIn("sexual", fresh.__dict__)
+
+        # Preflight's fail-closed read does not reject it
+        preflight = preflight_item_use(
+            ItemUseRequest(fresh, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertTrue(preflight.allowed)
+        self.assertIsNone(preflight.reason)
+
+        # Still unmaterialized after preflight!
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+
+        # Settlement raises pleasure through the shared writer
+        result = resolve_item_use(
+            ItemUseRequest(fresh, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(int(fresh.sexual.pleasure.base), 30)
+        (entry,) = result.event_log.entries
+        self.assertEqual(entry.data["stat"], "pleasure")
+        self.assertEqual(entry.data["amount"], 30)
+
 
 class RemovalSelectorSettlementTests(_MultiEffectTestCase):
     """Concrete and ``all`` removal selectors settle through removal."""
