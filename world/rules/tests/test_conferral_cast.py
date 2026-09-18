@@ -198,6 +198,22 @@ class ConferralStoreSemanticsTests(EvenniaTest):
             round(60 * multiplier * 0.5 * multiplier * 0.25),
         )
 
+    def test_replacing_one_pair_preserves_the_relative_order(self):
+        entity = self._entity()
+        record_conferred_grant(entity, "t_first", _MIGHTY_PULSE.key, 0.5)
+        record_conferred_grant(entity, "t_second", _DEFENSE_INSTINCT.key, 0.5)
+        record_conferred_grant(entity, "t_first", _MIGHTY_PULSE.key, 0.25)
+        self.assertEqual(
+            [
+                (g.source_key, g.skill_key, g.scale)
+                for g in entity.skills.conferred_grants()
+            ],
+            [
+                ("t_first", _MIGHTY_PULSE.key, 0.25),
+                ("t_second", _DEFENSE_INSTINCT.key, 0.5),
+            ],
+        )
+
     def test_unowned_skill_is_rejected_and_writes_nothing(self):
         entity = self._entity()
         with self.assertRaises(RejectedAction) as raised:
@@ -390,6 +406,35 @@ class ConferralPreviewAndRollbackTests(EvenniaTest):
         )
         self.assertEqual(preflight.outcome, "rejected")
         self.assertIs(preflight.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
+
+    def test_combat_submission_with_an_empty_derived_set_rejects_before_initiative(self):
+        from unittest.mock import patch
+
+        from typeclasses.monsters import Monster
+        from world.rules.clock import WorldClock
+        from world.rules.combat_session import (
+            engage,
+            read_session,
+            submit_player_action,
+        )
+
+        caster = self._caster("combat-empty", passive=[_MIRROR_VEIL.key])
+        monster = create_object(Monster, key="sparring dummy")
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        monster.location = self.room1
+        engage(caster, monster)
+        clock = WorldClock()
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            result = submit_player_action(
+                caster, _DUSK_CONFER.key, [monster]
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertIs(
+            result["reason"], RejectReason.EFFECT_RESOLUTION_FAILED
+        )
+        self.assertEqual(read_session(caster).rounds_elapsed, 0)
+        self.assertEqual(clock.tick, 0)
 
     def test_failed_commit_restores_skill_grants_byte_equal(self):
         target = self._caster("rollback")

@@ -69,7 +69,14 @@ class ConferredSkillTests(EvenniaTestCase):
             entity.skills.effective_value("atk_phys"), round(60 * multiplier * 0.1)
         )
 
-    def test_grant_write_does_not_check_source_or_ownership(self):
+    def test_write_primitive_takes_string_identities_and_skips_unknown_keys(self):
+        # Design D2: the write primitive receives string identities and has no
+        # entity to interrogate, so ownership is enforced where the actor
+        # exists — at the resolver boundary, whose derived set only ever
+        # contains directly-owned keys (validate_source_owns_skill is covered
+        # by world.rules.tests.test_conferral_cast). An unrecognized key is
+        # still written verbatim because such a grant contributes nothing at
+        # read time.
         entity = self._entity()
         before = entity.traits.atk_phys.value
         record_conferred_grant(entity, "unknown source", "unknown skill", 0.5)
