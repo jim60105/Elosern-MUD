@@ -44,11 +44,11 @@
 ## 3. Store `readPanel` helper
 
 - [x] 3.1 In `web/webclient-app/stores/elosern.js`, add the module-private
-  `readPanel(rs, key)` per design D3 and replace the five
-  `(rs.panels && rs.panels.<key>) || null` reads in `buildView`
-  (`status`/vitals if it uses the same shape, `party`, `objectives`, `roster`,
-  `exploration`; locate via `grep -n "rs.panels && rs.panels" stores/elosern.js`). Leave
-  every `available === true` / `available !== false` / `Array.isArray` guard verbatim.
+  `readPanel(rs, key)` per design D3 and replace the four `(rs.panels && rs.panels.<key>) || null`
+  reads in `buildView` (`party`, `objectives`, `roster`, `exploration`; the vitals read goes
+  through the `panels.status` alias — a different shape — and is untouched; locate via
+  `grep -n "rs.panels && rs.panels" stores/elosern.js`). Leave every
+  `available === true` / `available !== false` / `Array.isArray` guard verbatim.
   Verify: `pnpm test -- tests/store tests/app_client_drawers.test.js tests/app_client_gallery.test.js`
   — then full `pnpm test`.
 
