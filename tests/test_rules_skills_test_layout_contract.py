@@ -59,7 +59,8 @@ COMBAT_SESSION_CLASS_MODULES = {
 SKILL_REGISTRY_CLASS_MODULES = {
     "SkillRegistryTests": "test_skill_registry.py",
     "SkillContentCompletionTests": "test_skill_registry.py",
-    "DivineMysteryRegistryTests": "test_skill_registry.py",
+    "DivineMysteryFamilyInvariantTests": "test_skill_registry.py",
+    "DivineMysteryLineageTreeTests": "test_skill_registry.py",
     "SkillCategoryClassificationTests": "test_skill_registry.py",
     "FleeCategoryDeclarationTests": "test_skill_registry.py",
     "ElementalSpellsBuilderTests": "test_spell_catalogs.py",
