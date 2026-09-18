@@ -348,9 +348,13 @@ class RestorePurityEffect:
 
 @dataclass(frozen=True)
 class DamageEffect:
-    """Deal damage of one element and school (``physical``/``magic``)."""
+    """Deal damage of one element and school (``physical``/``magic``).
 
-    element: str
+    ``element`` is ``None`` for the reserved ``damage:none:<school>`` token,
+    which declares the absence of an element rather than a registry lookup.
+    """
+
+    element: str | None
     school: str
 
 
@@ -1125,7 +1129,7 @@ def parse_effect(effect_id: str) -> object:
             raise ValueError(
                 f"damage effect must be damage:<element>:<school>, got {effect_id!r}"
             )
-        return DamageEffect(element=element, school=school)
+        return DamageEffect(element=None if element == "none" else element, school=school)
     if prefix == "heal":
         shape = _parse_single_arg(effect_id, prefix)
         if shape not in {"single", "area"}:

@@ -13,7 +13,11 @@ elemental reads a different field:
 
 - `world/rules/combat.py` reads only the school (via the attack-key selection) and the
   `DamagePolicy`; the parsed element never enters the damage formula, the event log line, or the
-  projection.
+  projection. It does, however, independently re-parse and validate the raw `effect_id` string in
+  its own `_parse_damage_effect` helper (a second, duplicate parser of the same grammar, separate
+  from `world.skills.effects.parse_effect`) purely to gate `element not in ELEMENT_REGISTRY` before
+  discarding the element and keeping only the school — this gate had to learn the reserved `none`
+  token too (found during implementation; corrected in `_parse_damage_effect` alongside D1).
 - `world/rules/combat_view.py:365` exports `skill.element.key` — the `SkillDef` field — which
   `SkillDetailPane.vue:50` renders as a visible badge.
 - `world/rules/progression.py:494` (`_is_elemental_magic`) gates the affinity practice factor on a

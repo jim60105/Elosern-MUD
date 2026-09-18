@@ -97,7 +97,7 @@ snapshot/restore face and the same transaction as the skill's own effects: `SKIL
 (physical or non-elemental skills multiply by `1.0`) `× growth_rate_multiplier(entity)` (the
 conferred-buff pull path). The affinity factor SHALL apply only to a skill whose parsed effects
 include a magic-school damage of its own element — a physical skill carrying an element (e.g.
-`basic_attack`) multiplies by `1.0`. Storage and derivation are unchanged:
+`light_sword_style`) multiplies by `1.0`, and so does a physical skill declaring no element at all. Storage and derivation are unchanged:
 `db.skill_proficiency[skill_key]` float XP with `level = floor(xp / 50)`. PASSIVE skills SHALL NOT
 accrue. A resolution carrying the simulated marker (a guild examination's
 `event_context["simulated"]`) SHALL accrue nothing. Accrual SHALL NOT read the actor's school or any
@@ -116,6 +116,12 @@ cadence of any kind.
 - **WHEN** an entity with `affinity_elements == ["fire"]` successfully casts a magic fire spell
 - **THEN** the accrued XP carries the `1.1` factor; a non-favored element carries `0.9`, and a
   physical skill carrying `element == fire` carries `1.0`
+
+#### Scenario: An elementless skill carries the neutral factor
+- **WHEN** an entity with declared affinities successfully resolves a physical skill that declares no
+  element, and a control entity with no declared affinities resolves the same skill
+- **THEN** both accruals carry the `1.0` factor and neither entity's affinity set is read as a bonus
+  or a penalty
 
 #### Scenario: The conferred growth buff participates
 - **WHEN** an entity with an active `conferred_growth_rate` buff successfully uses a skill

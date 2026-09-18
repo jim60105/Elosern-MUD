@@ -494,7 +494,7 @@ def award_practice_xp(entity: Any, skill_key: str, xp: float) -> None:
 def _is_elemental_magic(skill: SkillDef) -> bool:
     """Return whether element affinity may ever scale this skill's practice.
 
-    ``basic_attack`` carries ``element == fire`` with a PHYSICAL damage
+    ``light_sword_style`` carries ``element == light`` with a PHYSICAL damage
     school, so the element field alone cannot decide affinity eligibility:
     only a skill whose parsed effects include a magic-school damage of its own
     element is elemental magic. Physical and non-elemental skills take the
