@@ -54,5 +54,5 @@
 
 ## 4. Close-out
 
-- [ ] 4.1 `git diff --stat` names only `web/webclient-app/**`; `git diff --check` clean.
-- [ ] 4.2 Full `pnpm test` green with ZERO test-file edits besides the two new test files.
+- [x] 4.1 `git diff --stat` names only `web/webclient-app/**`; `git diff --check` clean.
+- [x] 4.2 Full `pnpm test` green with ZERO test-file edits besides the two new test files.
