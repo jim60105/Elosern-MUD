@@ -74,7 +74,7 @@ _MIGHTY_PULSE = make_skill(
 )
 _DEFENSE_INSTINCT = make_skill(
     "t_defense_instinct",
-    label="防禦直覺",
+    label="防護直覺",
     description="連結規則表的合成被動。",
     kind=SkillKind.PASSIVE,
     effects=["passive_buff:t_defense_instinct"],
@@ -330,7 +330,7 @@ class ConferralCastPathTests(EvenniaTest):
 
     def test_growth_rate_cast_reads_the_declared_scale(self):
         caster = self._caster("mentor", confer=_MENTORS_RITE)
-        target = self._caster("apprentice")
+        target = self._caster("t_protege")
         result = self._cast(caster, target, skill=_MENTORS_RITE)
         self.assertEqual(result.outcome, "success")
         buff = target.buffs.all[f"conferred_growth_rate:{caster.key}"]
@@ -338,7 +338,7 @@ class ConferralCastPathTests(EvenniaTest):
 
     def test_growth_rate_ignores_a_caller_supplied_scale(self):
         caster = self._caster("mentor", confer=_MENTORS_RITE)
-        target = self._caster("apprentice")
+        target = self._caster("t_protege")
         result = self._cast(
             caster,
             target,

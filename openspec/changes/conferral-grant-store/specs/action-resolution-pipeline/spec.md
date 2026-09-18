@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
-### Requirement: The effect-resolution registry is open, prefix-keyed, and every handler declares its mutation surfaces
-
+### Requirement: The effect-resolution registry is open, prefix-keyed, and every handler declares its
+mutation surfaces
 `world/rules/action.py` SHALL expose `register_effect_handler(prefix, handler, surfaces)` as the only
 sanctioned way to add an effect-ID handler, where `surfaces` is the exact set of entity-state surfaces
 that handler's staged effects mutate. Step 5 SHALL dispatch purely by looking up an effect ID's prefix
@@ -33,6 +33,15 @@ run any action whose staged effects declare a surface outside that same set.
   `RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE` before touching any entity, proving the commit-time check
   is not merely decorative alongside the registration-time one
 
+#### Scenario: 統御術's cast-time conferral commits atomically with its own resource cost
+
+- **WHEN** `resolve()` is called for 統御術 (`dominion_art`) targeting a single ally, with an
+  `event_context` carrying no conferral keys, by a caster who directly owns conferrable passives
+  declared at the node's coefficient
+- **THEN** the target's `entity.db.skill_grants` gains one `ConferredSkillGrant` per derived skill at
+  the node's declared scale, and the actor's declared `cost` resources are deducted, in the same
+  successful `resolve()` call
+
 #### Scenario: A sexual-magic effect ID rejects cleanly before change 7b exists, and self-arms after
 
 - **WHEN** `resolve()` is called for a skill whose `effects` include a `sexual_event:`-prefixed ID,
@@ -55,10 +64,14 @@ run any action whose staged effects declare a surface outside that same set.
 - **WHEN** a player submits `status_disguise` in combat without `event_context.disguise`
 - **THEN** the action is rejected at preflight, no round is consumed, and the enemy does not act
 
-#### Scenario: A conferral with an empty derived set rejects before initiative
+#### Scenario: Missing dominion context rejects before initiative
 
-- **WHEN** a player submits `dominion_art` while owning no skill that passes the conferrability shape validation, with an `event_context` carrying no conferral keys
-- **THEN** the action is rejected at preflight with `EFFECT_RESOLUTION_FAILED`, no round is consumed, and the enemy does not act
+- **WHEN** a player submits `dominion_art` in combat while owning no skill that passes the
+  conferrability shape validation, with an `event_context` carrying no conferral keys (the scale and
+  the conferred set are now derived from the caster's own ownership and the node's policy, so the
+  old required-context keys no longer exist)
+- **THEN** the action is rejected at preflight with `EFFECT_RESOLUTION_FAILED`, no round is consumed,
+  and the enemy does not act
 
 #### Scenario: Out-of-combat casts with supplied context still work
 
