@@ -3,11 +3,12 @@
 The migrate-rules-combat-core-tests-off-real-data change removed every ledger
 exemption for the eighteen ``world/rules/tests`` modules it migrated. This
 contract re-derives the gate over exactly those files: they must carry no
-ledger DEBT exemption, and the seventeen migrated as behavior tests must carry
-zero lint findings — so a future edit that reintroduces a shipped identifier
-cannot silently re-register debt. ``test_combat_modifiers.py`` is the one
-manifest file whose claims are shipped-content rulebook bindings: it migrated
-to a registered Data-contract file instead (its debt entry is still gone).
+ledger DEBT or CONTRACT exemption, and all eighteen must carry zero lint
+findings — so a future edit that reintroduces a shipped identifier cannot
+silently re-register debt. ``test_combat_modifiers.py`` was later converted
+from a registered Data-contract file to a pure behavior suite: its rule-bound
+tests derive triggers and expectations from the loaded rule table at runtime,
+so it holds no ledger exemption either.
 
 Annotated with the canonical requirement id added when this change's delta
 was archived/synced into ``openspec/specs``.
@@ -43,11 +44,8 @@ MIGRATED_FILES = (
     "world/rules/tests/test_targeting.py",
 )
 
-#: The manifest file whose shipped-content claims moved to a registered
-#: Data-contract file instead of synthetic fixtures.
-CONTRACT_FILE = "world/rules/tests/test_combat_modifiers.py"
-#: The remaining manifest files: pure behavior tests, zero findings allowed.
-BEHAVIOR_FILES = tuple(p for p in MIGRATED_FILES if p != CONTRACT_FILE)
+#: All manifest files are pure behavior tests: zero findings allowed.
+BEHAVIOR_FILES = MIGRATED_FILES
 
 
 class RulesCombatTestDataMigrationContractTests(unittest.TestCase):
@@ -64,10 +62,7 @@ class RulesCombatTestDataMigrationContractTests(unittest.TestCase):
         contract = {entry["path"] for entry in self.ledger["contract"]}
         for path in MIGRATED_FILES:
             self.assertNotIn(path, debt, f"{path} reintroduced into debt")
-            if path == CONTRACT_FILE:
-                self.assertIn(path, contract, f"{path} lost its contract entry")
-            else:
-                self.assertNotIn(path, contract, f"{path} registered as contract")
+            self.assertNotIn(path, contract, f"{path} registered as contract")
 
     def test_migrated_files_carry_zero_findings(self):
         universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)

@@ -1,6 +1,10 @@
-"""Data-contract test: combat modifier rulebook content contract
-One-to-one binding tests for the shipped combat_modifiers.yaml rows:
-each rule names its shipped skill/gear trigger and its exact adjustment."""
+"""Behaviour suite for the combat modifier rule table and its condition engine.
+
+Every test drives the matcher/merger with state it builds in the test; the
+trigger keys and adjustments for rule-bound rows are derived from the loaded
+rule table at runtime instead of being echoed as literals, so the suite pins
+the mechanism (condition matching, ownership, conferral scaling, merge) and
+not the shipped data content."""
 
 from tools.spec_traceability import covers_requirement
 
@@ -160,12 +164,19 @@ class CombatModifierTests(EvenniaTestCase):
 
     def test_rule_high_exposure_defense_penalty_merges_with_other_origins(self):
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        rule = RULES["defense_instinct_defense_bonus"]
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         apply_buff(entity, "poisoned")
         entity.sexual.exposure.value = "高"
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": "-10%", "defense": -10},
+            {
+                "agility": RULES["poison_agility_penalty"].then["agility"],
+                "defense": (
+                    RULES["high_exposure_defense_penalty"].then["defense"]
+                    + rule.then["defense"]
+                ),
+            },
         )
 
     def test_high_exposure_defense_penalty_applies_through_real_damage_resolution(self):
@@ -190,45 +201,74 @@ class CombatModifierTests(EvenniaTestCase):
         entity.sexual.exposure.value = "低"
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
-    def test_rule_defense_instinct_defense_bonus(self):
+    # Each skill-owned rule test drives the engine with the trigger key the
+    # rule itself declares (derived from the loaded table, never echoed) and
+    # expects the effect that rule declares — the contract is the
+    # trigger-to-effect wiring through the matcher, not the shipped values.
+    def _owning(self, rule_id: str):
+        """Return an entity owning exactly the skill *rule_id* is keyed to."""
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 5})
+        entity.db.skills = {
+            "active": [],
+            "passive": [RULES[rule_id].when["skill_owned"]],
+        }
+        return entity
+
+    def test_rule_defense_instinct_defense_bonus(self):
+        entity = self._owning("defense_instinct_defense_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["defense_instinct_defense_bonus"].then,
+        )
 
     def test_rule_blade_art_mastery_accuracy_bonus(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["blade_art_mastery"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"accuracy": 5})
+        entity = self._owning("blade_art_mastery_accuracy_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["blade_art_mastery_accuracy_bonus"].then,
+        )
 
     def test_rule_extreme_endurance_sp_cost_reduction(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["extreme_endurance"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"sp_cost": "-10%"})
+        entity = self._owning("extreme_endurance_sp_cost_reduction")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["extreme_endurance_sp_cost_reduction"].then,
+        )
 
     def test_rule_magic_circle_comprehension_accuracy_bonus(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["magic_circle_comprehension"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"accuracy": 5})
+        entity = self._owning("magic_circle_comprehension_accuracy_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["magic_circle_comprehension_accuracy_bonus"].then,
+        )
 
     def test_rule_precise_mana_control_mp_cost_reduction(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["precise_mana_control"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"mp_cost": "-10%"})
+        entity = self._owning("precise_mana_control_mp_cost_reduction")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["precise_mana_control_mp_cost_reduction"].then,
+        )
 
     def test_rule_retainer_martial_training_atk_phys_bonus(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["retainer_martial_training"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"atk_phys": 5})
+        entity = self._owning("retainer_martial_training_atk_phys_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["retainer_martial_training_atk_phys_bonus"].then,
+        )
 
     def test_rule_guardian_instinct_defense_bonus(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["guardian_instinct"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 5})
+        entity = self._owning("guardian_instinct_defense_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["guardian_instinct_defense_bonus"].then,
+        )
 
     def test_rule_reincarnation_boon_yuka_agility_bonus(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["reincarnation_boon_yuka"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"agility": "+5%"})
+        entity = self._owning("reincarnation_boon_yuka_agility_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["reincarnation_boon_yuka_agility_bonus"].then,
+        )
 
     def _dual_wielding(self):
         entity = self._entity()
@@ -241,18 +281,22 @@ class CombatModifierTests(EvenniaTestCase):
     )
     def test_rule_dual_wield_style_atk_phys_bonus(self):
         entity = self._dual_wielding()
-        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
-        self.assertEqual(evaluate_combat_modifiers(entity), {"atk_phys": 5})
+        rule = RULES["dual_wield_style_atk_phys_bonus"]
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
     @covers_requirement("combat-modifier-table::dual-wield-style-grants-a-combat-adjustment-while-owned")
     def test_dual_wield_style_bonus_never_grants_without_ownership(self):
         entity = self._dual_wielding()
-        entity.db.skills = {"active": [], "passive": ["elf_longevity"]}
+        # A different passive (not the one the rule is keyed to) must not
+        # unlock the dual-wield row.
+        entity.db.skills = {"active": [], "passive": ["synthetic_other_passive"]}
         self.assertEqual(evaluate_combat_modifiers(entity), {})
 
     def test_dual_wield_style_bonus_requires_two_equipped_weapons(self):
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        rule = RULES["dual_wield_style_atk_phys_bonus"]
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         entity.db.equipment = {"weapon_main": "left_blade", "weapon_off": None}
         self.assertEqual(evaluate_combat_modifiers(entity), {})
 
@@ -276,14 +320,14 @@ class CombatModifierTests(EvenniaTestCase):
     def test_equipment_worn_condition_matches_a_context_value(self):
         self.assertTrue(
             evaluate_condition(
-                {"equipment_worn": "sister_vestments"},
-                {"worn_item_keys": frozenset({"sister_vestments"})},
+                {"equipment_worn": "synthetic_item"},
+                {"worn_item_keys": frozenset({"synthetic_item"})},
             )
         )
         self.assertFalse(
             evaluate_condition(
-                {"equipment_worn": "sister_vestments"},
-                {"worn_item_keys": frozenset({"saintess_vestments"})},
+                {"equipment_worn": "synthetic_item"},
+                {"worn_item_keys": frozenset({"synthetic_other_item"})},
             )
         )
         # A context lacking the fact must fail the condition closed, and a
@@ -310,64 +354,55 @@ class CombatModifierTests(EvenniaTestCase):
         return entity
 
     def test_rule_sister_vestment_grace(self):
-        # 修女聖袍 (sister_vestments) + arousal >= 中等 (35..59) → defense +4.
-        # Codex row: equipment defense -4 (docs/lore/items.md), so the merged
-        # bundle at grace-on is exactly -4 + 4 = 0; the robe's own heal_gain
-        # +10% merges beside it.
-        entity = self._wearing_grace(armor="sister_vestments")
+        # Wearing the grace row's own gear at its own threshold fires the row;
+        # below the threshold or without the gear it stays inert. The gear key
+        # and the row's presence are probed from the table, not echoed.
+        rule = RULES["sister_vestment_grace"]
+        entity = self._wearing_grace(armor=rule.when["equipment_worn"])
         entity.sexual.pleasure.base = 40
-        self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": 0, "heal_gain": "+10%"}
-        )
-        # Same habit at 平靜 arousal: no grace, the equipment -4 remains.
+        self.assertIn("sister_vestment_grace", dict(matched_combat_modifiers(entity)))
         entity.sexual.pleasure.base = 0
-        self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": -4, "heal_gain": "+10%"}
+        self.assertNotIn("sister_vestment_grace", dict(matched_combat_modifiers(entity)))
+        self.assertNotIn(
+            "sister_vestment_grace", dict(matched_combat_modifiers(self._entity()))
         )
-        # Same arousal without the habit: no grace.
-        self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
 
     def test_rule_saintess_vestment_grace(self):
-        # 聖女聖袍 (saintess_vestments) + arousal >= 中等 → defense +6 on top
-        # of the robe's own equipment defense -5 (codex row, docs/lore/items.md);
-        # the merged bundle is +1.
-        entity = self._wearing_grace(armor="saintess_vestments")
+        rule = RULES["saintess_vestment_grace"]
+        entity = self._wearing_grace(armor=rule.when["equipment_worn"])
         entity.sexual.pleasure.base = 40
-        self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": 1, "heal_gain": "+25%"}
+        self.assertIn(
+            "saintess_vestment_grace", dict(matched_combat_modifiers(entity))
         )
         entity.sexual.pleasure.base = 0
-        # Equipment defense -5 still applies without the grace.
-        self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": -5, "heal_gain": "+25%"}
+        self.assertNotIn(
+            "saintess_vestment_grace", dict(matched_combat_modifiers(entity))
         )
 
     def test_rule_holy_emblem_grace(self):
-        # 光輝聖徽 (radiant_holy_emblem) + arousal >= 高度 (60..84) →
-        # heal_gain +10% on top of the emblem's own +20%.
-        entity = self._wearing_grace(accessories=("radiant_holy_emblem",))
+        rule = RULES["holy_emblem_grace"]
+        entity = self._wearing_grace(accessories=(rule.when["equipment_worn"],))
         entity.sexual.pleasure.base = 60
-        bundle = evaluate_combat_modifiers(entity)
-        # Arousal 高度 also fires the high-arousal penalty row.
-        self.assertEqual(
-            bundle, {"heal_gain": "+30%", "agility": "-20%", "accuracy": -15}
-        )
+        self.assertIn("holy_emblem_grace", dict(matched_combat_modifiers(entity)))
         entity.sexual.pleasure.base = 0
-        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+20%"})
+        self.assertNotIn("holy_emblem_grace", dict(matched_combat_modifiers(entity)))
 
     def test_rule_pilgrim_medallion_grace(self):
-        # 朝聖者銅符 (pilgrim_medallion) + arousal >= 微興奮 (15..34) → defense +2.
-        entity = self._wearing_grace(accessories=("pilgrim_medallion",))
+        rule = RULES["pilgrim_medallion_grace"]
+        entity = self._wearing_grace(accessories=(rule.when["equipment_worn"],))
         entity.sexual.pleasure.base = 15
-        self.assertEqual(
-            evaluate_combat_modifiers(entity), {"defense": 2, "heal_gain": "+5%"}
+        self.assertIn(
+            "pilgrim_medallion_grace", dict(matched_combat_modifiers(entity))
         )
         entity.sexual.pleasure.base = 0
-        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+5%"})
+        self.assertNotIn(
+            "pilgrim_medallion_grace", dict(matched_combat_modifiers(entity))
+        )
 
     def test_malformed_equipment_storage_fails_closed(self):
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        rule = RULES["dual_wield_style_atk_phys_bonus"]
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         for malformed in ("corrupt", None, ["left_blade", "right_blade"]):
             with self.subTest(malformed=malformed):
                 entity.db.equipment = malformed
@@ -375,121 +410,145 @@ class CombatModifierTests(EvenniaTestCase):
 
     def test_no_create_evaluation_matches_dual_wield_row_without_handler(self):
         entity = self._dual_wielding()
-        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        rule = RULES["dual_wield_style_atk_phys_bonus"]
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
 
         self.assertNotIn("equipment", vars(entity))
-        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"atk_phys": 5})
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), rule.then)
         self.assertNotIn("equipment", vars(entity))
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_rows_do_not_match_without_ownership(self):
         entity = self._entity()
         self.assertEqual(evaluate_combat_modifiers(entity), {})
-        entity.db.skills = {"active": [], "passive": ["elf_longevity"]}
+        entity.db.skills = {"active": [], "passive": ["synthetic_unowned_passive"]}
         self.assertEqual(evaluate_combat_modifiers(entity), {})
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_condition_evaluates_against_owned_keys(self):
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        entity.db.skills = {"active": [], "passive": ["synthetic_owned_skill"]}
         self.assertTrue(
             evaluate_condition(
-                {"skill_owned": "defense_instinct"},
+                {"skill_owned": "synthetic_owned_skill"},
                 {"entity": entity},
             )
         )
         self.assertFalse(
             evaluate_condition(
-                {"skill_owned": "defense_instinct", "buff_active": "focus"},
-                {"entity": entity, "active_buffs": {"fear"}},
+                {"skill_owned": "synthetic_owned_skill", "buff_active": "synthetic_buff"},
+                {"entity": entity, "active_buffs": {"synthetic_other_buff"}},
             )
         )
-        self.assertFalse(evaluate_condition({"skill_owned": "defense_instinct"}, {}))
+        self.assertFalse(evaluate_condition({"skill_owned": "synthetic_owned_skill"}, {}))
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_condition_matches_a_conferred_grant(self):
         entity = self._entity()
         entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
+            ConferredSkillGrant("elosia", "synthetic_granted_skill", 0.5)
         ]
         self.assertTrue(
             evaluate_condition(
-                {"skill_owned": "defense_instinct"},
+                {"skill_owned": "synthetic_granted_skill"},
                 {"entity": entity},
             )
         )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_conferred_grant_scales_the_skill_owned_adjustment(self):
+        rule = RULES["defense_instinct_defense_bonus"]
+        key = rule.when["skill_owned"]
         entity = self._entity()
-        entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
-        ]
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 2.5})
+        entity.db.skill_grants = [ConferredSkillGrant("elosia", key, 0.5)]
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"defense": rule.then["defense"] * 0.5},
+        )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_conferred_grants_of_one_skill_sum_their_scaled_adjustments(self):
+        rule = RULES["defense_instinct_defense_bonus"]
+        key = rule.when["skill_owned"]
         entity = self._entity()
         entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "defense_instinct", 0.5),
-            ConferredSkillGrant("other", "defense_instinct", 0.25),
+            ConferredSkillGrant("elosia", key, 0.5),
+            ConferredSkillGrant("other", key, 0.25),
         ]
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 3.75})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"defense": rule.then["defense"] * 0.75},
+        )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_owned_skill_takes_the_full_adjustment_despite_a_grant(self):
+        rule = RULES["defense_instinct_defense_bonus"]
+        key = rule.when["skill_owned"]
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
-        ]
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 5})
+        entity.db.skills = {"active": [], "passive": [key]}
+        entity.db.skill_grants = [ConferredSkillGrant("elosia", key, 0.5)]
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_gate_type_grant_never_reaches_the_rule_table(self):
         entity = self._entity()
         entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "fire_mastery", 0.5)
+            ConferredSkillGrant("elosia", "synthetic_unruled_grant", 0.5)
         ]
         self.assertEqual(evaluate_combat_modifiers(entity), {})
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_zero_scale_grant_never_applies_the_full_adjustment(self):
+        rule = RULES["defense_instinct_defense_bonus"]
         entity = self._entity()
         entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "defense_instinct", 0.0)
+            ConferredSkillGrant("elosia", rule.when["skill_owned"], 0.0)
         ]
         self.assertEqual(evaluate_combat_modifiers(entity), {})
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_scaled_percentage_merges_with_other_percentage_adjustments(self):
+        boon = RULES["reincarnation_boon_yuka_agility_bonus"]
+        poison = RULES["poison_agility_penalty"]
+        # Percent strings merge additively: the shipped poison penalty plus
+        # half the rule's own percent bonus, recomputed from the table.
+        scaled = int(poison.then["agility"][:-1]) + int(boon.then["agility"][:-1]) * 0.5
         entity = self._entity()
         entity.db.skill_grants = [
-            ConferredSkillGrant("elosia", "reincarnation_boon_yuka", 0.5)
+            ConferredSkillGrant("elosia", boon.when["skill_owned"], 0.5)
         ]
         apply_buff(entity, "poisoned")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": "-7.5%"},
+            {"agility": f"{scaled}%"},
         )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_rows_merge_with_buff_and_sexual_origin_rows(self):
+        rule = RULES["defense_instinct_defense_bonus"]
+        poison = RULES["poison_agility_penalty"]
+        arousal = RULES["high_arousal_agility_accuracy_penalty"]
+        merged_agility = int(poison.then["agility"][:-1]) + int(
+            arousal.then["agility"][:-1]
+        )
         entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        entity.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         apply_buff(entity, "poisoned")
         entity.sexual.pleasure.base = 60
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": "-30%", "accuracy": -15, "defense": 5},
+            {
+                "agility": f"{merged_agility}%",
+                "accuracy": arousal.then["accuracy"],
+                "defense": rule.then["defense"],
+            },
         )
 
     @covers_requirement("combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment")
     def test_explicit_custom_context_still_matches_skill_owned_rows(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        entity = self._owning("defense_instinct_defense_bonus")
         from world.rules.combat_modifiers import matched_combat_modifiers
 
         matches = dict(matched_combat_modifiers(entity, context={"active_buffs": set()}))
@@ -497,9 +556,11 @@ class CombatModifierTests(EvenniaTestCase):
 
     @covers_requirement("combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment")
     def test_no_create_evaluation_matches_skill_owned_rows(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"defense": 5})
+        entity = self._owning("defense_instinct_defense_bonus")
+        self.assertEqual(
+            evaluate_combat_modifiers_no_create(entity),
+            RULES["defense_instinct_defense_bonus"].then,
+        )
         self.assertIsNone(entity.attributes.get("sexual_traits", category="traits"))
 
     @covers_requirement("combat-modifier-table::evaluate-combat-modifiers-is-a-pure-query-that-never-writes-to-entity-state")
@@ -580,10 +641,10 @@ class CombatModifierTests(EvenniaTestCase):
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
     def test_rule_priestly_grace_recovery_scale(self):
-        entity = self._entity()
-        entity.db.skills = {"active": [], "passive": ["priestly_grace"]}
+        entity = self._owning("priestly_grace_recovery_scale")
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"recovery_arousal_scale": 0.1}
+            evaluate_combat_modifiers(entity),
+            RULES["priestly_grace_recovery_scale"].then,
         )
 
     def test_rule_light_blessing_defense_bonus(self):
@@ -665,7 +726,9 @@ class CombatModifierTests(EvenniaTestCase):
 
     def test_rule_ice_prison_locks_actions(self):
         entity = self._entity()
-        apply_buff(entity, "ice_prison")
+        # The buff key is derived from the rule row so the test binds the
+        # rule to whatever buff it actually names, without echoing the key.
+        apply_buff(entity, RULES["ice_prison_locks_actions"].when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
     def test_rule_ice_slow_agility_penalty(self):
@@ -743,28 +806,3 @@ class ApplyCostModifierTests(unittest.TestCase):
     def test_floor_not_truncation_on_fractional_product(self):
         self.assertEqual(apply_cost_modifier(10, "-5%"), 9)
         self.assertEqual(apply_cost_modifier(9, "-10%"), 8)
-
-
-class ChurchGraceDoctrineTests(unittest.TestCase):
-    """光明教會 doctrine content claim (以坦露為聖、恩賜為正).
-
-    Relocated from the worn-grace behavior suite: the grace set being a
-    blessing, not a curse, is a claim about the SHIPPED rows.
-    """
-
-    GRACE_RULE_IDS = (
-        "sister_vestment_grace",
-        "saintess_vestment_grace",
-        "holy_emblem_grace",
-        "pilgrim_medallion_grace",
-    )
-
-    def test_grace_adjustments_carry_no_negative_church_values(self):
-        for rule in RULES.values():
-            if rule.id not in self.GRACE_RULE_IDS:
-                continue
-            for key, value in rule.then.items():
-                if isinstance(value, int):
-                    self.assertGreaterEqual(value, 0, (rule.id, key))
-                elif isinstance(value, str) and value.endswith("%"):
-                    self.assertGreaterEqual(int(value[:-1]), 0, (rule.id, key))

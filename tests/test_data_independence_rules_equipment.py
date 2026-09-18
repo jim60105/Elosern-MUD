@@ -7,10 +7,12 @@ ledger DEBT or CONTRACT exemption, and all must hold zero lint findings — so
 a future edit that reintroduces a shipped identifier cannot silently
 re-register debt. One manifest file's claims are pure shipped-content
 bindings: ``test_buffs.py`` is the buffs.yaml one-test-per-key correspondence
-owner, so it was converted atomically to a registered Data-contract file
-(mirroring the combat migration's ``test_combat_modifiers.py``); it must stay
-registered and must never re-enter debt. The other suites compute their
-expectations from runtime rule probes instead of pinned data.
+owner, so it was converted atomically to a registered Data-contract file; it
+must stay registered and must never re-enter debt. (The combat migration's
+``test_combat_modifiers.py`` was first registered the same way and has since
+been converted to a pure behavior suite deriving its expectations from the
+loaded rule table.) The other suites compute their expectations from runtime
+rule probes instead of pinned data.
 
 ``_equipment_rulebook_probes.py`` is the shared runtime-probe helper created
 by this migration (never seeded as debt); it joins the zero-findings set.
