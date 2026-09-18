@@ -71,11 +71,64 @@ def record_conferred_grant(
     skill_key: str,
     scale: float,
 ) -> None:
-    """Persist grant data after the resolver has validated the action."""
+    """Persist one grant, replacing any earlier grant for the same pair.
+
+    The store is keyed by ``(source_key, skill_key)``: a repeated conferral
+    refreshes the scale instead of appending a second row that would compound
+    the read-side multiplier, while grants from other sources for the same
+    skill are preserved. Existing rows keep their relative order so the
+    stored representation stays deterministic.
+    """
     validate_conferrable_skill(skill_key)
     grants = list(entity.db.skill_grants or [])
-    grants.append(ConferredSkillGrant(source_key, skill_key, scale))
+    identity = (source_key, skill_key)
+    for index, grant in enumerate(grants):
+        if (grant.source_key, grant.skill_key) == identity:
+            grants[index] = ConferredSkillGrant(source_key, skill_key, scale)
+            break
+    else:
+        grants.append(ConferredSkillGrant(source_key, skill_key, scale))
     entity.db.skill_grants = grants
+
+
+def validate_source_owns_skill(actor: Any, skill_key: str) -> None:
+    """Reject conferral of a skill the source does not directly own.
+
+    Raises ``RejectedAction(EFFECT_RESOLUTION_FAILED)`` when ``skill_key``
+    is absent from the actor's directly owned keys, so a conferred grant
+    can never exceed — or be chained onward from — what its source holds.
+    """
+    from world.rules.action import RejectReason, RejectedAction
+
+    if skill_key not in actor.skills.owned_keys():
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            f"source does not directly own skill {skill_key!r}",
+        )
+
+
+def derive_conferrable_skills(actor: Any) -> list[str]:
+    """Derive the conferred set from the actor's direct ownership.
+
+    One key per skill the actor directly owns that passes the conferrability
+    shape validation, in owned order. The set is derived, never chosen: no
+    caller names a skill, and ownership is read from ``owned_keys()`` only —
+    the predicate ``_step1_ownership`` trusts — so a skill held merely as a
+    conferred grant can never be re-conferred onward. The ownership
+    precondition is enforced per candidate where the actor exists, keeping
+    the whole conferral contract readable in this module.
+    """
+    from world.rules.action import RejectedAction
+
+    conferrable: list[str] = []
+    for skill_key in actor.skills.owned_keys():
+        try:
+            validate_conferrable_skill(skill_key)
+        except RejectedAction:
+            continue
+        validate_source_owns_skill(actor, skill_key)
+        conferrable.append(skill_key)
+    return conferrable
 
 
 def apply_disguise_effect(entity: Any, overrides: dict[str, int]) -> None:

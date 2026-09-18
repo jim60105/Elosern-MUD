@@ -24,6 +24,7 @@ from world.rules.action import (
     RejectedAction,
     _EFFECT_HANDLERS,
     _EFFECT_HANDLER_REQUIRED_CONTEXT,
+    _conferral_empty_set_failure,
     _effect_prefix,
     _step1_divine_arts_gate,
     _stored_trait_value,
@@ -180,6 +181,9 @@ def _skill_wide_failure(
                 RejectReason.MISSING_EFFECT_CONTEXT,
                 f"missing event_context key {sorted(missing)[0]!r}",
             )
+    failure = _conferral_empty_set_failure(actor, skill)
+    if failure is not None:
+        return failure
     seconds = SKILL_TIME_OVERRIDES.get(skill.key, DEFAULT_CAST_SECONDS)
     if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 0:
         return RejectReason.TIME_COST_LOOKUP_FAILED, f"{skill.key}: {seconds!r}"

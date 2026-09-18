@@ -55,8 +55,8 @@ from world.rules.sexual_act_effects import (
 )
 from world.rules.skill_effects import (
     apply_disguise_effect,
+    derive_conferrable_skills,
     record_conferred_grant,
-    validate_conferrable_skill,
 )
 from world.rules.targeting import (
     ActionContext,
@@ -516,6 +516,47 @@ def _require_context(context: dict[str, Any], prefix: str) -> dict[str, Any]:
     return {key: context[key] for key in declared}
 
 
+# Shared rejection detail so preflight, the preview, and the handler report
+# the identical reason and wording for a conferral that derives nothing.
+_CONFERRAL_EMPTY_SET_DETAIL = (
+    "conferral derives no conferrable skill owned by the caster"
+)
+
+
+def _occurrence_scale(context: dict[str, Any]) -> float:
+    """Return the occurrence's declared scale (its ``EffectPolicy.coefficient``).
+
+    The resolution pipeline binds the occurrence's own policy into the
+    reserved ``resolved_effect`` context key; a direct caller without a
+    bound policy falls back to the identity scale so the handlers stay
+    deterministic outside the pipeline too.
+    """
+    resolved = context.get("resolved_effect")
+    policy = resolved.policy if resolved is not None else None
+    return float(policy.coefficient) if policy is not None else 1.0
+
+
+def _conferral_empty_set_failure(
+    actor: Any,
+    skill: SkillDef,
+) -> tuple[RejectReason, str] | None:
+    """Return the skill-wide conferral rejection ``(reason, detail)`` or ``None``.
+
+    A conferral skill whose caster directly owns nothing conferrable can
+    never resolve a grant, so preflight and the shared preview reject it
+    with the same ``EFFECT_RESOLUTION_FAILED`` the handler raises — the
+    preview never advertises a cast the resolver would reject.
+    """
+    if not any(
+        _effect_prefix(effect_id) == "confer_skill_partial"
+        for effect_id in skill.effects
+    ):
+        return None
+    if derive_conferrable_skills(actor):
+        return None
+    return RejectReason.EFFECT_RESOLUTION_FAILED, _CONFERRAL_EMPTY_SET_DETAIL
+
+
 def _handle_confer_skill_partial(
     actor: Any,
     targets: list[Any],
@@ -524,24 +565,26 @@ def _handle_confer_skill_partial(
     scale: float,
 ) -> list[PendingEffect]:
     del scale
-    values = _require_context(context, "confer_skill_partial")
-    skill_key = values["confer_skill_key"]
-    scale = values["confer_scale"]
-    validate_conferrable_skill(skill_key)
+    conferrable = derive_conferrable_skills(actor)
+    if not conferrable:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            _CONFERRAL_EMPTY_SET_DETAIL,
+        )
+    coefficient = _occurrence_scale(context)
     target = targets[0]
     source_key = _entity_key(actor)
     return [
         PendingEffect(
             target,
-            f"skill_granted|{_entity_key(target)}|{skill_key}|{scale}",
+            f"skill_granted|{_entity_key(target)}|{skill_key}|{coefficient}",
             frozenset(),
-            lambda: record_conferred_grant(
-                target,
-                source_key,
-                skill_key,
-                float(scale),
+            lambda target=target, source_key=source_key, skill_key=skill_key,
+            coefficient=coefficient: record_conferred_grant(
+                target, source_key, skill_key, coefficient
             ),
         )
+        for skill_key in conferrable
     ]
 
 
@@ -814,8 +857,7 @@ def _handle_confer_growth_rate(
     scale: float,
 ) -> list[PendingEffect]:
     del scale
-    values = _require_context(context, "confer_growth_rate")
-    scale = values["confer_scale"]
+    coefficient = _occurrence_scale(context)
     target = targets[0]
     source_key = _entity_key(actor)
     return [
@@ -823,10 +865,9 @@ def _handle_confer_growth_rate(
             target,
             f"buff_applied|{_entity_key(target)}|conferred_growth_rate",
             frozenset(),
-            lambda: grant_conferred_growth_rate(
-                target,
-                source_key,
-                float(scale),
+            lambda target=target, source_key=source_key,
+            coefficient=coefficient: grant_conferred_growth_rate(
+                target, source_key, coefficient
             ),
         )
     ]
@@ -1539,7 +1580,7 @@ register_effect_handler(
     "confer_skill_partial",
     _handle_confer_skill_partial,
     frozenset({"skill_grants"}),
-    requires_event_context=frozenset({"confer_skill_key", "confer_scale"}),
+    requires_event_context=frozenset(),
 )
 register_effect_handler(
     "set_disguise",
@@ -1563,7 +1604,7 @@ register_effect_handler(
     "confer_growth_rate",
     _handle_confer_growth_rate,
     frozenset({"buffs"}),
-    requires_event_context=frozenset({"confer_scale"}),
+    requires_event_context=frozenset(),
 )
 register_effect_handler(
     "sexual_event",
@@ -2928,6 +2969,9 @@ class ActionResolver:
                         RejectReason.MISSING_EFFECT_CONTEXT,
                         f"missing event_context key {sorted(missing)[0]!r}",
                     )
+                failure = _conferral_empty_set_failure(request.actor, skill)
+                if failure is not None:
+                    raise RejectedAction(failure[0], failure[1])
             plan_effect_audiences(request.actor, request.context, skill, targets)
             _step8_time_cost(request, skill)
         except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
