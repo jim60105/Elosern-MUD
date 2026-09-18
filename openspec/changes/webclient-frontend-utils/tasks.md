@@ -6,7 +6,7 @@
 
 ## 1. Condition label util
 
-- [ ] 1.1 Create `web/webclient-app/lib/condition-label.js` exporting
+- [ ] 1.1 Create `web/webclient-app/lib/condition_label.js` exporting
   `conditionLabel(condition)` — byte-identical body of `ConditionChips.vue:50-62` (zh-TW
   `剩 ${...} 秒` and `，` join preserved).
 - [ ] 1.2 Replace `ConditionChips.vue::chipName` (lines 50-62) and
@@ -24,7 +24,7 @@
 
 ## 2. Narrative line util
 
-- [ ] 2.1 Create `web/webclient-app/lib/narrative-line-nodes.js` exporting
+- [ ] 2.1 Create `web/webclient-app/lib/narrative_line_nodes.js` exporting
   `lineText(line)` and `narrativeLineNodes(line, index)` per design D2 (imports `h` from vue,
   `NarrativeMarkup` from `./narrative_markup.js`, `renderNarrativeTokens` from
   `../components/narrative-renderer.js`; `BOX_DRAWING = /[\u2500-\u257f]/` once).

@@ -59,10 +59,20 @@
   variant-a override in `test_browser_action_feedback.py` and `test_browser_creation.py`
   (the two whose order reads `server` before `super().tearDown()`). Delete the two
   `_wait_command_field_released` copies (`test_browser_input_narrative.py:60`,
-  `test_browser_shell.py:46`) importing the harness function. Verify by running one cheap
-  class from two converted files (never the whole browser suite):
-  `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.tests.browser.test_browser_wait_helper`
-  (harness self-test) and one converted journey class, e.g.
+  `test_browser_shell.py:46`) importing the harness function.
+  NOTE: `web/tests/browser/test_browser_wait_helper.py` tests the UNRELATED
+  `wait_for_store_state` helper (`browser_helpers.py`) and never touches
+  `wait_command_field_released` or `ManagedServerTearDownMixin` — running it proves nothing
+  about 3.1 and must not be cited as coverage. Verification instead: (1) a small new
+  plain-`unittest` self-test INSIDE `harness.py`'s owning module is not possible (browser
+  budget), so add one cheap non-browser test module `web/tests/browser/test_harness_mixins.py`
+  — a NON-browser `unittest.TestCase` that drives `ManagedServerTearDownMixin.tearDown` with a
+  `Mock()` server and drives `wait_command_field_released` against a fake page object (same
+  fake-locator pattern as `test_browser_wait_helper.py` uses for `wait_for_store_state`);
+  register nothing in the shard manifest (browser package `web.tests.browser` is already a
+  label — check first whether a new non-journey module under it must be listed; if the shard
+  contract sweeps `web/tests/browser/`, add the label in the same commit as AGENTS.md
+  requires); and (2) one converted journey class, e.g.
   `... web.tests.browser.test_browser_synth_journey.<OneCheapClass>` — pick the smallest
   existing class in that file.
 

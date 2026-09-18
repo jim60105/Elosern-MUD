@@ -23,10 +23,12 @@
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.art.tests.test_worker` and
   `... world.art.tests.test_sd_worker`.
 - [ ] 1.3 `web/art_media.py`: delete `_store_root`/`_resolved_under_root` (lines 68-80); the
-  gallery branch at 173-176 becomes `resolved = resolved_under_store_root(identity)` (the
-  manual `target.is_symlink()` 404 at 174 is subsumed by the strict helper — delete it);
-  defaults/gallery branches already use `resolved_under_root`/`resolved_under_store_root`,
-  leave them. Keep the module import line tidy (the names are already imported at line 27).
+  PLAIN committed-record fallback branch at 173-176 inside `art_media()` (NOT `_serve_gallery`,
+  which at 125-131 already routes through `resolved_under_store_root`) becomes
+  `resolved = resolved_under_store_root(identity)` (the manual `target.is_symlink()` 404 at 174
+  is subsumed by the strict helper — delete it); defaults/gallery branches already use
+  `resolved_under_root`/`resolved_under_store_root`, leave them. Keep the module import line
+  tidy (the names are already imported at line 27).
   Verify: `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_art_media`.
 - [ ] 1.4 Security-regression pin: confirm `world/art/tests/test_gallery.py`'s symlink/NUL
   cases (lines ~131-179) pass untouched, and run

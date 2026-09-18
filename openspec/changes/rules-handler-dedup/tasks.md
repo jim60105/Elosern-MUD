@@ -25,14 +25,18 @@
   `stage_buff_pending(target, key, kwargs, definition, frozenset())`. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_buffs` and
   `... world.rules.tests.test_effect_handlers`.
-- [ ] 1.3 Rewrite `_handle_self_buff_apply` (790-899) with `id_fallback=False`,
+- [ ] 1.3 Rewrite `_handle_self_buff_apply` (790-901) with `id_fallback=False`,
   `stage_buff_pending(actor, key, kwargs, definition, frozenset({"buffs"}))`, and the
   `self_buff_applied|` tag. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_sexual_event_self_arming`
   (self-arming exercises the self-buff route),
   `... world.rules.tests.test_cmd_cast`, `... world.rules.tests.test_stateful_spells`.
-- [ ] 1.4 Review checkpoint: `git diff` shows the ONLY behavioral difference between the two
-  handlers is the `id_fallback` and `effect_set` arguments plus the tag prefix.
+- [ ] 1.4 Review checkpoint: `git diff` shows the ONLY behavioral differences between the two
+  handlers are (a) kwargs seeding — buff passes `source_kwargs=context.get("buff_kwargs", {})`
+  while self-buff seeds empty and must NEVER read `buff_kwargs` (design D2 item 1; the
+  attribution-spoofing tests `test_effect_handlers.py::test_caller_supplied_source_pk_cannot_override_attribution`
+  and `test_erosion_leech.py` are the proof), (b) `id_fallback`, (c) `effect_set`, plus the tag
+  prefix. Any diff beyond those four is a defect.
 
 ## 2. Sexual event family
 

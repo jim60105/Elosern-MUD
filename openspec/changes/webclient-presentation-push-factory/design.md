@@ -44,8 +44,9 @@ the identity-based patch seam survives the move. Event ids are built as
 were chosen so the produced strings are byte-identical to the catalog strings
 (`party_push_watchers_failed`, `dialogue_push_failed`, ...). A unit test in
 `web/webclient/tests/test_panel_push_factory.py` (new file; covered by the
-`web.webclient.tests` shard label) pins the four produced id strings literally so a prefix
-typo can never silently mint a new event id.
+`web.webclient.tests` shard label) pins the six concrete strings the three trio prefixes
+produce (party/dialogue/lore_codex × `{prefix}_push_watchers_failed` / `{prefix}_push_failed`)
+literally, so a prefix typo can never silently mint a new event id.
 
 `art_push.py` stays as-is: its fan-out iterates `SESSION_HANDLER.get_sessions()` with a
 coordinator gate and subject-key filtering — structurally different, not a quadruplet member.

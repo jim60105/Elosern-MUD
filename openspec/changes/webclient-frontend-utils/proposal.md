@@ -17,11 +17,11 @@ defensive-panel-read boilerplate:
 
 ## What Changes
 
-- New `web/webclient-app/lib/condition-label.js` exporting `conditionLabel(condition)` — the
+- New `web/webclient-app/lib/condition_label.js` exporting `conditionLabel(condition)` — the
   single copy of the label rule; both components import it (each keeps its local `chipName` /
   `conditionName` as one-line delegates so template usage and any test introspection stay
   unchanged).
-- New `web/webclient-app/lib/narrative-line-nodes.js` exporting `lineText(line)` and
+- New `web/webclient-app/lib/narrative_line_nodes.js` exporting `lineText(line)` and
   `narrativeLineNodes(line, index)` (imports `h` from vue, `NarrativeMarkup` from
   `./narrative_markup.js`, `renderNarrativeTokens` from `../components/narrative-renderer.js`
   — the same pipeline both components already import); both components delete their local
@@ -48,8 +48,8 @@ requirements; no command surface, no Python, no protocol touched.
 ## Impact
 
 `web/webclient-app/components/{ConditionChips,CharacterStatusDrawer,FullLogOverlay,NarrativeFeed}.vue`,
-`web/webclient-app/stores/elosern.js`; new `lib/condition-label.js`,
-`lib/narrative-line-nodes.js`, plus two small Vitest files. The Vitest suite and the Vite
+`web/webclient-app/stores/elosern.js`; new `lib/condition_label.js`,
+`lib/narrative_line_nodes.js`, plus two small Vitest files. The Vitest suite and the Vite
 build inputs change; `pnpm run build` and the showcase fingerprint inputs follow
 automatically (CI-owned builds). `.github/evennia-shards.json` untouched.
 

@@ -72,9 +72,12 @@ The six copies differ only in docstring; the union SQL body moves to
 one-line delegate (call sites inside those classes are dense; a rename churns dozens of
 assertions for nothing). `world/tests/` is inside the `world` shard prefix — but the new
 module is not named `test_*`, so the ownership contract's test-module scan (which discovers
-via unittest loading of manifest labels, i.e. `world.rules.tests`-style labels) never sees it
-as an owned test module; `world.tests` is not a manifest label and stays that way (verify by
-running the optimization contract test).
+via unittest loading of manifest labels) never sees it as an owned test module. `world.tests`
+IS already a manifest label (shard 6 `webclient-actions`, `.github/evennia-shards.json:229`),
+but the contract resolves package labels via `rglob("test*.py")`
+(`tests/test_evennia_test_optimization_contract.py:30-35`) — a non-`test_*` helper stays
+outside the sweep exactly like the existing `world/tests/synthetic_data.py` (verify by running
+the optimization contract test).
 
 ## Risks / Trade-offs
 

@@ -7,7 +7,7 @@ evidence gates (component coverage is by file, not internals).
 
 ## Decisions
 
-### D1 — `lib/condition-label.js::conditionLabel(condition)`; components keep thin delegates
+### D1 — `lib/condition_label.js::conditionLabel(condition)`; components keep thin delegates
 
 ```js
 export function conditionLabel(condition) {
@@ -28,7 +28,7 @@ Byte-identical body incl. zh-TW literals. `ConditionChips.vue` keeps
 `const conditionName = conditionLabel;` — template bindings (`chipName(condition)`,
 `conditionName(condition)`) and any `wrapper.vm` introspection stay intact.
 
-### D2 — `lib/narrative-line-nodes.js` owns the line→vnode pipeline
+### D2 — `lib/narrative_line_nodes.js` owns the line→vnode pipeline
 
 `narrativeLineNodes(h, line, index)` takes `h` as a parameter (the util stays Vue-import-free
 except types, matching how `narrative-renderer.js` receives vnodes) — or imports `h` itself;

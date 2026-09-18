@@ -21,11 +21,24 @@ with zero seam risk.
 
 ### D2 — The buff/self-buff difference is an explicit parameter
 
-The recovery-policy block differs in exactly one branch: `_handle_buff_apply` falls back to
-`kwargs["source_pk"] = int(actor.id)` when `pk` is not a positive int,
-`_handle_self_buff_apply` does not. `recovery_snapshot_kwargs(..., id_fallback: bool)` carries
-that choice (`True` for buff, `False` for self-buff) — an accidental unification is visible in
-one diff line instead of being silent. Likewise the equipment-immunity staging moves to
+The two handlers differ in exactly TWO load-bearing places, both preserved as parameters,
+never silently unified:
+
+1. **kwargs seeding.** `_handle_buff_apply` seeds `kwargs = dict(context.get("buff_kwargs", {}))`
+   (`action.py:684`) — the caller-supplied attribution channel, exercised by
+   `test_effect_handlers.py::test_caller_supplied_source_pk_cannot_override_attribution` and
+   `test_erosion_leech.py` — while `_handle_self_buff_apply` seeds `kwargs = {}`
+   (`action.py:815`) and NEVER reads `context["buff_kwargs"]`. The shared helper takes a
+   `source_kwargs: Mapping | None` parameter (buff passes `context.get("buff_kwargs", {})`,
+   self-buff passes nothing); a naive merge that lets self-buff read `buff_kwargs` would open
+   the exact attribution-spoofing seam the named tests defend.
+2. **recovery-policy fallback.** `_handle_buff_apply` falls back to
+   `kwargs["source_pk"] = int(actor.id)` when `pk` is not a positive int,
+   `_handle_self_buff_apply` does not. `recovery_snapshot_kwargs(..., id_fallback: bool)` carries
+   that choice (`True` for buff, `False` for self-buff).
+
+An accidental unification of either is visible in one diff line instead of being silent.
+Likewise the equipment-immunity staging moves to
 `stage_buff_pending(target, key, kwargs, definition)` which returns the neutralized
 `PendingEffect` or the real one; self-buff calls it with `actor` as target, keeping its
 `frozenset({"buffs"})` tag set by a parameter too (`effect_set`).
@@ -66,16 +79,27 @@ stages `PendingEffect(target, tag(target), frozenset(), apply_for(target))` per 
 ### D5 — Economy: verb-parameterized parse + message table lookup
 
 ```python
-def _parse_trade_args(self, verb: str) -> tuple[str, int] | None:
-    # "" -> f"用法：{verb} <item_key> [數量]"; bad int -> "數量必須是正整數。"; returns None after msg
-def _trade_error_message(self, error, table, verb) -> str:  # .get(reason, f"{verb}失敗：{error}")
+def _parse_trade_args(self, usage_verb: str) -> tuple[str, int] | None:
+    # "" -> f"用法：{usage_verb} <item_key> [數量]"; bad int -> "數量必須是正整數。"; returns None after msg
+def _trade_error_message(self, error, table, fallback_verb_zh: str) -> str:
+    # .get(reason, f"{fallback_verb_zh}失敗：{error}")
 ```
 
-`CmdBuy` passes `("buy", BUY_TABLE)`; `CmdSell` passes `("sell", SELL_TABLE)`; tables are the
-exact current dict literals moved to module constants. The success messages differ enough to
-stay inline. `test_command_branch_behaviour.py` patches `commands.economy.buy` /
-`.sell` module globals — tables/parse keep resolving from `commands.economy` globals
-unchanged.
+TWO distinct verb-like arguments, never one: the usage line embeds the ENGLISH verb
+(`f"用法：buy <item_key> [數量]"`, `commands/economy.py:98`; sell at :144) while the
+off-table fallback message is CHINESE (`f"購買失敗：{error}"`, `:119`; sell
+`f"販賣失敗：{error}"`, `:165`). A single shared `verb` parameter would ship
+`"buy失敗：…"` — a player-visible text regression with NO existing test pinning the fallback
+string (`test_command_branch_behaviour.py` exercises only table-covered reasons). So `CmdBuy`
+passes `usage_verb="buy"`, `fallback_verb_zh="購買"`, `BUY_ERROR_MESSAGES`; `CmdSell` passes
+`usage_verb="sell"`, `fallback_verb_zh="販賣"`, `SELL_ERROR_MESSAGES`. Tables are the exact
+current dict literals moved to module constants. The success messages differ enough to stay
+inline. `test_command_branch_behaviour.py` patches `commands.economy.buy` / `.sell` module
+globals — tables/parse keep resolving from `commands.economy` globals unchanged.
+
+Regression pin: add one assertion to the EXISTING off-table-reason path test (or one new
+subTest in `test_command_branch_behaviour.py`) pinning the exact fallback bytes
+`購買失敗：` / `販賣失敗：` so the extraction cannot silently recombine the verbs.
 
 ## Risks / Trade-offs
 

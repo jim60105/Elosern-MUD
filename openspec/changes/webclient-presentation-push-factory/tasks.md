@@ -39,13 +39,14 @@
   `lore_codex_push.py` (`("lore_codex", "lore_codex")`). Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_dialogue_panel` and
   `... web.webclient.presentation.tests.test_lore_codex_panel`.
-- [ ] 1.4 Leave `art_push.py` on its own signal-subscriber path (it fans out over
-  SESSION_HANDLER sessions with a coordinator, not watchers_for — NOT one of the identical
-  quadruplets), but do not duplicate any new shared code it doesn't need. Verify:
+- [ ] 1.4 Leave `art_push.py` untouched on its own signal-subscriber path (it fans out over
+  SESSION_HANDLER sessions with a coordinator, not watchers_for — NOT a member of the identical
+  trio), but do not duplicate any new shared code it doesn't need. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_art_push`.
 - [ ] 1.5 Diff-check the extracted trio: `git diff` must show the three shells containing no
-  remaining fan-out logic and the factory containing exactly one copy; confirm the four
-  event-id strings appear exactly once each in `push.py` template usage and nowhere else new
+  remaining fan-out logic and the factory containing exactly one copy; confirm the six
+  produced event-id strings (party/dialogue/lore_codex × two event templates) are generated
+  only via the factory prefix and no literal `{prefix}_push*` string survives in any shell
   (grep `party_push_failed|dialogue_push_failed|lore_codex_push_watchers_failed` etc.).
 
 ## 2. Creation validators

@@ -47,10 +47,23 @@ is part of the R2 lint contract, and losing it turns the file into a lint violat
 clock's own call site passes `stage="advance_registry_attribute"`. The event id
 (`rollback_restore_failed`) and every context key except the `stage` value stay identical.
 
+The public name stays `_restore_registry_attribute` (underscore kept). `world/rules/tests/
+test_rules_observability.py:89` imports `world.rules.clock._restore_registry_attribute` and
+calls it positionally with four arguments — a rename to drop the underscore would silently
+break that import, and the change owns no test edits for it. `cast_settlement` importing the
+private name is acceptable (same-package rollback helper); keep the underscore, add the
+keyword-only `stage` parameter after the existing four positional parameters so the existing
+4-arg call in `test_rules_observability.py:95` keeps resolving — `stage` therefore gets the
+default `"advance_registry_attribute"` (the clock-side tag, which is the path that test
+exercises). Both production call sites pass `stage` explicitly; the default exists only for
+the existing test call, and task 2.3's pinned assertions cover the real tags.
+
 ## Risks / Trade-offs
 
 - Placing the money rule in its own module adds a fourth state-reading module to
   `world/rules/`; acceptable because the alternative is two authoritative copies of the
   integer-copper refusal on the single-writer boundary.
 - A `stage` parameter could be passed wrong; the focused tests
-  (`test_cast_settlement`, `test_clock`) assert the logged context and pin both strings.
+  do NOT today pin the stage values (no test references `cast_registry_attribute` or
+  `advance_registry_attribute`), which is why task 2.3 adds one stage-tag assertion per call
+  site in the EXISTING rollback-failure tests before the extraction is trusted.

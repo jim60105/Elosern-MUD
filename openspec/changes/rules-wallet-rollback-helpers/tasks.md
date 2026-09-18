@@ -30,12 +30,13 @@
 ## 2. Rollback restore helper
 
 - [ ] 2.1 In `world/rules/clock.py`, generalize `_restore_registry_attribute` to accept a
-  keyword-only `stage: str` used in the `rollback_restore_failed` context dict; keep the
-  `# observability: ignore R2: cache invalidation is best-effort; ...` comment verbatim on
-  the inner `except`. Update the clock call site (`clock.py:554`) to pass
-  `stage="advance_registry_attribute"`. Rename to `restore_registry_attribute` (drop the
-  leading underscore only if `cast_settlement.py` — the new importer — is the sole external
-  caller; verify with grep).
+  keyword-only `stage: str = "advance_registry_attribute"` used in the `rollback_restore_failed`
+  context dict; keep the `# observability: ignore R2: cache invalidation is best-effort; ...`
+  comment verbatim on the inner `except`. Update the clock call site (`clock.py:554`) to pass
+  `stage="advance_registry_attribute"` explicitly. Do NOT rename the function:
+  `world/rules/tests/test_rules_observability.py:89,95` imports
+  `world.rules.clock._restore_registry_attribute` and calls it with four positional args — the
+  keyword-only default keeps that call live; a rename would break it.
 - [ ] 2.2 In `world/rules/cast_settlement.py`, replace the body of
   `_restore_attribute_direct` (lines 203-238) with a delegate to the clock helper passing
   `stage="cast_registry_attribute"`; delete the duplicated try/except. Verify:

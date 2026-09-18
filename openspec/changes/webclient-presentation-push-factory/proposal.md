@@ -2,12 +2,14 @@
 
 Three production-utility duplications in the webclient presentation layer are drifting toward divergence:
 
-- The four panel-push modules (`presentation/party_push.py`, `dialogue_push.py`,
-  `lore_codex_push.py`, `art_push.py`) are ~50 lines × 4, line-identical except the panel
-  key and the log-event strings (`party_push_watchers_failed` / `party_push_failed` and
-  siblings). Any fix to the fan-out discipline (epoch guarding, per-session failure
-  isolation, the registry-construction degrade path) must currently be applied four times
-  and one of the four is always forgotten.
+- The three identical panel-push modules (`presentation/party_push.py`, `dialogue_push.py`,
+  `lore_codex_push.py`) are ~50 lines × 3, line-identical except the panel key and the
+  log-event strings (`party_push_watchers_failed` / `party_push_failed` and siblings). Any
+  fix to the fan-out discipline (epoch guarding, per-session failure isolation, the
+  registry-construction degrade path) must currently be applied three times and one of the
+  three is always forgotten. `art_push.py` is a fourth push module but not a member of this
+  trio: it fans out over `SESSION_HANDLER.get_sessions()` with a coordinator gate and
+  subject-key filtering (see design D1) and stays untouched.
 - The creation payload validators `_validate_background` and `_validate_affinity_elements`
   exist twice — `presentation/creation.py:427,459` and `actions/creation_actions.py:227,257`
   — and have **already diverged** (list vs tuple return, `ProtocolValidationError` vs
@@ -23,7 +25,7 @@ Three production-utility duplications in the webclient presentation layer are dr
 ## What Changes
 
 - New `web/webclient/presentation/push.py` with a `make_panel_pusher(panel_key, event_prefix)`
-  factory; the four `*_push.py` modules become thin shells calling it. Every log-event id
+  factory; the three trio-member `*_push.py` modules become thin shells calling it. Every log-event id
   stays **byte-identical** (catalog in
   `docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4); patch targets in
   existing tests (`patch.object(party_push, "log_warn")`, `patch("web.webclient.presentation.art_push.log_warn")`)

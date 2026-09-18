@@ -14,7 +14,12 @@ Two byte-identical duplications live in `world/rules/`, the single writer of gam
   `world/rules/clock.py:485 `_restore_registry_attribute``: identical try/except
   (direct `attributes.add`/`remove`, best-effort `reset_cache` fallback, `rollback_restore_failed`
   warn with a `stage` context tag); only the tag differs (`cast_registry_attribute` vs
-  `advance_registry_attribute`).
+  `advance_registry_attribute`). A third, RELATED copy exists —
+  `world/rules/surfaces.py:41 restore_attribute_best_effort` (stage `"attribute"`) — but it is
+  the DEEPCOPY variant (`restore_attribute` deepcopies the snapshot value), while these two
+  deliberately write the snapshot directly because registry surfaces embed live database
+  objects that `deepcopy` cannot copy. Folding it in would change behavior; it stays file-local
+  and is listed as a non-goal.
 
 ## What Changes
 
@@ -69,4 +74,8 @@ shard labels already cover the packages; `wallet.py` is a non-test module).
 - The sibling `clock.py::_restore_advance_location` / `cast_settlement.py` location-restore
   pair is similar but not byte-identical (different stage tags AND different re-fetch
   prose/events); leaving both file-local.
+- `world/rules/surfaces.py::restore_attribute_best_effort` stays file-local: it restores through
+  the deepcopy path (`restore_attribute`), which the registry pair deliberately avoids because
+  registry surfaces embed live DB objects. Same event id, different write discipline — merging
+  them would be a behavior change, not a dedup.
 - `world/rules/economy.py`'s own wallet arithmetic is the writer side; untouched here.
