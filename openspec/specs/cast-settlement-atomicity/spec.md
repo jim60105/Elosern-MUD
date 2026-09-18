@@ -7,7 +7,6 @@ surfaces.
 
 ## Requirements
 
-
 ### Requirement: Out-of-combat casts settle resolution and world-time cost in one outer transaction
 The out-of-combat cast command path SHALL route every cast that is not a field-combat initiation
 through
@@ -60,6 +59,12 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
   target
 - **THEN** the cast routes through `settle_out_of_combat_cast` and every snapshot, transaction, and
   command-time behaviour is identical to before this change
+
+#### Scenario: The settlement snapshot covers every ACTIVE out-of-combat catalog skill's effect entities
+- **WHEN** every ACTIVE catalog skill marked `usable_out_of_combat=True` is inspected
+- **THEN** each skill's effect handlers write only entities within the settlement's declared snapshot
+  superset — the actor, the request targets, and the merged advance registry — so no rolled-back cast can
+  leave an unsnapshotted write behind
 
 ### Requirement: A failed out-of-combat settlement restores every touched Evennia cache before the failure surfaces
 When the clock callback, the final clock persistence, or the outer commit fails after a successful

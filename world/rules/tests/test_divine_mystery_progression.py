@@ -181,7 +181,9 @@ class ProgressionConferralLadderTests(EvenniaTest):
 
     @covers_requirement(
         "skill-handler::conferral-records-a-data-scaled-grant-of-every-skill-"
-        "its-caster-owns-統御術"
+        "its-caster-owns-統御術",
+        "divine-mystery::divine-mystery-progression-composes-conferral-veil-"
+        "and-reveal-behavior",
     )
     def test_later_rung_confers_a_strictly_larger_effective_value(self):
         caster = self._caster(
@@ -222,7 +224,9 @@ class PartyAudienceConferralTests(EvenniaTest):
 
     @covers_requirement(
         "skill-effect-model::effect-audiences-select-recipients-without-"
-        "changing-skill-faction-constraints"
+        "changing-skill-faction-constraints",
+        "divine-mystery::divine-mystery-progression-composes-conferral-veil-"
+        "and-reveal-behavior",
     )
     def test_skill_partial_conferral_reaches_every_ally_in_the_audience(self):
         caster = self._member("t_shared_master")
@@ -249,7 +253,9 @@ class PartyAudienceConferralTests(EvenniaTest):
 
     @covers_requirement(
         "skill-effect-model::effect-audiences-select-recipients-without-"
-        "changing-skill-faction-constraints"
+        "changing-skill-faction-constraints",
+        "divine-mystery::divine-mystery-progression-composes-conferral-veil-"
+        "and-reveal-behavior",
     )
     def test_growth_rate_conferral_reaches_every_ally_in_the_audience(self):
         caster = self._member("t_growth_master")
@@ -332,7 +338,9 @@ class CapstoneGateTests(unittest.TestCase):
 
     @covers_requirement(
         "skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-"
-        "predicate"
+        "predicate",
+        "divine-mystery::divine-mystery-progression-composes-conferral-veil-"
+        "and-reveal-behavior",
     )
     def test_three_parent_capstone_waits_for_its_last_parent(self):
         level = SKILL_PROFICIENCY_XP_PER_LEVEL
@@ -349,7 +357,9 @@ class CapstoneGateTests(unittest.TestCase):
 
     @covers_requirement(
         "skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-"
-        "predicate"
+        "predicate",
+        "divine-mystery::divine-mystery-progression-composes-conferral-veil-"
+        "and-reveal-behavior",
     )
     def test_chain_root_is_usable_with_no_prerequisite(self):
         # The root declares no edge and the entity owns no descendant: the

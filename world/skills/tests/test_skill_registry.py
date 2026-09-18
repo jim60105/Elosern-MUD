@@ -569,8 +569,6 @@ class DivineMysteryFamilyInvariantTests(unittest.TestCase):
     labels — establishing the family boundary the redesigned lore mandates
     (docs/lore/skill-trees/divine-mystery.md section 0.1): zero resource
     cost, mandatory divine-blood gating, and no damage or healing effect.
-    The delta spec's cost and no-combat-verb scenarios receive their
-    traceability annotations when this change's specs archive.
     """
 
     def _members(self):
@@ -586,11 +584,17 @@ class DivineMysteryFamilyInvariantTests(unittest.TestCase):
             with self.subTest(skill=key):
                 self.assertTrue(skill.requires_divine_arts, key)
 
+    @covers_requirement(
+        "divine-mystery::the-divine-mystery-family-takes-no-element-verb-and-costs-nothing",
+    )
     def test_every_member_declares_an_empty_resource_cost(self):
         for key, skill in self._members():
             with self.subTest(skill=key):
                 self.assertEqual(skill.cost, {}, key)
 
+    @covers_requirement(
+        "divine-mystery::the-divine-mystery-family-takes-no-element-verb-and-costs-nothing",
+    )
     def test_no_member_declares_a_damage_or_healing_effect(self):
         # The family vocabulary is closed: conferral, revocation, veil and
         # reveal effects only — plus the retained inert flavor form (design
