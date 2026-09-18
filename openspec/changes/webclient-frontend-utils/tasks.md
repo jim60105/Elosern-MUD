@@ -24,26 +24,26 @@
 
 ## 2. Narrative line util
 
-- [ ] 2.1 Create `web/webclient-app/lib/narrative_line_nodes.js` exporting
+- [x] 2.1 Create `web/webclient-app/lib/narrative_line_nodes.js` exporting
   `lineText(line)` and `narrativeLineNodes(line, index)` per design D2 (imports `h` from vue,
   `NarrativeMarkup` from `./narrative_markup.js`, `renderNarrativeTokens` from
   `../components/narrative-renderer.js`; `BOX_DRAWING = /[\u2500-\u257f]/` once).
-- [ ] 2.2 Delete the local `BOX_DRAWING`/`lineText`/`lineNodes` copies in
+- [x] 2.2 Delete the local `BOX_DRAWING`/`lineText`/`lineNodes` copies in
   `FullLogOverlay.vue` (lines 82-120) and `NarrativeFeed.vue` (lines 70, 73-77, 146-178),
   importing the util instead; keep each component's design-note comment. Verify:
   `pnpm test -- tests/narrative_feed.test.js tests/full_log_overlay.test.js`
   (paths relative to `web/webclient-app/tests/`).
-- [ ] 2.3 Add `web/webclient-app/tests/narrative_line_nodes.test.js`: an `in` line at
+- [x] 2.3 Add `web/webclient-app/tests/narrative_line_nodes.test.js`: an `in` line at
   index 0 renders no divider, at index > 0 renders `narrative-divider` before the literal
   `.inp` line; a box-drawing line gets the `map-art` class; the escaped `BOX_DRAWING` form
   agrees with the literal-glyph form `/[─-╿]/` on both a `─` sample and a CJK sample
   (design D2's equivalence assertion). Verify: `pnpm test` (full Vitest suite green).
-- [ ] 2.4 Build gate: `pnpm run build` succeeds (new lib modules enter the Vite graph) and
+- [x] 2.4 Build gate: `pnpm run build` succeeds (new lib modules enter the Vite graph) and
   `pnpm run showcase-coverage` passes unchanged.
 
 ## 3. Store `readPanel` helper
 
-- [ ] 3.1 In `web/webclient-app/stores/elosern.js`, add the module-private
+- [x] 3.1 In `web/webclient-app/stores/elosern.js`, add the module-private
   `readPanel(rs, key)` per design D3 and replace the five
   `(rs.panels && rs.panels.<key>) || null` reads in `buildView`
   (`status`/vitals if it uses the same shape, `party`, `objectives`, `roster`,
