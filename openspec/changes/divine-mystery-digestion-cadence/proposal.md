@@ -10,7 +10,8 @@ brake — the 消化節拍 — and no divine-mystery catalog can land honestly w
 ## What Changes
 
 - Add a per-world-calendar-day accrual claim for ACTIVE skills in `SkillCategory.DIVINE_MYSTERY`: at
-  most one practice accrual per actor per skill per calendar day.
+  most one use-driven practice accrual per actor per skill per calendar day. The cadence governs
+  the per-use resolution pathway only; declared booked practice is not a use and is unchanged.
 - Scope the brake by **category**, never by `requires_divine_arts`. The 情慾秘術 divine line
   (`divine_sexual_arts`, the seven 神性 acts, `divine_sexual_mastery`) keeps its current accrual
   behavior byte-for-byte.
