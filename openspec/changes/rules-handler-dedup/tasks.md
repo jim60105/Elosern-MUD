@@ -12,7 +12,7 @@
 
 ## 1. Buff handler pair
 
-- [ ] 1.1 In `world/rules/action.py`, add file-local helpers per design D1/D2:
+- [x] 1.1 In `world/rules/action.py`, add file-local helpers per design D1/D2:
   `parse_effect_key`, `resolve_source_tier` (keeps the
   `# observability: ignore R2: nonspell or out-of-tier skill safely falls back to apprentice rung`
   comment verbatim at the moved `except Exception`),
@@ -20,18 +20,18 @@
   `stage_buff_pending(..., effect_set)`. Keep the deferred imports
   (`world.skills.cost_tiers.spell_tier_for`, `world.rules.combat_modifiers.evaluate_combat_modifiers`,
   `world.rules.stored_sexual_reads.stored_sexual_level`) deferred inside the helpers.
-- [ ] 1.2 Rewrite `_handle_buff_apply` (669-787) as the helper sequence with
+- [x] 1.2 Rewrite `_handle_buff_apply` (669-787) as the helper sequence with
   `id_fallback=True`, target iteration + per-target equipment-immunity via
   `stage_buff_pending(target, key, kwargs, definition, frozenset())`. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_buffs` and
   `... world.rules.tests.test_effect_handlers`.
-- [ ] 1.3 Rewrite `_handle_self_buff_apply` (790-901) with `id_fallback=False`,
+- [x] 1.3 Rewrite `_handle_self_buff_apply` (790-901) with `id_fallback=False`,
   `stage_buff_pending(actor, key, kwargs, definition, frozenset({"buffs"}))`, and the
   `self_buff_applied|` tag. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_sexual_event_self_arming`
   (self-arming exercises the self-buff route),
   `... world.rules.tests.test_cmd_cast`, `... world.rules.tests.test_stateful_spells`.
-- [ ] 1.4 Review checkpoint: `git diff` shows the ONLY behavioral differences between the two
+- [x] 1.4 Review checkpoint: `git diff` shows the ONLY behavioral differences between the two
   handlers are (a) kwargs seeding — buff passes `source_kwargs=context.get("buff_kwargs", {})`
   while self-buff seeds empty and must NEVER read `buff_kwargs` (design D2 item 1; the
   attribution-spoofing tests `test_effect_handlers.py::test_caller_supplied_source_pk_cannot_override_attribution`
