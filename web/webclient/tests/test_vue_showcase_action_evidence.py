@@ -38,7 +38,7 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
-from ._showcase_build import ensure_storybook_out, showcase_build_lock
+from ._showcase_build import ShowcaseEvidenceMixin, run_npm, run_node, showcase_build_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
@@ -75,40 +75,11 @@ ACTION_FAMILY_STORY_IDS = {
 }
 
 
-def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["npm", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["node", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-class VueShowcaseActionEvidenceTest(unittest.TestCase):
+class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the B2 action-dock family gates and assert each one passes."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        # The action family stories are registered in the static Storybook
-        # build; build it once per process when the checkout has none (CI
-        # workspaces only build the app dist). The shared fingerprint-guarded
-        # chain serializes against the B1 evidence class (which rebuilds the
-        # same .storybook-out in another parallel worker as its gate
-        # evidence) and rebuilds only on input-fingerprint mismatch.
-        with showcase_build_lock():
-            ensure_storybook_out()
+    #: The action-dock family stories live in the static Storybook build.
+    SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
         "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"

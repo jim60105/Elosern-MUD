@@ -35,12 +35,12 @@
 
 ## 2. Showcase evidence run_npm / build-lock boilerplate
 
-- [ ] 2.1 Add public `run_npm(args, timeout)` (and `run_node` if any file defines it
+- [x] 2.1 Add public `run_npm(args, timeout)` (and `run_node` if any file defines it
   separately — check `grep -n "def run_node" web/webclient/tests/`) to
   `web/webclient/tests/_showcase_build.py`, plus a shared `ShowcaseEvidenceMixin`
   (or `build_for(cls)` helper) wrapping the `showcase_build_lock()`/`ensure_app_dist()`
   `setUpClass` pattern.
-- [ ] 2.2 Delete the local `run_npm` defs and collapse `setUpClass` in the 7 evidence
+- [x] 2.2 Delete the local `run_npm` defs and collapse `setUpClass` in the 7 evidence
   modules (`test_vue_showcase_evidence.py`, `test_vue_store_evidence.py`,
   `test_vue_breakdown_evidence.py`, `test_vue_showcase_action_evidence.py`,
   `test_vue_showcase_data_evidence.py`, `test_vue_showcase_overlays_evidence.py`,

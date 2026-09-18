@@ -54,7 +54,13 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
-from ._showcase_build import ensure_app_dist, ensure_storybook_out, showcase_build_lock
+from ._showcase_build import (
+    ShowcaseEvidenceMixin,
+    ensure_storybook_out,
+    run_npm,
+    run_node,
+    showcase_build_lock,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
@@ -72,38 +78,8 @@ KNOWN_NON_REQUEST_URL_CONSTANTS = (
 )
 
 
-def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["npm", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["node", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-class VueShowcaseEvidenceTest(unittest.TestCase):
+class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the B1 showcase gates and assert each one passes."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        # The vite build wipes and repopulates dist while other parallel
-        # workers read it or copy it into the showcase, so it runs under the
-        # shared showcase build lock; the input fingerprint recorded in the
-        # output lets the other workers reuse a green build.
-        with showcase_build_lock():
-            ensure_app_dist()
 
     @covers_requirement(
         "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa"
