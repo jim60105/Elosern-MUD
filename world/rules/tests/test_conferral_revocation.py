@@ -164,6 +164,10 @@ class RevocationPrimitiveTests(EvenniaTest):
         return entity
 
     @covers_requirement(
+        "skill-handler::the-conferral-store-has-a-revocation-primitive-"
+        "reachable-from-a-skill"
+    )
+    @covers_requirement(
         "skill-handler::effective-value-is-the-sole-resolution-time-"
         "multiplier-application-point-and-never-writes-to-entity-traits"
     )

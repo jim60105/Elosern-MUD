@@ -11,15 +11,15 @@ at import, not silently at use.
 `world/skills/effects.py` SHALL define `parse_effect(effect_id: str)` returning one of a fixed set of
 frozen dataclasses, one per recognized prefix. The recognized set is the complete set
 already dispatched by `world/skills/effects.py` plus `stimulus` (introduced by
-`light-sacrament-casting`, which syncs before this change) plus `pleasure_peak` plus this change's
-`gauge_transfer`,
+`light-sacrament-casting`, which syncs before this change) plus `pleasure_peak` plus `gauge_transfer` plus this change's
+`revoke_grants`,
 namely: (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
 `passive_trait`, `movement`, `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`,
 `self_buff_apply`, `confer_growth_rate`, `sexual_event`, `sexual_event_actor`, `sexual_event_target`,
 `pleasure`, `sexual_counter`, `act_pair_event`, `damage`, `heal`, `self_heal`, `cleanse`, `disengage`,
 `divine_mystery`, `divine_pleasure_max`, `divine_climax_extension_stage`, `divine_drain`,
 `divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`,
-`stimulus`, `pleasure_peak`, `gauge_transfer`). `parse_effect` SHALL raise `ValueError` for any prefix
+`stimulus`, `pleasure_peak`, `gauge_transfer`, `revoke_grants`). `parse_effect` SHALL raise `ValueError` for any prefix
 not in this set and SHALL retain every prefix previously recognized, so no shipped skill fails to
 parse. `growth_rate` SHALL be recognized because
 `reincarnation_boon_elosia` already declares `growth_rate:practice:100`, which
@@ -106,6 +106,17 @@ coefficient attached to a `missing_fraction` occurrence SHALL be rejected at ski
 - **WHEN** `SKILL_REGISTRY` is imported after this change and every registered effect string is parsed
 - **THEN** no shipped sexual-act, divine or stimulus effect raises, the bare `pleasure_peak` parses,
   any `pleasure_peak:<suffix>` form raises, and the enumeration above is exactly the recognized set
+
+`revoke_grants` SHALL be a BARE prefix: it parses into a payload-free frozen marker dataclass, and any
+payload (`revoke_grants:<anything>`) SHALL raise `ValueError` at parse and therefore at registry load.
+
+#### Scenario: The bare revoke prefix parses into its marker dataclass
+- **WHEN** `parse_effect("revoke_grants")` is called
+- **THEN** it returns the payload-free revoke-grants dataclass
+
+#### Scenario: A payload on the revoke prefix fails at registry load
+- **WHEN** a skill declares `revoke_grants:all`
+- **THEN** `parse_effect` raises `ValueError` and the registry fails to import
 
 ### Requirement: SkillDef.__post_init__ rejects unparseable effects at construction
 `SkillDef.__post_init__` SHALL call `parse_effect` on every string in `effects` and store the results
