@@ -64,6 +64,17 @@ _TONIC_KEY = "t_ember_spray"  # kit SELF_HEAL consumable, combat-allowed
 _FANG_KEY = "t_iron_fang"  # kit weapon: registered, not usable
 _MANA_KEY = "t_mist_vial"
 _ATTACK_SKILL_KEY = "t_ember_burst"  # flows through mocked resolvers only
+_PEACE_KEY = "t_calm_balm"
+
+_PEACE_ITEM = make_item(
+    _PEACE_KEY,
+    display_name_zh="合成靜心香膏",
+    price_table_key="t_mossmeals",
+    use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=False),
+)
+_PEACE_PROFILE = ItemEffectProfile(
+    effects=(GaugeAdjustEffect(stat=ItemStat.HP, amount=20),)
+)
 
 _MANA_VIAL = make_item(
     _MANA_KEY,
@@ -126,8 +137,11 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             self,
             "items",
             extra={
-                "items": {_MANA_KEY: _MANA_VIAL},
-                "item_effect_profiles": {_MANA_KEY: _MANA_VIAL_PROFILE},
+                "items": {_MANA_KEY: _MANA_VIAL, _PEACE_KEY: _PEACE_ITEM},
+                "item_effect_profiles": {
+                    _MANA_KEY: _MANA_VIAL_PROFILE,
+                    _PEACE_KEY: _PEACE_PROFILE,
+                },
             },
         )
         self.room = create_object(Room, key="item arena")
@@ -216,6 +230,27 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                     self.player.db.inventory, [_TONIC_KEY, _MANA_KEY]
                 )
                 self.assertEqual(int(self.player.traits.hp.current), maximum)
+        self.assertEqual(clock.tick, 0)
+
+    @covers_requirement(
+        "lore-item-catalog::an-item-barred-from-combat-is-refused-at-submission"
+    )
+    def test_combat_barred_item_refused_at_combat_submission(self):
+        engage(self.player, self.monster)
+        self._hurt(20)
+        hp_before = int(self.player.traits.hp.current)
+        self.player.db.inventory = [_PEACE_KEY]
+        clock = WorldClock()
+        with patch(
+            "world.rules.combat_session.get_world_clock",
+            return_value=clock,
+        ):
+            result = submit_player_item_use(self.player, _PEACE_KEY)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["reason"], "combat_not_allowed")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(self.player.db.inventory, [_PEACE_KEY])
+        self.assertEqual(int(self.player.traits.hp.current), hp_before)
         self.assertEqual(clock.tick, 0)
 
     def test_unheld_item_rejects_before_initiative(self):

@@ -1637,6 +1637,54 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
             ),
         ),
         ItemDefinition(
+            key="kiss_of_goddess_mist",
+            display_name_zh="女神之吻聖霧",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.RARE,
+                summary_zh="聖所「女神之吻」禮儀聖霧的裝瓶紀念品，一噴讓全身敏感度瞬間拉到頂，信徒把它當成能帶回家的神蹟。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=False,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
+            key="censer_of_desire",
+            display_name_zh="情欲香爐",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.RARE,
+                summary_zh="聖所禮儀用的小巧香爐，爐煙沾上肌膚就化作綿長酥癢，越是動情燒得越是歡。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=False,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
+            key="embracing_vine",
+            display_name_zh="纏枝魔藤",
+            price_table_key="intimacy_tool",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.TOY,
+                icon_key=ItemIconKey.TOY,
+                rarity=ItemRarity.RARE,
+                summary_zh="一盆栽在陶盆裡的魔法藤蔓，澆水醒來後會溫柔地纏上全身每一處敏感地，以恰好不弄傷人的力道緩慢收緊磨蹭，一個季度後自己縮回盆裡沉睡，等下次澆水再醒。",
+            ),
+            use_mechanics=ItemUseMechanics(
+                consumable=False,
+                combat_allowed=False,
+            ),
+        ),
+        ItemDefinition(
             key="spark_candy",
             display_name_zh="微電跳蛋糖",
             price_table_key="intimacy_tool",

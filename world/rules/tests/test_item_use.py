@@ -481,6 +481,31 @@ class ItemUseSettlementTests(_ItemUseTestCase):
         self.assertEqual(after["inventory"], before["inventory"])
         self.assertEqual(after["contents"], before["contents"])
 
+    @covers_requirement(
+        "lore-item-catalog::a-non-consuming-use-settles-without-spending-the-item"
+    )
+    def test_non_consuming_item_preserves_inventory_and_advances_clock(self):
+        # Scenario 1: A reusable item survives its own use
+        self.register_fixture(_fixture_item("t_reusable_device", consumable=False))
+        self.hurt(HEAL_AMOUNT + 5)
+        self.actor.db.inventory = ["t_reusable_device"]
+        clock = WorldClock()
+        settlement = use_item(self.actor, "t_reusable_device", clock=clock)
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertEqual(list_items(self.actor), ["t_reusable_device"])
+        self.assertEqual(clock.tick, ITEM_USE_SECONDS)
+
+        # Scenario 2: A consuming item is spent
+        self.hurt(HEAL_AMOUNT + 5)
+        self.actor.db.inventory = ["t_moss_tonic", "t_moss_tonic"]
+        consuming_clock = WorldClock()
+        consuming_settlement = use_item(
+            self.actor, "t_moss_tonic", clock=consuming_clock
+        )
+        self.assertEqual(consuming_settlement.result.outcome, "success")
+        self.assertEqual(list_items(self.actor), ["t_moss_tonic"])
+        self.assertEqual(consuming_clock.tick, ITEM_USE_SECONDS)
+
     def test_healing_clamps_at_maximum_and_reports_actual_amount(self):
         self.hurt(5)
         self.actor.db.inventory = ["t_moss_tonic"]
@@ -1249,6 +1274,57 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
         self.assertEqual(self.actor.sexual.wetness.level, wetness_before)
         self.assertEqual(self.actor.sexual.climax_phase.level, phase_before)
         self.assertEqual(list_items(self.actor), [_PLEASURE_UP_KEY])
+
+    @covers_requirement(
+        "lore-item-catalog::a-non-consuming-use-settles-without-spending-the-item"
+    )
+    def test_non_consuming_use_rollback_restores_all_surfaces_and_inventory(self):
+        # Scenario 3: A rolled-back reusable use leaves nothing behind
+        from world.rules.item_effects import ItemTargetScope
+        reusable_pleasure = _fixture_item("t_reusable_pleasure", consumable=False)
+        reusable_profile = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.PLEASURE, amount=30, scope=ItemTargetScope.SELF
+                ),
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=20, scope=ItemTargetScope.SELF
+                ),
+            )
+        )
+        self.register_fixture(reusable_pleasure, reusable_profile)
+        self.hurt(30)
+        self.set_pleasure(60)
+        self.actor.sexual.wetness.value = 1
+        hp_before = int(self.actor.traits.hp.current)
+        pleasure_before = self.pleasure()
+        wetness_before = self.actor.sexual.wetness.value
+        phase_before = self.actor.sexual.climax_phase.level
+        self.actor.db.inventory = ["t_reusable_pleasure"]
+
+        from world.rules import items as items_module
+        real_gauge = items_module._apply_gauge_step
+        step_count = 0
+        def fail_on_second_step(step):
+            nonlocal step_count
+            step_count += 1
+            if step_count > 1:
+                raise RuntimeError("mid-settlement failure")
+            return real_gauge(step)
+
+        with patch(
+            "world.rules.items._apply_gauge_step",
+            side_effect=fail_on_second_step,
+        ), self.assertRaises(RuntimeError):
+            resolve_item_use(
+                ItemUseRequest(self.actor, "t_reusable_pleasure"), in_combat=False
+            )
+
+        self.assertEqual(int(self.actor.traits.hp.current), hp_before)
+        self.assertEqual(self.pleasure(), pleasure_before)
+        self.assertEqual(self.actor.sexual.wetness.value, wetness_before)
+        self.assertEqual(self.actor.sexual.climax_phase.level, phase_before)
+        self.assertEqual(list_items(self.actor), ["t_reusable_pleasure"])
 
     def test_post_drain_fault_restores_pleasure_and_buffs(self):
         self.hurt(50)

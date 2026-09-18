@@ -47,3 +47,15 @@ items:
     effects:
       - stat: pleasure
         amount: 11
+  kiss_of_goddess_mist:
+    effects:
+      - stat: pleasure
+        amount: 14
+  censer_of_desire:
+    effects:
+      - stat: pleasure
+        amount: 14
+  embracing_vine:
+    effects:
+      - stat: pleasure
+        amount: 11

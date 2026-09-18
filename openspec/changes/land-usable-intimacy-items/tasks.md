@@ -11,12 +11,12 @@
 
 ## 3. Reusable devices
 
-- [ ] 3.1 Register `embracing_vine` (`rare`, `consumable=False`) with the moderate amount, and verify the loader closes.
-- [ ] 3.2 Register `kiss_of_goddess_mist` and `censer_of_desire` (`rare`, `consumable=False`) with the intense amount, and verify the loader closes with all seven profiles bound.
-- [ ] 3.3 Add a behavior test that a synthetic usable item declaring no combat use is refused at combat submission, naming the combat restriction, with no gauge movement and the item still in inventory. Annotate for the combat-bar requirement. Verify with `world.rules.tests.test_item_combat_turn`.
-- [ ] 3.4 Add a behavior test for the non-consuming shape on a synthetic item: a successful out-of-combat use settles, leaves the inventory count unchanged, and advances the clock by the standard item-use duration; a consuming item removes exactly one copy. Annotate for the non-consuming requirement. Verify with `world.rules.tests.test_item_use`.
-- [ ] 3.5 Add the rollback case: force a failure partway through a synthetic non-consuming use and assert every touched gauge, status, and intimate surface is restored with the inventory count unchanged. Verify with `world.rules.tests.test_item_use`.
-- [ ] 3.6 Add all four tests to existing test modules so `.github/evennia-shards.json` needs no edit, confirm the annotation IDs against `uv run --locked python -m tools.spec_traceability list`, and verify with `uv run --locked python -m tools.spec_traceability check`.
+- [x] 3.1 Register `embracing_vine` (`rare`, `consumable=False`) with the moderate amount, and verify the loader closes.
+- [x] 3.2 Register `kiss_of_goddess_mist` and `censer_of_desire` (`rare`, `consumable=False`) with the intense amount, and verify the loader closes with all seven profiles bound.
+- [x] 3.3 Add a behavior test that a synthetic usable item declaring no combat use is refused at combat submission, naming the combat restriction, with no gauge movement and the item still in inventory. Annotate for the combat-bar requirement. Verify with `world.rules.tests.test_item_combat_turn`.
+- [x] 3.4 Add a behavior test for the non-consuming shape on a synthetic item: a successful out-of-combat use settles, leaves the inventory count unchanged, and advances the clock by the standard item-use duration; a consuming item removes exactly one copy. Annotate for the non-consuming requirement. Verify with `world.rules.tests.test_item_use`.
+- [x] 3.5 Add the rollback case: force a failure partway through a synthetic non-consuming use and assert every touched gauge, status, and intimate surface is restored with the inventory count unchanged. Verify with `world.rules.tests.test_item_use`.
+- [x] 3.6 Add all four tests to existing test modules so `.github/evennia-shards.json` needs no edit, confirm the annotation IDs against `uv run --locked python -m tools.spec_traceability list`, and verify with `uv run --locked python -m tools.spec_traceability check`.
 
 ## 4. Existing roster assertions
 
