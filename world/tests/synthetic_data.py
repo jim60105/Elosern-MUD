@@ -426,13 +426,15 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         effects=["self_buff_apply:t_moss_veil"],
         category=SkillCategory.UTILITY,
     ),
-    # Utility row whose effect handler declares a required event_context key
-    # the combat session never supplies, so the combat menu must expose it
-    # disabled with the missing-context explanation (effect-context-validation
-    # seam). Mirrors the shipped confer handler: after divine-veil-cast-path
-    # made ``set_disguise`` context-free, the seam's demo row rides
-    # ``confer_skill_partial`` instead (the disguised caster row keeps its
-    # place as the panel's first-owned utility row).
+    # Utility row the combat menu must expose disabled with an explanation
+    # (combat-menu H3 seam). The race gate is the live mechanism: every
+    # shipped effect handler became context-free (divine-veil-cast-path made
+    # ``set_disguise`` context-free, conferral-grant-store made
+    # ``confer_skill_partial`` read its scale from node data), so the row
+    # rides the divine-arts race gate instead — the kit's only race has no
+    # divine affinity, mirroring the shipped fixture's human casting a divine
+    # row (the carrier keeps its place as the panel's first-owned utility
+    # row).
     "t_rock_quietus": SkillDef(
         key="t_rock_quietus",
         label="岩中授語",
@@ -442,6 +444,7 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         cost={},
         usable_out_of_combat=True,
         element=None,
+        requires_divine_arts=True,
         effects=["confer_skill_partial"],
         category=SkillCategory.UTILITY,
     ),

@@ -1097,9 +1097,9 @@ def rarity_word(rarity: str) -> str:
 #: is the panel's intra-group row order: the borrowed-element group carries
 #: the deep canopy cast ``t_ember_comet`` first (``grant_lineage`` closes its
 #: prereq ``t_ember_burst`` in BEHIND it, the shipped fire tree's exact
-#: two-row shape), the utility group carries the context-disabled row
-#: (a ``confer_skill_partial`` carrier whose declared event context the
-#: combat session never supplies) BEFORE the NONE-shape cast carrier so the
+#: two-row shape), the utility group carries the race-gate-disabled row
+#: (a ``confer_skill_partial`` carrier requiring divine arts, which the kit's
+#: only race lacks) BEFORE the NONE-shape cast carrier so the
 #: disabled row is the frame's first focus in both modes.
 SYNTH_COMBAT_ACTIVE_SKILLS = (
     "t_ember_comet",
@@ -1143,9 +1143,12 @@ def combat_journey_values() -> dict:
     - ``none_key``: the owned NONE-shape active the NONE-payload journey
       submits (enhancement in shipped mode; utility under the kit install).
     - ``none_category``: the ``SkillCategory`` value ``none_key`` lives in.
-    - ``self_disabled_key``: the utility active whose effect handler
-      declares an event-context key the combat session never supplies, so
-      the menu exposes it disabled.
+    - ``self_disabled_key``: the active the race gate disables for the
+      fixture character (a divine-arts row the fixture race cannot cast), so
+      the menu exposes it disabled with its reason.
+    - ``self_disabled_category``: the ``SkillCategory`` value
+      ``self_disabled_key`` lives in (the utility group under the kit
+      install; the divine-mystery category in shipped mode).
     - ``spell_element`` / ``ladder_element``: the ELEMENT_REGISTRY keys the
       sub-groups of the elemental category are named after (the spell borrows
       the shipped first element in both modes; the ladder's element differs).
@@ -1172,6 +1175,7 @@ def combat_journey_values() -> dict:
             "none_key": "t_cinder_breath",
             "none_category": "utility",
             "self_disabled_key": "t_rock_quietus",
+            "self_disabled_category": "utility",
             "spell_element": "fire",
             "ladder_element": "t_glowmire",
             # The kit install registers t_glowmire first; the borrowed shipped
@@ -1193,6 +1197,7 @@ def combat_journey_values() -> dict:
         "none_key": SHIPPED_COMBAT_NONE_SKILL,
         "none_category": "enhancement",
         "self_disabled_key": SHIPPED_COMBAT_DISABLED_SKILL,
+        "self_disabled_category": "divine_mystery",
         "spell_element": "fire",
         "ladder_element": "wind",
         "element_group_order": ("fire", "wind"),

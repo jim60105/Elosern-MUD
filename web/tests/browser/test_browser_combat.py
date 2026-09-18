@@ -868,15 +868,17 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         roles = self._roles()
         # H3 (design D2/D11): a disabled entry explains itself through the
         # detail pane (`SkillDetailPane`, `combat-detail`) in the skill frame.
-        # The mode's context-less utility SELF caster is disabled in combat
-        # (the session context cannot supply its handler's event-context
-        # key), so the pane exposes its disabled explanation instead of a
-        # cast. Navigate: skills tab -> category frame -> utility
-        # (single-group) -> skill frame (the disabled row is the group's
-        # first focus in both modes).
+        # The mode's race-gated SELF caster is disabled in combat (the
+        # fixture character's race lacks the divine affinity its row
+        # requires), so the pane exposes its disabled explanation instead of
+        # a cast. Navigate: skills tab -> category frame -> the disabled
+        # row's category (utility under the kit install; divine-mystery in
+        # shipped mode) -> skill frame (the disabled row is the utility
+        # group's first focus under the kit install).
         self._open_skills(page)
-        self._open_category(page, "utility")
-        self._focus_skill(page, "utility", roles["self_disabled_key"])
+        disabled_category = roles["self_disabled_category"]
+        self._open_category(page, disabled_category)
+        self._focus_skill(page, disabled_category, roles["self_disabled_key"])
         # Focusing the disabled skill row sets the focused-skill model, so the
         # detail pane (SkillDetailPane, `combat-detail`) renders its reason.
         self.assertTrue(
