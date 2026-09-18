@@ -6,10 +6,10 @@
 
 ## 1. Condition label util
 
-- [ ] 1.1 Create `web/webclient-app/lib/condition_label.js` exporting
+- [x] 1.1 Create `web/webclient-app/lib/condition_label.js` exporting
   `conditionLabel(condition)` — byte-identical body of `ConditionChips.vue:50-62` (zh-TW
   `剩 ${...} 秒` and `，` join preserved).
-- [ ] 1.2 Replace `ConditionChips.vue::chipName` (lines 50-62) and
+- [x] 1.2 Replace `ConditionChips.vue::chipName` (lines 50-62) and
   `CharacterStatusDrawer.vue::conditionName` (lines 147-159) with imports + one-line
   delegates (`const chipName = conditionLabel;` / `const conditionName = conditionLabel;`),
   keeping each component's explanatory comment. Verify:
@@ -17,7 +17,7 @@
   (paths relative to `web/webclient-app/`; adjust to the actual test paths —
   `condition_chips.test.js` and `character_status_drawer.test.js` live under
   `tests/data/`).
-- [ ] 1.3 Add `web/webclient-app/tests/data/condition_label.test.js` pinning the extracted
+- [x] 1.3 Add `web/webclient-app/tests/data/condition_label.test.js` pinning the extracted
   rule directly: label-else-code fallback, `剩 N 秒` suffix only for numeric
   `remaining_seconds`, modifier pairs joined, `，` separator (fails pre-extraction only in
   the sense that it now guards the single copy). Verify: `pnpm test`.
