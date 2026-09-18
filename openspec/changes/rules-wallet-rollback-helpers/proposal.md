@@ -25,8 +25,10 @@ Two byte-identical duplications live in `world/rules/`, the single writer of gam
 
 - New `world/rules/wallet.py::read_wallet(entity, error_cls)` — the single money-read
   implementation, recursion included; `service_view._read_wallet` and
-  `status_query._read_wallet` become one-line delegates (the private names stay so existing
-  module-level patch targets, if any, keep resolving).
+  `status_query._read_wallet` are deleted (a repo-wide grep found zero references to either
+  private name outside its own definition and same-module call sites, so no module-level patch
+  target exists and the call sites switch directly to `read_wallet(...)` — the delegate form
+  of design.md D1 applied only while a patch target existed).
 - New shared rollback helper (hosted in `world/rules/clock.py`, which already owns the
   advance-side restore and is imported by `cast_settlement.py`; signature gains a `stage: str`
   parameter) — both call sites pass their own stage tag so the logged `stage` context value

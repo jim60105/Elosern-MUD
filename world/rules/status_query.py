@@ -38,6 +38,7 @@ from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
 from world.rules.stored_sexual_reads import StoredLevel
 from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS, compose_full_title
+from world.rules.wallet import read_wallet
 from world.skills.equipment import dual_wielding_from_storage
 from world.skills.handler import INNATE_SKILL_KEYS, INNATE_SKILL_ORDER
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
@@ -1527,23 +1528,6 @@ def _read_disguise(entity: Any) -> tuple[bool, tuple[tuple[str, int], ...]]:
     return True, tuple(displayed)
 
 
-def _read_wallet(entity: Any) -> int:
-    raw = getattr(getattr(entity, "db", None), "wallet", None)
-    if raw is None:
-        possessed_by = getattr(getattr(entity, "db", None), "possessed_by", None)
-        if possessed_by is not None:
-            from world.rules.possession import _resolve_live_object
-            owner = _resolve_live_object(int(possessed_by))
-            if owner is not None:
-                return _read_wallet(owner)
-        from typeclasses.characters import PlayerCharacter
-        if not isinstance(entity, PlayerCharacter):
-            return 0
-    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
-        raise StatusQueryError("wallet is malformed")
-    return raw
-
-
 def build_character_read_model(entity: Any) -> CharacterReadModel:
     """Build the frozen character read model or raise :class:`StatusQueryError`.
 
@@ -1578,12 +1562,12 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         owner_assembly = _assemble(owner)
         guild_rank = getattr(owner, "guild_rank", None)
         guild_merit = _read_guild_merit(owner_assembly.traits_data)
-        wallet = _read_wallet(owner)
+        wallet = read_wallet(owner, StatusQueryError)
         full_title = _read_full_title(owner)
     else:
         guild_rank = getattr(entity, "guild_rank", None)
         guild_merit = _read_guild_merit(assembly.traits_data)
-        wallet = _read_wallet(entity)
+        wallet = read_wallet(entity, StatusQueryError)
         full_title = _read_full_title(entity)
 
     return CharacterReadModel(

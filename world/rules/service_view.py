@@ -60,6 +60,7 @@ from world.rules.targeting import RoomActionContext
 from world.skills.equipment import list_items
 from world.rules.equipment import normalized_equipment, preflight_equipment_toggle
 from world.rules.items import ItemUseRequest, preflight_item_use
+from world.rules.wallet import read_wallet
 
 # Presentation bounds owned by the services view (equal or below the wire
 # limits enforced by web.webclient.presentation.services).
@@ -308,23 +309,6 @@ def _resolve_host(actor: Any, component_class: type) -> tuple[Any, str | None]:
         if message == "multiple local service hosts":
             return None, "ambiguous_service_host"
         return None, "no_local_service_host"
-
-
-def _read_wallet(actor: Any) -> int:
-    raw = getattr(getattr(actor, "db", None), "wallet", None)
-    if raw is None:
-        possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
-        if possessed_by is not None:
-            from world.rules.possession import _resolve_live_object
-            owner = _resolve_live_object(int(possessed_by))
-            if owner is not None:
-                return _read_wallet(owner)
-        from typeclasses.characters import PlayerCharacter
-        if not isinstance(actor, PlayerCharacter):
-            return 0
-    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
-        raise ServicesViewError("wallet is malformed")
-    return raw
 
 
 def _read_merit(actor: Any) -> int:
@@ -846,7 +830,7 @@ def build_services_view(actor: Any) -> ServicesView:
         owner = _resolve_live_object(int(possessed_by))
 
     player_source = owner if owner is not None else actor
-    wallet = _read_wallet(player_source)
+    wallet = read_wallet(player_source, ServicesViewError)
 
     player = _build_player(player_source, wallet, catalog)
     in_combat = is_in_active_session(actor)

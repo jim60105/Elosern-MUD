@@ -8,12 +8,12 @@
 
 ## 1. read_wallet extraction
 
-- [ ] 1.1 Create `world/rules/wallet.py` with `read_wallet(entity: Any, error_cls: type[Exception]) -> int`
+- [x] 1.1 Create `world/rules/wallet.py` with `read_wallet(entity: Any, error_cls: type[Exception]) -> int`
   copying `service_view.py:313-327` byte-for-byte (possession recursion calls
   `read_wallet(owner, error_cls)`; deferred imports of `world.rules.possession._resolve_live_object`
   and `typeclasses.characters.PlayerCharacter` stay deferred inside the body; refusal raises
   `error_cls("wallet is malformed")`).
-- [ ] 1.2 Grep the private names for external references:
+- [x] 1.2 Grep the private names for external references:
   `grep -rn "_read_wallet" world web commands tests` — replace the bodies of
   `service_view._read_wallet` and `status_query._read_wallet` with one-line delegates
   `return read_wallet(actor, ServicesViewError)` / `return read_wallet(entity, StatusQueryError)`;
@@ -21,7 +21,7 @@
   shows the sole references are its definition and same-module call sites. Verify:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_service_view` and
   `... world.rules.tests.test_status_query`.
-- [ ] 1.3 Confirm the possession-recursion path stays covered: run
+- [x] 1.3 Confirm the possession-recursion path stays covered: run
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_service_view_side_effects`
   (it exercises the possessed-actor wallet read). If neither suite names a malformed-wallet
   case, grep `wallet is malformed` under `world/rules/tests/` and run whichever module
