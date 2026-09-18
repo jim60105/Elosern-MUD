@@ -13,7 +13,7 @@
 
 ## 1. Data-independence base (17 files)
 
-- [ ] 1.1 Diff the family to enumerate variants exactly: read
+- [x] 1.1 Diff the family to enumerate variants exactly: read
   `tests/_data_independence_base.py`'s future inputs — `git grep -l "test_migrated_files_hold_no_ledger_exemption" tests/`
   (expect 12), `... "test_migrated_files_carry_zero_findings"` (16), `... "test_no_violation_naming_a_manifest_file"` (12),
   `... "test_freeze_ledger_seed_array_untouched_by_the_migration"` (17),
@@ -21,11 +21,11 @@
   same-named bodies to confirm they are verbatim-identical modulo manifest constants; record
   the "hash-groups" split inside `test_migrated_files_carry_zero_findings` and
   `test_freeze_ledger_seed_array_untouched_by_the_migration`.
-- [ ] 1.2 Create `tests/_data_independence_base.py` with
+- [x] 1.2 Create `tests/_data_independence_base.py` with
   `DataIndependenceContractMixin` and the five `assert_*` methods per design D1 (bodies =
   the union of the copies; `setUp` loads the ledger once via `test_data_lint.load_ledger`
   and asserts `fatal == []`; manifest variants become parameters/class-attributes).
-- [ ] 1.3 Convert the 17 `tests/test_data_independence_*.py` files to mixin + thin decorated
+- [x] 1.3 Convert the 17 `tests/test_data_independence_*.py` files to mixin + thin decorated
   shells, keeping each file's docstring, manifest constants (`MIGRATED_FILES`,
   `NEW_HELPER_FILES`, `BEHAVIOR_FILES`), class name, literal `@covers_requirement` IDs, and
   every shell's `test_*` name. Convert ONE file first (`tests/test_data_independence_rules_guild.py`)
