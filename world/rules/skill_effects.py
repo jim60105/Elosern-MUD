@@ -10,6 +10,7 @@ from typing import Any
 from world.lore.races import RACE_REGISTRY
 from world.skills.effects import (
     DisguiseEffect,
+    RevealStrength,
     RuleTableEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
@@ -215,3 +216,38 @@ def apply_divine_disguise(entity: Any) -> None:
     """
     apply_disguise_effect(entity, mundane_veil_values())
     record_disguise_provenance(entity, DISGUISE_PROVENANCE_DIVINE)
+
+
+def reveal_can_pierce(entity: Any, strength: RevealStrength) -> bool:
+    """Whether the declared strength could lift the veil the entity holds.
+
+    A target carrying no disguise layer has nothing to reveal. Within the
+    closed two-strength grammar, only the true-name strength pierces a
+    divine veil; a mundane reveal stops at one. This predicate is the single
+    source of that table, shared by the reveal write and the handler's
+    stage-time outcome report.
+    """
+    if entity.db.disguised_stats is None:
+        return False
+    if (
+        strength is RevealStrength.MUNDANE_ONLY
+        and disguise_provenance_of(entity) == DISGUISE_PROVENANCE_DIVINE
+    ):
+        return False
+    return True
+
+
+def reveal_disguise_effect(entity: Any, strength: RevealStrength) -> bool:
+    """Lift a veil whose provenance the declared strength covers.
+
+    Clears the display layer and its provenance record in the same operation
+    (``clear_disguise_effect``), so a reveal that pierces never leaves the
+    record behind. Returns True when the veil was cleared and False for a
+    reported no-op — nothing hidden, or a provenance the strength cannot
+    pierce — so a failed reveal costs the action without leaking the veil's
+    existence through a rejection.
+    """
+    if not reveal_can_pierce(entity, strength):
+        return False
+    clear_disguise_effect(entity)
+    return True

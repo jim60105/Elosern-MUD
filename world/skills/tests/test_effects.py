@@ -19,6 +19,8 @@ from world.skills.effects import (
     HealEffect,
     MovementEffect,
     PleasureEffect,
+    RevealDisguiseEffect,
+    RevealStrength,
     RuleTableEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
@@ -116,6 +118,32 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_set_disguise_parses_into_its_dataclass(self):
         self.assertEqual(parse_effect("set_disguise"), DisguiseEffect())
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_bare_reveal_prefix_parses_at_mundane_only_strength(self):
+        self.assertEqual(
+            parse_effect("reveal_disguise"),
+            RevealDisguiseEffect(strength=RevealStrength.MUNDANE_ONLY),
+        )
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_true_name_reveal_form_parses_at_any_provenance_strength(self):
+        self.assertEqual(
+            parse_effect("reveal_disguise:true_name"),
+            RevealDisguiseEffect(strength=RevealStrength.ANY_PROVENANCE),
+        )
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_unknown_reveal_payload_fails_at_parse(self):
+        for effect in (
+            "reveal_disguise:",
+            "reveal_disguise:everything",
+            "reveal_disguise:true_name:extra",
+            "reveal_disguise:mundane",
+        ):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     def test_buff_apply_parses_into_its_dataclass(self):
         self.assertEqual(
