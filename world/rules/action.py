@@ -570,6 +570,14 @@ def _handle_confer_skill_partial(
     context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
+    """Stage one grant per (target, conferrable skill) pair.
+
+    The audienced form of the conferral verb (an AREA node declaring an
+    ALLIES audience) routes every member of the resolved audience through
+    this handler, so each target must be written individually — mirroring
+    the per-target dispatch of ``revoke_grants`` and ``reveal_disguise``.
+    A single-target cast degenerates to one recipient, exactly as before.
+    """
     del scale
     conferrable = derive_conferrable_skills(actor)
     if not conferrable:
@@ -578,7 +586,6 @@ def _handle_confer_skill_partial(
             _CONFERRAL_EMPTY_SET_DETAIL,
         )
     coefficient = _occurrence_scale(context)
-    target = targets[0]
     source_key = _entity_key(actor)
     return [
         PendingEffect(
@@ -590,6 +597,7 @@ def _handle_confer_skill_partial(
                 target, source_key, skill_key, coefficient
             ),
         )
+        for target in targets
         for skill_key in conferrable
     ]
 
@@ -610,26 +618,36 @@ def _handle_set_disguise(
     veil (an authored declaration) or an unveiled state is refreshed, so a
     caster is never trapped behind their own face and never strips the
     authored disguise their character card starts the game wearing.
+
+    Every member of the resolved audience is written individually, so an
+    ALLIES-audience veil (the capstone's party-wide veil) reaches each
+    recipient instead of only the first routed target.
     """
     del scale, context
-    target = targets[0]
-    if target is actor and disguise_provenance_of(target) == DISGUISE_PROVENANCE_DIVINE:
-        return [
-            PendingEffect(
-                target,
-                f"disguise_lifted|{_entity_key(target)}",
-                frozenset(),
-                lambda: clear_disguise_effect(target),
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if (
+            target is actor
+            and disguise_provenance_of(target) == DISGUISE_PROVENANCE_DIVINE
+        ):
+            pending.append(
+                PendingEffect(
+                    target,
+                    f"disguise_lifted|{_entity_key(target)}",
+                    frozenset(),
+                    lambda target=target: clear_disguise_effect(target),
+                )
             )
-        ]
-    return [
-        PendingEffect(
-            target,
-            f"disguise_set|{_entity_key(target)}",
-            frozenset(),
-            lambda: apply_divine_disguise(target),
-        )
-    ]
+        else:
+            pending.append(
+                PendingEffect(
+                    target,
+                    f"disguise_set|{_entity_key(target)}",
+                    frozenset(),
+                    lambda target=target: apply_divine_disguise(target),
+                )
+            )
+    return pending
 
 
 def _handle_reveal_disguise(
@@ -908,9 +926,15 @@ def _handle_confer_growth_rate(
     context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
+    """Stage one conferred growth-rate buff per resolved target.
+
+    The ALLIES-audience growth conferrals (the 傳承 chain's party nodes)
+    route every member of the audience through this handler, so each
+    recipient is written individually; a single-target cast keeps the
+    historical one-recipient behavior.
+    """
     del scale
     coefficient = _occurrence_scale(context)
-    target = targets[0]
     source_key = _entity_key(actor)
     return [
         PendingEffect(
@@ -922,6 +946,7 @@ def _handle_confer_growth_rate(
                 target, source_key, coefficient
             ),
         )
+        for target in targets
     ]
 
 

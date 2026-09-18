@@ -46,7 +46,7 @@ from ._combat_session_helpers import synth_innate_overlay
 # The revoke cast row: one bare registered prefix, no payload, no policy.
 _REVOKE = make_skill(
     "t_sovereign_retraction",
-    label="權能收回",
+    label="收權之儀",
     description="收回目標身上一切授予的合成神術。",
     kind=SkillKind.ACTIVE,
     target_spec=TargetSpec.SINGLE,

@@ -2829,17 +2829,6 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             group="身法",
         ),
         _skill(
-            "status_disguise",
-            "神之秘法：狀態偽裝",
-            "以神之秘法偽裝自身的外貌與部分能力數值。",
-            SkillKind.ACTIVE,
-            TargetSpec.SELF,
-            usable_out_of_combat=True,
-            requires_divine_arts=True,
-            effects=["set_disguise"],
-            category=SkillCategory.DIVINE_MYSTERY,
-        ),
-        _skill(
             "concentration",
             "集中",
             "凝聚精神，暫時提升自身的專注與準確度。",
@@ -2849,22 +2838,6 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"mp": 5},
             effects=["self_buff_apply:focus"],
             category=SkillCategory.ENHANCEMENT,
-        ),
-        _skill(
-            "dominion_art",
-            "統御術",
-            "授予目標一部分自身技能的效果。",
-            SkillKind.ACTIVE,
-            TargetSpec.SINGLE,
-            usable_out_of_combat=True,
-            requires_divine_arts=True,
-            effects=["confer_skill_partial"],
-            # The lore prices this root at 一成 (0.10): the scale is the
-            # per-occurrence coefficient the conferral handlers now read, so
-            # the shipped verb records grants at the priced strength from the
-            # moment the mechanism becomes castable.
-            effect_policies=(EffectPolicy(coefficient=0.1),),
-            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "defense_instinct",
@@ -3012,49 +2985,193 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             category=SkillCategory.SEXUAL_ACT,
             group="精通",
         ),
+        # ------------------------------------------------------------------
+        # 神之秘法 (DIVINE_MYSTERY): the three known chains plus the
+        # three-parent convergence node, transcribed from the authored node
+        # table (docs/lore/skill-trees/divine-mystery.md section 2).
+        #
+        # Every node is zero-cost, bloodline-gated and usable outside
+        # combat. Grant scales and the party audience live in the
+        # per-occurrence EffectPolicy (conferral-grant-store D4/D3), so the
+        # category declares no damage or healing effect and derives no MP
+        # cost band (spell_tier_for stays None for every member). Chain
+        # depth is expressed by prerequisite edges and the derived tip cap.
+        # ------------------------------------------------------------------
+        # 統御線 — "power belongs to the one who earned it".
         _skill(
-            "divine_time_dilation",
-            "神之秘法：時間加速",
-            "以神性加速或減緩時間流動的秘法。",
+            "dominion_art",
+            "統御術",
+            "授予目標一部分自身技能的效果。",
             SkillKind.ACTIVE,
-            TargetSpec.NONE,
+            TargetSpec.SINGLE,
             usable_out_of_combat=True,
             requires_divine_arts=True,
-            effects=["divine_mystery:時間加速"],
+            effects=["confer_skill_partial"],
+            # The lore prices this root at 一成 (0.10): the scale is the
+            # per-occurrence coefficient the conferral handlers read, so the
+            # shipped verb records grants at the priced strength from the
+            # moment the mechanism becomes castable.
+            effect_policies=(EffectPolicy(coefficient=0.1),),
             category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
-            "divine_space_distortion",
-            "神之秘法：空間扭曲",
-            "以神性扭曲空間，使存在與景物移位重組的秘法。",
+            "dominion_recall",
+            "權能收回",
+            "解除目標身上的一切技能授予與成長授予，不論來源為何。",
             SkillKind.ACTIVE,
-            TargetSpec.NONE,
+            TargetSpec.SINGLE,
             usable_out_of_combat=True,
             requires_divine_arts=True,
-            effects=["divine_mystery:空間扭曲"],
+            effects=["revoke_grants"],
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("dominion_art", 3),),
+        ),
+        _skill(
+            "shared_dominion",
+            "共權統御",
+            "把施法者持有的同一批可授予被動，一次覆蓋全隊。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["confer_skill_partial"],
+            effect_policies=(
+                EffectPolicy(coefficient=0.1, audience=EffectAudience.ALLIES),
+            ),
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("dominion_art", 3),),
+        ),
+        _skill(
+            "sovereign_investiture",
+            "王權授予",
+            "以更高的授予強度，把施法者持有的可授予被動覆蓋全隊。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["confer_skill_partial"],
+            effect_policies=(
+                EffectPolicy(coefficient=0.25, audience=EffectAudience.ALLIES),
+            ),
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("shared_dominion", 3),),
+        ),
+        # 傳承線 — "learning takes time".
+        _skill(
+            "mentors_covenant",
+            "師徒契約",
+            "把自身的學習節奏借給目標，加速其熟練度累積。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["confer_growth_rate"],
+            effect_policies=(EffectPolicy(coefficient=1.5),),
             category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
-            "divine_matter_transmutation",
-            "神之秘法：物質轉換",
-            "以神性改變物質本質，將萬物轉化為其他形態的秘法。",
+            "chorus_of_ages",
+            "世代合誦",
+            "把自身的學習節奏借給全隊，加速熟練度累積。",
             SkillKind.ACTIVE,
-            TargetSpec.NONE,
+            TargetSpec.AREA,
             usable_out_of_combat=True,
             requires_divine_arts=True,
-            effects=["divine_mystery:物質轉換"],
+            effects=["confer_growth_rate"],
+            effect_policies=(
+                EffectPolicy(coefficient=1.5, audience=EffectAudience.ALLIES),
+            ),
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("mentors_covenant", 3),),
+        ),
+        _skill(
+            "undying_tutelage",
+            "不朽教誨",
+            "以近乎精靈的學習節奏覆蓋全隊，大幅加速熟練度累積。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["confer_growth_rate"],
+            effect_policies=(
+                EffectPolicy(coefficient=3.0, audience=EffectAudience.ALLIES),
+            ),
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("chorus_of_ages", 3),),
+        ),
+        # 帷幕線 — "what you see is what is real".
+        _skill(
+            "status_disguise",
+            "狀態偽裝",
+            "以神之秘法偽裝自身的外貌與部分能力數值。",
+            SkillKind.ACTIVE,
+            TargetSpec.SELF,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["set_disguise"],
             category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
-            "divine_life_extension",
-            "神之秘法：生命延續",
-            "以神性延續生命與壽命的秘法，據說能超越種族的極限。",
+            "bestowed_veil",
+            "賜帷",
+            "把帷幕蓋到目標身上，改寫其顯示層的外貌與能力數值。",
             SkillKind.ACTIVE,
-            TargetSpec.NONE,
+            TargetSpec.SINGLE,
             usable_out_of_combat=True,
             requires_divine_arts=True,
-            effects=["divine_mystery:生命延續"],
+            effects=["set_disguise"],
             category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("status_disguise", 3),),
+        ),
+        _skill(
+            "unveiling_eye",
+            "揭帷之眼",
+            "清除目標身上非神性來源的偽裝層。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["reveal_disguise"],
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("status_disguise", 3),),
+        ),
+        _skill(
+            "true_name_sight",
+            "真名之視",
+            "清除目標身上任何來源的偽裝層，包含神之秘法級的帷幕。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["reveal_disguise:true_name"],
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(SkillPrerequisite("unveiling_eye", 5),),
+        ),
+        # 匯合 — the capstone waits for all three chain ends at Lv.10.
+        _skill(
+            "crown_apotheosis",
+            "冠冕神格",
+            "把三條秘法之鏈的極限同時授予全隊：授予力量、借出成長、蓋上帷幕。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=[
+                "confer_skill_partial",
+                "confer_growth_rate",
+                "set_disguise",
+            ],
+            effect_policies=(
+                EffectPolicy(coefficient=0.5, audience=EffectAudience.ALLIES),
+                EffectPolicy(coefficient=5.0, audience=EffectAudience.ALLIES),
+                EffectPolicy(audience=EffectAudience.ALLIES),
+            ),
+            category=SkillCategory.DIVINE_MYSTERY,
+            prerequisites=(
+                SkillPrerequisite("sovereign_investiture", 10),
+                SkillPrerequisite("undying_tutelage", 10),
+                SkillPrerequisite("true_name_sight", 10),
+            ),
         ),
     )
 }

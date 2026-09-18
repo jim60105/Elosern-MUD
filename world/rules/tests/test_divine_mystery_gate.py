@@ -2,8 +2,11 @@
 
 Runs on synthetic rows: a divine-arts-capable race and two mundane races,
 plus mastery/arts gate rows and unmechanized mystery rows carrying the
-registered flavor effect prefix. The mechanized-rejection branch is driven
-directly with a patched effect parser.
+registered flavor effect prefix (the ``divine_mystery:`` prefix stays
+registered after the catalog redesign, so an inert-flavor row remains a
+legitimate shape for a future node and its cast-time behavior stays
+covered here). The mechanized-rejection branch is driven directly with a
+patched effect parser.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -176,8 +179,11 @@ class DivineMysteryGateTests(EvenniaTestCase):
         )
         self.assertEqual(result.outcome, "success")
 
-    @covers_requirement("divine-mystery::unmechanized-divine-mysteries-are-explicitly-declared-not-silently-missing")
     def test_unmechanized_mysteries_cast_without_state_change(self):
+        # The inert-flavor shape stays legal (the prefix and its handler are
+        # retained by design), and a cast of it must change no state. The
+        # requirement this used to claim is retired by the catalog redesign,
+        # so no traceability annotation is carried here.
         self.actor.race = _DIVINE_RACE.key
         self.actor.apply_race_baseline()
         self.actor.db.skills = {"active": [], "passive": []}

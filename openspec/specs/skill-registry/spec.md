@@ -103,8 +103,9 @@ exhaustive transcription of every skill mentioned on every sample card.
 
 #### Scenario: The conferral skill (統御術) and the disguise skill (狀態偽裝) are both present
 - **WHEN** `SKILL_REGISTRY` is inspected
-- **THEN** it contains exactly one `ACTIVE` entry whose `effects` include `"confer_skill_partial"`,
-  and exactly one `ACTIVE` entry whose `effects` include `"set_disguise"`
+- **THEN** it contains at least one `ACTIVE` entry whose `effects` include `"confer_skill_partial"`
+  with `dominion_art` among them, and at least one `ACTIVE` entry whose `effects` include
+  `"set_disguise"` with `status_disguise` among them
 
 #### Scenario: At least three per-character-unique passives exist under distinct keys
 - **WHEN** `SKILL_REGISTRY` is inspected
