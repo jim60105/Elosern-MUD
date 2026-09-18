@@ -1,0 +1,25 @@
+## MODIFIED Requirements
+
+### Requirement: Effect handlers declare their required event context
+
+Every registered effect handler SHALL declare the `event_context` keys it requires, as part of its
+registration metadata. A handler that derives everything it needs from the actor, the targets and the
+skill's own declared policy SHALL declare an EMPTY required set, so preflight and the shared preview
+never advertise and then refuse it.
+
+#### Scenario: Context requirements are declared per handler
+
+- **WHEN** the `set_disguise` handler is registered
+- **THEN** it declares its required context key (`disguise`)
+
+#### Scenario: The conferral handlers require no context
+
+- **WHEN** the `confer_skill_partial` and `confer_growth_rate` handlers are registered
+- **THEN** each declares an empty required set, because the scale comes from the skill's own
+  per-occurrence policy and the conferred set is derived from the caster's direct ownership
+
+#### Scenario: A conferral skill is not rejected for missing context
+
+- **WHEN** the shared action preview is asked about a conferral skill on an entity that owns it, with
+  an `event_context` carrying no conferral keys
+- **THEN** the preview reports no missing-effect-context failure
