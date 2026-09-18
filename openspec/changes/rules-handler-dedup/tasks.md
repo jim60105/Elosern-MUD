@@ -68,7 +68,7 @@
 
 ## 4. Economy buy/sell
 
-- [ ] 4.1 In `commands/economy.py`, add `_ShopCommandBase._parse_trade_args(verb)` and
+- [x] 4.1 In `commands/economy.py`, add `_ShopCommandBase._parse_trade_args(verb)` and
   `_trade_error_message(error, table, verb)` per design D5; move the two message dicts to
   module constants `BUY_ERROR_MESSAGES` / `SELL_ERROR_MESSAGES` byte-identical to the current
   literals; rewrite `CmdBuy.func`/`CmdSell.func` bodies. Do NOT touch `key`, `aliases`,
@@ -76,7 +76,7 @@
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands.tests.test_command_branch_behaviour` and
   `... commands.tests.test_guild_economy_commands` and
   `... tests.test_command_docs`.
-- [ ] 4.2 Confirm the command surface is textually untouched:
+- [x] 4.2 Confirm the command surface is textually untouched:
   `git diff -- docs/game/` is empty.
 
 ## 5. Wave close-out verification

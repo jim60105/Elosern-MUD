@@ -362,6 +362,11 @@ class EconomyCommandBranchTests(TestCase):
             (CmdSell, "sell", TradeReason.INSUFFICIENT_ITEMS, "你沒有足夠的這個物品。"),
             (CmdSell, "sell", TradeReason.STOCK_OVERFLOW, "商店收購上限已滿。"),
             (CmdSell, "sell", TradeReason.SERVICE_UNAVAILABLE, MESSAGE_OFF_ANCHOR),
+            # Off-table reasons pin the CHINESE fallback frame: the shared
+            # extraction must never recombine the English usage verb into the
+            # failure line, so it cannot regress to "buy失敗：..." / "sell失敗：...".
+            (CmdBuy, "buy", "mystery-buy", "購買失敗：mystery-buy"),
+            (CmdSell, "sell", "mystery-sell", "販賣失敗：mystery-sell"),
         )
         for command_type, function_name, reason, message in cases:
             command = _command(command_type, "meal 2")

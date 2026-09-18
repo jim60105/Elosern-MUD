@@ -23,6 +23,29 @@ from world.rules.npc_schedules import interaction_reason
 from world.skills.equipment import list_items
 
 
+BUY_ERROR_MESSAGES = {
+    TradeReason.CLOSED: "商店目前沒有營業。",
+    TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
+    TradeReason.UNKNOWN_ITEM: "商店不賣這個物品。",
+    TradeReason.NOT_OFFERED: "商店沒有這個商品。",
+    TradeReason.INSUFFICIENT_FUNDS: "你的銅幣不足。",
+    TradeReason.UNSELLABLE: "這個物品無法購買。",
+    TradeReason.INSUFFICIENT_STOCK: "商店庫存不足。",
+    TradeReason.BAD_QUANTITY: "數量必須是正整數。",
+}
+
+SELL_ERROR_MESSAGES = {
+    TradeReason.CLOSED: "商店目前沒有營業。",
+    TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
+    TradeReason.UNKNOWN_ITEM: "商店不收這個物品。",
+    TradeReason.UNSELLABLE: "這個物品無法販賣。",
+    TradeReason.INSUFFICIENT_ITEMS: "你沒有足夠的這個物品。",
+    TradeReason.EQUIPPED_ITEM: "已裝備的物品不能這樣賣出。",
+    TradeReason.STOCK_OVERFLOW: "商店收購上限已滿。",
+    TradeReason.BAD_QUANTITY: "數量必須是正整數。",
+}
+
+
 class _ShopCommandBase(Command):
     locks = "cmd:all()"
     help_category = "Economy"
@@ -35,6 +58,40 @@ class _ShopCommandBase(Command):
         except Exception:
             self.caller.msg("這裡沒有商人。")
             return None
+
+    def _parse_trade_args(self, usage_verb: str) -> tuple[str, int] | None:
+        """Parse ``<item_key> [數量]`` from ``self.args``, messaging on failure.
+
+        An empty command line reports the usage line (embedding the ENGLISH
+        command key) and a non-integer quantity reports the canonical
+        ``數量必須是正整數。`` rejection; either returns ``None``.
+        """
+        parts = self.args.strip().split()
+        if not parts:
+            self.caller.msg(f"用法：{usage_verb} <item_key> [數量]")
+            return None
+        item_key = parts[0]
+        try:
+            quantity = int(parts[1]) if len(parts) > 1 else 1
+        except ValueError:
+            self.caller.msg("數量必須是正整數。")
+            return None
+        return item_key, quantity
+
+    def _trade_error_message(
+        self,
+        error: TradeError,
+        table: dict[TradeReason, str],
+        fallback_verb_zh: str,
+    ) -> str:
+        """Map a rejected trade to a player message.
+
+        Table-covered reasons render their canonical Chinese line; anything
+        else falls back to the CHINESE verb-ized failure frame
+        (``購買失敗：`` / ``販賣失敗：``) — never the English command key,
+        which is reserved for the usage line.
+        """
+        return table.get(error.args[0], f"{fallback_verb_zh}失敗：{error}")
 
 
 class CmdShopStock(_ShopCommandBase):
@@ -93,31 +150,16 @@ class CmdBuy(_ShopCommandBase):
         if reason is not None:
             self.caller.msg(reason)
             return
-        parts = self.args.strip().split()
-        if not parts:
-            self.caller.msg("用法：buy <item_key> [數量]")
+        parsed = self._parse_trade_args("buy")
+        if parsed is None:
             return
-        item_key = parts[0]
-        try:
-            quantity = int(parts[1]) if len(parts) > 1 else 1
-        except ValueError:
-            self.caller.msg("數量必須是正整數。")
-            return
+        item_key, quantity = parsed
         try:
             result = buy(self.caller, merchant_host, item_key, quantity)
         except TradeError as error:
-            reason = error.args[0]
-            message = {
-                TradeReason.CLOSED: "商店目前沒有營業。",
-                TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
-                TradeReason.UNKNOWN_ITEM: "商店不賣這個物品。",
-                TradeReason.NOT_OFFERED: "商店沒有這個商品。",
-                TradeReason.INSUFFICIENT_FUNDS: "你的銅幣不足。",
-                TradeReason.UNSELLABLE: "這個物品無法購買。",
-                TradeReason.INSUFFICIENT_STOCK: "商店庫存不足。",
-                TradeReason.BAD_QUANTITY: "數量必須是正整數。",
-            }.get(reason, f"購買失敗：{error}")
-            self.caller.msg(message)
+            self.caller.msg(
+                self._trade_error_message(error, BUY_ERROR_MESSAGES, "購買")
+            )
             return
         self.caller.msg(
             f"你買了 {result['quantity']} 個 {result['item_key']}，"
@@ -139,31 +181,16 @@ class CmdSell(_ShopCommandBase):
         if reason is not None:
             self.caller.msg(reason)
             return
-        parts = self.args.strip().split()
-        if not parts:
-            self.caller.msg("用法：sell <item_key> [數量]")
+        parsed = self._parse_trade_args("sell")
+        if parsed is None:
             return
-        item_key = parts[0]
-        try:
-            quantity = int(parts[1]) if len(parts) > 1 else 1
-        except ValueError:
-            self.caller.msg("數量必須是正整數。")
-            return
+        item_key, quantity = parsed
         try:
             result = sell(self.caller, merchant_host, item_key, quantity)
         except TradeError as error:
-            reason = error.args[0]
-            message = {
-                TradeReason.CLOSED: "商店目前沒有營業。",
-                TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
-                TradeReason.UNKNOWN_ITEM: "商店不收這個物品。",
-                TradeReason.UNSELLABLE: "這個物品無法販賣。",
-                TradeReason.INSUFFICIENT_ITEMS: "你沒有足夠的這個物品。",
-                TradeReason.EQUIPPED_ITEM: "已裝備的物品不能這樣賣出。",
-                TradeReason.STOCK_OVERFLOW: "商店收購上限已滿。",
-                TradeReason.BAD_QUANTITY: "數量必須是正整數。",
-            }.get(reason, f"販賣失敗：{error}")
-            self.caller.msg(message)
+            self.caller.msg(
+                self._trade_error_message(error, SELL_ERROR_MESSAGES, "販賣")
+            )
             return
         self.caller.msg(
             f"你賣了 {result['quantity']} 個 {result['item_key']}，"
