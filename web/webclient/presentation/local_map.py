@@ -23,6 +23,10 @@ from web.webclient.presentation.protocol import (
     _require_str,
     json_byte_size,
 )
+from web.webclient.presentation.protocol_validation import (
+    require_exit_ref,
+    require_node_id_shape,
+)
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.map_knowledge import (
     KnowledgeError,
@@ -77,20 +81,13 @@ class LocalMapError(ProtocolValidationError):
 
 
 def _require_node_id(value: Any, field: str) -> str:
-    if not isinstance(value, str) or len(value) > MAX_NODE_ID_CHARS:
-        raise ProtocolValidationError(f"{field} exceeds the maximum node-ID length")
+    require_node_id_shape(value, field, ProtocolValidationError, MAX_NODE_ID_CHARS)
     decode_node(value)
     return value
 
 
 def _require_exit_ref(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not 1 <= len(value) <= MAX_EXIT_REF_CHARS:
-        raise ProtocolValidationError(
-            f"{field} must be 1..{MAX_EXIT_REF_CHARS} ASCII characters"
-        )
-    if not value.isascii():
-        raise ProtocolValidationError(f"{field} must be ASCII")
-    return value
+    return require_exit_ref(value, field, ProtocolValidationError)
 
 
 def _require_coord(value: Any, field: str) -> int:

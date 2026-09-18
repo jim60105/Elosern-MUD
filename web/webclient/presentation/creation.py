@@ -35,6 +35,10 @@ from web.webclient.presentation.protocol import (
     _validate_identifier,
     json_byte_size,
 )
+from web.webclient.presentation.protocol_validation import (
+    validate_affinity_elements,
+    validate_background,
+)
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.sex import SEX_VALUES
@@ -431,29 +435,13 @@ def _validate_affinity_elements(value: Any, race_key: str) -> list[str]:
     over-bound set degrades the draft so an invalid set never reaches the
     browser. Elf drafts always carry ``[]`` (the subrace seeds at activation).
     """
-    if value is None:
-        return []
-    if not isinstance(value, list):
-        raise ProtocolValidationError("affinity_elements must be a list or null")
-    if len(value) > MAX_AFFINITY_ELEMENTS:
-        raise ProtocolValidationError("affinity_elements exceeds its bound")
-    if race_key == "elf" and value:
-        raise ProtocolValidationError(
-            "an elf must not supply affinity_elements; the subrace is the authority"
-        )
-    maximum = max_affinity_elements(race_key)
-    if len(value) > maximum:
-        raise ProtocolValidationError(
-            f"affinity_elements exceeds the {race_key} maximum of {maximum}"
-        )
-    checked = []
-    for entry in value:
-        if not isinstance(entry, str) or entry not in ELEMENT_REGISTRY:
-            raise ProtocolValidationError(f"unknown affinity element {entry!r}")
-        if entry in checked:
-            raise ProtocolValidationError(f"duplicate affinity element {entry!r}")
-        checked.append(entry)
-    return checked
+    return validate_affinity_elements(
+        value,
+        race_key,
+        ProtocolValidationError,
+        empty_as_none=False,
+        global_bound=MAX_AFFINITY_ELEMENTS,
+    )
 
 
 def _validate_background(value: Any) -> str | None:
@@ -463,16 +451,9 @@ def _validate_background(value: Any) -> str | None:
     over-bound value rejects. The bound mirrors ``MAX_PERSONA_FIELD_LENGTH`` so
     a validated draft always fits the persona-field contract.
     """
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ProtocolValidationError("background must be text or null")
-    text = value.strip()
-    if not text:
-        return None
-    if sum(1 for _ in text) > MAX_PERSONA_FIELD_LENGTH:
-        raise ProtocolValidationError("background exceeds its bound")
-    return text
+    return validate_background(
+        value, ProtocolValidationError, MAX_PERSONA_FIELD_LENGTH
+    )
 
 
 def _validate_draft(value: Any) -> dict[str, Any] | None:

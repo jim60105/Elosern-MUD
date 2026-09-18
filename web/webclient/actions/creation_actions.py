@@ -24,7 +24,6 @@ from typing import Any
 from twisted.internet.defer import Deferred
 
 from typeclasses.characters import PlayerCharacter
-from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
@@ -35,7 +34,6 @@ from world.rules.character_creation import (
     _validate_allocations,
     _validate_persona_block,
     resolve_starting_profile,
-    max_affinity_elements,
 )
 from world.rules.creation_messages import rejection_code, rejection_message
 from world.rules.creation_wizard import (
@@ -46,6 +44,11 @@ from world.rules.creation_wizard import (
     save_preset_draft,
 )
 from world.rules.namegen import roll_name_for_race
+
+from web.webclient.presentation.protocol_validation import (
+    validate_affinity_elements,
+    validate_background,
+)
 
 # Wire limits (equal to the deterministic bounds and the panel contract). The
 # display-name limit mirrors the shared entity-key contract
@@ -231,27 +234,10 @@ def _validate_affinity_elements(value: Any, race: str) -> tuple[str, ...] | None
     duplicate, over-bound set, or any set on an elf rejects structurally before
     the deterministic service runs (webclient-character-creation-ui D4).
     """
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise CreationActionError("affinity_elements must be a list or null")
-    if race == "elf" and value:
-        raise CreationActionError(
-            "an elf must not supply affinity_elements; the subrace is the authority"
-        )
-    maximum = max_affinity_elements(race)
-    if len(value) > maximum:
-        raise CreationActionError(
-            f"affinity_elements exceeds the {race} maximum of {maximum}"
-        )
-    checked: list[str] = []
-    for entry in value:
-        if not isinstance(entry, str) or entry not in ELEMENT_REGISTRY:
-            raise CreationActionError(f"unknown affinity element {entry!r}")
-        if entry in checked:
-            raise CreationActionError(f"duplicate affinity element {entry!r}")
-        checked.append(entry)
-    return tuple(checked)
+    checked = validate_affinity_elements(
+        value, race, CreationActionError, empty_as_none=True
+    )
+    return None if checked is None else tuple(checked)
 
 
 def _validate_background(value: Any) -> str | None:
@@ -261,16 +247,7 @@ def _validate_background(value: Any) -> str | None:
     the key); a non-string or over-bound value rejects structurally before the
     deterministic service runs (webclient-character-creation-ui D4).
     """
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise CreationActionError("background must be text or null")
-    text = value.strip()
-    if not text:
-        return None
-    if sum(1 for _ in text) > MAX_PERSONA_FIELD_LENGTH:
-        raise CreationActionError("background exceeds its bound")
-    return text
+    return validate_background(value, CreationActionError, MAX_PERSONA_FIELD_LENGTH)
 
 
 def validate_creation_activate_payload(payload: dict[str, Any]) -> dict[str, Any]:
