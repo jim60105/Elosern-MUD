@@ -1,7 +1,7 @@
 ## 1. Magnitude derivation
 
-- [ ] 1.1 Derive the three magnitudes by reading the `stimulus_applied` pleasure delta band from `world/rules/rulebook/sexual.yaml` — its floor, midpoint, and ceiling — and record the resulting values in this change's notes. Do not hard-code `8`, `11`, `14` anywhere outside the authored profiles.
-- [ ] 1.2 Add a behavior test that a synthetic usable item declaring a positive pleasure adjustment settles through the shared intimacy writer with no status key in the profile, and that the reported amount is the gauge delta actually applied rather than the declared amount. Annotate with `covers_requirement` for the shared-writer requirement. Verify with `world.rules.tests.test_item_use`.
+- [x] 1.1 Derive the three magnitudes by reading the `stimulus_applied` pleasure delta band from `world/rules/rulebook/sexual.yaml` — its floor, midpoint, and ceiling — and record the resulting values in this change's notes. Do not hard-code `8`, `11`, `14` anywhere outside the authored profiles.
+- [x] 1.2 Add a behavior test that a synthetic usable item declaring a positive pleasure adjustment settles through the shared intimacy writer with no status key in the profile, and that the reported amount is the gauge delta actually applied rather than the declared amount. Annotate with `covers_requirement` for the shared-writer requirement. Verify with `world.rules.tests.test_item_use`.
 
 ## 2. Consuming devices
 

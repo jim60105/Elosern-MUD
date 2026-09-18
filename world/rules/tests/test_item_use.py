@@ -949,18 +949,48 @@ class MultiEffectSettlementTests(_MultiEffectTestCase):
         self.assertEqual(entry.data["amount"], -10)
         self.assertIn("失去", entry.text_template)
 
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
     def test_pleasure_gain_uses_the_shared_writer(self):
+        # Scenario 1: A pleasure gain needs no status vocabulary
+        profile = live_item_effect_profiles()[_PLEASURE_UP_KEY]
+        self.assertEqual(len(profile.effects), 1)
+        self.assertIs(profile.effects[0].stat, ItemStat.PLEASURE)
+        self.assertFalse(hasattr(profile.effects[0], "status"))
+        self.assertFalse(hasattr(profile.effects[0], "remove_status"))
+
+        # Scenario 2: A device's stimulation drives the same cascade as a skill's
         self.set_pleasure(60)
+        self.actor.sexual.wetness.value = 1
+        wetness_before = self.actor.sexual.wetness.value
+        self.assertEqual(self.actor.sexual.arousal.level, "高度")
         self.actor.db.inventory = [_PLEASURE_UP_KEY]
         result = resolve_item_use(
             ItemUseRequest(self.actor, _PLEASURE_UP_KEY), in_combat=False
         )
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.pleasure(), 90)
+        self.assertEqual(self.actor.sexual.arousal.level, "極限")
+        self.assertEqual(self.actor.sexual.wetness.value, wetness_before + 1)
         (entry,) = result.event_log.entries
         self.assertEqual(entry.data["amount"], 30)
         self.assertIn("提升", entry.text_template)
 
+        # Clamped near-ceiling case: reported amount is actual gauge delta, not declared
+        self.set_pleasure(85)
+        self.actor.db.inventory = [_PLEASURE_UP_KEY]
+        clamped_result = resolve_item_use(
+            ItemUseRequest(self.actor, _PLEASURE_UP_KEY), in_combat=False
+        )
+        self.assertEqual(clamped_result.outcome, "success")
+        self.assertEqual(self.pleasure(), 100)
+        (clamped_entry,) = clamped_result.event_log.entries
+        self.assertEqual(clamped_entry.data["amount"], 15)
+
+    @covers_requirement(
+        "lore-item-catalog::a-usable-item-s-pleasure-gain-routes-through-the-shared-intimacy-writer"
+    )
     def test_pleasure_full_at_the_ceiling_rejects_consumption(self):
         self.set_pleasure(100)
         self.actor.db.inventory = [_PLEASURE_UP_KEY]
