@@ -60,6 +60,8 @@ from world.rules.skill_effects import (
     disguise_provenance_of,
     DISGUISE_PROVENANCE_DIVINE,
     record_conferred_grant,
+    reveal_can_pierce,
+    reveal_disguise_effect,
     revoke_conferred_grants,
 )
 from world.rules.targeting import (
@@ -628,6 +630,40 @@ def _handle_set_disguise(
             lambda: apply_divine_disguise(target),
         )
     ]
+
+
+def _handle_reveal_disguise(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Stage one provenance-scoped reveal attempt per target.
+
+    The attempt always completes and is reported, never rejected: a veil the
+    declared strength cannot pierce, or no veil at all, resolves as a clean
+    no-op (design D4), so the action pays its cost and the caster learns
+    nothing beyond the attempt itself. The outcome token is decided against
+    the pre-action state; the staged write re-checks the same strength table
+    at commit, keeping that table in the deterministic-core primitive.
+    """
+    del actor, scale, context
+    strength = parse_effect(effect_id).strength
+    pending: list[PendingEffect] = []
+    for target in targets:
+        outcome = "lifted" if reveal_can_pierce(target, strength) else "noop"
+        pending.append(
+            PendingEffect(
+                target,
+                f"reveal_{outcome}|{_entity_key(target)}",
+                frozenset({"traits"}),
+                lambda target=target, strength=strength: reveal_disguise_effect(
+                    target, strength
+                ),
+            )
+        )
+    return pending
 
 
 def _handle_buff_apply(
@@ -1633,6 +1669,12 @@ register_effect_handler(
     requires_event_context=frozenset(),
 )
 register_effect_handler(
+    "reveal_disguise",
+    _handle_reveal_disguise,
+    frozenset({"traits"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
     "buff_apply",
     _handle_buff_apply,
     frozenset({"buffs"}),
@@ -2348,6 +2390,8 @@ _ENTRY_TEMPLATES = {
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "disguise_lifted": "{actor} 解除了 {target} 的偽裝狀態。",
+    "reveal_lifted": "{actor} 看穿了 {target} 的偽裝。",
+    "reveal_noop": "{actor} 未能看穿 {target} 的偽裝。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
     "grants_revoked": "{actor} 收回了 {target} 身上的一切授予。",
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
