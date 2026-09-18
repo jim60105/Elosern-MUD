@@ -81,14 +81,14 @@
 
 ## 5. Wave close-out verification
 
-- [ ] 5.1 `uv run --locked python -m tools.spec_traceability check` unchanged-passes (no
+- [x] 5.1 `uv run --locked python -m tools.spec_traceability check` unchanged-passes (no
   annotation moved off a renamed method — none are renamed).
-- [ ] 5.2 `uv run --locked python -m tools.observability_lint check` passes; the moved R2
+- [x] 5.2 `uv run --locked python -m tools.observability_lint check` passes; the moved R2
   exemption comments survived the cut — the duplicated tier-block pair merges into the
   single `resolve_source_tier` helper `except`, so the `observability: ignore R2` count in
   `world/rules/action.py` is 6 (pre-change 7: the tier-block comments at 713/844 collapse
   into one; 2226, 3002, 3100, 3190, 3200 unchanged).
-- [ ] 5.3 Pipeline smoke: `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_action_pipeline_rejections`
+- [x] 5.3 Pipeline smoke: `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_action_pipeline_rejections`
   and `... world.rules.tests.test_action_preview` green.
-- [ ] 5.4 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
+- [x] 5.4 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
   green with no manifest edit; `git diff --check` clean.
