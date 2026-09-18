@@ -277,7 +277,7 @@ def _parse_damage_effect(effect_id: str) -> tuple[str, str]:
             "damage effect must be damage:<element>:<school>"
         )
     _, element, school = parts
-    if element not in ELEMENT_REGISTRY:
+    if element != "none" and element not in ELEMENT_REGISTRY:
         raise ValueError(f"unknown damage element {element!r}")
     if school not in {"physical", "magic"}:
         raise ValueError(f"unknown damage school {school!r}")

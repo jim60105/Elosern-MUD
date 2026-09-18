@@ -259,6 +259,18 @@ class SkillDef:
             "parsed_effects",
             tuple(parse_effect(effect_id) for effect_id in self.effects),
         )
+        # One-directional by design (elementless-damage-effect D3): an
+        # element-bearing damage effect on a skill declaring no element is
+        # pre-existing content and stays legal; only the new contradiction
+        # (a declared element alongside an elementless damage effect) fails.
+        if self.element is not None:
+            for effect_id, parsed in zip(self.effects, self.parsed_effects):
+                if isinstance(parsed, DamageEffect) and parsed.element is None:
+                    raise ValueError(
+                        f"skill {self.key!r} declares element {self.element.key!r} "
+                        f"together with an elementless damage effect {effect_id!r}; "
+                        "a skill cannot declare both"
+                    )
         self._validate_effect_policies()
         # Interaction derivation runs only AFTER effect_policies validation:
         # a raw (non-EffectPolicy) declaration is rejected there with the
@@ -667,9 +679,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
-            element="fire",
             faction_constraint=FactionConstraint.ANY,
-            effects=["damage:fire:physical"],
+            effects=["damage:none:physical"],
             category=SkillCategory.MARTIAL_ARTS,
         ),
         _body_multiplier("body_enhancement", "身體強化", 100),
