@@ -466,7 +466,9 @@ def _apply_rate_modifier(
             from world.rules.state_reactions import dispatch_outcome_reaction
 
             tier = source_tier or "學徒"
-            dispatch_outcome_reaction(entity, "hp_loss", source_tier=tier)
+            dispatch_outcome_reaction(
+                entity, "hp_loss", source_tier=tier, hp_loss_amount=actual_loss
+            )
 
         caster_share = rate_mod.get("caster_share")
         if caster_share is not None and actual_loss > 0 and source_pk is not None:

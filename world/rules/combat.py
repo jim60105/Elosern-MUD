@@ -484,7 +484,10 @@ def _handle_damage(
                 if actual_loss > 0:
                     skill_key = getattr(source_skill, "key", source_skill)
                     dispatch_outcome_reaction(
-                        target, "hp_loss", source_tier=source_tier
+                        target,
+                        "hp_loss",
+                        source_tier=source_tier,
+                        hp_loss_amount=actual_loss,
                     )
                     if school == "physical":
                         dispatch_outcome_reaction(

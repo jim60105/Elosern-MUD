@@ -14,6 +14,7 @@ list with disjoint action ownership:
 
 from pathlib import Path
 from collections.abc import Mapping
+from fractions import Fraction
 import math
 from typing import Any
 
@@ -170,31 +171,51 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
                         f"state reaction rule {rule.id!r} pleasure_gain integer must be non-negative, got {gain_val}"
                     )
             elif isinstance(gain_val, dict):
+                # Loadable gain mappings (light-masochism repricing D1/D3):
+                # {"max_hp_coefficient": c} for loss-proportional gains and
+                # {"max_hp_coefficient": c, "flat_max_hp_fraction": f} for
+                # no-loss negative instances. The retired source-tier-keyed
+                # mapping is rejected fail-closed so it cannot be authored
+                # back in by accident.
                 if not gain_val:
                     raise ValueError(
                         f"state reaction rule {rule.id!r} pleasure_gain mapping must not be empty"
                     )
-                from world.skills.cost_tiers import MP_COST_TIERS
-
-                valid_tiers = set(MP_COST_TIERS.keys())
-                for tier_name, tier_amount in gain_val.items():
-                    if not isinstance(tier_name, str) or tier_name not in valid_tiers:
-                        raise ValueError(
-                            f"state reaction rule {rule.id!r} pleasure_gain invalid tier {tier_name!r}; "
-                            f"must be one of {sorted(valid_tiers)}"
-                        )
+                unknown = set(gain_val) - {
+                    "max_hp_coefficient",
+                    "flat_max_hp_fraction",
+                }
+                if unknown:
+                    raise ValueError(
+                        f"state reaction rule {rule.id!r} pleasure_gain mapping key {sorted(unknown)[0]!r} is not recognized; "
+                        f"the retired source-tier mapping is no longer loadable, use 'max_hp_coefficient' "
+                        f"with an optional 'flat_max_hp_fraction'"
+                    )
+                coeff = gain_val.get("max_hp_coefficient")
+                if (
+                    isinstance(coeff, bool)
+                    or not isinstance(coeff, (int, float))
+                    or not math.isfinite(coeff)
+                    or coeff <= 0
+                ):
+                    raise ValueError(
+                        f"state reaction rule {rule.id!r} pleasure_gain max_hp_coefficient must be a finite positive number, got {coeff!r}"
+                    )
+                if "flat_max_hp_fraction" in gain_val:
+                    fraction = gain_val["flat_max_hp_fraction"]
                     if (
-                        isinstance(tier_amount, bool)
-                        or not isinstance(tier_amount, int)
-                        or tier_amount < 0
+                        isinstance(fraction, bool)
+                        or not isinstance(fraction, (int, float))
+                        or not math.isfinite(fraction)
+                        or not (0 < fraction < 1)
                     ):
                         raise ValueError(
-                            f"state reaction rule {rule.id!r} pleasure_gain for tier {tier_name!r} "
-                            f"must be a non-negative integer, got {tier_amount!r}"
+                            f"state reaction rule {rule.id!r} pleasure_gain flat_max_hp_fraction must be a finite number between 0 and 1, got {fraction!r}"
                         )
             else:
                 raise ValueError(
-                    f"state reaction rule {rule.id!r} pleasure_gain must be an integer or mapping of tiers to integers, got {type(gain_val).__name__}"
+                    f"state reaction rule {rule.id!r} pleasure_gain must be a non-negative integer or a "
+                    f"'max_hp_coefficient' mapping, got {type(gain_val).__name__}"
                 )
 
 
@@ -410,6 +431,70 @@ def dispatch_phase_reaction(
                 remove_by_selector(entity, rule.then["remove_buff"])
 
 
+def _read_max_hp(entity: Any) -> Fraction | None:
+    """Read the recipient's maximum HP through the damage pipeline accessor.
+
+    Returns ``None`` — never raises — when the maximum is unreadable, zero or
+    negative, so a state reaction on a malformed entity is a silent no-op
+    instead of an exception aborting a damage settlement mid-transaction
+    (design D4).
+    """
+    try:
+        from world.rules.combat import _max_hp
+
+        max_hp = _max_hp(entity)
+    except (AttributeError, KeyError, TypeError):
+        return None
+    if not (isinstance(max_hp, (int, float)) and max_hp > 0):
+        return None
+    return Fraction(max_hp)
+
+
+def _resolve_pleasure_gain(
+    entity: Any, rule: Rule, hp_loss_amount: int | None
+) -> int:
+    """Resolve one authored ``pleasure_gain`` into a whole number of pleasure.
+
+    Three loadable shapes:
+    - a plain non-negative integer: a flat gain used verbatim;
+    - ``{"max_hp_coefficient": c}``: ``floor(c * hp_loss_amount / max_hp)``,
+      the loss-proportional shape (design D1);
+    - ``{"max_hp_coefficient": c, "flat_max_hp_fraction": f}``:
+      ``floor(c * f)``, the no-loss negative-instance shape (design D3).
+
+    Every indeterminate case — a loss-fraction shape with no loss amount, an
+    unreadable or non-positive maximum HP, or any other mapping — yields ``0``
+    rather than a guessed number: the same fail-closed posture the dispatcher
+    already keeps for a missing handler on a malformed entity (design D2/D4).
+    The derivation runs on exact rational arithmetic so ``floor`` can never
+    undershoot an exact integer through float rounding.
+    """
+    gain_spec = rule.then["pleasure_gain"]
+    if isinstance(gain_spec, int):
+        return gain_spec
+    if not isinstance(gain_spec, dict):
+        return 0
+    coefficient = gain_spec.get("max_hp_coefficient")
+    if isinstance(coefficient, bool) or not isinstance(coefficient, (int, float)):
+        return 0
+    if "flat_max_hp_fraction" in gain_spec:
+        flat = gain_spec["flat_max_hp_fraction"]
+        if isinstance(flat, bool) or not isinstance(flat, (int, float)):
+            return 0
+        fraction = Fraction(flat)
+    else:
+        if hp_loss_amount is None or hp_loss_amount <= 0:
+            return 0
+        max_hp = _read_max_hp(entity)
+        if max_hp is None:
+            return 0
+        fraction = Fraction(hp_loss_amount) / max_hp
+    gain = Fraction(coefficient) * fraction
+    if gain <= 0:
+        return 0
+    return gain.numerator // gain.denominator
+
+
 def dispatch_outcome_reaction(
     entity: Any,
     event: str,
@@ -422,13 +507,18 @@ def dispatch_outcome_reaction(
     nonlethal_keys: frozenset[str] = frozenset(),
     battlefield: Any = None,
     is_counter: bool = False,
+    hp_loss_amount: int | None = None,
 ) -> None:
     """Dispatch outcome reactions (hp_loss, mp_zero, negative_buff_added, physical_hit).
 
     Context provides: entity, event, active_buffs, sexual fields (climax_phase, arousal),
-    source_skill, and source (for source-targeted reactions).
-    A pleasure_gain action calculates the gain using the source_tier (falling back to '學徒'
-    for non-spell or unspecified sources) and calls canonical apply_pleasure_gain.
+    source_skill, source (for source-targeted reactions), and hp_loss_amount
+    (the event's positive actual HP loss, when the caller knows it — it also
+    rides the context, so future when-conditions may author against it).
+    A pleasure_gain action resolves the gain from the rule's authored shape —
+    a flat integer, or the loss fraction of maximum HP for ``hp_loss`` — and
+    calls the canonical apply_pleasure_gain; the gain never reads the source's
+    tier, school or spell-or-not nature.
 
     Only event-conditioned rules are considered: the buff actions of
     field-conditioned phase rules belong to ``dispatch_phase_reaction`` and
@@ -447,6 +537,7 @@ def dispatch_outcome_reaction(
         "active_buffs": active_buff_keys_from_storage(entity),
         "source_skill": skill_key,
         "source": source,
+        "hp_loss_amount": hp_loss_amount,
     }
 
     sexual = getattr(entity, "sexual", None)
@@ -483,19 +574,7 @@ def dispatch_outcome_reaction(
             elif "pleasure_gain" in rule.then:
                 from world.rules.pleasure import apply_pleasure_gain
 
-                gain_spec = rule.then["pleasure_gain"]
-                if isinstance(gain_spec, dict):
-                    chosen_tier = (
-                        source_tier
-                        if (source_tier and source_tier in gain_spec)
-                        else "學徒"
-                    )
-                    gain = gain_spec.get(chosen_tier, gain_spec.get("學徒", 0))
-                elif isinstance(gain_spec, int):
-                    gain = gain_spec
-                else:
-                    gain = 0
-
+                gain = _resolve_pleasure_gain(entity, rule, hp_loss_amount)
                 if gain > 0:
                     apply_pleasure_gain(entity, gain)
             elif "counter_damage" in rule.then:
@@ -564,6 +643,7 @@ def dispatch_outcome_reaction(
                         rules=rules,
                         source_skill=source_skill,
                         is_counter=True,
+                        hp_loss_amount=source_actual_loss,
                     )
             elif "apply_buff_to_source" in rule.then:
                 # Preconditions:

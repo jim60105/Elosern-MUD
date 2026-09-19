@@ -97,7 +97,12 @@ def _handle_gauge_transfer(
                     actual = max(0, int(before - max(0.0, after)))
                     if actual > 0:
                         from world.rules.state_reactions import dispatch_outcome_reaction
-                        dispatch_outcome_reaction(target, "hp_loss", source_tier=skill_tier)
+                        dispatch_outcome_reaction(
+                            target,
+                            "hp_loss",
+                            source_tier=skill_tier,
+                            hp_loss_amount=actual,
+                        )
 
                 actual_drained_box[0] += actual
 

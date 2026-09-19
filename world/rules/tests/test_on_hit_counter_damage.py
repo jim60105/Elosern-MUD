@@ -441,7 +441,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
         rule_attacker_loss = Rule(
             id="synth_attacker_loss_rule",
             when={"event": "hp_loss", "skill_qualified": attacker_passive.key},
-            then={"pleasure_gain": 25},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
         )
 
         with patch(
@@ -474,8 +474,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                 expected_counter,
             )
 
-            # Attacker's hp_loss reaction fired once (+25 pleasure)
-            self.assertEqual(self.actor.sexual.pleasure.base, 25)
+            # Attacker's hp_loss reaction fired once, priced by the counter's
+            # own actual loss (40 of 200 max HP): floor(140 x 40 / 200) = 28.
+            self.assertEqual(self.actor.sexual.pleasure.base, 28)
 
     @covers_requirement(
         "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"
