@@ -933,6 +933,46 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         self.assertEqual(skill_proficiency_level(actor, _T_DRILL.key), 1)
         self.assertEqual(actor.db.skills["passive"], [_T_GRANTED.key])
 
+    def test_failed_commit_restores_the_grant_with_the_award(self):
+        # The practice effect crosses the wiring rule's threshold and grants
+        # into db.skills inside the commit; a later failing effect must undo
+        # both the award and the grant it triggered (the grant shares the
+        # award's commit boundary, forward and backward).
+        entity = self._character("grant-rollback")
+        entity.db.skills = {"active": [_T_DRILL.key], "passive": []}
+        entity.db.skill_proficiency = {
+            _T_DRILL.key: (
+                SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
+            )
+        }
+        before_skills = dict(entity.db.skills)
+        effects = [
+            PendingEffect(
+                entity,
+                "practice",
+                frozenset({"progression"}),
+                lambda: grant_skill_practice_xp(entity, _T_DRILL.key),
+            ),
+            PendingEffect(
+                entity,
+                "failure",
+                frozenset({"progression"}),
+                lambda: (_ for _ in ()).throw(RuntimeError("injected")),
+            ),
+        ]
+        with self.assertRaises(CommitFailed):
+            _commit(effects, char="tester", action="test_skill")
+        self.assertEqual(entity.db.skills, before_skills)
+        self.assertNotIn(_T_GRANTED.key, entity.skills.owned_keys())
+        self.assertEqual(
+            entity.db.skill_proficiency,
+            {
+                _T_DRILL.key: (
+                    SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
+                )
+            },
+        )
+
     def test_award_crossing_no_threshold_grants_nothing_and_stages_no_line(self):
         actor = self._character("no-cross")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
