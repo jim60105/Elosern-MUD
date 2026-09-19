@@ -4,7 +4,8 @@
 # including rulebook and direct-gain callers, or outcome events (hp_loss, mp_zero, negative_buff_added, physical_hit).
 #
 # Rules evaluate using the shared evaluate_condition condition engine.
-# Allowed actions in then are apply_buff, remove_buff, pleasure_gain, counter_damage, and apply_buff_to_source.
+# Allowed actions in then are apply_buff, remove_buff, pleasure_gain, counter_damage, apply_buff_to_source,
+# mark_order_op, and self_heal_max_fraction (field-conditioned phase rules only).
 # Source-targeted actions (counter_damage, apply_buff_to_source) consume the strike's attack source
 # provided by the physical_hit outcome event. The counter's hp_loss dispatch carries the initiating strike's tier.
 
@@ -15,6 +16,17 @@
     skill_qualified: bliss_apotheosis
   then:
     apply_buff: climax_empowerment
+
+# 歡愉回生（rapture-renewal-climax-heal D3/D4）：進入「進行中」期相的一次性無成本自癒 —
+# floor(最大 HP × 0.5)，受 HP 缺口限制、不復活、不問興奮來源。階段轉換語意保證
+# 每輪高潮只兌現一次；extension 或任何停留在進行中的事件都不會再觸發。
+- id: rapture_renewal_climax_heal
+  when:
+    field: climax_phase
+    equals: 進行中
+    skill_qualified: rapture_renewal
+  then:
+    self_heal_max_fraction: 0.5
 
 - id: climax_neutral_remove_empowerment
   when:
