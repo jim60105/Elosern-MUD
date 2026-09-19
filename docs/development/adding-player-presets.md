@@ -104,7 +104,7 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 `sexual_baseline` 選填，`None` 時不寫任何狀態，`SexualState` 繼續沿用泛用預設基線。有宣告時是 `PresetSexualBaseline`：`arousal`、`virgin`（真 bool）、`sensitivity`（`(部位, 等級)` 成對）必填；`wetness`、`shame`、`exposure`、`climax_phase` 選填，留空的會被 `to_record()` 省略、由建構器落到詞彙表最低階。各等級值必須是 `world/lore/sexual_vocab.py` 對應詞彙元組的成員，部位要在 `BODY_PARTS` 加泛用部位 `軀體` 之內。必填的 `arousal` 不容許空字串，只有四個選填欄可以留空。
 
-`disguised_stats` 是 `(軸名, 值)` 成對的純顯示層，值必須是恰好的 `int`（`bool` 拒絕）。軸名刻意不設白名單（`CHARACTER_SCHEMA_V1` 對該欄也只約束整數值），同鍵重複會被拒，因為 `dict()` 會靜默丟掉先寫的那筆。
+`disguised_stats` 是 `(軸名, 值)` 成對的純顯示層，值必須是恰好的 `int`（`bool` 拒絕）。軸名刻意不設白名單（`CHARACTER_SCHEMA_V1` 對該欄也只約束整數值），同鍵重複會被拒，因為 `dict()` 會靜默丟掉先寫的那筆。**非空宣告還要求該卡的種族能使用神之秘法**（`RaceProfile.can_use_divine_arts`）：偽裝層只有這個動詞能寫，無神性或種族本身無法解析的卡宣告非空 `disguised_stats` 一律在載入期爆（divine-arts-seeding-guard）。留空（`()`）不受此限，因為空宣告本來就不播種任何層。這個不變式在 JSON 匯入路徑也同步成立，見下方表格。
 
 ### Step 5.5 — 頭像回退鍵（選填）
 
@@ -142,7 +142,7 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_sex` | lore 匯入 | `sex` 不在 `SEX_VALUES`（`female`／`male`／`other`） | `declares unknown sex` |
 | `_validate_preset_personas` | lore 匯入 | 散文欄非文字、identity／appearance 型別壞、`social_connection` 非成對文字、關係名重複 | `persona.<欄> that is not text`／`is not a PresetIdentity`／`not a (name, relationship) pair` |
 | `_validate_preset_skill_proficiency` | lore 匯入 | 未知技能、重複條目、值非有限非負數（`bool` 拒） | `proficiency for unknown skill`／`duplicate proficiency`／`non-numeric or negative proficiency` |
-| `_validate_preset_disguised_stats` | lore 匯入 | 條目形狀壞、軸名非文字、同鍵重複、值非恰好 `int` | `malformed disguised_stats entry`／`duplicate disguised_stats key`／`non-integer disguise value` |
+| `_validate_preset_disguised_stats` | lore 匯入 | 條目形狀壞、軸名非文字、同鍵重複、值非恰好 `int`、非空宣告落在無神性或無法解析的種族 | `malformed disguised_stats entry`／`duplicate disguised_stats key`／`non-integer disguise value`／`on a race without divine affinity` |
 | `_validate_preset_sexual_baselines` | lore 匯入 | 非 `PresetSexualBaseline`、`virgin` 非真 bool、等級越出詞彙表（僅四個選填欄可空）、部位未知或重複 | `outside its vocabulary`／`unknown body part` |
 | `_validate_preset_starting_companions` | lore 匯入 | 非 `StartingCompanion`、夥伴卡未登錄、宣告自己、同夥伴重複 | `that is not registered`／`declares itself as its own companion`／`more than once` |
 | `_validate_preset_fallback_keys` | lore 匯入 | `fallback_key` 不在閉合詞彙表（六鍵之外且非 `None`） | `declares fallback key ... outside the closed fallback vocabulary` |
@@ -150,6 +150,15 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_companion_bounds` | `starting_companions` 匯入 | 夥伴數超過 `PARTY_MAX_COMPANIONS`（4）、`affinity` 不在 1～`NATURAL_CAP`（99）或為 bool、`relationship` 超過 600 | `more than the party cap 4`／`outside 1..99`／`persona length cap` |
 
 配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超跨度，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
+
+「非神性種族不得帶偽裝層」這條規則不是模板路徑獨有：`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
+
+| 驗證函式 | 觸發於 | 何時爆 | 錯誤訊息（節錄） |
+|---|---|---|---|
+| `_check_disguised_stats_race` | 匯入驗證 | 非空 `disguised_stats` 落在無神性或無法解析的種族 | `disguised_stats requires a race that can use divine arts` |
+| `_check_skills`（延伸） | 匯入驗證 | `skills`／`passives` 點名 `requires_divine_arts` 的技能鍵，但種族無神性或無法解析 | `requires a race that can use divine arts` |
+
+這兩個檢查與既有的 `_check_disguised_stats_subset`（偽裝鍵須是 `stats` 子集）互相獨立，同一筆記錄可能同時違反兩者，回報也會同時列出兩筆問題。
 
 ---
 
@@ -159,6 +168,7 @@ uv run --locked python -m tools.spec_traceability check
 |---|---|
 | 精靈卡宣告非空 `affinity_elements` | lore 匯入即爆。精靈的親附永遠由亞種在啟動時播種，模板不得代宣告 |
 | 神術技能落在無神性種族 | lore 匯入即爆；先確認 `can_use_divine_arts` |
+| 非精靈（無神性種族）的卡或匯入記錄宣告非空 `disguised_stats` | lore 匯入或匯入驗證即爆；偽裝層只有神之秘法能寫，見 §4 |
 | `allocations` 總和不等於預算 | 載入無事、CI 與啟動爆。這是配點制最容易踩的一條，Step 0 先算預算 |
 | `starting_equipment` 的鍵不在 `starting_items` | lore 匯入即爆。背包是持有事實唯一來源，穿戴只能是子集 |
 | persona 散文欄寫超過 600 碼點 | `world.rules.character_creation` 匯入即爆，訊息點名卡與欄 |

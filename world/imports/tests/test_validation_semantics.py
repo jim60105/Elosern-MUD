@@ -10,6 +10,7 @@ import importlib
 import json
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ from world.imports.schema import MAX_NPC_TITLE_CODE_POINTS
 from world.imports.tests.helpers import example_record
 from world.imports.validate import (
     _check_affinity_elements,
+    _check_disguised_stats_race,
     _check_disguised_stats_subset,
     _check_race_subrace,
     _check_npc_title,
@@ -33,6 +35,7 @@ from world.tests.synthetic_data import (
     SYNTH_RACES,
     SYNTH_SKILLS,
     SYNTH_SUBRACES,
+    make_race,
     make_subrace,
     synthetic_registries,
 )
@@ -253,9 +256,10 @@ class SemanticValidationTests(TestCase):
     @covers_requirement("import-validation::race-and-subrace-must-resolve-in-the-lore-registries-with-subrace-cross-checked-against-race", "import-validation::skills-and-passives-use-a-pluggable-registry-with-explicit-degraded-state-reporting")
     def test_skill_check_rejects_unknown_once_registry_exists(self):
         record = {"skills": ["known", "unknown"], "passives": ["passive"]}
+        non_divine_row = SimpleNamespace(requires_divine_arts=False)
         with patch(
             "world.imports.validate._resolve_skill_registry",
-            return_value={"known": object(), "passive": object()},
+            return_value={"known": non_divine_row, "passive": non_divine_row},
         ):
             issues = _check_skills(record)
         self.assertEqual([issue.message for issue in issues], ["'unknown' not found in skill registry"])
@@ -364,6 +368,83 @@ class SemanticValidationTests(TestCase):
                 from world.imports.validate import _resolve_skill_registry
 
                 _resolve_skill_registry()
+
+
+class DivineArtsSeedingGuardTests(TestCase):
+    """divine-arts-seeding-guard: only a divine-capable race may carry a
+    disguise layer or own a skill that requires divine arts."""
+
+    @covers_requirement("disguised-stats-boundary::only-an-entity-that-can-use-divine-arts-may-be-seeded-with-a-disguise-layer", "import-validation::a-disguise-layer-is-rejected-for-a-record-whose-race-cannot-use-divine-arts")
+    def test_disguise_layer_race_guard(self):
+        divine_race = make_race("t_divine_seed_race", can_use_divine_arts=True)
+        with synthetic_registries("races", extra={"races": {divine_race.key: divine_race}}):
+            record = example_record()
+            record["race"] = divine_race.key
+            record["disguised_stats"] = {"atk_phys": 1}
+            self.assertEqual(_check_disguised_stats_race(record), [])
+
+            record["race"] = sorted(SYNTH_RACES)[0]  # non-divine
+            issues = _check_disguised_stats_race(record)
+            self.assertEqual([issue.field for issue in issues], ["disguised_stats"])
+
+            record["race"] = "not_a_registered_race"
+            issues = _check_disguised_stats_race(record)
+            self.assertEqual([issue.field for issue in issues], ["disguised_stats"])
+
+            record["race"] = sorted(SYNTH_RACES)[0]
+            record["disguised_stats"] = {}
+            self.assertEqual(_check_disguised_stats_race(record), [])
+
+    @covers_requirement("import-validation::a-disguise-layer-is-rejected-for-a-record-whose-race-cannot-use-divine-arts")
+    def test_disguise_layer_and_subset_issues_report_together(self):
+        with synthetic_registries("races"):
+            record = example_record()
+            record["race"] = sorted(SYNTH_RACES)[0]
+            record["stats"] = {"hp": 1}
+            record["disguised_stats"] = {"charisma": 1}
+            report = validate_character(record)
+            fields = {issue.field for issue in report.rejections}
+            self.assertIn("disguised_stats.charisma", fields)
+            self.assertIn("disguised_stats", fields)
+
+    @covers_requirement("import-validation::skill-ownership-requiring-divine-arts-is-rejected-for-a-non-divine-record")
+    def test_skill_ownership_race_guard(self):
+        divine_race = make_race("t_divine_skill_race", can_use_divine_arts=True)
+        with synthetic_registries(
+            "races", "skills", extra={"races": {divine_race.key: divine_race}}
+        ):
+            divine_skill = next(
+                key for key, row in SYNTH_SKILLS.items() if row.requires_divine_arts
+            )
+            mundane_skill = next(
+                key for key, row in SYNTH_SKILLS.items() if not row.requires_divine_arts
+            )
+            non_divine = sorted(SYNTH_RACES)[0]
+
+            # Non-divine race owning a divine-arts skill: rejected.
+            record = {"race": non_divine, "skills": [divine_skill], "passives": []}
+            self.assertEqual(
+                [issue.field for issue in _check_skills(record)], ["skills"]
+            )
+            # Same rule for passives.
+            record = {"race": non_divine, "skills": [], "passives": [divine_skill]}
+            self.assertEqual(
+                [issue.field for issue in _check_skills(record)], ["passives"]
+            )
+            # Divine-capable race owning the same skill: accepted.
+            record = {
+                "race": divine_race.key, "skills": [divine_skill], "passives": [],
+            }
+            self.assertEqual(_check_skills(record), [])
+            # A non-divine-arts skill is unaffected regardless of race.
+            record = {"race": non_divine, "skills": [mundane_skill], "passives": []}
+            self.assertEqual(_check_skills(record), [])
+
+    @covers_requirement("import-validation::skill-ownership-requiring-divine-arts-is-rejected-for-a-non-divine-record")
+    def test_skill_ownership_race_guard_degrades_with_the_registry(self):
+        with patch("world.imports.validate._resolve_skill_registry", return_value=None):
+            record = {"race": "not_a_registered_race", "skills": ["anything"], "passives": []}
+            self.assertEqual(_check_skills(record), [])
 
 
 class TitleSemanticTests(TestCase):

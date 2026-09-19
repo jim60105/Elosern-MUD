@@ -72,7 +72,7 @@ class SchemaTests(TestCase):
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
 
-    @covers_requirement("import-reference-example::the-reference-example-exercises-every-major-schema-branch", "import-schema::persona-is-validated-as-an-object-and-nothing-more")
+    @covers_requirement("import-reference-example::the-reference-example-exercises-every-major-schema-branch-it-can-demonstrate-on-its-race", "import-schema::persona-is-validated-as-an-object-and-nothing-more")
     def test_persona_is_opaque_but_must_be_an_object(self):
         record = example_record()
         record["persona"] = {"anything": [1, {"nested": None}]}

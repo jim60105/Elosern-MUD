@@ -1227,8 +1227,20 @@ def _validate_preset_disguised_stats(registry: dict[str, PlayerPreset]) -> None:
     and the layer is display-only per ``get_display_value``. A duplicate
     key is rejected because ``dict()`` would silently drop the earlier
     entry, the same reason the proficiency validator rejects repeats.
+
+    A non-empty declaration also requires the preset's race to be able to use
+    divine arts, mirroring ``_validate_preset_skill_kits``'s stance for
+    divine-arts skill ownership: only the bloodline-gated veil verb can place
+    a disguise layer, so a non-divine or unresolved race may never carry one.
     """
     for preset in registry.values():
+        if preset.disguised_stats:
+            race = RACE_REGISTRY.get(preset.race)
+            if race is None or not race.can_use_divine_arts:
+                raise ValueError(
+                    f"preset {preset.key!r} declares disguised_stats "
+                    "on a race without divine affinity"
+                )
         seen: set[str] = set()
         for entry in preset.disguised_stats:
             if not isinstance(entry, tuple) or len(entry) != 2:

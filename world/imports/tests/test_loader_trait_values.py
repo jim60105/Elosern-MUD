@@ -117,7 +117,10 @@ class LoaderTraitTests(EvenniaTestCase):
         )
         self.assertEqual(entity.db.equipment, record["equipment"])
         self.assertEqual(entity.db.inventory, record["inventory"])
-        self.assertEqual(entity.db.disguised_stats, record["disguised_stats"])
+        # An empty declaration normalizes to None (design D4 of
+        # divine-arts-seeding-guard): the reference record's race cannot
+        # carry a disguise layer, so its disguised_stats is empty.
+        self.assertEqual(entity.db.disguised_stats, record["disguised_stats"] or None)
 
     @covers_requirement("import-loader::the-loader-assigns-sex-from-the-validated-record-mirroring-race-and-subrace")
     def test_loaded_sex_is_assigned_verbatim(self):
@@ -365,7 +368,7 @@ class LoaderTitleTests(EvenniaTestCase):
         self.assertEqual(
             entity.db.portrait_policy, {"mode": "named", "stable_key": record["key"]}
         )
-        self.assertEqual(entity.db.disguised_stats, record["disguised_stats"])
+        self.assertEqual(entity.db.disguised_stats, record["disguised_stats"] or None)
 
     def test_internal_seam_rejects_invalid_title_before_construction(self):
         # Design D3's fail-closed second gate: even a caller that bypasses
