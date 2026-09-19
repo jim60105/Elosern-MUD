@@ -545,6 +545,7 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_failed_advance_restores_the_cross_lineage_grant_with_the_award(self):
         # A booked practice that crosses a cross-lineage rule's threshold
         # grants into db.skills inside the advance; a post-practice failure

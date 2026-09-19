@@ -888,6 +888,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
     def _monster(self, key: str) -> Monster:
         return _monster(self, key)
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_per_use_award_crossing_a_threshold_grants_within_the_call(self):
         actor = self._character("per-use-grant")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
@@ -909,6 +910,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         # that carries newly-usable-skill lines.
         self.assertEqual(sink, [f"新技能可用：{_T_GRANTED.label}"])
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_award_already_owned_grant_stages_no_line_and_writes_nothing(self):
         actor = self._character("re-grant")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": [_T_GRANTED.key]}
@@ -924,6 +926,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         self.assertEqual(actor.db.skills["passive"], [_T_GRANTED.key])
         self.assertEqual(sink, [])
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_booked_settlement_crossing_a_threshold_grants_the_same_key(self):
         actor = self._character("study-grant")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
@@ -933,6 +936,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         self.assertEqual(skill_proficiency_level(actor, _T_DRILL.key), 1)
         self.assertEqual(actor.db.skills["passive"], [_T_GRANTED.key])
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_failed_commit_restores_the_grant_with_the_award(self):
         # The practice effect crosses the wiring rule's threshold and grants
         # into db.skills inside the commit; a later failing effect must undo
@@ -973,6 +977,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
             },
         )
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_award_crossing_no_threshold_grants_nothing_and_stages_no_line(self):
         actor = self._character("no-cross")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
@@ -984,6 +989,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         self.assertEqual(actor.db.skills["passive"], [])
         self.assertEqual(sink, [])
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_read_paths_produce_no_grant_and_no_write(self):
         actor = self._character("read-path")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
