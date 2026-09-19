@@ -35,6 +35,7 @@ from world.rules.skill_effects import mundane_veil_values
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.tests.raw_attributes import raw_attribute_value
 from world.tests.synthetic_data import make_skill
 
 from ._combat_session_helpers import open_synthetic_scope
@@ -156,14 +157,7 @@ class _CastSettlementTestCase(EvenniaTest):
 
     def _raw_attribute(self, obj, key):
         """The raw stored Attribute row value for ``key``, read via SQL only."""
-        row = (
-            obj.db_attributes.through.objects.filter(
-                objectdb_id=obj.pk, attribute__db_key=key
-            )
-            .values_list("attribute__db_value", flat=True)
-            .first()
-        )
-        return None if row is None else row
+        return raw_attribute_value(obj, key)
 
 
 class OutOfCombatCastSettlementTests(_CastSettlementTestCase):

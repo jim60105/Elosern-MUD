@@ -20,6 +20,7 @@ from world.quests.runtime import (
     to_storage,
 )
 from world.rules.clock import AdvanceSource, get_world_clock, register_event_source
+from world.tests.raw_attributes import raw_attribute_value
 
 from ._fixtures import (
     QuestRegistryIsolation,
@@ -315,14 +316,7 @@ class DeadlineRollbackCacheTests(QuestRegistryIsolation, EvenniaTestCase):
         return room
 
     def _raw_attribute(self, obj, key):
-        row = (
-            obj.db_attributes.through.objects.filter(
-                objectdb_id=obj.pk, attribute__db_key=key
-            )
-            .values_list("attribute__db_value", flat=True)
-            .first()
-        )
-        return None if row is None else row
+        return raw_attribute_value(obj, key)
 
     @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
     def test_later_stage_failure_restores_quest_log_and_pins(self):

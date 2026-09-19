@@ -78,7 +78,7 @@
 
 ## 4. `_raw_attribute` SQL probe
 
-- [ ] 4.1 Create `world/tests/raw_attributes.py::raw_attribute_value(obj, key)` with the
+- [x] 4.1 Create `world/tests/raw_attributes.py::raw_attribute_value(obj, key)` with the
   union SQL body (read `world/rules/tests/test_clock.py:820-840` for the fullest docstring).
   Replace each of the six class methods with a one-line delegate in
   `world/maps/tests/test_instance_reclamation.py:507`, `world/quests/tests/test_deadlines.py:317`,

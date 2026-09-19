@@ -19,6 +19,7 @@ from world.maps.instance import (
     register_owned_entity,
 )
 from world.rules.clock import ScheduledEvent
+from world.tests.raw_attributes import raw_attribute_value
 
 BLOCKING_PIN = "quest:1:stage:0"
 
@@ -505,14 +506,7 @@ class ReclaimRollbackCacheTests(EvenniaTest):
         super().tearDown()
 
     def _raw_attribute(self, obj, key):
-        row = (
-            obj.db_attributes.through.objects.filter(
-                objectdb_id=obj.pk, attribute__db_key=key
-            )
-            .values_list("attribute__db_value", flat=True)
-            .first()
-        )
-        return None if row is None else row
+        return raw_attribute_value(obj, key)
 
     @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
     def test_failing_persist_restores_reclaimed_room_knowledge_and_occupants(self):
