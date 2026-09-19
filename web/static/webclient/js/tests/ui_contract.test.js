@@ -160,8 +160,9 @@ test("the creation overlay and preserved menu model insert text via text APIs", 
 test("the creation form reads both age minimums from the custom.age descriptor", () => {
   // age-range-0-10000: the descriptor block is `custom.age` and the fallback
   // minimum is 0. The fresh-form default age is a showcase-side UX choice
-  // and deliberately not pinned here.
-  const source = read("web/webclient-app/components/CreationOverlay.vue");
+  // and deliberately not pinned here. The creation-overlay split moved the
+  // age reads and the gate expression into the custom-derivations composable.
+  const source = read("web/webclient-app/composables/use-creation-custom.js");
   assert.match(source, /custom\.value\?\.age\?\.age_minimum \?\? 0/);
   assert.match(source, /custom\.value\?\.age\?\.apparent_age_minimum \?\? 0/);
   assert.match(source, /Number\(age\.value\) >= minimumAge\.value && Number\(apparentAge\.value\) >= minimumApparentAge\.value/);
