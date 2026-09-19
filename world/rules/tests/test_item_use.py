@@ -567,7 +567,7 @@ class ItemUseSettlementTests(_ItemUseTestCase):
         self.actor.db.inventory = ["t_moss_tonic"]
         before = self.canonical_state()
         with patch(
-            "world.rules.items.plan_inventory_delta",
+            "world.rules.items.settlement.plan_inventory_delta",
             side_effect=RuntimeError("inventory boom"),
         ):
             with self.assertRaises(RuntimeError):
@@ -587,7 +587,7 @@ class ItemUseSettlementTests(_ItemUseTestCase):
             o.id for o in self.actor.contents if registry_key_for_object(o) == "t_moss_tonic"
         )
         before = self.canonical_state()
-        from world.rules import items as items_module
+        from world.rules.items import settlement as items_module
 
         real_delete = items_module._delete_mirror
 
@@ -1298,7 +1298,7 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
         phase_before = self.actor.sexual.climax_phase.level
         self.actor.db.inventory = [_PLEASURE_UP_KEY]
         with patch(
-            "world.rules.items._delete_mirror",
+            "world.rules.items.settlement._delete_mirror",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
@@ -1337,7 +1337,7 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
         phase_before = self.actor.sexual.climax_phase.level
         self.actor.db.inventory = ["t_reusable_pleasure"]
 
-        from world.rules import items as items_module
+        from world.rules.items import settlement as items_module
         real_gauge = items_module._apply_gauge_step
         step_count = 0
         def fail_on_second_step(step):
@@ -1348,7 +1348,7 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
             return real_gauge(step)
 
         with patch(
-            "world.rules.items._apply_gauge_step",
+            "world.rules.items.settlement._apply_gauge_step",
             side_effect=fail_on_second_step,
         ), self.assertRaises(RuntimeError):
             resolve_item_use(
@@ -1372,7 +1372,7 @@ class SexualSurfaceRollbackTests(_MultiEffectTestCase):
         before_wetness = self.actor.sexual.wetness.level
         before_phase = self.actor.sexual.climax_phase.level
         with patch(
-            "world.rules.items._delete_mirror",
+            "world.rules.items.settlement._delete_mirror",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
@@ -1585,7 +1585,7 @@ class JournalIdentityTests(_MultiEffectTestCase):
         a_record, b_record = journal.entities[left], journal.entities[right]
         journal.entities[left] = replace(a_record, entity=b_record.entity)
         journal.entities[right] = replace(b_record, entity=a_record.entity)
-        from world.rules import items as items_module
+        from world.rules.items import journal as items_module
 
         warnings: list[dict] = []
         real_warn = items_module.log_warn
@@ -1669,7 +1669,7 @@ class MultiTargetRollbackTests(_MultiEffectTestCase):
             },
         }
 
-        from world.rules import items as items_module
+        from world.rules.items import settlement as items_module
 
         real_status = items_module._apply_status_step
         applied = {"count": 0}
@@ -1737,7 +1737,7 @@ class MultiTargetRollbackTests(_MultiEffectTestCase):
         self.assertEqual(int(companion.sexual.pleasure.base), 10)
         self.assertEqual(self.pleasure(), 60)
         with patch(
-            "world.rules.items._delete_mirror",
+            "world.rules.items.settlement._delete_mirror",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):

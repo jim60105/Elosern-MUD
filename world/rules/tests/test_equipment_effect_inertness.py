@@ -58,7 +58,7 @@ _ALLOWLIST = frozenset(
         Path("world/rules/action/effects/sexual.py"),
         Path("world/rules/buffs.py"),
         Path("world/rules/equipment.py"),
-        Path("world/rules/items.py"),
+        Path("world/rules/items/planning.py"),
         Path("commands/economy.py"),
         Path("commands/items.py"),
         Path("typeclasses/objects.py"),

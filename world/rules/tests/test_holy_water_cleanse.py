@@ -151,7 +151,7 @@ class StatusRemovalCleanseTests(EvenniaTest):
         before_inventory = list(self.actor.db.inventory)
         before_buffs = set(self.actor.buffs.all)
         with patch(
-            "world.rules.items._delete_mirror",
+            "world.rules.items.settlement._delete_mirror",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
