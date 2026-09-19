@@ -402,10 +402,11 @@ def graft_synth_state_reaction_rulebook() -> None:
     against the LIVE ``BUFF_DEFINITIONS`` and ``MP_COST_TIERS``. The
     synthetic install replaces both with t_-only rows, which removes
     vocabulary the shipped rulebook legitimately names: every buff key the
-    shipped reaction rules reference (markers, counters, ignite/ward marks)
-    and the six shipped pleasure-gain tier keys. Importing the module after
-    the install then fail-closes, and the browser seed dies inside the first
-    ``apply_buff`` dispatch. Same seam class as
+    shipped reaction rules reference (markers, counters, ignite/ward marks).
+    (``pleasure_gain`` rows are loss-fraction shapes since the
+    pain-to-pleasure repricing, so they no longer name tier vocabulary.)
+    Importing the module after the install then fail-closes, and the browser
+    seed dies inside the first ``apply_buff`` dispatch. Same seam class as
     ``graft_synth_defeat_rulebook``: restore both vocabularies ADDITIVELY
     (``setdefault``), so kit ``t_``-keyed lookups keep resolving their own
     rows first.
@@ -460,10 +461,12 @@ def graft_synth_state_reaction_rulebook() -> None:
             # bug; the real loader's dict access fails loudly here instead of
             # silently leaving the import-time validation to fail later.
             BUFF_DEFINITIONS.setdefault(buff_key, shipped_buffs[buff_key])
-    # state_reactions.yaml pleasure_gain rows are keyed by the shipped tier
-    # vocabulary; re-add those CostTier rows beside the installed t_ rows.
-    # Widens spell_tier_for's area band to include 91-110 for future kit
-    # spells (no kit row lands there today); harmless for tier-label reads.
+    # Re-add the shipped CostTier rows beside the installed t_ rows. The
+    # shipped state reactions no longer name tier vocabulary (pleasure_gain
+    # is loss-fraction shaped), but the rows stay for other shipped-data
+    # consumers; this also widens spell_tier_for's area band to include
+    # 91-110 for future kit spells (no kit row lands there today); harmless
+    # for tier-label reads.
     for tier_key, tier in MP_SHIPPED_COST_TIERS.items():
         MP_COST_TIERS.setdefault(tier_key, tier)
 

@@ -969,7 +969,12 @@ def _apply_gauge_step(step: ItemEffectStep) -> int:
         if actual_loss > 0:
             from world.rules.state_reactions import dispatch_outcome_reaction
 
-            dispatch_outcome_reaction(step.target, "hp_loss", source_tier="學徒")
+            dispatch_outcome_reaction(
+                step.target,
+                "hp_loss",
+                source_tier="學徒",
+                hp_loss_amount=actual_loss,
+            )
     return applied
 
 

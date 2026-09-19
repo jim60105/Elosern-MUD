@@ -29,12 +29,7 @@
     skill_qualified: pain_to_pleasure
   then:
     pleasure_gain:
-      學徒: 5
-      術師: 8
-      大師: 12
-      賢者: 18
-      主宰: 28
-      神格: 40
+      max_hp_coefficient: 140
 
 - id: drowning_suffocation
   when:
@@ -49,12 +44,8 @@
     skill_qualified: pain_to_pleasure
   then:
     pleasure_gain:
-      學徒: 5
-      術師: 8
-      大師: 12
-      賢者: 18
-      主宰: 28
-      神格: 40
+      max_hp_coefficient: 140
+      flat_max_hp_fraction: 0.05
 
 # 荊棘反甲（earth-spell-catalog D2）：the first live rule on the shipped
 # physical_hit event — holder-gated through buff_active on the empty-modifier
