@@ -1,0 +1,275 @@
+.local-map__viewport {
+  display: contents;
+}
+
+.local-map__viewport--canvas {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
+  scrollbar-color: var(--gold-500) transparent;
+  scrollbar-width: thin;
+}
+
+.local-map__viewport--canvas > svg {
+  margin: 0 auto;
+}
+
+.local-map__dot-field {
+  pointer-events: none;
+}
+
+.local-map__vignette {
+  pointer-events: none;
+}
+
+.local-map__axis {
+  pointer-events: none;
+}
+
+/* The lattice canvas sizes from the model's exported lattice (cols × rows
+   cells) and scales proportionally under the caller-supplied caps, which
+   both callers resolve into the single `max-width` bound computed in
+   `latticeStyle` (the island passes its measured height budget; the overlay
+   passes no height cap and fills the body width). */
+.local-map__lattice {
+  display: block;
+  /* `align-self: center` centres the canvas whenever a cap makes it narrower
+     than the surface (a tall payload trades width for the island's height
+     budget). It no longer defends a natural-size rendering: an earlier
+     revision used it plus `width: auto` to stop the flex column from
+     *enlarging* small lattices, which is exactly what the draft's
+     `.mini svg { width: 100% }` asks for and what `fillWidth` now does —
+     uniformly, through the viewBox, so every marker/label/gutter offset in
+     the geometry contract stays proportional and scale-invariant. */
+  align-self: center;
+  width: auto;
+  height: auto;
+  background: var(--ink-860);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  overflow: visible;
+}
+
+/* The island's edge-marker name. Its type size is the surface's own declared
+   `markerNameFont` step, bound as an inline style (the same policy the node
+   label follows) because the SAME number drives the along-edge fit budget and
+   the stacked-column line step in script: a CSS-only size could drift away
+   from the geometry that reserves the name's room. `--text-sm` (13px) used to
+   sit here, which the island's coordinate margin then drew at ~13 CSS px —
+   larger than the island's 10px title and than the 9-unit node labels, so a
+   marker's name out-shouted both the map it annotates and the card's own
+   heading. */
+.local-map__edge-marker-name--island {
+  font-family: var(--f-mono);
+  fill: var(--paper-500);
+}
+
+/* The draft mapcanvas framing (webclient-map-01-draft-chrome D4): the
+   overlay surface paints the dark radial-gradient terrain and the rounded
+   ink frame as pure CSS — no fabricated terrain geometry. */
+.local-map__lattice--canvas {
+  background: radial-gradient(70% 60% at 40% 30%, var(--map-canvas-hi), var(--map-canvas-lo));
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+}
+
+.local-map__node {
+  cursor: pointer;
+  scroll-margin: 12px;
+}
+
+.local-map__node:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 6px;
+}
+
+.local-map__node-label {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  /* Decorative label: must never intercept pointer events intended for the
+     node's actionable circle (the label sits in the cell below its node). */
+  pointer-events: none;
+}
+
+/* Draft label tiers (D3 tokens): current brightest, landmark gold,
+   visited seen, unvisited far. */
+.local-map__node-label--here {
+  fill: var(--map-label-here);
+}
+
+.local-map__node-label--gold {
+  fill: var(--map-label-gold);
+}
+
+.local-map__node-label--seen {
+  fill: var(--map-label-seen);
+}
+
+.local-map__node-label--far {
+  fill: var(--map-label-far);
+}
+
+/* The draft marker ladder (D2): the large seal-stroked current circle, the
+   small ink-filled visited dot, the small hollow unvisited dot (keeps the
+   未探索 rule), the remembered diamond. Shape/size distinguish the states
+   without colour. */
+.local-map__marker--current {
+  fill: var(--seal-deep);
+  stroke: var(--seal-light);
+  stroke-width: 2;
+}
+
+.local-map__marker--visible_unvisited {
+  fill: transparent;
+  stroke: var(--vit-sp);
+  stroke-width: 2;
+}
+
+.local-map__marker--visible_visited {
+  fill: var(--ink-700);
+  stroke: var(--ink-edge);
+  stroke-width: 1;
+}
+
+.local-map__marker--remembered {
+  fill: var(--paper-500);
+}
+
+/* The gold landmark ring (draft `.mini` 金環): a decoration over the node's
+   own visibility marker, never a second position claim. */
+.local-map__landmark {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.local-map__actionable {
+  fill: var(--gold-glow);
+  stroke: var(--gold-500);
+  stroke-width: 2;
+}
+
+/* The draft location pin (D4): the teardrop ornament above the current
+   marker — non-interactive, unlabelled, no activation of its own. The path
+   geometry scales with the marker ladder via the element transform, but
+   `vector-effect: non-scaling-stroke` keeps the draft's 1.4px outline at
+   any `markerScale` (an SVG transform would otherwise thicken the stroke
+   proportionally — the draft pairs a hairline pin with a 2px marker ring). */
+.local-map__pin {
+  fill: var(--map-canvas-lo);
+  stroke: var(--seal-light);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* Edge direction markers (map-02 D3b): a non-interactive decoration layer
+   in the gutter. The diamond reuses the remembered-node fill so the off-
+   canvas place reads with the same state identity; the landmark ring and
+   the 11px monospace name follow the node-label/pin precedents (glyphs
+   never scale with markerScale). */
+.local-map__edge-marker {
+  pointer-events: none;
+}
+
+.local-map__edge-marker-diamond {
+  fill: var(--paper-500);
+}
+
+.local-map__edge-marker-landmark {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 1;
+}
+
+.local-map__edge-marker-name {
+  font-family: var(--f-mono);
+  fill: var(--paper-500);
+}
+
+/* Edges form a non-interactive connector layer: they never intercept the
+   pointer events intended for a node's actionable circle. Draft strokes
+   (D2 language): solid ink for traversable, dashed for blocked, faint for
+   unknown — all through the ink-edge token. */
+.local-map__edge {
+  pointer-events: none;
+}
+
+.local-map__edge--traversable {
+  stroke: var(--ink-edge);
+  stroke-width: 2;
+}
+
+.local-map__edge--blocked {
+  stroke: var(--ink-edge);
+  stroke-width: 2;
+  stroke-dasharray: 3 4;
+}
+
+.local-map__edge--unknown {
+  stroke: var(--ink-edge);
+  stroke-width: 1.5;
+  stroke-opacity: 0.45;
+  stroke-dasharray: 2 5;
+}
+
+/* The draft dot-chip legend (D6): an 11px radius-3 chip + 11px text label,
+   14px gap, no bordered pill. The text labels stay the non-colour
+   indicator; remembered (dashed) vs visited (solid) chip borders add a
+   non-colour distinction between those two entries. */
+.local-map__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.local-map__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--paper-500);
+  font-size: 11px;
+}
+
+.local-map__legend-chip {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+.local-map__legend-chip--current {
+  background: var(--seal-deep);
+}
+
+.local-map__legend-chip--visible_unvisited {
+  background: transparent;
+  border: 1px solid var(--ink-edge);
+}
+
+.local-map__legend-chip--visible_visited {
+  background: var(--map-canvas-hi);
+  border: 1px solid var(--gold-500);
+}
+
+.local-map__legend-chip--remembered {
+  background: var(--map-canvas-hi);
+  border: 1px dashed var(--gold-500);
+}
+
+/* Beyond-state note entries (webclient-map-scale-legend D3): a neutral
+   design-token chip whose dotted border is a shape distinction no state
+   chip uses (current: solid fill, unvisited: solid border, visited: solid
+   border, remembered: dashed border), so the info entry never relies on
+   colour alone and can never be mistaken for a visibility state. */
+.local-map__legend-chip--info {
+  background: transparent;
+  border: 1px dotted var(--ink-edge);
+}

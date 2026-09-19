@@ -271,11 +271,13 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(contrast(axisInk, token("--map-canvas-lo"))).toBeGreaterThanOrEqual(0.65);
     expect(contrast(axisInk, token("--map-canvas-hi"))).toBeGreaterThanOrEqual(0.65);
     expect(contrast(axisInk, token("--ink-860"))).toBeGreaterThanOrEqual(0.65);
-    const source = readFileSync(
-      join(process.cwd(), "web/webclient-app/components/MapLattice.vue"),
+    // The MapLattice split moved the scoped stylesheet verbatim to
+    // components/map-lattice.css (included via <style scoped src>, the
+    // CreationOverlay precedent), so the contrast scan reads that file.
+    const style = readFileSync(
+      join(process.cwd(), "web/webclient-app/components/map-lattice.css"),
       "utf-8",
     );
-    const style = source.match(/<style[^>]*>([\s\S]*)<\/style>/)[1];
     // Shipped connector-axis stroke widths (design floor 1.5px): the three
     // edge states only — the marker layer's landmark ring is a decoration,
     // not an axis.
