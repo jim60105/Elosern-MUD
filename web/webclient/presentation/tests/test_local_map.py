@@ -1453,7 +1453,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
     def _registry(self):
         return build_production_registry()
 
-    @patch("web.webclient.presentation.local_map._grid_nodes_in_range", return_value=[])
+    @patch("web.webclient.presentation.local_map.grid._grid_nodes_in_range", return_value=[])
     def test_a_stood_on_gate_room_out_of_range_is_remembered(self, _mock_range):
         self.char1.location = self.north_gate
         record_arrival(self.char1)
@@ -1471,7 +1471,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
 
-    @patch("web.webclient.presentation.local_map._grid_nodes_in_range", return_value=[])
+    @patch("web.webclient.presentation.local_map.grid._grid_nodes_in_range", return_value=[])
     def test_an_in_map_landmark_is_not_a_way_out_of_the_map(self, _mock_range):
         self.char1.location = self.plaza
         record_arrival(self.char1)
@@ -1481,7 +1481,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         remembered_ids = {node["id"] for node in payload["nodes"] if node["visibility"] == "remembered"}
         self.assertNotIn(_t_grid_id(2, 2), remembered_ids)
 
-    @patch("web.webclient.presentation.local_map._grid_nodes_in_range", return_value=[])
+    @patch("web.webclient.presentation.local_map.grid._grid_nodes_in_range", return_value=[])
     def test_two_capital_gate_rooms_stay_distinguishable_when_both_remembered(self, _mock_range):
         self.char1.location = self.north_gate
         record_arrival(self.char1)
@@ -1799,7 +1799,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.location = self.north_gate
         record_arrival(self.char1)
         with patch(
-            "web.webclient.presentation.local_map.MAX_NODES", 4
+            "web.webclient.presentation.local_map.grid.MAX_NODES", 4
         ):
             payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
@@ -1856,7 +1856,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         with (
             patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
-            patch("web.webclient.presentation.local_map.MAX_NODES", 9),
+            patch("web.webclient.presentation.local_map.grid.MAX_NODES", 9),
             patch(
                 "typeclasses.rooms.GridRoom.objects.filter_xyz",
                 return_value=EmptyQuery(),
@@ -2051,7 +2051,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         with (
             patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
-            patch("web.webclient.presentation.local_map.MAX_NODES", 4),
+            patch("web.webclient.presentation.local_map.grid.MAX_NODES", 4),
             patch(
                 "typeclasses.rooms.GridRoom.objects.filter_xyz",
                 return_value=EmptyQuery(),

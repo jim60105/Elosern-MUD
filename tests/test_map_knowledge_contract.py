@@ -24,7 +24,7 @@ FIRST_PARTY_ROOTS = ("commands", "server", "typeclasses", "web", "world")
 KNOWLEDGE_ATTR = "map_knowledge"
 SOLE_WRITER = "world/rules/map_knowledge.py"
 
-_PY_LOCAL_MAP = REPO_ROOT / "web/webclient/presentation/local_map.py"
+_PY_LOCAL_MAP = REPO_ROOT / "web/webclient/presentation/local_map/validate.py"
 _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
 
 

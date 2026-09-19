@@ -40,7 +40,7 @@ _PANEL_MODULES = (
     ("art", "art.py"),
     ("status", "status.py"),
     ("context_actions", "combat_panel.py"),
-    ("local_map", "local_map.py"),
+    ("local_map", "local_map/validate.py"),
     ("party", "party.py"),
     ("objectives", "objectives.py"),
     ("services", "services.py"),

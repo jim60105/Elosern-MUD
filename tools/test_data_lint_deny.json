@@ -91,8 +91,8 @@
       "token": "digest"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "e"
     },
@@ -205,20 +205,20 @@
       "token": "mid"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "n"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "ne"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "nw"
     },
@@ -259,8 +259,8 @@
       "token": "s"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "se"
     },
@@ -301,8 +301,8 @@
       "token": "stages"
     },
     {
-      "evidence": "web/webclient/presentation/local_map.py:64",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient/presentation/local_map/validate.py:58",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map/validate.py:58); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "sw"
     },
