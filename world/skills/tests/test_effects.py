@@ -70,6 +70,11 @@ class ParseEffectTests(unittest.TestCase):
         # The multiplier must be non-negative.
         with self.assertRaises(ValueError):
             parse_effect("growth_rate:practice:-1:wind")
+        # The multiplier must be finite.
+        for multiplier in ("nan", "inf"):
+            with self.subTest(multiplier=multiplier):
+                with self.assertRaises(ValueError):
+                    parse_effect(f"growth_rate:practice:{multiplier}:wind")
         # Exactly four segments: a fifth segment is not a valid payload.
         with self.assertRaises(ValueError):
             parse_effect("growth_rate:practice:5:wind:extra")
