@@ -6,7 +6,8 @@ list with disjoint action ownership:
 
 * ``dispatch_phase_reaction`` runs once after a successful canonical
   ``_apply_climax_phase_set`` edge and executes the ``apply_buff`` /
-  ``remove_buff`` actions of field-conditioned phase rules.
+  ``remove_buff`` / ``self_heal_max_fraction`` actions of field-conditioned
+  phase rules.
 * ``dispatch_outcome_reaction`` runs on named outcome events (``hp_loss``,
   ``negative_buff_added``) and executes only the ``pleasure_gain`` action of
   event-conditioned rules; buff actions belong to the phase dispatcher.
@@ -89,10 +90,12 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
             {"counter_damage"},
             {"apply_buff_to_source"},
             {"mark_order_op"},
+            {"self_heal_max_fraction"},
         ):
             raise ValueError(
                 f"state reaction rule {rule.id!r} then clause must declare exactly one of "
-                f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', 'apply_buff_to_source', or 'mark_order_op', "
+                f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', "
+                f"'apply_buff_to_source', 'mark_order_op', or 'self_heal_max_fraction', "
                 f"got {sorted(then_keys)!r}"
             )
 
@@ -216,6 +219,28 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
                 raise ValueError(
                     f"state reaction rule {rule.id!r} pleasure_gain must be a non-negative integer or a "
                     f"'max_hp_coefficient' mapping, got {type(gain_val).__name__}"
+                )
+        elif action_key == "self_heal_max_fraction":
+            # A max-HP-fraction self-heal is a PHASE action: it mutates HP on
+            # a canonical phase edge, which only dispatch_phase_reaction
+            # executes. dispatch_outcome_reaction never runs it, so an
+            # event-conditioned rule carrying the action would be a dead
+            # rule — rejected fail-closed instead of silently loadable.
+            if "event" in rule.when:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} self_heal_max_fraction is a phase action "
+                    f"and must not be conditioned on an event"
+                )
+            fraction = rule.then["self_heal_max_fraction"]
+            if (
+                isinstance(fraction, bool)
+                or not isinstance(fraction, (int, float))
+                or not math.isfinite(fraction)
+                or not (0 < fraction <= 1)
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} self_heal_max_fraction must be a finite "
+                    f"number in (0, 1], got {fraction!r}"
                 )
 
 
@@ -401,8 +426,12 @@ def dispatch_phase_reaction(
 ) -> None:
     """Dispatch phase transition reactions once after canonical climax phase changes.
 
-    Callers must execute inside a buffs-snapshotting transaction to preserve
-    all-or-nothing settlement when a reaction applies or removes a marker.
+    Fires only on actual canonical transitions (never on phase state), so an
+    extension or any other event while the holder already sits in the target
+    phase triggers nothing. Callers must execute inside an HP- and
+    buffs-snapshotting transaction: a reaction may write the holder's HP
+    (``self_heal_max_fraction``) as well as apply or remove a marker, and all
+    of it must roll back together.
     Context provides: entity, field (climax_phase), from_phase, to_phase,
     climax_phase (to_phase), and active_buffs.
     """
@@ -429,15 +458,48 @@ def dispatch_phase_reaction(
                 apply_buff(entity, rule.then["apply_buff"])
             elif "remove_buff" in rule.then:
                 remove_by_selector(entity, rule.then["remove_buff"])
+            elif "self_heal_max_fraction" in rule.then:
+                # Self-recovery expressed as a fraction of maximum HP
+                # (rapture-renewal-climax-heal D3/D4). Indeterminate shapes
+                # never raise mid-transaction: an unreadable or non-positive
+                # maximum, a downed holder, or a malformed authored fraction
+                # is a silent no-write (the loader already rejects the
+                # malformed fraction at load, so this is defensive).
+                from world.rules.action import _stored_trait_value
+                from world.rules.combat import _apply_heal
+
+                max_hp = _read_max_hp(entity)
+                if max_hp is None:
+                    continue
+                fraction = rule.then["self_heal_max_fraction"]
+                if (
+                    isinstance(fraction, bool)
+                    or not isinstance(fraction, (int, float))
+                    or not math.isfinite(fraction)
+                    or not (0 < fraction <= 1)
+                ):
+                    continue
+                current = _stored_trait_value(entity.traits.hp)
+                if current <= 0:
+                    continue
+                # Parse the authored decimal (not the binary double) so a
+                # future balance value like 0.1 floors as written, not as
+                # repr(0.1) would compute.
+                authored = max_hp * Fraction(str(fraction))
+                floored = authored.numerator // authored.denominator
+                gap = max(0.0, max_hp - current)
+                amount = min(floored, gap)
+                if amount > 0:
+                    _apply_heal(entity, int(amount))
 
 
 def _read_max_hp(entity: Any) -> Fraction | None:
     """Read the recipient's maximum HP through the damage pipeline accessor.
 
     Returns ``None`` — never raises — when the maximum is unreadable, zero or
-    negative, so a state reaction on a malformed entity is a silent no-op
-    instead of an exception aborting a damage settlement mid-transaction
-    (design D4).
+    negative, or not a finite number, so a state reaction on a malformed
+    entity is a silent no-op instead of an exception aborting a damage
+    settlement mid-transaction (design D4).
     """
     try:
         from world.rules.combat import _max_hp
@@ -445,7 +507,11 @@ def _read_max_hp(entity: Any) -> Fraction | None:
         max_hp = _max_hp(entity)
     except (AttributeError, KeyError, TypeError):
         return None
-    if not (isinstance(max_hp, (int, float)) and max_hp > 0):
+    if not (
+        isinstance(max_hp, (int, float))
+        and math.isfinite(max_hp)
+        and max_hp > 0
+    ):
         return None
     return Fraction(max_hp)
 

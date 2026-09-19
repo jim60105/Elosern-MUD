@@ -864,6 +864,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "precise_mana_control",
                 "concentration",
                 "pain_to_pleasure",
+                "rapture_renewal",
                 "priestly_grace",
                 "reincarnation_boon_elosia",
                 "reincarnation_boon_yuka",

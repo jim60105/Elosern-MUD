@@ -95,7 +95,7 @@
 | --- | --- | --- |
 | 痛苦轉換（`pain_to_pleasure`） | PASSIVE，劇情／聖職敘階授予，無法靠使用練習取得 | **已實裝，但數值設計本次改版**：觸發時機不變（實際 HP 損失、或首次取得一個負面 buff 實例；未命中、零 HP 損失、免疫與單純刷新不觸發，持續傷害逐次觸發）。推進量由「來源法術位階 5／8／12／18／28／40」改為**依已損 HP 比例**計算：`pleasure_gain = floor(140 × 該次 HP 損失 ÷ 最大 HP)`。負面 buff 實例（無 HP 損失）按最大 HP 的 5% 計，即 +7。改版理由與係數推導見下方〈聖職者循環的數值平衡〉。寫入仍只由 `world/rules/` 透過 `world.rules.pleasure.apply_pleasure_gain` 執行 |
 | 女神近接（`priestly_grace`，興奮 → 回復強化） | PASSIVE，與痛苦轉換同由劇情／聖職敘階授予，不靠職稱字串判定 | **已實裝**：裝備恩寵維持既有行為；無裝備也可生效的 HOT 倍率 `1 + 0.1 × 施法者興奮序數`（`recovery_arousal_scale`，於 `world/rules/action/effects/buffs.py` 施放時擷取），只有持有此被動者生效。〔聖禮〕的興奮／露出收益已列在各節點，不再額外乘一次此倍率，以免重複加成。**倍率維持 0.1／序數不變**，理由見下方〈聖職者循環的數值平衡〉 |
-| 歡愉回生（`rapture_renewal`，高潮 → 自身回復） | PASSIVE，身心強化分支（`SkillCategory.ENHANCEMENT`、`element="light"`），與前兩者同由劇情／聖職敘階授予 | **尚未實作（本次新增）**：自身高潮期相進入「進行中」時，被動回復 `floor(最大 HP × 0.5)`，**不消耗任何資源**，受 HP 缺口限制（不溢出、不復活）。觸發只看是否進入高潮期相，不問興奮來源，戰鬥外達成的高潮同樣生效。每次高潮只觸發一次，高潮延長不重複觸發 |
+| 歡愉回生（`rapture_renewal`，高潮 → 自身回復） | PASSIVE，身心強化分支（`SkillCategory.ENHANCEMENT`、`element="light"`），與前兩者同由劇情／聖職敘階授予 | **已實作**：自身高潮期相進入「進行中」時，被動回復 `floor(最大 HP × 0.5)`，**不消耗任何資源**，受 HP 缺口限制（不溢出、不復活）。觸發只看是否進入高潮期相，不問興奮來源，戰鬥外達成的高潮同樣生效。每次高潮只觸發一次，高潮延長不重複觸發（寫入由 `world/rules/state_reactions.py` 的 `self_heal_max_fraction` 階段動作執行，0.5 為 `state_reactions.yaml` 資料） |
 | 露出計價 | 露出度↑ → 防禦↓ 在光屬性的收益面翻轉 | **減益側已實裝**（`high_exposure_defense_penalty`）、有效露出入口已就緒（`effective_exposure`，存儲值＋裝備 `exposure_bias` 封頂疊加）；收益側**亦已實裝**（`sanctified_ward` HOT 的每次結算重讀受護者有效露出，見 `world/rules/buffs.py`；`goddess_milk` 推進量隨最高有效露出序數計算）。修女聖袍／聖女聖袍的 `exposure_bias`＋`pleasure_gain`＋`heal_gain` 三欄構成聖職者裝備線；禁慾／束縛系道具在教義上是反教條物品，永不帶光屬性加成 |
 
 ## 聖職者循環的數值平衡
