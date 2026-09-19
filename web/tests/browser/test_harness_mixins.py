@@ -101,6 +101,24 @@ class ManagedServerTearDownMixinTest(unittest.TestCase):
         server.stop.assert_called_once_with()
         self.assertIsNone(host.server)
 
+    def test_variant_a_override_stops_the_server_exactly_once(self) -> None:
+        # The variant-a suites (action-feedback, creation) snapshot the
+        # attribute BEFORE the base teardown, clear it so the mixin's own
+        # stop is skipped, and hand the snapshot to _stop_managed_server
+        # afterwards. Without the clear, the mixin stops the server a
+        # second time; the byte-order (a) contract is a single stop.
+        calls: list[str] = []
+        host = _MixinHost(calls)
+        server = Mock()
+        server.stop.side_effect = lambda: calls.append("stop")
+        host.server = server
+        snapshot = getattr(host, "server", None)
+        host.server = None
+        host.tearDown()
+        host._stop_managed_server(snapshot)
+        self.assertEqual(calls, ["base", "stop"])
+        server.stop.assert_called_once_with()
+
 
 class WaitCommandFieldReleasedTest(unittest.TestCase):
     """Unit tests for the shared command-field-release gate."""

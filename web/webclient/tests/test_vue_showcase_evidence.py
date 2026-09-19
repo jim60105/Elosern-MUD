@@ -47,7 +47,6 @@ from __future__ import annotations
 import glob
 import json
 import re
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path

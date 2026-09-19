@@ -33,7 +33,6 @@ from __future__ import annotations
 import glob
 import json
 import re
-import subprocess
 import unittest
 from pathlib import Path
 

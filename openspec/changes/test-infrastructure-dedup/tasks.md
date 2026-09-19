@@ -92,10 +92,13 @@
 
 ## 5. Close-out
 
-- [ ] 5.1 Shard contract green with an untouched manifest:
+- [x] 5.1 Shard contract green with an untouched manifest:
   `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
-- [ ] 5.2 `uv run --locked python -m tools.spec_traceability check` and
+- [x] 5.2 `uv run --locked python -m tools.spec_traceability check` and
   `uv run --locked python -m tools.observability_lint check` pass; freeze list diff empty.
-- [ ] 5.3 `uv run --locked python -m tools.test_data_lint check` green (the gate the
+- [x] 5.3 `uv run --locked python -m tools.test_data_lint check` green (the gate the
   data-independence family guards must be untouched by the extraction).
-- [ ] 5.4 `git diff --check` clean; `git status` shows no new/renamed `test_*.py` anywhere.
+- [x] 5.4 `git diff --check` clean; `git status` shows no new/renamed `test_*.py` under the
+  HARD directories (`commands/`, `server/`, `typeclasses/`, `world/`, `web/webclient/`);
+  the only new `test_*.py` anywhere is the task-3.2-mandated
+  `web/tests/browser/test_harness_mixins.py` (registered in `browser-shards.json`).

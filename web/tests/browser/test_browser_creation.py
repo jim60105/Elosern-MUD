@@ -87,6 +87,7 @@ class CreationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def tearDown(self) -> None:
         server = getattr(self, "server", None)
+        self.server = None
         super().tearDown()
         self._stop_managed_server(server)
 

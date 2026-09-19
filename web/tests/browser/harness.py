@@ -512,8 +512,9 @@ class ManagedServerTearDownMixin:
     byte-order (b): run the base teardown first, then stop the server. Two
     suites (``test_browser_action_feedback`` and ``test_browser_creation``)
     instead read the attribute BEFORE the base teardown (byte-order (a));
-    their ``tearDown`` overrides snapshot the attribute first and hand the
-    snapshot to :meth:`_stop_managed_server`.
+    their ``tearDown`` overrides snapshot the attribute first, clear it so
+    this mixin's own stop is skipped, then hand the snapshot to
+    :meth:`_stop_managed_server` after the base teardown.
     """
 
     def tearDown(self) -> None:
