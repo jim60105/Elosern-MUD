@@ -217,6 +217,12 @@ class PhaseSelfHealDispatchTests(unittest.TestCase):
         entity.traits.hp._data["base"] = 0
         with _patch_registry():
             self._dispatch(entity)
+        # Non-finite maximum (corrupted storage) is unreadable too: the
+        # dispatcher must not raise or guess, it must write nothing.
+        entity = _holder(hp=50, max_hp=100)
+        entity.traits.hp._data["base"] = math.inf
+        with _patch_registry():
+            self._dispatch(entity)
         self.assertEqual(entity.traits.hp.current, 50)
 
     @covers_requirement("damage-state-feedback::a-qualified-passive-self-recovers-once-on-canonical-climax-entry")
@@ -227,6 +233,24 @@ class PhaseSelfHealDispatchTests(unittest.TestCase):
         with _patch_registry():
             self._dispatch(entity)
         self.assertEqual(entity.traits.hp.current, 120)
+
+    @covers_requirement("damage-state-feedback::a-qualified-passive-self-recovers-once-on-canonical-climax-entry")
+    def test_fraction_is_parsed_as_the_authored_decimal(self):
+        # floor(max_hp x 0.1) must be the decimal product, not the binary
+        # double: 10 x 1/10 = 1, never 0.
+        entity = _holder(hp=1, max_hp=10)
+        decimal_rule = Rule(
+            id="t_synth_decimal_fraction",
+            when={
+                "field": "climax_phase",
+                "equals": "進行中",
+                "skill_qualified": _T_RENEWAL_KEY,
+            },
+            then={"self_heal_max_fraction": 0.1},
+        )
+        with _patch_registry():
+            self._dispatch(entity, rules=[decimal_rule])
+        self.assertEqual(entity.traits.hp.current, 2)
 
 
 # ---------------------------------------------------------------------------

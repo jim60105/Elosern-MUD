@@ -482,7 +482,10 @@ def dispatch_phase_reaction(
                 current = _stored_trait_value(entity.traits.hp)
                 if current <= 0:
                     continue
-                authored = max_hp * Fraction(fraction)
+                # Parse the authored decimal (not the binary double) so a
+                # future balance value like 0.1 floors as written, not as
+                # repr(0.1) would compute.
+                authored = max_hp * Fraction(str(fraction))
                 floored = authored.numerator // authored.denominator
                 gap = max(0.0, max_hp - current)
                 amount = min(floored, gap)
@@ -494,9 +497,9 @@ def _read_max_hp(entity: Any) -> Fraction | None:
     """Read the recipient's maximum HP through the damage pipeline accessor.
 
     Returns ``None`` — never raises — when the maximum is unreadable, zero or
-    negative, so a state reaction on a malformed entity is a silent no-op
-    instead of an exception aborting a damage settlement mid-transaction
-    (design D4).
+    negative, or not a finite number, so a state reaction on a malformed
+    entity is a silent no-op instead of an exception aborting a damage
+    settlement mid-transaction (design D4).
     """
     try:
         from world.rules.combat import _max_hp
@@ -504,7 +507,11 @@ def _read_max_hp(entity: Any) -> Fraction | None:
         max_hp = _max_hp(entity)
     except (AttributeError, KeyError, TypeError):
         return None
-    if not (isinstance(max_hp, (int, float)) and max_hp > 0):
+    if not (
+        isinstance(max_hp, (int, float))
+        and math.isfinite(max_hp)
+        and max_hp > 0
+    ):
         return None
     return Fraction(max_hp)
 
