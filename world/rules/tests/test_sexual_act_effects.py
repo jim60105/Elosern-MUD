@@ -466,7 +466,7 @@ class SharedPleasureModuleTests(unittest.TestCase):
         ("world/rules/pleasure.py", "apply_pleasure_gain"),
         ("world/rules/pleasure.py", "zero_pleasure"),
         ("world/rules/sexual_transitions.py", "_apply_then"),
-        ("world/rules/sexual_state.py", "decay_tick"),
+        ("world/rules/sexual_state/lifecycle.py", "decay_tick"),
     }
 
     @staticmethod

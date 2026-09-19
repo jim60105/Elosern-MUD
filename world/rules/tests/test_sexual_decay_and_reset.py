@@ -7,8 +7,11 @@ import inspect
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+import importlib
+
 from typeclasses.characters import PlayerCharacter
 from world.rules import sexual_state
+from world.rules.sexual_state import lifecycle as sexual_state_lifecycle
 from world.rules.sexual_state import decay_tick, reset_daily_counters
 
 
@@ -26,18 +29,18 @@ class SexualDecayAndResetTests(EvenniaTestCase):
     def test_afterglow_decay_routes_through_guard(self):
         entity = create_object(PlayerCharacter, key="afterglow")
         entity.sexual.climax_phase.value = "餘韻"
-        original = sexual_state._apply_climax_phase_set
+        original = sexual_state_lifecycle._apply_climax_phase_set
         calls = []
 
         def recording_guard(target, level):
             calls.append((target, level))
             return original(target, level)
 
-        sexual_state._apply_climax_phase_set = recording_guard
+        sexual_state_lifecycle._apply_climax_phase_set = recording_guard
         try:
             decay_tick(entity, 300)
         finally:
-            sexual_state._apply_climax_phase_set = original
+            sexual_state_lifecycle._apply_climax_phase_set = original
         self.assertEqual(calls, [(entity, "未達")])
         self.assertEqual(entity.sexual.climax_phase.level, "未達")
 
@@ -84,7 +87,18 @@ class SexualDecayAndResetTests(EvenniaTestCase):
 
     @covers_requirement("sexual-state-handler::decay-tick-and-reset-daily-counters-are-exposed-as-plain-callables-with-no-settlement-order-invented")
     def test_module_has_no_clock_or_settlement_policy(self):
-        source = inspect.getsource(sexual_state)
+        source = "".join(
+            inspect.getsource(module)
+            for module in (
+                sexual_state,
+                *(
+                    importlib.import_module(
+                        f"world.rules.sexual_state.{name}"
+                    )
+                    for name in ("pleasure", "traits", "handler", "lifecycle")
+                ),
+            )
+        )
         self.assertNotIn("WorldClock", source)
         self.assertNotIn("settlement_order", source)
         self.assertNotIn("trait_regen", source)

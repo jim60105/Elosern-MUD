@@ -579,7 +579,7 @@ class LifetimeCounterStructureTests(unittest.TestCase):
                 relative = path.relative_to(root).as_posix()
                 if "/tests/" in relative or path.name.startswith("test_"):
                     continue
-                if relative == "world/rules/sexual_state.py":
+                if relative.startswith("world/rules/sexual_state/"):
                     continue
                 source = path.read_text(encoding="utf-8")
                 for field in LIFETIME_COUNTER_FIELDS:

@@ -683,7 +683,10 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
     # Modules allowed to read the STORED exposure ordinal alone.
     _STORED_CONSUMERS = frozenset(
         {
-            Path("world/rules/sexual_state.py"),
+            # The SexualState package: the handler property and the ordered
+            # field table name the stored exposure field directly.
+            Path("world/rules/sexual_state/handler.py"),
+            Path("world/rules/sexual_state/traits.py"),
             Path("world/rules/sexual_transitions.py"),
             Path("world/imports/schema.py"),
             # Declaration-vocabulary exemption, not a live-state reader: the

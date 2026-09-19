@@ -9,10 +9,10 @@ observer-presence read that gates the watched event/counter names. This
 module owns the two new balance tables (the participant-count multiplier
 ladder and the climax-extension threshold) in ``rulebook/sexual_act_effects.yaml``;
 it reads ``PLEASURE_CONFIG``'s sensitivity/shame tables from
-``sexual_state.py`` read-only, exactly as the shipped ``pleasure-gauge``
+the ``world.rules.sexual_state`` package read-only, exactly as the shipped ``pleasure-gauge``
 change declared them.
 
-``sexual_state.py`` never imports this module, so the top-level
+``world.rules.sexual_state`` never imports this module, so the top-level
 ``PLEASURE_CONFIG`` import here is cycle-free — unlike the ``Monster`` import
 in :func:`resolve_part`, which stays deferred inside the function body to
 match ``SexualState.__init__``'s existing ``typeclasses``↔``world.rules``
