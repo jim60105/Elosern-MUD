@@ -35,6 +35,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
+    PRACTICE_XP_PER_STUDY_HOUR,
     SKILL_PRACTICE_XP_PER_USE,
     SKILL_PROFICIENCY_XP_PER_LEVEL,
     element_affinity_multiplier,
@@ -43,12 +44,19 @@ from world.rules.progression import (
 )
 from world.rules.targeting import RoomActionContext
 import world.rules.progression as progression
-from world.tests.synthetic_data import SYNTH_RACES, make_race
+from world.tests.synthetic_data import (
+    SYNTH_GLOWMIRE_ELEMENT,
+    SYNTH_RACES,
+    SYNTH_SKILLS,
+    make_race,
+    make_skill,
+)
 from .combat_fixtures import grant_lineage
 from ._combat_session_helpers import (
     _behaviour_archetype_key,
     _monster_tier_key,
     _race_key,
+    SYNTH_GLOW_ELEMENT,
     live_skill_registry,
     SYNTH_SEAM_AREA_SKILL,
     open_synthetic_scope,
@@ -84,6 +92,49 @@ _T_HEAVY_SPELL = synth_damage_skill(
     cost={"mp": 30},
     category=_live_registry("world.skills.registry", "SkillCategory").ELEMENTAL_MAGIC,
 )
+# Scoped growth-rate fixtures: a synthetic elemental spell of the borrowed
+# shipped element (elemental magic by construction), an invented-element spell
+# the scoped registry also carries, and PASSIVE growth rows scoped to the
+# borrowed element. Scope strings are derived from the spell's own element key
+# at import, so no shipped identifier is pinned in this file; the borrowed
+# element's key IS a shipped element, so the rows parse at import time against
+# the shipped registry and again inside the synthetic scope.
+_T_FIRE_SPELL = synth_damage_skill(
+    "t_scorch_salvo",
+    "灼焰齊射",
+    effects=(f"damage:{SYNTH_SKILLS['t_ember_burst'].element.key}:magic",),
+)
+_T_GLOW_SPELL = replace(
+    _T_FIRE_SPELL,
+    key="t_glowmire_surge",
+    label="光沼湧流",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic"],
+    element=SYNTH_GLOWMIRE_ELEMENT,
+)
+_T_GROWTH_FIRE = replace(
+    _T_DRILL,
+    key="t_growth_windfall",
+    label="成長恩惠",
+    kind=SkillKind.PASSIVE,
+    category=SkillCategory.ENHANCEMENT,
+    effects=[f"growth_rate:practice:5:{_T_FIRE_SPELL.element.key}"],
+)
+_T_GROWTH_FIRE2 = replace(
+    _T_GROWTH_FIRE,
+    key="t_growth_bounty",
+    label="成長豐饒",
+    effects=[f"growth_rate:practice:7:{_T_FIRE_SPELL.element.key}"],
+)
+_T_GROWTH_DUP = replace(
+    _T_GROWTH_FIRE,
+    key="t_growth_duplicate",
+    label="成長重疊",
+    effects=[
+        f"growth_rate:practice:5:{_T_FIRE_SPELL.element.key}",
+        f"growth_rate:practice:7:{_T_FIRE_SPELL.element.key}",
+    ],
+)
+_T_PLAIN_DRILL = make_skill("t_plain_drill")
 # The cross-lineage wiring grant: a synthetic PASSIVE the rulebook is allowed
 # to grant. It lives only in the wiring rulebook's registry — never in the
 # scoped skill registry — because the grant writer resolves kinds through the
@@ -105,6 +156,12 @@ _ALL_SKILLS = {
     _T_DRILL.key: _T_DRILL,
     _T_GALE.key: _T_GALE,
     _T_HEAVY_SPELL.key: _T_HEAVY_SPELL,
+    _T_FIRE_SPELL.key: _T_FIRE_SPELL,
+    _T_GLOW_SPELL.key: _T_GLOW_SPELL,
+    _T_GROWTH_FIRE.key: _T_GROWTH_FIRE,
+    _T_GROWTH_FIRE2.key: _T_GROWTH_FIRE2,
+    _T_GROWTH_DUP.key: _T_GROWTH_DUP,
+    _T_PLAIN_DRILL.key: _T_PLAIN_DRILL,
     SYNTH_SEAM_AREA_SKILL.key: SYNTH_SEAM_AREA_SKILL,
     **synth_lineage_tree(),
     **synth_lineage_tree_magic(),
@@ -216,6 +273,111 @@ class ProgressionTests(EvenniaTestCase):
             SKILL_PRACTICE_XP_PER_USE
             * SWIFT_LEARNER.learning_multiplier
             * 0.5,
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_owned_scoped_growth_accelerates_only_its_own_tree(self):
+        # The owned growth passive accelerates the spell of its scoped element
+        # and leaves a spell of another element at the neutral factor (the
+        # delta's "accelerates only its own tree" scenario). Both spells are
+        # cast by the same entity in one tick; the dedupe triple differs by
+        # skill key, so both accruals land.
+        entity = self._character("growth-scope", SWIFT_LEARNER.key)
+        entity.db.skills = {"active": [], "passive": [_T_GROWTH_FIRE.key]}
+        self.assertTrue(grant_skill_practice_xp(entity, _T_FIRE_SPELL.key))
+        self.assertTrue(grant_skill_practice_xp(entity, _T_GLOW_SPELL.key))
+        base = SKILL_PRACTICE_XP_PER_USE * SWIFT_LEARNER.learning_multiplier
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_FIRE_SPELL.key],
+            base
+            * element_affinity_multiplier(entity, _T_FIRE_SPELL.element.key)
+            * 5.0,
+        )
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_GLOW_SPELL.key],
+            base
+            * element_affinity_multiplier(entity, _T_GLOW_SPELL.element.key),
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_owned_scoped_growth_leaves_non_elemental_practice_alone(self):
+        # A skill declaring no element takes the neutral owned-skill factor
+        # even when the actor owns a scoped growth passive (delta scenario).
+        entity = self._character("growth-plain", SWIFT_LEARNER.key)
+        entity.db.skills = {"active": [], "passive": [_T_GROWTH_FIRE.key]}
+        self.assertTrue(grant_skill_practice_xp(entity, _T_PLAIN_DRILL.key))
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_PLAIN_DRILL.key],
+            SKILL_PRACTICE_XP_PER_USE * SWIFT_LEARNER.learning_multiplier,
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_owned_and_conferred_growth_compose_multiplicatively(self):
+        # The owned-skill factor and the conferred-buff factor are independent
+        # and multiply (delta scenario).
+        entity = self._character("growth-compose", SWIFT_LEARNER.key)
+        entity.db.skills = {"active": [], "passive": [_T_GROWTH_FIRE.key]}
+        grant_conferred_growth_rate(entity, "elosia", 0.5)
+        self.assertTrue(grant_skill_practice_xp(entity, _T_FIRE_SPELL.key))
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_FIRE_SPELL.key],
+            SKILL_PRACTICE_XP_PER_USE
+            * SWIFT_LEARNER.learning_multiplier
+            * element_affinity_multiplier(entity, _T_FIRE_SPELL.element.key)
+            * 0.5
+            * 5.0,
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_duplicate_scoped_growth_raises_only_for_the_queried_scope(self):
+        # One skill declaring two growth_rate effects for the same scope
+        # raises when that scope is practised (mirroring _matching_multiplier);
+        # a spell of another element is unaffected by the duplicate pair.
+        entity = self._character("growth-dup", SWIFT_LEARNER.key)
+        entity.db.skills = {"active": [], "passive": [_T_GROWTH_DUP.key]}
+        with self.assertRaises(ValueError):
+            grant_skill_practice_xp(entity, _T_FIRE_SPELL.key)
+        self.assertTrue(grant_skill_practice_xp(entity, _T_GLOW_SPELL.key))
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_GLOW_SPELL.key],
+            SKILL_PRACTICE_XP_PER_USE
+            * SWIFT_LEARNER.learning_multiplier
+            * element_affinity_multiplier(entity, _T_GLOW_SPELL.element.key),
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_separate_owned_growth_skills_multiply(self):
+        # The duplicate guard is per skill: two distinct owned growth passives
+        # of the same scope multiply across skills (5 x 7).
+        entity = self._character("growth-multi", SWIFT_LEARNER.key)
+        entity.db.skills = {
+            "active": [],
+            "passive": [_T_GROWTH_FIRE.key, _T_GROWTH_FIRE2.key],
+        }
+        self.assertTrue(grant_skill_practice_xp(entity, _T_FIRE_SPELL.key))
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_FIRE_SPELL.key],
+            SKILL_PRACTICE_XP_PER_USE
+            * SWIFT_LEARNER.learning_multiplier
+            * element_affinity_multiplier(entity, _T_FIRE_SPELL.element.key)
+            * 5.0
+            * 7.0,
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_booked_study_inherits_the_owned_scoped_growth_factor(self):
+        # The booked-hourly settlement scales by the same composite as the
+        # per-use grant (one formula, two entry points).
+        entity = self._character("growth-study", SWIFT_LEARNER.key)
+        entity.db.skills = {"active": [], "passive": [_T_GROWTH_FIRE.key]}
+        self.assertTrue(
+            progression.grant_study_practice_xp(entity, _T_FIRE_SPELL.key, hours=1)
+        )
+        self.assertEqual(
+            entity.db.skill_proficiency[_T_FIRE_SPELL.key],
+            PRACTICE_XP_PER_STUDY_HOUR
+            * SWIFT_LEARNER.learning_multiplier
+            * 5.0,
         )
 
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")

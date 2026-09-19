@@ -45,7 +45,7 @@
 
 如果未來設計出現「天賦異能還能再練得更強」的內容，應重新分類到身心強化通用被動或對應的元素系譜。
 
-### 待實作缺口
+### 落地狀態
 
-- `growth_rate` 目前在引擎裡**解析得出但沒有生產端消費者**：`world/rules/progression.py` 的練習成長只讀統御術授予的 `conferred_growth_rate` 狀態，不讀持有者自身技能上的 `growth_rate` 效果。因此直接持有 `reincarnation_boon_elosia` 的角色，其成長加速目前完全沒有生效。
-- 現行效果字串 `growth_rate:practice:100` 是全域倍率形式，無法表達本頁要求的「指名單一系譜樹」。落地時需要改寫成帶作用域的形式。
+- `growth_rate` 的練習成長消費端已落地：`world/rules/progression.py` 的練習成長複合會乘上持有者**已擁有**技能上所宣告的 scoped `growth_rate` 效果（作用域等於被練習技能的元素時生效，其他元素或無元素技能為 `1.0`），與統御術授予的 `conferred_growth_rate` 狀態各自獨立相乘。
+- 現行效果字串是帶作用域的四段形式 `growth_rate:<stat>:<multiplier>:<scope>`（`reincarnation_boon_elosia` 為 `growth_rate:practice:5:wind`）。舊的全域三／二段形式（`growth_rate:practice:100`、`growth_rate:magic:<N>`）在 parse 時一律失敗關閉，因此無法再以全域倍率的形式存在於資料中。

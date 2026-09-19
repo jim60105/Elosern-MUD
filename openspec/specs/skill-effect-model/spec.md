@@ -22,12 +22,13 @@ namely: (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`,
 `divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`,
 `stimulus`, `pleasure_peak`, `gauge_transfer`, `revoke_grants`, `reveal_disguise`). `parse_effect` SHALL raise `ValueError` for any prefix
 not in this set and SHALL retain every prefix previously recognized, so no shipped skill fails to
-parse. `growth_rate` SHALL be recognized because
-`reincarnation_boon_elosia` already declares `growth_rate:practice:100`, which
-the registry parses at load (the magic-XP consumer retired with
-`magic-xp-engine-retirement`; the prefix stays until the use-driven ladder
-lands); omitting it would make the registry's own import fail the
-"every existing entry parses" scenario below.
+parse. `growth_rate` SHALL parse exactly the four-segment form
+`growth_rate:<stat>:<multiplier>:<scope>`, where `<stat>` is `practice` (the retired `magic` stat
+key keeps failing closed), `<multiplier>` is a finite non-negative number, and `<scope>` is a key of
+`ELEMENT_REGISTRY` naming the one lineage tree whose practice the effect accelerates. The parsed
+`GrowthRateEffect` SHALL carry that scope. The previous three-segment form
+`growth_rate:<stat>:<multiplier>` SHALL raise `ValueError` and therefore fail registry load, so an
+unscoped growth rate cannot survive as data with its old global meaning.
 `gauge_transfer` SHALL parse `gauge_transfer:<gauge>:<drain|restore>:fixed:<positive int>`,
 `gauge_transfer:<gauge>:<drain|restore>:fraction:<finite fraction in (0,1]>` and
 `gauge_transfer:<gauge>:<drain|restore>:all` — with `<gauge>` from the closed set {`mp`, `hp`} and
@@ -50,10 +51,18 @@ coefficient attached to a `missing_fraction` occurrence SHALL be rejected at ski
 - **THEN** it returns a `StatMultiplyEffect(trait="atk_phys", multiplier=100.0)` instance
 
 #### Scenario: The read-time growth_rate prefix parses into its dataclass
-- **WHEN** `parse_effect("growth_rate:practice:100")` is called
-- **THEN** it returns a `GrowthRateEffect(stat="practice", multiplier=100.0)` instance, and
-  `parse_effect("growth_rate:magic:100")` raises `ValueError` (the retired stat key fails closed
-  at parse and therefore at registry load)
+- **WHEN** `parse_effect("growth_rate:practice:5:wind")` is called
+- **THEN** it returns a `GrowthRateEffect` carrying `stat="practice"`, `multiplier=5.0` and
+  `scope="wind"`
+
+#### Scenario: Every unscoped or malformed growth_rate payload fails closed
+- **WHEN** `parse_effect("growth_rate:practice:100")`, `parse_effect("growth_rate:magic:5:wind")`,
+  `parse_effect("growth_rate:practice:5:notanelement")` and
+  `parse_effect("growth_rate:practice:-1:wind")` are called
+- **THEN** each raises `ValueError` at parse and therefore at registry load — the three-segment form
+  because a growth rate must name its tree, the second because the retired stat key stays closed, the
+  third because the scope is not an `ELEMENT_REGISTRY` key, and the fourth because the multiplier is
+  negative
 
 #### Scenario: heal and self_heal parse into their dataclasses
 - **WHEN** `parse_effect("heal:single")`, `parse_effect("heal:area")`, and
