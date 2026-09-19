@@ -479,6 +479,9 @@ class SkillRegistryTests(unittest.TestCase):
                 SkillKind.PASSIVE,
                 key,
             )
+            # A PASSIVE skill has no cast action from which any resource could
+            # be deducted, so neither movement waiver declares a spendable cost.
+            self.assertEqual(SKILL_REGISTRY[key].cost, {})
 
     @covers_requirement("skill-registry::reincarnation-boon-yuna-s-effect-string-is-well-formed")
     def test_reincarnation_boon_yuna_parses_as_sexual_mastery_effect(self):
@@ -492,7 +495,7 @@ class SkillRegistryTests(unittest.TestCase):
 
         expected = {
             "reincarnation_boon_elosia": (
-                "elosia_shadowmoon", "伊洛希雅", ("growth_rate:practice:100",),
+                "elosia_shadowmoon", "伊洛希雅", ("growth_rate:practice:5:wind",),
             ),
             "reincarnation_boon_yuka": (
                 "yuka_darknight", "悠花", ("combat_prediction:武感",),
@@ -1020,7 +1023,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
     def test_rehomed_acquired_passives_keep_their_mechanics(self):
         flight = SKILL_REGISTRY["flight"]
         self.assertIs(flight.kind, SkillKind.PASSIVE)
-        self.assertEqual(flight.cost, {"mp": 22})
+        self.assertEqual(flight.cost, {})
         self.assertEqual(flight.effects, ["movement:flight"])
         self.assertEqual(flight.element.key, "wind")
         self.assertIs(flight.category, SkillCategory.ENHANCEMENT)
