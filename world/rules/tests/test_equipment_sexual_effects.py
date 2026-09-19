@@ -700,7 +700,11 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
         {
             Path("world/rules/combat_modifiers.py"),
             Path("world/rules/equipment_effects.py"),
-            Path("world/rules/status_query.py"),
+            # The status read model is the world/rules/status_query/ package:
+            # the intimate reader renders the effective exposure label and
+            # the condition-context builder overlays it for rule matching.
+            Path("world/rules/status_query/sexual.py"),
+            Path("world/rules/status_query/context.py"),
             Path("web/webclient/presentation/character.py"),
         }
     )

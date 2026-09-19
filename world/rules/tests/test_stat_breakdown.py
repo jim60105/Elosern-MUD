@@ -559,7 +559,7 @@ class ConditionLayerTests(EvenniaTestCase):
                 raise MissingDisplayMetadataError(code)
             return real(code)
 
-        with patch("world.rules.status_query.display_for", side_effect=fake):
+        with patch("world.rules.status_query.breakdown.display_for", side_effect=fake):
             with self.assertRaises(StatusQueryError):
                 build_stat_breakdown(player, assembly)
 

@@ -866,7 +866,9 @@ class CharacterReadModelTests(EvenniaTestCase):
         # even though it is never written into db.skills. The patched
         # unlocked_act_keys_for simulates such a registry extension.
         self.actor.db.skills = {"active": [_T_EL_A], "passive": []}
-        from world.rules import status_query
+        # The split lives in the read-model package's readers module; the
+        # patch targets the module where ``unlocked_act_keys_for`` is bound.
+        from world.rules.status_query import readers as status_query
 
         with patch.object(
             status_query,
