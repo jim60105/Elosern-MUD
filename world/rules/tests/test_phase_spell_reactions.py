@@ -609,7 +609,7 @@ class PhaseSpellReactionsTests(EvenniaTest):
             self.actor.sexual.pleasure.base = 25
             self.target.sexual.pleasure.base = 25
             req = self._request(_T_KISS_LIKE, [self.target])
-            with patch("world.rules.action.roll_d100", return_value=1):
+            with patch("world.rules.action.gates.roll_d100", return_value=1):
                 res = ActionResolver.resolve(req)
             self.assertEqual(res.outcome, "success")
 

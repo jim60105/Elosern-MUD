@@ -867,7 +867,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=60),
             patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
             patch.dict(
-                "world.rules.action._EVENT_EFFECT_PLANNERS",
+                "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
                 {
                     "test_bomb": lambda req, log: [
                         PendingEffect(
@@ -910,7 +910,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
         self.companion.traits.hp.current = 60
         req = ActionRequest(self.caster, skill.key, [self.companion], self.context)
-        with patch("world.rules.action.grant_skill_practice_xp", return_value=True) as mock_grant:
+        with patch("world.rules.action.costs.grant_skill_practice_xp", return_value=True) as mock_grant:
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
         # Companion received TWO effects (heal + cleanse), but grant_skill_practice_xp was called ONCE for companion!
@@ -935,7 +935,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             )
         )
         req = ActionRequest(self.caster, skill.key, [], RoomActionContext(self.room))
-        with patch("world.rules.action.grant_skill_practice_xp", return_value=True) as mock_grant:
+        with patch("world.rules.action.costs.grant_skill_practice_xp", return_value=True) as mock_grant:
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
         # Verified practiced vs None

@@ -219,7 +219,7 @@ class DivineCastTests(EvenniaTest):
         human.location = self.room1
         for key in _DIVINE_KEYS:
             with self.subTest(key=key):
-                with patch("world.rules.action.roll_d100", return_value=1):
+                with patch("world.rules.action.gates.roll_d100", return_value=1):
                     result = ActionResolver.resolve(
                         ActionRequest(
                             human,
@@ -235,7 +235,7 @@ class DivineCastTests(EvenniaTest):
         self.target.sexual.climax_phase.value = "未達"
         self.target.sexual.pleasure.base = 10
         self.actor.sexual.pleasure.base = 30
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_extreme_climax_command", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pleasure.base, 100)
@@ -246,7 +246,7 @@ class DivineCastTests(EvenniaTest):
     def test_extreme_climax_command_keeps_in_progress_target_in_progress(self):
         self.target.sexual.climax_phase.value = "進行中"
         self.target.sexual.pleasure.base = 40
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_extreme_climax_command", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pleasure.base, 100)
@@ -274,7 +274,7 @@ class DivineCastTests(EvenniaTest):
             },
         )
         context = BattlefieldActionContext(battlefield)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_extreme_climax_command", "all", context)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.pleasure.base, 0)
@@ -311,7 +311,7 @@ class DivineCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-divine-core::時姦-stages-three-climax-extensions-on-every-target-in-one-cast-never-touching-the-actor")
     def test_timed_copulation_stages_exactly_three_extensions(self):
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_timed_copulation", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pending_climax_extension, 3)
@@ -320,7 +320,7 @@ class DivineCastTests(EvenniaTest):
     @covers_requirement("sexual-catalog-divine-core::時姦-stages-three-climax-extensions-on-every-target-in-one-cast-never-touching-the-actor")
     def test_in_progress_target_consumes_all_three_across_settlement_points(self):
         self.target.sexual.climax_phase.value = "進行中"
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_timed_copulation", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pending_climax_extension, 3)
@@ -332,7 +332,7 @@ class DivineCastTests(EvenniaTest):
     @covers_requirement("sexual-catalog-divine-core::時姦-stages-three-climax-extensions-on-every-target-in-one-cast-never-touching-the-actor")
     def test_non_in_progress_target_discards_the_staged_count(self):
         self.target.sexual.climax_phase.value = "未達"
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_timed_copulation", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pending_climax_extension, 3)
@@ -352,7 +352,7 @@ class DivineCastTests(EvenniaTest):
         for key in ("mp", "sp", "hp"):
             trait = getattr(self.actor.traits, key)
             trait.current = trait.max - 100
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_realm_drain", [self.target])
         self.assertEqual(result.outcome, "success")
         for key in ("mp", "sp", "hp"):
@@ -366,7 +366,7 @@ class DivineCastTests(EvenniaTest):
         self.actor.traits.mp.current = self.actor.traits.mp.max - 5
         self.actor.traits.sp.current = self.actor.traits.sp.max - 100
         self.actor.traits.hp.current = self.actor.traits.hp.max - 100
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_realm_drain", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.mp.current, self.actor.traits.mp.max)
@@ -379,7 +379,7 @@ class DivineCastTests(EvenniaTest):
         before = {
             key: getattr(self.actor.traits, key).current for key in ("mp", "sp", "hp")
         }
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_realm_drain", [self.target])
         self.assertEqual(result.outcome, "success")
         for key in ("mp", "sp", "hp"):
@@ -392,7 +392,7 @@ class DivineCastTests(EvenniaTest):
         for key in ("mp", "sp", "hp"):
             trait = getattr(self.actor.traits, key)
             trait.current = trait.max - 100
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_realm_drain", [self.target])
         self.assertEqual(result.outcome, "success")
         drain_entries = [
@@ -560,7 +560,7 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
         for key in _UNLOCKED_DIVINE_KEYS:
             with self.subTest(key=key):
                 self.assertIn(key, owned)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 ActionRequest(
                     elf, _GATED_KEY, [elf], RoomActionContext(None, {})
@@ -592,7 +592,7 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
             )
         ]
         self.assertNotIn(_GATED_KEY, holder.skills.owned_keys())
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 ActionRequest(
                     holder, _GATED_KEY, [holder], RoomActionContext(None, {})
@@ -630,7 +630,7 @@ class DivineSexualArtsCastTests(EvenniaTest):
 
     def test_owner_cast_complies_and_applies_the_event_to_the_target_only(self):
         # Deterministic lower bound of stimulus_applied's +8..+14 delta.
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast([self.target])
         self.assertEqual(result.outcome, "success")
         self.assertGreaterEqual(self.target.sexual.pleasure.base, 8)
@@ -639,7 +639,7 @@ class DivineSexualArtsCastTests(EvenniaTest):
     def test_complied_cast_logs_exactly_one_resist_entry(self):
         # The resist gate fires now that the act is cataloged (intended fix
         # D3): a compliant outcome is recorded, not skipped.
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast([self.target])
         entries = self._resist_entries(result)
         self.assertEqual(len(entries), 1)
@@ -716,7 +716,7 @@ class DivineSexualArtsCoercionSettlementTests(EvenniaTest):
         )
         # roll=1: the resist contest fails -> resisted=False, auto_comply=False
         # (the companion is not party-bound here), the forced-outcome shape.
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             settlement = settle_out_of_combat_cast(request, clock=self.clock)
         self.assertEqual(settlement.result.outcome, "success")
         entries = [

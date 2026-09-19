@@ -546,16 +546,20 @@ class SharedPleasureModuleTests(unittest.TestCase):
 
     def test_the_shared_module_does_not_import_the_cast_pipeline(self):
         """The transitive world-internal import closure of pleasure.py never
-        names ``world.rules.action``, so a non-cast caller cannot pull the
-        cast pipeline in through it."""
+        names the ``world.rules.action`` module or package, so a non-cast
+        caller cannot pull the cast pipeline in through it."""
         seen, stack = set(), ["world.rules.pleasure"]
         while stack:
             module = stack.pop()
             if module in seen:
                 continue
             seen.add(module)
-            path = self._ROOT / f"{module.replace('.', '/')}.py"
-            if not path.exists():
+            base = self._ROOT / module.replace(".", "/")
+            candidates = [base.with_suffix(".py"), base / "__init__.py"]
+            for path in candidates:
+                if path.exists():
+                    break
+            else:
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
@@ -570,7 +574,12 @@ class SharedPleasureModuleTests(unittest.TestCase):
                 for name in names:
                     if name.startswith("world"):
                         stack.append(name)
-        self.assertNotIn("world.rules.action", seen)
+        offenders = {
+            name
+            for name in seen
+            if name == "world.rules.action" or name.startswith("world.rules.action.")
+        }
+        self.assertEqual(offenders, set())
 
 
 class ClimaxExtensionTests(EvenniaTestCase):
@@ -640,7 +649,7 @@ class _ActCastTestCase(EvenniaTest):
         # _build_duo_act default), so a real dice roll would make the cast
         # outcome flaky; force a compliant roll (both fixtures are floor
         # humans with equal contest scores, so roll=1 always complies).
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             return ActionResolver.resolve(
                 ActionRequest(
                     self.actor,

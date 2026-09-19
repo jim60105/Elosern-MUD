@@ -169,7 +169,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
         with patch("world.rules.combat.roll_d100", side_effect=[80, 80]), patch(
-            "world.rules.action.grant_skill_practice_xp"
+            "world.rules.action.costs.grant_skill_practice_xp"
         ) as mock_practice:
             res = ActionResolver.resolve(req)
 
@@ -334,7 +334,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
             raise RuntimeError("commit explosion")
 
         with patch("world.rules.combat.roll_d100", side_effect=[80, 80]), patch.dict(
-            "world.rules.action._EVENT_EFFECT_PLANNERS",
+            "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
             {
                 "boom": lambda r, l: [
                     PendingEffect(self.target, "boom", frozenset({"traits"}), bomb_apply)

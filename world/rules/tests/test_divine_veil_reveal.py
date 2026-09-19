@@ -422,14 +422,20 @@ class RevealBoundaryParityTests(_RevealCastTestCase):
                     offenders.append(relative)
         self.assertEqual(
             offenders,
-            ["world/rules/action.py", "world/rules/skill_effects.py"],
+            # The self-toggle handler moved with the action package split.
+            [
+                "world/rules/action/effects/conferral.py",
+                "world/rules/skill_effects.py",
+            ],
             f"unclassified veil-clear call sites: {offenders}",
         )
-        # Within action.py only the divine self-toggle calls the clear
+        # Within conferral.py only the divine self-toggle calls the clear
         # directly: the reveal handler stages the deterministic-core write
         # instead. Stripping the two sanctioned handler sources leaves no
         # call behind anywhere else in the module.
-        action_source = (root / "world/rules/action.py").read_text(encoding="utf-8")
+        action_source = (
+            root / "world/rules/action/effects/conferral.py"
+        ).read_text(encoding="utf-8")
         self.assertIn(
             "clear_disguise_effect(", inspect.getsource(_handle_set_disguise)
         )

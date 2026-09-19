@@ -1488,7 +1488,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         }
         engage(self.player, self.monster)
         with patch.dict(
-            "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+            "world.rules.action.contracts._EFFECT_HANDLER_REQUIRED_CONTEXT",
             {"confer_skill_partial": frozenset({"confer_skill_key"})},
         ):
             payload = self.registry.render(

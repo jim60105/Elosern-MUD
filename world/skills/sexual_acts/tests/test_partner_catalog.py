@@ -269,7 +269,7 @@ class PartnerCastTests(EvenniaTest):
         # equal contest scores, so forcing roll=1 guarantees the target
         # complies and every target-side credit lands deterministically
         # (sexual-resist-cast-wiring design D-3a).
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             return ActionResolver.resolve(
                 ActionRequest(
                     actor,
@@ -441,7 +441,7 @@ class IntercourseActsTests(PartnerCastTests):
         self.actor.sex = "female"
         partner = self._partner()
         partner.sex = "male"
-        with patch("world.rules.action.roll_d100", return_value=100):
+        with patch("world.rules.action.gates.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 ActionRequest(
                     self.actor,

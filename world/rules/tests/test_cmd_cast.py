@@ -207,7 +207,7 @@ class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):
                 "world.rules.cast_settlement.get_world_clock",
                 return_value=self.clock,
             ),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("commands.action.render_plain_text", return_value="RENDERED"),
         ):
             return self.call(

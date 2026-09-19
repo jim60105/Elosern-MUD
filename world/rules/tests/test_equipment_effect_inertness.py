@@ -46,7 +46,11 @@ _ALLOWLIST = frozenset(
         Path("world/rules/equipment.py"),
         Path("server/conf/at_server_startstop.py"),
         Path("world/rules/status_query.py"),
-        Path("world/rules/action.py"),
+        # The action pipeline is the world/rules/action/ package: the buff
+        # staging gate consumes the immunity accessor and the act handlers
+        # consume the pleasure accessor.
+        Path("world/rules/action/effects/buffs.py"),
+        Path("world/rules/action/effects/sexual.py"),
         Path("world/rules/buffs.py"),
         Path("world/rules/equipment.py"),
         Path("world/rules/items.py"),

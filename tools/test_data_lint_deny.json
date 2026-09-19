@@ -61,8 +61,8 @@
       "token": "command_defaults"
     },
     {
-      "evidence": "world/rules/action.py:1596",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action.py:1596); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/action/event_log.py:43",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action/event_log.py:43); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "damage"
     },
@@ -127,8 +127,8 @@
       "evidence": "world/rules/progression.py:72"
     },
     {
-      "evidence": "world/rules/action.py:1597",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action.py:1597); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/action/event_log.py:44",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action/event_log.py:44); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "heal"
     },

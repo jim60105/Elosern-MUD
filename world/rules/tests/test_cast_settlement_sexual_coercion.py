@@ -222,7 +222,7 @@ class OutOfCombatCoercionBase(EvenniaTest):
 
     def _forced_cast(self, skill_key, targets):
         """A real settlement whose resist roll always fails (a forced outcome)."""
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             return self._settle(skill_key, targets)
 
     def _raw_relations(self, npc):
@@ -708,7 +708,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
                 "world.rules.cast_settlement.get_world_clock",
                 side_effect=failing_clock_lookup,
             ),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
         ):
             with self.assertRaises(RuntimeError):
                 settle_out_of_combat_cast(
@@ -777,7 +777,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     def test_complied_out_of_combat_cast_applies_no_penalty(self):
         # An auto-complied target (至愛 stage, no roll) cast out of combat.
         target = self._npc("自動服從", affinity=90)
-        with patch("world.rules.action.roll_d100") as roll:
+        with patch("world.rules.action.gates.roll_d100") as roll:
             settlement = self._settle(_T_COERCE, [target])
         roll.assert_not_called()
         self.assertEqual(settlement.result.outcome, "success")
@@ -787,7 +787,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-sexual-act-applies-the-same-affinity-penalty-as-an-in-combat-one")
     def test_resisted_out_of_combat_cast_applies_no_penalty(self):
         target = self._npc("成功拒絕", affinity=10)
-        with patch("world.rules.action.roll_d100", return_value=100):
+        with patch("world.rules.action.gates.roll_d100", return_value=100):
             settlement = self._settle(_T_COERCE, [target])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())

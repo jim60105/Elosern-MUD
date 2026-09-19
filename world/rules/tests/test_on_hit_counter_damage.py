@@ -588,7 +588,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             target_hp_before = self.target.traits.hp.current
 
             with (
-                patch("world.rules.action._step5_effect_resolution", side_effect=failing_step5),
+                patch("world.rules.action.resolver._step5_effect_resolution", side_effect=failing_step5),
                 patch("world.rules.combat.roll_d100", return_value=100),
             ):
                 res = ActionResolver.resolve(req)

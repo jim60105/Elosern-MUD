@@ -167,7 +167,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         clock = WorldClock()
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.get_world_clock", return_value=clock),
         ):
             result = submit_player_item_use(self.player, _TONIC_KEY)
@@ -304,7 +304,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         )
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat.resolve_item_use", return_value=rejected
             ),
@@ -327,7 +327,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         foe_team = "foes"
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session.classify_overwhelm",
                 return_value=foe_team,
@@ -362,7 +362,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session.classify_overwhelm",
                 return_value="party",
@@ -400,7 +400,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session._persist", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
@@ -444,7 +444,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
@@ -482,7 +482,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session._continue_or_settle", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
@@ -576,7 +576,7 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
@@ -630,7 +630,7 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         clock = WorldClock()
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.get_world_clock", return_value=clock),
             # The troll sits below its archetype's flee boundary and acts
             # before the player, so its turn always attempts to flee; pin the

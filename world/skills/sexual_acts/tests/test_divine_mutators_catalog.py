@@ -174,7 +174,7 @@ class DivineMutatorCastTests(EvenniaTest):
         human.location = self.room1
         for key in _MUTATOR_KEYS:
             with self.subTest(key=key):
-                with patch("world.rules.action.roll_d100", return_value=1):
+                with patch("world.rules.action.gates.roll_d100", return_value=1):
                     result = ActionResolver.resolve(
                         ActionRequest(
                             human,
@@ -187,7 +187,7 @@ class DivineMutatorCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-divine-mutators::感度創世-saturates-the-target-s-sensitivity-excluding-the-actor-and-tolerating-a-resisted-cast")
     def test_sensitivity_creation_saturates_every_named_body_part(self):
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_sensitivity_creation", [self.target])
         self.assertEqual(result.outcome, "success")
         for part in BODY_PARTS:
@@ -208,7 +208,7 @@ class DivineMutatorCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-divine-mutators::恥辱剝奪-pins-the-target-s-shame-at-成癮-eagerly-rejecting-a-monster-target-before-staging-any-mutation")
     def test_shame_deprivation_pins_shame_and_survives_decay(self):
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_shame_deprivation", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.shame.level, "成癮")
@@ -225,7 +225,7 @@ class DivineMutatorCastTests(EvenniaTest):
     def test_shame_deprivation_at_monster_is_rejected_before_any_mutation(self):
         monster = _monster("shame-deprivation monster")
         monster.location = self.room1
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_shame_deprivation", [monster])
         self.assertIs(result.outcome, "rejected")
         self.assertIs(
@@ -237,7 +237,7 @@ class DivineMutatorCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-divine-mutators::絕對從屬-marks-the-target-as-permanently-auto-complying-toward-the-caster-keyed-by-a-guaranteed-unique-identity")
     def test_absolute_submission_makes_future_contests_auto_comply(self):
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_absolute_submission", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
@@ -253,7 +253,7 @@ class DivineMutatorCastTests(EvenniaTest):
     def test_submission_mark_does_not_affect_a_different_actor(self):
         other = _entity("unrelated mutator caster", race="elf")
         other.location = self.room1
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_absolute_submission", [self.target])
         self.assertEqual(result.outcome, "success")
         verdict = resist_verdict(other, self.target, rng=lambda: 1)
@@ -272,7 +272,7 @@ class DivineMutatorCastTests(EvenniaTest):
         impostor.location = self.room1
         self.assertEqual(self.actor.key, impostor.key)
         self.assertNotEqual(self.actor.id, impostor.id)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_absolute_submission", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
@@ -288,7 +288,7 @@ class DivineMutatorCastTests(EvenniaTest):
         self.target.sexual.virgin = False
         self.target.sexual.add_experience_type("陰道性交")
         self.assertFalse(self.target.sexual.virgin)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("divine_purity_restoration", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertTrue(self.target.sexual.virgin)

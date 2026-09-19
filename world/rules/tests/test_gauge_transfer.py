@@ -592,7 +592,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         )
         self._register_synth_skill(skill)
 
-        with patch("world.rules.action._commit", side_effect=RuntimeError("simulated commit failure")):
+        with patch("world.rules.action.resolver._commit", side_effect=RuntimeError("simulated commit failure")):
             with self.assertRaises(RuntimeError):
                 self._cast(skill.key, [self.target])
 

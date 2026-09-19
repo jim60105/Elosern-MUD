@@ -233,7 +233,7 @@ class DivineMysteryGateTests(EvenniaTestCase):
 
     def test_mechanized_divine_mystery_effect_rejects_without_commit(self):
         with patch(
-            "world.rules.action.parse_effect",
+            "world.rules.action.effects.conferral.parse_effect",
             return_value=DivineMysteryEffect(name="t_mystery_time", mechanized=True),
         ):
             with self.assertRaises(Exception) as caught:

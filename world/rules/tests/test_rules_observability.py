@@ -136,7 +136,7 @@ class ActionCommitEventTests(EvenniaTest):
             ),
         ]
         with (
-            patch("world.rules.action.log_info") as info,
+            patch("world.rules.action.transaction.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
             _commit(effects, char="commit-event", action=PROBE_ACTION)
@@ -157,7 +157,7 @@ class ActionCommitEventTests(EvenniaTest):
             ),
         ]
         with (
-            patch("world.rules.action.log_info") as info,
+            patch("world.rules.action.transaction.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
             with self.assertRaises(Exception):

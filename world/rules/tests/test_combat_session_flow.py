@@ -705,7 +705,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.action.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=100),
             patch.object(session_mod, "_primary_opponent_id", side_effect=spy),
         ):
             result = submit_opening_action(self.player, SYNTH_SEAM_AREA_SKILL.key, [m1])
@@ -755,14 +755,14 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=44),
-            patch("world.rules.action.roll_d100", return_value=44),
+            patch("world.rules.action.gates.roll_d100", return_value=44),
             patch("world.rules.combat_session.run_round", side_effect=record_round),
         ):
             submit_player_action(self.player, _T_CAST, [build()])
         self.player.db.active_combat = None
         with (
             patch("world.rules.combat.roll_d100", return_value=44),
-            patch("world.rules.action.roll_d100", return_value=44),
+            patch("world.rules.action.gates.roll_d100", return_value=44),
             patch(
                 "world.rules.combat_session.resolve_overwhelm",
                 side_effect=record_resolve,
@@ -821,7 +821,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, weak)
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.classify_overwhelm", return_value="foes"),
             patch(
                 "world.rules.combat_session.resolve_overwhelm",
@@ -847,7 +847,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, weak)
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
-            patch("world.rules.action.roll_d100", return_value=50),
+            patch("world.rules.action.gates.roll_d100", return_value=50),
             patch("world.rules.combat_session.classify_overwhelm", return_value=None),
             patch(
                 "world.rules.combat_session.resolve_overwhelm",
@@ -882,7 +882,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         )
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
-            patch("world.rules.action.roll_d100", return_value=50),
+            patch("world.rules.action.gates.roll_d100", return_value=50),
             patch(
                 "world.rules.combat_session.resolve_overwhelm",
                 side_effect=AssertionError(

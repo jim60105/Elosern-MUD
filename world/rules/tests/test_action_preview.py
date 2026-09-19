@@ -416,7 +416,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         }
         context = self._context()
         with patch.dict(
-            "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+            "world.rules.action.contracts._EFFECT_HANDLER_REQUIRED_CONTEXT",
             {"confer_skill_partial": frozenset({"confer_skill_key"})},
         ):
             preview = preview_skill(
@@ -505,7 +505,7 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
                     return_value=value,
                 ),
                 patch(
-                    "world.rules.action.evaluate_combat_modifiers_no_create",
+                    "world.rules.action.gates.evaluate_combat_modifiers_no_create",
                     return_value=value,
                 ),
             ):
@@ -582,7 +582,7 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
                 return_value=bundle,
             ),
             patch(
-                "world.rules.action.evaluate_combat_modifiers_no_create",
+                "world.rules.action.gates.evaluate_combat_modifiers_no_create",
                 return_value=bundle,
             ),
         ):

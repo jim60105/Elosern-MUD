@@ -227,7 +227,7 @@ class ResistGateTests(ResistCastWiringBase):
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
             "world.rules.sexual_resist.resist_verdict",
             wraps=resist_verdict,
-        ) as spy, patch("world.rules.action.roll_d100", return_value=100):
+        ) as spy, patch("world.rules.action.gates.roll_d100", return_value=100):
             result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(spy.call_count, 1)
@@ -274,7 +274,7 @@ class ResistGateTests(ResistCastWiringBase):
             "world.rules.sexual_resist.resist_verdict",
             wraps=resist_verdict,
         ) as spy, patch(
-            "world.rules.action.roll_d100",
+            "world.rules.action.gates.roll_d100",
             side_effect=[1, 100],
         ):
             result = self._cast(_T_AREA, [self.target, second])
@@ -312,7 +312,7 @@ class ResistGateTests(ResistCastWiringBase):
         second = self._npc("area second")
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch.object(
             sexual_transitions, "_RULES", [rule]
-        ), patch("world.rules.action.roll_d100", side_effect=[1, 100]):
+        ), patch("world.rules.action.gates.roll_d100", side_effect=[1, 100]):
             result = self._cast(_T_AREA, [self.target, second])
         self.assertEqual(result.outcome, "success")
         self.assertIn("t_area_experience", self.target.sexual.experience_types)
@@ -325,7 +325,7 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
     def test_resisted_target_keeps_pleasure_and_participant_counter(self):
         before = self._pleasure(self.target)
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
-            "world.rules.action.roll_d100", return_value=100
+            "world.rules.action.gates.roll_d100", return_value=100
         ):
             result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
@@ -340,7 +340,7 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
             self.target, None, _T_ACT_DEF.base_pleasure, 1.0, 2
         )
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
-            "world.rules.action.roll_d100", return_value=1
+            "world.rules.action.gates.roll_d100", return_value=1
         ):
             result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
@@ -360,7 +360,7 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
         )
         actor_before = self._pleasure(self.actor)
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS):
-            with patch("world.rules.action.roll_d100", return_value=100):
+            with patch("world.rules.action.gates.roll_d100", return_value=100):
                 self._cast(_T_ACT, [self.target])
             after_resisted = self._pleasure(self.actor)
             self.assertEqual(after_resisted - actor_before, resisted_actor_gain)
@@ -371,7 +371,7 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
             )
             second.race = _race_key()
             second.apply_race_baseline()
-            with patch("world.rules.action.roll_d100", return_value=1):
+            with patch("world.rules.action.gates.roll_d100", return_value=1):
                 self._cast(_T_ACT, [second])
             self.assertEqual(
                 self._pleasure(self.actor) - after_resisted, complied_actor_gain
@@ -382,7 +382,7 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
     def test_fully_resisted_cast_still_deducts_resource_cost(self):
         mp_before = self.actor.traits.mp.current
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
-            "world.rules.action.roll_d100", return_value=100
+            "world.rules.action.gates.roll_d100", return_value=100
         ):
             result = self._cast(_T_COST, [self.target])
         self.assertEqual(result.outcome, "success")
@@ -411,7 +411,7 @@ class ResistEventLogTests(ResistCastWiringBase):
     @covers_requirement("sexual-resist-cast-wiring::every-resist-contest-emits-a-sexual-resist-eventlog-entry-matching-the-sexual-resist-turn-cost-contract")
     def test_rolled_contest_logs_exactly_one_entry_with_numeric_roll(self):
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
-            "world.rules.action.roll_d100", return_value=42
+            "world.rules.action.gates.roll_d100", return_value=42
         ):
             result = self._cast(_T_ACT, [self.target])
         entries = self._resist_entries(result)
@@ -430,7 +430,7 @@ class ResistEventLogTests(ResistCastWiringBase):
     @covers_requirement("sexual-resist-cast-wiring::every-resist-contest-emits-a-sexual-resist-eventlog-entry-matching-the-sexual-resist-turn-cost-contract")
     def test_resisted_verdict_logs_resisted_true(self):
         with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
-            "world.rules.action.roll_d100", return_value=100
+            "world.rules.action.gates.roll_d100", return_value=100
         ):
             result = self._cast(_T_ACT, [self.target])
         (entry,) = self._resist_entries(result)

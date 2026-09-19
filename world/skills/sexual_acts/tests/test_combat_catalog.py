@@ -288,7 +288,7 @@ class CombatCastTests(EvenniaTest):
         # pin deterministic.
         _counter_up(self.actor, "hostile_act", 5)
         self.assertEqual(self.target.sexual.hostile_act_count, 0)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_tease_whisper", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 6)
@@ -307,7 +307,7 @@ class CombatCastTests(EvenniaTest):
         _counter_up(self.actor, "hostile_act", 40)
         _counter_up(self.actor, "climax_count", 30)
         self.target.sexual.shame.value = "強烈"
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_forced_climax", [self.target])
         self.assertEqual(result.outcome, "success")
         threshold = load_effects_config().climax_extension_threshold
@@ -328,7 +328,7 @@ class CombatCastTests(EvenniaTest):
         )
         other.race = "human"
         other.apply_race_baseline()
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_climax_domination", [self.target, other])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 81)

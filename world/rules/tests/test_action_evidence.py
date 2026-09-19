@@ -528,7 +528,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             BattlefieldActionContext(bf, event_context={"now": 50}),
         )
         # Force low resist roll so target fails to resist (resisted is False, auto_comply is False)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=50))
@@ -554,7 +554,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             [self.target],
             BattlefieldActionContext(bf, event_context={"now": 200}),
         )
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertTrue(has_action_evidence(npc, "forced_interaction", now=200))
@@ -579,8 +579,8 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         def failing_apply():
             raise RuntimeError("forced commit failure")
 
-        with patch("world.rules.action.roll_d100", return_value=1), patch.dict(
-            "world.rules.action._EVENT_EFFECT_PLANNERS",
+        with patch("world.rules.action.gates.roll_d100", return_value=1), patch.dict(
+            "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
             {
                 "poison_planner": lambda r, l: [
                     PendingEffect(self.actor, "poison", frozenset({"action_evidence"}), failing_apply)
@@ -609,7 +609,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             RoomActionContext(room, event_context={"now": 70}),
         )
         clock = WorldClock(tick=70)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             settlement = settle_out_of_combat_cast(request, clock=clock)
         self.assertEqual(settlement.result.outcome, "success")
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=70))
@@ -632,7 +632,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         )
         clock = WorldClock(tick=70)
 
-        with patch("world.rules.action.roll_d100", return_value=1), patch.object(
+        with patch("world.rules.action.gates.roll_d100", return_value=1), patch.object(
             clock, "advance", side_effect=RuntimeError("clock advance failed")
         ):
             with self.assertRaises(RuntimeError):
@@ -817,7 +817,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             raise RuntimeError("commit explosion")
 
         with patch("world.rules.combat.roll_d100", return_value=50), patch.dict(
-            "world.rules.action._EVENT_EFFECT_PLANNERS",
+            "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
             {
                 "boom": lambda r, l: [
                     PendingEffect(self.target, "boom", frozenset({"traits"}), failing_apply)

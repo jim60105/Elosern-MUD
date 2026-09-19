@@ -746,7 +746,7 @@ class EquipmentImmunityTests(MpFlowTestBase):
 
         # Mock target as immune to ebbing
         with patch(
-            "world.rules.action.equipment_immune_buff_keys",
+            "world.rules.action.effects.buffs.equipment_immune_buff_keys",
             return_value=frozenset({"ebbing"}),
         ):
             effects = _handle_buff_apply(

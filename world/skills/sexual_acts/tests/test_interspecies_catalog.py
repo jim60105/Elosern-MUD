@@ -270,7 +270,7 @@ class InterspeciesCastTests(EvenniaTest):
         _counter_up(self.actor, "hostile_act", 10)
         self.assertEqual(self.actor.sexual.interspecies_act_count, 0)
         self.assertEqual(self.monster.sexual.interspecies_act_count, 0)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("interspecies_touch", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.interspecies_act_count, 1)
@@ -291,7 +291,7 @@ class InterspeciesCastTests(EvenniaTest):
         other.race = "human"
         other.apply_race_baseline()
         _counter_up(self.actor, "hostile_act", 10)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("interspecies_touch", [other])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.interspecies_act_count, 1)
@@ -317,7 +317,7 @@ class InterspeciesCastTests(EvenniaTest):
         # actor's 1.0, and any roll below 49 complies — to keep the target-side
         # pleasure assertion deterministic.
         _counter_up(self.actor, "hostile_act", 10)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("interspecies_touch", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.monster.sexual.pleasure.base, 13)
@@ -327,7 +327,7 @@ class InterspeciesCastTests(EvenniaTest):
         _counter_up(self.actor, "hostile_act", 30)
         _counter_up(self.actor, "climax_count", 20)
         self.assertNotIn("異種性愛", self.monster.sexual.experience_types)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("interspecies_mating", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertIn("異種性愛", self.monster.sexual.experience_types)
@@ -341,7 +341,7 @@ class InterspeciesCastTests(EvenniaTest):
         # compliance (roll=1) so the target-side event effect actually lands.
         _counter_up(self.actor, "hostile_act", 30)
         _counter_up(self.actor, "climax_count", 20)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("interspecies_mating", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertIn("異種性愛", self.monster.sexual.experience_types)

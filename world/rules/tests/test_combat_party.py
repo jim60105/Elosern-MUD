@@ -747,8 +747,10 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
         self.assertEqual(field.knocked_out, {str(entity.key)})
 
     def test_action_module_uses_shape_dispatch_for_both_sets(self):
+        # The snapshot/restore mechanism moved to the action package's
+        # transaction module; the shape-dispatch contract lives with it.
         source = (
-            Path(__file__).parents[1] / "action.py"
+            Path(__file__).parents[1] / "action" / "transaction.py"
         ).read_text(encoding="utf-8")
         self.assertNotIn("from world.rules.combat import Battlefield", source)
         self.assertNotIn("isinstance(context, Battlefield", source)

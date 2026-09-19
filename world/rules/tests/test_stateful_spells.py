@@ -291,7 +291,7 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
             req = self._request(_T_KISS, [self.target])
             # For StateMagnitude(base=3.2, per_ordinal=0.2, maximum=4.0):
             # At ordinal 1 (微興奮), coefficient = 3.2 + 0.2 * 1 = 3.4
-            with patch("world.rules.action.roll_d100", return_value=1):
+            with patch("world.rules.action.gates.roll_d100", return_value=1):
                 res = ActionResolver.resolve(req)
             self.assertEqual(res.outcome, "success")
 
@@ -309,12 +309,12 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
             self.target.traits.hp.current = 50
             req = self._request(_T_MILK, [self.target])
 
-            with patch("world.rules.action._stimulus_rng.randint", return_value=10):
+            with patch("world.rules.action.effects.sexual._stimulus_rng.randint", return_value=10):
                 with patch(
                     "world.rules.equipment_effects.equipment_exposure_bias",
                     return_value=2,
                 ):
-                    with patch("world.rules.action.roll_d100", return_value=1):
+                    with patch("world.rules.action.gates.roll_d100", return_value=1):
                         res = ActionResolver.resolve(req)
                     self.assertEqual(res.outcome, "success")
                     # Base roll was 10, bonus was 4.0 -> total 14
@@ -373,8 +373,8 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
 
             req = self._request(_T_KISS, [self.target])
 
-            with patch("world.rules.action._stimulus_rng.randint", return_value=10):
-                with patch("world.rules.action.roll_d100", return_value=1):
+            with patch("world.rules.action.effects.sexual._stimulus_rng.randint", return_value=10):
+                with patch("world.rules.action.gates.roll_d100", return_value=1):
                     res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")
@@ -394,10 +394,10 @@ class StatefulSpellCastingTests(StatefulSpellsBase):
 
             # Force commit to fail during effect execution inside atomic transaction
             with patch(
-                "world.rules.action.apply_pleasure_gain",
+                "world.rules.action.effects.sexual.apply_pleasure_gain",
                 side_effect=RuntimeError("simulated commit crash"),
             ):
-                with patch("world.rules.action.roll_d100", return_value=1):
+                with patch("world.rules.action.gates.roll_d100", return_value=1):
                     res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "rejected")

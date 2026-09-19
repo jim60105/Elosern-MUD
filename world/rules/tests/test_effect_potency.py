@@ -648,8 +648,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         )
         with (
             patch("world.rules.combat.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}),
-            patch("world.rules.action.is_freeform_eligible", return_value=True),
-            patch("world.rules.action.freeform_scales_for", return_value=(0.5, 1.0)),
+            patch("world.rules.action.gates.is_freeform_eligible", return_value=True),
+            patch("world.rules.action.gates.freeform_scales_for", return_value=(0.5, 1.0)),
         ):
             res = ActionResolver.resolve(req)
 

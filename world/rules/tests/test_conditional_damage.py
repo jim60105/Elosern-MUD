@@ -829,7 +829,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
         )
 
-        with patch("world.rules.action._commit", side_effect=RuntimeError("simulated commit crash")):
+        with patch("world.rules.action.resolver._commit", side_effect=RuntimeError("simulated commit crash")):
             with self.assertRaises(RuntimeError):
                 ActionResolver.resolve(request)
 

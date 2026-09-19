@@ -233,7 +233,7 @@ class InitiationRoutingTests(
                 monster = _monster(f"target {skill_key}", hp=2000, atk=1)
                 monster.location = self.room
                 with patch("world.rules.combat.roll_d100", return_value=50), patch(
-                    "world.rules.action.roll_d100", return_value=1
+                    "world.rules.action.gates.roll_d100", return_value=1
                 ):
                     result = initiate_field_combat(self.player, skill_key, monster)
                 self.assertEqual(result["outcome"], "round", skill_key)
@@ -739,7 +739,7 @@ class FieldCombatCommandTests(
         npc.traits.hp.current = 500
         self.char1.db.skills = {"active": [_T_ACT], "passive": []}
         with (
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.cast_settlement._scan_out_of_combat_sexual_coercion",
                 wraps=__import__(
@@ -767,7 +767,7 @@ class FieldCombatCommandTests(
         self.char1.db.skills = {"active": [_T_ACT], "passive": []}
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
-            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session._scan_sexual_coercion",
                 wraps=__import__(

@@ -580,7 +580,7 @@ class OverwhelmCompressionTests(FriendlyFireBase):
         with (
             patch.object(self.player, "msg") as msg,
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.action.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=100),
         ):
             result = submit_opening_action(
                 self.player, _T_AREA, [companion, self.monster]

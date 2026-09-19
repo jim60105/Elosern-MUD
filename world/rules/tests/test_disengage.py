@@ -220,8 +220,10 @@ class DisengageStagingTests(unittest.TestCase):
 
     @covers_requirement("battlefield-commit-surface::a-battlefield-shaped-object-is-snapshotted-and-restored-by-shape-not-by-explicit")
     def test_action_module_uses_shape_dispatch_without_combat_import(self):
+        # The snapshot/restore mechanism moved to the action package's
+        # transaction module; the shape-dispatch contract lives with it.
         source = (
-            Path(__file__).parents[1] / "action.py"
+            Path(__file__).parents[1] / "action" / "transaction.py"
         ).read_text(encoding="utf-8")
         self.assertNotIn("from world.rules.combat import Battlefield", source)
         self.assertNotIn("isinstance(context, Battlefield", source)

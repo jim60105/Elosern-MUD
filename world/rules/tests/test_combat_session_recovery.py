@@ -675,7 +675,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch.dict(
-                "world.rules.action._EFFECT_HANDLER_REQUIRED_CONTEXT",
+                "world.rules.action.contracts._EFFECT_HANDLER_REQUIRED_CONTEXT",
                 {"set_disguise": frozenset({"disguise"})},
             ),
         ):

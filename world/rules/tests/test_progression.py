@@ -763,7 +763,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch(
-                "world.rules.action._commit",
+                "world.rules.action.resolver._commit",
                 side_effect=CommitFailed(RejectReason.COMMIT_FAILED, "injected"),
             ),
         ):

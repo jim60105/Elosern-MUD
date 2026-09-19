@@ -140,7 +140,7 @@ class SeedActCastingTests(EvenniaTest):
         # force a compliant roll (both fixtures are floor humans with equal
         # contest scores, making roll=1 a guaranteed comply) to keep the
         # assertion deterministic (sexual-resist-cast-wiring design D-3a).
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("partner_caress", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.duo_act_count, 1)
@@ -153,7 +153,7 @@ class SeedActCastingTests(EvenniaTest):
         # (both fixtures are floor humans with equal contest scores, making
         # roll=1 a guaranteed comply) to keep the assertion deterministic
         # (sexual-resist-cast-wiring design D-3a).
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_tease", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 1)

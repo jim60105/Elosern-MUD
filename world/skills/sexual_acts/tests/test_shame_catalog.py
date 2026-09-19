@@ -401,7 +401,7 @@ class ShameCastTests(EvenniaTest):
                     _counter_up(entity, counter, times)
                 self.assertEqual(entity.sexual.exposure.value, 0)
                 self.assertEqual(target.sexual.exposure.value, 0)
-                with patch("world.rules.action.roll_d100", return_value=1):
+                with patch("world.rules.action.gates.roll_d100", return_value=1):
                     result = ActionResolver.resolve(
                         ActionRequest(
                             entity,
@@ -483,7 +483,7 @@ class ShameCastTests(EvenniaTest):
         _counter_up(self.actor, "watched", 10)
         _counter_up(self.actor, "exposure_act", 20)
         shame_before = self.actor.sexual.shame.value
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("shame_public_performance", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertIn("露出", self.actor.sexual.experience_types)
@@ -501,7 +501,7 @@ class ShameCastTests(EvenniaTest):
         # withheld on a resisted verdict, so force a compliant roll (two
         # floor fixtures with equal contest scores, making roll=1 a
         # guaranteed comply) to keep the target-side pin deterministic.
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("shame_provocative_gaze", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 1)
@@ -520,7 +520,7 @@ class ShameCastTests(EvenniaTest):
         # contest scores) so the target-side pleasure assertion stays
         # deterministic under the shipped resist gate.
         _counter_up(self.actor, "watched", 10)
-        with patch("world.rules.action.roll_d100", return_value=1):
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("shame_provocative_gaze", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pleasure.base, 15)

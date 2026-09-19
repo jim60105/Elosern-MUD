@@ -162,7 +162,7 @@ class WaterManaTideBehaviorTests(EvenniaTest):
         self.actor.traits.mp.current = 100
 
         with patch(
-            "world.rules.action._commit",
+            "world.rules.action.resolver._commit",
             side_effect=CommitFailed(RejectReason.COMMIT_FAILED, "simulated commit failure"),
         ):
             res_fail = self._cast(composite_skill, [self.enemy, self.ally])
