@@ -596,11 +596,23 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.player.db.skill_proficiency = {"fire_arrow": 49.0}
         self.player.db.practice_booking = "fire_arrow"
         clock = get_world_clock()
+
+        def _boundary_failure(*_args):
+            # The booked award must have granted the passive before the
+            # boundary failed — otherwise the rollback assertion below would
+            # pass vacuously.
+            self.assertEqual(
+                dict(self.player.db.skills)["passive"],
+                [granted.key],
+                "the booked award must grant the passive before the failure",
+            )
+            raise RuntimeError("simulated post-practice failure")
+
         with (
             patch.object(cross_lineage, "RULEBOOK", rulebook),
             patch(
                 "world.rules.clock._settle_boundary_stages",
-                side_effect=RuntimeError("simulated post-practice failure"),
+                side_effect=_boundary_failure,
             ),
             self.assertRaises(RuntimeError),
         ):
