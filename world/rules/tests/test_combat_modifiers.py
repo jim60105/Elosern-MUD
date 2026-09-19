@@ -741,6 +741,21 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "ice_frost_mire")
         self.assertIn("agility_flat", evaluate_combat_modifiers(entity))
 
+    # Martial-arts 斬技 riders (martial-arts-catalog): the correspondence gate
+    # only requires one named test per rule id; settlement behaviour is
+    # covered by world/skills/tests/test_martial_arts_behavior.py.
+    def test_rule_martial_hamstring_agility_penalty(self):
+        entity = self._entity()
+        rule = RULES["martial_hamstring_agility_penalty"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
+    def test_rule_sword_saint_domain_atk_phys_bonus(self):
+        entity = self._entity()
+        rule = RULES["sword_saint_domain_atk_phys_bonus"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()
