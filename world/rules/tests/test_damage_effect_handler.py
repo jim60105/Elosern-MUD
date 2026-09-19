@@ -26,7 +26,7 @@ from world.rules.combat import (
     _handle_damage,
     _stored_hp,
 )
-from world.skills.effects import RuleTableEffect
+from world.skills.effects import RuleTableEffect, parse_effect
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
 
 from .combat_fixtures import FakeEntity, grant_lineage
