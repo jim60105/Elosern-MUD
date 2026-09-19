@@ -455,7 +455,7 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         self.player.traits.hp.current = 500
         self.call(CmdEngage(), monster.key, "戰鬥開始")
         self.assertIsNotNone(self.player.db.active_combat)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             self.call(CmdCast(), f"basic_attack={monster.key}", None)
         self.assertIsNone(self.player.db.active_combat)
 
