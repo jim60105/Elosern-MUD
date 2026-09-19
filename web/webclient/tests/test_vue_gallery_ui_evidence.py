@@ -24,7 +24,7 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
-from ._showcase_build import ensure_storybook_out, showcase_build_lock
+from ._showcase_build import ShowcaseEvidenceMixin, showcase_build_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
@@ -106,20 +106,11 @@ def _assert_vitest_passes(result, label):
     assert "passed" in result.stdout, f"{label}: expected a passing suite summary"
 
 
-class VueGalleryUiEvidenceTest(unittest.TestCase):
+class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the gallery UI Vitest/showcase gates as requirement evidence."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        # The storyboard gate needs the static Storybook build; build it once
-        # per process when the checkout has none (CI workspaces only build the
-        # app dist). The shared fingerprint-guarded chain serializes against
-        # the B1/B2 evidence classes (which rebuild the same .storybook-out
-        # in other parallel workers) and rebuilds only on input-fingerprint
-        # mismatch.
-        with showcase_build_lock():
-            ensure_storybook_out()
+    #: The gallery storyboard gate needs the static Storybook build.
+    SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
         "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts"

@@ -184,7 +184,8 @@
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_surfaces_visible_at_1440x900",
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_unavailable_placeholders_and_numeric_status",
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_unread_marker_keyboard_activation_moves_focus_to_narrative",
-        "web.tests.browser.test_browser_wait_helper"
+        "web.tests.browser.test_browser_wait_helper",
+        "web.tests.browser.test_harness_mixins"
       ]
     },
     {

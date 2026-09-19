@@ -38,7 +38,7 @@ from .browser_helpers import (
     store_state_or_none,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 
 
@@ -47,7 +47,7 @@ def _press(page, key, wait_ms=80):
     page.wait_for_timeout(wait_ms)
 
 
-class ServicesBrowserTest(BrowserAcceptanceTest):
+class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with a services fixture."""
 
     SERVICES_MODE = ""
@@ -71,14 +71,6 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     # -- navigation helpers ---------------------------------------------------
 

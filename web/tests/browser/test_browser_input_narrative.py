@@ -31,7 +31,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin, wait_command_field_released
 from . import fixtures
 
 
@@ -52,31 +52,6 @@ def _wait_field_focused(page, timeout=30000):
                 "document.getElementById('inputfield')"
             ),
             "description": "#inputfield focused",
-        },
-        timeout=timeout,
-    )
-
-
-def _wait_command_field_released(page, timeout=30000):
-    """Gate on the action dock holding focus after Escape from the field.
-
-    H5 (webclient-hud-05-overlays-and-command-line): the command line is
-    permanently present — the release path is focus restoration to
-    ``#action-dock`` (design D2); the field is never closed (design D1).
-    """
-    wait_for_store_state(
-        page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": "#action-dock",
-            "predicate": (
-                "() => { const d = document.querySelector('[data-testid=\"command-line\"]');"
-                " const dock = document.getElementById('action-dock');"
-                " return d && dock && "
-                "(document.activeElement === dock || "
-                "(document.activeElement && dock.contains(document.activeElement))); }"
-            ),
-            "description": "command field released: #action-dock focused, command line still present",
         },
         timeout=timeout,
     )
@@ -789,7 +764,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="narrative-feed"] .inp script').count(), 0)
 
 
-class InputEchoExplorationTest(BrowserAcceptanceTest):
+class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Move/free-form input-echo journeys on one isolated exploration server."""
 
     @classmethod
@@ -804,14 +779,6 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _wait_exploration_available(self, page, timeout=30000):
         wait_for_store_state(
@@ -912,7 +879,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         )
         # The interaction completed: focus back on the dock (H5, design D2)
         # and the command line is still present (it is never closed).
-        _wait_command_field_released(page)
+        wait_command_field_released(page)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         self.assertEqual(
             page.locator('[data-testid="narrative-feed"] .inp').count(),

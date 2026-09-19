@@ -21,6 +21,7 @@ import unittest
 
 from tools import test_data_lint
 from tools.spec_traceability import covers_requirement
+from ._data_independence_base import DataIndependenceContractMixin
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -54,10 +55,7 @@ MIGRATED_FILES = (
 MANIFEST_SIZE = 19
 
 
-class BrowserTestDataMigrationContractTests(unittest.TestCase):
-    def setUp(self):
-        self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
-        self.assertEqual(fatal, [], "ledger must load cleanly")
+class BrowserTestDataMigrationContractTests(DataIndependenceContractMixin, unittest.TestCase):
 
     def test_manifest_covers_the_migrated_files(self):
         # The manifest is an exact, immutable list: it may not shrink (an
@@ -80,11 +78,7 @@ class BrowserTestDataMigrationContractTests(unittest.TestCase):
         "synthetic-fixtures"
     )
     def test_migrated_files_hold_no_ledger_exemption(self):
-        debt = set(self.ledger["debt"])
-        contract = {entry["path"] for entry in self.ledger["contract"]}
-        for path in self._browser_area():
-            self.assertNotIn(path, debt, f"{path} reintroduced into debt")
-            self.assertNotIn(path, contract, f"{path} registered as contract")
+        self.assert_no_ledger_exemption(self._browser_area())
 
     @covers_requirement(
         "test-data-independence::"
@@ -92,13 +86,7 @@ class BrowserTestDataMigrationContractTests(unittest.TestCase):
         "synthetic-fixtures"
     )
     def test_migrated_files_carry_zero_findings(self):
-        universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)
-        for path in self._browser_area():
-            with self.subTest(path=path):
-                self.assertEqual(
-                    test_data_lint.scan_file(test_data_lint.REPO_ROOT, path, universe),
-                    [],
-                )
+        self.assert_zero_findings(self._browser_area(), check_exists=False)
 
     def _browser_area(self):
         """Every Python module in the migrated browser directory."""
@@ -109,32 +97,10 @@ class BrowserTestDataMigrationContractTests(unittest.TestCase):
         )
 
     def test_no_violation_naming_a_manifest_file(self):
-        # Whole-repo greenness is owned by the ``tools.test_data_lint check``
-        # gate itself; inside a process-wide universe lazily-registered
-        # vocabulary can name unrelated files. What must never regress is a
-        # violation whose path belongs to this migration's manifest.
-        report = test_data_lint.check_repo(test_data_lint.REPO_ROOT)
-        mine = set(MIGRATED_FILES)
-        self.assertEqual(
-            [
-                f"{v.path}: {v.rule}: {v.detail}"
-                for v in report.violations
-                if v.path in mine
-            ],
-            [],
-        )
+        self.assert_no_violation_naming_manifest(MIGRATED_FILES)
 
     def test_freeze_ledger_seed_array_untouched_by_the_migration(self):
-        # Manifest-membership check only: every migrated path must remain in
-        # the carried seed classification, and the live ledger's seed array
-        # must equal the live seed file (the authoritative ratchet against
-        # the committed history is the gate's own check_ledger, exercised via
-        # check_repo in the violation test above).
-        seed = test_data_lint.load_seed(test_data_lint.REPO_ROOT)
-        seed_debt = set(seed["seedDebtPaths"])
-        for path in MIGRATED_FILES:
-            self.assertIn(path, seed_debt)
-        self.assertEqual(self.ledger["seedDebtPaths"], seed["seedDebtPaths"])
+        self.assert_freeze_seed_untouched(MIGRATED_FILES)
 
 
 if __name__ == "__main__":

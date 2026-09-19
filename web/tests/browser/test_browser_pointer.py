@@ -31,11 +31,11 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 
 
-class PointerAcceptanceTest(BrowserAcceptanceTest):
+class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with the exploration fixture."""
 
     @classmethod
@@ -50,14 +50,6 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     # -- helpers --------------------------------------------------------------
 
@@ -455,7 +447,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
                 page.close()
 
 
-class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
+class PointerServiceAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Service submenu submission by pointer at the guild hall."""
 
     @classmethod
@@ -470,14 +462,6 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     def _wait_services_available(self, page, timeout=30000):
         wait_for_store_state(

@@ -27,7 +27,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 from .test_browser_contextual_hud import _wait_mode
 from .test_browser_input_narrative import _wait_inp_line
@@ -43,7 +43,7 @@ def _codex_panel(state: dict) -> dict:
     return (state.get("panels") or {}).get("title_codex") or {}
 
 
-class TitleCodexBrowserTest(BrowserAcceptanceTest):
+class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated codex-fixture server per test."""
 
     @classmethod
@@ -59,14 +59,6 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        if getattr(self, "server", None) is not None:
-            try:
-                self.server.stop()
-            finally:
-                self.server = None
 
     # -- helpers ---------------------------------------------------------------
 

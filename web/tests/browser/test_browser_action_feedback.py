@@ -32,7 +32,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import wait_for_store_state
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 from .seed import CREATION_ACCOUNT_PASSWORD, CREATION_ACCOUNT_USERNAME
 
@@ -41,7 +41,7 @@ from .seed import CREATION_ACCOUNT_PASSWORD, CREATION_ACCOUNT_USERNAME
 _AUTO_DISMISS_CEILING_MS = 12000
 
 
-class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
+class ActionFeedbackBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with a creation fixture."""
 
     @classmethod
@@ -66,12 +66,9 @@ class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
 
     def tearDown(self) -> None:
         server = getattr(self, "server", None)
+        self.server = None
         super().tearDown()
-        if server is not None:
-            try:
-                server.stop()
-            finally:
-                self.server = None
+        self._stop_managed_server(server)
 
     # -- helpers --------------------------------------------------------------
 

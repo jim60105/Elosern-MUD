@@ -44,11 +44,10 @@ from __future__ import annotations
 import glob
 import json
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
-from ._showcase_build import ensure_storybook_out, showcase_build_lock
+from ._showcase_build import ShowcaseEvidenceMixin, run_npm, run_node, showcase_build_lock
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -189,41 +188,11 @@ PREVIOUS_MANIFEST_KEYS = {
 WORLD_KEYS_JOINED_AFTER_B4 = ("World/TitleBallotMenu",)
 
 
-def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["npm", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["node", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-class VueShowcaseWorldEvidenceTest(unittest.TestCase):
+class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the B4 world + services family gates and assert each passes."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        # The world family stories are registered in the static Storybook
-        # build; build it once per process when the checkout has none (CI
-        # workspaces only build the app dist). The shared fingerprint-guarded
-        # chain serializes against the B1/B2/B3 evidence classes (which
-        # rebuild the same .storybook-out in another parallel worker as
-        # their gate evidence) and rebuilds only on input-fingerprint
-        # mismatch.
-        with showcase_build_lock():
-            ensure_storybook_out()
+    #: The world + services family stories live in the static Storybook build.
+    SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"

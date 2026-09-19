@@ -35,6 +35,7 @@ import hashlib
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from typing import ClassVar
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LOCK_PATH = REPO_ROOT / ".storybook-out.lock"
@@ -131,9 +132,21 @@ def _write_marker(marker: Path, fingerprint: str) -> None:
     marker.write_text(fingerprint + "\n", encoding="utf-8")
 
 
-def _run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    """Run ``npm`` in the repo root, capturing output, under ``timeout``."""
     return subprocess.run(
         ["npm", *args],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    """Run ``node`` in the repo root, capturing output, under ``timeout``."""
+    return subprocess.run(
+        ["node", *args],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
@@ -158,7 +171,7 @@ def ensure_app_dist() -> None:
         and (DIST_ROOT / "index.css").is_file()
     ):
         return
-    result = _run_npm(["run", "build"], timeout=600)
+    result = run_npm(["run", "build"], timeout=600)
     assert (
         result.returncode == 0
     ), "vite build failed under evidence:\n" + result.stdout + result.stderr
@@ -181,8 +194,35 @@ def ensure_storybook_out() -> None:
         and (STORYBOOK_OUT / "index.json").is_file()
     ):
         return
-    result = _run_npm(["run", "build-storybook"], timeout=900)
+    result = run_npm(["run", "build-storybook"], timeout=900)
     assert (
         result.returncode == 0
     ), "Storybook build failed under showcase evidence:\n" + result.stdout + result.stderr
     _write_marker(_STORYBOOK_MARKER, fingerprint)
+
+
+class ShowcaseEvidenceMixin:
+    """Unittest mixin that builds the static showcase output once per process.
+
+    Evidence classes need a green static build before their gates run. The
+    shared fingerprint-guarded chain serializes against every other evidence
+    class (which may rebuild the same output in another parallel worker) and
+    rebuilds only when the input fingerprint no longer matches, so workers
+    reuse a green build. Subclasses pin :attr:`SHOWCASE_BUILD` to ``"dist"``
+    (the vite ``pnpm run build``) or ``"storybook"`` (the Storybook static
+    build, which itself ensures ``dist`` first).
+    """
+
+    #: Which static build the class needs before its tests run.
+    SHOWCASE_BUILD: ClassVar[str] = "dist"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        ensure = (
+            ensure_storybook_out
+            if cls.SHOWCASE_BUILD == "storybook"
+            else ensure_app_dist
+        )
+        with showcase_build_lock():
+            ensure()

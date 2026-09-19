@@ -33,6 +33,7 @@ from world.rules.clock import (
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
+from world.tests.raw_attributes import raw_attribute_value
 
 
 class Gauge:
@@ -824,14 +825,7 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         idmapper-cached Attribute model, so the value proves the database row
         (after rollback) rather than any in-process cache.
         """
-        row = (
-            obj.db_attributes.through.objects.filter(
-                objectdb_id=obj.pk, attribute__db_key=key
-            )
-            .values_list("attribute__db_value", flat=True)
-            .first()
-        )
-        return None if row is None else row
+        return raw_attribute_value(obj, key)
 
     @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
     def test_outer_commit_failure_restores_registry_and_tick(self):

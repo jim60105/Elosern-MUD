@@ -35,7 +35,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .harness import ManagedServer
+from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 from .seed import CREATION_ACCOUNT_PASSWORD, CREATION_ACCOUNT_USERNAME
 
@@ -45,7 +45,7 @@ def _press(page, key, wait_ms=60):
     page.wait_for_timeout(wait_ms)
 
 
-class CreationBrowserTest(BrowserAcceptanceTest):
+class CreationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with a creation fixture.
 
     Boot mode: SHIPPED catalogs (explicit per-runtime override of the
@@ -87,12 +87,9 @@ class CreationBrowserTest(BrowserAcceptanceTest):
 
     def tearDown(self) -> None:
         server = getattr(self, "server", None)
+        self.server = None
         super().tearDown()
-        if server is not None:
-            try:
-                server.stop()
-            finally:
-                self.server = None
+        self._stop_managed_server(server)
 
     # -- navigation helpers ---------------------------------------------------
 

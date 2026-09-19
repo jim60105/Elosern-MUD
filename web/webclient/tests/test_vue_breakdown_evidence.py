@@ -33,11 +33,10 @@ Test-to-requirement mapping:
 from __future__ import annotations
 
 import json
-import subprocess
 import unittest
 from pathlib import Path
 
-from ._showcase_build import ensure_storybook_out, showcase_build_lock
+from ._showcase_build import ShowcaseEvidenceMixin, run_npm, run_node, showcase_build_lock
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -54,41 +53,11 @@ BREAKDOWN_STORY_IDS = {
 }
 
 
-def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["npm", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["node", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-class VueBreakdownEvidenceTest(unittest.TestCase):
+class VueBreakdownEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the P7 breakdown gates and assert each one passes."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        # The breakdown stories are registered in the static Storybook
-        # build; build it once per process when the checkout has none (CI
-        # workspaces only build the app dist). The shared fingerprint-guarded
-        # chain serializes against the B1/B2/B3 evidence classes (which
-        # rebuild the same .storybook-out in another parallel worker as
-        # their gate evidence) and rebuilds only when the input fingerprint
-        # no longer matches, so workers reuse a green build.
-        with showcase_build_lock():
-            ensure_storybook_out()
+    #: The breakdown family stories live in the static Storybook build.
+    SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
         "webclient-vue-application::the-character-ui-renders-server-breakdown-without-recomputation"
