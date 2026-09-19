@@ -328,7 +328,7 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
                 compiled = compile_quest_blueprint(entry.to_payload())
                 validate_definition(compiled.definition)
                 with patch(
-                    "world.quests.compile.append_generated_quest_payload",
+                    "world.quests.compile.registration.append_generated_quest_payload",
                     return_value=True,
                 ):
                     register_generated_quest(compiled)
@@ -377,7 +377,7 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
         compiled = compile_quest_blueprint(payload)
         validate_definition(compiled.definition)
         with patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         ):
             register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
@@ -501,7 +501,7 @@ class RegistryRestoreRegressionTests(unittest.TestCase):
         try:
             compiled = compile_quest_blueprint(_instance_payload())
             with patch(
-                "world.quests.compile.append_generated_quest_payload",
+                "world.quests.compile.registration.append_generated_quest_payload",
                 return_value=True,
             ):
                 register_generated_quest(compiled)

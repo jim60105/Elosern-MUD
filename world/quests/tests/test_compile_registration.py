@@ -49,7 +49,7 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         # Pure-unit class: the durable store is a database Script, so the
         # store boundary is patched to keep every test here DB-free.
         patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         )
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -158,7 +158,7 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
         # Pure-unit class: the durable store is a database Script, so the
         # store boundary is patched to keep every test here DB-free.
         patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         )
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -282,12 +282,12 @@ class PrivateCommissionRegistrationTests(CompileRegistryIsolation, unittest.Test
         super().setUp()
         self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
         patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         )
         patcher.start()
         self.addCleanup(patcher.stop)
         authorizer = patch(
-            "world.quests.compile.issuer_is_authorized", return_value=True
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=True
         )
         authorizer.start()
         self.addCleanup(authorizer.stop)

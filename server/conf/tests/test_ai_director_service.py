@@ -98,7 +98,7 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         # Pure-unit class: the durable store is a database Script, so the
         # store boundary is patched to keep every test here DB-free.
         patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         )
         patcher.start()
         self.addCleanup(patcher.stop)

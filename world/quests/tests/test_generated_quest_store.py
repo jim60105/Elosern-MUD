@@ -182,7 +182,7 @@ class GeneratedQuestStoreTests(EvenniaTestCase):
 
     def test_two_commissioners_of_one_definition_coexist_in_the_store(self):
         with patch(
-            "world.quests.compile.issuer_is_authorized", return_value=True
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=True
         ):
             first = compile_quest_blueprint(_npc_payload(issuer="npc:grey_granny"))
             second = compile_quest_blueprint(_npc_payload(issuer="npc:old_martha"))
@@ -285,7 +285,7 @@ class StoreFailureInjectionTests(RegistryIsolationMixin, unittest.TestCase):
         offers_before = dict(GUILD_OFFER_REGISTRY)
         requirements_before = dict(SCENE_REQUIREMENT_REGISTRY)
         with patch(
-            "world.quests.compile.append_generated_quest_payload",
+            "world.quests.compile.registration.append_generated_quest_payload",
             side_effect=RuntimeError("store unavailable"),
         ):
             with self.assertRaises(RuntimeError):

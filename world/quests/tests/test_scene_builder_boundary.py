@@ -45,7 +45,17 @@ class SceneBuilderBoundaryTests(unittest.TestCase):
                 continue
             if "SCENE_REQUIREMENT_REGISTRY" in path.read_text(encoding="utf-8"):
                 writers.append(path.relative_to(repo).as_posix())
-        self.assertEqual(writers, ["world/quests/compile.py"])
+        # The single compile module became the world/quests/compile package:
+        # contracts.py owns the dict and registration.py remains its only
+        # writer, so every file naming the registry must stay inside the
+        # compile-boundary package.
+        self.assertTrue(writers)
+        for writer in writers:
+            self.assertTrue(
+                writer.startswith("world/quests/compile/"),
+                f"{writer} names SCENE_REQUIREMENT_REGISTRY outside the "
+                "compile boundary",
+            )
 
     @covers_requirement("scene-builder::every-scene-builder-test-runs-offline-and-the-boundary-invariants-stay-green")
     def test_no_startup_resync_populates_generated_requirements(self):

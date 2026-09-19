@@ -514,7 +514,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         compiled = compile_quest_blueprint(payload)
         validate_definition(compiled.definition)
         with patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
+            "world.quests.compile.registration.append_generated_quest_payload", return_value=True
         ):
             register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)

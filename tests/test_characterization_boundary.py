@@ -96,21 +96,43 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
     def test_both_layers_import_the_shared_helper(self):
         for relative in (
             "world/ai/scenario_director/validators.py",
-            "world/quests/compile.py",
+            "world/quests/compile/fields.py",
+            "world/quests/compile/compiler.py",
         ):
             with self.subTest(module=relative):
                 tree = ast.parse(_production_source(relative))
                 imported = _imported_module_names(tree)
                 self.assertIn(SHARED_HELPER, imported)
-                for symbol in RULE_SYMBOLS:
-                    source = _production_source(relative)
-                    self.assertIn(symbol, source, f"{relative} must call {symbol}")
+        # Every rule symbol must be called by the AI layer, and by the
+        # compile boundary -- now a package, so the calls are split across
+        # submodules and are checked over the combined package source.
+        compile_sources = "".join(
+            _production_source(relative)
+            for relative in (
+                "world/quests/compile/fields.py",
+                "world/quests/compile/compiler.py",
+            )
+        )
+        for symbol in RULE_SYMBOLS:
+            self.assertIn(
+                symbol,
+                _production_source("world/ai/scenario_director/validators.py"),
+                f"validators.py must call {symbol}",
+            )
+            self.assertIn(
+                symbol, compile_sources, f"compile package must call {symbol}"
+            )
 
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
     def test_no_inline_duplicate_of_the_rules_exists_in_either_layer(self):
         for relative in (
             "world/ai/scenario_director/validators.py",
-            "world/quests/compile.py",
+            "world/quests/compile/contracts.py",
+            "world/quests/compile/fields.py",
+            "world/quests/compile/canonical.py",
+            "world/quests/compile/compiler.py",
+            "world/quests/compile/payload.py",
+            "world/quests/compile/registration.py",
         ):
             with self.subTest(module=relative):
                 source = _production_source(relative)

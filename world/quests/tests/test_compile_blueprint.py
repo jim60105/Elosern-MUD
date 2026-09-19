@@ -533,7 +533,7 @@ class PrivateCommissionCompileTests(CompileRegistryIsolation, unittest.TestCase)
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_a_character_namespaced_issuer_compiles_to_an_auto_descriptor(self):
         with mock.patch(
-            "world.quests.compile.issuer_is_authorized", return_value=True
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=True
         ):
             compiled = compile_quest_blueprint(self._npc_payload())
         self.assertEqual(compiled.issuance.issuer_key, "npc:grey_granny")
@@ -549,14 +549,14 @@ class PrivateCommissionCompileTests(CompileRegistryIsolation, unittest.TestCase)
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_a_private_commission_carrying_merit_fails_compile(self):
         with mock.patch(
-            "world.quests.compile.issuer_is_authorized", return_value=True
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=True
         ):
             with self.assertRaises(QuestCompileError):
                 compile_quest_blueprint(self._npc_payload(merit=25))
 
     def test_a_private_commission_naming_an_unauthorized_carrier_fails_compile(self):
         with mock.patch(
-            "world.quests.compile.issuer_is_authorized", return_value=False
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=False
         ):
             with self.assertRaises(QuestCompileError):
                 compile_quest_blueprint(self._npc_payload())
@@ -564,7 +564,7 @@ class PrivateCommissionCompileTests(CompileRegistryIsolation, unittest.TestCase)
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_two_commissioners_of_identical_stages_share_a_definition_key(self):
         with mock.patch(
-            "world.quests.compile.issuer_is_authorized", return_value=True
+            "world.quests.compile.compiler.issuer_is_authorized", return_value=True
         ):
             first = compile_quest_blueprint(self._npc_payload(issuer="npc:grey_granny"))
             second = compile_quest_blueprint(self._npc_payload(issuer="npc:old_martha"))
