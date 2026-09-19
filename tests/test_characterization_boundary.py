@@ -95,7 +95,7 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
     def test_both_layers_import_the_shared_helper(self):
         for relative in (
-            "world/ai/scenario_director.py",
+            "world/ai/scenario_director/validators.py",
             "world/quests/compile.py",
         ):
             with self.subTest(module=relative):
@@ -109,7 +109,7 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
     def test_no_inline_duplicate_of_the_rules_exists_in_either_layer(self):
         for relative in (
-            "world/ai/scenario_director.py",
+            "world/ai/scenario_director/validators.py",
             "world/quests/compile.py",
         ):
             with self.subTest(module=relative):

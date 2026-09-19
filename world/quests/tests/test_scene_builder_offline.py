@@ -137,7 +137,7 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         # same offline-loop shape (bound-target instance scene + named
         # portrait occupant), rows keyed entirely from kit data.
         pool_patch = patch(
-            "world.ai.scenario_director.get_template_pool",
+            "world.ai.scenario_director.generation.get_template_pool",
             return_value=(_offline_kit_blueprint(),),
         )
         pool_patch.start()

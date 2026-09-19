@@ -553,8 +553,11 @@ class ScenarioDirectorOfflineTestRuleTests(unittest.TestCase):
     def test_no_live_client_constructor_or_socket_in_scenario_director_tests(self):
         import pathlib
 
+        # The director is a package: its __file__ is the package __init__, so
+        # the package's tests live in the sibling world/ai/tests directory.
         tests_dir = (
-            pathlib.Path(scenario_director.__file__).resolve().parent / "tests"
+            pathlib.Path(scenario_director.__file__).resolve().parent.parent
+            / "tests"
         )
         modules = sorted(tests_dir.glob("test_scenario_director_*.py"))
         self.assertTrue(modules, "no scenario-director test modules found")

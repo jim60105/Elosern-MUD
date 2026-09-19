@@ -595,7 +595,8 @@ class CharacterizationValidatorTests(unittest.TestCase):
         # Attribute patching (not patch.dict): the shipped registries are
         # read-only mappings, and the director holds an import-time binding
         # of the tier registry — patch both the lore module (the lifespan
-        # helper re-imports it per call) and the consumer binding.
+        # helper re-imports it per call) and the consumer binding (the
+        # validators module, the owner of the tier-registry lookups).
         with patch.object(
             races_module,
             "RACE" + "_REGISTRY",
@@ -605,7 +606,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
             "NPC_TIER" + "_REGISTRY",
             {**tiers, tier.key: tier},
         ), patch.object(
-            scenario_director,
+            scenario_director.validators,
             "NPC_TIER" + "_REGISTRY",
             {**tiers, tier.key: tier},
         ):
