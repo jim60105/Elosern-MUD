@@ -538,9 +538,10 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(len(damage_entries), 1)
         self.assertEqual(damage_entries[0].data["amount"], 20)
 
-        # hp_loss reaction saw only actual loss of 20
+        # hp_loss reaction saw only actual loss of 20 (dispatched with the
+        # residual amount, not the raw 40 the attack promised).
         mock_reaction.assert_any_call(
-            self.defender, "hp_loss", source_tier=T_APPRENTICE
+            self.defender, "hp_loss", source_tier=T_APPRENTICE, hp_loss_amount=20
         )
 
         # Defender survives

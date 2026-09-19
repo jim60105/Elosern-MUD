@@ -446,6 +446,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
                 self.target,
                 "hp_loss",
                 source_tier=_APPRENTICE,
+                hp_loss_amount=15,
             )
 
     @covers_requirement(

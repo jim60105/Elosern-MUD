@@ -430,6 +430,7 @@ class BuffEngineMpRoutingTests(MpFlowTestBase):
                 self.target,
                 "hp_loss",
                 source_tier=T_ADEPT,
+                hp_loss_amount=15,
             )
 
     @covers_requirement("mp-state-feedback::buff-engine-mp-target-ticks-route-through-the-writer-with-persisted-attribution")

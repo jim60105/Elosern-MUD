@@ -95,7 +95,9 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(self.target.traits.hp.current, 40)
         self.assertEqual(self.caster.traits.hp.current, 60)
-        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier=_APPRENTICE)
+        mock_dispatch.assert_called_once_with(
+            self.target, "hp_loss", source_tier=_APPRENTICE, hp_loss_amount=10
+        )
 
     def test_fractional_share_floor_credit(self):
         buff_def = self._register_synth_buff(
@@ -195,7 +197,9 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
             tick_buffs(self.target, 10)
 
         self.assertEqual(mock_dispatch.call_count, 1)
-        mock_dispatch.assert_called_once_with(self.target, "hp_loss", source_tier=_APPRENTICE)
+        mock_dispatch.assert_called_once_with(
+            self.target, "hp_loss", source_tier=_APPRENTICE, hp_loss_amount=10
+        )
 
     def test_non_share_buff_ticks_bit_identically_with_zero_credit(self):
         buff_def = self._register_synth_buff(
