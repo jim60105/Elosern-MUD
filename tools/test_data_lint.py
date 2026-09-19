@@ -47,7 +47,6 @@ import importlib
 import io
 import json
 import os
-import pkgutil
 import re
 import subprocess
 import sys
@@ -190,19 +189,32 @@ def _harvest_display(value: Any, seen: set[int], out: set[str]) -> None:
 
 
 def _catalog_module_names() -> list[str]:
-    import world
-    import world.lore
-    import world.maps
-    import world.quests
-    import world.skills
+    """Enumerate catalog module names from the filesystem, without importing.
 
-    packages = {"world.lore": world.lore, "world.skills": world.skills, "world.quests": world.quests, "world.maps": world.maps}
+    ``pkgutil.walk_packages`` imports each package to recurse — which crashes
+    the cold child when a package's ``__init__`` needs runtime state (the
+    failure escapes the per-module try/except below, because it happens
+    during discovery). The caller imports each name individually, so
+    discovery stays side-effect-free on the filesystem.
+    """
+    root = Path(__file__).resolve().parent.parent
+    packages = ("world/lore", "world/skills", "world/quests", "world/maps")
     names: list[str] = []
-    for package_name, package in packages.items():
-        for module in pkgutil.walk_packages(package.__path__, package_name + "."):
-            names.append(module.name)
+    for package_dir in packages:
+        base = root / package_dir
+        package_name = package_dir.replace("/", ".")
+        for path in sorted(base.rglob("*.py")):
+            relative = path.relative_to(root)
+            if "__pycache__" in relative.parts:
+                continue
+            if path.name == "__init__.py":
+                dotted = ".".join(relative.parent.parts)
+            else:
+                dotted = ".".join(relative.with_suffix("").parts)
+            if dotted == package_name or dotted.startswith(package_name + "."):
+                names.append(dotted)
     names.extend(EXTRA_CATALOG_MODULES)
-    return names
+    return sorted(names)
 
 
 def _defines_catalog_mapping(root: Path, module_name: str) -> bool:
