@@ -253,7 +253,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_one_request_drives_one_complete_round(self):
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -261,7 +261,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
     def test_mid_round_invalidation_consumes_round(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
         # Whatever the outcome, the round count advanced exactly once.
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
@@ -282,7 +282,9 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
@@ -314,7 +316,9 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 2000
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
@@ -355,7 +359,7 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
     def test_compressed_opening_marks_commanded_skill_once_with_attributable_rolls(self):
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=44):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=44), patch("world.rules.combat.damage.roll_d100", return_value=44), patch("world.rules.combat.rounds.roll_d100", return_value=44):
             result = submit_opening_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         # Exactly one first-round commanded_action marker, kind skill, the
@@ -484,7 +488,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             #    the player's area attack hits both the monster and the
             #    companion, so the friendly-fire penalty applies (-1 per hit)
             #    inside the seam.
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
                 result = submit_player_action(
                     self.player,
                     _T_SEAM_CASCADE.key,
@@ -507,7 +511,9 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             #    on the kill path.
             self.monster.traits.hp.current = 1
             with (
-                patch("world.rules.combat.roll_d100", return_value=100),
+                patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+                patch("world.rules.combat.damage.roll_d100", return_value=100),
+                patch("world.rules.combat.rounds.roll_d100", return_value=100),
                 patch(
                     "world.rules.combat_session.settlement.settle_combat_result",
                     side_effect=RuntimeError("clock write failed"),
@@ -543,7 +549,9 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
                 return real_settle(result_, entities_)
 
             with (
-                patch("world.rules.combat.roll_d100", return_value=100),
+                patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+                patch("world.rules.combat.damage.roll_d100", return_value=100),
+                patch("world.rules.combat.rounds.roll_d100", return_value=100),
                 patch(
                     "world.rules.monster_behaviour._should_flee",
                     return_value=False,
@@ -623,7 +631,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         # The player dominates both floor-tier foes, so the opening's
         # two-part judgement selects compression, and the round-1 cast
         # plus the auto-attacks settle the whole session in one call.
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             outcome = submit_opening_action(self.player, _T_CAST, [m1])
         self.assertEqual(outcome["outcome"], "victory")
         self.assertGreaterEqual(
@@ -705,7 +713,9 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             return value
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
             patch.object(session_rounds, "_primary_opponent_id", side_effect=spy),
         ):
@@ -755,14 +765,18 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             return foe
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=44),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=44),
+            patch("world.rules.combat.damage.roll_d100", return_value=44),
+            patch("world.rules.combat.rounds.roll_d100", return_value=44),
             patch("world.rules.action.gates.roll_d100", return_value=44),
             patch("world.rules.combat_session.rounds.run_round", side_effect=record_round),
         ):
             submit_player_action(self.player, _T_CAST, [build()])
         self.player.db.active_combat = None
         with (
-            patch("world.rules.combat.roll_d100", return_value=44),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=44),
+            patch("world.rules.combat.damage.roll_d100", return_value=44),
+            patch("world.rules.combat.rounds.roll_d100", return_value=44),
             patch("world.rules.action.gates.roll_d100", return_value=44),
             patch(
                 "world.rules.combat_session.rounds.resolve_overwhelm",
@@ -821,7 +835,9 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         weak.location = self.room
         engage(self.player, weak)
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.rounds.classify_overwhelm", return_value="foes"),
             patch(
@@ -847,7 +863,9 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         weak.location = self.room
         engage(self.player, weak)
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=50),
             patch("world.rules.combat_session.rounds.classify_overwhelm", return_value=None),
             patch(
@@ -882,7 +900,9 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
             ),
         )
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=50),
             patch(
                 "world.rules.combat_session.rounds.resolve_overwhelm",
@@ -906,7 +926,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, fast)
         # The non-damaging focus never damages, so the opening takes the round path;
         # first_actor must still move the player to the head of the round.
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = submit_opening_action(self.player, _T_FOCUS.key, [])
         self.assertEqual(result["outcome"], "round")
         acting_logs = [log for log in result["logs"] if log.entries]
@@ -960,7 +980,9 @@ class CompressedOpeningFirstStrikeTests(BattlefieldIsolation, EvenniaTestCase):
             return real_resolve(field, provider, **kwargs)
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.combat_session.rounds.resolve_overwhelm", side_effect=spy),
         ):
                 result = submit_opening_action(self.player, _T_CAST, [self.monster])

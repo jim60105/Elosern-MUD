@@ -171,8 +171,8 @@ class HealEffectHandlerTests(unittest.TestCase):
     @covers_requirement("heal-effect-handler::self-heal-restores-the-acting-entity-s-hp-regardless-of-the-skill-s-resolved-targets")
     def test_self_heal_missing_fraction_scale_and_heal_gain_composition(self):
         actor = FakeEntity("actor", hp=30, max_hp=100, magic_power=20)
-        with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+        with patch("world.rules.combat.healing.evaluate_combat_modifiers", return_value={"heal_gain": "+50%"}), patch(
+            "world.rules.combat.battlefield.evaluate_combat_modifiers",
             return_value={"heal_gain": "+50%"},
         ):
             stat_amount = _heal_magnitude(actor)
@@ -365,9 +365,13 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         )
         enemy = self.battlefield.roster["enemy"]
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.healing.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):
@@ -387,9 +391,13 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         )
         enemy = self.battlefield.roster["enemy"]
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.healing.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):
@@ -419,9 +427,13 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         enemy = self.battlefield.roster["enemy"]
         enemy.traits.hp.current = 10
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.healing.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):

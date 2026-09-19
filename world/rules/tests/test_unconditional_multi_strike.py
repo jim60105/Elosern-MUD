@@ -168,7 +168,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]), patch(
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]), patch(
             "world.rules.action.costs.grant_skill_practice_xp"
         ) as mock_practice:
             res = ActionResolver.resolve(req)
@@ -203,7 +203,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -224,7 +224,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 1]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 1]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -245,7 +245,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 1]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -267,7 +267,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertFalse(has_action_evidence(self.target, "forced_interaction", now=100))
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]):
             res_clean = ActionResolver.resolve(req)
         rolls_clean = [e for e in res_clean.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(rolls_clean), 2)
@@ -280,7 +280,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         self.assertTrue(has_action_evidence(self.target, "forced_interaction", now=100))
         bf2, ctx2 = self._make_bf()
         req2 = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx2)
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]):
             res_ev = ActionResolver.resolve(req2)
         rolls_ev = [e for e in res_ev.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(rolls_ev), 2)
@@ -295,7 +295,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -312,7 +312,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf(nonlethal=True, nonlethal_keys=(str(self.target.key),))
         req = ActionRequest(self.actor, _T_UNCONDITIONAL_MULTI.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -333,7 +333,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         def bomb_apply():
             raise RuntimeError("commit explosion")
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]), patch.dict(
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]), patch.dict(
             "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
             {
                 "boom": lambda r, l: [
@@ -352,7 +352,7 @@ class UnconditionalMultiStrikeSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_CONTROL_SINGLE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")

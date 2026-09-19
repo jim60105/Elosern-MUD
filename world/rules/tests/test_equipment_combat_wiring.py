@@ -479,7 +479,7 @@ class CostParityTests(BattlefieldIsolation, _WearerCase):
 
         # A successful cast spends exactly the equipment-adjusted cost.
         player.traits.mp.current = adjusted
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             result = ActionResolver.resolve(
                 ActionRequest(player, _MP_SKILL.key, [monster], context)
             )
@@ -523,7 +523,7 @@ class CostParityTests(BattlefieldIsolation, _WearerCase):
         )
 class _FixtureFieldCase(_WearerCase):
     def _staged_damage(self, actor, target):
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             pending = combat._handle_damage(
                 actor, [target], f"damage:{_T_ELEMENT}:physical", {}, 1.0
             )[0]
@@ -639,7 +639,7 @@ class AdjustedAgilityTests(_FixtureFieldCase):
             },
             {"cloak carrier": boosted, "plain runner": plain},
         )
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 1]):
+        with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 1]):
             order = combat.roll_initiative(field)
         # Raw effective agility decides: the plain runner outranks the
         # gear-boosted carrier despite the higher adjusted value.
@@ -702,7 +702,10 @@ class HealWiringTests(_WearerCase):
 
     def test_fractional_heal_gain_percent_is_tolerated(self):
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.healing.evaluate_combat_modifiers",
+            return_value={"heal_gain": "+2.5%"},
+        ), patch(
+            "world.rules.combat.battlefield.evaluate_combat_modifiers",
             return_value={"heal_gain": "+2.5%"},
         ):
             self.assertEqual(_heal_magnitude(self.caster), 41)  # floor(40*1.025)

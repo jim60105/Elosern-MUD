@@ -91,7 +91,7 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     @covers_requirement("quest-progress-tracking::change-15-exposes-a-deterministic-no-ai-completion-seam-for-phase-4")

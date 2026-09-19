@@ -397,7 +397,10 @@ class ParseEffectTests(unittest.TestCase):
         from pathlib import Path
 
         for relative in (
-            "world/rules/combat.py",
+            "world/rules/combat/battlefield.py",
+            "world/rules/combat/damage.py",
+            "world/rules/combat/healing.py",
+            "world/rules/combat/rounds.py",
             "world/rules/progression.py",
             "world/rules/combat_modifiers.py",
         ):

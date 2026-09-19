@@ -112,7 +112,7 @@ class DamageDivertTestBase(EvenniaTest):
         patcher = patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched)
         patcher.start()
         self._patchers.append(patcher)
-        combat_patcher = patch.dict("world.rules.combat.BUFF_DEFINITIONS", patched)
+        combat_patcher = patch.dict("world.rules.combat.damage.BUFF_DEFINITIONS", patched)
         combat_patcher.start()
         self._patchers.append(combat_patcher)
 
@@ -141,7 +141,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self._register_synth_buff(buff_def)
         apply_buff(self.defender, buff_def.key, source_skill="synth_cast", source_tier=T_APPRENTICE)
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(
                 self.attacker, [self.defender], "damage:dark:physical", {}, 1.0
             )
@@ -185,7 +185,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.defender.traits.defense.base = 20  # post-defense = 40
         self.defender.traits.mp.current = 100
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         self.assertEqual(int(pending[0].description.rsplit("|", 1)[1]), 20)  # 40 - 20
         self.assertEqual(int(pending[1].description.rsplit("|", 1)[1]), 20)
@@ -194,7 +194,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         update_divert_consumed(self.defender.buffs.all[buff_def.key], 20)  # remaining cap = 10
         self.attacker.traits.atk_phys.base = 100
         self.defender.traits.defense.base = 20  # post-defense = 80 -> 50% is 40 > cap 10
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         self.assertEqual(int(pending[0].description.rsplit("|", 1)[1]), 70)  # 80 - 10
         self.assertEqual(int(pending[1].description.rsplit("|", 1)[1]), 10)
@@ -202,7 +202,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         # Bound 3: gauge shortage binds (MP has only 6, remaining cap 20, fraction gives 40)
         update_divert_consumed(self.defender.buffs.all[buff_def.key], 10)  # remaining cap = 20
         self.defender.traits.mp.current = 6
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         self.assertEqual(int(pending[0].description.rsplit("|", 1)[1]), 74)  # 80 - 6
         self.assertEqual(int(pending[1].description.rsplit("|", 1)[1]), 6)
@@ -227,7 +227,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.defender.traits.defense.base = 20  # post-defense = 40
 
         # Hit 1: 50% of 40 = 20 diverted, cap consumed = 20, remaining = 10
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             p1 = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         for eff in p1:
             eff.apply()
@@ -236,7 +236,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(int(self.defender.traits.mp.current), 80)
 
         # Hit 2: 50% of 40 = 20, but remaining cap is 10 -> divert 10, cap consumed = 30 (exhausted)
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             p2 = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         for eff in p2:
             eff.apply()
@@ -246,7 +246,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
 
         # Hit 3: cap is fully exhausted, but buff is STILL active (remaining_seconds > 0)
         self.assertIn(buff_def.key, entity_active_buffs(self.defender))
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             p3 = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         # Only damage PendingEffect, no damage_divert effect
         self.assertEqual(len(p3), 1)
@@ -260,7 +260,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertNotIn(buff_def.key, entity_active_buffs(self.defender))
 
         # Hit 4: after expiry, full damage lands
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             p4 = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
         self.assertEqual(len(p4), 1)
         self.assertEqual(int(p4[0].description.rsplit("|", 1)[1]), 40)
@@ -294,7 +294,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.attacker.traits.atk_phys.base = 100
         self.defender.traits.defense.base = 20  # post-defense = 80
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
 
         # Expected:
@@ -336,7 +336,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         apply_buff(self.defender, buff_def.key)
 
         # Miss (roll=1)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             pending_miss = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
 
         self.assertEqual(len(pending_miss), 1)
@@ -365,7 +365,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.attacker.traits.atk_phys.base = 60
         self.defender.traits.defense.base = 20  # post-defense = 40
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
 
         # Add an injected failure effect at the end of pending
@@ -461,7 +461,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.defender.traits.defense.base = 20  # post-defense = 40 -> 50% is 20 -> clamped to 10 MP
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
             patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_reaction,
         ):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
@@ -520,8 +520,8 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
                 context=BattlefieldActionContext(battlefield),
             )
             with (
-                patch("world.rules.combat.roll_d100", return_value=50),
-                patch("world.rules.combat.dispatch_outcome_reaction") as mock_reaction,
+                patch("world.rules.combat.damage.roll_d100", return_value=50),
+                patch("world.rules.combat.damage.dispatch_outcome_reaction") as mock_reaction,
             ):
                 result = ActionResolver.resolve(req)
 
@@ -662,8 +662,8 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         }
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
-            patch("world.rules.combat.has_action_evidence", return_value=True),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.has_action_evidence", return_value=True),
         ):
             pending = _handle_damage(
                 self.attacker, [self.defender], "damage:dark:physical", ctx, 1.0

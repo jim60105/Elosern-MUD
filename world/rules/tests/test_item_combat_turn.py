@@ -166,7 +166,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
         ):
@@ -303,10 +305,12 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             outcome="rejected", reason=ItemUseReason.UNKNOWN_EFFECT
         )
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
-                "world.rules.combat.resolve_item_use", return_value=rejected
+                "world.rules.combat.rounds.resolve_item_use", return_value=rejected
             ),
         ):
             result = submit_player_item_use(self.player, _TONIC_KEY)
@@ -326,7 +330,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         foe_team = "foes"
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session.rounds.classify_overwhelm",
@@ -361,7 +367,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session.rounds.classify_overwhelm",
@@ -399,7 +407,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             raise RuntimeError("persist boom")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.rounds._persist", side_effect=boom),
         ):
@@ -443,9 +453,11 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             raise RuntimeError("upkeep boom")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
+            patch("world.rules.combat.rounds._end_of_round_upkeep", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _TONIC_KEY)
@@ -481,7 +493,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             raise RuntimeError("settlement boom")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.rounds._continue_or_settle", side_effect=boom),
         ):
@@ -575,9 +589,11 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
             raise RuntimeError("upkeep boom")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
+            patch("world.rules.combat.rounds._end_of_round_upkeep", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _MANA_KEY)
@@ -629,7 +645,9 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         engage_group(self.player, [self.monster, second])
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
             # The troll sits below its archetype's flee boundary and acts
@@ -737,17 +755,17 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 return_value={},
             ),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
-            patch("world.rules.combat.roll_initiative", return_value=["elf"]),
-            patch("world.rules.combat.resolve_item_use", side_effect=item_resolver),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["elf"]),
+            patch("world.rules.combat.rounds.resolve_item_use", side_effect=item_resolver),
             patch(
-                "world.rules.combat.ActionResolver.resolve",
+                "world.rules.combat.rounds.ActionResolver.resolve",
                 side_effect=action_resolver,
             ),
-            patch("world.rules.combat._end_of_round_upkeep", return_value={}),
-            patch("world.rules.combat.settle_upkeep", return_value=[]),
+            patch("world.rules.combat.rounds._end_of_round_upkeep", return_value={}),
+            patch("world.rules.combat.rounds.settle_upkeep", return_value=[]),
         ):
             result = resolve_overwhelm(
                 self.field,

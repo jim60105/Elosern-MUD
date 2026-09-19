@@ -615,8 +615,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -654,8 +654,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         comp_hp = self.companion.traits.hp.current
         req = ActionRequest(self.caster, skill.key, [self.companion], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
@@ -712,8 +712,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.caster.traits.hp.current = 50
         req = ActionRequest(self.caster, skill.key, [self.target], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
@@ -749,8 +749,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         req = ActionRequest(self.caster, skill.key, [self.companion], self.context)
 
         with (
-            patch("world.rules.combat.roll_d100") as mock_roll,
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100") as mock_roll,
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -864,8 +864,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
 
         # Inject an error in event effect planners (commit stage)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch.dict(
                 "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
                 {
@@ -971,8 +971,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
         req = ActionRequest(self.caster, water_spell.key, [self.target, self.companion], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -1052,8 +1052,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.target.traits.hp.current = 50
         req_heal = ActionRequest(self.caster, heal_skill.key, [self.target], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res_heal = ActionResolver.resolve(req_heal)
         self.assertEqual(res_heal.outcome, "success")
@@ -1085,8 +1085,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         companion_hp_before = self.companion.traits.hp.current
         req_mixed = ActionRequest(self.caster, mixed_skill.key, [self.target, self.companion], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res_mixed = ActionResolver.resolve(req_mixed)
         self.assertEqual(res_mixed.outcome, "success")
@@ -1119,8 +1119,8 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         caster_mp_before = self.caster.traits.mp.current
         req = ActionRequest(self.caster, composite_skill.key, [self.companion, self.target], self.context)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")

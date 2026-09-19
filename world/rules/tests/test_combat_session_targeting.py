@@ -85,7 +85,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.combat_session import _persist
 
         _persist(self.player, record)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_ANY_AREA, [self.monster_a, self.monster_b]
             )
@@ -94,7 +94,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_approved_shorthand_reaches_ordinary_targeting(self):
         engage(self.player, self.monster_a)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _T_ANY_AREA, "all-enemies")
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertLessEqual(self.monster_a.traits.hp.current, 99)
@@ -105,7 +105,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         clock = WorldClock()
         with (
             patch("world.rules.clock.get_world_clock", return_value=clock),
-            patch("world.rules.combat.roll_d100") as roll,
+            patch("world.rules.combat.battlefield.roll_d100") as roll,
         ):
             result = submit_player_action(
                 self.player, _T_ANY_AREA, [self.monster_a, self.monster_a]

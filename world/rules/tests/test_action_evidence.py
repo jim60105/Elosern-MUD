@@ -694,7 +694,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         )
 
         initial_hp = _stored_hp(self.target)
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80]):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")
@@ -724,7 +724,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             [self.target],
             ctx,
         )
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")
@@ -736,7 +736,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         eff.apply()
         self.assertFalse(has_action_evidence(self.target, "forced_interaction", now=100))
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             result2 = ActionResolver.resolve(request)
 
         self.assertEqual(result2.outcome, "success")
@@ -761,7 +761,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             [self.target],
             ctx,
         )
-        with patch("world.rules.combat.roll_d100", return_value=80):
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")
@@ -785,7 +785,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             [self.target],
             ctx,
         )
-        with patch("world.rules.combat.roll_d100", return_value=80):
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")
@@ -816,7 +816,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         def failing_apply():
             raise RuntimeError("commit explosion")
 
-        with patch("world.rules.combat.roll_d100", return_value=50), patch.dict(
+        with patch("world.rules.combat.damage.roll_d100", return_value=50), patch.dict(
             "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
             {
                 "boom": lambda r, l: [
@@ -845,7 +845,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             [self.target],
             ctx,
         )
-        with patch("world.rules.combat.roll_d100", return_value=80):
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")
@@ -886,7 +886,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             ctx,
         )
 
-        with patch("world.rules.combat.roll_d100", return_value=80):
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
             result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success")

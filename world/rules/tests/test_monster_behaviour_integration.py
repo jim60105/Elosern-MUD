@@ -93,16 +93,16 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
         )()
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=["monster"],
             ),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
-            patch("world.rules.combat.ActionResolver.resolve", return_value=result),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.ActionResolver.resolve", return_value=result),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(self.field, monster_behaviour_policy)
         self.assertEqual(logs, [log])
@@ -143,19 +143,19 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
     def test_zero_actions_gate_never_calls_policy(self):
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=["monster"],
             ),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={"actions_per_turn": 0},
             ),
             patch(
                 "world.rules.tests.test_monster_behaviour_integration."
                 "monster_behaviour_policy"
             ) as policy,
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(self.field, policy)
         policy.assert_not_called()
@@ -201,7 +201,7 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
             request = monster_behaviour_policy(monster, battlefield)
         self.assertEqual(request.skill_key, _T_CLAW.key)
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.rounds.evaluate_combat_modifiers",
             return_value={},
         ):
             result = ActionResolver.resolve(request)
@@ -253,12 +253,12 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         self._assert_flee_preconditions()
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=[self.monster.key, self.target.key],
             ),
             patch("world.rules.disengage.roll_d100", return_value=100),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(self.field, monster_behaviour_policy)
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
@@ -274,12 +274,12 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         before = self.target.traits.hp.current
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=[self.monster.key, self.target.key],
             ),
             patch("world.rules.disengage.roll_d100", return_value=1),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(self.field, monster_behaviour_policy)
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
@@ -299,7 +299,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         self.assertNotIn("FLEE_SKILL_KEY", source)
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=[self.monster.key, self.target.key],
             ),
             patch(
@@ -313,8 +313,8 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                     },
                 ),
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             result = resolve_overwhelm(
                 self.field,
@@ -390,10 +390,10 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                 else:
                     with (
                         patch(
-                            "world.rules.combat.evaluate_combat_modifiers",
+                            "world.rules.combat.rounds.evaluate_combat_modifiers",
                             return_value={},
                         ),
-                        patch("world.rules.combat.roll_d100", return_value=100),
+                        patch("world.rules.combat.damage.roll_d100", return_value=100),
                     ):
                         result = ActionResolver.resolve(request)
                     self.assertEqual(result.outcome, "success")

@@ -170,7 +170,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
     def test_empty_party_engage_behaves_exactly_as_before(self):
         result = engage(self.player, self.monster)
         self.assertEqual(result["record"].player_ids, (self.player.pk,))
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             outcome = submit_player_action(
                 self.player, _T_CAST, [self.monster]
             )
@@ -210,7 +210,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             calls[str(entity.key)] = calls.get(str(entity.key), 0) + 1
             return provider(entity, field)
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             run_round(battlefield, counting)
         for key in (self.player.key, first.key, second.key, monster_a.key, monster_b.key):
             self.assertEqual(calls.get(str(key), 0), 1, key)
@@ -228,7 +228,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         apply_affinity_change(
             companion, self.player, AffinitySource.QUEST_COMPLETION, 10
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [companion]
             )
@@ -250,7 +250,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             self.player, _T_CAST, [monster], context
         )
         provider = _round_provider(self.player, request, battlefield, record)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
         targets = [entry.target for entry in _damage_entries(logs)]
         self.assertIn(str(companion.key), targets)
@@ -282,7 +282,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         context = _context_for(battlefield, record)
         request = ActionRequest(self.player, _T_CAST, [monster], context)
         provider = _round_provider(self.player, request, battlefield, record)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
         companion_damage = [
             entry
@@ -327,7 +327,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
             self.player, _T_CAST, [self.monster], context
         )
         provider = _round_provider(self.player, request, battlefield, record)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             return battlefield, run_round(battlefield, provider)
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
@@ -378,7 +378,9 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
                 "world.rules.combat_session.policies.monster_behaviour_policy",
                 side_effect=spy,
             ),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
@@ -439,7 +441,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
     def test_knockout_state_survives_a_battlefield_rebuild(self):
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             submit_player_action(self.player, _T_CAST, [self.monster])
         record = read_session(self.player)
         self.assertIn(int(self.companion.pk), record.knocked_out_ids)
@@ -468,7 +470,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         # round's combat seconds and lifts the companion above the nonlethal
         # floor, and a later engagement includes it again.
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
             )
@@ -521,7 +523,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 1
         companion = _companion(self.player, "仍站著", hp=100)
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
             )
@@ -552,7 +554,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.hp.current = 100
         self.monster.traits.agility.base = 5
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
             )
@@ -566,7 +568,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
     def test_knocked_out_companion_does_not_end_the_session(self):
         companion = _companion(self.player, "先倒下", hp=50)
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
             )
@@ -631,9 +633,13 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
             },
         )
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.battlefield.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):

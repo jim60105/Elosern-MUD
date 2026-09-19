@@ -13,7 +13,11 @@ from typeclasses.characters import PlayerCharacter
 from world.rules.traits import get_display_value
 
 FORBIDDEN_MODULES = (
-    "world/rules/combat.py",
+    "world/rules/combat/__init__.py",
+    "world/rules/combat/battlefield.py",
+    "world/rules/combat/damage.py",
+    "world/rules/combat/healing.py",
+    "world/rules/combat/rounds.py",
     "world/rules/dice.py",
     "world/rules/targeting.py",
 )

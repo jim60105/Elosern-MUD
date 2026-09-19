@@ -283,7 +283,7 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         engage(self.char1, monster)
         session = read_session(self.char1)
         self.assertIn(int(self.companion.pk), session.player_ids)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             outcome = submit_player_action(self.char1, _T_CAST, [monster])
         self.assertEqual(outcome["outcome"], "victory")
         self.assertIsNone(read_session(self.char1))

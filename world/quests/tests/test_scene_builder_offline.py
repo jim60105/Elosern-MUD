@@ -157,7 +157,7 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
             [target],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     def _accept(self, payload):

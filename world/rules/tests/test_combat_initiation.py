@@ -206,7 +206,7 @@ class InitiationRoutingTests(
         monster = _monster("opening wolf", hp=2000, atk=1)
         monster.location = self.room
         hp_before = monster.traits.hp.current
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monster)
         self.assertEqual(result["outcome"], "round")
         self.assertIsNotNone(read_session(self.player))
@@ -232,7 +232,7 @@ class InitiationRoutingTests(
             with self.subTest(skill=skill_key):
                 monster = _monster(f"target {skill_key}", hp=2000, atk=1)
                 monster.location = self.room
-                with patch("world.rules.combat.roll_d100", return_value=50), patch(
+                with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch(
                     "world.rules.action.gates.roll_d100", return_value=1
                 ):
                     result = initiate_field_combat(self.player, skill_key, monster)
@@ -258,7 +258,9 @@ class InitiationRoutingTests(
         # the flee predicate: this scenario is about the fight opening and
         # the heal landing, not about a random escape roll ending it.
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch("world.rules.monster_behaviour._should_flee", return_value=False),
         ):
             result = initiate_field_combat(self.player, _T_HEAL, monster)
@@ -421,7 +423,7 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         dead = _monster("pack dead", hp=1)
         dead.location = self.room
         dead.traits.hp.current = 0
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = initiate_field_combat(
                 self.player, SEAM_AREA_KEY, monsters[0]
             )
@@ -442,7 +444,7 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         ]
         for monster in monsters:
             monster.location = self.room
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monsters[1])
         self.assertEqual(result["outcome"], "round")
         record = read_session(self.player)
@@ -455,7 +457,7 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         grant_lineage(self.player, [SEAM_AREA_KEY])
         monster = _monster("lone pack wolf", hp=2000, atk=1)
         monster.location = self.room
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = initiate_field_combat(self.player, SEAM_AREA_KEY, monster)
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).enemy_ids, (int(monster.pk),))
@@ -535,7 +537,9 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         npc.apply_race_baseline()
         open_or_refresh_dialogue(self.player, npc, "即將隨開戰結束的一句話")
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, self.monster)
@@ -560,7 +564,7 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         monster.location = self.room
         for trait_key in ("atk_phys", "agility"):
             getattr(self.player.traits, trait_key).base = 10
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = initiate_field_combat(self.player, _T_CAST, monster)
         self.assertEqual(result["outcome"], "round")
         # Combat time stays unsettled in the session until the terminal
@@ -576,7 +580,9 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         monster = _monster("doomed wolf", hp=100, atk=10)
         monster.location = self.room
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.combat_session.settlement.log_info") as session_info,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -613,7 +619,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         monster = _monster("event wolf", hp=100, atk=10)
         monster.location = self.room
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.combat_initiation.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -638,7 +646,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         monster = _monster("durable wolf", hp=2000, atk=1)
         monster.location = self.room
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch("world.rules.combat_initiation.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -695,7 +705,7 @@ class FieldCombatCommandTests(
     "field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and-its-documentation-says-so"
 )
     def test_command_routes_a_monster_targeted_cast_into_combat(self):
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             self.call(
                 CmdCast(),
                 f"{BASIC_ATTACK_KEY}=command wolf",
@@ -766,7 +776,9 @@ class FieldCombatCommandTests(
     def test_sexual_act_aimed_at_a_monster_runs_the_in_combat_scan(self):
         self.char1.db.skills = {"active": [_T_ACT], "passive": []}
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
                 "world.rules.combat_session.rounds._scan_sexual_coercion",

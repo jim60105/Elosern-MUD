@@ -167,7 +167,7 @@ class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
     def _defeat_by_forfeit(self, target=None):
         """Drive one hostile defeat settlement through ``forfeit``."""
         engage(self.player, target or self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             _attack(self.player, target or self.monster)
         return forfeit(self.player)
 
@@ -1062,7 +1062,7 @@ class RollbackTests(
     )
     def test_persist_failure_rolls_back_the_whole_aftermath_and_retry_settles_once(self):
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             _attack(self.player, self.monster)
         saved_pk = self.monster.pk
         hp_after_round = self.player.traits.hp.current
@@ -1129,7 +1129,7 @@ class RollbackTests(
         merchant.last_restock_day = 0
 
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             _attack(self.player, self.monster)
         hp_after_round = self.player.traits.hp.current
         saved_marker = self.monster.db.population_key
@@ -1181,7 +1181,7 @@ class RollbackTests(
 
         collected: list = []
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             _attack(self.player, self.monster)
         saved_pk = self.monster.pk
         saved_marker = self.monster.db.population_key
@@ -1227,7 +1227,9 @@ class RollbackTests(
                 "world.rules.combat_session.rounds._continue_or_settle",
                 exploding_continue,
             ),
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             self.assertRaises(RuntimeError),
         ):
             _attack(self.player, self.monster)
@@ -1259,7 +1261,7 @@ class RecoveryFallbackDepartureTests(WildernessDefeatMixin, DefeatAftermathBase)
         self.player.location = elsewhere
         saved_pk = self.monster.pk
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
             self.captureOnCommitCallbacks(execute=True),
         ):
             restore_active_session(self.player)

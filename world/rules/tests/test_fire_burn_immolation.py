@@ -283,7 +283,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.foe],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -346,7 +346,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.caster],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res_strike = ActionResolver.resolve(strike_req)
 
         self.assertEqual(res_strike.outcome, "success")
@@ -378,12 +378,12 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.caster],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             ActionResolver.resolve(magic_req)
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
 
         # Missed physical swing does NOT trigger ignite
-        with patch("world.rules.combat.roll_d100", return_value=0):  # miss
+        with patch("world.rules.combat.damage.roll_d100", return_value=0):  # miss
             miss_req = ActionRequest(
                 actor=self.foe2,
                 skill_key=strike_skill.key,
@@ -433,7 +433,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.foe],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -493,7 +493,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self.foe2.traits.defense.base = 0
 
         # Execute strike against high defense foe vs zero defense foe2
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             pending_high_def = _handle_damage(
                 self.caster,
                 [self.foe],
@@ -538,7 +538,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.foe],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res_hit = ActionResolver.resolve(req_hit)
         self.assertEqual(res_hit.outcome, "success")
         self.assertIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
@@ -546,7 +546,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         # Case B: Cast misses the target (damage leg misses, but self-burn still lands)
         self.caster.buffs.remove("t_synth_sacrifice_self")
         self.assertNotIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
-        with patch("world.rules.combat.roll_d100", return_value=0):  # miss
+        with patch("world.rules.combat.damage.roll_d100", return_value=0):  # miss
             res_miss = ActionResolver.resolve(req_hit)
         # Self-buff lands regardless of damage hit
         self.assertIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
@@ -589,7 +589,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.foe, self.foe2],
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")

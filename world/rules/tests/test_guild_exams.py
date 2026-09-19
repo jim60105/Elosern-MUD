@@ -480,7 +480,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 2000
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
@@ -506,7 +506,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 2000
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
@@ -556,7 +556,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 2000
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
@@ -573,7 +573,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
             getattr(opponent.traits, key).base = 500
         opponent.traits.hp.base = 2000
         opponent.traits.hp.current = 2000
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_failed")
         self.assertEqual(self.player.guild_rank, "F")
@@ -634,7 +634,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self.player.db.quest_log, [])
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         defeated = [
@@ -664,7 +664,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         opponent.traits.hp.current = 3
         opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
         self.assertEqual(self.player.db.quest_log, [])
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
@@ -828,7 +828,9 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
         opponent.traits.hp.current = 1
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.settlement.settle_combat_result",
@@ -842,7 +844,9 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
         self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
         self.assertIsNotNone(read_session(self.player))
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _attack_key(), [opponent])

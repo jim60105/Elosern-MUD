@@ -106,7 +106,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         monster = self._spawn_hunt_monster()
         self.call(CmdEngage(), monster.key, "戰鬥開始")
         self.assertIsNotNone(self.player.db.active_combat)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             self.call(CmdCast(), f"basic_attack={monster.key}", None)
         self.assertIsNone(self.player.db.active_combat)
         from world.quests.runtime import QuestState
@@ -197,7 +197,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         from evennia.objects.models import ObjectDB
 
         opponent = ObjectDB.objects.filter(id=session.enemy_ids[0]).first()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             self.call(CmdCast(), f"basic_attack={opponent.key}", None)
         self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(self.player.db.active_combat)
@@ -220,7 +220,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         self._accept_intro()
         monster = self._spawn_hunt_monster()
         self.call(CmdEngage(), monster.key, "戰鬥開始")
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             self.call(CmdCast(), f"basic_attack={monster.key}", None)
         self.assertIsNone(self.player.db.active_combat)
 

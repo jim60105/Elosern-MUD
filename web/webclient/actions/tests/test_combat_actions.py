@@ -264,7 +264,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         from unittest.mock import Mock, patch
 
         self.player.msg = Mock()
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = _cast_adapter(
                 self.player,
                 validate_cast_payload(
@@ -340,7 +340,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.skills = {"active": [_T_AREA.key], "passive": []}
         from unittest.mock import patch
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = _cast_adapter(
                 self.player,
                 validate_cast_payload(
@@ -369,7 +369,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         expected_cost = scaled_mp_cost(int(_T_AREA.cost["mp"]), _T_SCALE)
         from unittest.mock import patch
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = _cast_adapter(
                 self.player,
                 validate_cast_payload(

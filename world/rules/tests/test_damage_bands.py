@@ -27,14 +27,14 @@ class DamageBandTests(unittest.TestCase):
         actor = FakeEntity("actor", atk_phys=1, agility=10)
         target = FakeEntity("target", hp=100, defense=99, agility=10)
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.damage.evaluate_combat_modifiers",
             return_value={},
         ):
-            with patch("world.rules.combat.roll_d100", return_value=51):
+            with patch("world.rules.combat.damage.roll_d100", return_value=51):
                 hit = _handle_damage(
                     actor, [target], "damage:dark:physical", {}, 1.0
                 )[0]
-            with patch("world.rules.combat.roll_d100", return_value=1):
+            with patch("world.rules.combat.damage.roll_d100", return_value=1):
                 miss = _handle_damage(
                     actor, [target], "damage:dark:physical", {}, 1.0
                 )[0]

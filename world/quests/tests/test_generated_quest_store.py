@@ -437,7 +437,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     @covers_requirement("quest-lifecycle::generated-quest-definitions-resolve-after-a-server-restart")

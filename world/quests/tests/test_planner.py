@@ -141,7 +141,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def _resolve(self, actor, skill_key, targets):
         field = self._field(actor, targets)
         request = ActionRequest(actor, skill_key, targets, BattlefieldActionContext(field))
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     def _records(self):
@@ -329,7 +329,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
                 event_context={"battlefield": field, "simulated": True},
             ),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(target.traits.hp.current, 0)
@@ -359,7 +359,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
                 event_context={"battlefield": field, "simulated": True},
             ),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(guard.traits.hp.current, 0)
@@ -431,7 +431,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         request = ActionRequest(
             actor, skill_key, targets, BattlefieldActionContext(field)
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     def _records(self):
@@ -533,7 +533,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         request = ActionRequest(
             companion, STRIKE_SKILL.key, [prey], RoomActionContext(self.room)
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)

@@ -101,9 +101,9 @@ class DamageEffectHandlerTests(unittest.TestCase):
         actor = FakeEntity("actor", atk_phys=20, agility=10)
         target = FakeEntity("target", hp=100, agility=10, defense=5)
         with (
-            patch("world.rules.combat.roll_d100", return_value=75),
+            patch("world.rules.combat.damage.roll_d100", return_value=75),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):
@@ -120,9 +120,9 @@ class DamageEffectHandlerTests(unittest.TestCase):
         actor = FakeEntity("actor")
         target = FakeEntity("target")
         with (
-            patch("world.rules.combat.roll_d100", return_value=90) as roller,
+            patch("world.rules.combat.damage.roll_d100", return_value=90) as roller,
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
                 return_value={},
             ),
         ):
@@ -151,9 +151,13 @@ class DamageEffectHandlerTests(unittest.TestCase):
             return {"accuracy": -10} if entity is actor else {}
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=51),
+            patch("world.rules.combat.damage.roll_d100", return_value=51),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                side_effect=modifiers,
+            ),
+            patch(
+                "world.rules.combat.battlefield.evaluate_combat_modifiers",
                 side_effect=modifiers,
             ),
         ):
@@ -181,9 +185,13 @@ class DamageParserArchitectureTests(unittest.TestCase):
 def _staged_amount(actor, target, effect_id, modifiers):
     """Resolve one hit and return the staged damage amount."""
     with (
-        patch("world.rules.combat.roll_d100", return_value=100),
+        patch("world.rules.combat.damage.roll_d100", return_value=100),
         patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.damage.evaluate_combat_modifiers",
+            side_effect=modifiers,
+        ),
+        patch(
+            "world.rules.combat.battlefield.evaluate_combat_modifiers",
             side_effect=modifiers,
         ),
     ):
@@ -312,7 +320,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
 
     def test_damage_skill_resolves_and_emits_structured_entries(self):
         before = self.target.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(self.target.traits.hp.value, before)
@@ -327,7 +335,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         before = self.target.traits.hp.value
         SKILL_TIME_OVERRIDES[_T_CAST.key] = -1
         try:
-            with patch("world.rules.combat.roll_d100", return_value=100) as roller:
+            with patch("world.rules.combat.damage.roll_d100", return_value=100) as roller:
                 result = ActionResolver.resolve(self.request)
         finally:
             SKILL_TIME_OVERRIDES.pop(_T_CAST.key, None)
@@ -342,7 +350,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
 
     def test_miss_leaves_complete_hp_gauge_backing_data_unchanged(self):
         before = deepcopy(self.target.traits.hp._data)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.traits.hp._data, before)
@@ -379,14 +387,14 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         spliced.start()
         self.addCleanup(spliced.stop)
         self.target.traits.hp.current = 100
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             ActionResolver.resolve(self.request)
         base_damage = 100 - self.target.traits.hp.value
         self.target.traits.hp.current = 100
         self.target.db.skill_grants = [
             ConferredSkillGrant("elosia", _T_GUARDIAN.key, 0.5)
         ]
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             ActionResolver.resolve(self.request)
         granted_damage = 100 - self.target.traits.hp.value
         self.assertGreater(base_damage, 0)
@@ -426,7 +434,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
         )
         before = npc.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertNotEqual(result.reason, RejectReason.EVENT_LOG_CONSTRUCTION_FAILED)
@@ -448,7 +456,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
             BattlefieldActionContext(self.request.context.battlefield),
         )
         before = _stored_hp(self.target)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(_stored_hp(self.target), before)
@@ -469,7 +477,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
             BattlefieldActionContext(self.request.context.battlefield),
         )
         before = _stored_hp(self.target)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, RejectReason.EFFECT_RESOLUTION_FAILED)

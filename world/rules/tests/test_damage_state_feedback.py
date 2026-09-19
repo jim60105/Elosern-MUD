@@ -255,7 +255,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         )
         field_ctx = BattlefieldActionContext(battlefield)
         req = ActionRequest(self.actor, sage_spell.key, [self.target], field_ctx)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
         observed_loss = 200 - self.target.traits.hp.current

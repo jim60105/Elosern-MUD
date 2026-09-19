@@ -97,7 +97,7 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     # NOTE: this API-level seam is NOT a player-command acceptance test. Change
@@ -163,7 +163,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.calls.count("quest"), 1)
@@ -194,7 +194,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         grant_lineage(self.char1, [_T_SKILL])
         monster = self._monster("round")
         field = self._field(self.char1, [monster])
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             run_round(
                 field,
                 lambda entity, field: (
@@ -214,7 +214,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.player.traits.hp.current = 2000
         monster = self._monster("overwhelmed", hp=1)
         field = self._field(self.player, [monster])
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = resolve_overwhelm(field, default_attack_policy)
         self.assertTrue(result.battle_over)
         self.assertGreaterEqual(self.calls.count("quest"), 1)

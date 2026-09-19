@@ -50,27 +50,27 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
 
     def test_ten_point_gap_dominates_every_roll_pair(self):
         battlefield = self.battlefield()
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 100]):
+        with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 100]):
             self.assertEqual(roll_initiative(battlefield), ["fast", "slow"])
 
     @covers_requirement("combat-resolution::initiative-order-is-agility-dominant-with-d100-jitter")
     def test_small_gap_can_be_reordered(self):
         battlefield = self.battlefield(gap=9)
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 100]):
+        with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 100]):
             self.assertEqual(roll_initiative(battlefield), ["slow", "fast"])
 
     @covers_requirement("combat-resolution::the-turn-loop-consumes-actions-per-turn-as-the-round-s-action-count-with-zero-skipping-before-actionresolver-is-called")
     def test_action_lock_skips_resolver_and_upkeep_runs(self):
         battlefield = self.battlefield()
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=[{"actions_per_turn": 0}, {}],
             ),
-            patch("world.rules.combat.ActionResolver.resolve") as resolve,
-            patch("world.rules.combat.tick_buffs") as tick,
-            patch("world.rules.combat.decay_tick") as decay,
+            patch("world.rules.combat.rounds.ActionResolver.resolve") as resolve,
+            patch("world.rules.combat.rounds.tick_buffs") as tick,
+            patch("world.rules.combat.rounds.decay_tick") as decay,
         ):
             logs = run_round(battlefield, lambda entity, field: None)
         self.assertEqual(logs[0].entries[0].kind, "action_skipped")
@@ -89,13 +89,13 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(battlefield, provider)
         self.assertEqual(calls, ["fast", "fast", "slow"])
@@ -111,13 +111,13 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(battlefield, provider)
         self.assertEqual(calls, ["fast", "slow"])
@@ -133,13 +133,13 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 5} if entity.key == "fast" else {},
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(battlefield, provider)
         self.assertEqual(calls, ["fast", "fast", "fast", "slow"])
@@ -150,18 +150,20 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         calls1 = []
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
             ),
             patch(
-                "world.rules.combat.matched_combat_modifiers",
+                "world.rules.combat.rounds.matched_combat_modifiers",
                 side_effect=lambda entity: (("rule_chance", {"actions_per_turn": 0, "chance": 15}),) if entity.key == "fast" else (),
             ),
-            patch("world.rules.combat.roll_d100", return_value=10),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=10),
+            patch("world.rules.combat.damage.roll_d100", return_value=10),
+            patch("world.rules.combat.rounds.roll_d100", return_value=10),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs1 = run_round(battlefield1, lambda entity, field: calls1.append(entity.key) or None)
 
@@ -175,18 +177,20 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         calls2 = []
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
             ),
             patch(
-                "world.rules.combat.matched_combat_modifiers",
+                "world.rules.combat.rounds.matched_combat_modifiers",
                 side_effect=lambda entity: (("rule_chance", {"actions_per_turn": 0, "chance": 15}),) if entity.key == "fast" else (),
             ),
-            patch("world.rules.combat.roll_d100", return_value=20),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=20),
+            patch("world.rules.combat.damage.roll_d100", return_value=20),
+            patch("world.rules.combat.rounds.roll_d100", return_value=20),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs2 = run_round(battlefield2, lambda entity, field: calls2.append(entity.key) or None)
 
@@ -198,21 +202,21 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield = self.battlefield()
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
             ),
             patch(
-                "world.rules.combat.matched_combat_modifiers",
+                "world.rules.combat.rounds.matched_combat_modifiers",
                 side_effect=lambda entity: (
                     ("lock_rule", {"actions_per_turn": 0}),
                     ("chance_rule", {"actions_per_turn": 0, "chance": 15}),
                 ) if entity.key == "fast" else (),
             ),
-            patch("world.rules.combat.roll_d100") as mock_roll,
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.battlefield.roll_d100") as mock_roll,
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(battlefield, lambda entity, field: calls.append(entity.key) or None)
         mock_roll.assert_not_called()
@@ -223,21 +227,23 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield2 = self.battlefield()
         calls2 = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
             ),
             patch(
-                "world.rules.combat.matched_combat_modifiers",
+                "world.rules.combat.rounds.matched_combat_modifiers",
                 side_effect=lambda entity: (
                     ("chance_15", {"actions_per_turn": 0, "chance": 15}),
                     ("chance_30", {"actions_per_turn": 0, "chance": 30}),
                 ) if entity.key == "fast" else (),
             ),
-            patch("world.rules.combat.roll_d100", return_value=25),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=25),
+            patch("world.rules.combat.damage.roll_d100", return_value=25),
+            patch("world.rules.combat.rounds.roll_d100", return_value=25),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs2 = run_round(battlefield2, lambda entity, field: calls2.append(entity.key) or None)
         self.assertEqual(calls2, ["slow"])
@@ -247,21 +253,21 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield = self.battlefield()
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 1} if entity.key == "fast" else {},
             ),
             patch(
-                "world.rules.combat.matched_combat_modifiers",
+                "world.rules.combat.rounds.matched_combat_modifiers",
                 side_effect=lambda entity: (
                     ("lock_rule", {"actions_per_turn": 0}),
                     ("grant_rule", {"actions_per_turn": 1}),
                 ) if entity.key == "fast" else (),
             ),
-            patch("world.rules.combat.ActionResolver.resolve") as resolve,
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.ActionResolver.resolve") as resolve,
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(battlefield, lambda entity, field: calls.append(entity.key) or None)
         self.assertEqual(calls, ["slow"])
@@ -385,13 +391,13 @@ class FirstActorOverrideTests(unittest.TestCase):
         kwargs = {} if first_actor == () else {"first_actor": first_actor}
         with (
             patch(
-                "world.rules.combat.roll_d100", side_effect=list(rolls)
+                "world.rules.combat.battlefield.roll_d100", side_effect=list(rolls)
             ) as roller,
             patch(
-                "world.rules.combat.evaluate_combat_modifiers", return_value={}
+                "world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(battlefield, provider, **kwargs)
         return seen, roller
@@ -447,17 +453,17 @@ class FirstActorOverrideTests(unittest.TestCase):
 
         with (
             patch(
-                "world.rules.combat.roll_initiative", return_value=list(rolled)
+                "world.rules.combat.rounds.roll_initiative", return_value=list(rolled)
             ) as roller,
             patch(
-                "world.rules.combat.roll_d100",
+                "world.rules.combat.rounds.roll_d100",
                 side_effect=AssertionError("re-rolled"),
             ),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers", return_value={}
+                "world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield(), provider, first_actor="slow")
         self.assertEqual(roller.call_count, 1)

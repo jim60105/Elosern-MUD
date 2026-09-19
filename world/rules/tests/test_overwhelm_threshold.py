@@ -545,7 +545,13 @@ class CommandedDamageQueryTests(unittest.TestCase):
             before = snapshot()
             # Any dice the query rolled would raise through this patch.
             with patch(
-                "world.rules.combat.roll_d100",
+                "world.rules.combat.battlefield.roll_d100",
+                side_effect=AssertionError("query rolled dice"),
+            ), patch(
+                "world.rules.combat.damage.roll_d100",
+                side_effect=AssertionError("query rolled dice"),
+            ), patch(
+                "world.rules.combat.rounds.roll_d100",
                 side_effect=AssertionError("query rolled dice"),
             ):
                 first = self.query(field, "q_damage", ["enemy"])

@@ -633,7 +633,7 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
             self.context,
         )
         self.assertEqual(request.scale, 1.0)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         spend = next(
@@ -658,7 +658,7 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
             self.context,
             scale=0.5,
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         spend = next(
@@ -741,7 +741,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.current = 200
         mp_before = self.actor.traits.mp.value
         hp_before = self.monster.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request(_T_CAST.key, [self.monster], 0.5)
             )
@@ -759,7 +759,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
     @covers_requirement("freeform-casting::a-scaled-cast-deducts-scaled-mp-and-applies-scaled-magnitudes-atomically")
     def test_double_scale_cast_deducts_double_mp(self):
         mp_before = self.actor.traits.mp.value
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 self._request(_T_STORM.key, [self.monster], 2.0)
             )
@@ -797,7 +797,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.defense.base = 0
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 200
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request(_T_CAST.key, [self.monster], 0.25)
             )
@@ -812,7 +812,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.defense.base = 0
         self.monster.traits.hp.base = 5
         self.monster.traits.hp.current = 5
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request(_T_CAST.key, [self.monster], 2.0)
             )
@@ -834,7 +834,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 150
         # magic_power 30 → base heal 30 → double scale 60, capped by the gap 50.
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 self._request(_T_TIDE.key, [self.monster], 2.0)
             )
@@ -848,7 +848,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         # candidate, so the scaled heal applies no restoration.
         self.monster.traits.hp.current = 0
         self.actor.traits.mp.current = 1000
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 self._request(_T_TIDE.key, [self.monster], 2.0)
             )
@@ -863,7 +863,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 200
         mp_before = self.actor.traits.mp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request(_T_PHOENIX.key, [self.monster], 2.0)
             )
@@ -980,7 +980,7 @@ class FreeformSessionFacadeTests(EvenniaTest, BattlefieldIsolation):
     def test_facade_resolves_a_scaled_combat_cast(self):
         engage(self.actor, self.monster)
         mp_before = self.actor.traits.mp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.actor, _T_CAST.key, [self.monster], scale=2.0
             )

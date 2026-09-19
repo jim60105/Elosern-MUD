@@ -297,7 +297,9 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         from world.rules.combat_session import submit_player_action
 
         with patch("world.rules.clock.get_world_clock", return_value=WorldClock()), patch(
-            "world.rules.combat.roll_d100", return_value=100
+            "world.rules.combat.battlefield.roll_d100", return_value=100
+        ), patch("world.rules.combat.damage.roll_d100", return_value=100), patch(
+            "world.rules.combat.rounds.roll_d100", return_value=100
         ):
             submit_player_action(self.char1, _SPELL, [self.monster])
         view_after = build_combat_view(self.char1)
@@ -308,7 +310,7 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         engage(self.char1, self.monster)
         from world.rules.combat_session import read_session
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             messages = self._run(CmdCast, f"{_SPELL}=e1")
         self.assertTrue(
             any("繼續戰鬥。" in message for message in messages),
@@ -327,14 +329,14 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         )
         _persist(self.char1, record)
         self.char1.db.skills = {"active": [_GALE_JAB.key], "passive": []}
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             messages = self._run(CmdCast, f"{_GALE_JAB.key}=e1,e2")
         self.assertTrue(any("繼續戰鬥。" in m for m in messages), messages)
         self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
 
     def test_cast_rejects_unknown_token_before_initiative(self):
         engage(self.char1, self.monster)
-        with patch("world.rules.combat.roll_d100") as roll:
+        with patch("world.rules.combat.damage.roll_d100") as roll:
             messages = self._run(CmdCast, f"{_SPELL}=e9")
         roll.assert_not_called()
         self.assertEqual(self.char1.db.active_combat["rounds_elapsed"], 0)

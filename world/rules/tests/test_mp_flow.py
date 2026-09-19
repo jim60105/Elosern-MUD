@@ -592,7 +592,7 @@ class CastCostDeductionTests(MpFlowTestBase):
         request = ActionRequest(self.actor, skill.key, [self.target], context)
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
             patch("world.rules.state_reactions.dispatch_outcome_reaction") as mock_dispatch,
         ):
             result = ActionResolver.resolve(request)
@@ -659,7 +659,7 @@ class CastCostDeductionTests(MpFlowTestBase):
         context = RoomActionContext(self.room)
         request = ActionRequest(self.actor, skill.key, [self.target], context)
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             result = ActionResolver.resolve(request)
             self.assertEqual(result.outcome, "success")
             self.assertEqual(int(self.actor.traits.mp.current), 0)
@@ -804,7 +804,7 @@ class TransactionalRollbackTests(MpFlowTestBase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
             result = ActionResolver.resolve(request)
             self.assertEqual(result.outcome, "rejected")
             # Both MP deduction and reaction-applied buff must be completely restored

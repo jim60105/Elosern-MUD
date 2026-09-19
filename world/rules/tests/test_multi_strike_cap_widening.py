@@ -103,7 +103,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]), patch(
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]), patch(
             "world.rules.action.costs.grant_skill_practice_xp"
         ) as mock_practice:
             res = ActionResolver.resolve(req)
@@ -138,7 +138,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -161,7 +161,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 1, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 1, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -184,7 +184,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[1, 1, 1]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1, 1]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -209,7 +209,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -240,7 +240,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         patched[buff_def.key] = buff_def
 
         with patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched), patch.dict(
-            "world.rules.combat.BUFF_DEFINITIONS", patched
+            "world.rules.combat.damage.BUFF_DEFINITIONS", patched
         ):
             apply_buff(self.target, buff_def.key, source_skill="synth_cast")
             self.assertIn(buff_def.key, self.target.buffs.all)
@@ -248,7 +248,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
             bf, ctx = self._make_bf()
             req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-            with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]):
+            with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
                 res = ActionResolver.resolve(req)
             self.assertEqual(res.outcome, "success")
             # 20 post-defense * 0.5 = 10 diverted per strike.
@@ -282,7 +282,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf()
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -301,7 +301,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         bf, ctx = self._make_bf(nonlethal=True, nonlethal_keys=(str(self.target.key),))
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
-        with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -336,7 +336,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         patched[buff_def.key] = buff_def
 
         with patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched), patch.dict(
-            "world.rules.combat.BUFF_DEFINITIONS", patched
+            "world.rules.combat.damage.BUFF_DEFINITIONS", patched
         ):
             apply_buff(self.target, buff_def.key, source_skill="synth_cast")
             buff_inst = self.target.buffs.all[buff_def.key]
@@ -348,7 +348,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
             def bomb_apply():
                 raise RuntimeError("commit explosion")
 
-            with patch("world.rules.combat.roll_d100", side_effect=[80, 80, 80]), patch.dict(
+            with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]), patch.dict(
                 "world.rules.action.contracts._EVENT_EFFECT_PLANNERS",
                 {
                     "boom": lambda r, l: [

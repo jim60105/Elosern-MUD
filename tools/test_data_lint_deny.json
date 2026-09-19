@@ -285,8 +285,8 @@
     {
       "token": "self_heal",
       "rule": "production-independent",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/combat.py:490 register_effect_handler); an effect-syntax keyword colliding with generic test vocabulary, not shipped-content coupling",
-      "evidence": "world/rules/combat.py:490"
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/combat/healing.py:169 register_effect_handler); an effect-syntax keyword colliding with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/combat/healing.py:169"
     },
     {
       "evidence": "world/rules/guild_config.py:526",

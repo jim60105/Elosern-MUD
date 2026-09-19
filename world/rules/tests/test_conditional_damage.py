@@ -464,7 +464,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
             scale=scale,
         )
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             result = ActionResolver.resolve(request)
             return result
 
@@ -693,7 +693,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
                 policy=EffectPolicy(damage=DamagePolicy(max_hp_fraction=0.10))
             )
         }
-        with patch("world.rules.combat.roll_d100", return_value=60):
+        with patch("world.rules.combat.damage.roll_d100", return_value=60):
             unscaled = _handle_damage(
                 self.actor, [self.target], "damage:fire:magic", event_context, scale=1.0
             )
@@ -725,7 +725,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             [self.target],
             BattlefieldActionContext(battlefield, nonlethal=True),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(_stored_hp(self.target), 1)

@@ -28,7 +28,7 @@ class GoldenCombatTests(unittest.TestCase):
         defender = FakeEntity("b", hp=200, defense=7, agility=9)
         random.seed(41)
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.rounds.evaluate_combat_modifiers",
             return_value={},
         ):
             pending = [
@@ -54,11 +54,11 @@ class GoldenCombatTests(unittest.TestCase):
         )
         with (
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             for raw_roll in (1, 50, 100):
                 self.assertTrue(

@@ -53,7 +53,7 @@
 
 ## 3. 數值公式
 
-現行 `world/rules/combat.py` 的傷害公式是：
+現行 `world/rules/combat/`（`damage.py`）的傷害公式是：
 
 ```
 命中判定通過後：

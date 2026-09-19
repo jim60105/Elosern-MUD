@@ -189,7 +189,9 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         with (
             patch("world.rules.combat_session.rounds.log_info") as info,
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             self.captureOnCommitCallbacks(execute=True),
         ):
             submit_player_action(self.player, basic_attack_key(), [self.monster])
@@ -210,7 +212,9 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         with (
             patch("world.rules.combat_session.rounds.log_info") as info,
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.combat_session.rounds._persist",
                 side_effect=RuntimeError("injected persist failure"),

@@ -178,7 +178,7 @@ class FriendlyFireBase(BattlefieldIsolation, EvenniaTest):
         grant_lineage(self.player, list(skill_keys))
 
     def _run_hit(self, skill_key, targets):
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             return submit_player_action(self.player, skill_key, targets)
 
 
@@ -255,7 +255,7 @@ class CombatFriendlyFireTests(FriendlyFireBase):
                 targets = [companion]
                 if skill_key == _T_AREA:
                     targets = [companion, monster]
-                with patch("world.rules.combat.roll_d100", return_value=100):
+                with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
                     result = submit_player_action(player, skill_key, targets)
                 self.assertEqual(result["outcome"], "round")
                 self.assertEqual(companion.relations.affinity_for(player), 9)
@@ -579,7 +579,9 @@ class OverwhelmCompressionTests(FriendlyFireBase):
         engage(self.player, self.monster)
         with (
             patch.object(self.player, "msg") as msg,
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
         ):
             result = submit_opening_action(

@@ -210,7 +210,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.event_log import EventLog
 
         before_tick = clock.tick
-        with patch("world.rules.combat.roll_d100") as roll:
+        with patch("world.rules.combat.damage.roll_d100") as roll:
             preview = preview_skill(
                 self.player, _SPELL.key, context, [self.monster]
             )

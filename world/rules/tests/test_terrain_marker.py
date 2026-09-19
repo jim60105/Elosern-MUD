@@ -247,7 +247,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_control_buff", entity_active_buffs(companion))
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
             patch(
                 "world.rules.combat_session.rounds._knocked_out_ids",
                 return_value=(int(companion.pk),),
@@ -278,7 +280,7 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
 
         # Win the fight: monster dies in 1 hit
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertFalse(is_in_active_session(self.player))
@@ -304,7 +306,7 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_ground_hazard", entity_active_buffs(self.player))
 
         # Submit a round that does not end the fight
-        with patch("world.rules.combat.roll_d100", return_value=50):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "round")
         self.assertTrue(is_in_active_session(self.player))

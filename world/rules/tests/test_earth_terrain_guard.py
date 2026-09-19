@@ -263,7 +263,7 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
             targets=targets,
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             return ActionResolver.resolve(req)
 
     # --- Scenario: The defense ladder guards observable stats at settlement
@@ -415,7 +415,7 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
 
     def _settle_strike(self, skill: SkillDef, target: Any) -> int:
         policy_effect = skill.effect_policies[0]
-        with patch("world.rules.combat.roll_d100", return_value=75):
+        with patch("world.rules.combat.damage.roll_d100", return_value=75):
             before = target.traits.hp.current
             pending = _handle_damage(
                 self.caster,
@@ -505,7 +505,7 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
         cm_patch = None
         if not hit:
             cm_patch = patch(
-                "world.rules.combat._to_hit", return_value=(False, -20.0)
+                "world.rules.combat.damage._to_hit", return_value=(False, -20.0)
             )
             cm_patch.start()
         try:

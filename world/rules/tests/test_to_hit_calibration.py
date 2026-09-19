@@ -16,7 +16,7 @@ class ToHitCalibrationTests(unittest.TestCase):
         attacker = FakeEntity("attacker", agility=attacker_agility)
         defender = FakeEntity("defender", agility=defender_agility)
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.damage.evaluate_combat_modifiers",
             return_value={},
         ):
             hits = sum(_to_hit(attacker, defender, roll)[0] for roll in range(1, 101))
@@ -43,7 +43,7 @@ class ToHitCalibrationTests(unittest.TestCase):
         attacker = FakeEntity("attacker", agility=10)
         defender = FakeEntity("defender", agility=60)
         with patch(
-            "world.rules.combat.evaluate_combat_modifiers",
+            "world.rules.combat.damage.evaluate_combat_modifiers",
             return_value={},
         ):
             self.assertFalse(_to_hit(attacker, defender, 100)[0])

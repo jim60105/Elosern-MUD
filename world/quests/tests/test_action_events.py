@@ -84,7 +84,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
             targets,
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     def test_lethal_damage_emits_single_target_defeated_with_identity(self):
@@ -105,7 +105,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
@@ -181,7 +181,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         return record, result
 
@@ -210,7 +210,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
 
         SKILL_TIME_OVERRIDES[_T_SKILL] = -1
         try:
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 result = ActionResolver.resolve(request)
         finally:
             SKILL_TIME_OVERRIDES.pop(_T_SKILL, None)

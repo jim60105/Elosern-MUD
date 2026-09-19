@@ -558,7 +558,7 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
             "action_id": "combat.cast",
             "payload": {"skill_key": "t_cinder_cleave", "target_ids": [int(self.monster.pk)]},
         }
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             handle_ui_action(
                 session, self.player, envelope, self.action_registry, self.registry
             )

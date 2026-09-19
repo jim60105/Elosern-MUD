@@ -188,7 +188,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")
@@ -236,7 +236,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             )
             self._grant_skill(self.actor, magic_skill.key, SkillKind.ACTIVE)
             req_magic = ActionRequest(self.actor, magic_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res_magic = ActionResolver.resolve(req_magic)
             self.assertEqual(res_magic.outcome, "success")
             self.assertNotIn("synth_should_never_apply", entity_active_buffs(self.target))
@@ -247,14 +247,14 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             )
             self._grant_skill(self.actor, physical_skill.key, SkillKind.ACTIVE)
             req_miss = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat._to_hit", return_value=(False, -20.0)):
+            with patch("world.rules.combat.damage._to_hit", return_value=(False, -20.0)):
                 res_miss = ActionResolver.resolve(req_miss)
             self.assertEqual(res_miss.outcome, "success")
             self.assertNotIn("synth_should_never_apply", entity_active_buffs(self.target))
 
             # 3. Zero-loss physical write -> target is already at 0 HP; _handle_damage staged apply produces zero loss
             self.target.traits.hp.current = 0
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 pending = _handle_damage(
                     self.actor,
                     [self.target],
@@ -367,9 +367,9 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
         # 1. Both strikes land
         with (
-            patch("world.rules.combat.has_action_evidence", return_value=True),
-            patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat.dispatch_outcome_reaction", side_effect=counting_dispatch),
+            patch("world.rules.combat.damage.has_action_evidence", return_value=True),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.dispatch_outcome_reaction", side_effect=counting_dispatch),
         ):
             pending = _handle_damage(
                 self.actor,
@@ -388,10 +388,10 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
         hit_counts.clear()
         to_hit_results = [(False, -10.0), (True, 10.0)]
         with (
-            patch("world.rules.combat.has_action_evidence", return_value=True),
-            patch("world.rules.combat._to_hit", side_effect=lambda a, t, r: to_hit_results.pop(0)),
-            patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat.dispatch_outcome_reaction", side_effect=counting_dispatch),
+            patch("world.rules.combat.damage.has_action_evidence", return_value=True),
+            patch("world.rules.combat.damage._to_hit", side_effect=lambda a, t, r: to_hit_results.pop(0)),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.dispatch_outcome_reaction", side_effect=counting_dispatch),
         ):
             pending = _handle_damage(
                 self.actor,
@@ -460,7 +460,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")
@@ -521,7 +521,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")
@@ -590,7 +590,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
             with (
                 patch("world.rules.action.resolver._step5_effect_resolution", side_effect=failing_step5),
-                patch("world.rules.combat.roll_d100", return_value=100),
+                patch("world.rules.combat.damage.roll_d100", return_value=100),
             ):
                 res = ActionResolver.resolve(req)
 
@@ -646,7 +646,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # 1. First attacker is hit by reactor's reaction -> gets unique_per_source ignite
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")
@@ -671,7 +671,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             ):
                 bf_immune = self._make_battlefield(immune_actor, self.target)
                 req_immune = ActionRequest(immune_actor, physical_skill.key, [self.target], BattlefieldActionContext(bf_immune))
-                with patch("world.rules.combat.roll_d100", return_value=100):
+                with patch("world.rules.combat.damage.roll_d100", return_value=100):
                     res_imm = ActionResolver.resolve(req_immune)
                 self.assertEqual(res_imm.outcome, "success")
                 self.assertNotIn(expected_instance_key, immune_actor.buffs.all)
@@ -799,7 +799,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
 
             with (
-                patch("world.rules.combat.roll_d100", return_value=100),
+                patch("world.rules.combat.damage.roll_d100", return_value=100),
             ):
                 pending = _handle_damage(
                     self.actor,
@@ -822,7 +822,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # 2. Session-flag nonlethal (empty nonlethal_keys): floors at 1 HP without battlefield mark
             self.actor.traits.hp.current = 20
             bf2 = self._make_battlefield(self.actor, self.target)
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 pending2 = _handle_damage(
                     self.actor,
                     [self.target],
@@ -896,7 +896,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 res = ActionResolver.resolve(req)
 
             self.assertEqual(res.outcome, "success")

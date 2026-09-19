@@ -161,7 +161,7 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
     def test_unstaged_climax_resolves_during_round_upkeep(self):
         entity = self._climaxing_player()
         before_sp = entity.traits.sp.value
-        with patch("world.rules.combat.tick_buffs", return_value=()):
+        with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
             _end_of_round_upkeep(self._field(entity))
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
         self.assertEqual(entity.sexual.pleasure.value, 15)
@@ -175,7 +175,7 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         entity = self._climaxing_player()
         entity.sexual.stage_climax_extension(1)
         before_sp = entity.traits.sp.value
-        with patch("world.rules.combat.tick_buffs", return_value=()):
+        with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
             _end_of_round_upkeep(self._field(entity))
         self.assertEqual(entity.sexual.climax_phase.level, "進行中")
         self.assertEqual(entity.sexual.pending_climax_extension, 0)
@@ -198,10 +198,10 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         field = self._field(entity)
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=[entity.key],
             ),
-            patch("world.rules.combat.tick_buffs", return_value=()),
+            patch("world.rules.combat.rounds.tick_buffs", return_value=()),
         ):
             run_round(
                 field,
@@ -263,7 +263,7 @@ class ClimaxDeadEndRegressionTests(EvenniaTestCase):
             {"a": frozenset({entity.key}), "b": frozenset()},
             {entity.key: entity},
         )
-        with patch("world.rules.combat.tick_buffs", return_value=()):
+        with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
             _end_of_round_upkeep(field)
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
         decay_tick(entity, 300)
@@ -380,9 +380,23 @@ class ClimaxRollbackTests(EvenniaTest):
         engage(entity, monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.battlefield.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.healing.evaluate_combat_modifiers",
+                return_value={},
+            ),
+            patch(
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
             patch(

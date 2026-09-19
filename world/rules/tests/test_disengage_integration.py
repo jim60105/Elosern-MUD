@@ -151,7 +151,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
     def test_landed_combat_consumers_exclude_fled_entity(self):
         self.field.fled.add("actor")
         with patch(
-            "world.rules.combat.roll_initiative",
+            "world.rules.combat.rounds.roll_initiative",
             return_value=["actor", "pursuer"],
         ):
             acted = []
@@ -206,11 +206,13 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         before = self.actor.traits.hp.value
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=["actor", "pursuer"],
             ),
             patch("world.rules.disengage.roll_d100", return_value=1),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
             logs = run_round(self.field, provider)
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
@@ -231,7 +233,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
 
         with (
             patch(
-                "world.rules.combat.roll_initiative",
+                "world.rules.combat.rounds.roll_initiative",
                 return_value=["actor", "pursuer"],
             ),
             patch(

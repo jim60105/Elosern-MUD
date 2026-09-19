@@ -116,10 +116,10 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls.append(entity.key) or None)
 
@@ -134,10 +134,10 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls.append(entity.key) or None)
 
@@ -155,10 +155,10 @@ class OrderFoldTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, provider)
 
@@ -170,10 +170,10 @@ class OrderFoldTests(unittest.TestCase):
         self._attach_marker(self.slow, self.advance_def)
         calls_r1 = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls_r1.append(entity.key) or None)
         self.assertEqual(calls_r1, ["slow", "fast", "mid"])
@@ -182,10 +182,10 @@ class OrderFoldTests(unittest.TestCase):
         self.slow.buffs.all.clear()
         calls_r2 = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls_r2.append(entity.key) or None)
         # Clean rolled order
@@ -197,13 +197,13 @@ class OrderFoldTests(unittest.TestCase):
         self._attach_marker(self.fast, self.retreat_def)
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
             patch(
-                "world.rules.combat.evaluate_combat_modifiers",
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
             ),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls.append(entity.key) or None)
 
@@ -232,10 +232,10 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "mid", "slow"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(self.battlefield, lambda entity, field: calls.append(entity.key) or None)
 

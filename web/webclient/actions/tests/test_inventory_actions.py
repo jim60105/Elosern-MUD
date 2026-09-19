@@ -237,7 +237,9 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.player.db.inventory = [_T_POTION.key]
         engage(self.player, self._monster())
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
         ):
             result = _inventory_use_adapter(

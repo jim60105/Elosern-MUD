@@ -301,7 +301,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         grant_lineage(self.actor, [storm_skill.key])
 
         # Cast area knockback
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             req = ActionRequest(self.actor, storm_skill.key, "all-enemies", ctx)
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
@@ -344,7 +344,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
             )
         )
         grant_lineage(self.actor, [magic_skill.key])
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_before = target1.traits.hp.current
             magic_req = ActionRequest(self.actor, magic_skill.key, [target1], ctx)
             magic_res = ActionResolver.resolve(magic_req)
@@ -383,7 +383,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
 
         # Hit-hit roll pair
         initial_mp = self.actor.traits.mp.current
-        with patch("world.rules.combat.roll_d100", side_effect=[100, 100]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100]):
             req = ActionRequest(self.actor, flurry_skill.key, [target], ctx)
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
@@ -411,7 +411,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
             )
         )
         grant_lineage(self.actor, [control_skill.key])
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             ctx_ctrl = BattlefieldActionContext(battlefield=bf, event_context={"now": 100})
             req_ctrl = ActionRequest(self.actor, control_skill.key, [target], ctx_ctrl)
             res_ctrl = ActionResolver.resolve(req_ctrl)
@@ -462,7 +462,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         )
         grant_lineage(self.actor, [exec_skill.key, normal_skill.key])
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_start = high_def_target.traits.hp.current
             req_exec = ActionRequest(self.actor, exec_skill.key, [high_def_target], ctx)
             res_exec = ActionResolver.resolve(req_exec)
@@ -512,7 +512,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         )
         grant_lineage(self.actor, [devast_skill.key, non_devast_skill.key])
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             restore_gauges_to_full(self.actor)
             hp_start = full_hp_target.traits.hp.current
             req_dev = ActionRequest(self.actor, devast_skill.key, [full_hp_target], ctx2)

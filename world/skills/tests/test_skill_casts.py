@@ -102,7 +102,7 @@ class SyntheticDamageCastTests(EvenniaTestCase):
         self._build()
         before = self.target.traits.hp.value
         sp_before = self.actor.traits.sp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(self.target.traits.hp.value, before)
@@ -122,7 +122,7 @@ class SyntheticDamageCastTests(EvenniaTestCase):
         }
         self.assertIn(_T_HOLLOW_STANCE.key, self.actor.skills.owned_keys())
         sp_before = self.actor.traits.sp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(

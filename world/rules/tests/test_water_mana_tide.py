@@ -110,7 +110,7 @@ class WaterManaTideBehaviorTests(EvenniaTest):
         req = ActionRequest(actor=self.actor, skill_key=skill.key, targets=targets, context=ctx)
         with patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False):
             self.actor.db.skills = {"active": [skill.key], "passive": []}
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 return ActionResolver.resolve(req)
 
     @covers_requirement("skill-registry::water-spell-progression-composes-executable-mana-tide-behavior")

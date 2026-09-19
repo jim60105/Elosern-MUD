@@ -261,8 +261,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         actor = FakeEntity("actor", atk_phys=50, agility=10)
         target = FakeEntity("target", hp=100, agility=10, defense=20)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             # Roll 60 gives hit with base_multiplier 1.0.
             # Potency 1.0: round(50 * 1.0 * 1.0) - 20 = 30
@@ -292,8 +292,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         actor = FakeEntity("actor", atk_phys=40, agility=10)
         target = FakeEntity("target", hp=100, agility=10, defense=10)
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             pending_empty = _handle_damage(
                 actor, [target], "damage:dark:physical", {}, 1.0
@@ -315,8 +315,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         actor = FakeEntity("actor", atk_phys=10, agility=10)
         target = FakeEntity("target", hp=100, agility=90, defense=50)
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             pending = _handle_damage(
                 actor,
@@ -334,8 +334,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         target = FakeEntity("target", hp=100, agility=10, defense=50)
         floor = int(COMBAT_YAML["damage"]["floor"])
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             pending = _handle_damage(
                 actor,
@@ -352,8 +352,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         target = FakeEntity("target", hp=100, agility=10, defense=5)
         crit_mult = float(COMBAT_YAML["damage"]["crit_multiplier"])
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             pending = _handle_damage(
                 actor,
@@ -392,7 +392,9 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         #   floor(33 * 1.15) = 37
         #   round(37 * 2.0) = 74 != 75
         actor = FakeEntity("actor", magic_power=33)
-        with patch("world.rules.combat.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}):
+        with patch("world.rules.combat.healing.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}), patch(
+            "world.rules.combat.battlefield.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}
+        ):
             mag = _heal_magnitude(actor, 2.0)
         self.assertEqual(mag, 75)
         self.assertNotEqual(mag, 74)
@@ -521,8 +523,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         self.assertEqual(pre.outcome, "success")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -562,8 +564,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         req = ActionRequest(self.caster, skill.key, [self.target], forged_context)
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -603,7 +605,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             BattlefieldActionContext(self.battlefield),
         )
 
-        with patch("world.rules.combat.evaluate_combat_modifiers", return_value={}):
+        with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
             res = ActionResolver.resolve(req)
 
         self.assertEqual(res.outcome, "success")
@@ -647,7 +649,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             scale=0.5,
         )
         with (
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}),
+            patch("world.rules.combat.healing.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}),
+            patch("world.rules.combat.battlefield.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}),
             patch("world.rules.action.gates.is_freeform_eligible", return_value=True),
             patch("world.rules.action.gates.freeform_scales_for", return_value=(0.5, 1.0)),
         ):
@@ -683,8 +686,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             BattlefieldActionContext(self.battlefield),
         )
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 
@@ -732,8 +735,8 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         _EVENT_EFFECT_PLANNERS["test_failing_late"] = _failing_planner
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=60),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
             res = ActionResolver.resolve(req)
 

@@ -325,7 +325,7 @@ class IceStillnessBehaviorTests(EvenniaTest):
             targets=targets,
             context=BattlefieldActionContext(self.bf),
         )
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             return ActionResolver.resolve(req)
 
     def _settle_damage(
@@ -335,7 +335,7 @@ class IceStillnessBehaviorTests(EvenniaTest):
         *,
         roll: int = 75,
     ) -> int:
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             before = target.traits.hp.current
             pending = _handle_damage(
                 self.caster,

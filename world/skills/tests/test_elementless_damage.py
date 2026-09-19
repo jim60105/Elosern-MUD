@@ -140,7 +140,7 @@ class ElementlessDamageSettlementParityTests(EvenniaTestCase):
             [self.target],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             return ActionResolver.resolve(request)
 
     @covers_requirement("damage-effect-handlers::damage-element-school-is-the-defined-convention-for-this-prefix")
@@ -210,7 +210,7 @@ class ElementlessPracticeAccrualParityTests(EvenniaTestCase):
             [self.target],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             return ActionResolver.resolve(request)
 
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")

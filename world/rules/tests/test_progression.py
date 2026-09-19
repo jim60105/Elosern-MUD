@@ -427,7 +427,7 @@ class ProgressionTests(EvenniaTestCase):
             [monster],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
@@ -466,7 +466,7 @@ class ProgressionTests(EvenniaTestCase):
             "all-enemies",
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
@@ -520,7 +520,7 @@ class ProgressionTests(EvenniaTestCase):
             [target],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
@@ -807,7 +807,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
     def test_simulated_marker_suppresses_every_accrual(self):
         monster = self._monsters(1)[0]
         context = self._field([monster], simulated=True)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request(_MAGIC_CASTER, [monster], context)
             )
@@ -822,7 +822,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
     def test_area_hit_accrues_once_per_distinct_target(self):
         monsters = self._monsters(3)
         context = self._field(monsters)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(
                 self._request("t_glitter_cascade", "all-enemies", context)
             )
@@ -854,7 +854,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
 
         _EVENT_EFFECT_PLANNERS["test-poison"] = poison
         try:
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 first = ActionResolver.resolve(request)
         finally:
             _EVENT_EFFECT_PLANNERS.clear()
@@ -865,7 +865,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
             progression.practice_claims_for(self.actor, _MAGIC_CASTER), set()
         )
         # The legitimate same-tick retry accrues normally.
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             retry = ActionResolver.resolve(request)
         self.assertEqual(retry.outcome, "success")
         self.assertEqual(
@@ -873,7 +873,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
             SKILL_PRACTICE_XP_PER_USE,
         )
         # And the same (actor, skill, target) is then deduped for the tick.
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             again = ActionResolver.resolve(request)
         self.assertEqual(again.outcome, "success")
         self.assertEqual(
@@ -924,7 +924,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_edge_crossing_action_notifies_exactly_one_line(self):
         actor, _, request = self._near_edge_cast("unlock-cast")
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
@@ -937,7 +937,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         actor.db.skill_proficiency[_MAGIC_CASTER] = (
             2 * SKILL_PROFICIENCY_XP_PER_LEVEL + 1
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual([line for line in result.notifications if "可用：" in line], [])
@@ -947,7 +947,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         actor, _, request = self._near_edge_cast("rolled-back")
         near_edge = actor.db.skill_proficiency[_MAGIC_CASTER]
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
                 "world.rules.action.resolver._commit",
                 side_effect=CommitFailed(RejectReason.COMMIT_FAILED, "injected"),
@@ -985,7 +985,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
 
         _EVENT_EFFECT_PLANNERS["test-late-poison"] = poison
         try:
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 result = ActionResolver.resolve(request)
         finally:
             _EVENT_EFFECT_PLANNERS.clear()
@@ -995,7 +995,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         self.assertEqual(actor.db.skill_proficiency[_MAGIC_CASTER], near_edge)
         # The claims released with the rollback: the legitimate retry accrues,
         # crosses the edge for real, and announces exactly once — last.
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             retry = ActionResolver.resolve(request)
         self.assertEqual(retry.outcome, "success")
         self.assertEqual(

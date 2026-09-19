@@ -186,7 +186,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         return Battlefield(teams=teams, roster=roster)
 
     def _cast(self, actor, key, targets, ctx, *, roll=100):
-        with patch("world.rules.combat.roll_d100", return_value=roll):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             req = ActionRequest(actor, key, targets, ctx)
             return ActionResolver.resolve(req)
 
@@ -273,7 +273,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         grant_lineage(self.actor, [two_judgment.key, three_judgment.key])
 
         restore_gauges_to_full(self.actor)
-        with patch("world.rules.combat.roll_d100", side_effect=[100, 100]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100]):
             res = ActionResolver.resolve(ActionRequest(self.actor, two_judgment.key, [target], ctx))
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -283,7 +283,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         self.assertEqual(damages[0].data.get("amount"), damages[1].data.get("amount"))
 
         restore_gauges_to_full(self.actor)
-        with patch("world.rules.combat.roll_d100", side_effect=[100, 100, 100]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100, 100]):
             res3 = ActionResolver.resolve(ActionRequest(self.actor, three_judgment.key, [target], ctx))
         self.assertEqual(res3.outcome, "success")
         rolls3 = [e for e in res3.event_log.entries if e.kind == "roll"]

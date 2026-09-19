@@ -136,7 +136,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         req = ActionRequest(actor=self.caster, skill_key=skill.key, targets=targets, context=ctx)
         with patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False):
             self.caster.db.skills = {"active": [skill.key], "passive": []}
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
                 return ActionResolver.resolve(req)
 
     @covers_requirement("skill-registry::dark-spell-progression-composes-executable-curse-and-erosion-behavior")
@@ -296,7 +296,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
 
         # 1. Ordinary damage rung without defense bypass
         normal_policy = EffectPolicy(coefficient=2.0)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             pending_normal = _handle_damage(
                 actor,
                 [target_high_def],
@@ -316,7 +316,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         )
         target_high_def.traits.hp._data["current"] = 1000
         before_hp = target_high_def.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             pending_exec = _handle_damage(
                 actor,
                 [target_high_def],
@@ -338,7 +338,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         )
         target_high_def.traits.hp._data["current"] = 1000
         before_hp = target_high_def.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             pending_devas = _handle_damage(
                 actor,
                 [target_high_def],

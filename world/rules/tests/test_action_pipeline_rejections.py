@@ -150,7 +150,7 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
         before_actor = deepcopy(dict(self.actor.traits.trait_data))
         before_target = deepcopy(dict(self.target.traits.trait_data))
         with (
-            patch("world.rules.combat.roll_d100") as roller,
+            patch("world.rules.combat.damage.roll_d100") as roller,
             patch("world.rules.action.resolver._commit", side_effect=AssertionError("committed")) as commit,
         ):
             result = ActionResolver.resolve(
@@ -166,7 +166,7 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
     def test_the_same_skill_resolves_normally_with_a_battlefield(self):
         before = self.target.traits.hp.value
-        with patch("world.rules.combat.roll_d100", return_value=100) as roller:
+        with patch("world.rules.combat.damage.roll_d100", return_value=100) as roller:
             result = ActionResolver.resolve(
                 self._request("gate_probe", self._field_context(), [self.target])
             )

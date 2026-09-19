@@ -162,9 +162,9 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls: list[str] = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(bf, lambda entity, field: calls.append(entity.key) or None)
 
@@ -178,9 +178,9 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls.clear()
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["fast", "slow"]),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(bf, lambda entity, field: calls.append(entity.key) or None)
 
@@ -247,10 +247,12 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls: list[str] = []
         with (
-            patch("world.rules.combat.roll_initiative", return_value=[str(fast.key)]),
-            patch("world.rules.combat.roll_d100", return_value=10),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[str(fast.key)]),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=10),
+            patch("world.rules.combat.damage.roll_d100", return_value=10),
+            patch("world.rules.combat.rounds.roll_d100", return_value=10),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(bf, lambda entity, field: calls.append(entity.key) or None)
 
@@ -262,10 +264,12 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # Winning dice (> 15, e.g. 50) lets attacker act
         calls.clear()
         with (
-            patch("world.rules.combat.roll_initiative", return_value=[str(fast.key)]),
-            patch("world.rules.combat.roll_d100", return_value=50),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[str(fast.key)]),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             logs = run_round(bf, lambda entity, field: calls.append(entity.key) or None)
 
@@ -302,10 +306,10 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
             return None
 
         with (
-            patch("world.rules.combat.roll_initiative", return_value=["p1", "p2", "p3", "p4"]),
-            patch("world.rules.combat.evaluate_combat_modifiers", return_value={}),
-            patch("world.rules.combat.tick_buffs"),
-            patch("world.rules.combat.decay_tick"),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["p1", "p2", "p3", "p4"]),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
         ):
             run_round(bf, provider)
 
@@ -378,7 +382,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         initial_mp = self.actor.traits.mp.current
         # All three strikes hit
-        with patch("world.rules.combat.roll_d100", side_effect=[100, 100, 100]):
+        with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100, 100]):
             req = ActionRequest(self.actor, combo_skill.key, [target], ctx)
             res = ActionResolver.resolve(req)
 
@@ -437,7 +441,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         )
         grant_lineage(self.actor, [exec_skill.key, normal_skill.key])
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_start = high_def_target.traits.hp.current
             req_exec = ActionRequest(self.actor, exec_skill.key, [high_def_target], ctx)
             res_exec = ActionResolver.resolve(req_exec)
@@ -484,7 +488,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         )
         grant_lineage(self.actor, [devast_skill.key, non_devast_skill.key])
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
             restore_gauges_to_full(self.actor)
             hp_start = full_hp_target.traits.hp.current
             req_dev = ActionRequest(self.actor, devast_skill.key, [full_hp_target], ctx2)

@@ -223,7 +223,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         record = read_session(self.player)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
@@ -250,7 +252,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.settlement.settle_combat_result",
@@ -267,7 +271,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNotNone(self.player.db.active_combat)
         # The retry runs the round again and settles exactly once.
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
@@ -282,7 +288,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.rounds._persist",
@@ -316,7 +324,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch("world.rules.monster_behaviour._should_flee", return_value=False),
         ):
@@ -383,7 +393,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
@@ -456,7 +468,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
     def test_dot_tick_kill_of_final_foe_commits_victory(self):
 
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
@@ -479,7 +491,9 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
             raise RuntimeError("injected upkeep planner failure")
 
         with (
-            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch.dict(_EVENT_EFFECT_PLANNERS, {"boom": boom}),
         ):
             with self.assertRaises(RuntimeError):
@@ -490,7 +504,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNotNone(self.player.db.active_combat)
         self.assertIsNone(self.player.db.magic_xp)
         # The retry without the failing planner settles normally.
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertIsNone(self.player.db.active_combat)
@@ -550,7 +564,9 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
                     "foe-overwhelming verdict"
                 ),
             ) as resolver,
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.monster_behaviour._should_flee",
                 return_value=False,
@@ -595,7 +611,9 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             "party",
         )
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
@@ -655,7 +673,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
             [self.monster],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100") as roll:
+        with patch("world.rules.combat.damage.roll_d100") as roll:
             result = ActionResolver.preflight(request)
         self.assertEqual(result.outcome, "success")
         roll.assert_not_called()
@@ -733,7 +751,9 @@ class DigestionCadenceRoundRollbackTests(BattlefieldIsolation, EvenniaTestCase):
         # settlement (the failure point the suite injects into) actually
         # runs, after the practice stage already resolved and committed.
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch("world.rules.combat_session.settlement._round_cap", return_value=0),
             patch(
@@ -760,7 +780,9 @@ class DigestionCadenceRoundRollbackTests(BattlefieldIsolation, EvenniaTestCase):
         # The same-day retry runs the round again: the rollback gave the day
         # back, so the practice stage accrues and records the real ordinal 2.
         with (
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch("world.rules.combat_session.settlement._round_cap", return_value=0),
         ):

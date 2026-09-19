@@ -137,7 +137,7 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
 
     def _settle(self):
         """Lose and forfeit the already-engaged session."""
-        with patch("world.rules.combat.roll_d100", return_value=1):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
             submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         return forfeit(self.player)
 
@@ -1013,7 +1013,7 @@ class EventLogOrderTests(ViolationBase):
             ),
         )
         with self._patch_rolls([1, 1]):
-            with patch("world.rules.combat.roll_d100", return_value=1):
+            with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
                 submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
             result = forfeit(self.player)
         kinds = _kinds(_aftermath_entries(result))

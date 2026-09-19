@@ -121,7 +121,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         coordinator = self._coordinator()
         from unittest.mock import patch
 
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             handle_ui_action(
                 self.session,
                 self.player,
@@ -343,7 +343,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         from server import option_proposal_service as service
 
         with patch.object(service, "schedule_action_options") as schedule:
-            with patch("world.rules.combat.roll_d100", return_value=100):
+            with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
                 handle_ui_action(
                     self.session,
                     self.player,

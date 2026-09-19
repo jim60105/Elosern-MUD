@@ -180,7 +180,7 @@ class SexualCoercionBase(BattlefieldIsolation, EvenniaTest):
         grant_lineage(self.player, list(skill_keys))
 
     def _run_hit(self, skill_key, targets):
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             return submit_player_action(self.player, skill_key, targets)
 
     def _battlefield(self):
@@ -571,7 +571,9 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
             return submit_player_action(self.player, skill_key, targets)
 
@@ -609,7 +611,9 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.combat_session.rounds._persist", side_effect=failing_persist
             ) as persist,
@@ -693,7 +697,9 @@ class SnapshotWideningTests(SexualCoercionBase):
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
             return submit_player_action(self.player, skill_key, targets)
 
@@ -734,7 +740,9 @@ class SnapshotWideningTests(SexualCoercionBase):
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
@@ -767,7 +775,9 @@ class SnapshotWideningTests(SexualCoercionBase):
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
-            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
