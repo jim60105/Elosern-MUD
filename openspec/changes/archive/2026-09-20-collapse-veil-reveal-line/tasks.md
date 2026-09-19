@@ -127,7 +127,7 @@ Run this group only after group 2, so the record has a single reader when it is 
   `uv run --locked python -m tools.spec_traceability check`.
 - [x] 6.3 Verify the new coverage stays behavior-only and is not added to
   `tools/test_data_freeze.json`: `uv run --locked python -m tools.test_data_lint check`.
-- [ ] 6.4 AFTER this change is archived, correct the two carried-over scenario titles by direct edit
+- [x] 6.4 AFTER this change is archived, correct the two carried-over scenario titles by direct edit
   to `openspec/specs/skill-effect-model/spec.md` per design D4, so no scenario title names a retired
   strength.
 
