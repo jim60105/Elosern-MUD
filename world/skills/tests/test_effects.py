@@ -32,6 +32,7 @@ from world.skills.effects import (
     WeaponStyleEffect,
     parse_effect,
 )
+from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 # Synthetic payloads for payload-agnostic parser arms. Each branch accepts any
 # single argument, so an invented key (kit t_* convention) exercises the
 # identical parse path without naming shipped content.
@@ -298,10 +299,37 @@ class ParseEffectTests(unittest.TestCase):
                     parse_effect(effect)
 
     def test_malformed_damage_raises(self):
-        for effect in ("damage", "damage:fire", "damage:fire:physical:extra"):
+        for effect in (
+            "damage",
+            "damage:fire",
+            "damage:fire:physical:extra",
+            "damage:fire:sonic",
+        ):
             with self.subTest(effect=effect):
                 with self.assertRaises(ValueError):
                     parse_effect(effect)
+
+    @covers_requirement(
+        "skill-effect-model::skilldef---post-init---rejects-unparseable-effects-at-construction"
+    )
+    def test_damage_skill_with_an_invalid_school_fails_at_construction(self):
+        # The school membership check lives in parse_effect, so a declaration
+        # carrying an out-of-set school fails when the SkillDef parses its
+        # effects — registry-load time, not first cast.
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="t_school_reject",
+                label="合成校驗",
+                description="宣稱封閉集合外 school 段的合成定義。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                cost={},
+                usable_out_of_combat=False,
+                element=None,
+                effects=["damage:fire:sonic"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                group=None,
+            )
 
     def test_bare_prefixes_reject_a_payload(self):
         for effect in (

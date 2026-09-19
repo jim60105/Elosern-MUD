@@ -173,7 +173,7 @@ def _damage_school(skill: SkillDef) -> str:
     effect = next(
         effect for effect in skill.effects if effect.startswith("damage:")
     )
-    _, school = combat._parse_damage_effect(effect)
+    school = combat._parse_damage_effect(effect).school
     return school
 
 
