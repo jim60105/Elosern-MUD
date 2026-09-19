@@ -552,10 +552,13 @@ class PlayerPresetTests(unittest.TestCase):
     def test_disguised_stats_validation_rejects_bad_keys_values_and_duplicates(self):
         from world.lore.player_presets import _validate_preset_disguised_stats
 
+        # Race defaults to elf (divine-capable) so these shape-only cases
+        # exercise the shape rules without tripping the separate race guard
+        # (divine-arts-seeding-guard), which is covered by its own test.
         def make(**overrides):
             values = dict(
-                key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_plains", allocations=(), emphasis="e",
+                key="x", display_name="x", age=18, apparent_age=18, race="elf",
+                subrace="fionnen", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -583,6 +586,38 @@ class PlayerPresetTests(unittest.TestCase):
         )
         _validate_preset_disguised_stats({"x": make()})
         _validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
+
+    @covers_requirement("disguised-stats-boundary::only-an-entity-that-can-use-divine-arts-may-be-seeded-with-a-disguise-layer")
+    def test_disguised_stats_validation_enforces_the_divine_arts_race_guard(self):
+        from world.lore.player_presets import _validate_preset_disguised_stats
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_plains", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        # A divine-capable race (elf) may declare a non-empty layer.
+        _validate_preset_disguised_stats(
+            {"x": make(race="elf", subrace="fionnen", disguised_stats=(("atk_phys", 60),))}
+        )
+        # A non-divine race (human) may not.
+        with self.assertRaisesRegex(ValueError, "divine affinity"):
+            _validate_preset_disguised_stats(
+                {"x": make(disguised_stats=(("atk_phys", 60),))}
+            )
+        # A race that does not resolve in the registry may not either.
+        with self.assertRaisesRegex(ValueError, "divine affinity"):
+            _validate_preset_disguised_stats(
+                {"x": make(race="not_a_race", subrace="human_plains",
+                           disguised_stats=(("atk_phys", 60),))}
+            )
+        # A non-divine race with an EMPTY declaration is fine -- no layer is
+        # seeded (design D4).
+        _validate_preset_disguised_stats({"x": make(disguised_stats=())})
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
     def test_sexual_baseline_validation_rejects_bad_levels_and_body_parts(self):

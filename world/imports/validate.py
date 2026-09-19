@@ -222,6 +222,28 @@ def _check_disguised_stats_subset(record: dict[str, Any]) -> list[Issue]:
     ]
 
 
+def _check_disguised_stats_race(record: dict[str, Any]) -> list[Issue]:
+    """Reject a disguise layer on a record whose race cannot use divine arts.
+
+    Only the bloodline-gated veil verb can place a disguise layer, so a
+    non-empty declaration on a race that cannot use divine arts -- or on a
+    race absent from the registry -- describes state the engine would refuse
+    to produce. Independent of `_check_disguised_stats_subset`; a record may
+    fail both checks and SHALL report both issues.
+    """
+    if not record.get("disguised_stats"):
+        return []
+    race = RACE_REGISTRY.get(record.get("race"))
+    if race is not None and race.can_use_divine_arts:
+        return []
+    return [
+        Issue(
+            "disguised_stats",
+            "disguised_stats requires a race that can use divine arts",
+        )
+    ]
+
+
 def _check_age_range(record: dict[str, Any]) -> list[Issue]:
     """Reject a canonical or apparent age outside the shared reasonable range.
 
@@ -448,12 +470,19 @@ def _check_skills(record: dict[str, Any]) -> list[Issue]:
     registry = _resolve_skill_registry()
     if registry is None:
         return []
-    return [
-        Issue(field_name, f"{key!r} not found in skill registry")
-        for field_name in ("skills", "passives")
-        for key in record.get(field_name, ())
-        if key not in registry
-    ]
+    issues: list[Issue] = []
+    race = RACE_REGISTRY.get(record.get("race"))
+    can_use_divine_arts = race is not None and race.can_use_divine_arts
+    for field_name in ("skills", "passives"):
+        for key in record.get(field_name, ()):
+            if key not in registry:
+                issues.append(Issue(field_name, f"{key!r} not found in skill registry"))
+                continue
+            if registry[key].requires_divine_arts and not can_use_divine_arts:
+                issues.append(
+                    Issue(field_name, f"{key!r} requires a race that can use divine arts")
+                )
+    return issues
 
 
 def _is_npc_target(typeclass: type | None) -> bool:
@@ -766,6 +795,7 @@ def validate_character(
     report.rejections.extend(_check_npc_title(record))
     report.rejections.extend(_check_age_range(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
+    report.rejections.extend(_check_disguised_stats_race(record))
     report.rejections.extend(_check_race_subrace(record))
     magic_rejections, magic_warnings = _check_magic_power_band(record)
     report.rejections.extend(magic_rejections)

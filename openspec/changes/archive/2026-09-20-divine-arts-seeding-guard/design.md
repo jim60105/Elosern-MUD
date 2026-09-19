@@ -91,6 +91,25 @@ line up and teach nothing about the rule. The tests instead construct a syntheti
 synthetic import records covering the divine-capable, non-divine, unresolvable-race and
 empty-declaration cases, so they establish the mechanic and stay correct when content changes.
 
+### D7: The example keeps the `disguised_stats` key, empty, and its own spec requirement follows
+
+`CHARACTER_SCHEMA_V1` requires the `disguised_stats` key on every character record (see D4's
+enumeration of the three writers that normalize an empty mapping to `None` — the schema's own
+requiredness is a separate, structural fact). So D5's "remove the block" is `{}`, not omitting the
+key. That leaves `import-reference-example`'s "exercises every major schema branch" requirement
+holding a scenario that asserts the field non-empty — true before this change, false after, since the
+example's race (`human`) can never carry a populated layer once the guard lands. `openspec validate`
+refuses a MODIFIED block that drops or renames a scenario the current spec still has, and also refuses
+the same title in both an ADDED and a REMOVED block in one delta file, so the requirement is retired
+under its old title (REMOVED, verbatim) and replaced under a new one — "...it can demonstrate on its
+race" (ADDED) — carrying the four unaffected scenarios unchanged and rewriting only the disguised_stats
+one. The title change moves the requirement's traceability ID, so
+`world/imports/tests/test_schema.py`'s `covers_requirement` call that named the old ID is repointed to
+the new one, and `test_reference_example.py`'s
+`test_reference_example_is_clean_and_exercises_contract` — whose own assertions already cover the new
+requirement's scenarios — gains the new ID alongside its existing one. Its
+`assertTrue(record["disguised_stats"])` becomes `assertFalse(...)`.
+
 ## Risks / Trade-offs
 
 - **Authored content in flight may break.** Any card or record written against the old permissive

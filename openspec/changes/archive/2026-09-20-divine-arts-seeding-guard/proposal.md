@@ -36,9 +36,11 @@ invariant.
 - `world/imports/validate.py` gains two rejections: a disguise layer declared for a record whose race
   cannot use divine arts, and a `skills`/`passives` entry requiring divine arts on such a record. Both
   are rejections rather than warnings — the record describes state the engine would refuse to produce.
-- **BREAKING** (authored example content): `world/imports/examples/example_character.json` loses its
-  `disguised_stats` block, because a human reference record may not carry one. The example keeps its
-  human race, since that is what makes it a useful baseline reference.
+- **BREAKING** (authored example content): `world/imports/examples/example_character.json`'s
+  `disguised_stats` becomes empty (`{}`), because a human reference record may not carry a populated
+  layer — `CHARACTER_SCHEMA_V1` requires the key itself, so it stays present but empty. The example
+  keeps its human race, since that is what makes it a useful baseline reference. The
+  `import-reference-example` requirement that asserted the field non-empty is replaced accordingly.
 - `docs/development/adding-player-presets.md` gains the new rejection rows in its validator table.
 
 ## Capabilities
@@ -54,13 +56,19 @@ None.
   states that the wearer must be able to produce a veil in the first place.
 - `import-validation`: gains two rejection requirements, one for a bloodline-inconsistent disguise
   layer and one for bloodline-inconsistent skill ownership.
+- `import-reference-example`: the "exercises every major schema branch" requirement's disguised_stats
+  scenario is replaced — the human baseline record can no longer demonstrate a populated layer, so the
+  scenario now demonstrates the field staying empty instead.
 
 ## Impact
 
 - `world/lore/player_presets.py` — one validator gains a race check.
 - `world/imports/validate.py` — one new check function, one extended check function, both wired into
   the existing rejection pipeline.
-- `world/imports/examples/example_character.json` — `disguised_stats` removed.
+- `world/imports/examples/example_character.json` — `disguised_stats` emptied (key stays, schema
+  requires it).
+- `world/imports/tests/test_reference_example.py` — the assertion that the example's
+  `disguised_stats` is truthy is replaced with an assertion that it is empty.
 - `docs/development/adding-player-presets.md` — validator table rows; contract-tested by
   `tests/test_preset_authoring_docs_contract.py`, which must stay green.
 - `world/lore/tests/`, `world/imports/tests/` — behavior tests over synthetic presets and synthetic

@@ -491,7 +491,10 @@ class ByteIdentityTests(ProfessionAssemblyHarness):
             "apparent_age": 22,
             "persona": record["persona"],
             "sexual": record["sexual_baseline"],
-            "disguised_stats": {"atk_phys": 8, "agility": 9},
+            # The reference record's race (human) cannot carry a disguise
+            # layer (divine-arts-seeding-guard), so its empty declaration
+            # normalizes to None (design D4).
+            "disguised_stats": None,
             "skills": {"active": record["skills"], "passive": record["passives"]},
             "equipment": record["equipment"],
             "inventory": record["inventory"],

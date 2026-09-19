@@ -16,7 +16,7 @@ GM_CHARACTERS_DOC = (
 
 
 class ReferenceExampleTests(TestCase):
-    @covers_requirement("import-reference-example::the-reference-example-demonstrates-the-base-value-stats-convention-correctly")
+    @covers_requirement("import-reference-example::the-reference-example-demonstrates-the-base-value-stats-convention-correctly", "import-reference-example::the-reference-example-exercises-every-major-schema-branch-it-can-demonstrate-on-its-race")
     def test_reference_example_is_clean_and_exercises_contract(self):
         report = validate_batch([EXAMPLE_PATH])
         self.assertTrue(report.all_valid)
@@ -26,8 +26,9 @@ class ReferenceExampleTests(TestCase):
         self.assertEqual(record["record_type"], "character")
         self.assertTrue(record["subrace"])
         self.assertEqual(len(record["stats"]), 8)
-        self.assertTrue(record["disguised_stats"])
-        self.assertLess(set(record["disguised_stats"]), set(record["stats"]))
+        # The example's race (human) cannot use divine arts, so the
+        # divine-arts-seeding-guard boundary forbids a populated layer here.
+        self.assertFalse(record["disguised_stats"])
         self.assertTrue(record["skills"] and record["passives"])
         self.assertGreater(len(record["sexual_baseline"]), 3)
         self.assertGreater(len(record["persona"]), 1)
