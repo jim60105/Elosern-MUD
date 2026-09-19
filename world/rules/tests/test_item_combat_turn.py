@@ -168,7 +168,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
         ):
             result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "round")
@@ -219,7 +219,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         for item_key, reason in cases:
             with self.subTest(item_key=item_key):
                 with patch(
-                    "world.rules.combat_session.get_world_clock",
+                    "world.rules.combat_session.settlement.get_world_clock",
                     return_value=clock,
                 ):
                     result = submit_player_item_use(self.player, item_key)
@@ -242,7 +242,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.inventory = [_PEACE_KEY]
         clock = WorldClock()
         with patch(
-            "world.rules.combat_session.get_world_clock",
+            "world.rules.combat_session.settlement.get_world_clock",
             return_value=clock,
         ):
             result = submit_player_item_use(self.player, _PEACE_KEY)
@@ -329,7 +329,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
-                "world.rules.combat_session.classify_overwhelm",
+                "world.rules.combat_session.rounds.classify_overwhelm",
                 return_value=foe_team,
             ),
         ):
@@ -364,11 +364,11 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
-                "world.rules.combat_session.classify_overwhelm",
+                "world.rules.combat_session.rounds.classify_overwhelm",
                 return_value="party",
             ),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "an item submission must never dispatch compression"
                 ),
@@ -401,7 +401,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session._persist", side_effect=boom),
+            patch("world.rules.combat_session.rounds._persist", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _TONIC_KEY)
@@ -483,7 +483,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session._continue_or_settle", side_effect=boom),
+            patch("world.rules.combat_session.rounds._continue_or_settle", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _TONIC_KEY)
@@ -631,7 +631,7 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
             # The troll sits below its archetype's flee boundary and acts
             # before the player, so its turn always attempts to flee; pin the
             # disengage seam to a failing roll (1 + agility < 51 + pursuer) so

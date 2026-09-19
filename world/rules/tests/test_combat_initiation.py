@@ -577,7 +577,7 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         monster.location = self.room
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat_session.log_info") as session_info,
+            patch("world.rules.combat_session.settlement.log_info") as session_info,
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = initiate_field_combat(self.player, _T_CAST, monster)
@@ -769,7 +769,7 @@ class FieldCombatCommandTests(
             patch("world.rules.combat.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=1),
             patch(
-                "world.rules.combat_session._scan_sexual_coercion",
+                "world.rules.combat_session.rounds._scan_sexual_coercion",
                 wraps=__import__(
                     "world.rules.combat_session",
                     fromlist=["_scan_sexual_coercion"],

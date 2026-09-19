@@ -157,7 +157,7 @@ class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
         self.monster.location = self.room
         self.clock = WorldClock()
         for target in (
-            "world.rules.combat_session.get_world_clock",
+            "world.rules.combat_session.settlement.get_world_clock",
             "world.rules.clock.get_world_clock",
         ):
             patcher = patch(target, return_value=self.clock)
@@ -785,7 +785,7 @@ class RenderingTests(DefeatAftermathBase):
         engage(self.player, self.monster)
         with (
             patch("world.rules.defeat_aftermath.aftermath.log_info") as info,
-            patch("world.rules.combat_session._persist", side_effect=RuntimeError("injected")),
+            patch("world.rules.combat_session.settlement._persist", side_effect=RuntimeError("injected")),
             self.captureOnCommitCallbacks(execute=True),
         ):
             with self.assertRaises(RuntimeError):
@@ -1068,7 +1068,7 @@ class RollbackTests(
         hp_after_round = self.player.traits.hp.current
         quest_log_before = [dict(e) for e in (self.player.db.quest_log or [])]
         with (
-            patch("world.rules.combat_session._persist", side_effect=RuntimeError("injected")),
+            patch("world.rules.combat_session.settlement._persist", side_effect=RuntimeError("injected")),
             self.assertRaises(RuntimeError),
         ):
             forfeit(self.player)
@@ -1224,7 +1224,7 @@ class RollbackTests(
 
         with (
             patch(
-                "world.rules.combat_session._continue_or_settle",
+                "world.rules.combat_session.rounds._continue_or_settle",
                 exploding_continue,
             ),
             patch("world.rules.combat.roll_d100", return_value=1),

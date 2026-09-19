@@ -152,8 +152,8 @@ class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn(str(self.player.pk), _BATTLEFIELDS)
         clock = WorldClock()
         with (
-            patch("world.rules.combat_session.get_world_clock", return_value=clock),
-            patch("world.rules.combat_session.settle_combat_result") as settle,
+            patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session.settlement.settle_combat_result") as settle,
         ):
             restore_active_session(self.player)
         settle.assert_not_called()
@@ -185,9 +185,9 @@ class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.hp.current = 0
         clock = WorldClock()
         with (
-            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ) as settle,
         ):
@@ -253,7 +253,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ),
         ):
@@ -285,7 +285,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session._persist",
+                "world.rules.combat_session.rounds._persist",
                 side_effect=RuntimeError("terminated"),
             ),
         ):
@@ -344,7 +344,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.disengage.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ),
         ):
@@ -544,7 +544,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         clock = WorldClock()
         with (
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "the compressed resolver must never dispatch for a "
                     "foe-overwhelming verdict"
@@ -597,7 +597,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "an in-session submission must never dispatch compression"
                 ),
@@ -735,9 +735,9 @@ class DigestionCadenceRoundRollbackTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
-            patch("world.rules.combat_session._round_cap", return_value=0),
+            patch("world.rules.combat_session.settlement._round_cap", return_value=0),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ),
         ):
@@ -762,7 +762,7 @@ class DigestionCadenceRoundRollbackTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
-            patch("world.rules.combat_session._round_cap", return_value=0),
+            patch("world.rules.combat_session.settlement._round_cap", return_value=0),
         ):
             result = submit_player_action(
                 self.player, _T_DIVINE_PROBE.key, [self.monster]

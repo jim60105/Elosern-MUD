@@ -316,7 +316,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "an in-session submission must never dispatch compression"
                 ),
@@ -509,7 +509,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             with (
                 patch("world.rules.combat.roll_d100", return_value=100),
                 patch(
-                    "world.rules.combat_session.settle_combat_result",
+                    "world.rules.combat_session.settlement.settle_combat_result",
                     side_effect=RuntimeError("clock write failed"),
                 ),
                 patch(
@@ -549,7 +549,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
                     return_value=False,
                 ),
                 patch(
-                    "world.rules.combat_session.settle_combat_result",
+                    "world.rules.combat_session.settlement.settle_combat_result",
                     side_effect=spy,
                 ),
             ):
@@ -684,6 +684,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         # 5.11: a two-enemy session through _primary_opponent_id(), the
         # friendly-fire scan, nonlethal knockout, and terminal settlement.
         import world.rules.combat_session as session_mod
+        import world.rules.combat_session.rounds as session_rounds
 
         companion = create_object(NPC, key="並肩", location=self.room)
         companion.race = _race_key()
@@ -706,7 +707,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
-            patch.object(session_mod, "_primary_opponent_id", side_effect=spy),
+            patch.object(session_rounds, "_primary_opponent_id", side_effect=spy),
         ):
             result = submit_opening_action(self.player, SYNTH_SEAM_AREA_SKILL.key, [m1])
         self.assertGreaterEqual(len(seen), 1)
@@ -756,7 +757,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=44),
             patch("world.rules.action.gates.roll_d100", return_value=44),
-            patch("world.rules.combat_session.run_round", side_effect=record_round),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=record_round),
         ):
             submit_player_action(self.player, _T_CAST, [build()])
         self.player.db.active_combat = None
@@ -764,7 +765,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=44),
             patch("world.rules.action.gates.roll_d100", return_value=44),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=record_resolve,
             ),
         ):
@@ -822,9 +823,9 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session.classify_overwhelm", return_value="foes"),
+            patch("world.rules.combat_session.rounds.classify_overwhelm", return_value="foes"),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "a foe-direction verdict must never compress"
                 ),
@@ -848,9 +849,9 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=50),
-            patch("world.rules.combat_session.classify_overwhelm", return_value=None),
+            patch("world.rules.combat_session.rounds.classify_overwhelm", return_value=None),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError("a contested verdict must never compress"),
             ) as resolver,
         ):
@@ -884,7 +885,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=50),
             patch("world.rules.action.gates.roll_d100", return_value=50),
             patch(
-                "world.rules.combat_session.resolve_overwhelm",
+                "world.rules.combat_session.rounds.resolve_overwhelm",
                 side_effect=AssertionError(
                     "a skill aimed away from every enemy must never compress"
                 ),
@@ -960,7 +961,7 @@ class CompressedOpeningFirstStrikeTests(BattlefieldIsolation, EvenniaTestCase):
 
         with (
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat_session.resolve_overwhelm", side_effect=spy),
+            patch("world.rules.combat_session.rounds.resolve_overwhelm", side_effect=spy),
         ):
                 result = submit_opening_action(self.player, _T_CAST, [self.monster])
         # The opening really compressed, and the override reached the resolver.
@@ -1016,5 +1017,5 @@ class SubmissionStructuralTests(unittest.TestCase):
                         name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
                         if name == "resolve_overwhelm":
                             callers.append(path)
-        session_file = (root / "world" / "rules" / "combat_session.py").resolve()
-        self.assertEqual([p.resolve() for p in callers], [session_file])
+        session_dir = (root / "world" / "rules" / "combat_session").resolve()
+        self.assertEqual({p.resolve().parent for p in callers}, {session_dir})

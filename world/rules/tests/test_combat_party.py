@@ -375,7 +375,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
 
         with (
             patch(
-                "world.rules.combat_session.monster_behaviour_policy",
+                "world.rules.combat_session.policies.monster_behaviour_policy",
                 side_effect=spy,
             ),
             patch("world.rules.combat.roll_d100", return_value=100),

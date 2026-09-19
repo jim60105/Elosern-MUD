@@ -249,7 +249,7 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
             patch(
-                "world.rules.combat_session._knocked_out_ids",
+                "world.rules.combat_session.rounds._knocked_out_ids",
                 return_value=(int(companion.pk),),
             ),
         ):

@@ -188,7 +188,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
     def test_committed_ordinary_round_emits_one_round_boundary(self):
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat_session.log_info") as info,
+            patch("world.rules.combat_session.rounds.log_info") as info,
             patch("world.rules.combat.roll_d100", return_value=100),
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -209,10 +209,10 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
     def test_rolled_back_round_emits_no_round_boundary(self):
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat_session.log_info") as info,
+            patch("world.rules.combat_session.rounds.log_info") as info,
             patch("world.rules.combat.roll_d100", return_value=100),
             patch(
-                "world.rules.combat_session._persist",
+                "world.rules.combat_session.rounds._persist",
                 side_effect=RuntimeError("injected persist failure"),
             ),
             self.captureOnCommitCallbacks(execute=True),
@@ -225,7 +225,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
     def test_committed_forfeit_settlement_emits_settlement_done(self):
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat_session.log_info") as info,
+            patch("world.rules.combat_session.settlement.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = forfeit(self.player)
@@ -244,9 +244,9 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
     def test_failed_settlement_emits_no_settlement_done(self):
         engage(self.player, self.monster)
         with (
-            patch("world.rules.combat_session.log_info") as info,
+            patch("world.rules.combat_session.settlement.log_info") as info,
             patch(
-                "world.rules.combat_session._persist",
+                "world.rules.combat_session.settlement._persist",
                 side_effect=RuntimeError("injected settlement failure"),
             ),
             self.captureOnCommitCallbacks(execute=True),

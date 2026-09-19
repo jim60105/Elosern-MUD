@@ -831,7 +831,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ),
         ):

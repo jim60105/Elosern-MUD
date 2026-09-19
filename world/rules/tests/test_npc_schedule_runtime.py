@@ -948,7 +948,7 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
 
         # The deterministic startup sequence registers every clock source
         # before session restoration (fix-startup-clock-source-order D1).
-        with patch("world.rules.combat_session.settle_combat_result", side_effect=spy):
+        with patch("world.rules.combat_session.settlement.settle_combat_result", side_effect=spy):
             sync_grid()
             sync_service_interiors()
             sync_quest_runtime()

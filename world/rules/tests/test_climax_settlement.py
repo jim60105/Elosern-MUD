@@ -395,7 +395,7 @@ class ClimaxRollbackTests(EvenniaTest):
             ),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
-                "world.rules.combat_session.settle_combat_result",
+                "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),
             ),
             self.assertRaises(RuntimeError),

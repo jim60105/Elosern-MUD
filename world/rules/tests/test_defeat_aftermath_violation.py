@@ -83,7 +83,7 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
         self.monster.location = self.room
         self.clock = WorldClock()
         for target in (
-            "world.rules.combat_session.get_world_clock",
+            "world.rules.combat_session.settlement.get_world_clock",
             "world.rules.clock.get_world_clock",
         ):
             patcher = patch(target, return_value=self.clock)

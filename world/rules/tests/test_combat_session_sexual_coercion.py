@@ -570,7 +570,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             return logs
 
         with (
-            patch("world.rules.combat_session.run_round", side_effect=run_with_resist),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.roll_d100", return_value=100),
         ):
             return submit_player_action(self.player, skill_key, targets)
@@ -608,10 +608,10 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             raise RuntimeError("injected settlement persist failure")
 
         with (
-            patch("world.rules.combat_session.run_round", side_effect=run_with_resist),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.roll_d100", return_value=100),
             patch(
-                "world.rules.combat_session._persist", side_effect=failing_persist
+                "world.rules.combat_session.rounds._persist", side_effect=failing_persist
             ) as persist,
         ):
             with self.assertRaises(RuntimeError):
@@ -692,7 +692,7 @@ class SnapshotWideningTests(SexualCoercionBase):
             return logs
 
         with (
-            patch("world.rules.combat_session.run_round", side_effect=run_with_resist),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.roll_d100", return_value=100),
         ):
             return submit_player_action(self.player, skill_key, targets)
@@ -733,9 +733,9 @@ class SnapshotWideningTests(SexualCoercionBase):
             raise RuntimeError("injected settlement persist failure")
 
         with (
-            patch("world.rules.combat_session.run_round", side_effect=run_with_resist),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat_session._persist", side_effect=failing_persist),
+            patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_action(self.player, _T_STRIKE, [self.monster])
@@ -766,9 +766,9 @@ class SnapshotWideningTests(SexualCoercionBase):
             raise RuntimeError("injected settlement persist failure")
 
         with (
-            patch("world.rules.combat_session.run_round", side_effect=run_with_resist),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.roll_d100", return_value=100),
-            patch("world.rules.combat_session._persist", side_effect=failing_persist),
+            patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_action(self.player, _T_STRIKE, [self.monster])

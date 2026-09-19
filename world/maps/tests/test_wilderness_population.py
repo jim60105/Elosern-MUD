@@ -544,7 +544,7 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
             settled["outcome"] = outcome
             return settle_session(actor, record, battlefield, outcome, logs)
 
-        with patch("world.rules.combat_session.settle_session", side_effect=spy):
+        with patch("world.rules.combat_session.settlement.settle_session", side_effect=spy):
             restore_persisted_sessions()
         self.assertEqual(settled["outcome"], "victory")
         self.assertIsNone(self.player.db.active_combat)

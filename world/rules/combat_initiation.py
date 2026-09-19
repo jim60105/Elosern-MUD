@@ -3,7 +3,7 @@
 Single purpose (field-combat-initiation D-2): classify the cast's target,
 open the session, and play the cast as the fight's first action. This
 exploration-side routing deliberately does not live in
-``world/rules/combat_session.py``, which is already 1697 lines; the
+the ``world/rules/combat_session`` package; the
 dependency direction is one-way — ``combat_initiation`` imports
 ``combat_session``, never the reverse.
 """
