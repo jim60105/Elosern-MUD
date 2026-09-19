@@ -90,7 +90,7 @@ from world.skills.registry import (
 )
 from world.tests.synthetic_data import synthetic_registries
 
-from ._combat_session_helpers import _race_key, open_synthetic_scope
+from ._combat_session_helpers import SYNTH_GLOW_ELEMENT, _race_key, open_synthetic_scope
 
 # --- Synthetic skill fixtures (file-local, never shipped content) ---------
 
@@ -368,7 +368,7 @@ class PhaseSpellReactionsTests(EvenniaTest):
         # 34 prefixes including stimulus and pleasure_peak
         prefixes_and_samples = [
             ("stat_multiply", "stat_multiply:atk_phys:100"),
-            ("growth_rate", "growth_rate:practice:100"),
+            ("growth_rate", f"growth_rate:practice:5:{SYNTH_GLOW_ELEMENT}"),
             ("sexual_magic_mastery", "sexual_magic_mastery"),
             ("passive_buff", "passive_buff:focus"),
             ("combat_prediction", "combat_prediction:test"),

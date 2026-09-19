@@ -51,12 +51,28 @@ class ParseEffectTests(unittest.TestCase):
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_growth_rate_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("growth_rate:practice:100"),
-            GrowthRateEffect(stat="practice", multiplier=100.0),
+            parse_effect("growth_rate:practice:5:wind"),
+            GrowthRateEffect(stat="practice", multiplier=5.0, scope="wind"),
         )
-        # The retired 'magic' stat key fails closed at parse time.
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_unscoped_or_malformed_growth_rate_payloads_fail_closed(self):
+        # A growth rate must name its tree: the old three-segment form no
+        # longer parses and therefore fails registry load.
         with self.assertRaises(ValueError):
-            parse_effect("growth_rate:magic:100")
+            parse_effect("growth_rate:practice:100")
+        # The retired 'magic' stat key stays closed on the four-segment form.
+        with self.assertRaises(ValueError):
+            parse_effect("growth_rate:magic:5:wind")
+        # The scope must be an ELEMENT_REGISTRY key.
+        with self.assertRaises(ValueError):
+            parse_effect("growth_rate:practice:5:notanelement")
+        # The multiplier must be non-negative.
+        with self.assertRaises(ValueError):
+            parse_effect("growth_rate:practice:-1:wind")
+        # Exactly four segments: a fifth segment is not a valid payload.
+        with self.assertRaises(ValueError):
+            parse_effect("growth_rate:practice:5:wind:extra")
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_retired_element_mastery_rank_prefix_fails_closed(self):

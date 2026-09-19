@@ -13,11 +13,14 @@ from math import isfinite
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal
 
+from world.lore.elements import ELEMENT_REGISTRY
+
 # Continuous-valued ownership effects read by deterministic consumers.
 # ``StatMultiplyEffect`` is consumed by ``SkillHandler.effective_value``;
-# ``GrowthRateEffect`` mirrors ``world/rules/progression.py``'s existing
-# ``growth_rate:practice:<multiplier>`` convention (the retired
-# ``growth_rate:magic:<N>`` prefix fails closed at parse).
+# ``GrowthRateEffect`` is consumed by ``world/rules/progression.py``'s
+# practice-growth composite via the scoped ``growth_rate:practice:<multiplier>:<scope>``
+# convention (the retired unscoped ``growth_rate:practice:<N>`` and
+# ``growth_rate:magic:<N>`` forms fail closed at parse).
 @dataclass(frozen=True)
 class StatMultiplyEffect:
     """Multiply one stored trait by a fixed factor while owned."""
@@ -28,10 +31,16 @@ class StatMultiplyEffect:
 
 @dataclass(frozen=True)
 class GrowthRateEffect:
-    """Multiply one growth stat by a fixed factor while owned."""
+    """Multiply one growth stat by a fixed factor while owned.
+
+    ``scope`` names the single ``ELEMENT_REGISTRY`` key whose practice the
+    factor accelerates; a growth rate that does not name its tree is not
+    expressible (the unscoped three-segment form fails closed at parse).
+    """
 
     stat: str
     multiplier: float
+    scope: str
 
 
 def _known_buff_keys() -> frozenset[str]:
@@ -1026,13 +1035,38 @@ def parse_effect(effect_id: str) -> object:
         trait, multiplier = _parse_stat_like(effect_id, prefix)
         return StatMultiplyEffect(trait=trait, multiplier=multiplier)
     if prefix == "growth_rate":
-        stat, multiplier = _parse_stat_like(effect_id, prefix)
+        parts = effect_id.split(":")
+        if len(parts) != 4:
+            raise ValueError(
+                f"growth_rate effect must be growth_rate:<stat>:<multiplier>:<scope>, "
+                f"got {effect_id!r}"
+            )
+        _, stat, multiplier_text, scope = parts
         if stat != "practice":
             raise ValueError(
                 f"growth_rate effect stat must be 'practice', got {stat!r} "
                 f"in {effect_id!r} (the retired 'magic' key fails closed)"
             )
-        return GrowthRateEffect(stat=stat, multiplier=multiplier)
+        try:
+            multiplier = float(multiplier_text)
+        except ValueError as error:
+            raise ValueError(
+                f"growth_rate multiplier must be numeric, got {effect_id!r}"
+            ) from error
+        if not isfinite(multiplier):
+            raise ValueError(
+                f"growth_rate multiplier must be finite, got {effect_id!r}"
+            )
+        if multiplier < 0:
+            raise ValueError(
+                f"growth_rate multiplier must be non-negative, got {effect_id!r}"
+            )
+        if scope not in ELEMENT_REGISTRY:
+            raise ValueError(
+                f"growth_rate scope must be an ELEMENT_REGISTRY key, got {scope!r} "
+                f"in {effect_id!r}"
+            )
+        return GrowthRateEffect(stat=stat, multiplier=multiplier, scope=scope)
     if prefix == "sexual_magic_mastery":
         _parse_bare(effect_id, prefix)
         return SexualMasteryEffect()
