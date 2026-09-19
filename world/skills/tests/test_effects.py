@@ -233,10 +233,21 @@ class ParseEffectTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     parse_effect(effect)
 
+    @covers_requirement(
+        "skill-effect-model::the-damage-effect-s-school-segment-is-validated-at-parse"
+    )
     def test_damage_parses_into_its_dataclass(self):
         self.assertEqual(
             parse_effect("damage:fire:physical"),
             DamageEffect(element="fire", school="physical"),
+        )
+        self.assertEqual(
+            parse_effect("damage:fire:magic"),
+            DamageEffect(element="fire", school="magic"),
+        )
+        self.assertEqual(
+            parse_effect("damage:none:physical"),
+            DamageEffect(element=None, school="physical"),
         )
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
@@ -319,6 +330,9 @@ class ParseEffectTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     parse_effect(effect)
 
+    @covers_requirement(
+        "skill-effect-model::the-damage-effect-s-school-segment-is-validated-at-parse"
+    )
     def test_malformed_damage_raises(self):
         for effect in (
             "damage",

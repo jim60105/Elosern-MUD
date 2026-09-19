@@ -12,6 +12,16 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules import combat as combat_module
+
+# Eagerly import the cross-lineage unlock rulebook at module-import time (the
+# same guard _combat_session_helpers.py applies): its module-level loader
+# validates the shipped table against the LIVE SKILL_REGISTRY, and the
+# practice-award paths import it lazily — without this import the first
+# scoped award in a standalone run of this module would validate the shipped
+# table against the synthetic (cleared) registry and reject every cast with
+# COMMIT_FAILED.
+import world.rules.cross_lineage_unlock  # noqa: F401
+
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -51,6 +61,14 @@ _T_ELEMENTLESS = make_skill(
     effects=("damage:none:physical",),
 )
 
+# A damage effect naming an element outside the scoped ELEMENT_REGISTRY:
+# ``parse_effect`` deliberately leaves the element segment unvalidated, so the
+# definition constructs; only the cast-time wrapper's registry check rejects it.
+_T_UNBOUND_ELEMENT = make_skill(
+    "t_unbound_element_strike",
+    effects=("damage:t_unbound_element:physical",),
+)
+
 _SCOPE = synthetic_registries(
     "skills",
     "races",
@@ -63,6 +81,7 @@ _SCOPE = synthetic_registries(
         "skills": {
             _T_GUARDIAN.key: _T_GUARDIAN,
             _T_ELEMENTLESS.key: _T_ELEMENTLESS,
+            _T_UNBOUND_ELEMENT.key: _T_UNBOUND_ELEMENT,
         }
     },
 )
@@ -147,6 +166,9 @@ class DamageEffectHandlerTests(unittest.TestCase):
 class DamageParserArchitectureTests(unittest.TestCase):
     """The ``damage:<element>:<school>`` grammar has exactly one parser."""
 
+    @covers_requirement(
+        "skill-effect-model::the-damage-element-school-grammar-has-exactly-one-parser"
+    )
     def test_cast_time_damage_parser_delegates_to_parse_effect(self):
         """The cast-time wrapper must not re-split the effect string itself."""
         source = inspect.getsource(combat_module._parse_damage_effect)
@@ -430,3 +452,25 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(_stored_hp(self.target), before)
+
+    @covers_requirement(
+        "skill-effect-model::the-damage-element-school-grammar-has-exactly-one-parser"
+    )
+    def test_cast_time_wrapper_rejects_an_element_outside_the_registry(self):
+        # parse_effect deliberately leaves the element segment unvalidated,
+        # so the definition itself is legal; the cast-time wrapper layers the
+        # registry check and the resolver rejects the action with the
+        # effect-resolution failure reason instead of silently damaging.
+        grant_lineage(self.actor, [_T_UNBOUND_ELEMENT.key])
+        request = ActionRequest(
+            self.actor,
+            _T_UNBOUND_ELEMENT.key,
+            [self.target],
+            BattlefieldActionContext(self.request.context.battlefield),
+        )
+        before = _stored_hp(self.target)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertIs(result.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
+        self.assertEqual(_stored_hp(self.target), before)
