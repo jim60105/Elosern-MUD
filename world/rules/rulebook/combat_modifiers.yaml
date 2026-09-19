@@ -193,3 +193,10 @@
 - id: flicker_micro_stun
   when: {buff_active: flicker_stun}
   then: {actions_per_turn: 0, chance: 30}
+# 武技系斬技附掛效果的實際數值（martial-arts-catalog D2）：
+- id: martial_hamstring_agility_penalty
+  when: {buff_active: martial_hamstring}
+  then: {agility_flat: -5}
+- id: sword_saint_domain_atk_phys_bonus
+  when: {buff_active: sword_saint_domain}
+  then: {atk_phys: 12}

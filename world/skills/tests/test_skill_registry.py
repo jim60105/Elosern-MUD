@@ -530,17 +530,6 @@ class SkillContentCompletionTests(unittest.TestCase):
         self.assertIs(skill.kind, SkillKind.PASSIVE)
         self.assertEqual(skill.effects, ["passive_buff:blade_arts"])
 
-    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
-    def test_dual_blade_mastery_is_a_higher_tier_sibling(self):
-        skill = SKILL_REGISTRY["dual_blade_mastery"]
-        self.assertEqual(skill.label, "雙刃旋舞")
-        self.assertIs(skill.kind, SkillKind.ACTIVE)
-        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(skill.cost, {"sp": 30})
-        self.assertIs(skill.element, ELEMENT_REGISTRY["dark"])
-        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-        self.assertEqual(skill.effects, ["damage:dark:physical"])
-
     @covers_requirement("skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill")
     def test_dual_wield_style_is_a_passive_stance(self):
         style = SKILL_REGISTRY["dual_wield_style"]
@@ -841,11 +830,23 @@ class SkillCategoryClassificationTests(unittest.TestCase):
         expected = {
             SkillCategory.MARTIAL_ARTS: {
                 "basic_attack",
-                "dual_blade_mastery",
                 "light_sword_style",
-                "shadow_slash",
                 "dual_wield_style",
                 "flee",
+                "basic_swordplay",
+                "flowing_strikes",
+                "tendon_sever",
+                "whirlwind_slash",
+                "thousand_blade_art",
+                "blade_storm",
+                "blade_saint_arts",
+                "thousand_army_slash",
+                "true_sword_saint",
+                "shadow_slash",
+                "phantom_dance",
+                "dual_blade_waltz",
+                "shadow_veil_execution",
+                "shadow_dance_finale",
             },
             SkillCategory.ENHANCEMENT: {
                 "body_enhancement",
