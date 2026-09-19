@@ -702,7 +702,7 @@ class BuffEntryPointStructuralTests(unittest.TestCase):
 
     @covers_requirement("buff-handler-integration::buff-application-has-one-public-entry-point-carrying-both-grant-time-guards")
     def test_no_module_outside_buffs_calls_the_handler_directly(self):
-        """No deterministic module outside world/rules/buffs.py reaches
+        """No deterministic module outside the world/rules/buffs/ package reaches
         ``entity.buffs.add(...)``; every buff grant goes through
         ``apply_buff``."""
         offenders = []
@@ -712,7 +712,7 @@ class BuffEntryPointStructuralTests(unittest.TestCase):
                 if "__pycache__" in path.parts or "node_modules" in path.parts:
                     continue
                 relative = path.relative_to(self._ROOT).as_posix()
-                if relative == "world/rules/buffs.py":
+                if relative.startswith("world/rules/buffs/"):
                     continue
                 tree = ast.parse(path.read_text(encoding="utf-8"))
                 for node in ast.walk(tree):

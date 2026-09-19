@@ -109,7 +109,7 @@ class DamageDivertTestBase(EvenniaTest):
     def _register_synth_buff(self, definition: BuffDefinition) -> None:
         patched = dict(BUFF_DEFINITIONS)
         patched[definition.key] = definition
-        patcher = patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched)
+        patcher = patch.dict("world.rules.buffs.definitions.BUFF_DEFINITIONS", patched)
         patcher.start()
         self._patchers.append(patcher)
         combat_patcher = patch.dict("world.rules.combat.damage.BUFF_DEFINITIONS", patched)

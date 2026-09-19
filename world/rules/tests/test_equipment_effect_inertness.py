@@ -56,7 +56,8 @@ _ALLOWLIST = frozenset(
         # consume the pleasure accessor.
         Path("world/rules/action/effects/buffs.py"),
         Path("world/rules/action/effects/sexual.py"),
-        Path("world/rules/buffs.py"),
+        Path("world/rules/buffs/rates.py"),
+        Path("world/rules/buffs/surface.py"),
         Path("world/rules/equipment.py"),
         Path("world/rules/items/planning.py"),
         Path("commands/economy.py"),

@@ -239,7 +239,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         patched = dict(BUFF_DEFINITIONS)
         patched[buff_def.key] = buff_def
 
-        with patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched), patch.dict(
+        with patch.dict("world.rules.buffs.definitions.BUFF_DEFINITIONS", patched), patch.dict(
             "world.rules.combat.damage.BUFF_DEFINITIONS", patched
         ):
             apply_buff(self.target, buff_def.key, source_skill="synth_cast")
@@ -335,7 +335,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         patched = dict(BUFF_DEFINITIONS)
         patched[buff_def.key] = buff_def
 
-        with patch.dict("world.rules.buffs.BUFF_DEFINITIONS", patched), patch.dict(
+        with patch.dict("world.rules.buffs.definitions.BUFF_DEFINITIONS", patched), patch.dict(
             "world.rules.combat.damage.BUFF_DEFINITIONS", patched
         ):
             apply_buff(self.target, buff_def.key, source_skill="synth_cast")
