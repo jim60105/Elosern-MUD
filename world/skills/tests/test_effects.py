@@ -20,7 +20,6 @@ from world.skills.effects import (
     MovementEffect,
     PleasureEffect,
     RevealDisguiseEffect,
-    RevealStrength,
     RuleTableEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
@@ -142,18 +141,15 @@ class ParseEffectTests(unittest.TestCase):
         self.assertEqual(parse_effect("set_disguise"), DisguiseEffect())
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
-    def test_bare_reveal_prefix_parses_at_mundane_only_strength(self):
-        self.assertEqual(
-            parse_effect("reveal_disguise"),
-            RevealDisguiseEffect(strength=RevealStrength.MUNDANE_ONLY),
-        )
+    def test_bare_reveal_prefix_parses_into_its_marker_dataclass(self):
+        self.assertEqual(parse_effect("reveal_disguise"), RevealDisguiseEffect())
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
-    def test_true_name_reveal_form_parses_at_any_provenance_strength(self):
-        self.assertEqual(
-            parse_effect("reveal_disguise:true_name"),
-            RevealDisguiseEffect(strength=RevealStrength.ANY_PROVENANCE),
-        )
+    def test_retired_true_name_payload_fails_at_parse(self):
+        # The payload-carrying grammar is retired entirely: this world admits
+        # exactly one grade of veil, so there is no strength left to select.
+        with self.assertRaises(ValueError):
+            parse_effect("reveal_disguise:true_name")
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_unknown_reveal_payload_fails_at_parse(self):

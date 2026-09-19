@@ -26,7 +26,6 @@ from world.skills.effects.passives import (
     GrowthRateEffect,
     MovementEffect,
     RevealDisguiseEffect,
-    RevealStrength,
     RevokeGrantsEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
@@ -164,14 +163,8 @@ def parse_effect(effect_id: str) -> object:
         _parse_bare(effect_id, prefix)
         return DisguiseEffect()
     if prefix == "reveal_disguise":
-        if effect_id == "reveal_disguise":
-            return RevealDisguiseEffect(strength=RevealStrength.MUNDANE_ONLY)
-        if effect_id == "reveal_disguise:true_name":
-            return RevealDisguiseEffect(strength=RevealStrength.ANY_PROVENANCE)
-        raise ValueError(
-            f"reveal_disguise effect must be 'reveal_disguise' or "
-            f"'reveal_disguise:true_name', got {effect_id!r}"
-        )
+        _parse_bare(effect_id, prefix)
+        return RevealDisguiseEffect()
     if prefix == "buff_apply":
         return BuffApplyEffect(buff_key=_parse_single_arg(effect_id, prefix))
     if prefix == "self_buff_apply":

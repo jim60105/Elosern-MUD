@@ -12,6 +12,7 @@ from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import (
     DamageEffect,
     HealEffect,
+    RevealDisguiseEffect,
     SelfHealEffect,
     SexualMasteryEffect,
 )
@@ -670,10 +671,26 @@ class DivineMysteryLineageTreeTests(unittest.TestCase):
         for key, threshold in (
             ("dominion_art", 3),
             ("mentors_covenant", 3),
-            ("status_disguise", 3),
+            ("status_disguise", 5),
         ):
             with self.subTest(key=key):
                 self.assertEqual(proficiency_cap(key), threshold, key)
+
+    def test_exactly_one_shipped_skill_can_declare_a_reveal(self):
+        # collapse-veil-reveal-line regression: before that change, this set
+        # held two keys, and the weaker (bare, mundane-only) reveal was the
+        # one able to strip an authored veil that always read mundane. After,
+        # the weaker node is gone and the survivor is the only skill in the
+        # catalog that can express a reveal at all.
+        reveal_skills = {
+            key
+            for key, skill in SKILL_REGISTRY.items()
+            if any(
+                isinstance(effect, RevealDisguiseEffect)
+                for effect in skill.parsed_effects
+            )
+        }
+        self.assertEqual(reveal_skills, {"true_name_sight"})
 
 
 class SkillCategoryClassificationTests(unittest.TestCase):
@@ -882,7 +899,6 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "undying_tutelage",
                 "status_disguise",
                 "bestowed_veil",
-                "unveiling_eye",
                 "true_name_sight",
                 "crown_apotheosis",
             },

@@ -39,7 +39,7 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
     return {
         "traits": _attribute_snapshot(entity, "traits", "traits"),
         "disguised_stats": _attribute_snapshot(entity, "disguised_stats"),
-        "disguise_provenance": _attribute_snapshot(entity, "disguise_provenance"),
+        "disguise_placed_by_cast": _attribute_snapshot(entity, "disguise_placed_by_cast"),
         "sexual_traits": _attribute_snapshot(
             entity,
             "sexual_traits",
@@ -101,7 +101,9 @@ def _restore_attribute(
 def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     _restore_attribute(entity, "traits", snapshot["traits"], "traits")
     _restore_attribute(entity, "disguised_stats", snapshot["disguised_stats"])
-    _restore_attribute(entity, "disguise_provenance", snapshot["disguise_provenance"])
+    _restore_attribute(
+        entity, "disguise_placed_by_cast", snapshot["disguise_placed_by_cast"]
+    )
     _restore_attribute(
         entity,
         "sexual_traits",
