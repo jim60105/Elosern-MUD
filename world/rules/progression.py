@@ -10,7 +10,7 @@ import yaml
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.skills.cost_tiers import is_freeform_eligible
-from world.skills.effects import DamageEffect
+from world.skills.effects import DamageEffect, GrowthRateEffect
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillCategory,
@@ -511,6 +511,49 @@ def _is_elemental_magic(skill: SkillDef) -> bool:
     )
 
 
+def _owned_growth_factor(entity: Any, skill: SkillDef) -> float:
+    """Return the owned-skill growth factor for one practised skill.
+
+    The product of the multipliers of every scoped ``growth_rate`` effect
+    carried by a skill the actor OWNS whose declared scope equals the
+    practised skill's element (design D3). ``1.0`` for a skill of any other
+    element and for a skill declaring no element, so an unscoped acceleration
+    is not expressible. The same ``_is_elemental_magic`` predicate the
+    affinity factor uses decides what "the practised skill's element" means:
+    a physical skill carrying an element takes ``1.0``, exactly as the
+    affinity factor already treats it, so the two element-keyed factors never
+    disagree about what an elemental skill is.
+
+    Within a single owned skill, two ``growth_rate`` effects sharing the
+    practised scope raise, mirroring ``_matching_multiplier()``'s duplicate
+    guard; across different owned skills, matching multipliers multiply.
+    Conferred grants are deliberately excluded: only the actor's OWNED skills
+    confer the scoped factor (design D3), unlike ``effective_value()`` which
+    folds ``conferred_grants()`` in for ``stat_multiply``.
+    """
+    if not _is_elemental_magic(skill):
+        return 1.0
+    scope = skill.element.key
+    factor = 1.0
+    for skill_key in dict.fromkeys(entity.skills.owned_keys()):
+        owned = SKILL_REGISTRY.get(skill_key)
+        if owned is None:
+            continue
+        multipliers = [
+            effect.multiplier
+            for effect in owned.parsed_effects
+            if isinstance(effect, GrowthRateEffect) and effect.scope == scope
+        ]
+        if len(multipliers) > 1:
+            raise ValueError(
+                f"skill {skill_key!r} defines duplicate growth_rate effects "
+                f"for scope {scope!r}"
+            )
+        for multiplier in multipliers:
+            factor *= multiplier
+    return float(factor)
+
+
 # Per-tick practice dedupe (D6, rule 2). Transient by contract: a module-level
 # dict keyed by the current world-clock tick plus the claimed
 # ``(actor, skill_key, target)`` triples. Never persisted, never snapshotted,
@@ -699,11 +742,13 @@ def _practice_growth_factors(entity: Any, skill: SkillDef) -> float:
 
     Race ``learning_multiplier`` x element-affinity multiplier (``1.0`` for a
     physical or non-elemental skill) x ``growth_rate_multiplier(entity)``
-    (the conferred-buff pull path). One formula, two entry points: the
-    per-use grant and the booked-hourly settlement both scale their base
-    amount by this composite, so learning, affinity, and buff growth can
-    never diverge between them. Every factor is a finite, non-negative
-    query; the composite is validated before any caller writes it.
+    (the conferred-buff pull path) x the owned-skill growth factor
+    (:func:`_owned_growth_factor`, the scoped ``growth_rate`` effects of the
+    skills the entity owns). One formula, two entry points: the per-use grant
+    and the booked-hourly settlement both scale their base amount by this
+    composite, so learning, affinity, and the two growth sources can never
+    diverge between them. Every factor is a finite, non-negative query; the
+    composite is validated before any caller writes it.
     """
     from world.rules.buffs import growth_rate_multiplier
 
@@ -716,6 +761,7 @@ def _practice_growth_factors(entity: Any, skill: SkillDef) -> float:
         _race_learning_multiplier(entity)
         * element_factor
         * growth_rate_multiplier(entity)
+        * _owned_growth_factor(entity, skill)
     )
     if not isfinite(factors) or factors < 0:
         raise ValueError(f"practice factors produced an invalid {factors!r}")
