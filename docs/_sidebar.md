@@ -21,7 +21,6 @@
     - [身心強化取得條件](/lore/skill-trees/enhancement)
     - [身法取得條件](/lore/skill-trees/movement)
     - [天賦異能取得條件](/lore/skill-trees/innate-gift)
-    - [雜學秘術系譜樹](/lore/skill-trees/utility)
     - [情慾秘術分類定位](/lore/skill-trees/sexual-act)
 
 - 遊戲指令
