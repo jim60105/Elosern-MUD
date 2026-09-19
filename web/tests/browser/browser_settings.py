@@ -467,7 +467,9 @@ def _browser_options_client():
 
 
 if os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") == "1":
-    _options_service._build_action_options_client = _browser_options_client
+    # The factory's call sites resolve through the owning submodule, so the
+    # seam must be assigned there (the package attribute would be inert).
+    _options_service.clients._build_action_options_client = _browser_options_client
 
 # Synthetic-catalog process install (kit design D2b): the wrapper installs at
 # at_server_init — the first hook Evennia calls, after evennia._init() and

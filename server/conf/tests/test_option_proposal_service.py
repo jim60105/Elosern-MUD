@@ -442,7 +442,7 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         client.add_timeout(lambda d: True)
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_clock", lambda: fake_clock[0]),
+            patch.object(service.state, "_clock", lambda: fake_clock[0]),
         ):
             await_result(self._schedule(client=client))
         fingerprint = self._state()["fingerprint"]
@@ -491,7 +491,7 @@ class MemoContractTests(_BaseServiceTests):
         client = self._fail_client()
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_clock", lambda: fake_clock[0]),
+            patch.object(service.state, "_clock", lambda: fake_clock[0]),
         ):
             await_result(self._schedule(client=client))
         self.assertEqual(self._state()["status"], "degraded")
@@ -500,7 +500,7 @@ class MemoContractTests(_BaseServiceTests):
         # Within the TTL: no transport work, immediate degraded.
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_clock", lambda: fake_clock[0] + 10),
+            patch.object(service.state, "_clock", lambda: fake_clock[0] + 10),
         ):
             await_result(self._schedule(client=client))
         self.assertEqual(len(client.calls), 1)
@@ -508,7 +508,7 @@ class MemoContractTests(_BaseServiceTests):
         # After the TTL: one more attempt.
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_clock", lambda: fake_clock[0] + 31),
+            patch.object(service.state, "_clock", lambda: fake_clock[0] + 31),
         ):
             await_result(self._schedule(client=client))
         self.assertEqual(len(client.calls), 2)
@@ -596,7 +596,7 @@ class MemoContractTests(_BaseServiceTests):
         fake_clock = [1000.0]
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_clock", lambda: fake_clock[0]),
+            patch.object(service.state, "_clock", lambda: fake_clock[0]),
         ):
             await_result(self._schedule(client=client))
         self.assertEqual(self._state()["status"], "degraded")
@@ -665,7 +665,7 @@ class FailureIsolationTests(_BaseServiceTests):
         dead pending generation (B1 regression)."""
         self._puppet_session()
         broken = patch.object(
-            service, "_build_action_options_client",
+            service.clients, "_build_action_options_client",
             side_effect=RuntimeError("broken profile environment"),
         )
         with (
@@ -924,7 +924,7 @@ class DismissalBarrierTests(_BaseServiceTests):
         fresh_client.add_response(lambda d: True, _valid_options_json(self._eligible()))
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_build_action_options_client", return_value=fresh_client),
+            patch.object(service.clients, "_build_action_options_client", return_value=fresh_client),
         ):
             await_result(self._schedule(client=None))
         self.assertEqual(len(fresh_client.calls), 1)
@@ -991,7 +991,7 @@ class DismissalBarrierTests(_BaseServiceTests):
         # settlement is lost and the generation strands in the registry.
         fired = Deferred()
         fired.callback(None)
-        with patch.object(service, "_run_generation", return_value=fired):
+        with patch.object(service.lifecycle, "_run_generation", return_value=fired):
             with override_settings(LLM_PROFILES=_raw()):
                 client.pending.callback(_valid_options_json(self._eligible()))
                 await_result(old)
@@ -1077,7 +1077,7 @@ class DismissalBarrierTests(_BaseServiceTests):
         fresh_client.add_response(lambda d: True, _valid_options_json(self._eligible()))
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch.object(service, "_build_action_options_client", return_value=fresh_client),
+            patch.object(service.clients, "_build_action_options_client", return_value=fresh_client),
         ):
             await_result(self._schedule(client=None))
         self.assertEqual(len(fresh_client.calls), 1)
@@ -1150,7 +1150,7 @@ class ReconnectTriggerTests(_BaseServiceTests):
             return deferred
 
         patch_object = patch.object(service, "schedule_action_options", side_effect=_wrapping)
-        patch_client = patch.object(service, "_build_action_options_client", return_value=client)
+        patch_client = patch.object(service.clients, "_build_action_options_client", return_value=client)
         return patch_object, patch_client, captured, deferreds
 
     @covers_requirement(
@@ -1259,26 +1259,27 @@ class ReconnectTriggerTests(_BaseServiceTests):
         import ast
         from pathlib import Path
 
-        module_path = Path(__file__).resolve().parents[2] / "option_proposal_service.py"
-        tree = ast.parse(module_path.read_text(encoding="utf-8"))
-        for node in tree.body:
-            if not isinstance(node, (ast.Import, ast.ImportFrom)):
-                continue
-            modules = (
-                [node.module] if isinstance(node, ast.ImportFrom) else [a.name for a in node.names]
-            )
-            for name in modules:
-                # The observability facade lazily binds the Evennia logger at
-                # first emit, so importing it pre-init cannot capture a None
-                # logger — the deferred-import ban exists for the guardrail's
-                # import-time capture, which the facade deliberately avoids.
-                if name == "world.observability":
+        package_dir = Path(__file__).resolve().parents[2] / "option_proposal_service"
+        for module_path in sorted(package_dir.glob("*.py")):
+            tree = ast.parse(module_path.read_text(encoding="utf-8"))
+            for node in tree.body:
+                if not isinstance(node, (ast.Import, ast.ImportFrom)):
                     continue
-                self.assertFalse(
-                    name and (name == "world" or name.startswith("world.")),
-                    f"module-level import {name} must be deferred to the call path",
+                modules = (
+                    [node.module] if isinstance(node, ast.ImportFrom) else [a.name for a in node.names]
                 )
-                self.assertFalse(
-                    name and (name == "web" or name.startswith("web.")),
-                    f"module-level import {name} must be deferred to the call path",
-                )
+                for name in modules:
+                    # The observability facade lazily binds the Evennia logger at
+                    # first emit, so importing it pre-init cannot capture a None
+                    # logger — the deferred-import ban exists for the guardrail's
+                    # import-time capture, which the facade deliberately avoids.
+                    if name == "world.observability":
+                        continue
+                    self.assertFalse(
+                        name and (name == "world" or name.startswith("world.")),
+                        f"module-level import {name} must be deferred to the call path",
+                    )
+                    self.assertFalse(
+                        name and (name == "web" or name.startswith("web.")),
+                        f"module-level import {name} must be deferred to the call path",
+                    )
