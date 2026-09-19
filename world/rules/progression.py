@@ -787,6 +787,12 @@ def grant_skill_practice_xp(
     alongside a live award, and the SINK ITSELF is not a notification — the
     caller owns delivery and must stage the lines only after its transaction
     commits.
+
+    After the award (and the newly-usable-skill lines), the cross-lineage
+    rulebook is evaluated for this ``skill_key``: any rule whose clauses just
+    became satisfiable grants its keys immediately, and one announcement line
+    per newly granted skill is appended to the same caller-owned sink. The
+    grant itself is unconditional — it lands whether or not a sink exists.
     """
     if nonlethal:
         return False
@@ -814,6 +820,7 @@ def grant_skill_practice_xp(
         for candidate in candidates:
             if not was_usable[candidate.key] and can_use_skill(entity, candidate):
                 unlocks_out.append(unlock_line(candidate))
+    _run_cross_lineage_eval(entity, skill_key, unlocks_out)
     return True
 
 
@@ -828,6 +835,11 @@ def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
     per-use eligibility rule: nothing practises a passive). Storage routes
     ONLY through :func:`award_practice_xp`, so a booked award crossing the
     derived tip cap saturates byte-identically to a per-use award.
+
+    The cross-lineage rulebook is evaluated right after the award, exactly as
+    on the per-use path, so the two practice entry points cannot diverge at a
+    grant boundary. This path carries no announcement sink (the clock
+    settlement has none); the grant itself is unconditional.
     """
     if isinstance(hours, bool) or not isinstance(hours, int):
         raise ValueError(f"study hours must be an int, got {hours!r}")
@@ -842,7 +854,39 @@ def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
     if not isfinite(amount) or amount < 0:
         raise ValueError(f"study XP formula produced an invalid {amount!r}")
     award_practice_xp(entity, skill_key, amount)
+    _run_cross_lineage_eval(entity, skill_key, None)
     return True
+
+
+def _run_cross_lineage_eval(
+    entity: Any, skill_key: str, unlocks_out: list[str] | None
+) -> None:
+    """Evaluate the cross-lineage rulebook after one practice award (D3).
+
+    Called immediately after :func:`award_practice_xp` on BOTH practice entry
+    points, because practice XP is the only quantity any clause reads and
+    therefore the only moment a rule can newly become satisfiable. Newly
+    granted keys are appended to the entity's stored owned set; when the
+    caller supplied the same sink that carries newly-usable-skill lines, one
+    announcement line per grant is appended there too (the caller owns
+    delivery after its transaction commits).
+
+    Imported lazily so importing ``world.rules.progression`` never pulls in
+    the rulebook module: cross_lineage_unlock imports progression at its top,
+    so a top-level import here would be a cycle. The module is imported by
+    the time the first award runs in any real boot or test collection.
+    """
+    import world.rules.cross_lineage_unlock as _cross_lineage
+
+    rulebook = _cross_lineage.RULEBOOK
+    newly_granted = _cross_lineage.evaluate_cross_lineage_unlocks(
+        entity, skill_key, rulebook
+    )
+    if unlocks_out is not None:
+        for grant_key in newly_granted:
+            unlocks_out.append(
+                _cross_lineage.unlock_line_for_grant(grant_key, rulebook.registry)
+            )
 
 
 def seed_lineage_proficiency(

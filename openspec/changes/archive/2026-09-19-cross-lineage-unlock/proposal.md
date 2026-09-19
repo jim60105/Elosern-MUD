@@ -28,7 +28,7 @@ None. `skill-lineage` keeps every requirement it has: prerequisites still gate u
 - **Modified**: `world/rules/progression.py` — `grant_skill_practice_xp()` gains one evaluation call after the award; the booked-hourly settlement path gains the same call so the two practice entry points cannot diverge. `world/rules/tests/test_progression.py` gains the wiring assertions (also touched by `enhancement-catalog-alignment`; different test classes).
 - **Read-only dependencies**: `SKILL_REGISTRY` (node sampling, `kind`/`category`/`group`), `proficiency_cap()` (reachability validation), `skill_proficiency_level()` (condition evaluation), `unlock_line()` (notification text).
 - **Untouched**: `world/skills/handler.py`, `world/skills/registry.py`, `world/rules/combat_modifiers.yaml`. The three granted skills and their modifier rules already ship; this change only creates a path to owning them.
-- `.github/evennia-shards.json` needs no edit — the new test module lives under `world/rules/tests/`, already covered by its shard's package label.
+- `.github/evennia-shards.json` gains one label (`world.rules.tests.test_cross_lineage_unlock` in shard 3, `rules-c`) — the new test module lives under `world/rules/tests/` but still needs an explicit manifest registration per the evennia shard-ownership contract.
 
 **No data-contract test is added by this change** — no rule-table echo, no key-set census, no threshold echo. Behavior is proved with synthetic rules over synthetic skills per `AGENTS.md`; the only assertion touching shipped content is that the rulebook imports cleanly.
 

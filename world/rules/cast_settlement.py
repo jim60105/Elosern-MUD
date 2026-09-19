@@ -46,11 +46,15 @@ from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 # The action- and clock-touched attribute surfaces of one actor or target: the
-# ``_ADVANCE_ENTITY_SURFACES`` declaration minus the sexual-decay accumulators,
-# which only ``advance()`` ever writes on its own caller entities (the actor)
-# and which the registry's actor entry already covers through the seam. The
-# climax-settlement bookkeeping attributes are included: an action may stage
-# or consume them on any target, so the outer rollback must restore them.
+# ``_ADVANCE_ENTITY_SURFACES`` declaration minus the sexual-decay accumulators
+# (which only ``advance()`` ever writes on its own caller entities — the actor
+# — and which the registry's actor entry already covers through the seam),
+# plus the cast-side extras the advance list has no reason to carry: the
+# climax-settlement bookkeeping attributes (an action may stage or consume
+# them on any target, so the outer rollback must restore them) and ``skills``
+# (a cross-lineage grant written by the action's practice award shares this
+# outer rollback boundary, so it is mirrored explicitly rather than left to
+# the cache-dependent registry leg).
 _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("traits", "traits"),
     ("disguised_stats", None),
@@ -62,6 +66,7 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
+    ("skills", None),
     ("skill_proficiency", None),
     ("skill_practice_day", None),
     ("title_collection", None),

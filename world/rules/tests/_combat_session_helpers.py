@@ -25,6 +25,15 @@ from typeclasses.monsters import Monster
 # during a scoped monster defeat would validate them against synthetic rows.
 import world.rules.defeat_aftermath  # noqa: F401
 
+# Eagerly import the cross-lineage unlock rulebook at module-import time for
+# the same reason: its module-level loader validates the shipped nine-key
+# sword scope and the elemental groups against the LIVE SKILL_REGISTRY, and
+# the practice award paths import it lazily — so without this import the
+# first scoped award in any shard would validate the shipped table against
+# the synthetic (cleared) registry. A scoped test needing synthetic tables
+# patches its RULEBOOK binding explicitly.
+import world.rules.cross_lineage_unlock  # noqa: F401
+
 from world.skills.registry import (
     FactionConstraint,
     SkillCategory,

@@ -351,6 +351,10 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
+    # Cross-lineage unlocks write db.skills on the booked-practice stage; the
+    # advance rollback restores it with every other durability surface so a
+    # failed advance undoes the grant its award triggered.
+    ("skills", None),
     ("skill_proficiency", None),
     ("skill_practice_day", None),
     ("practice_booking", None),

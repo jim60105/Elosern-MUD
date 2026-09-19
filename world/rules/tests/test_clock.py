@@ -545,6 +545,89 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
+    @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
+    def test_failed_advance_restores_the_cross_lineage_grant_with_the_award(self):
+        # A booked practice that crosses a cross-lineage rule's threshold
+        # grants into db.skills inside the advance; a post-practice failure
+        # must undo both the award and the grant it triggered (the grant
+        # shares the award's rollback boundary on the clock face too).
+        import world.rules.cross_lineage_unlock as cross_lineage
+        from world.rules.clock import get_world_clock
+        from world.skills.registry import (
+            SKILL_REGISTRY,
+            SkillCategory,
+            SkillDef,
+            SkillKind,
+            TargetSpec,
+        )
+
+        granted = SkillDef(
+            key="t_clock_granted",
+            label="時鐘領悟",
+            description="clock rollback fixture",
+            kind=SkillKind.PASSIVE,
+            target_spec=TargetSpec.NONE,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=[],
+            category=SkillCategory.ENHANCEMENT,
+            group=None,
+        )
+        rulebook = cross_lineage.load_rules(
+            [
+                {
+                    "id": "t_clock_rule",
+                    "grants": [granted.key],
+                    "requires": [
+                        {"scope": {"keys": ["fire_arrow"]}, "min_level": 1},
+                    ],
+                }
+            ],
+            registry={
+                "fire_arrow": SKILL_REGISTRY["fire_arrow"],
+                granted.key: granted,
+            },
+            cap=lambda _key: 3,
+        )
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
+        # One XP short of the first proficiency level: the base human race's
+        # learning multiplier is 1.0, so eight booked hours at 10.0 XP/hour
+        # cross the level-1 threshold and trigger the grant.
+        self.player.db.skill_proficiency = {"fire_arrow": 49.0}
+        self.player.db.practice_booking = "fire_arrow"
+        clock = get_world_clock()
+
+        def _boundary_failure(*_args):
+            # The booked award must have granted the passive before the
+            # boundary failed — otherwise the rollback assertion below would
+            # pass vacuously.
+            self.assertEqual(
+                dict(self.player.db.skills)["passive"],
+                [granted.key],
+                "the booked award must grant the passive before the failure",
+            )
+            raise RuntimeError("simulated post-practice failure")
+
+        with (
+            patch.object(cross_lineage, "RULEBOOK", rulebook),
+            patch(
+                "world.rules.clock._settle_boundary_stages",
+                side_effect=_boundary_failure,
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            clock.advance(28800, AdvanceSource.SKIP, [self.player])
+        # The stage granted the passive into db.skills before the boundary
+        # failed; the rollback restores the surface with the award that
+        # triggered it, leaving the declared intent retryable.
+        self.assertEqual(
+            self.player.db.skills, {"active": ["fire_arrow"], "passive": []}
+        )
+        self.assertNotIn(granted.key, self.player.skills.owned_keys())
+        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 49.0)
+        self.assertEqual(self.player.db.practice_booking, "fire_arrow")
+
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_advance_skip_after_rollback_grows_nothing(self):
         from world.rules.clock import get_world_clock
