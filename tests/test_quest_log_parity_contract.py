@@ -12,6 +12,8 @@ so the client and server validators can never diverge.
 
 from pathlib import Path
 import re
+
+from tools.protocol_client_source import protocol_client_source
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -66,7 +68,7 @@ class QuestLogValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_quest_log_bounds_are_identical(self):
         quest_log_source = _QUEST_LOG.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for module, constant, js_name in _OWNED_BOUNDS:
             py_match = re.search(
@@ -98,7 +100,7 @@ class QuestLogValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_share_schema_version_one(self):
         quest_log_source = _QUEST_LOG.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         py_match = re.search(
             r"^QUEST_LOG_SCHEMA_VERSION\s*=\s*([0-9]+)", quest_log_source, re.MULTILINE
         )

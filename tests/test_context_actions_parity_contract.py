@@ -13,6 +13,7 @@ import re
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from tools.protocol_client_source import protocol_client_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,7 +44,7 @@ class ContextActionsOptionsParityContract(unittest.TestCase):
     @covers_requirement("webclient-context-actions-suggestions::the-v5-client-mirror-and-parity-contract-enforce-the-suggestions-shape")
     def test_python_and_js_option_bounds_are_identical(self):
         py_source = _PY_OPTIONS.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _OPTIONS_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -59,7 +60,7 @@ class ContextActionsOptionsParityContract(unittest.TestCase):
 
     def test_python_and_js_share_option_fragments(self):
         py_source = _PY_OPTIONS.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         for fragment in _OPTIONS_FRAGMENTS:
             self.assertIn(fragment, py_source, f"Python options missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")

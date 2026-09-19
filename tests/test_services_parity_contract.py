@@ -9,6 +9,8 @@ considers valid (or vice versa), mirroring the local_map D10a parity contract.
 
 from pathlib import Path
 import re
+
+from tools.protocol_client_source import protocol_client_source
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -39,7 +41,7 @@ _SERVICES_CONSTANTS = (
 class ServicesValidatorParityContract(unittest.TestCase):
     def test_python_and_js_validators_share_identical_d4_bounds(self):
         py_source = _PY_SERVICES.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _SERVICES_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -55,7 +57,7 @@ class ServicesValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_share_quest_states_and_action_ids(self):
         py_source = _PY_SERVICES.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         for fragment in (
             '"in_progress", "completed", "failed"',
             '"guild.register"',

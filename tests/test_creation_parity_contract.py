@@ -14,6 +14,7 @@ import re
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from tools.protocol_client_source import protocol_client_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,7 +50,7 @@ _CREATION_CONSTANTS = (
 class CreationValidatorParityContract(unittest.TestCase):
     def test_python_and_js_validators_share_identical_d2_bounds(self):
         py_source = _PY_CREATION.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _CREATION_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -66,7 +67,7 @@ class CreationValidatorParityContract(unittest.TestCase):
     def test_python_and_js_share_axes_and_stages(self):
         py_source = _PY_CREATION.read_text(encoding="utf-8")
         py_wizard = (REPO_ROOT / "world/rules/creation_wizard.py").read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         for fragment in ('"hp", "mp", "sp", "atk_phys", "agility", "defense"',):
             self.assertIn(fragment, py_source, f"Python creation missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
@@ -100,7 +101,12 @@ class CreationValidatorParityContract(unittest.TestCase):
         }
         values = {}
         for label, (path, pattern) in sources.items():
-            match = re.search(pattern, path.read_text(encoding="utf-8"), re.MULTILINE)
+            if path == _JS_PROTOCOL:
+                # SRP split: scan the whole client protocol module corpus.
+                source = protocol_client_source()
+            else:
+                source = path.read_text(encoding="utf-8")
+            match = re.search(pattern, source, re.MULTILINE)
             self.assertIsNotNone(match, f"{label}: missing constant {pattern!r}")
             values[label] = match.group(1)
         self.assertEqual(values["adapter"], values["command"])
@@ -116,7 +122,7 @@ class CreationValidatorParityContract(unittest.TestCase):
         # JS validator must use the same numeric bound (not the preset-card
         # prose bound, which is smaller).
         py_source = (REPO_ROOT / "world/rules/character_creation.py").read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         py_match = re.search(r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*([0-9]+)", py_source, re.MULTILINE)
         js_match = re.search(r"var CREATION_MAX_PERSONA_BACKGROUND\s*=\s*([0-9]+)", js_source)
         self.assertIsNotNone(py_match, "Python MAX_PERSONA_FIELD_LENGTH missing")
@@ -125,7 +131,7 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(js_match.group(1), "600")
 
     def test_panel_allowlist_contains_creation_v5(self):
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         self.assertIn("creation: 5", js_source)
         py_source = _PY_CREATION.read_text(encoding="utf-8")
         match = re.search(r"^CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -139,7 +145,7 @@ class CreationValidatorParityContract(unittest.TestCase):
         # The v3 transient-fill display-name bound must stay equal between the
         # Python presenter validator and the mirrored browser validator.
         py_source = _PY_CREATION.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         py_match = re.search(
             r"^MAX_PROPOSAL_NAME_CODE_POINTS\s*=\s*([0-9]+)", py_source, re.MULTILINE
         )
@@ -152,7 +158,7 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(js_match.group(1), "64")
 
     def test_affinity_race_maxima_match_the_deterministic_bound_mapping(self):
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         match = re.search(
             r"var CREATION_AFFINITY_MAXIMUMS\s*=\s*\{([^}]*)\}", js_source
         )
@@ -202,7 +208,7 @@ class CreationSexVocabularyParityContract(unittest.TestCase):
     def test_sex_values_and_default_mirror_across_python_and_js(self):
         from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         js_values = re.search(
             r"var CREATION_SEX_VALUES = \[([^\]]*)\];", js_source
         )

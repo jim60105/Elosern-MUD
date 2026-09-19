@@ -12,6 +12,8 @@ vice versa), mirroring the local_map D10a and services D4 parity contracts.
 
 from pathlib import Path
 import re
+
+from tools.protocol_client_source import protocol_client_source
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -111,7 +113,7 @@ _EXPLORATION_FRAGMENTS = (
 class ExplorationValidatorParityContract(unittest.TestCase):
     def test_python_and_js_exploration_bounds_are_identical(self):
         py_source = _PY_EXPLORATION.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _EXPLORATION_ONLY_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -127,7 +129,7 @@ class ExplorationValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_affordance_bounds_are_identical(self):
         py_source = _PY_AFFORDANCES.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _AFFORDANCE_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -143,7 +145,7 @@ class ExplorationValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_character_bounds_are_identical(self):
         py_source = _PY_CHARACTER.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _CHARACTER_CONSTANTS:
             if py_name == _PERSONA_PY_NAME:
@@ -165,7 +167,7 @@ class ExplorationValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_share_affordance_fragments(self):
         py_source = _PY_EXPLORATION.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         for fragment in _EXPLORATION_FRAGMENTS:
             self.assertIn(fragment, py_source, f"Python exploration missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
@@ -173,7 +175,7 @@ class ExplorationValidatorParityContract(unittest.TestCase):
     def test_character_category_group_bound_matches_the_skillcategory_enum(self):
         from world.skills.registry import SkillCategory
 
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         js_match = re.search(
             r"var CHARACTER_MAX_CATEGORY_GROUPS\s*=\s*([0-9]+)", js_source
         )

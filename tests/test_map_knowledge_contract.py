@@ -17,6 +17,7 @@ import re
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from tools.protocol_client_source import protocol_client_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIRST_PARTY_ROOTS = ("commands", "server", "typeclasses", "web", "world")
@@ -95,7 +96,7 @@ class LocalMapValidatorParityContract(unittest.TestCase):
     @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_python_and_js_validators_share_identical_d10a_bounds(self):
         py_source = _PY_LOCAL_MAP.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _LOCAL_MAP_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9-]+)", py_source, re.MULTILINE)
@@ -111,7 +112,7 @@ class LocalMapValidatorParityContract(unittest.TestCase):
 
     def test_python_and_js_share_visibility_layer_and_action_kind_sets(self):
         py_source = _PY_LOCAL_MAP.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         for py_fragment, js_fragment in (
             ("\"current\", \"visible_unvisited\", \"visible_visited\", \"remembered\"", "LOCAL_MAP_VISIBILITIES"),
             ("\"grid\", \"wilderness\", \"instance\", \"interior\"", "LOCAL_MAP_LAYERS"),

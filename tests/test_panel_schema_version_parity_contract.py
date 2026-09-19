@@ -23,6 +23,7 @@ import re
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from tools.protocol_client_source import protocol_client_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,7 +65,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
     )
     def test_panel_schema_versions_are_equal_everywhere(self):
         registry_source = _PY_REGISTRY.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for panel_name, module_name in _PANEL_MODULES:
             constant = self._registry_reference(registry_source, panel_name)
@@ -111,7 +112,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         )
         self.assertTrue(registered, "registry.py registration pattern matched nothing")
         table = {name for name, _module in _PANEL_MODULES}
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         block_match = re.search(r"var PANEL_ALLOWLIST\s*=\s*\{(.*?)\};", js_source, re.DOTALL)
         self.assertIsNotNone(block_match, "UMD PANEL_ALLOWLIST block vanished")
         umd = set(re.findall(r"(\w+):\s*\d+", block_match.group(1)))
@@ -136,7 +137,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         affordances_source = (
             REPO_ROOT / "web/webclient/presentation/affordances.py"
         ).read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         values = {
             "party.PARTY_MAX_ROWS": re.search(
                 r"^PARTY_MAX_ROWS\s*=\s*(\d+)", party_source, re.MULTILINE
@@ -145,7 +146,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
                 r"^PARTY_MAX_COMPANIONS\s*=\s*(\d+)", rules_source, re.MULTILINE
             ),
             "js PARTY_MAX_ROWS": re.search(
-                r"^  var PARTY_MAX_ROWS\s*=\s*(\d+);", js_source, re.MULTILINE
+                r"^var PARTY_MAX_ROWS\s*=\s*(\d+);", js_source, re.MULTILINE
             ),
             "affordances MAX_DISPLAY_NAME_CODE_POINTS": re.search(
                 r"^MAX_DISPLAY_NAME_CODE_POINTS\s*=\s*(\d+)",
@@ -153,7 +154,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
                 re.MULTILINE,
             ),
             "js PARTY_MAX_DISPLAY_NAME": re.search(
-                r"^  var PARTY_MAX_DISPLAY_NAME\s*=\s*(\d+);",
+                r"^var PARTY_MAX_DISPLAY_NAME\s*=\s*(\d+);",
                 js_source,
                 re.MULTILINE,
             ),

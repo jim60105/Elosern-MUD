@@ -9,6 +9,8 @@ order so the client and server validators can never diverge.
 
 from pathlib import Path
 import re
+
+from tools.protocol_client_source import protocol_client_source
 import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +45,7 @@ _EXPECTED_CATEGORIES = (
 class LoreCodexValidatorParityContract(unittest.TestCase):
     def test_python_and_js_lore_codex_bounds_are_identical(self):
         py_source = _PY_LORE_CODEX.read_text(encoding="utf-8")
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _LORE_CODEX_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
@@ -58,7 +60,7 @@ class LoreCodexValidatorParityContract(unittest.TestCase):
         self.assertEqual(mismatches, [], "Python/JS lore_codex bounds diverged")
 
     def test_python_and_js_share_exact_categories_in_mapping_order(self):
-        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_source = protocol_client_source()
         match = re.search(
             r"var LORE_CODEX_CATEGORIES\s*=\s*\[([\s\S]*?)\];", js_source
         )
