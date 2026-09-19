@@ -428,3 +428,23 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 武技系斬技附掛效果（martial-arts-catalog D2）：
+# 斷筋與劍豪之境為 empty-modifier mount，實際數值由 combat_modifiers.yaml 的
+# buff_active 規則結算；暗影創傷比照 fire_ignite 的 60s/10s/-8 DoT 形狀。
+- key: martial_hamstring
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: shadow_wound
+  duration: 60
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -8}
+- key: sword_saint_domain
+  duration: 60
+  stacking: refresh
+  polarity: buff
+  modifiers: {}

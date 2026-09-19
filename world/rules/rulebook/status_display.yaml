@@ -338,3 +338,18 @@
 - code: flicker_micro_stun
   label: 連閃麻痺微階鎖定行動
   severity: critical
+- code: martial_hamstring
+  label: 斷筋
+  severity: harmful
+- code: shadow_wound
+  label: 暗影創傷
+  severity: harmful
+- code: sword_saint_domain
+  label: 劍豪之境
+  severity: beneficial
+- code: martial_hamstring_agility_penalty
+  label: 斷筋敏捷下降
+  severity: harmful
+- code: sword_saint_domain_atk_phys_bonus
+  label: 劍豪之境攻擊提升
+  severity: beneficial

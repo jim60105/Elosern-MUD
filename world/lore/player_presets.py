@@ -680,7 +680,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 18),
          ("agility", 22), ("defense", 20), ("magic_power", 377)),
         "攻擊與防禦逼近精靈上限的雙刀配點",
-        active_skills=("dual_blade_mastery", "shadow_slash", "status_disguise"),
+        active_skills=("dual_blade_waltz", "shadow_slash", "status_disguise"),
         passive_skills=(
             "fire_mastery", "dark_mastery", "body_enhancement_extreme",
             "flash_step", "flight", "dual_wield_style", "blade_art_mastery",
