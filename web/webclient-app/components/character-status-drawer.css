@@ -1,0 +1,407 @@
+.character-status-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  box-sizing: border-box;
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--f-sans);
+}
+
+.character-status-drawer__title {
+  margin: 0;
+  color: var(--paper-100);
+  font-family: var(--f-display);
+  font-size: 1em;
+}
+
+.character-status-drawer__full-title {
+  margin: 0;
+  color: var(--gold-400);
+  font-family: var(--f-display);
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
+}
+
+.character-status-drawer__skill-link {
+  align-self: flex-start;
+  padding: 3px var(--sp-3);
+  color: var(--paper-500);
+  background: none;
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.character-status-drawer__skill-link:hover {
+  color: var(--paper-50);
+  border-color: var(--seal-600);
+}
+
+.character-status-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: 4px;
+  border-top: var(--line);
+}
+
+/* The shared section heading: the same small-caps treatment ConditionChips'
+   `.clab` uses, copied (not imported) per this component's convention. */
+.character-status-drawer__section-label {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--paper-500);
+  text-transform: uppercase;
+}
+
+/* The design's two-column stat-tile grid (`.statgrid`): each stat is its
+   own bordered tile; `minmax(0, 1fr)` keeps the columns shrinkable. */
+.character-status-drawer__statgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* The design's `.statrow` tile: bordered, rounded; content stacks on two
+   lines (label+value, then the full-width fill track) so the halved tile
+   width never squeezes the numeral and the 危險 marker. */
+.character-status-drawer__statrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 10px;
+  min-width: 0;
+  background: var(--ink-820);
+  border: 1px solid var(--ink-700);
+  border-radius: 9px;
+  padding: 6px 12px;
+  font-family: var(--f-sans);
+}
+
+.character-status-drawer__statrow-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--paper-100);
+}
+
+.character-status-drawer__statrow-value {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--gold-400);
+}
+
+/* The breakdown chip row (render-equipment-breakdown-webclient D1): the
+   chips ride their own full-width wrapped line inside the statrow tile
+   (the same flex-basis treatment as the vital track), wrap freely at the
+   16-layer bound, and are text-bearing (source word / 其他 marker + signed
+   amount) so the tint never carries meaning alone. */
+.character-status-drawer__layerrow {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.character-status-drawer__layer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--ink-600);
+  background: var(--ink-780);
+  color: var(--paper-300);
+}
+
+.character-status-drawer__layer-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.character-status-drawer__layer-amount {
+  font-family: var(--f-mono);
+}
+
+/* Source tints reuse the existing design tokens (same non-colour-alone
+   principle as the condition pills: the chip already carries its words). */
+.character-status-drawer__layer--skill {
+  border-color: rgba(127, 191, 127, 0.5);
+  color: var(--buff);
+}
+
+.character-status-drawer__layer--condition {
+  border-color: rgba(199, 154, 74, 0.55);
+  color: var(--warn);
+}
+
+.character-status-drawer__layer--equipment {
+  border-color: rgba(201, 162, 39, 0.55);
+  color: var(--gold-400);
+}
+
+.character-status-drawer__layer--other {
+  border-style: dashed;
+  color: var(--paper-500);
+}
+
+.character-status-drawer__vital-key {
+  color: var(--paper-300);
+}
+
+.character-status-drawer__vital-track {
+  flex-basis: 100%;
+  height: 4px;
+  background: var(--ink-800);
+  border-radius: 3px;
+  overflow: hidden;
+  display: block;
+}
+
+.character-status-drawer__vital-fill {
+  display: block;
+  height: 100%;
+  background: var(--seal-500);
+}
+
+.character-status-drawer__vital-danger {
+  color: var(--crit);
+  font-family: var(--f-mono);
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+/* The design's wrapped pill row (`.pillrow`/`.pill`): one rounded badge per
+   committed condition; the pill's muted suffix carries the same content the
+   flat row showed (severity word, glyph, duration, modifiers). */
+.character-status-drawer__pillrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.character-status-drawer__pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11px;
+  padding: 3px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--ink-600);
+  background: var(--ink-780);
+  color: var(--paper-300);
+}
+
+.character-status-drawer__condition-label {
+  color: var(--paper-50);
+  font-weight: 600;
+}
+
+.character-status-drawer__condition-stat {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  margin-left: 5px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--paper-500);
+}
+
+.character-status-drawer__condition-severity {
+  color: var(--paper-500);
+}
+
+.character-status-drawer__condition-timer,
+.character-status-drawer__condition-mod {
+  color: var(--paper-500);
+}
+
+.character-status-drawer__empty,
+.character-status-drawer__unavailable,
+.character-status-drawer__section-reason {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: 0.85em;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px dashed var(--ink-700);
+  border-radius: var(--radius-sm);
+}
+
+.character-status-drawer__equipment-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: 0.9em;
+}
+
+.character-status-drawer__equipment-slot {
+  color: var(--paper-300);
+  min-width: 3.5em;
+}
+
+/* The five severity tints: copied verbatim from ConditionChips' `.chip--*`
+   rules, so the full roster and the capped island agree on severity colour
+   everywhere it appears. */
+.character-status-drawer__pill--beneficial {
+  background: rgba(127, 191, 127, 0.14);
+  border-color: rgba(127, 191, 127, 0.5);
+  color: var(--buff);
+}
+
+.character-status-drawer__pill--informational {
+  background: rgba(195, 185, 163, 0.1);
+  border-color: var(--ink-600);
+  color: var(--paper-300);
+}
+
+.character-status-drawer__pill--warning {
+  background: rgba(199, 154, 74, 0.14);
+  border-color: rgba(199, 154, 74, 0.55);
+  color: var(--warn);
+}
+
+.character-status-drawer__pill--harmful {
+  background: rgba(224, 138, 90, 0.14);
+  border-color: rgba(224, 138, 90, 0.55);
+  color: var(--debuff);
+}
+
+.character-status-drawer__pill--critical {
+  background: rgba(224, 87, 79, 0.18);
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.character-status-drawer__equipment-name {
+  color: var(--paper-100);
+  text-align: right;
+}
+
+.character-status-drawer__disguise-description {
+  margin: 0 0 var(--sp-1);
+  color: var(--paper-500);
+  font-size: 0.8em;
+  line-height: 1.5;
+}
+
+.character-status-drawer__disguise-row {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: 0.9em;
+}
+
+.character-status-drawer__disguise-key {
+  color: var(--paper-300);
+  min-width: 3.5em;
+}
+
+.character-status-drawer__disguise-true {
+  color: var(--paper-500);
+  font-family: var(--f-mono);
+}
+
+.character-status-drawer__disguise-displayed {
+  margin-left: auto;
+  color: var(--warn);
+  font-family: var(--f-mono);
+}
+
+.character-status-drawer__disguise-note {
+  margin: var(--sp-1) 0 0;
+  color: var(--paper-300);
+  font-size: 0.75em;
+}
+
+.character-status-drawer__disguise-inactive {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: 0.8em;
+  line-height: 1.5;
+}
+
+.character-status-drawer__persona-background {
+  margin: 0;
+  color: var(--paper-300);
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+/* Persona editing (add-persona-edit-surface D4): the unset placeholder is
+   muted display copy; the inline editor reuses the shared control layer
+   (`ui-btn` / `ui-btn--primary` from styles/tokens.css) and never relies on
+   colour alone (buttons carry text labels). The rules below add layout
+   only; they never restate the control chrome. */
+.character-status-drawer__persona-block {
+  margin-bottom: 0.75rem;
+}
+
+.character-status-drawer__persona-empty {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.character-status-drawer__persona-edit {
+  margin-top: 0.25rem;
+}
+
+.character-status-drawer__persona-editor textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--paper-300);
+  background: var(--ink-820);
+  border: 1px solid var(--ink-600);
+  border-radius: 4px;
+  padding: 0.4rem;
+  resize: vertical;
+}
+
+.character-status-drawer__persona-editor-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* The design's 親密狀態 disclosure: the native `<details>` header carries the
+   label and the trailing marker; the hint line sits above the shared
+   two-column stat grid. The details element is collapsed by default (no
+   `open` attribute) and needs no script. */
+.character-status-drawer__intimate-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-bottom: 7px;
+  color: var(--paper-100);
+  cursor: pointer;
+  list-style: none;
+}
+
+.character-status-drawer__intimate-summary::-webkit-details-marker {
+  display: none;
+}
+
+.character-status-drawer__intimate-marker {
+  margin-left: auto;
+  color: var(--paper-500);
+}
+
+.character-status-drawer__intimate-hint {
+  margin: 0 0 7px;
+  color: var(--paper-500);
+  font-size: 0.8em;
+}
