@@ -151,7 +151,7 @@ uv run --locked python -m tools.spec_traceability check
 
 配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超跨度，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
 
-「非神性種族不得帶偽裝層」這條規則不是模板路徑獨有：`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
+「非神性種族不得帶偽裝層」這條規則不是模板路徑獨有，`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
 
 | 驗證函式 | 觸發於 | 何時爆 | 錯誤訊息（節錄） |
 |---|---|---|---|
