@@ -17,6 +17,7 @@
     - [暗屬性系譜樹](/lore/skill-trees/dark)
     - [神之秘法系譜樹](/lore/skill-trees/divine-mystery)
     - [武藝系譜樹](/lore/skill-trees/martial-arts)
+    - [跨系譜解鎖規則表](/lore/skill-trees/cross-lineage-unlock)
     - [身心強化取得條件](/lore/skill-trees/enhancement)
     - [身法取得條件](/lore/skill-trees/movement)
     - [天賦異能取得條件](/lore/skill-trees/innate-gift)
