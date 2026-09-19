@@ -1,9 +1,12 @@
 """Synthetic behavior tests for damage and debuff state feedback (light-cleric-feedback).
 
 Exercising:
-- Different damage sources share reaction and use captured source tier (direct spell, item, periodic tick)
-- Tier ladder rungs: 5/8/12/18/28/40 for 學徒/術師/大師/賢者/主宰/神格
-- Nonspell fallback rung: items and non-elemental sources use 5
+- Different damage sources share reaction with loss-proportional gain (direct spell, item, periodic tick)
+- Coefficient shaping: floor(140 x actual_loss / max_hp); a half-max-HP loss is worth five times a tenth-max-HP loss
+- A full climax journey costs half of maximum HP (post-climax 15 + 70 = 極限 floor 85)
+- No-loss negative instances price at the authored flat fraction of max HP (floor(140 x 0.05) = 7)
+- Indeterminate cases (absent loss amount, unreadable or non-positive max HP) apply nothing rather than guess
+- Retired source-tier gain mapping fails closed at rule load naming the rule id
 - Negative triggers: misses, zero damage, dead targets, immunity refused debuffs, buff refreshes, resource costs
 - Distinct events for new debuff acceptance and subsequent periodic damage ticks
 - Transitive feedback cascades entering normal lock phase without inventing a second state system
@@ -56,6 +59,7 @@ from world.skills.handler import ConferredSkillGrant
 from world.rules.state_reactions import (
     STATE_REACTION_RULES,
     dispatch_outcome_reaction,
+    validate_state_reaction_rules,
 )
 from world.skills.effects import RuleTableEffect
 from world.skills.registry import (
@@ -153,11 +157,14 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
     @covers_requirement(
         "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
     )
-    def test_different_damage_sources_share_reaction_and_use_captured_tier(self):
+    def test_different_damage_sources_share_reaction_with_equal_gains(self):
         """Scenario: Different damage sources share the reaction.
 
-        WHEN a synthetic passive owner suffers direct spell, item and periodic damage
-        THEN each actual loss causes the configured gain once and uses its captured source tier
+        WHEN a synthetic passive owner suffers direct spell, item and periodic
+            damage of equal actual loss
+        THEN each actual loss causes the configured gain exactly once, and all
+            three gains are equal because the gain reads the loss rather than
+            the source
         """
         feedback_passive = self._register_synth_skill(
             _make_synth_skill(
@@ -169,18 +176,10 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         )
         self._grant_skill(self.target, feedback_passive.key)
 
-        tier_gains = {
-            T_APPRENTICE: 5,
-            T_ADEPT: 8,
-            T_MASTER: 12,
-            T_SAGE: 18,
-            T_SOVEREIGN: 28,
-            T_GODHEAD: 40,
-        }
         reaction_rule = Rule(
             id="synth_feedback_hp_loss_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": tier_gains},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -189,51 +188,54 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         patcher_reaction.start()
         self.addCleanup(patcher_reaction.stop)
 
-        # 1. Direct spell damage across each cost tier
-        costs_by_tier = {
-            T_APPRENTICE: 12,
-            T_ADEPT: 24,
-            T_MASTER: 40,
-            T_SAGE: 75,
-            T_SOVEREIGN: 130,
-            T_GODHEAD: 200,
-        }
-        for tier, cost in costs_by_tier.items():
-            self.target.sexual.pleasure.base = 0
-            pleasure_before = self.target.sexual.pleasure.base
-            spell = self._register_synth_skill(
-                _make_synth_skill(
-                    f"synth_dmg_spell_{tier}",
-                    element="fire",
-                    target_spec=TargetSpec.SINGLE,
-                    cost={"mp": cost},
-                    effects=("damage:fire:magic",),
-                )
-            )
-            # Dispatch hp_loss with this spell's tier
-            dispatch_outcome_reaction(self.target, "hp_loss", source_tier=tier)
-            pleasure_after = self.target.sexual.pleasure.base
-            expected_gain = tier_gains[tier]
-            self.assertEqual(
-                pleasure_after - pleasure_before,
-                expected_gain,
-                f"Tier {tier} should gain {expected_gain} pleasure, got {pleasure_after - pleasure_before}",
-            )
-
-        # 2. Item HP loss -> uses fallback tier rung (學徒, 5)
-        pleasure_before = self.target.sexual.pleasure.base
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=None)
-        pleasure_after = self.target.sexual.pleasure.base
-        self.assertEqual(pleasure_after - pleasure_before, 5)
-
-        # 3. Periodic rate tick damage with captured source tier (e.g. 賢者, 18)
-        pleasure_before = self.target.sexual.pleasure.base
-        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=T_SAGE)
-        pleasure_after = self.target.sexual.pleasure.base
-        self.assertEqual(pleasure_after - pleasure_before, 18)
-
-        # 4. Engine-level spell damage resolved through ActionResolver on unprotected target
+        # 1. Spell source: direct dispatch at godhead tier — the source tier
+        #    must not affect a loss-proportional gain (max_hp is 200).
         self.target.sexual.pleasure.base = 0
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=T_GODHEAD, hp_loss_amount=20
+        )
+        pleasure_levels = [self.target.sexual.pleasure.base]
+        self.assertEqual(pleasure_levels[-1], 14)  # floor(140 x 20 / 200)
+
+        # 2. Item source: an item HP step through the real item write path.
+        step = ItemEffectStep(
+            target=self.target,
+            effect=GaugeAdjustEffect(stat=ItemStat.HP, amount=-20),
+            amount=-20,
+        )
+        self.assertEqual(_apply_gauge_step(step), -20)
+        pleasure_levels.append(self.target.sexual.pleasure.base)
+        self.assertEqual(
+            pleasure_levels[-1] - pleasure_levels[-2], 14
+        )
+
+        # 3. Periodic source: a damaging rate tick through the clock path.
+        tick_debuff = self._register_synth_buff(
+            BuffDefinition(
+                key="synth_equal_tick_poison",
+                duration=60,
+                polarity="debuff",
+                tick_interval=10,
+                stacking="refresh",
+                modifiers={"rate": {"target": "hp", "delta": -20}},
+            )
+        )
+        apply_buff(self.target, tick_debuff.key, source_tier=T_APPRENTICE)
+        tick_buffs(self.target, 10)
+        pleasure_levels.append(self.target.sexual.pleasure.base)
+        self.assertEqual(
+            pleasure_levels[-1] - pleasure_levels[-2], 14
+        )
+
+        # Equal actual loss (20 each) prices identically across sources.
+        deltas = [b - a for a, b in zip(pleasure_levels, pleasure_levels[1:])]
+        self.assertEqual(len(set(deltas)), 1)
+
+        # 4. Engine-level spell damage resolved through ActionResolver on an
+        #    unprotected target: the combat dispatch site threads its own
+        #    actual_loss rather than a guessed amount.
+        self.target.sexual.pleasure.base = 0
+        self.target.traits.hp.current = 200
         sage_spell = self._register_synth_skill(
             _make_synth_skill(
                 "synth_engine_sage_spell",
@@ -256,8 +258,301 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         with patch("world.rules.combat.roll_d100", return_value=100):
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
-        self.assertLess(self.target.traits.hp.current, 200)
-        self.assertEqual(self.target.sexual.pleasure.base, 18)
+        observed_loss = 200 - self.target.traits.hp.current
+        self.assertGreater(observed_loss, 0)
+        self.assertEqual(
+            self.target.sexual.pleasure.base,
+            math.floor(140 * observed_loss / 200),
+            "Engine spell damage must thread its actual loss into the reaction",
+        )
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_larger_loss_is_worth_proportionally_more(self):
+        """Scenario: A larger loss is worth proportionally more.
+
+        WHEN a synthetic passive owner suffers one loss of a tenth of maximum
+            HP and, separately, one loss of half of maximum HP
+        THEN the second gain is five times the first
+        """
+        feedback_passive = self._register_synth_skill(
+            _make_synth_skill(
+                "synth_proportional_passive",
+                kind=SkillKind.PASSIVE,
+                target_spec=TargetSpec.NONE,
+                category=SkillCategory.ENHANCEMENT,
+            )
+        )
+        self._grant_skill(self.target, feedback_passive.key)
+        reaction_rule = Rule(
+            id="synth_proportional_hp_rule",
+            when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        patcher_reaction = patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction_rule],
+        )
+        patcher_reaction.start()
+        self.addCleanup(patcher_reaction.stop)
+
+        self.target.sexual.pleasure.base = 0
+        # A tenth of max HP (20 of 200).
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=None, hp_loss_amount=20
+        )
+        tenth_gain = self.target.sexual.pleasure.base
+        self.assertEqual(tenth_gain, 14)
+        # Half of max HP (100 of 200).
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=None, hp_loss_amount=100
+        )
+        half_gain = self.target.sexual.pleasure.base - tenth_gain
+        self.assertEqual(half_gain, 70)
+        self.assertEqual(half_gain, 5 * tenth_gain)
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_full_journey_costs_half_of_maximum_hp(self):
+        """Scenario: A full journey costs half of maximum HP.
+
+        WHEN a synthetic passive owner at the post-climax baseline suffers
+            cumulative losses totalling half of maximum HP
+        THEN the accumulated gain reaches the threshold band that opens the
+            climax gate
+        """
+        feedback_passive = self._register_synth_skill(
+            _make_synth_skill(
+                "synth_journey_passive",
+                kind=SkillKind.PASSIVE,
+                target_spec=TargetSpec.NONE,
+                category=SkillCategory.ENHANCEMENT,
+            )
+        )
+        self._grant_skill(self.target, feedback_passive.key)
+        reaction_rule = Rule(
+            id="synth_journey_hp_rule",
+            when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        patcher_reaction = patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction_rule],
+        )
+        patcher_reaction.start()
+        self.addCleanup(patcher_reaction.stop)
+
+        # Post-climax baseline: pleasure 15, phase neutral 未達.
+        self.target.sexual.pleasure.base = 15
+        self.assertEqual(self.target.sexual.climax_phase.level, "未達")
+
+        # Five losses of a tenth of max HP (20 of 200) total half of max HP:
+        # 15 + 5 x floor(140 x 20 / 200) = 15 + 70 = 85, the 極限 band floor.
+        for _ in range(5):
+            dispatch_outcome_reaction(
+                self.target, "hp_loss", source_tier=None, hp_loss_amount=20
+            )
+        self.assertEqual(self.target.sexual.pleasure.base, 85)
+        self.assertEqual(self.target.sexual.climax_phase.level, "接近")
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_no_loss_negative_instance_uses_the_flat_fraction(self):
+        """Scenario: A no-loss negative instance uses the flat fraction.
+
+        WHEN a synthetic passive owner newly accepts a negative buff instance
+            that inflicts no HP loss
+        THEN the gain equals the authored flat fraction of maximum HP, and is
+            smaller than the gain from a loss of a tenth of maximum HP
+        """
+        feedback_passive = self._register_synth_skill(
+            _make_synth_skill(
+                "synth_flat_fraction_passive",
+                kind=SkillKind.PASSIVE,
+                target_spec=TargetSpec.NONE,
+                category=SkillCategory.ENHANCEMENT,
+            )
+        )
+        self._grant_skill(self.target, feedback_passive.key)
+
+        rule_debuff = Rule(
+            id="synth_flat_fraction_rule",
+            when={"event": "negative_buff_added", "skill_qualified": feedback_passive.key},
+            then={
+                "pleasure_gain": {
+                    "max_hp_coefficient": 140,
+                    "flat_max_hp_fraction": 0.05,
+                }
+            },
+        )
+        rule_hp = Rule(
+            id="synth_flat_fraction_hp_rule",
+            when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        patcher_reaction = patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [rule_debuff, rule_hp],
+        )
+        patcher_reaction.start()
+        self.addCleanup(patcher_reaction.stop)
+
+        curse = self._register_synth_buff(
+            BuffDefinition(
+                key="synth_no_hp_loss_curse",
+                duration=60,
+                polarity="debuff",
+                tick_interval=10,
+                stacking="refresh",
+                modifiers={},
+            )
+        )
+        self.target.sexual.pleasure.base = 0
+        apply_buff(self.target, curse.key, source_tier=T_SAGE)
+        flat_gain = self.target.sexual.pleasure.base
+        self.assertEqual(flat_gain, 7)  # floor(140 x 0.05)
+
+        # A loss of a tenth of maximum HP (20 of 200) is worth more.
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=T_SAGE, hp_loss_amount=20
+        )
+        self.assertEqual(self.target.sexual.pleasure.base - flat_gain, 14)
+        self.assertLess(flat_gain, 14)
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_unreadable_maximum_produces_no_gain(self):
+        """Scenario: An unreadable maximum produces no gain.
+
+        WHEN a synthetic passive owner whose maximum HP is unreadable or not
+            positive suffers an actual loss
+        THEN no gain is applied and no state write occurs
+        """
+        feedback_passive = self._register_synth_skill(
+            _make_synth_skill(
+                "synth_indeterminate_passive",
+                kind=SkillKind.PASSIVE,
+                target_spec=TargetSpec.NONE,
+                category=SkillCategory.ENHANCEMENT,
+            )
+        )
+        self._grant_skill(self.target, feedback_passive.key)
+        reaction_rule = Rule(
+            id="synth_indeterminate_hp_rule",
+            when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        patcher_reaction = patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction_rule],
+        )
+        patcher_reaction.start()
+        self.addCleanup(patcher_reaction.stop)
+
+        self.target.sexual.pleasure.base = 0
+
+        # 1. A loss-fraction rule with no loss amount applies nothing.
+        dispatch_outcome_reaction(self.target, "hp_loss", source_tier=None)
+        self.assertEqual(self.target.sexual.pleasure.base, 0)
+
+        # 2. A zero maximum HP applies nothing (and raises nothing).
+        self.target.traits.hp.base = 0
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=None, hp_loss_amount=20
+        )
+        self.assertEqual(self.target.sexual.pleasure.base, 0)
+
+        # 3. An unreadable maximum (no hp trait at all) applies nothing.
+        self.target.traits.remove("hp")
+        dispatch_outcome_reaction(
+            self.target, "hp_loss", source_tier=None, hp_loss_amount=20
+        )
+        self.assertEqual(self.target.sexual.pleasure.base, 0)
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_pleasure_gain_new_shapes_validate(self):
+        """The loader accepts the flat integer and the two new derived shapes."""
+        validate_state_reaction_rules(
+            [
+                Rule(
+                    id="synth_ok_flat_int",
+                    when={"event": "hp_loss"},
+                    then={"pleasure_gain": 7},
+                ),
+                Rule(
+                    id="synth_ok_coefficient",
+                    when={"event": "hp_loss"},
+                    then={"pleasure_gain": {"max_hp_coefficient": 140}},
+                ),
+                Rule(
+                    id="synth_ok_flat_fraction",
+                    when={"event": "negative_buff_added"},
+                    then={
+                        "pleasure_gain": {
+                            "max_hp_coefficient": 140,
+                            "flat_max_hp_fraction": 0.05,
+                        }
+                    },
+                ),
+            ]
+        )
+
+    @covers_requirement(
+        "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
+    )
+    def test_pleasure_gain_retired_tier_mapping_fails_load(self):
+        """Scenario: A tier-keyed gain mapping fails at load.
+
+        WHEN a rule authors pleasure_gain as a source-tier-keyed mapping
+        THEN rule loading raises naming that rule id
+        """
+        retired = Rule(
+            id="synth_retired_tier_rule",
+            when={"event": "hp_loss"},
+            then={"pleasure_gain": {T_APPRENTICE: 5, T_SAGE: 18}},
+        )
+        with self.assertRaises(ValueError) as ctx:
+            validate_state_reaction_rules([retired])
+        self.assertIn("synth_retired_tier_rule", str(ctx.exception))
+        self.assertIn(T_APPRENTICE, str(ctx.exception))
+
+        # Malformed new shapes also fail closed naming the rule id.
+        for bad_rule in (
+            Rule(
+                id="synth_missing_coeff",
+                when={"event": "hp_loss"},
+                then={"pleasure_gain": {"flat_max_hp_fraction": 0.05}},
+            ),
+            Rule(
+                id="synth_bad_coeff",
+                when={"event": "hp_loss"},
+                then={"pleasure_gain": {"max_hp_coefficient": 0}},
+            ),
+            Rule(
+                id="synth_bad_fraction",
+                when={"event": "negative_buff_added"},
+                then={
+                    "pleasure_gain": {
+                        "max_hp_coefficient": 140,
+                        "flat_max_hp_fraction": 1.0,
+                    }
+                },
+            ),
+            Rule(
+                id="synth_empty_mapping",
+                when={"event": "hp_loss"},
+                then={"pleasure_gain": {}},
+            ),
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                validate_state_reaction_rules([bad_rule])
+            self.assertIn(bad_rule.id, str(ctx.exception))
 
     @covers_requirement(
         "damage-state-feedback::damage-feedback-follows-actual-loss-and-newly-accepted-negative-instances"
@@ -281,7 +576,12 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_feedback_debuff_added_rule",
             when={"event": "negative_buff_added", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_APPRENTICE: 5, T_SAGE: 18}},
+            then={
+                "pleasure_gain": {
+                    "max_hp_coefficient": 140,
+                    "flat_max_hp_fraction": 0.05,
+                }
+            },
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -301,11 +601,11 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             )
         )
 
-        # Case 1: First application -> accepted -> triggers once
+        # Case 1: First application -> accepted -> triggers once (flat 7)
         pleasure_before = self.target.sexual.pleasure.base
         apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         pleasure_after = self.target.sexual.pleasure.base
-        self.assertEqual(pleasure_after - pleasure_before, 18)
+        self.assertEqual(pleasure_after - pleasure_before, 7)
 
         # Case 2: Refresh of existing instance -> NO trigger
         pleasure_before = self.target.sexual.pleasure.base
@@ -383,12 +683,17 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_feedback_hp_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
         )
         rule_debuff = Rule(
             id="synth_feedback_debuff_rule",
             when={"event": "negative_buff_added", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
+            then={
+                "pleasure_gain": {
+                    "max_hp_coefficient": 140,
+                    "flat_max_hp_fraction": 0.05,
+                }
+            },
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -408,17 +713,17 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
             )
         )
 
-        # 1. Apply new damaging debuff with source tier 賢者 (gain: 18)
+        # 1. Apply new damaging debuff (no HP loss yet -> flat gain 7)
         pleasure_start = self.target.sexual.pleasure.base
         apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         pleasure_after_apply = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after_apply - pleasure_start,
-            18,
+            7,
             "Initial debuff application should trigger negative_buff_added once",
         )
 
-        # 2. First tick (10s): deals 10 damage -> triggers hp_loss once with captured tier 賢者 (gain: 18)
+        # 2. First tick (10s): deals 10 damage -> hp_loss once (floor(140 x 10 / 200) = 7)
         hp_before_tick1 = self.target.traits.hp.current
         tick_buffs(self.target, 10)
         hp_after_tick1 = self.target.traits.hp.current
@@ -426,21 +731,21 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         pleasure_after_tick1 = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after_tick1 - pleasure_after_apply,
-            18,
-            "First damage tick should trigger hp_loss once using captured tier 賢者",
+            7,
+            "First damage tick should trigger hp_loss once for its actual loss",
         )
 
-        # 3. Second tick (10s): deals 10 damage -> triggers hp_loss again once (gain: 18)
+        # 3. Second tick (10s): deals 10 damage -> hp_loss again once (+7)
         tick_buffs(self.target, 10)
         pleasure_after_tick2 = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after_tick2 - pleasure_after_tick1,
-            18,
-            "Second damage tick should trigger hp_loss once using captured tier 賢者",
+            7,
+            "Second damage tick should trigger hp_loss once for its actual loss",
         )
 
-        # Total gain across application and two ticks: 18 + 18 + 18 = 54
-        self.assertEqual(pleasure_after_tick2 - pleasure_start, 54)
+        # Total gain across application and two ticks: 7 + 7 + 7 = 21
+        self.assertEqual(pleasure_after_tick2 - pleasure_start, 21)
 
     @covers_requirement(
         "damage-state-feedback::feedback-cascades-remain-within-the-initiating-transaction"
@@ -464,7 +769,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_feedback_lock_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_APPRENTICE: 25}},
+            then={"pleasure_gain": 25},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -514,7 +819,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         rule_hp = Rule(
             id="synth_rollback_hp_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_APPRENTICE: 40, T_GODHEAD: 40}},
+            then={"pleasure_gain": 40},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -586,7 +891,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_conferred_reaction_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_APPRENTICE: 15}},
+            then={"pleasure_gain": 15},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -623,7 +928,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         reaction_rule = Rule(
             id="synth_clock_tier_rule",
             when={"event": "hp_loss", "skill_qualified": feedback_passive.key},
-            then={"pleasure_gain": {T_SAGE: 18, T_APPRENTICE: 5}},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
         )
         patcher_reaction = patch(
             "world.rules.state_reactions.STATE_REACTION_RULES",
@@ -647,22 +952,22 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         apply_buff(self.target, debuff_def.key, source_tier=T_SAGE)
         self.assertEqual(self.target.buffs.all[debuff_def.key].source_tier, T_SAGE)
 
-        # Advance clock by 10s -> fires tick 1
+        # Advance clock by 10s -> fires tick 1 (10 damage -> floor(140 x 10 / 200) = 7)
         pleasure_before = self.target.sexual.pleasure.base
         WorldClock().advance(10, AdvanceSource.COMMAND, [self.target])
         pleasure_after = self.target.sexual.pleasure.base
         self.assertEqual(
             pleasure_after - pleasure_before,
-            18,
-            "Tick after clock advance must use retained source tier 賢者 (gain 18)",
+            7,
+            "Tick after clock advance prices its actual loss",
         )
 
         # Retained across second advance
         WorldClock().advance(10, AdvanceSource.COMMAND, [self.target])
         self.assertEqual(
             self.target.sexual.pleasure.base - pleasure_after,
-            18,
-            "Second tick after clock advance must still use retained source tier 賢者 (gain 18)",
+            7,
+            "Second tick after clock advance prices its actual loss",
         )
 
     @covers_requirement(
