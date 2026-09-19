@@ -64,6 +64,11 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
         ),
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
+        # Cross-lineage unlocks write db.skills inside the practice award's
+        # commit; the rollback face must restore it so a failed action undoes
+        # the grant that its award triggered (design: the grant shares the
+        # award's commit boundary, forward and backward).
+        "skills": _attribute_snapshot(entity, "skills"),
         "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
         "skill_practice_day": _attribute_snapshot(entity, "skill_practice_day"),
         "title_collection": _attribute_snapshot(entity, "title_collection"),
@@ -130,6 +135,7 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     )
     _restore_attribute(entity, "buffs", snapshot["buffs"])
     _restore_attribute(entity, "skill_grants", snapshot["skill_grants"])
+    _restore_attribute(entity, "skills", snapshot["skills"])
     _restore_attribute(entity, "skill_proficiency", snapshot["skill_proficiency"])
     _restore_attribute(entity, "skill_practice_day", snapshot["skill_practice_day"])
     _restore_attribute(entity, "title_collection", snapshot["title_collection"])
