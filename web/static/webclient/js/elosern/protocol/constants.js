@@ -206,7 +206,7 @@ var SERVICES_SELL = "shop.sell";
 
 // title_ballot panel bounds (mirror of web.webclient.presentation.
 // title_ballot, title-epithet-nomination D4). The values are owned by
-// world/rules/titles.py (the ballot writer); these constants mirror the
+// world/rules/titles/ballot.py (the ballot writer); these constants mirror the
 // panel validator and must stay equal.
 var TITLE_BALLOT_MAX_CANDIDATES = 3;
 var TITLE_BALLOT_MAX_DISPLAY = 64;

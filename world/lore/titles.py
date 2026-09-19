@@ -6,7 +6,7 @@ system, change G). This module holds the frozen ``FixedTitleDef`` registry,
 the declarative predicate families it validates against, and the
 ``STARTER_EPITHET`` constant every character receives on guild registration
 (D8, ``title-fixed-core`` DF4). The deterministic grants themselves live in
-``world/rules/titles.py``; this module is read-only registry data.
+the ``world.rules.titles`` package; this module is read-only registry data.
 """
 
 from dataclasses import dataclass
@@ -114,7 +114,7 @@ class StarterEpithet:
     """The deterministic first-quest epithet: display plus origin basis.
 
     Granted by the actor's first guild reward claim
-    (``world/rules/titles.py::grant_first_quest_epithet``), not at
+    (``world/rules/titles/planner.py::grant_first_quest_epithet``), not at
     registration.
     """
 

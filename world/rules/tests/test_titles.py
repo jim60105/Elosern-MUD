@@ -13,6 +13,7 @@ delete/unequip mutator exists anywhere in the module or its command.
 from tools.spec_traceability import covers_requirement
 
 import ast
+import contextlib
 import functools
 import inspect
 from copy import deepcopy
@@ -34,6 +35,7 @@ from world.lore.titles import (
     TitlePredicateFamily,
 )
 from world.rules import titles as titles_module
+from world.rules.titles import removal as titles_removal_module
 from world.rules.action import (
     CommitFailed,
     PendingEffect,
@@ -209,15 +211,30 @@ def _with_counter_row(func):
         # The published registry is an immutable proxy, so the seam replaces
         # the module attribute wholesale (merged with the scoped rows) for
         # the duration of the test.
-        with patch(
-            "world.rules.titles.FIXED_TITLE_REGISTRY",
-            {**live_fixed_title_registry(), _COUNTER_ROW_KEY: _COUNTER_ROW},
+        with _patched_fixed_registry(
+            {**live_fixed_title_registry(), _COUNTER_ROW_KEY: _COUNTER_ROW}
         ):
             return func(self, *args, **kwargs)
 
     return wrapper
 
 
+
+
+@contextlib.contextmanager
+def _patched_fixed_registry(rows):
+    """Replace the fixed-title registry for every submodule binding that reads it.
+
+    After the titles package split, the planner scans the registry through its
+    own module binding while ``bank_fixed``/``fixed_display_name`` resolve
+    through the state binding, so one seam must patch both to outlive the
+    grant (composition asserts made after the patch closes would correctly
+    see the key fallback, not the display name).
+    """
+    with contextlib.ExitStack() as stack:
+        for _module in ("world.rules.titles.planner", "world.rules.titles.state"):
+            stack.enter_context(patch(f"{_module}.FIXED_TITLE_REGISTRY", rows))
+        yield rows
 
 
 def _event_log(*entries: EventEntry) -> EventLog:
@@ -628,7 +645,7 @@ class TitleStateTests(EvenniaTest):
         # no assignment to the slots. The command dispatcher mirrors this:
         # ``parts[1]`` is never gated on ``fixed``, so a bare
         # ``title remove fixed …`` falls through to usage.
-        tree = ast.parse(inspect.getsource(titles_module))
+        tree = ast.parse(inspect.getsource(titles_removal_module))
         fn = next(
             node
             for node in tree.body
@@ -759,12 +776,12 @@ class TitlePredicateTests(EvenniaTest):
             family=TitlePredicateFamily.LINEAGE_COMPLETE, root_skill_key="fire_lineage"
         )
         self.entity.db.skills = {"active": ["fire_lineage"], "passive": []}
-        with patch("world.rules.titles.skill_proficiency_level", return_value=9):
+        with patch("world.rules.titles.planner.skill_proficiency_level", return_value=9):
             self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
-        with patch("world.rules.titles.skill_proficiency_level", return_value=10):
+        with patch("world.rules.titles.planner.skill_proficiency_level", return_value=10):
             self.assertTrue(predicate_satisfied(self.entity, _event_log(), predicate))
         self.entity.db.skills = {"active": [], "passive": []}
-        with patch("world.rules.titles.skill_proficiency_level", return_value=10):
+        with patch("world.rules.titles.planner.skill_proficiency_level", return_value=10):
             self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
 
     def test_quest_completed_tolerates_a_corrupt_log(self):
@@ -885,10 +902,7 @@ class TitlePlannerTests(EvenniaTest):
         self.assertEqual(compose_full_title(self.actor), "受矚者")
 
     def test_one_grant_per_action_and_key_idempotency(self):
-        with patch(
-            "world.rules.titles.FIXED_TITLE_REGISTRY",
-            {"t_first_high": _FIRST_KILL_ROW},
-        ):
+        with _patched_fixed_registry({"t_first_high": _FIRST_KILL_ROW}):
             first = title_event_effect_planner(self._request(), _event_log(_defeated("high", 1), _defeated("high", 2)))
             self.assertEqual(len(first), 1)
             first[0].apply()
@@ -916,7 +930,7 @@ class TitlePlannerTests(EvenniaTest):
                     "提示文字。",
                     TitlePredicate(family=family, **{parameter: value}),
                 )
-                with patch("world.rules.titles.FIXED_TITLE_REGISTRY", {"t_contained": row}):
+                with _patched_fixed_registry({"t_contained": row}):
                     with self.assertRaises(TitleDataError):
                         predicate_satisfied(self.actor, _event_log(), row.predicate)
                     self.assertEqual(self._plan(), [])
@@ -935,7 +949,7 @@ class TitlePlannerTests(EvenniaTest):
         )
         self.actor.db.skills = {"active": ["probe_skill"], "passive": []}
         self.actor.db.skill_proficiency = {"probe_skill": "not-a-number"}
-        with patch("world.rules.titles.FIXED_TITLE_REGISTRY", {"t_lineage": row}):
+        with _patched_fixed_registry({"t_lineage": row}):
             with self.assertRaises(TitleDataError):
                 predicate_satisfied(self.actor, _event_log(), row.predicate)
             self.assertEqual(self._plan(), [])
@@ -1182,7 +1196,7 @@ class TitleGuildPairingTests(EvenniaTest):
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_first_quest_epithet_grant_banks_and_auto_equips_the_epithet_slot(self):
-        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(42)):
+        with patch("world.rules.titles.planner.get_world_clock", return_value=WorldClock(42)):
             lines = grant_first_quest_epithet(self.player)
         self.assertEqual(lines, (f"獲得異名：{_starter().display}",))
         self.assertEqual(compose_full_title(self.player), _starter().display)
@@ -1544,7 +1558,7 @@ class EpithetNominationRulesTests(EvenniaTest):
 
         self.entity.attributes.add(PENDING_BALLOT_KEY, _ballot((display, "事蹟")))
         with patch(
-            "world.rules.titles.get_world_clock",
+            "world.rules.titles.ballot.get_world_clock",
             return_value=WorldClock(tick),
         ):
             decline_epithet_ballot(self.entity)
@@ -1695,7 +1709,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
             deepcopy(self.entity.attributes.get(TITLE_COLLECTION_KEY)),
             deepcopy(self.entity.attributes.get(TITLE_EQUIPPED_KEY)),
         )
-        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(900)):
+        with patch("world.rules.titles.removal.get_world_clock", return_value=WorldClock(900)):
             event_log = remove_epithet(self.entity, "破城先鋒")
         collection, equipped = read_title_state(self.entity)
         # Exactly one entry gone; the OTHER entry is byte-identical.
@@ -1756,7 +1770,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
             self.entity.attributes.has(REMOVALS_LOG_KEY), before[2]
         )
         # One retry after the fault completes exactly once.
-        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(901)):
+        with patch("world.rules.titles.removal.get_world_clock", return_value=WorldClock(901)):
             remove_epithet(self.entity, "破城先鋒")
         self.assertEqual(
             [entry["display"] for entry in banked_epithets(self.entity)],
@@ -1777,7 +1791,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
             # The previously equipped epithet is now unequipped (and the
             # collection holds at least two) → removable.
             with patch(
-                "world.rules.titles.get_world_clock",
+                "world.rules.titles.removal.get_world_clock",
                 return_value=WorldClock(1000 + index),
             ):
                 remove_epithet(self.entity, previous)
@@ -1790,7 +1804,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
 
     def test_removed_display_is_renomable_and_digests_softly(self):
         self._bank_pair()
-        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(900)):
+        with patch("world.rules.titles.removal.get_world_clock", return_value=WorldClock(900)):
             remove_epithet(self.entity, "破城先鋒")
         # The live-collection collision filter no longer blocks the name.
         self.assertNotIn("破城先鋒", owned_epithet_displays(self.entity))

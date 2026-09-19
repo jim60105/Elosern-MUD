@@ -137,7 +137,7 @@ class NominationSchedulingTests(EvenniaTest):
         # Past the second day boundary the same trigger fires again.
         day = title_rules._DAY_SECONDS
         clock = SimpleNamespace(tick=10 * day)
-        with patch("world.rules.titles.get_world_clock", return_value=clock):
+        with patch("world.rules.titles.ballot.get_world_clock", return_value=clock):
             self.assertIsNotNone(self._schedule(_good_client()))
 
     @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
@@ -152,7 +152,7 @@ class NominationSchedulingTests(EvenniaTest):
         title_rules.decline_epithet_ballot(self.player)
         client = _good_client()
         clock = SimpleNamespace(tick=10 * title_rules._DAY_SECONDS)
-        with patch("world.rules.titles.get_world_clock", return_value=clock):
+        with patch("world.rules.titles.ballot.get_world_clock", return_value=clock):
             self._schedule(client)
         self.assertEqual(len(client.calls), 1)
         user_text = client.calls[0].messages[1]["content"]
