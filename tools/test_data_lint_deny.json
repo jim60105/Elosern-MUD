@@ -67,8 +67,8 @@
       "token": "damage"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "dark"
     },
@@ -97,20 +97,20 @@
       "token": "e"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "earth"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:349",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:349); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:321",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:321); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "elf"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "fire"
     },
@@ -145,26 +145,26 @@
       "token": "hours_per_day"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:349",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:349); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:321",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:321); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "human"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "ice"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "light"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:344",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:344); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "lightning"
     },
@@ -247,8 +247,8 @@
       "token": "recovery"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:918",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:918); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/panels/status.js:135",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/panels/status.js:135); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "round"
     },
@@ -319,14 +319,14 @@
       "token": "w"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "water"
     },
     {
-      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/static/webclient/js/elosern/protocol/constants.js:319",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol/constants.js:319); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "wind"
     },

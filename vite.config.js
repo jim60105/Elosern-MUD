@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { transformSync } from "esbuild";
+import { buildSync, transformSync } from "esbuild";
 import vue from "@vitejs/plugin-vue";
 
 // A2 (webclient-vue-01-foundation): the Vue view layer builds into the
@@ -25,6 +25,25 @@ function elosernCjsInterop() {
       const cleanId = id.split("?")[0];
       if (!/web[\\/]static[\\/]webclient[\\/]js[\\/]/.test(cleanId)) return null;
       if (!/\bmodule\.exports\b/.test(code)) return null;
+      // The protocol facade and its SRP domain modules form one CommonJS
+      // island. `transformSync` rewrites ESM syntax but never resolves
+      // require() calls, so the facade is bundled instead: esbuild statically
+      // inlines the whole ./protocol/ graph and emits one ESM module with
+      // CJS default-export semantics. The domain modules are never emitted
+      // as separate Rollup ids (they are inlined by the facade bundle).
+      if (/[\\/]js[\\/]elosern[\\/]protocol(\.js|\/)/.test(cleanId)) {
+        if (!/protocol\.js$/.test(cleanId)) return null;
+        const result = buildSync({
+          entryPoints: [cleanId],
+          bundle: true,
+          write: false,
+          format: "esm",
+          platform: "neutral",
+          sourcemap: "inline",
+        });
+        // inline sourcemap rides the code comment; Vite/rollup parses it.
+        return { code: result.outputFiles[0].text, map: null };
+      }
       const result = transformSync(code, {
         loader: "js",
         format: "esm",

@@ -15,6 +15,28 @@
  * it attaches to `window.Elosern.Protocol`; under Node it exports the same API
  * via `module.exports` for the DOM-independent test suite.
  */
+/* eslint-disable global-require */
+
+// Module wiring lives at the top level (outside the UMD factory): Vite's
+// esbuild CommonJS interop converts top-level require() calls to ESM imports,
+// while Node and the dependency-free gate keep loading the same CJS form.
+var C = require("./protocol/constants.js");
+var core = require("./protocol/core.js");
+var env = require("./protocol/envelope.js");
+var store = require("./protocol/store.js");
+var combat = require("./protocol/panels/combat.js");
+var status = require("./protocol/panels/status.js");
+var suggestions = require("./protocol/panels/suggestions.js");
+var local_map = require("./protocol/panels/local_map.js");
+var services = require("./protocol/panels/services.js");
+var creation = require("./protocol/panels/creation.js");
+var exploration = require("./protocol/panels/exploration.js");
+var character = require("./protocol/panels/character.js");
+var art = require("./protocol/panels/art.js");
+var titles = require("./protocol/panels/titles.js");
+var misc = require("./protocol/panels/misc.js");
+var exotic = require("./protocol/panels/exotic.js");
+
 (function (root, factory) {
   "use strict";
   if (typeof module !== "undefined" && module.exports) {
@@ -25,23 +47,6 @@
   }
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
-
-  var C = require("./protocol/constants.js");
-  var core = require("./protocol/core.js");
-  var env = require("./protocol/envelope.js");
-  var store = require("./protocol/store.js");
-  var combat = require("./protocol/panels/combat.js");
-  var status = require("./protocol/panels/status.js");
-  var suggestions = require("./protocol/panels/suggestions.js");
-  var local_map = require("./protocol/panels/local_map.js");
-  var services = require("./protocol/panels/services.js");
-  var creation = require("./protocol/panels/creation.js");
-  var exploration = require("./protocol/panels/exploration.js");
-  var character = require("./protocol/panels/character.js");
-  var art = require("./protocol/panels/art.js");
-  var titles = require("./protocol/panels/titles.js");
-  var misc = require("./protocol/panels/misc.js");
-  var exotic = require("./protocol/panels/exotic.js");
 
   return {
     PROTOCOL_VERSION: C.PROTOCOL_VERSION,
