@@ -1129,6 +1129,10 @@ def parse_effect(effect_id: str) -> object:
             raise ValueError(
                 f"damage effect must be damage:<element>:<school>, got {effect_id!r}"
             )
+        if school not in {"physical", "magic"}:
+            raise ValueError(
+                f"damage school must be 'physical' or 'magic', got {school!r}"
+            )
         return DamageEffect(element=None if element == "none" else element, school=school)
     if prefix == "heal":
         shape = _parse_single_arg(effect_id, prefix)
