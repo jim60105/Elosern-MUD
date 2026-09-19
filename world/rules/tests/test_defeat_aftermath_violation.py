@@ -16,6 +16,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 import world.rules.defeat_aftermath as defeat_aftermath_module
+import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -90,9 +91,9 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
             self.addCleanup(patcher.stop)
         self.addCleanup(
             setattr,
-            defeat_aftermath_module,
+            defeat_aftermath_violation_module,
             "_VIOLATION_HOOK",
-            defeat_aftermath_module._VIOLATION_HOOK,
+            defeat_aftermath_violation_module._VIOLATION_HOOK,
         )
         register_violation_hook(run_violation_sequence)
 
@@ -166,7 +167,7 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
     def _patch_rolls(self, rolls):
         """Patch the engine's derivation to return ``rolls`` by attempt index."""
         return patch.object(
-            defeat_aftermath_module,
+            defeat_aftermath_violation_module,
             "derived_roll",
             side_effect=lambda *args: rolls[args[3]],
         )
@@ -185,7 +186,7 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
             return resist_rolls[attempt_index]
 
         return patch.object(
-            defeat_aftermath_module,
+            defeat_aftermath_violation_module,
             "derived_roll",
             side_effect=roll,
         )
@@ -321,7 +322,7 @@ class ThresholdGateTests(ViolationBase):
     def test_missing_archetype_row_is_inert_and_logs_once(self):
         self.monster.key = "defeat goblin"
         self._arouse(90)
-        with patch.object(defeat_aftermath_module, "log_warn") as warn:
+        with patch.object(defeat_aftermath_violation_module, "log_warn") as warn:
             result = self._defeat()
         self.assertNotIn("violation_attempt", _kinds(_aftermath_entries(result)))
         warnings = [
@@ -558,14 +559,16 @@ class AttemptLoopTests(ViolationBase):
         self.player.sexual.climax_phase.value = "進行中"
         self.player.attributes.add("climax_turns", 1, category="sexual_state")
         consumed = []
-        real_roll = defeat_aftermath_module.derived_roll
+        real_roll = defeat_aftermath_violation_module.derived_roll
 
         def counting_roll(*args):
             consumed.append(args)
             return real_roll(*args)
 
         with patch.object(
-            defeat_aftermath_module, "derived_roll", side_effect=counting_roll
+            defeat_aftermath_violation_module,
+            "derived_roll",
+            side_effect=counting_roll,
         ):
             result = self._defeat()
         self.assertEqual(consumed, [])
@@ -796,7 +799,7 @@ class CompanionPoolTests(ViolationBase):
         self._knock_out(companion)
         # Attempt 0 draws slot 1 (the companion), attempt 1 slot 0 (the
         # player); both contests land.
-        with patch.object(defeat_aftermath_module, "log_info") as info:
+        with patch.object(defeat_aftermath_violation_module, "log_info") as info:
             with self._patch_purpose_rolls([1, 0], [1, 1]):
                 with self.captureOnCommitCallbacks(execute=True):
                     result = forfeit(self.player)
@@ -1112,7 +1115,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.monster.traits.atk_phys.base = 500
         player_pleasure_before = self.player.sexual.pleasure.value
         monster_pleasure_before = self.monster.sexual.pleasure.value
-        real_roll = defeat_aftermath_module.derived_roll
+        real_roll = defeat_aftermath_violation_module.derived_roll
         calls = []
 
         def recording_roll(session_id, violator_key, victim_key, attempt_index, purpose):
@@ -1125,13 +1128,15 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
             return value
 
         advancing = patch.object(
-            defeat_aftermath_module,
+            defeat_aftermath_violation_module,
             "_advance_attempt_clock",
             side_effect=[None, RuntimeError("injected")],
         )
         with (
             patch.object(
-                defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+                defeat_aftermath_violation_module,
+                "derived_roll",
+                side_effect=recording_roll,
             ),
             advancing,
             self.assertRaises(RuntimeError),
@@ -1150,7 +1155,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         # The retry re-derives the identical roll for the same durable state
         # and completes the whole sequence exactly once.
         with patch.object(
-            defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+            defeat_aftermath_violation_module, "derived_roll", side_effect=recording_roll
         ):
             # The durable session is still active after the rollback, so the
             # retry is a bare re-settlement (no re-engage, no extra round).
@@ -1178,7 +1183,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.monster.traits.atk_phys.base = 500
         engage(self.player, self.monster)
         self._knock_out(companion)
-        real_roll = defeat_aftermath_module.derived_roll
+        real_roll = defeat_aftermath_violation_module.derived_roll
         calls = []
 
         def recording_roll(*args):
@@ -1187,13 +1192,15 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
             return value
 
         advancing = patch.object(
-            defeat_aftermath_module,
+            defeat_aftermath_violation_module,
             "_advance_attempt_clock",
             side_effect=[None, RuntimeError("injected")],
         )
         with (
             patch.object(
-                defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+                defeat_aftermath_violation_module,
+                "derived_roll",
+                side_effect=recording_roll,
             ),
             advancing,
             self.assertRaises(RuntimeError),
@@ -1210,7 +1217,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         # The retry re-derives the identical draws (same victims, same
         # contests) for the same durable state and completes exactly once.
         with patch.object(
-            defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+            defeat_aftermath_violation_module, "derived_roll", side_effect=recording_roll
         ):
             result = forfeit(self.player)
         self.assertEqual(calls[len(first_run_calls):], first_run_calls)

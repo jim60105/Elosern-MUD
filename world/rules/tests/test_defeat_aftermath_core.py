@@ -24,6 +24,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 import world.rules.defeat_aftermath as defeat_aftermath_module
+import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
 from world.rules import combat_session as combat_session_module
 from world.rules import clock as clock_module
 from world.rules import guild_config as guild_config_module
@@ -236,9 +237,14 @@ class ViolationHookGuardTests(DefeatAftermathBase):
         # DA4 registers the violation engine at import; save and restore that
         # exact body so these guard tests can install their own probes without
         # leaking hook state into other suites in the same process.
-        saved_hook = defeat_aftermath_module._VIOLATION_HOOK
-        self.addCleanup(setattr, defeat_aftermath_module, "_VIOLATION_HOOK", saved_hook)
-        defeat_aftermath_module._VIOLATION_HOOK = None
+        saved_hook = defeat_aftermath_violation_module._VIOLATION_HOOK
+        self.addCleanup(
+            setattr,
+            defeat_aftermath_violation_module,
+            "_VIOLATION_HOOK",
+            saved_hook,
+        )
+        defeat_aftermath_violation_module._VIOLATION_HOOK = None
 
     @covers_requirement(
         "defeat-aftermath-core::the-defeat-adult-scenes-setting-exists-and-guards-the-violation-hook"
@@ -340,7 +346,7 @@ class WildernessDepartureTests(WildernessDefeatMixin, DefeatAftermathBase):
             patch.object(
                 type(self.monster), "delete", side_effect=RuntimeError("boom")
             ),
-            patch("world.rules.defeat_aftermath.log_error") as log_error,
+            patch("world.rules.defeat_aftermath.aftermath.log_error") as log_error,
             self.captureOnCommitCallbacks(execute=True),
         ):
             self._defeat_by_forfeit()
@@ -619,7 +625,7 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
     )
     def test_zero_rate_hits_the_cap_with_one_error_event(self):
         self.player.traits.hp.rate = 0
-        with patch("world.rules.defeat_aftermath.log_error") as error:
+        with patch("world.rules.defeat_aftermath.aftermath.log_error") as error:
             result, calls = self._spied_defeat()
         self.assertEqual(calls[1], (21600, AdvanceSource.DEFEAT_AFTERMATH))
         # The capped virtual model produced no regen: HP rests at 1, below
@@ -646,7 +652,7 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         # aftermath must settle the stored gauge at the virtual state,
         # remainder included (final duck finding 1).
         self.player.traits.hp.rate = 0.0001
-        with patch("world.rules.defeat_aftermath.log_error") as error:
+        with patch("world.rules.defeat_aftermath.aftermath.log_error") as error:
             result, calls = self._spied_defeat()
         self.assertEqual(calls[1], (21600, AdvanceSource.DEFEAT_AFTERMATH))
         self.assertEqual(self.player.traits.hp.current, 2)
@@ -756,7 +762,7 @@ class RenderingTests(DefeatAftermathBase):
     )
     def test_committed_defeat_emits_one_boundary_event(self):
         with (
-            patch("world.rules.defeat_aftermath.log_info") as info,
+            patch("world.rules.defeat_aftermath.aftermath.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
             self._defeat_by_forfeit()
@@ -778,7 +784,7 @@ class RenderingTests(DefeatAftermathBase):
     def test_rolled_back_defeat_emits_no_boundary_event(self):
         engage(self.player, self.monster)
         with (
-            patch("world.rules.defeat_aftermath.log_info") as info,
+            patch("world.rules.defeat_aftermath.aftermath.log_info") as info,
             patch("world.rules.combat_session._persist", side_effect=RuntimeError("injected")),
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -860,7 +866,7 @@ class RulebookLoaderTests(DefeatAftermathBase):
         self.assertIn("哥布林", DEFEAT_AFTERMATH_RULEBOOK.violation.rows)
 
     def test_unknown_section_is_ignored_with_one_warning(self):
-        with patch("world.rules.defeat_aftermath.log_warn") as warn:
+        with patch("world.rules.defeat_aftermath.rulebook.log_warn") as warn:
             rulebook = self._load(
                 "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
                 "recovery:\n  regen_scale: 0.5\n  max_recovery_seconds: 21600\n"
