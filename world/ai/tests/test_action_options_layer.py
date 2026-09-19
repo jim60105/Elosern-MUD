@@ -347,7 +347,7 @@ class ActionOptionsContextBuilderTests(unittest.TestCase):
         register_action_options()
         client = FakeLLMClient()
         with patch.object(
-            action_options,
+            action_options.generation,
             "build_action_options_prompt",
             side_effect=ActionOptionsInputError("affordances exceed the maximum of 16 entries"),
         ):
@@ -634,7 +634,7 @@ class ActionOptionsRegistrationTests(unittest.TestCase):
     @covers_requirement("action-options-layer::guardrail-hooks-install-atomically-and-idempotently")
     def test_partial_failure_rolls_back_its_own_hooks(self):
         with patch(
-            "world.ai.action_options.register_output_schema",
+            "world.ai.action_options.generation.register_output_schema",
             side_effect=DuplicateSchemaError("action_options"),
         ):
             with self.assertRaises(DuplicateSchemaError):
@@ -685,7 +685,7 @@ class ActionOptionsStartupRegistrationTests(unittest.TestCase):
         from server.conf.at_server_startstop import _register_action_options_layer
 
         with patch(
-            "world.ai.action_options.register_output_schema",
+            "world.ai.action_options.generation.register_output_schema",
             side_effect=DuplicateSchemaError("action_options"),
         ):
             _register_action_options_layer()
