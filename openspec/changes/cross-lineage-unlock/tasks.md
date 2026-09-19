@@ -17,6 +17,7 @@
 - [x] 3.1 Call the evaluator from `grant_skill_practice_xp()` immediately after `award_practice_xp()`, and append one `unlock_line()` per newly granted skill into `unlocks_out` when that sink was supplied. Verify an award that crosses a threshold grants within the same call and stages one line per granted skill.
 - [x] 3.2 Call the evaluator from the booked-hourly practice settlement after its `award_practice_xp()` so the two practice entry points cannot diverge (design D3). Verify a booked settlement that crosses a threshold grants the same keys as the per-use path.
 - [x] 3.3 Confirm no read path gained a side effect: verify that querying owned skills, and running an action preview, produce no grant and no write to `db.skills`.
+- [x] 3.4 Keep the grant inside its award's rollback boundary on both rollback faces: mirror `db.skills` into the action commit snapshot/restore (`world/rules/action/transaction.py`) and into the clock advance's `_ADVANCE_ENTITY_SURFACES`, so a failed action commit or a failed clock advance undoes the grant its award triggered. Verify with focused rollback tests on both faces (per-use `_commit` failure and booked-settlement `advance` failure each restore `db.skills` alongside the proficiency award).
 
 ## 4. Traceability and gates
 
