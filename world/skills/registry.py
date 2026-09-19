@@ -3116,6 +3116,16 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
+            "rapture_renewal",
+            "歡愉回生",
+            "進入高潮「進行中」期相時，無消耗回復自身最大生命值的一部分。",
+            SkillKind.PASSIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            element="light",
+            category=SkillCategory.ENHANCEMENT,
+        ),
+        _skill(
             "priestly_grace",
             "女神近接",
             "以自身興奮強化聖光庇護的回復效果。",
