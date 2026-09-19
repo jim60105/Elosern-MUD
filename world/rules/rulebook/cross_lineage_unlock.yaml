@@ -1,0 +1,59 @@
+# Cross-lineage unlock rulebook (cross-lineage-unlock): declarative ownership
+# grants.
+#
+# Each rule grants skill OWNERSHIP (a set of SKILL_REGISTRY keys appended to
+# the entity's stored owned set) when the entity's practice proficiency in
+# OTHER lineage trees reaches declared depths. Ownership and usability stay
+# separate: the granted keys fall under the same `skill-lineage` gates as any
+# other owned skill, and granting never writes proficiency.
+#
+# Clause shape:
+#   scope:            declarative {category, group?} — samples ACTIVE nodes
+#                     only, partitioned into one group per `group` field — or
+#                     explicit {keys: [...]} — exactly one group.
+#   min_level:        integer >= 1 — the proficiency level that qualifies a
+#                     group (a group qualifies when at least one sampled node
+#                     reaches it).
+#   distinct_groups:  integer >= 1 (default 1) — how many distinct groups
+#                     must qualify for the clause to be satisfied.
+#
+# A rule fires when EVERY clause is satisfied (AND semantics); its `grants`
+# keys are then added to the entity's owned set. Grants are monotonic and
+# idempotent: re-evaluation and direct grants collide harmlessly.
+#
+# The three shipped rules reproduce docs/lore/skill-trees/cross-lineage-unlock.md
+# §3 exactly: the nine-key sword line at Lv.3, any one element tree at Lv.5,
+# and any two distinct element trees at Lv.5.
+- id: blade_art_mastery
+  # 劍術精通 — 武藝「劍術」路線任一節點 Lv.3。The sword line has no data
+  # dimension (MARTIAL_ARTS entries must declare group is None), so the scope
+  # names its nine keys explicitly as one group.
+  grants: [blade_art_mastery]
+  requires:
+    - scope:
+        keys:
+          - basic_swordplay
+          - flowing_strikes
+          - tendon_sever
+          - whirlwind_slash
+          - thousand_blade_art
+          - blade_storm
+          - blade_saint_arts
+          - thousand_army_slash
+          - true_sword_saint
+      min_level: 3
+- id: magic_circle_comprehension
+  # 魔法陣理解 — 任一元素系譜樹任一節點 Lv.5。The declarative scope samples
+  # ACTIVE elemental-magic nodes only and groups them by element.
+  grants: [magic_circle_comprehension]
+  requires:
+    - scope: {category: elemental_magic}
+      min_level: 5
+      distinct_groups: 1
+- id: precise_mana_control
+  # 精準魔力控制 — 任兩條不同元素系譜樹各有節點 Lv.5。
+  grants: [precise_mana_control]
+  requires:
+    - scope: {category: elemental_magic}
+      min_level: 5
+      distinct_groups: 2
