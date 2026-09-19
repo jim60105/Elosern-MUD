@@ -11,12 +11,11 @@ from world.rules.skill_effects import (
     apply_divine_disguise,
     clear_disguise_effect,
     derive_conferrable_skills,
-    disguise_provenance_of,
-    DISGUISE_PROVENANCE_DIVINE,
     record_conferred_grant,
     reveal_can_pierce,
     reveal_disguise_effect,
     revoke_conferred_grants,
+    was_cast_placed,
 )
 from world.skills.effects import parse_effect
 from world.skills.registry import SkillDef
@@ -112,10 +111,10 @@ def _handle_set_disguise(
     The veil's displayed values are derived from the race registry, never
     supplied through ``event_context``. A cast at another entity always
     applies the derived veil. A cast at the actor toggles only against a
-    veil this verb itself placed: a DIVINE veil is lifted, while a mundane
-    veil (an authored declaration) or an unveiled state is refreshed, so a
-    caster is never trapped behind their own face and never strips the
-    authored disguise their character card starts the game wearing.
+    veil this verb itself placed: a veil the verb placed is lifted, while an
+    authored veil or an unveiled state is refreshed, so a caster is never
+    trapped behind their own face and never strips the authored disguise
+    their character card starts the game wearing.
 
     Every member of the resolved audience is written individually, so an
     ALLIES-audience veil (the capstone's party-wide veil) reaches each
@@ -124,10 +123,7 @@ def _handle_set_disguise(
     del scale, context
     pending: list[PendingEffect] = []
     for target in targets:
-        if (
-            target is actor
-            and disguise_provenance_of(target) == DISGUISE_PROVENANCE_DIVINE
-        ):
+        if target is actor and was_cast_placed(target):
             pending.append(
                 PendingEffect(
                     target,
@@ -155,28 +151,26 @@ def _handle_reveal_disguise(
     context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
-    """Stage one provenance-scoped reveal attempt per target.
+    """Stage one unconditional reveal attempt per target.
 
-    The attempt always completes and is reported, never rejected: a veil the
-    declared strength cannot pierce, or no veil at all, resolves as a clean
-    no-op (design D4), so the action pays its cost and the caster learns
-    nothing beyond the attempt itself. The outcome token is decided against
-    the pre-action state; the staged write re-checks the same strength table
-    at commit, keeping that table in the deterministic-core primitive.
+    The attempt always completes and is reported, never rejected: no veil at
+    all resolves as a clean no-op, so the action pays its cost and the
+    caster learns nothing beyond the attempt itself. This world admits
+    exactly one grade of veil, so a reveal that finds one always lifts it —
+    there is no strength table to consult. The outcome token is decided
+    against the pre-action state; the staged write re-checks presence at
+    commit, keeping that check in the deterministic-core primitive.
     """
     del actor, scale, context
-    strength = parse_effect(effect_id).strength
     pending: list[PendingEffect] = []
     for target in targets:
-        outcome = "lifted" if reveal_can_pierce(target, strength) else "noop"
+        outcome = "lifted" if reveal_can_pierce(target) else "noop"
         pending.append(
             PendingEffect(
                 target,
                 f"reveal_{outcome}|{_entity_key(target)}",
                 frozenset({"traits"}),
-                lambda target=target, strength=strength: reveal_disguise_effect(
-                    target, strength
-                ),
+                lambda target=target: reveal_disguise_effect(target),
             )
         )
     return pending

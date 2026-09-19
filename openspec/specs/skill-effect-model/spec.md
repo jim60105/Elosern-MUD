@@ -128,18 +128,21 @@ payload (`revoke_grants:<anything>`) SHALL raise `ValueError` at parse and there
 - **WHEN** a skill declares `revoke_grants:all`
 - **THEN** `parse_effect` raises `ValueError` and the registry fails to import
 
-`reveal_disguise` SHALL accept exactly two closed grammar forms: the bare prefix, parsing to a
-typed dataclass carrying the mundane-only strength, and `reveal_disguise:true_name`, parsing to the
-same dataclass carrying the any-provenance strength. Every other payload SHALL raise `ValueError` at
-parse and therefore at registry load.
+`reveal_disguise` SHALL be a BARE prefix: it parses into a payload-free frozen marker dataclass
+carrying no strength, and any payload — including the retired `reveal_disguise:true_name` form —
+SHALL raise `ValueError` at parse and therefore at registry load. The grammar carries no strength
+because a veil has only one grade: nothing in this world veils an entity except the bloodline-gated
+divine mystery, so a reveal either lifts a veil or finds none.
 
-#### Scenario: The bare reveal prefix parses at mundane-only strength
+#### Scenario: The bare reveal prefix parses into its marker dataclass
 - **WHEN** `parse_effect("reveal_disguise")` is called
-- **THEN** it returns the reveal dataclass carrying the mundane-only strength
+- **THEN** it returns the payload-free reveal marker dataclass, which carries no strength field —
+  the mundane-only strength no longer exists
 
-#### Scenario: The true-name form parses at any-provenance strength
+#### Scenario: The retired true-name form fails at parse
 - **WHEN** `parse_effect("reveal_disguise:true_name")` is called
-- **THEN** it returns the reveal dataclass carrying the any-provenance strength
+- **THEN** it raises `ValueError` and the registry fails to import — the strength-carrying grammar is
+  retired, and an unqualified reveal now has the any-provenance meaning the suffix used to mark
 
 #### Scenario: An unknown reveal payload fails at registry load
 - **WHEN** a skill declares `reveal_disguise:everything`

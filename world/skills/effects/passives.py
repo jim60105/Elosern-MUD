@@ -149,30 +149,15 @@ class DisguiseEffect:
     """Replace the target's displayed stats with a disguise override."""
 
 
-class RevealStrength(StrEnum):
-    """Closed vocabulary of reveal strengths (divine-veil-reveal D3).
-
-    The two strengths are the whole grammar: a mundane reveal pierces a
-    veil of mundane provenance only, and the true-name reveal pierces a veil
-    of either provenance. There is deliberately no third strength.
-    """
-
-    MUNDANE_ONLY = "mundane_only"
-    ANY_PROVENANCE = "any_provenance"
-
-
 @dataclass(frozen=True)
 class RevealDisguiseEffect:
-    """Lift a target's veil when its provenance falls within the strength.
+    """Lift a target's veil, whatever it is.
 
-    The bare prefix parses at ``MUNDANE_ONLY`` (clears a mundane veil and
-    leaves a divine one in place); ``reveal_disguise:true_name`` parses at
-    ``ANY_PROVENANCE`` (clears a veil of either provenance). The two closed
-    forms are validated at parse so an authoring mistake fails at registry
-    load rather than at cast.
+    This world admits exactly one grade of veil (collapse-veil-reveal-line):
+    only the bloodline-gated divine mystery can write one, so a reveal either
+    lifts the veil it finds or finds none. The bare prefix is the whole
+    grammar; any payload fails at parse, and therefore at registry load.
     """
-
-    strength: RevealStrength
 
 
 @dataclass(frozen=True)

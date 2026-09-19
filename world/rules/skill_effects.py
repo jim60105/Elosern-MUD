@@ -10,7 +10,6 @@ from typing import Any
 from world.lore.races import RACE_REGISTRY
 from world.skills.effects import (
     DisguiseEffect,
-    RevealStrength,
     RuleTableEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
@@ -156,13 +155,6 @@ def apply_disguise_effect(entity: Any, overrides: dict[str, int]) -> None:
     entity.db.disguised_stats = dict(overrides)
 
 
-# Provenance vocabulary of the disguise layer (divine-mystery cast vs any
-# authored origin). ``divine-veil-reveal`` consumes this record; an entity
-# without one reads as mundane.
-DISGUISE_PROVENANCE_DIVINE = "divine"
-DISGUISE_PROVENANCE_MUNDANE = "mundane"
-
-
 def mundane_veil_values() -> dict[str, int]:
     """The deterministic displayed combat five at the mundane ceilings.
 
@@ -183,71 +175,62 @@ def mundane_veil_values() -> dict[str, int]:
     }
 
 
-def disguise_provenance_of(entity: Any) -> str:
-    """The provenance of the veil the layer currently holds.
+def was_cast_placed(entity: Any) -> bool:
+    """Whether the veil verb itself wrote the layer this entity carries.
 
-    Any value other than the divine marker — an absent record, a None shell
-    default, or a foreign string — reads as mundane, so every pre-existing
-    authored veil is correct without a migration.
+    Absent-is-False: a record is written only by the veil verb, so no record
+    means the layer came from an authored origin (an import record, preset
+    activation, or the companion builder) or predates the record's
+    introduction — every one of which reads the same as "not placed by the
+    verb", with no migration required.
     """
-    value = entity.db.disguise_provenance
-    if value == DISGUISE_PROVENANCE_DIVINE:
-        return DISGUISE_PROVENANCE_DIVINE
-    return DISGUISE_PROVENANCE_MUNDANE
+    return bool(entity.db.disguise_placed_by_cast)
 
 
-def record_disguise_provenance(entity: Any, provenance: str) -> None:
-    """Record the provenance of the veil just written onto ``entity``."""
-    entity.db.disguise_provenance = provenance
+def record_cast_placement(entity: Any) -> None:
+    """Record that the veil verb itself just wrote this entity's layer."""
+    entity.db.disguise_placed_by_cast = True
 
 
 def clear_disguise_effect(entity: Any) -> None:
-    """Lift a disguise layer and its provenance record in one operation."""
+    """Lift a disguise layer and its placement record in one operation."""
     del entity.db.disguised_stats
-    del entity.db.disguise_provenance
+    del entity.db.disguise_placed_by_cast
 
 
 def apply_divine_disguise(entity: Any) -> None:
-    """Write a divine veil: the derived mapping plus its provenance.
+    """Write a divine veil: the derived mapping plus its placement record.
 
-    Composes the narrow display write with the provenance record so the
+    Composes the narrow display write with the placement record so the
     single-staged effect keeps ``apply_disguise_effect``'s own source free of
     trait expressions while still writing the record beside the mapping.
     """
     apply_disguise_effect(entity, mundane_veil_values())
-    record_disguise_provenance(entity, DISGUISE_PROVENANCE_DIVINE)
+    record_cast_placement(entity)
 
 
-def reveal_can_pierce(entity: Any, strength: RevealStrength) -> bool:
-    """Whether the declared strength could lift the veil the entity holds.
+def reveal_can_pierce(entity: Any) -> bool:
+    """Whether the entity carries a veil a reveal can lift.
 
-    A target carrying no disguise layer has nothing to reveal. Within the
-    closed two-strength grammar, only the true-name strength pierces a
-    divine veil; a mundane reveal stops at one. This predicate is the single
-    source of that table, shared by the reveal write and the handler's
-    stage-time outcome report.
+    This world admits exactly one grade of veil, because only the
+    bloodline-gated divine mystery can write one, so a reveal either lifts
+    the veil it finds or finds none — there is no provenance to consult.
+    This predicate is the single source of that answer, shared by the reveal
+    write and the handler's stage-time outcome report.
     """
-    if entity.db.disguised_stats is None:
-        return False
-    if (
-        strength is RevealStrength.MUNDANE_ONLY
-        and disguise_provenance_of(entity) == DISGUISE_PROVENANCE_DIVINE
-    ):
-        return False
-    return True
+    return entity.db.disguised_stats is not None
 
 
-def reveal_disguise_effect(entity: Any, strength: RevealStrength) -> bool:
-    """Lift a veil whose provenance the declared strength covers.
+def reveal_disguise_effect(entity: Any) -> bool:
+    """Lift whatever veil the entity carries.
 
-    Clears the display layer and its provenance record in the same operation
-    (``clear_disguise_effect``), so a reveal that pierces never leaves the
-    record behind. Returns True when the veil was cleared and False for a
-    reported no-op — nothing hidden, or a provenance the strength cannot
-    pierce — so a failed reveal costs the action without leaking the veil's
-    existence through a rejection.
+    Clears the display layer and its placement record in the same operation
+    (``clear_disguise_effect``), so a reveal that finds a veil never leaves
+    the record behind. Returns True when a veil was cleared and False for a
+    reported no-op — nothing to reveal — so a failed reveal costs the action
+    without leaking the veil's existence through a rejection.
     """
-    if not reveal_can_pierce(entity, strength):
+    if not reveal_can_pierce(entity):
         return False
     clear_disguise_effect(entity)
     return True

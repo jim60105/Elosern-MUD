@@ -343,7 +343,7 @@ def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entiti
 _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("traits", "traits"),
     ("disguised_stats", None),
-    ("disguise_provenance", None),
+    ("disguise_placed_by_cast", None),
     ("sexual_traits", "traits"),
     ("virgin", "sexual_state"),
     ("experience_types", "sexual_state"),

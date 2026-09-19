@@ -10,8 +10,8 @@ The package splits the historical single module into cohesive submodules
 while preserving its full public surface:
 
 - :mod:`world.skills.effects.passives` — the ownership/passive family,
-  the ``EffectAudience``/``RevealStrength`` vocabularies, and
-  ``_known_buff_keys`` (rulebook-only; never imports world.rules).
+  the ``EffectAudience`` vocabulary, and ``_known_buff_keys``
+  (rulebook-only; never imports world.rules).
 - :mod:`world.skills.effects.sexual` — the sexual event/act effect family.
 - :mod:`world.skills.effects.combat` — the combat/cleanse/heal/gauge
   effect family.
@@ -49,7 +49,6 @@ from world.skills.effects.passives import (  # noqa: F401
     GrowthRateEffect,
     MovementEffect,
     RevealDisguiseEffect,
-    RevealStrength,
     RevokeGrantsEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
