@@ -45,6 +45,7 @@ from world.rules.target_facts import matches_target_predicate
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
 from world.skills.effects import (
+    DamageEffect,
     DamagePolicy,
     EffectPolicy,
     ResolvedEffect,
@@ -270,18 +271,22 @@ def _adjusted_defense(entity: Any) -> float:
     ).get("defense", 0)
 
 
-def _parse_damage_effect(effect_id: str) -> tuple[str, str]:
-    parts = effect_id.split(":")
-    if len(parts) != 3 or parts[0] != "damage":
-        raise ValueError(
-            "damage effect must be damage:<element>:<school>"
-        )
-    _, element, school = parts
-    if element != "none" and element not in ELEMENT_REGISTRY:
-        raise ValueError(f"unknown damage element {element!r}")
-    if school not in {"physical", "magic"}:
-        raise ValueError(f"unknown damage school {school!r}")
-    return element, school
+def _parse_damage_effect(effect_id: str) -> DamageEffect:
+    """Parse and fully validate one damage effect for cast-time resolution.
+
+    Delegates the string grammar to the canonical ``parse_effect`` (the
+    registry-load-time parser) instead of re-splitting the shape here, and
+    layers the one cast-time-only check ``parse_effect`` deliberately
+    excludes: a non-``None`` element must be a real ``ELEMENT_REGISTRY``
+    key. ``None`` (the elementless sentinel) is always legal and is never
+    checked against the registry.
+    """
+    parsed = parse_effect(effect_id)
+    if not isinstance(parsed, DamageEffect):
+        raise ValueError(f"expected damage effect, got {effect_id!r}")
+    if parsed.element is not None and parsed.element not in ELEMENT_REGISTRY:
+        raise ValueError(f"unknown damage element {parsed.element!r}")
+    return parsed
 
 
 def _apply_hp_delta(entity: Any, delta: int) -> None:
@@ -335,7 +340,7 @@ def _handle_damage(
     at the unscaled ``combat.yaml`` damage floor (the floor itself is never
     scaled, so even a 1/4 cast lands its minimum hit).
     """
-    _, school = _parse_damage_effect(effect_id)
+    school = _parse_damage_effect(effect_id).school
     attack_key = "atk_phys" if school == "physical" else "magic_power"
     coefficient = _extract_effect_coefficient(event_context)
     damage_policy = _extract_damage_policy(event_context)

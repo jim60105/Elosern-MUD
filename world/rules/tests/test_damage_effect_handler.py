@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 from copy import deepcopy
+import inspect
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from world.rules import combat as combat_module
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -41,6 +43,14 @@ assert any(
     isinstance(effect, RuleTableEffect) for effect in _T_GUARDIAN.parsed_effects
 ), parse_effect.__doc__ or "rule-table shape"
 
+# An elementless physical strike: the reserved ``damage:none:physical`` token.
+# The cast-time wrapper must treat ``None`` as always legal (never checked
+# against ELEMENT_REGISTRY), before and after the wrapper consolidation.
+_T_ELEMENTLESS = make_skill(
+    "t_elementless_strike",
+    effects=("damage:none:physical",),
+)
+
 _SCOPE = synthetic_registries(
     "skills",
     "races",
@@ -49,7 +59,12 @@ _SCOPE = synthetic_registries(
     "elements",
     "items",
     "sexual_acts",
-    extra={"skills": {_T_GUARDIAN.key: _T_GUARDIAN}},
+    extra={
+        "skills": {
+            _T_GUARDIAN.key: _T_GUARDIAN,
+            _T_ELEMENTLESS.key: _T_ELEMENTLESS,
+        }
+    },
 )
 
 
@@ -127,6 +142,18 @@ class DamageEffectHandlerTests(unittest.TestCase):
                 actor, [target], "damage:fire:magic", {}, 1.0
             )[0]
         self.assertTrue(pending.description.endswith("|0|0"))
+
+
+class DamageParserArchitectureTests(unittest.TestCase):
+    """The ``damage:<element>:<school>`` grammar has exactly one parser."""
+
+    def test_cast_time_damage_parser_delegates_to_parse_effect(self):
+        """The cast-time wrapper must not re-split the effect string itself."""
+        source = inspect.getsource(combat_module._parse_damage_effect)
+        self.assertIn("parse_effect(effect_id)", source)
+        for token in ('split(":")', 'partition(":")'):
+            with self.subTest(token=token):
+                self.assertNotIn(token, source)
 
 
 def _staged_amount(actor, target, effect_id, modifiers):
@@ -386,3 +413,20 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
             ["roll", "damage"],
         )
         self.assertLess(npc.traits.hp.value, before)
+
+    @covers_requirement(
+        "damage-effect-handlers::damage-element-school-is-the-defined-convention-for-this-prefix"
+    )
+    def test_elementless_damage_resolves_through_the_cast_time_wrapper(self):
+        grant_lineage(self.actor, [_T_ELEMENTLESS.key])
+        request = ActionRequest(
+            self.actor,
+            _T_ELEMENTLESS.key,
+            [self.target],
+            BattlefieldActionContext(self.request.context.battlefield),
+        )
+        before = _stored_hp(self.target)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(_stored_hp(self.target), before)
