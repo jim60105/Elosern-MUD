@@ -28,11 +28,10 @@ def _services_fixture(character) -> None:
         SHIPPED_WEAPON_KEY,
     )
     from world.maps.bootstrap import (
-        GENERAL_STORE_TAG,
-        GUILD_HALL_TAG,
         sync_grid,
         sync_service_interiors,
     )
+    from world.lore.settlements.places import PLACE_REGISTRY
     from world.quests.catalog import register_catalog
     from world.rules.clock import get_world_clock
     from world.rules.guild import register_adventurer
@@ -56,8 +55,8 @@ def _services_fixture(character) -> None:
     register_catalog_offers(catalog)
     sync_guild_economy()
 
-    halls = search_object_by_tag(GUILD_HALL_TAG)
-    stores = search_object_by_tag(GENERAL_STORE_TAG)
+    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
+    stores = search_object_by_tag(PLACE_REGISTRY["altoria_general_store"].key)
     hall = halls[0] if halls else None
     store = stores[0] if stores else None
     staff = None
