@@ -24,12 +24,17 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-desktop-shell::client-state-reduction-is-strict-and-atomic"
     )
     def test_protocol_reducer_node_suite_passes(self):
+        # Every protocol_*.test.js sibling is evidence; node --test silently
+        # ignores a missing path whenever another path resolves.
+        suite = sorted(
+            str(path)
+            for path in (REPO_ROOT / "web/static/webclient/js/tests").glob(
+                "protocol_*.test.js"
+            )
+        )
+        self.assertTrue(suite, "no protocol reducer Node siblings discovered")
         result = subprocess.run(
-            [
-                "node",
-                "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/protocol.test.js"),
-            ],
+            ["node", "--test", *suite],
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,

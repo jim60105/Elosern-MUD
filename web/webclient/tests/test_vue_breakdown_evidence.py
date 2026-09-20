@@ -104,10 +104,19 @@ class VueBreakdownEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         v5-accept / v4-reject character-validator tests and the totals-only
         v5 character-menu rendering.
         """
+        # Every protocol_*.test.js sibling is evidence; node --test silently
+        # ignores a missing path whenever another path resolves.
+        suite = sorted(
+            str(path)
+            for path in (REPO_ROOT / "web/static/webclient/js/tests").glob(
+                "protocol_*.test.js"
+            )
+        )
+        self.assertTrue(suite, "no protocol Node siblings discovered")
         result = run_node(
             [
                 "--test",
-                "web/static/webclient/js/tests/protocol.test.js",
+                *suite,
                 "web/static/webclient/js/tests/character_menu.test.js",
             ],
             timeout=300,
