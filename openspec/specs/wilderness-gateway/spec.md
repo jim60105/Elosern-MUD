@@ -29,8 +29,8 @@ in change 12's `ANCHOR_PLACEMENT_REGISTRY`. The registry SHALL NOT be required t
 entry for every `ANCHOR_PLACEMENT_REGISTRY` key. It SHALL hold one entry per settlement
 reachable across the wilderness, and currently holds two. The first is keyed
 `"capital_altoria"`: a 5×5 all-`#` mask at origin `(58, 98)` (anchor cell `(60, 100)`) with
-gates `return_direction="n"` → `(2, 0, "capital_altoria")` (approach cell `(60, 97)`) and
-`return_direction="s"` → `(2, 4, "capital_altoria")` (approach cell `(60, 103)`). The second is
+gates `return_direction="n"` → `(3, 0, "capital_altoria")` (approach cell `(60, 97)`) and
+`return_direction="w"` → `(6, 3, "capital_altoria")` (approach cell `(63, 100)`). The second is
 keyed `"village_ciaran"`: a smaller mask placed well clear of the capital's footprint, with a
 single gate returning to the village's entrance node.
 `anchor_cell` SHALL be the bounding-box midpoint `((min_x + max_x) // 2, (min_y + max_y) // 2)`
@@ -44,7 +44,7 @@ entry's footprint.
      two-entry state. -->
 - **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
 - **THEN** it contains exactly two entries; the `"capital_altoria"` entry has a 5×5 mask of `#`,
-  `origin_xy` `(58, 98)`, and gates exactly `("n" → (2,0)), ("s" → (2,4))` on map
+  `origin_xy` `(58, 98)`, and gates exactly `("n" → (3,0)), ("w" → (6,3))` on map
   `capital_altoria`; the `"village_ciaran"` entry has a smaller mask and one gate returning to
   the village's entrance node; and no test asserts that any other `ANCHOR_PLACEMENT_REGISTRY`
   key must also appear
@@ -53,8 +53,8 @@ entry's footprint.
 - **WHEN** `footprint_cells`, `anchor_cell`, and `approach_cell` are read for the
   `"capital_altoria"` entry
 - **THEN** `footprint_cells` is the 25-cell set `58 <= x <= 62 and 98 <= y <= 102`, `anchor_cell`
-  is `(60, 100)`, the `"n"` gate's approach cell is `(60, 97)`, and the `"s"` gate's approach
-  cell is `(60, 103)`
+  is `(60, 100)`, the `"n"` gate's approach cell is `(60, 97)`, and the `"w"` gate's approach
+  cell is `(63, 100)`
 
 #### Scenario: Gate identity is globally unique
 
@@ -165,17 +165,19 @@ branch" requirement below, which applies uniformly regardless of which routing b
 #### Scenario: Traversing north from the south approach cell returns through the south gate
 - **WHEN** a character at `(60, 97)` traverses the `"north"` exit
 - **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at grid
-  `(2, 0, "capital_altoria")`
+  `(3, 0, "capital_altoria")`
 
 #### Scenario: Traversing south from the north approach cell returns through the north gate
-- **WHEN** a character at `(60, 103)` traverses the `"south"` exit
-- **THEN** the character's new location is the `capital_altoria` North Gate `GridRoom` object at
-  grid `(2, 4, "capital_altoria")` (the same object instance that existed before the character
+<!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The capital's
+     second gate is now the East Gate, approached from the east and entered travelling west. -->
+- **WHEN** a character at `(63, 100)` traverses the `"west"` exit
+- **THEN** the character's new location is the `capital_altoria` East Gate `GridRoom` object at
+  grid `(6, 3, "capital_altoria")` (the same object instance that existed before the character
   first entered the wilderness through it)
 
 #### Scenario: The return direction at the wrong approach cell is not a gateway
-- **WHEN** a character at `(60, 97)` traverses `"south"`, or a character at `(60, 103)` traverses
-  `"north"`
+- **WHEN** a character at `(60, 97)` traverses `"south"`, or a character at `(63, 100)` traverses
+  `"east"`
 - **THEN** the traversal routes like the stock `WildernessExit` (ordinary coordinate movement to
   the provider-valid neighbor), reaching no grid room
 
