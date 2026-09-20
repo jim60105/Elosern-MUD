@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     region_for_coordinates,
@@ -29,6 +29,34 @@ def live_region_registry():
     )
 
 
+def live_gateway_entry():
+    """The settlement entry authoring both gateway faces (north + west)."""
+    import importlib
+
+    entries = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    ).values()
+    candidates = [
+        entry
+        for entry in entries
+        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+    ]
+    if len(candidates) != 1:
+        raise AssertionError("exactly one wilderness entry must author both gateway faces")
+    return candidates[0]
+
+
+_ENTRY = live_gateway_entry()
+_EAST_GATE = _ENTRY.gate_for("w")
+EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+EAST_APPROACH = _ENTRY.approach_cell(_EAST_GATE)
+SOUTH_GATE_XYZ = (
+    *_ENTRY.gate_for("n").grid_xy,
+    _ENTRY.gate_for("n").z_map_key,
+)
+
+
 class CityWildernessRoundTripTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -40,8 +68,8 @@ class CityWildernessRoundTripTests(EvenniaTest):
         sync_all()
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 
     def _exit(self, direction):
         return [e for e in self.char1.location.exits if e.key == direction][0]
@@ -53,24 +81,27 @@ class CityWildernessRoundTripTests(EvenniaTest):
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         before = get_world_clock().tick
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
-        self.assertEqual(self.char1.location.coordinates, (60, 103))
+        self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
         entry_room = self.char1.location
 
-        # One east step off the north-gate approach leaves the gate cell;
+        # One east step off the east-gate approach leaves the gate cell
+        # (the footprint lies west);
         # the description follows the deterministic terrain model.
         self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(self.char1.location.coordinates, (61, 103))
+        ax, ay = EAST_APPROACH
+        self.assertEqual(self.char1.location.coordinates, (ax + 1, ay))
         self.assertEqual(
             self.char1.location.ndb.active_desc,
-            terrain_description(61, 103),
+            terrain_description(ax + 1, ay),
         )
 
-        # Return west to the approach cell, then south to the North Gate.
+        # Return west to the approach cell, then west again through the
+        # gateway to the East Gate.
         self._exit("west").at_traverse(self.char1, self.char1.location)
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.east_gate)
 
         # 1 entry + 1 east + 1 west + 1 return = 4 legs.
         self.assertEqual(get_world_clock().tick, before + 4 * 9000)
@@ -86,15 +117,16 @@ class CityWildernessRoundTripTests(EvenniaTest):
         entry_monsters = [
             obj
             for obj, coords in coordinates.items()
-            if isinstance(obj, Monster) and coords == (60, 103)
+            if isinstance(obj, Monster) and coords == EAST_APPROACH
         ]
         self.assertEqual(len(entry_monsters), 1)
-        self.assertEqual(entry_monsters[0].db.population_key, "wilderness:60:103")
+        ax, ay = EAST_APPROACH
+        self.assertEqual(entry_monsters[0].db.population_key, f"wilderness:{ax}:{ay}")
         retained = list(script.db.rooms.values())
         self.assertIn(entry_room, retained or script.db.unused_rooms)
 
     def test_wilderness_room_renders_via_return_appearance(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertTrue(self.char1.location.return_appearance(self.char1))
         # The rendered location name delegates to the deterministic terrain
         # model: the region row the coordinate partition resolves to.

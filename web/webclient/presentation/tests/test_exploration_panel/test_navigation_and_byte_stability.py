@@ -9,7 +9,7 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope

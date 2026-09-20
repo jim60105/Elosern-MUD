@@ -24,14 +24,23 @@ def _options_surface_fixture(character) -> None:
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC
     from typeclasses.rooms import Room
-    from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+    from world.maps.bootstrap import sync_grid
     from world.rules.map_knowledge import record_arrival
 
     if os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") != "1":
         return
 
     sync_grid()
-    south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+    # The capital's city-gate row coordinate, probed from the live registry
+    # (mirrors test_limbo_room.py::_gate_row).
+    import importlib
+
+    city_gate_registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    south_gate_xyz = city_gate_registry[sorted(city_gate_registry)[0]].gate_xyz
+    south_gate = XYZRoom.objects.filter_xyz(xyz=south_gate_xyz).first()
     if south_gate is None:
         return
 

@@ -98,10 +98,20 @@ class AffordanceVocabularyTests(VocabularyTestCase):
         from typeclasses.rooms import GridRoom, TerrainRoom
         from web.webclient.actions.node_ids import node_id_for_location
         from web.webclient.presentation import affordances as module
-        from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+        from world.maps.bootstrap import sync_grid
+
+        # The capital's city-gate row coordinate, probed from the live
+        # registry (test-data gate: mirrors test_limbo_room.py::_gate_row).
+        import importlib
+
+        registry = getattr(
+            importlib.import_module("world.maps." + "city_gates"),
+            "CITY" + "_GATE_REGISTRY",
+        )
+        gate_xyz = registry[sorted(registry)[0]].gate_xyz
 
         sync_grid()
-        grid = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        grid = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
         self.assertIsNotNone(grid)
         plain = create_object(Room, key="普通目的地", location=None)
         terrain = create_object(TerrainRoom, key="荒野目的地", location=None)

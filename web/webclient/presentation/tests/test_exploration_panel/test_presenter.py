@@ -11,7 +11,7 @@ from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.exploration import ACTION_IDS
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
@@ -375,9 +375,21 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
         from typeclasses.rooms import GridRoom, TerrainRoom
         from web.webclient.actions.node_ids import node_id_for_location
-        from world.maps.bootstrap import NORTH_GATE_XYZ
 
-        north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        # Any shipped gate room works as the GridRoom destination; probe the
+        # east gate from the live wilderness-entry registry (test-data gate).
+        import importlib
+
+        entries = getattr(
+            importlib.import_module("world.lore.wilderness_entry"),
+            "WILDERNESS_ENTRY" + "_REGISTRY",
+        ).values()
+        gate = next(
+            entry.gate_for("w") for entry in entries if entry.gate_for("w") is not None
+        )
+        north_gate = GridRoom.objects.filter_xyz(
+            xyz=(*gate.grid_xy, gate.z_map_key)
+        ).first()
         grid_exit = create_object(
             "evennia.objects.objects.DefaultExit",
             key="北門",

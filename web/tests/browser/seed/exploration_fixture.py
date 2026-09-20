@@ -22,7 +22,6 @@ def _exploration_fixture(character) -> None:
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC, NPC
     from world.maps.bootstrap import (
-        SOUTH_GATE_XYZ,
         sync_grid,
         sync_service_interiors,
     )
@@ -33,7 +32,16 @@ def _exploration_fixture(character) -> None:
 
     sync_grid()
     sync_service_interiors()
-    south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+    # The capital's city-gate row coordinate, probed from the live registry
+    # (mirrors test_limbo_room.py::_gate_row).
+    import importlib
+
+    city_gate_registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    south_gate_xyz = city_gate_registry[sorted(city_gate_registry)[0]].gate_xyz
+    south_gate = XYZRoom.objects.filter_xyz(xyz=south_gate_xyz).first()
     if south_gate is None:
         return
     character.location = south_gate

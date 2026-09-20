@@ -8,13 +8,37 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.limbo import LIMBO_KEY
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 WILD = CLOCK_YAML["command_defaults"]["wilderness_move"]
+
+
+def live_gateway_entry():
+    """The settlement entry authoring both gateway faces (north + west)."""
+    import importlib
+
+    entries = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    ).values()
+    candidates = [
+        entry
+        for entry in entries
+        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+    ]
+    if len(candidates) != 1:
+        raise AssertionError("exactly one wilderness entry must author both gateway faces")
+    return candidates[0]
+
+
+_ENTRY = live_gateway_entry()
+_EAST_GATE = _ENTRY.gate_for("w")
+EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+SOUTH_GATE_XYZ = (*_ENTRY.gate_for("n").grid_xy, _ENTRY.gate_for("n").z_map_key)
 
 
 class MovementLineageRoundTripTests(EvenniaTest):
@@ -30,9 +54,9 @@ class MovementLineageRoundTripTests(EvenniaTest):
         sync_wilderness()
         self.limbo = search_object(LIMBO_KEY, exact=True)[0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [
-            e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)
+            e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)
         ][0]
 
     def test_every_lineage_charges_and_one_failure_charges_nothing(self):
@@ -48,8 +72,8 @@ class MovementLineageRoundTripTests(EvenniaTest):
         self.assertIs(self.char1.location, self.south_gate)
 
         # 2. Across the city via CostedXYZExit links: South Gate -> 南大道 ->
-        #    中央廣場 -> 北大道 -> North Gate (4 move legs).
-        path = ["南大道", "中央廣場", "北大道", "北門"]
+        #    大道北段 -> 中央廣場 -> 公會前 -> 東市 -> East Gate (6 move legs).
+        path = ["南大道", "大道北段", "中央廣場", "公會前", "東市", "東門"]
         for expected_key in path:
             exit_obj = [
                 e
@@ -58,21 +82,21 @@ class MovementLineageRoundTripTests(EvenniaTest):
             ][0]
             exit_obj.at_traverse(self.char1, exit_obj.destination)
             self.assertEqual(self.char1.location.key, expected_key)
-        self.assertIs(self.char1.location, self.north_gate)
+        self.assertIs(self.char1.location, self.east_gate)
 
         # 3. Into the wilderness through WildernessGateExit (wilderness_move),
         #    two intermediate steps, and back via WildernessReturnExit's
         #    special-cased return (3 more wilderness_move legs).
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         entry_xy = self.char1.location.coordinates
         for direction in ("east", "west"):
             exit_obj = [e for e in self.char1.location.exits if e.key == direction][0]
             exit_obj.at_traverse(self.char1, self.char1.location)
         self.assertEqual(self.char1.location.coordinates, entry_xy)
-        exit_obj = [e for e in self.char1.location.exits if e.key == "south"][0]
+        exit_obj = [e for e in self.char1.location.exits if e.key == "west"][0]
         exit_obj.at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
+        self.assertIs(self.char1.location, self.east_gate)
 
         # 4. A synthetic origin/return Exit pair, mirroring change 14's
         #    spawn_instance_room() call shape (2 move legs).
@@ -99,7 +123,7 @@ class MovementLineageRoundTripTests(EvenniaTest):
         command.func()
         self.assertIs(self.char1.location, origin)
 
-        grid_legs = 1 + 4 + 2  # Limbo bridge + 4 city links + instance pair
+        grid_legs = 1 + 6 + 2  # Limbo bridge + 6 city links + instance pair
         wild_legs = 1 + 2 + 1  # entry + east + west + return
         self.assertEqual(
             get_world_clock().tick,

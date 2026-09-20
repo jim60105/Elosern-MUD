@@ -19,9 +19,24 @@ from web.webclient.actions.exploration_actions import (
     _move_adapter,
 )
 from web.webclient.actions.node_ids import node_id_for_location
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.map_knowledge import encode_grid, encode_room, encode_wild
+
+
+def _south_gate_xyz():
+    """The capital's city-gate row coordinate, probed from the live registry
+    (test-data gate: mirrors test_limbo_room.py::_gate_row)."""
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    keys = sorted(registry)
+    if not keys:
+        raise AssertionError("no city gate row exists")
+    return registry[keys[0]].gate_xyz
 
 
 class NodeIdEncoderTests(EvenniaTestCase):
@@ -43,11 +58,12 @@ class NodeIdEncoderTests(EvenniaTestCase):
         self.assertEqual(_current_node(self.player), expected)
 
     def test_grid_room_encodes_grid_node(self):
-        gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        south_gate_xyz = _south_gate_xyz()
+        gate = GridRoom.objects.filter_xyz(xyz=south_gate_xyz).first()
         self.assertIsNotNone(gate)
         self.player.location = gate
         expected = encode_grid(
-            str(SOUTH_GATE_XYZ[2]), SOUTH_GATE_XYZ[0], SOUTH_GATE_XYZ[1]
+            str(south_gate_xyz[2]), south_gate_xyz[0], south_gate_xyz[1]
         )
         self.assertEqual(node_id_for_location(gate), expected)
         self.assertEqual(_current_node(self.player), expected)

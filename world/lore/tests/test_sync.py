@@ -112,7 +112,7 @@ class LoreSyncTests(EvenniaTestCase):
             "capital_altoria",
             ("#",),
             (120, 120),
-            (WildernessGate("n", (2, 0), "capital_altoria"),),
+            (WildernessGate("n", (3, 0), "capital_altoria"),),
         )
         with (
             patch.dict(
@@ -131,7 +131,7 @@ class LoreSyncTests(EvenniaTestCase):
         self.assertEqual(first[0].db.fields, _db_safe(asdict(probe)))
         self.assertEqual(
             first[0].db.fields["gates"],
-            ({"return_direction": "n", "grid_xy": (2, 0), "z_map_key": "capital_altoria"},),
+            ({"return_direction": "n", "grid_xy": (3, 0), "z_map_key": "capital_altoria"},),
         )
         self.assertEqual(first[0].db.fields["shape"], ("#",))
 
