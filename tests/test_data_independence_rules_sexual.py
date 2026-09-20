@@ -46,6 +46,7 @@ MIGRATED_FILES = (
 #: the zero-findings guarantee covers every slice verbatim.
 _SPLIT_PACKAGES = (
     "test_sexual_act_effects",
+    "test_status_query",
 )
 
 

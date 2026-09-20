@@ -48,6 +48,32 @@ MIGRATED_FILES = (
 #: All manifest files are pure behavior tests: zero findings allowed.
 BEHAVIOR_FILES = MIGRATED_FILES
 
+#: Oversized modules later split into same-named packages (rules test split).
+#: The ledger/seed checks stay pinned on the original flat paths; the
+#: file-level checks below expand each split path onto its package slices so
+#: the zero-findings guarantee covers every slice verbatim.
+_SPLIT_PACKAGES = (
+    "test_combat_session_flow",
+    "test_freeform_casting",
+)
+
+
+def _finding_scan_files(paths) -> tuple[str, ...]:
+    """Every manifest file to scan, following split modules into slices."""
+    files: list[str] = []
+    for rel in paths:
+        name = rel.rsplit("/", 1)[-1][: -len(".py")]
+        if name in _SPLIT_PACKAGES:
+            package = (REPO_ROOT / rel).with_suffix("")
+            files.extend(
+                str(path.relative_to(REPO_ROOT))
+                for path in sorted(package.rglob("*.py"))
+                if "__pycache__" not in path.parts
+            )
+        else:
+            files.append(rel)
+    return tuple(files)
+
 
 class RulesCombatTestDataMigrationContractTests(DataIndependenceContractMixin, unittest.TestCase):
 
@@ -59,7 +85,7 @@ class RulesCombatTestDataMigrationContractTests(DataIndependenceContractMixin, u
         self.assert_no_ledger_exemption(MIGRATED_FILES)
 
     def test_migrated_files_carry_zero_findings(self):
-        self.assert_zero_findings(BEHAVIOR_FILES)
+        self.assert_zero_findings(_finding_scan_files(BEHAVIOR_FILES))
 
     def test_gate_is_green_and_reports_no_violation_for_migrated_files(self):
         self.assert_gate_green_for_manifest()

@@ -18,7 +18,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RULES_TESTS = REPO_ROOT / "world" / "rules" / "tests"
 SKILLS_TESTS = REPO_ROOT / "world" / "skills" / "tests"
 
-#: The post-split combat-session family modules (world/rules/tests).
+#: The post-split combat-session family modules (world/rules/tests). The flow
+#: module was later split into a same-named package (rules test split); the
+#: family pin below names the flat stem, and the partition scan follows that
+#: package's slice modules so every class still lives exactly once.
 COMBAT_SESSION_SPLIT_MODULES = {
     "test_combat_session_flow.py",
     "test_combat_session_targeting.py",
@@ -77,6 +80,38 @@ SKILL_REGISTRY_CLASS_MODULES = {
 }
 
 
+def _split_package_modules(tests_dir: Path, split_modules: set[str]) -> dict[str, Path]:
+    """Flat stems later converted into same-named packages.
+
+    A split package keeps the original module stem as its directory name and
+    holds its classes verbatim in ``test_*.py`` slice modules, so the family
+    pins below keep naming the flat stem while the scan follows the slices.
+    """
+    packages: dict[str, Path] = {}
+    for relative in split_modules:
+        package = tests_dir / Path(relative).with_suffix("")
+        if package.is_dir():
+            packages[relative] = package
+    return packages
+
+
+def _family_scan_files(tests_dir: Path, split_modules: set[str]) -> list[tuple[str, Path]]:
+    """(pinned module name, file) pairs for every class-carrying module.
+
+    Flat modules pair with themselves; split-package slices pair with the
+    flat stem their package replaced.
+    """
+    packages = _split_package_modules(tests_dir, split_modules)
+    pairs: list[tuple[str, Path]] = []
+    for path in sorted(tests_dir.glob("*.py")):
+        pairs.append((path.name, path))
+    for relative, package in packages.items():
+        pairs.extend(
+            (relative, slice_path) for slice_path in sorted(package.rglob("test_*.py"))
+        )
+    return pairs
+
+
 def _module_class_occurrences(path: Path) -> dict[str, int]:
     """Count ClassDef occurrences per class name (AST only, no imports)."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -96,11 +131,17 @@ class RulesSkillsTestLayoutContractTests(unittest.TestCase):
             path.name
             for path in RULES_TESTS.glob("test_combat_session_*.py")
             if path.name in COMBAT_SESSION_SPLIT_MODULES
+        } | {
+            relative
+            for relative in _split_package_modules(
+                RULES_TESTS, COMBAT_SESSION_SPLIT_MODULES
+            )
         }
         self.assertEqual(discovered, COMBAT_SESSION_SPLIT_MODULES)
         for relative in COMBAT_SESSION_SPLIT_MODULES:
             self.assertTrue(
-                (RULES_TESTS / relative).is_file(),
+                (RULES_TESTS / relative).is_file()
+                or (RULES_TESTS / Path(relative).with_suffix("")).is_dir(),
                 f"{relative} is missing from world/rules/tests",
             )
 
@@ -128,28 +169,35 @@ class RulesSkillsTestLayoutContractTests(unittest.TestCase):
         "evennia-test-optimization::combat-session-and-skill-registry-test-modules-are-split-into-themed-modules"
     )
     def test_every_presplit_combat_class_lives_in_its_pinned_module(self):
-        self._assert_partition(RULES_TESTS, COMBAT_SESSION_CLASS_MODULES)
+        self._assert_partition(
+            RULES_TESTS, COMBAT_SESSION_CLASS_MODULES, COMBAT_SESSION_SPLIT_MODULES
+        )
 
     @covers_requirement(
         "evennia-test-optimization::combat-session-and-skill-registry-test-modules-are-split-into-themed-modules"
     )
     def test_every_presplit_skill_class_lives_in_its_pinned_module(self):
-        self._assert_partition(SKILLS_TESTS, SKILL_REGISTRY_CLASS_MODULES)
+        self._assert_partition(
+            SKILLS_TESTS, SKILL_REGISTRY_CLASS_MODULES, SKILL_REGISTRY_SPLIT_MODULES
+        )
 
     def _assert_partition(
-        self, tests_dir: Path, class_modules: dict[str, str]
+        self,
+        tests_dir: Path,
+        class_modules: dict[str, str],
+        split_modules: set[str],
     ) -> None:
-        modules = sorted(tests_dir.glob("*.py"))
-        self.assertTrue(modules, f"{tests_dir} has no Python modules")
+        pairs = _family_scan_files(tests_dir, split_modules)
+        self.assertTrue(pairs, f"{tests_dir} has no Python modules")
         per_class: dict[str, list[Path]] = {name: [] for name in class_modules}
         occurrences: dict[str, int] = {name: 0 for name in class_modules}
-        for path in modules:
+        for pinned_name, path in pairs:
             module_occurrences = _module_class_occurrences(path)
             for name in class_modules:
                 count = module_occurrences.get(name, 0)
                 occurrences[name] += count
                 if count:
-                    per_class[name].append(path)
+                    per_class[name].append((pinned_name, path))
         for name, pinned_module in class_modules.items():
             with self.subTest(class_name=name):
                 self.assertEqual(
@@ -159,10 +207,10 @@ class RulesSkillsTestLayoutContractTests(unittest.TestCase):
                     f"{tests_dir.name} (a later definition shadows earlier ones)",
                 )
                 self.assertEqual(
-                    per_class[name],
-                    [tests_dir / pinned_module],
+                    [found for found, _ in per_class[name]],
+                    [pinned_module],
                     f"{name} must live in {pinned_module}, found: "
-                    + ", ".join(path.name for path in per_class[name]),
+                    + ", ".join(path.name for _, path in per_class[name]),
                 )
 
     @covers_requirement(

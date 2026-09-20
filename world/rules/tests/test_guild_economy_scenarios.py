@@ -27,7 +27,11 @@ MODULES = {
     "registration": "world.rules.tests.test_guild_registration",
     "acquire": "world.quests.tests.test_acquire",
     "rewards": "world.rules.tests.test_guild_rewards",
-    "session_flow": "world.rules.tests.test_combat_session_flow",
+    # The combat-session flow suite moved into a same-named package; each
+    # mapped class now resolves through its slice module.
+    "session_flow_innate": "world.rules.tests.test_combat_session_flow.test_innate_skill_flow",
+    "session_flow_rounds": "world.rules.tests.test_combat_session_flow.test_engage_and_player_rounds",
+    "session_flow_commands": "world.rules.tests.test_combat_session_flow.test_attribution_seam_and_command_surface",
     "session_persistence": "world.rules.tests.test_combat_session_persistence",
     "session_recovery": "world.rules.tests.test_combat_session_recovery",
     "exams": "world.rules.tests.test_guild_exams",
@@ -179,28 +183,28 @@ SCENARIO_TO_TEST = {
     ),
     # player-combat-session
     "Present monster can be engaged": ref(
-        "session_flow", "EngageTests", "test_present_monster_can_be_engaged"
+        "session_flow_rounds", "EngageTests", "test_present_monster_can_be_engaged"
     ),
     "Remote or dead target is rejected": ref(
-        "session_flow", "EngageTests", "test_remote_or_dead_target_is_rejected"
+        "session_flow_rounds", "EngageTests", "test_remote_or_dead_target_is_rejected"
     ),
     "Active session blocks another engagement": ref(
-        "session_flow", "EngageTests", "test_active_session_blocks_another_engagement"
+        "session_flow_rounds", "EngageTests", "test_active_session_blocks_another_engagement"
     ),
     "Invalid cast preserves the round before initiative": ref(
-        "session_flow", "PlayerRoundTests", "test_invalid_cast_preserves_round_before_initiative"
+        "session_flow_rounds", "PlayerRoundTests", "test_invalid_cast_preserves_round_before_initiative"
     ),
     "One request drives one complete round": ref(
-        "session_flow", "PlayerRoundTests", "test_one_request_drives_one_complete_round"
+        "session_flow_rounds", "PlayerRoundTests", "test_one_request_drives_one_complete_round"
     ),
     "Flee closes the same session": ref(
-        "session_flow", "PlayerRoundTests", "test_flee_closes_the_same_session"
+        "session_flow_rounds", "PlayerRoundTests", "test_flee_closes_the_same_session"
     ),
     "Overwhelming player resolves a reachable hunt": ref(
-        "session_flow", "PlayerRoundTests", "test_overwhelming_player_resolves_after_first_action"
+        "session_flow_rounds", "PlayerRoundTests", "test_overwhelming_player_resolves_after_first_action"
     ),
     "Engage alone never runs an overwhelming round": ref(
-        "session_flow", "PlayerRoundTests", "test_no_action_before_overwhelm_round"
+        "session_flow_rounds", "PlayerRoundTests", "test_no_action_before_overwhelm_round"
     ),
     "Disconnect and reconnect resume the same session": ref(
         "session_persistence", "SessionPersistenceTests", "test_disconnect_reconnect_resumes_same_session"
@@ -292,16 +296,16 @@ SCENARIO_TO_TEST = {
     ),
     # universal-action-ownership
     "An entity with no imported skill data still owns both innate actions": ref(
-        "session_flow", "InnateSkillTests", "test_no_skill_entity_owns_both_innate_actions"
+        "session_flow_innate", "InnateSkillTests", "test_no_skill_entity_owns_both_innate_actions"
     ),
     "An entity with a full imported skill list also owns both innate actions": ref(
-        "session_flow", "InnateSkillTests", "test_full_import_list_plus_innate"
+        "session_flow_innate", "InnateSkillTests", "test_full_import_list_plus_innate"
     ),
     "A Monster instance can fight without spawned skill data": ref(
-        "session_flow", "InnateSkillTests", "test_monster_instance_can_fight_without_spawned_skills"
+        "session_flow_innate", "InnateSkillTests", "test_monster_instance_can_fight_without_spawned_skills"
     ),
     "Basic attack does not bypass ActionResolver": ref(
-        "session_flow", "InnateSkillTests", "test_basic_attack_selectable_out_of_combat_but_damage_gated"
+        "session_flow_innate", "InnateSkillTests", "test_basic_attack_selectable_out_of_combat_but_damage_gated"
     ),
     # disguised-stats-boundary
     "Accessor documentation still names exactly three consumers": ref(
@@ -312,10 +316,10 @@ SCENARIO_TO_TEST = {
     ),
     # world-clock
     "A successful out-of-combat cast advances its reported command time": ref(
-        "session_flow", "CommandSessionTests", "test_active_session_cast_does_not_advance_command_time"
+        "session_flow_commands", "CommandSessionTests", "test_active_session_cast_does_not_advance_command_time"
     ),
     "Terminal session settles all round time once": ref(
-        "session_flow", "PlayerRoundTests", "test_terminal_victory_settles_rounds_once_and_clears"
+        "session_flow_rounds", "PlayerRoundTests", "test_terminal_victory_settles_rounds_once_and_clears"
     ),
 }
 
