@@ -1,4 +1,9 @@
-"""Sample city sample grid data for 聖潔王都 (capital_altoria), map-anchor-grid."""
+"""Sample city sample grid data for 聖潔王都 (capital_altoria), map-anchor-grid.
+
+The ``XYMAP_DATA_LIST`` assembly for all settlements lives in
+``world/maps/map_data.py`` (settlement-shops design §6.2 / §10); this module
+declares only its own ``XYMAP_DATA``.
+"""
 
 MAPSTR = r"""
 + 0 1 2 3 4
@@ -109,5 +114,3 @@ XYMAP_DATA = {
         },
     },
 }
-
-XYMAP_DATA_LIST = [XYMAP_DATA]
