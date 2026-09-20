@@ -13,7 +13,7 @@ from enum import StrEnum
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.map_data import XYMAP_DATA_LIST
 
 
 class QuestType(StrEnum):

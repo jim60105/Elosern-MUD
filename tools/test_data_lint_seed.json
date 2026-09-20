@@ -113,6 +113,10 @@
       "reason": "capital map walkability contract"
     },
     {
+      "path": "world/maps/tests/test_village_ciaran.py",
+      "reason": "village ciaran map data contract"
+    },
+    {
       "path": "world/quests/tests/test_compile_blueprint.py",
       "reason": "quest compile data-contract surface"
     },

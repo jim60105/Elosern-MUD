@@ -75,7 +75,9 @@ abstractions survive that, the remaining four archetypes are interpolation.
 - `world/maps/village_ciaran.py` — new map module.
 - `world/maps/` — a shared assembly exporting both maps' data. `XYMAP_DATA_LIST`
   is defined in `world/maps/altoria_capital.py` and merely imported by
-  `world/maps/bootstrap.py:19`, so "add a map" is an assembly edit, not an
+  `world/maps/bootstrap.py:19`, `world/lore/wilderness_entry.py:180` (deferred)
+  and `world/quests/definitions.py:16` (through which `KNOWN_GRID_MAP_KEYS`
+  grows the village's map key), so "add a map" is an assembly edit, not an
   append to a list literal in bootstrap.
 - `world/lore/wilderness_entry.py` — **two** edits, not one. Besides the new
   registry row, `_iter_map_extents()` (line 180) has its **own** deferred

@@ -28,8 +28,11 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
-    def test_registry_has_exactly_one_v2_entry_keyed_capital_altoria(self):
-        self.assertEqual(list(WILDERNESS_ENTRY_REGISTRY), ["capital_altoria"])
+    def test_registry_has_two_v2_entries_keyed_by_settlement(self):
+        self.assertEqual(
+            list(WILDERNESS_ENTRY_REGISTRY),
+            ["capital_altoria", "village_ciaran"],
+        )
         self.assertEqual(CAPITAL.anchor_key, "capital_altoria")
         self.assertEqual(CAPITAL.shape, ("#####",) * 5)
         self.assertEqual(CAPITAL.origin_xy, (58, 98))
@@ -37,6 +40,28 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
             [(gate.return_direction, gate.grid_xy, gate.z_map_key) for gate in CAPITAL.gates],
             [("n", (2, 0), "capital_altoria"), ("s", (2, 4), "capital_altoria")],
         )
+        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+        self.assertEqual(village.anchor_key, "village_ciaran")
+        self.assertLess(village.hash_cell_count, CAPITAL.hash_cell_count)
+        self.assertEqual(
+            [(gate.return_direction, gate.grid_xy, gate.z_map_key) for gate in village.gates],
+            [("n", (0, 1), "village_ciaran")],
+        )
+        # The village footprint is placed well clear of the capital's mask.
+        self.assertFalse(village.footprint_cells & CAPITAL.footprint_cells)
+
+    @covers_requirement(
+        "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
+    )
+    def test_village_derived_geometry_matches_the_authored_mask(self):
+        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+        self.assertEqual(village.origin_xy, (39, 139))
+        self.assertEqual(village.shape, ("###", "###", "###"))
+        self.assertEqual(village.anchor_cell, (40, 140))
+        self.assertEqual(village.approach_cell(village.gate_for("n")), (40, 138))
+        gate = village.gate_for("n")
+        # The gate returns to the village's entrance node on its own map.
+        self.assertEqual((gate.grid_xy, gate.z_map_key), ((0, 1), "village_ciaran"))
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
@@ -85,6 +110,21 @@ class WildernessEntryValidationTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_shipped_registry_validates(self):
+        validate_wilderness_entries()
+
+    @covers_requirement(
+        "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
+    )
+    def test_village_gate_validates_against_the_shared_map_assembly(self):
+        # The village's gate names z_map_key "village_ciaran", which only the
+        # shared map assembly exposes to _iter_map_extents(): if that deferred
+        # import still pointed at the capital alone, this would raise
+        # "unknown z_map_key" and take the whole lore load down at startup.
+        from world.lore.wilderness_entry import _iter_map_extents
+
+        extents = _iter_map_extents()
+        self.assertIn("village_ciaran", extents)
+        self.assertIn((0, 1), extents["village_ciaran"])
         validate_wilderness_entries()
 
     def _assert_rejected(self, key, entry, fragment):

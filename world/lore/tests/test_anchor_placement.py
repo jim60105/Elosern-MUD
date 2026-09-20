@@ -12,12 +12,19 @@ from world.lore.anchors import ANCHOR_REGISTRY, Anchor
 
 class AnchorPlacementRegistryTests(unittest.TestCase):
     @covers_requirement("anchor-placement::anchor-placement-registry-is-intentionally-partial")
-    def test_registry_has_exactly_one_entry_keyed_capital_altoria(self):
-        self.assertEqual(list(ANCHOR_PLACEMENT_REGISTRY), ["capital_altoria"])
-        placement = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
-        self.assertEqual(placement.anchor_key, "capital_altoria")
-        self.assertEqual(placement.zcoord, "capital_altoria")
-        self.assertEqual(placement.entrance_xy, (2, 2))
+    def test_registry_has_one_entry_per_built_settlement(self):
+        self.assertEqual(
+            list(ANCHOR_PLACEMENT_REGISTRY),
+            ["capital_altoria", "village_ciaran"],
+        )
+        capital = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
+        self.assertEqual(capital.anchor_key, "capital_altoria")
+        self.assertEqual(capital.zcoord, "capital_altoria")
+        self.assertEqual(capital.entrance_xy, (2, 2))
+        village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
+        self.assertEqual(village.anchor_key, "village_ciaran")
+        self.assertEqual(village.zcoord, "village_ciaran")
+        self.assertEqual(village.entrance_xy, (1, 1))
 
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
     def test_every_entrys_anchor_key_exists_in_anchor_registry(self):

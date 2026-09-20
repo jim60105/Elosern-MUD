@@ -9,6 +9,12 @@ one row plus that city's map data; no bootstrap code change (design doc §4,
 D7). Race-based selection of which gate a new character takes is explicitly
 out of scope (design doc §2, YAGNI).
 
+The registry slot expresses "the authored way in from 虛境", and a row SHALL
+NOT be assumed to describe a walled settlement: elven villages have no walls
+and no gates, so ``village_ciaran``'s row is a concealed path (隱密小徑)
+through the forest even though it occupies the slot a city gate would
+(settlement-shops design §6.2).
+
 Frozen dataclass + ``MappingProxyType`` is the repo's immutable-registry
 convention (mirrors ``WILDERNESS_ENTRY_REGISTRY``); consumers must read these
 values instead of duplicating gate keys, aliases, or coordinates.
@@ -35,6 +41,12 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType(
             gate_xyz=(2, 0, "capital_altoria"),
             exit_key="南門",
             exit_aliases=("王都", "城門"),
+        ),
+        "village_ciaran": CityGateDef(
+            map_id="village_ciaran",
+            gate_xyz=(0, 1, "village_ciaran"),
+            exit_key="隱密小徑",
+            exit_aliases=("祕徑", "幽徑"),
         ),
     }
 )

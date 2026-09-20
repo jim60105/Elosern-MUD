@@ -9,7 +9,6 @@ provisioning wired into server startup.
 
 ## Requirements
 
-
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
 `world/lore/wilderness_entry.py` SHALL define frozen `WildernessGate` (`return_direction: str`,
 `grid_xy: tuple[int, int]`, `z_map_key: str`) and `WildernessEntryPoint` (`anchor_key: str`,
@@ -27,20 +26,28 @@ offsets, empty for point-shape), `anchor_cell` (integer-rounded centroid of the 
 from `anchor_cell` along the face opposite `return_direction` that lies outside the footprint) —
 as the single geometry source for all consumers. Every entry's `anchor_key` SHALL exist as a key
 in change 12's `ANCHOR_PLACEMENT_REGISTRY`. The registry SHALL NOT be required to contain an
-entry for every `ANCHOR_PLACEMENT_REGISTRY` key. This change SHALL populate exactly one entry,
-keyed `"capital_altoria"`: a 5×5 all-`#` mask at origin `(58, 98)` (anchor cell `(60, 100)`) with
+entry for every `ANCHOR_PLACEMENT_REGISTRY` key. It SHALL hold one entry per settlement
+reachable across the wilderness, and currently holds two. The first is keyed
+`"capital_altoria"`: a 5×5 all-`#` mask at origin `(58, 98)` (anchor cell `(60, 100)`) with
 gates `return_direction="n"` → `(2, 0, "capital_altoria")` (approach cell `(60, 97)`) and
-`return_direction="s"` → `(2, 4, "capital_altoria")` (approach cell `(60, 103)`).
+`return_direction="s"` → `(2, 4, "capital_altoria")` (approach cell `(60, 103)`). The second is
+keyed `"village_ciaran"`: a smaller mask placed well clear of the capital's footprint, with a
+single gate returning to the village's entrance node.
 `anchor_cell` SHALL be the bounding-box midpoint `((min_x + max_x) // 2, (min_y + max_y) // 2)`
 of the `#` cells under Python floor division, and no two gates in the whole registry SHALL share
-the same `(approach_cell, return_direction)` pair.
+the same `(approach_cell, return_direction)` pair. No entry's footprint SHALL overlap another
+entry's footprint.
 
 #### Scenario: The registry has exactly one v2 entry after this change
+<!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
+     scenario. The "exactly one" wording is historical; the assertion below is the current
+     two-entry state. -->
 - **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
-- **THEN** it contains exactly one entry, keyed `"capital_altoria"`, whose `shape` is a 5×5 mask
-  of `#`, whose `origin_xy` is `(58, 98)`, and whose gates are exactly `("n" → (2,0)),
-  ("s" → (2,4))` on map `capital_altoria`, and no test in this change's own suite asserts that
-  any other `ANCHOR_PLACEMENT_REGISTRY` key must also appear
+- **THEN** it contains exactly two entries; the `"capital_altoria"` entry has a 5×5 mask of `#`,
+  `origin_xy` `(58, 98)`, and gates exactly `("n" → (2,0)), ("s" → (2,4))` on map
+  `capital_altoria`; the `"village_ciaran"` entry has a smaller mask and one gate returning to
+  the village's entrance node; and no test asserts that any other `ANCHOR_PLACEMENT_REGISTRY`
+  key must also appear
 
 #### Scenario: Derived geometry matches the authored mask
 - **WHEN** `footprint_cells`, `anchor_cell`, and `approach_cell` are read for the
@@ -70,6 +77,10 @@ the same `(approach_cell, return_direction)` pair.
 - **WHEN** `sync_all()` runs, and then runs a second time
 - **THEN** a `LoreRecord` Script keyed `"lore:wilderness_entries:capital_altoria"` exists after
   both calls, and no duplicate exists after the second
+
+#### Scenario: Two settlements' footprints do not overlap
+- **WHEN** the footprint cells of every registry entry are collected
+- **THEN** no cell belongs to two entries
 
 ### Requirement: WildernessGateExit moves a traversing object from a grid room into the wilderness
 `typeclasses.exits.py::WildernessGateExit`, an ordinary `Exit`, SHALL fully override `at_traverse`
@@ -358,6 +369,7 @@ read each other's constant. The amended scenario below asserts exactly that.
 - **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`, and
   no grid-traversal code reads `wilderness_move` — grid traversal is unaffected by the wilderness
   cost, charging the ordinary `move` cost instead
+
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
 `world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
 DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL

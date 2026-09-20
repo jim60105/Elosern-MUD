@@ -12,7 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
-from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.map_data import XYMAP_DATA_LIST
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -36,7 +36,7 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
         sync_grid()
         exits = self._intra_city_exits()
-        self.assertEqual(len(exits), 24)
+        self.assertEqual(len(exits), 34)
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 
@@ -82,6 +82,21 @@ class SampleCityCostedExitTests(EvenniaTest):
         before = get_world_clock().tick
         city_exit.at_traverse(self.char1, city_exit.destination)
         self.assertEqual(self.char1.location.key, "南大道")
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    def test_village_traversal_advances_clock_by_move_like_city_movement(self):
+        # map-movement-clock: the village's wildcard link override spawns
+        # CostedXYZExit for every intra-village link, so a step inside the
+        # village charges exactly the ordinary move cost a capital street
+        # step charges (ciaran-village-map scenario).
+        sync_grid()
+        entrance = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
+        self.char1.location = entrance
+        village_exit = [e for e in entrance.exits if e.destination.key == "村中廣場"][0]
+        self.assertIsInstance(village_exit, CostedXYZExit)
+        before = get_world_clock().tick
+        village_exit.at_traverse(self.char1, village_exit.destination)
+        self.assertEqual(self.char1.location.key, "村中廣場")
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")

@@ -57,7 +57,9 @@ class ServiceInteriorTests(EvenniaTestCase):
     @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
         sync_service_interiors()
-        self.assertEqual(self._count_grid_rooms(), 13)
+        # Two settlements are spawned (13 capital + 6 village nodes); the
+        # interiors are still not xyzgrid nodes.
+        self.assertEqual(self._count_grid_rooms(), 19)
 
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()

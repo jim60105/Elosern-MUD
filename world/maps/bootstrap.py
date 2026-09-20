@@ -16,7 +16,7 @@ from world.observability import log_info, log_warn
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
-from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.map_data import XYMAP_DATA_LIST
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
