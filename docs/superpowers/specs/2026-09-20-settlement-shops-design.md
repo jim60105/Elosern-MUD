@@ -162,6 +162,9 @@ class PlaceDefinition:
     doorway_aliases: tuple[str, ...]
     host_name: str
     host_title: str
+    host_race: str                        # RACE_REGISTRY key
+    host_subrace: str | None              # SUBRACE_REGISTRY key
+    host_sex: str                         # SEX_VALUES member
     profession: str
     service_id: str
     assortment_keys: tuple[str, ...]
@@ -176,8 +179,32 @@ for `guild_staff` — and is projected onto the blueprint exactly as
 `validate_service_hosts` projects roster kwargs today. A flat `shop_key`
 field would not cover the guild hall, whose host is `guild_staff`.
 
+`host_race` / `host_subrace` / `host_sex` exist because
+`world/rules/guild_economy.py:103` currently hard-codes
+
+```python
+if host.race is None:
+    host.race = "human"
+```
+
+which would build the elven village's four hosts as humans, and because
+`LivingEntity.sex` (`typeclasses/entities.py:28`) defaults to `"other"` and
+is never written for a service host. `SUBRACE_REGISTRY` already ships
+`ciaran` bound to `native_anchor="village_ciaran"`
+(`world/lore/races.py:216`), so the village's hosts carry a real subrace
+rather than a bare race.
+
+These three are **creation-time authored identity**, written only inside the
+`host is None` branch alongside `npc_title`, and never rewritten on a later
+sync. Changing an authored value therefore requires roster convergence
+(delete and recreate), consistent with the existing never-rename /
+never-retitle contract. `apply_race_baseline()` runs after they are set.
+
 Validation rules on a place row:
 
+- `host_race` must be a `RACE_REGISTRY` key, `host_sex` a `SEX_VALUES`
+  member, and `host_subrace`, when present, a `SUBRACE_REGISTRY` key whose
+  `race` equals `host_race`.
 - Blueprint coverage and dead-kwarg rejection are inherited unchanged from
   `validate_service_hosts` (every component's identity fields except the
   row-level `service_id` must be authored; surplus kwargs are an error).
@@ -277,7 +304,7 @@ assortment base and the capital price comes from an override:
 
 | Place | Source | Final buy |
 | --- | --- | --- |
-| 塞雷的家 (暗影谷村) | `elven_sundries` base, scale 100 | 60 copper |
+| 瓦爾溫的家 (暗影谷村) | `elven_sundries` base, scale 100 | 60 copper |
 | 阿爾托利亞雜貨商店 (聖潔王都) | per-item override on the place row | 8,000 copper |
 
 One `item_key`, one `ItemDefinition`. What the player carries away is
@@ -390,12 +417,14 @@ Every trading place is a private home, not a storefront. Room names use the
 given name only; the full 名·姓 form would be unwieldy and is not how a
 village refers to a neighbour's house.
 
+All four hosts are `race="elf"`, `subrace="ciaran"`, `sex="female"`.
+
 | Interior | Exterior node | Host | Assortment |
 | --- | --- | --- | --- |
-| 倫溫的家 | 練刀場 | 倫溫·斯塔爾法爾 | `elven_crafted_arms` |
+| 海莉爾的家 | 練刀場 | 海莉爾·斯塔爾法爾 | `elven_crafted_arms` |
 | 拉瑞內斯的家 | 溪畔小徑 | 拉瑞內斯·妮特布倫 | `elven_fare` |
-| 塞雷的家 | 村北古樹下 | 塞雷·拉文伍德 | `elven_sundries` |
-| 凱拉斯的家 | 織房坡 | 凱拉斯·菲溫德 | `elven_attire` |
+| 瓦爾溫的家 | 村北古樹下 | 瓦爾溫·斯蒂爾瓦特爾 | `elven_sundries` |
+| 維特希爾的家 | 織房坡 | 維特希爾·威爾德布瑞亞爾 | `elven_attire` |
 
 村中廣場 and 練刀場 are public space and carry no components this change;
 `practice` is already room-independent.
@@ -417,18 +446,25 @@ etymology matches the character. Registry names use U+00B7 `·` (the authored
 convention), not the generator's U+30FB. Titles carry no internal whitespace,
 per `validate_npc_title`.
 
-| Name | Original | Title | Why |
-| --- | --- | --- | --- |
-| 維爾登·黑潭 | Verdon Blackmere | `聖潔王都鍛造鋪鐵匠` | "Blackmere" reads as the quenching pool |
-| 西格瑪·庫柏 | Sigmar Cooper | `聖潔王都餐館老闆` | Cooper = barrel-maker; the family trade became an eatery |
-| 妮絲塔·狐溪 | Nesta Foxbourne | `聖潔王都裁縫坊坊主` | Fox fur and streamside fulling — material and process both in the surname |
-| 倫溫·斯塔爾法爾 | Lumwyn Starfall | `暗影谷村鑄刃者` | "Starfall" = meteoric iron, tying to the 暗影鋼 blades |
-| 拉瑞內斯·妮特布倫 | Lareneth Nightbloom | `暗影谷村花饌好手` | Night-blooming flowers: the valley's darkness and the 蜜漬花蕊 |
-| 塞雷·拉文伍德 | Serai Ravenwood | `暗影谷村蒐羅者` | Ravens hoard; that *is* the collector trait |
-| 凱拉斯·菲溫德 | Caellas Faewind | `暗影谷村織衣者` | "Leaf-light one" + "Faewind" for the gossamer elven weaves |
+| Name | Original | Sex | Title | Why |
+| --- | --- | --- | --- | --- |
+| 維爾登·黑潭 | Verdon Blackmere | male | `聖潔王都鍛造鋪鐵匠` | "Blackmere" reads as the quenching pool |
+| 西格瑪·庫柏 | Sigmar Cooper | male | `聖潔王都餐館老闆` | Cooper = barrel-maker; the family trade became an eatery |
+| 妮絲塔·狐溪 | Nesta Foxbourne | female | `聖潔王都裁縫坊坊主` | Fox fur and streamside fulling — material and process both in the surname |
+| 海莉爾·斯塔爾法爾 | Haeliel Starfall | female | `暗影谷村鑄刃者` | "Starfall" = meteoric iron, tying to the 暗影鋼 blades. The given name means "healer's daughter" and has nothing to do with smithing — which is the point: elves hold no fixed trades, so a name must not read as a job title |
+| 拉瑞內斯·妮特布倫 | Lareneth Nightbloom | female | `暗影谷村花饌好手` | Night-blooming flowers: the valley's darkness and the 蜜漬花蕊 |
+| 瓦爾溫·斯蒂爾瓦特爾 | Valwyn Stillwater | female | `暗影谷村蒐羅者` | "Daughter of the hidden valley" places her in 暗影谷; "Stillwater" is sediment — what flows in never flows out, which is the collector trait |
+| 維特希爾·威爾德布瑞亞爾 | Vethiel Wildbriar | female | `暗影谷村織衣者` | A briar's twining is warp and weft; thorn and needle share a root. "Daughter of the oath" suits a craftsman's persistence |
 
-The three elven titles deliberately avoid 老闆 / 店主 — those words denote
+The capital's three hosts are `race="human"`, `subrace="human_plains"`; the
+village's four are `race="elf"`, `subrace="ciaran"`.
+
+The four elven titles deliberately avoid 老闆 / 店主 — those words denote
 commercial establishments, which elven villages do not have.
+
+A roll produced `海莉爾·斯塔爾威維爾 / Starweaver` ("star-weaver"), a sharper
+etymology for the weaver, but it collides on the given name with the smith.
+The 星墜 → 隕鐵 → 暗影鋼 link was judged the more valuable of the two.
 
 `docs/lore/settlement-locations.md` names 霍布·熔爐 (line 170) and 柯爾特·暖爐
 (line 265) as the capital's smith and eatery owner. Those examples must be
@@ -444,6 +480,10 @@ updated to the names above as part of this change.
   `zcoord`, and creates the tagged interior plus its two doorway exits. The
   existing "exterior missing → warn and skip" behaviour is kept.
   `XYMAP_DATA_LIST` grows to two maps.
+- **`world/rules/guild_economy.py:103`** — replace the hard-coded
+  `host.race = "human"` with the place row's authored `host_race`,
+  `host_subrace` and `host_sex`, written once at creation before
+  `apply_race_baseline()`.
 - **`world/rules/guild_config.py`** — `validate_shop_configs` splits into
   assortment validation and per-place resolution; the completeness check is
   re-keyed on `shop_key` (§1.1); `validate_service_hosts` reads the derived
@@ -487,6 +527,10 @@ branch, which is the central claim this change validates.
   yields the same `item_key` at the two configured prices.
 - **Bootstrap** — repeated sync is idempotent; both settlements' interiors
   and doorways appear; a missing exterior warns without raising.
+- **Host identity** — an unknown `host_race`, an unknown `host_sex`, and a
+  `host_subrace` whose race disagrees with `host_race` each fail load; a
+  created village host is `elf`/`ciaran`/`female` with race baselines
+  applied; a re-synced host is not rewritten when its authored values change.
 - **Elven parity** — `buy`/`sell` against an elven home traverses the same
   API as a capital shop.
 
