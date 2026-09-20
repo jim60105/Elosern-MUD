@@ -14,6 +14,12 @@ synthetic kit ``world/tests/synthetic_data.py``, or values read from the
 committed panel snapshots at runtime; the support module lives outside the
 scanned tree, so it can name shipped vocabulary while every scanned file
 stays literal-free.
+
+The harness module ``seed.py`` was later split into the
+``web/tests/browser/seed/`` package of domain slices (the
+``web/browser_support/browser_fixtures_data`` package precedent applies
+here): its migration-era manifest path stays in the frozen ledger
+classification, and the live scans below resolve it through the package.
 """
 
 from pathlib import Path
@@ -65,7 +71,7 @@ class BrowserTestDataMigrationContractTests(DataIndependenceContractMixin, unitt
         # this test.
         self.assertEqual(len(MIGRATED_FILES), MANIFEST_SIZE)
         self.assertEqual(len(set(MIGRATED_FILES)), MANIFEST_SIZE)
-        area = set(self._browser_area())
+        area = self._area_with_seed_package()
         self.assertEqual(
             [p for p in MIGRATED_FILES if p not in area],
             [],
@@ -89,12 +95,24 @@ class BrowserTestDataMigrationContractTests(DataIndependenceContractMixin, unitt
         self.assert_zero_findings(self._browser_area(), check_exists=False)
 
     def _browser_area(self):
-        """Every Python module in the migrated browser directory."""
+        """Every Python module in the migrated browser directory.
+
+        The scan is recursive so every source file of the ``seed/``
+        package (the former single ``seed.py``) joins the scanned area.
+        """
         return sorted(
-            f"web/tests/browser/{path.name}"
-            for path in (test_data_lint.REPO_ROOT / "web/tests/browser").iterdir()
-            if path.name.endswith(".py")
+            str(path.relative_to(test_data_lint.REPO_ROOT))
+            for path in (test_data_lint.REPO_ROOT / "web/tests/browser").rglob("*.py")
         )
+
+    def _area_with_seed_package(self):
+        """The live area plus the retired single-module manifest path,
+        standing in for the seed package it became (the frozen ledger
+        classification keeps naming ``web/tests/browser/seed.py``)."""
+        area = set(self._browser_area())
+        if "web/tests/browser/seed/__init__.py" in area:
+            area.add("web/tests/browser/seed.py")
+        return area
 
     def test_no_violation_naming_a_manifest_file(self):
         self.assert_no_violation_naming_manifest(MIGRATED_FILES)
