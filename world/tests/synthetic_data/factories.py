@@ -33,6 +33,7 @@ from world.lore.races import (
     Vitals,
 )
 from world.lore.scene_archetypes import SceneArchetype
+from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.shops import ShopDefinition
 from world.lore.titles import (
     FixedTitleDef,
@@ -184,6 +185,11 @@ def make_price_entry(key: str = "t_made_price", **overrides: object) -> PriceEnt
 def make_shop(key: str = "t_made_shop", **overrides: object) -> ShopDefinition:
     """One synthetic shop identity."""
     return _make(key, SYNTH_SHOPS["t_mossgate_stall"], overrides)
+
+
+def make_assortment(key: str = "t_made_assortment", **overrides: object) -> AssortmentDefinition:
+    """One synthetic assortment identity."""
+    return _make(key, SYNTH_ASSORTMENTS["t_mossgate_goods"], overrides)
 
 
 def make_title(key: str = "t_made_title", **overrides: object) -> FixedTitleDef:
