@@ -17,6 +17,10 @@
       "reason": "anchor data contract"
     },
     {
+      "path": "world/lore/tests/test_assortments.py",
+      "reason": "assortment registry content contract"
+    },
+    {
       "path": "world/lore/tests/test_economy.py",
       "reason": "price-table data contract"
     },
