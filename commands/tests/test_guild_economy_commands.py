@@ -363,7 +363,7 @@ class EconomyCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest
         floor, _ceiling = price_band(_MEAL)
         with patch("world.rules.economy.get_world_clock") as clock:
             clock.return_value.tick = 12 * 3600
-            self.call(CmdShopStock(), "", "商店（營業中）")
+            self.call(CmdShopStock(), "", "合成商店（營業中）")
             self.call(CmdBuy(), f"{_MEAL} 2", "你買了 2 個")
             self.call(CmdSell(), f"{_MEAL} 1", "你賣了 1 個")
         self.assertEqual(
