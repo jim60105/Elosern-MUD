@@ -10,6 +10,8 @@ magic accessories wait in sundries for the unbuilt specialist shops."""
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.items import ITEM_REGISTRY
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY, AssortmentDefinition
 
@@ -82,6 +84,31 @@ class AssortmentRegistryTests(unittest.TestCase):
             for item_key in definition.item_keys:
                 with self.subTest(assortment=definition.key, item=item_key):
                     self.assertIn(item_key, ITEM_REGISTRY)
+
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+    )
+    def test_capital_shops_redistribute_the_pre_split_set_without_overlap(self):
+        # The specialist split (altoria-trading-places §6.1) narrows the
+        # general store to sundries; the union across every trading place
+        # must still equal the 58-key pre-split offered set, with no key
+        # offered by two shops.
+        from world.lore.settlements.shops import SHOP_REGISTRY
+
+        union: list[str] = []
+        owner: dict[str, str] = {}
+        for shop in SHOP_REGISTRY.values():
+            for item_key in shop.offered_item_keys:
+                self.assertNotIn(
+                    item_key,
+                    owner,
+                    f"{item_key!r} offered by both {owner.get(item_key)!r} and "
+                    f"{shop.key!r}",
+                )
+                owner[item_key] = shop.key
+                union.append(item_key)
+        self.assertEqual(set(union), set(PRE_SPLIT_OFFERED_KEYS))
+        self.assertEqual(len(union), len(PRE_SPLIT_OFFERED_KEYS))
 
     def test_display_names_are_traditional_chinese(self):
         for definition in ASSORTMENT_REGISTRY.values():
