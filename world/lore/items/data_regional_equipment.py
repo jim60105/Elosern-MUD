@@ -1,0 +1,192 @@
+"""Registry data slice: the Beastfolk and Elven regional-equipment roster.
+
+Moved verbatim from the ``ITEM_REGISTRY`` literal in
+``world/lore/items.py``; ``ROWS`` is the contiguous, in-order
+entry block (section comments included) the assembly concatenates.
+Do not reorder or edit rows here: registry order is observable.
+"""
+
+from world.lore.items.vocab import (
+    ItemPresentation,
+    ItemDefinition,
+    EquipmentModifierKey,
+    ItemKind,
+    ItemIconKey,
+    ItemRarity,
+)
+
+from world.skills.equipment import EquipmentSlot
+
+ROWS: tuple[ItemDefinition, ...] = (
+        # Regional equipment: 5 Beastfolk Weapons (land-lore-regional-equipment)
+        ItemDefinition(
+            key="beastfolk_warhammer",
+            display_name_zh="獸人重鎚",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="部族鍛爐打造的巨型戰鎚，非獸人臂力難以掄動。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_WARHAMMER,
+        ),
+        ItemDefinition(
+            key="beastfolk_repeating_bow",
+            display_name_zh="獸人連射短弓",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人擅用的輕量連射短弓，講求速度而非單發威力。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_REPEATING_BOW,
+        ),
+        ItemDefinition(
+            key="beastfolk_war_spear",
+            display_name_zh="獸人陣地長槍",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人部族列陣時使用的長槍，攻守兼備。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_WAR_SPEAR,
+        ),
+        ItemDefinition(
+            key="beastfolk_twin_claws",
+            display_name_zh="獸人雙爪刃",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人綁縛於指節的鋒利爪刃，高攻但幾乎不設防禦。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_TWIN_CLAWS,
+        ),
+        ItemDefinition(
+            key="beastfolk_spirit_wand",
+            display_name_zh="獸人導靈短杖",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人以魔力見長所用的短杖，罕見的獸人法具。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_SPIRIT_WAND,
+        ),
+        # Regional equipment: Elven and Trophy Weapons (land-lore-regional-equipment)
+        ItemDefinition(
+            key="elven_longbow",
+            display_name_zh="精靈長弓",
+            price_table_key="mundane_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.RARE,
+                summary_zh="精靈以自產弓術淬鍊而成的長弓，箭無虛發。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.ELVEN_LONGBOW,
+        ),
+        ItemDefinition(
+            key="dragon_lair_trophy_blade",
+            display_name_zh="龍之巢穴戰利品劍",
+            price_table_key="magic_weapon",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.WEAPON,
+                icon_key=ItemIconKey.WEAPON,
+                rarity=ItemRarity.EPIC,
+                summary_zh="深入龍之巢穴討伐後才可能取得的鍛龍鱗劍，帶著淡淡硫磺氣息。",
+            ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.DRAGON_LAIR_TROPHY_BLADE,
+        ),
+        # Regional equipment: Armor and Accessories (land-lore-regional-equipment)
+        ItemDefinition(
+            key="beastfolk_heavy_hide_armor",
+            display_name_zh="獸人厚甲",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="以獸皮與鐵片疊層縫製的部族重甲，犧牲機動換取硬度。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_HEAVY_HIDE_ARMOR,
+        ),
+        ItemDefinition(
+            key="beastfolk_stalker_garb",
+            display_name_zh="獸人輕行衣",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人暗殺者慣用的貼身輕甲，幾乎不影響身法。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_STALKER_GARB,
+        ),
+        ItemDefinition(
+            key="elven_forest_veil",
+            display_name_zh="精靈森林輕紗",
+            price_table_key="armor",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.LEGENDARY,
+                summary_zh="精靈以晨露編織的輕紗長裙，傳統服飾的精靈分支款式，精靈村商店應季上架的季節限定品。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.ELVEN_FOREST_VEIL,
+        ),
+        ItemDefinition(
+            key="beastfolk_tribal_totem",
+            display_name_zh="獸人部族圖騰",
+            price_table_key="jewelry",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ACCESSORY,
+                icon_key=ItemIconKey.ACCESSORY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="以獵得的獸爪製成的部族圖騰項飾，力量與防禦並重。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_TRIBAL_TOTEM,
+        ),
+        ItemDefinition(
+            key="beastfolk_gale_earring",
+            display_name_zh="獸人疾風耳環",
+            price_table_key="jewelry",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.ACCESSORY,
+                icon_key=ItemIconKey.ACCESSORY,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="獸人以自身耳形為靈感打造的耳環，象徵族群的速度自豪。",
+            ),
+            equipment_slot=EquipmentSlot.ACCESSORY,
+            modifier_key=EquipmentModifierKey.BEASTFOLK_GALE_EARRING,
+        ),
+)
