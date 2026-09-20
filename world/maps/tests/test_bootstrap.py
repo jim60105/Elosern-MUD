@@ -340,6 +340,9 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             # Exactly one forward exit per row, leading to that row's gate room.
             self.assertEqual(exit_obj.destination.xyz, row.gate_xyz)
 
+    @covers_requirement(
+        "village-ciaran-map::the-village-has-exactly-one-concealed-entrance"
+    )
     @covers_requirement("limbo-one-way-gates::every-sync-prunes-every-exit-whose-destination-is-the-starting-room")
     def test_no_village_room_holds_an_exit_back_to_the_starting_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)

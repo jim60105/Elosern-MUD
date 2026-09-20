@@ -143,6 +143,9 @@ class ItemDefinitionTests(unittest.TestCase):
         self.assertTrue(all(key in ITEM_REGISTRY for key in shop.offered_item_keys))
 
     @covers_requirement(
+        "masterwork-price-band::goods-a-community-trades-everyday-do-not-sit-in-the-keepsake-band"
+    )
+    @covers_requirement(
         "item-presentation-metadata::presentation-metadata-does-not-claim-unimplemented-mechanics"
     )
     def test_presentation_swap_leaves_economy_outputs_unchanged(self):
@@ -503,6 +506,9 @@ class AssortmentRuleTests(unittest.TestCase):
                 validate_assortment_configs(raw_commerce()["assortments"])
             self.assertIn("t_orphan", str(caught.exception))
 
+    @covers_requirement(
+        "masterwork-price-band::a-keepsake-band-item-can-never-be-offered-for-sale"
+    )
     @covers_requirement(
         "commerce-assortments::an-assortment-may-not-contain-a-keepsake-band-item"
     )

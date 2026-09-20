@@ -26,6 +26,9 @@ def _point_entry(anchor_key="capital_altoria", anchor=(120, 120), gates=None):
 
 class WildernessEntryRegistryShapeTests(unittest.TestCase):
     @covers_requirement(
+        "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"
+    )
+    @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_registry_has_two_v2_entries_keyed_by_settlement(self):
@@ -96,6 +99,9 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         self.assertEqual(CAPITAL.gate_for("s").grid_xy, (2, 4))
         self.assertIsNone(CAPITAL.gate_for("e"))
 
+    @covers_requirement(
+        "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"
+    )
     def test_gate_identity_is_globally_unique(self):
         keys = set()
         for entry in WILDERNESS_ENTRY_REGISTRY.values():

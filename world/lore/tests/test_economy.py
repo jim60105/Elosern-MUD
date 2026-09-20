@@ -26,6 +26,9 @@ class EconomyRegistryTests(unittest.TestCase):
                 self.assertIsInstance(entry.max_copper, int)
                 self.assertGreaterEqual(entry.max_copper, entry.min_copper)
 
+    @covers_requirement(
+        "masterwork-price-band::a-masterwork-price-band-spans-everyday-and-scarce-prices-for-the-same-object"
+    )
     def test_masterwork_band_ceiling_stays_below_keepsake_floor(self):
         # The masterwork band is how a community-traded good carries a scarce
         # outside price; it must never bleed into relic's exclusive region, or
