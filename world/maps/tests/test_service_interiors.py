@@ -48,11 +48,9 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     def test_fresh_sync_creates_one_permanent_interior_per_place(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL)
-        general_store = self._interior(GENERAL_STORE)
-        self.assertIsNotNone(guild_hall)
-        self.assertIsNotNone(general_store)
-        for place, room in ((GUILD_HALL, guild_hall), (GENERAL_STORE, general_store)):
+        for place in PLACE_REGISTRY.values():
+            room = self._interior(place)
+            self.assertIsNotNone(room, place.key)
             self.assertIsInstance(room, Room)
             self.assertEqual(room.key, place.room_name_zh)
             self.assertIsNone(room.db.expire_tick)
@@ -61,15 +59,15 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL)
-        general_store = self._interior(GENERAL_STORE)
-        guild_exterior = self._exterior(GUILD_HALL)
-        store_exterior = self._exterior(GENERAL_STORE)
-
-        self.assertIn(guild_hall, {exit_obj.destination for exit_obj in guild_exterior.exits})
-        self.assertIn(general_store, {exit_obj.destination for exit_obj in store_exterior.exits})
-        self.assertIn(guild_exterior, {exit_obj.destination for exit_obj in guild_hall.exits})
-        self.assertIn(store_exterior, {exit_obj.destination for exit_obj in general_store.exits})
+        for place in PLACE_REGISTRY.values():
+            interior = self._interior(place)
+            exterior = self._exterior(place)
+            self.assertIn(
+                interior, {exit_obj.destination for exit_obj in exterior.exits}
+            )
+            self.assertIn(
+                exterior, {exit_obj.destination for exit_obj in interior.exits}
+            )
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
@@ -81,8 +79,8 @@ class ServiceInteriorTests(EvenniaTestCase):
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()
         grid_keys = {room.key for room in GridRoom.objects.all_family()}
-        self.assertNotIn(GUILD_HALL.room_name_zh, grid_keys)
-        self.assertNotIn(GENERAL_STORE.room_name_zh, grid_keys)
+        for place in PLACE_REGISTRY.values():
+            self.assertNotIn(place.room_name_zh, grid_keys)
 
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
     @covers_requirement(
@@ -92,14 +90,14 @@ class ServiceInteriorTests(EvenniaTestCase):
         sync_service_interiors()
         first = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in (GUILD_HALL, GENERAL_STORE)
+            for place in PLACE_REGISTRY.values()
             for room in search_object_by_tag(place.key)
         }
         room_count = Room.objects.all_family().count()
         exit_count = Exit.objects.all().count()
         # Drift the authored description the way a legacy database has it:
         # the next sync must re-apply the authored text in place.
-        for place in (GUILD_HALL, GENERAL_STORE):
+        for place in PLACE_REGISTRY.values():
             room = search_object_by_tag(place.key)[0]
             room.db.desc = "drifted description"
             room.save()
@@ -108,19 +106,19 @@ class ServiceInteriorTests(EvenniaTestCase):
 
         second = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in (GUILD_HALL, GENERAL_STORE)
+            for place in PLACE_REGISTRY.values()
             for room in search_object_by_tag(place.key)
         }
         self.assertEqual(first, second)
         self.assertEqual(Room.objects.all_family().count(), room_count)
         self.assertEqual(Exit.objects.all().count(), exit_count)
-        for place in (GUILD_HALL, GENERAL_STORE):
+        for place in PLACE_REGISTRY.values():
             room = search_object_by_tag(place.key)[0]
             self.assertEqual(room.db.desc, place.room_desc_zh)
 
     def test_doorway_keys_and_aliases_are_the_places_authored_pair(self):
         sync_service_interiors()
-        for place in (GUILD_HALL, GENERAL_STORE):
+        for place in PLACE_REGISTRY.values():
             interior = self._interior(place)
             exterior = self._exterior(place)
             forward = [
@@ -141,10 +139,14 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     def test_interior_reachable_from_and_back_to_exterior(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL)
-        guild_exterior = self._exterior(GUILD_HALL)
-        self.assertTrue(guild_hall.access(guild_exterior, "traverse", default=True))
-        self.assertIn(guild_exterior, {e.destination for e in guild_hall.exits})
+        for place in PLACE_REGISTRY.values():
+            interior = self._interior(place)
+            exterior = self._exterior(place)
+            self.assertTrue(
+                interior.access(exterior, "traverse", default=True),
+                place.key,
+            )
+            self.assertIn(exterior, {e.destination for e in interior.exits})
 
     @covers_requirement("guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster")
     @covers_requirement(

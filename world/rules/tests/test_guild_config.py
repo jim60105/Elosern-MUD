@@ -725,24 +725,32 @@ class ShopRuleTests(unittest.TestCase):
             host_title="合成二號店老闆",
             assortment_keys=("t_shared_goods",),
         )
+        # Per-shop display names resolve to the owning place's room name, so
+        # the synthetic shop needs a place row that authors its shop_key too.
+        second_place = replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key="t_second_shop",
+            service_id="t_second_shop_service",
+            room_name_zh="合成二號店",
+            host_name="合成二號",
+            host_title="合成二號店老闆",
+            authored_kwargs=(("shop_key", "t_second_shop"),),
+            assortment_keys=("t_shared_goods",),
+        )
         rows = [
             {**raw_commerce()["shops"][0]},
             {"shop_key": "t_second_shop", "open_hour": 9, "close_hour": 19, "restock_hour": 7},
         ]
-        second_place = replace(
-            PLACE_REGISTRY["altoria_general_store"],
-            key="t_second_shop_place",
-            settlement_key="capital_altoria",
-            assortment_keys=("t_shared_goods",),
-            authored_kwargs=(("shop_key", "t_second_shop"),),
-        )
         with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
              mock.patch.dict(
                  SHOP_REGISTRY,
                  {"altoria_general_store": first, "t_second_shop": second},
                  clear=True,
-             ), \
-             mock.patch.dict(PLACE_REGISTRY, {"t_second_shop_place": second_place}, clear=False):
+             ), mock.patch.dict(
+                 PLACE_REGISTRY,
+                 {"t_second_shop": second_place},
+                 clear=False,
+             ):
             configs = validate_shop_configs(rows, offers, _shipped_scales())
             self.assertEqual(
                 {offer.item_key for offer in configs["t_second_shop"].offers},
