@@ -393,7 +393,9 @@ class WiringTests(unittest.TestCase):
         for phrase in (
             "tools.test_data_lint check",
             "Data-contract test:",
-            "world/tests/synthetic_data.py",
+            # The kit module moved into a package (kit split); the guide
+            # documents the package path now. Phrase pin follows the path only.
+            "world/tests/synthetic_data/",
         ):
             self.assertIn(phrase, text)
 
