@@ -22,7 +22,7 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from typeclasses.exits import WildernessGateExit
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_population import (
     CAPITAL_ENTRY_XY,
     ensure_population,
@@ -83,13 +83,34 @@ def live_anchor_entry():
     return next(iter(entries.values()))
 
 
-ENTRY_XY = CAPITAL_ENTRY_XY  # the north-gate approach cell, (60, 103)
+def live_gateway_entry():
+    """The sole registry entry exposing both an "n" and a "w" gate."""
+    entries = [
+        entry
+        for entry in live_entry_registry().values()
+        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
+    ]
+    if len(entries) != 1:
+        raise AssertionError("expected exactly one wilderness entry with both n and w gates")
+    return entries[0]
+
+
+_EAST_GATE = live_gateway_entry().gate_for("w")
+EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+EAST_APPROACH = live_gateway_entry().approach_cell(_EAST_GATE)
+
+ENTRY_XY = CAPITAL_ENTRY_XY  # the east-gate approach cell, EAST_APPROACH
+ENTRY_POPULATION_KEY = f"wilderness:{ENTRY_XY[0]}:{ENTRY_XY[1]}"
+# One step further east of the approach cell: still inside the hunting band,
+# but outside the anchor footprint (unlike the approach cell's own neighbors
+# toward the city).
+NEARBY_BAND_XY = (ENTRY_XY[0] + 1, ENTRY_XY[1])
 
 
 class TerrainPopulationModelTests(unittest.TestCase):
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_same_input_returns_same_output(self):
-        for x, y in ((0, 0), (60, 103), (111, 189), (203, 30), (223, 223)):
+        for x, y in ((0, 0), ENTRY_XY, (111, 189), (203, 30), (223, 223)):
             self.assertEqual(
                 population_for_coordinates(x, y),
                 population_for_coordinates(x, y),
@@ -114,9 +135,9 @@ class TerrainPopulationModelTests(unittest.TestCase):
         # The entry constant, the registered wilderness entry point, and the
         # tier registry are tied together through the rows themselves.
         entry = live_anchor_entry()
-        # Registry-derived, not duplicated: the constant is exactly the north
+        # Registry-derived, not duplicated: the constant is exactly the east
         # gate's approach cell.
-        self.assertEqual(CAPITAL_ENTRY_XY, entry.approach_cell(entry.gate_for("s")))
+        self.assertEqual(CAPITAL_ENTRY_XY, entry.approach_cell(entry.gate_for("w")))
         self.assertNotIn(CAPITAL_ENTRY_XY, entry.footprint_cells)
         # The entry cell is inside the guaranteed hunting band: always
         # populated, low tier, with a name drawn from that tier's registry
@@ -137,7 +158,7 @@ class TerrainPopulationModelTests(unittest.TestCase):
     def test_hunting_band_is_contiguous_low_tier(self):
         # Band membership is only asserted for provider-valid ground: cells
         # inside the anchor footprint are refused by the provider and are not
-        # band members (the square around (60, 103) overlaps rows y=100..102
+        # band members (the square around ENTRY_XY overlaps rows y=100..102
         # of the 5x5 footprint).
         footprint = live_anchor_entry().footprint_cells
         entry_x, entry_y = CAPITAL_ENTRY_XY
@@ -223,7 +244,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         self.script_cls = WildernessScript
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
         self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        enter_wilderness(self.char1, coordinates=(60, 103), name=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
         self.room = self.char1.location
 
     def _monsters_at(self, coordinates):
@@ -240,25 +261,28 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_empty_coordinate_is_populated_once(self):
-        # (61, 100) is inside the hunting band but unvisited so far: the first
+        # NEARBY_BAND_XY is inside the hunting band but unvisited so far: the first
         # ensure_population creates exactly one living monster there.
-        ensure_population(self.script, (61, 100))
+        ensure_population(self.script, NEARBY_BAND_XY)
         monsters = [
-            obj for obj in self._monsters_at((61, 100)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(NEARBY_BAND_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         monster = monsters[0]
         self.assertEqual(monster.threat_tier, "low")
-        self.assertEqual(monster.db.population_key, "wilderness:61:100")
-        self.assertEqual(self.script.db.itemcoordinates[monster], (61, 100))
+        self.assertEqual(
+            monster.db.population_key,
+            f"wilderness:{NEARBY_BAND_XY[0]}:{NEARBY_BAND_XY[1]}",
+        )
+        self.assertEqual(self.script.db.itemcoordinates[monster], NEARBY_BAND_XY)
         self.assertGreater(monster.traits.hp.current, 0)
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_repeated_calls_create_no_duplicates(self):
-        ensure_population(self.script, (61, 100))
-        first = [obj for obj in self._monsters_at((61, 100)) if isinstance(obj, Monster)]
-        ensure_population(self.script, (61, 100))
-        second = [obj for obj in self._monsters_at((61, 100)) if isinstance(obj, Monster)]
+        ensure_population(self.script, NEARBY_BAND_XY)
+        first = [obj for obj in self._monsters_at(NEARBY_BAND_XY) if isinstance(obj, Monster)]
+        ensure_population(self.script, NEARBY_BAND_XY)
+        second = [obj for obj in self._monsters_at(NEARBY_BAND_XY) if isinstance(obj, Monster)]
         self.assertEqual(len(first), 1)
         self.assertEqual(len(second), 1)
         self.assertEqual(first[0].pk, second[0].pk)
@@ -266,20 +290,20 @@ class WildernessPopulationSpawnTests(EvenniaTest):
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_dead_monster_is_replaced_on_next_call(self):
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         original = monsters[0]
         original.traits.hp.current = 0
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, ENTRY_XY)
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         replacement = monsters[0]
         self.assertNotEqual(replacement.pk, original.pk)
         self.assertEqual(replacement.threat_tier, "low")
-        self.assertEqual(replacement.db.population_key, "wilderness:60:103")
+        self.assertEqual(replacement.db.population_key, ENTRY_POPULATION_KEY)
         self.assertGreater(replacement.traits.hp.current, 0)
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
@@ -296,11 +320,11 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_foreign_monster_at_coordinate_is_never_reconciled(self):
-        foreign = self._spawn_foreign_monster((60, 103), key="scripted-encounter")
+        foreign = self._spawn_foreign_monster(ENTRY_XY, key="scripted-encounter")
         foreign.traits.hp.current = 7
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, ENTRY_XY)
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertIn(foreign, monsters)
         self.assertEqual(foreign.traits.hp.current, 7)
@@ -310,19 +334,19 @@ class WildernessPopulationSpawnTests(EvenniaTest):
     def test_surplus_dead_matching_monster_is_cleaned_to_exactly_one(self):
         # The populated coordinate already holds its living population monster.
         original = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ][0]
         self.assertGreater(original.traits.hp.current, 0)
         # Add a dead matching monster; reconciliation must drop it so exactly
         # one living matching monster remains (dead extras are not idempotent).
-        dead = self._spawn_foreign_monster((60, 103), key="dead-duplicate")
-        dead.db.population_key = "wilderness:60:103"
+        dead = self._spawn_foreign_monster(ENTRY_XY, key="dead-duplicate")
+        dead.db.population_key = ENTRY_POPULATION_KEY
         dead.traits.hp.current = 0
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, ENTRY_XY)
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
-        matching = [obj for obj in monsters if obj.db.population_key == "wilderness:60:103"]
+        matching = [obj for obj in monsters if obj.db.population_key == ENTRY_POPULATION_KEY]
         self.assertEqual(len(matching), 1)
         self.assertGreater(matching[0].traits.hp.current, 0)
 
@@ -330,15 +354,15 @@ class WildernessPopulationSpawnTests(EvenniaTest):
     def test_stale_model_drift_is_reconciled_to_current_model(self):
         # A living matching monster whose tier no longer matches the model (a
         # model/registry fix after spawn) must be replaced, not kept stale.
-        stale = self._spawn_foreign_monster((60, 103), key="drifted")
-        stale.db.population_key = "wilderness:60:103"
+        stale = self._spawn_foreign_monster(ENTRY_XY, key="drifted")
+        stale.db.population_key = ENTRY_POPULATION_KEY
         stale.threat_tier = "high"
         stale.apply_monster_tier("floor")
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, ENTRY_XY)
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
-        matching = [obj for obj in monsters if obj.db.population_key == "wilderness:60:103"]
+        matching = [obj for obj in monsters if obj.db.population_key == ENTRY_POPULATION_KEY]
         self.assertEqual(len(matching), 1)
         self.assertNotEqual(matching[0].pk, stale.pk)
         self.assertEqual(matching[0].threat_tier, "low")
@@ -347,28 +371,28 @@ class WildernessPopulationSpawnTests(EvenniaTest):
     @covers_requirement("wilderness-monster-population::a-registered-wilderness-monster-survives-room-recycling")
     def test_registered_monster_survives_room_recycling(self):
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         monster = monsters[0]
         self.assertIs(monster.location, self.room)
 
-        # Step east: the contrib vacates and recycles the (60, 103) room (the
+        # Step east: the contrib vacates and recycles the ENTRY_XY room (the
         # only account has left and preserve_items is False). The monster stays
         # registered in itemcoordinates with its location cleared, not deleted.
         east = [exit_obj for exit_obj in self.room.exits if exit_obj.key == "east"][0]
         east.at_traverse(self.char1, self.room)
         monster.refresh_from_db()
         self.assertIsNone(monster.location)
-        self.assertEqual(self.script.db.itemcoordinates[monster], (60, 103))
+        self.assertEqual(self.script.db.itemcoordinates[monster], ENTRY_XY)
 
-        # Step back west: a room is activated again at (60, 103) and the
+        # Step back west: a room is activated again at ENTRY_XY and the
         # contrib re-attaches the registered monster to it.
         west_room = self.char1.location
         west = [exit_obj for exit_obj in west_room.exits if exit_obj.key == "west"][0]
         west.at_traverse(self.char1, west_room)
         reattached = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(reattached), 1)
         self.assertEqual(reattached[0].pk, monster.pk)
@@ -379,7 +403,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         from world.maps.bootstrap import sync_wilderness
 
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         original = monsters[0]
@@ -388,7 +412,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         # living population monster must survive unchanged.
         sync_wilderness()
         monsters = [
-            obj for obj in self._monsters_at((60, 103)) if isinstance(obj, Monster)
+            obj for obj in self._monsters_at(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         self.assertEqual(monsters[0].pk, original.pk)
@@ -396,7 +420,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
 
 class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaCommandTestMixin, EvenniaTest):
-    """End-to-end introductory hunt: register, accept, walk out the North Gate,
+    """End-to-end introductory hunt: register, accept, walk out the East Gate,
     defeat the populated monster, and observe the quest complete.
 
     ``setUp`` runs ``sync_guild_economy()``, which registers the canonical
@@ -414,8 +438,8 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         register_catalog()
         sync_quest_runtime()
         sync_guild_economy()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
         # The guild hall is the registry's guild-hall row resolved by kind —
         # never a shipped key — so the journey walks into whichever hall the
         # live registry authors.
@@ -442,23 +466,23 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         )
         self.assertIs(record.state, QuestState.IN_PROGRESS)
 
-        # Walk to the North Gate and through it into the wilderness.
-        self.player.location = self.north_gate
-        self.gate.at_traverse(self.player, self.north_gate)
+        # Walk to the East Gate and through it into the wilderness.
+        self.player.location = self.east_gate
+        self.gate.at_traverse(self.player, self.east_gate)
         self.assertIsInstance(self.player.location, TerrainRoom)
-        self.assertEqual(self.player.location.coordinates, (60, 103))
+        self.assertEqual(self.player.location.coordinates, ENTRY_XY)
 
         # A living low-tier population monster is present at the entry.
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         monsters = [
-            obj for obj in script.get_objs_at_coordinates((60, 103)) if isinstance(obj, Monster)
+            obj for obj in script.get_objs_at_coordinates(ENTRY_XY) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
         monster = monsters[0]
         self.assertEqual(monster.threat_tier, "low")
-        self.assertEqual(monster.db.population_key, "wilderness:60:103")
+        self.assertEqual(monster.db.population_key, ENTRY_POPULATION_KEY)
         self.assertGreater(monster.traits.hp.current, 0)
 
         # Decisive deterministic combat: a boosted adventurer lands a critical
@@ -501,14 +525,14 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
         self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        enter_wilderness(self.char1, coordinates=(60, 103), name=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
         self.room = self.char1.location
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.monster = next(
             obj
-            for obj in self.script.get_objs_at_coordinates((60, 103))
+            for obj in self.script.get_objs_at_coordinates(ENTRY_XY)
             if isinstance(obj, Monster)
         )
 
@@ -545,7 +569,7 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         sync_wilderness()
         surviving = [
             obj
-            for obj in self.script.get_objs_at_coordinates((60, 103))
+            for obj in self.script.get_objs_at_coordinates(ENTRY_XY)
             if isinstance(obj, Monster)
         ]
         self.assertEqual([obj.pk for obj in surviving], [self.monster.pk])
@@ -567,7 +591,7 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         sync_wilderness()
         respawned = [
             obj
-            for obj in self.script.get_objs_at_coordinates((60, 103))
+            for obj in self.script.get_objs_at_coordinates(ENTRY_XY)
             if isinstance(obj, Monster)
         ]
         self.assertEqual(len(respawned), 1)
@@ -595,10 +619,10 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         # is still replaced by a fresh living one, exactly as before the guard.
         dead_pk = self.monster.pk
         self.monster.traits.hp.current = 0
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, ENTRY_XY)
         respawned = [
             obj
-            for obj in self.script.get_objs_at_coordinates((60, 103))
+            for obj in self.script.get_objs_at_coordinates(ENTRY_XY)
             if isinstance(obj, Monster)
         ]
         self.assertEqual(len(respawned), 1)
@@ -611,17 +635,17 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         # entry monster must not freeze reconciliation at a different
         # coordinate.
         engage(self.player, self.monster)
-        ensure_population(self.script, (61, 100))
+        ensure_population(self.script, NEARBY_BAND_XY)
         other = next(
             obj
-            for obj in self.script.get_objs_at_coordinates((61, 100))
+            for obj in self.script.get_objs_at_coordinates(NEARBY_BAND_XY)
             if isinstance(obj, Monster)
         )
         other.traits.hp.current = 0
-        ensure_population(self.script, (61, 100))
+        ensure_population(self.script, NEARBY_BAND_XY)
         respawned = [
             obj
-            for obj in self.script.get_objs_at_coordinates((61, 100))
+            for obj in self.script.get_objs_at_coordinates(NEARBY_BAND_XY)
             if isinstance(obj, Monster)
         ]
         self.assertEqual(len(respawned), 1)

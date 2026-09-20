@@ -5,6 +5,7 @@ The dialogue key comes from the synthetic kit (never a shipped key), so this
 suite proves the SHAPE of the blueprint, not any shipped content.
 """
 from evennia.utils.test_resources import EvenniaTestCase
+from tools.spec_traceability import covers_requirement
 from typeclasses.components import (
     GuildExaminer,
     GuildStaff,
@@ -45,6 +46,9 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self._patch_roster(tuple(catalog.service_hosts) + (self._attendant_row(),))
         sync_service_content()
 
+    @covers_requirement(
+        "place-attendant-hosts::a-place-whose-service-is-conversation-has-a-blueprint-to-host-it"
+    )
     def test_an_attendant_place_yields_a_talk_only_host(self):
         self._sync_with_attendant_row()
         host = NPC.objects.filter(db_key="合成櫃檯店員").first()

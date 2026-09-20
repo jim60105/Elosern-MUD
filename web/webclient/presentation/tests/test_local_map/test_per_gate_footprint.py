@@ -4,29 +4,39 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import _context, _t_grid_id
-
+from ._support import (
+    EAST_APPROACH,
+    EAST_GATE_XYZ,
+    SOUTH_APPROACH,
+    SOUTH_GATE_XYZ,
+    _context,
+    _live_gateway_entry,
+    _t_grid_id,
+)
 
 
 class LocalMapPerGateFootprintTests(EvenniaTest):
     """Per-gate presentation on both sides and the footprint boundary (P1b).
 
-    Registry geometry: footprint x=58..62, y=98..102; gate "n" -> 南門
-    ``SOUTH_GATE_XYZ`` with approach (60, 97); gate "s" -> 北門
-    ``NORTH_GATE_XYZ`` with approach (60, 103). ``EvenniaTest``
-    because the round-trips traverse real gateway exits (same fixture need as
+    Registry geometry (probed, not authored): the sample city's footprint is
+    a five-by-five mask; gate "n" -> 南門 ``SOUTH_GATE_XYZ`` with its
+    south-approach cell, gate "w" -> 東門 ``EAST_GATE_XYZ`` with its
+    east-approach cell. ``EvenniaTest`` because the round-trips traverse
+    real gateway exits (same fixture need as
     ``LocalMapGatewayPairTests``).
     """
 
-    SOUTH_ID = _t_grid_id(2, 0)  # 南門
-    NORTH_ID = _t_grid_id(2, 4)  # 北門
-    SOUTH_APPROACH = "wild:elosern:60:97"
-    NORTH_APPROACH = "wild:elosern:60:103"
-    FOOTPRINT_X = range(58, 63)
-    FOOTPRINT_Y = range(98, 103)
+    SOUTH_ID = _t_grid_id(*SOUTH_GATE_XYZ[:2])  # 南門
+    EAST_ID = _t_grid_id(*EAST_GATE_XYZ[:2])  # 東門
+    _ENTRY = _live_gateway_entry()
+    SOUTH_APPROACH = "wild:%s:%d:%d" % ("elosern", *SOUTH_APPROACH)
+    EAST_APPROACH = "wild:%s:%d:%d" % ("elosern", *EAST_APPROACH)
+    _CELLS = _ENTRY.footprint_cells
+    FOOTPRINT_X = {x for x, _ in _CELLS}
+    FOOTPRINT_Y = {y for _, y in _CELLS}
 
     def setUp(self):
         super().setUp()
@@ -34,7 +44,7 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         sync_grid()
         sync_wilderness()
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
 
     def _registry(self):
         return build_production_registry()
@@ -65,11 +75,17 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         # ground: no footprint wild node anywhere in the payload and no edge
         # for the footprint-facing direction (delta scenario, vantages off
         # the two gate approach cells).
+        # The east gate's own approach cell sits immediately east of the
+        # footprint's middle row, so the east-side vantage moves one cell
+        # north of it.
+        ex, ey = EAST_APPROACH
+        sx, sy = SOUTH_APPROACH
+        fy = max(self.FOOTPRINT_Y)
         vantages = [
-            ((57, 100), "e"),  # -> (58, 100)
-            ((63, 100), "w"),  # -> (62, 100)
-            ((59, 97), "n"),   # -> (59, 98)
-            ((59, 103), "s"),  # -> (59, 102)
+            ((ex - 6, sy + 3), "e"),  # west vantage -> footprint edge
+            ((ex, ey + 1), "w"),      # north of the east approach -> footprint
+            ((sx - 1, sy), "n"),      # south vantage -> footprint edge
+            ((sx - 1, fy + 1), "s"),  # north vantage -> footprint edge
         ]
         for coordinates, blocked in vantages:
             with self.subTest(vantage=coordinates, direction=blocked):
@@ -91,9 +107,11 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
     def test_both_gates_render_independently_on_the_grid_side(self):
         # Each city gate room shows its OWN approach cell, drawn toward its
         # registry face -- never the other gate's approach cell.
+        sx, sy = SOUTH_GATE_XYZ[:2]
+        ex, ey = EAST_GATE_XYZ[:2]
         for room, approach_id, other_id, slot in (
-            (self.south_gate, self.SOUTH_APPROACH, self.NORTH_APPROACH, (2, -1)),
-            (self.north_gate, self.NORTH_APPROACH, self.SOUTH_APPROACH, (2, 5)),
+            (self.south_gate, self.SOUTH_APPROACH, self.EAST_APPROACH, (sx, sy - 1)),
+            (self.east_gate, self.EAST_APPROACH, self.SOUTH_APPROACH, (ex + 1, ey)),
         ):
             with self.subTest(room=room.key):
                 self.char1.location = room
@@ -111,11 +129,11 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
     )
     def test_both_gates_render_independently_on_the_wild_side(self):
         # Each approach cell resolves ONLY its own gateway: the south
-        # approach's north step is 南門, the north approach's south step is
-        # 北門, and the other gate never appears.
+        # approach's north step is 南門, the east approach's west step is
+        # 東門, and the other gate never appears.
         for coordinates, gate_id, other_id, direction in (
-            ((60, 97), self.SOUTH_ID, self.NORTH_ID, "n"),
-            ((60, 103), self.NORTH_ID, self.SOUTH_ID, "s"),
+            (SOUTH_APPROACH, self.SOUTH_ID, self.EAST_ID, "n"),
+            (EAST_APPROACH, self.EAST_ID, self.SOUTH_ID, "w"),
         ):
             with self.subTest(cell=coordinates):
                 self._at_wild(coordinates)
@@ -147,23 +165,25 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
             for exit_obj in self.south_gate.exits
             if isinstance(exit_obj, WildernessGateExit)
         )
-        north_exit = next(
+        east_exit = next(
             exit_obj
-            for exit_obj in self.north_gate.exits
+            for exit_obj in self.east_gate.exits
             if isinstance(exit_obj, WildernessGateExit)
         )
         self.assertEqual(south_exit.key, "荒野")
-        self.assertEqual(north_exit.key, "荒野")
-        # 南門's face is "s"; alias it as if it led north. 北門's face is "n";
-        # alias it as if it led south.
+        self.assertEqual(east_exit.key, "荒野")
+        # 南門's face is "s"; alias it as if it led north. 東門's face is "e";
+        # alias it as if it led west.
         south_exit.aliases.clear()
         south_exit.aliases.add("north", "n")
-        north_exit.aliases.clear()
-        north_exit.aliases.add("south", "s")
+        east_exit.aliases.clear()
+        east_exit.aliases.add("west", "w")
 
+        sx, sy = SOUTH_GATE_XYZ[:2]
+        ex, ey = EAST_GATE_XYZ[:2]
         for room, approach_id, face_slot, exit_obj in (
-            (self.south_gate, self.SOUTH_APPROACH, (2, -1), south_exit),
-            (self.north_gate, self.NORTH_APPROACH, (2, 5), north_exit),
+            (self.south_gate, self.SOUTH_APPROACH, (sx, sy - 1), south_exit),
+            (self.east_gate, self.EAST_APPROACH, (ex + 1, ey), east_exit),
         ):
             with self.subTest(room=room.key):
                 self.char1.location = room
@@ -184,7 +204,7 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
 
         for room, gate_id, approach_id, return_key in (
             (self.south_gate, self.SOUTH_ID, self.SOUTH_APPROACH, "north"),
-            (self.north_gate, self.NORTH_ID, self.NORTH_APPROACH, "south"),
+            (self.east_gate, self.EAST_ID, self.EAST_APPROACH, "west"),
         ):
             with self.subTest(gate=gate_id):
                 gate = next(

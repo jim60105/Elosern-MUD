@@ -33,8 +33,10 @@ from world.maps.wilderness_provider import (
     ElosernWildernessMapProvider,
 )
 
-SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
-NORTH_GATE_XYZ = (2, 4, "capital_altoria")
+# No gate coordinates live here (limbo-one-way-gates D1: the registries are the
+# sole authored source): every consumer resolves a city gate through
+# CITY_GATE_REGISTRY and a wilderness gate through WILDERNESS_ENTRY_REGISTRY,
+# so bootstrap owns no gate surface of its own.
 
 # The hard-gate starting-room typeclass (limbo-one-way-gates D4). Referenced
 # by module path so bootstrap never imports typeclasses.rooms' subclasses.
@@ -423,7 +425,8 @@ def _provision_gate_exit(anchor_key: str, gate) -> None:
         return
 
     # Outward direction from the city is the gate's face -- opposite of the
-    # wilderness-side return_direction: leaving 北門 toward the wild is north.
+    # wilderness-side return_direction: leaving the 東門 (return_direction "w")
+    # toward the wild is east.
     face = OPPOSITE_DIRECTION[gate.return_direction]
     gate_exit = create_object(
         WildernessGateExit,

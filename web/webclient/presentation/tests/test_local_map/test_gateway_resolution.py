@@ -1,9 +1,17 @@
 import unittest
 from unittest.mock import patch
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 
-from ._support import _T_MAP_KEY, _T_PLAZA_XYZ, _t_anchor_display, _t_region_display_for
-
+from ._support import (
+    EAST_APPROACH,
+    EAST_GATE_XYZ,
+    SOUTH_APPROACH,
+    SOUTH_GATE_XYZ,
+    _T_MAP_KEY,
+    _T_PLAZA_XYZ,
+    _t_anchor_display,
+    _t_region_display_for,
+)
 
 
 class LocalMapGatewayResolutionTests(unittest.TestCase):
@@ -19,10 +27,10 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
 
         triples = set(_registered_gateways())
         self.assertIn(
-            ((60, 97), (SOUTH_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
+            (SOUTH_APPROACH, (SOUTH_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
         )
         self.assertIn(
-            ((60, 103), (NORTH_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
+            (EAST_APPROACH, (EAST_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
         )
 
     def test_registered_gateways_yields_a_point_shape_entrys_own_anchor_cell(self):
@@ -48,14 +56,16 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
     def test_wilderness_gateway_at_matches_only_registered_approach_cells(self):
         from web.webclient.presentation.local_map import _wilderness_gateway_at
 
-        self.assertIsNotNone(_wilderness_gateway_at(60, 103))
-        self.assertIsNotNone(_wilderness_gateway_at(60, 97))
-        self.assertIsNone(_wilderness_gateway_at(60, 104))
+        self.assertIsNotNone(_wilderness_gateway_at(*EAST_APPROACH))
+        self.assertIsNotNone(_wilderness_gateway_at(*SOUTH_APPROACH))
+        # Immediately north of the east approach is outside every footprint:
+        # not itself an approach cell.
+        self.assertIsNone(_wilderness_gateway_at(EAST_APPROACH[0], EAST_APPROACH[1] + 1))
 
     def test_grid_gateway_at_matches_only_registered_gate_rooms(self):
         from web.webclient.presentation.local_map import _grid_gateway_at
 
-        self.assertIsNotNone(_grid_gateway_at(*NORTH_GATE_XYZ))
+        self.assertIsNotNone(_grid_gateway_at(*EAST_GATE_XYZ))
         # The plaza AnchorRoom is an in-map landmark, not a registered gate.
         self.assertIsNone(_grid_gateway_at(*_T_PLAZA_XYZ))
 
@@ -64,21 +74,23 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
 
         # Same coordinates, wrong map: the registry's own z_map_key must
         # match, never just the (x, y) pair (design D3's cross-space guard).
-        self.assertIsNone(_grid_gateway_at(2, 4, "some_other_map"))
-        self.assertIsNotNone(_grid_gateway_at(*NORTH_GATE_XYZ))
+        self.assertIsNone(
+            _grid_gateway_at(EAST_GATE_XYZ[0], EAST_GATE_XYZ[1], "some_other_map")
+        )
+        self.assertIsNotNone(_grid_gateway_at(*EAST_GATE_XYZ))
 
     def test_gateway_far_side_label_wilderness_names_the_anchor(self):
         from web.webclient.presentation.local_map import _gateway_far_side_label
 
-        label = _gateway_far_side_label("wilderness", (60, 103), _T_MAP_KEY)
+        label = _gateway_far_side_label("wilderness", EAST_APPROACH, _T_MAP_KEY)
         self.assertEqual(label, _t_anchor_display(_T_MAP_KEY))
-        self.assertNotEqual(label, _t_region_display_for(60, 103))
+        self.assertNotEqual(label, _t_region_display_for(*EAST_APPROACH))
 
     def test_gateway_far_side_label_grid_names_the_far_side_region(self):
         from web.webclient.presentation.local_map import _gateway_far_side_label
 
-        label = _gateway_far_side_label("grid", (60, 103), _T_MAP_KEY)
-        self.assertEqual(label, _t_region_display_for(60, 103))
+        label = _gateway_far_side_label("grid", EAST_APPROACH, _T_MAP_KEY)
+        self.assertEqual(label, _t_region_display_for(*EAST_APPROACH))
 
 
 if __name__ == "__main__":

@@ -36,13 +36,13 @@ def live_gateway_entry():
     """The settlement entry supplying the anchor and both gate approaches.
 
     Selection is atomic (ONE entry authors both a north-facing and a
-    south-facing gate) and fails loudly if that invariant disappears.
+    west-facing gate) and fails loudly if that invariant disappears.
     """
     entries = live_entry_registry()
     candidates = [
         entry
         for entry in entries.values()
-        if entry.gate_for("n") is not None and entry.gate_for("s") is not None
+        if entry.gate_for("n") is not None and entry.gate_for("w") is not None
     ]
     if len(candidates) != 1:
         raise AssertionError(
@@ -52,15 +52,15 @@ def live_gateway_entry():
 
 
 _CAPITAL = live_gateway_entry()
-NORTH_GATE_XYZ = (
-    *_CAPITAL.gate_for("s").grid_xy,
-    _CAPITAL.gate_for("s").z_map_key,
+EAST_GATE_XYZ = (
+    *_CAPITAL.gate_for("w").grid_xy,
+    _CAPITAL.gate_for("w").z_map_key,
 )
 SOUTH_GATE_XYZ = (
     *_CAPITAL.gate_for("n").grid_xy,
     _CAPITAL.gate_for("n").z_map_key,
 )
-NORTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))
+EAST_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("w"))
 SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 
 
@@ -74,8 +74,8 @@ class WildernessGatewayExitTests(EvenniaTest):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.south_gate_exit = [
             e for e in self.south_gate.exits if isinstance(e, WildernessGateExit)
@@ -91,22 +91,22 @@ class WildernessGatewayExitTests(EvenniaTest):
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_gate_exit_places_traverser_at_gate_approach_and_advances_clock(self):
         before = self._tick()
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         from typeclasses.rooms import TerrainRoom
 
         self.assertIsInstance(self.char1.location, TerrainRoom)
-        self.assertEqual(self.char1.location.coordinates, NORTH_APPROACH)
+        self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
         self.assertEqual(self._tick(), before + 9000)
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_each_gate_exit_lands_on_its_own_gate_approach_cell(self):
-        # Per-gate landing (wilderness-anchor-footprint): the 南門 gate's exit
-        # lands on the south approach, not the north one.
+        # Per-gate landing (wilderness-anchor-footprint): each gate's exit
+        # lands only on its own approach cell.
         self.south_gate_exit.at_traverse(self.char1, self.south_gate)
         self.assertEqual(self.char1.location.coordinates, SOUTH_APPROACH)
-        self.char1.move_to(self.north_gate)
-        self.gate.at_traverse(self.char1, self.north_gate)
-        self.assertEqual(self.char1.location.coordinates, NORTH_APPROACH)
+        self.char1.move_to(self.east_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
+        self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_misconfigured_gate_exit_fails_closed_before_settlement(self):
@@ -133,12 +133,12 @@ class WildernessGatewayExitTests(EvenniaTest):
                 before = self._tick()
                 baseline = known()
                 misconfiguration(self.gate)
-                self.assertFalse(self.gate.at_traverse(self.char1, self.north_gate))
+                self.assertFalse(self.gate.at_traverse(self.char1, self.east_gate))
                 self.assertIs(self.char1.location, original)
                 self.assertEqual(self._tick(), before)
                 self.assertEqual(known(), baseline)
                 self.gate.db.anchor_key = _CAPITAL.anchor_key
-                self.gate.db.gate_direction = "s"
+                self.gate.db.gate_direction = "w"
 
     def test_failed_enter_wilderness_does_not_advance_clock(self):
         from unittest.mock import patch
@@ -146,7 +146,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         original_location = self.char1.location
         before = self._tick()
         with patch("typeclasses.exits.enter_wilderness", return_value=False):
-            result = self.gate.at_traverse(self.char1, self.north_gate)
+            result = self.gate.at_traverse(self.char1, self.east_gate)
         self.assertFalse(result)
         self.assertIs(self.char1.location, original_location)
         self.assertEqual(self._tick(), before)
@@ -155,26 +155,26 @@ class WildernessGatewayExitTests(EvenniaTest):
     def test_eight_directional_exits_are_wilderness_return_exits(self):
         from typeclasses.rooms import TerrainRoom
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         for exit_obj in self.char1.location.exits:
             self.assertIsInstance(exit_obj, WildernessReturnExit)
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
-    def test_south_from_entry_returns_to_exact_grid_room(self):
+    def test_west_from_entry_returns_to_exact_grid_room(self):
         from typeclasses.rooms import TerrainRoom
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         before = self._tick()
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.east_gate)
         self.assertEqual(self._tick(), before + 9000)
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
     def test_north_from_south_approach_returns_to_the_south_gate_room(self):
-        # Every authored pair routes home: (60, 97) + north -> 南門 (2, 0).
+        # Every authored return pair routes to its matching gate.
         self.south_gate_exit.at_traverse(self.char1, self.south_gate)
         before = self._tick()
         self._exit("north").at_traverse(self.char1, self.char1.location)
@@ -185,7 +185,7 @@ class WildernessGatewayExitTests(EvenniaTest):
     def test_intermediate_steps_each_advance_clock_by_one_wilderness_move(self):
         from typeclasses.rooms import TerrainRoom
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         expected = self._tick()
         for _ in range(3):
@@ -199,14 +199,14 @@ class WildernessGatewayExitTests(EvenniaTest):
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         before = self._tick()
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         for _ in range(3):
             self._exit("east").at_traverse(self.char1, self.char1.location)
         for _ in range(3):
             self._exit("west").at_traverse(self.char1, self.char1.location)
-        self._exit("south").at_traverse(self.char1, self.char1.location)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertEqual(self._tick(), before + 8 * 9000)
-        self.assertIs(self.char1.location, self.north_gate)
+        self.assertIs(self.char1.location, self.east_gate)
         # The return-exit cleanup drops the player, but each visited coordinate
         # keeps its deterministic population monster (wilderness-monster-
         # population); the leak-check intent -- no player bookkeeping left
@@ -221,7 +221,7 @@ class WildernessGatewayExitTests(EvenniaTest):
     def test_other_directions_route_as_ordinary_wilderness_exit(self):
         from typeclasses.rooms import TerrainRoom
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         start = self.char1.location.coordinates
         self._exit("east").at_traverse(self.char1, self.char1.location)
@@ -231,7 +231,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         original_location = self.char1.location
         before = self._tick()
         self.char1.at_pre_move = lambda *a, **k: False
-        result = self.gate.at_traverse(self.char1, self.north_gate)
+        result = self.gate.at_traverse(self.char1, self.east_gate)
         self.assertFalse(result)
         self.assertIs(self.char1.location, original_location)
         self.assertEqual(self._tick(), before)
@@ -241,10 +241,10 @@ class WildernessGatewayExitTests(EvenniaTest):
         from typeclasses.monsters import Monster
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         first_room = self.char1.location
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.east_gate)
         # The player's bookkeeping is cleaned up on the return exit; only the
         # deterministic population monster stays registered (wilderness-
         # monster-population).
@@ -261,19 +261,19 @@ class WildernessGatewayExitTests(EvenniaTest):
         in_pool = first_room in script.db.unused_rooms
         in_retained = first_room in retained
         self.assertTrue(in_pool or in_retained, "vacated room was orphaned")
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIs(self.char1.location, first_room)
 
     def test_failed_return_to_missing_gate_does_not_advance_clock(self):
         from unittest.mock import patch
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         before = self._tick()
         wilderness_location = self.char1.location
         # Simulate a vanished gate (the true misconfiguration this guards
         # against) by patching the shared gate-room lookup to return None.
         with patch("typeclasses.exits.grid_room_for_gate", return_value=None):
-            result = self._exit("south").at_traverse(
+            result = self._exit("west").at_traverse(
                 self.char1, self.char1.location
             )
         self.assertFalse(result)
@@ -281,11 +281,11 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertEqual(self._tick(), before)
 
     def test_vetoed_return_move_does_not_advance_clock(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         before = self._tick()
         wilderness_location = self.char1.location
         self.char1.at_pre_move = lambda *a, **k: False
-        result = self._exit("south").at_traverse(self.char1, self.char1.location)
+        result = self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertFalse(result)
         self.assertIs(self.char1.location, wilderness_location)
         self.assertEqual(self._tick(), before)

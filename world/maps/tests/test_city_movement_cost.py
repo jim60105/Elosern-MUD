@@ -13,9 +13,11 @@ from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
 from world.maps.map_data import XYMAP_DATA_LIST
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
+
+SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
@@ -36,7 +38,7 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
         sync_grid()
         exits = self._intra_city_exits()
-        self.assertEqual(len(exits), 34)
+        self.assertEqual(len(exits), 62)
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 
@@ -49,7 +51,7 @@ class SampleCityCostedExitTests(EvenniaTest):
             sync_grid()
 
         loaded = self._intra_city_exits()
-        self.assertEqual(len(loaded), 24)
+        self.assertEqual(len(loaded), 52)
         for exit_obj in loaded:
             self.assertEqual(type(exit_obj).__name__, "XYZExit")
 

@@ -8,17 +8,26 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import MAX_NODES
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import _T_MAP_KEY, _T_PLAZA_XYZ, _context, _t_grid_id
+from ._support import (
+    EAST_APPROACH,
+    SOUTH_APPROACH,
+    EAST_GATE_XYZ,
+    _T_MAP_KEY,
+    _T_PLAZA_XYZ,
+    _context,
+    _t_grid_id,
+    _t_wild_id,
+)
 
 
 
 class LocalMapGridGateCapacityTests(EvenniaTestCase):
     """Capacity reservation and slot probing for grid-side gate nodes."""
 
-    ENTRY_ID = "wild:elosern:60:103"
+    ENTRY_ID = _t_wild_id(*EAST_APPROACH)
 
     @classmethod
     def setUpClass(cls):
@@ -26,15 +35,15 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        cls._north_gate = GridRoom.objects.filter_xyz(
-            xyz=NORTH_GATE_XYZ
+        cls._east_gate = GridRoom.objects.filter_xyz(
+            xyz=EAST_GATE_XYZ
         ).first()
         cls._plaza = GridRoom.objects.filter_xyz(xyz=_T_PLAZA_XYZ).first()
         from typeclasses.exits import WildernessGateExit
 
         cls._gate = [
             exit_obj
-            for exit_obj in cls._north_gate.exits
+            for exit_obj in cls._east_gate.exits
             if isinstance(exit_obj, WildernessGateExit)
         ][0]
 
@@ -45,8 +54,8 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.apply_race_baseline()
         # filter_xyz, not get(id): the plaza is an AnchorRoom, and the plain
         # typeclass manager does not resolve subclass typeclasses.
-        self.north_gate = GridRoom.objects.filter_xyz(
-            xyz=NORTH_GATE_XYZ
+        self.east_gate = GridRoom.objects.filter_xyz(
+            xyz=EAST_GATE_XYZ
         ).first()
         self.plaza = GridRoom.objects.filter_xyz(
             xyz=_T_PLAZA_XYZ
@@ -56,7 +65,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         return build_production_registry()
 
     def _make_gate(
-        self, location, key="荒野", aliases=("wilderness", "north", "n"), gate_direction="s"
+        self, location, key="荒野", aliases=("wilderness", "east", "e"), gate_direction="w"
     ):
         from typeclasses.exits import WildernessGateExit
 
@@ -66,9 +75,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         )
         gate.db.anchor_key = _T_MAP_KEY
         # The presenter refuses a gate row whose direction names no gate
-        # (same refusal as the traversal), so synthetic gates carry the
-        # identity the tests pin: "s" -> approach cell (60, 103), face "n";
-        # "n" -> approach cell (60, 97), face "s".
+        # (same refusal as the traversal), so synthetic gates carry an
+        # identity a shipped gate actually holds: the live entry's "w" face
+        # and its "n" face (approach cells derived, never authored).
         gate.db.gate_direction = gate_direction
         return gate
 
@@ -76,9 +85,10 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_capacity_trim_keeps_the_gate_and_farthers_first(self):
-        # At the real north gate: in-range {(2,4),(2,3),(1,3),(3,3)} + gate.
-        # Cap 4 reserves one slot for the gate, so exactly one far node goes.
-        self.char1.location = self.north_gate
+        # At the real east gate (6,3): in-range within 2 hops is
+        # {(6,3),(5,3),(4,3),(4,4)} + gate. Cap 4 reserves one slot for the
+        # gate, so exactly one far node goes.
+        self.char1.location = self.east_gate
         record_arrival(self.char1)
         with patch(
             "web.webclient.presentation.local_map.grid.MAX_NODES", 4
@@ -87,18 +97,15 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertTrue(payload["available"])
         ids = {node["id"] for node in payload["nodes"]}
         self.assertEqual(len(ids), 4)
-        # In range from (2,4): {(2,4),(2,3),(1,3),(3,3),(2,2)}; cap 4 reserves
-        # one slot for the gate -> trim drops the two farthest in Chebyshev/
-        # Y/X descending order: (2,2) then the (1,3)/(2,3)/(3,3) tie-break
-        # loser (3,3).
+        # Cap 4 reserves one slot for the gate -> trim drops the single
+        # farthest node in Chebyshev/Y/X descending order: (4,4).
         self.assertIn(self.ENTRY_ID, ids)
-        self.assertNotIn(_t_grid_id(3, 3), ids)
-        self.assertNotIn(_t_grid_id(2, 2), ids)
-        self.assertIn(_t_grid_id(2, 4), ids)
-        self.assertIn(_t_grid_id(2, 3), ids)
-        self.assertIn(_t_grid_id(1, 3), ids)
+        self.assertNotIn(_t_grid_id(4, 4), ids)
+        self.assertIn(_t_grid_id(6, 3), ids)
+        self.assertIn(_t_grid_id(5, 3), ids)
+        self.assertIn(_t_grid_id(4, 3), ids)
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
-        self.assertEqual((gate_node["x"], gate_node["y"]), (2, 5))
+        self.assertEqual((gate_node["x"], gate_node["y"]), (7, 3))
         self.assertIsNotNone(gate_node["action"])
 
     @covers_requirement(
@@ -193,10 +200,10 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertTrue(payload["available"])
         by_id = {node["id"]: node for node in payload["nodes"]}
         gate_node = by_id[self.ENTRY_ID]
-        # Preferred (1024,1025) is out of bounds; diamond ring 1 (dy,dx)-
-        # sorted: (1024,1024) occupied by the current node, (1023,1025)/
-        # (1025,1025)/(1024,1026) out of bounds; ring 2 opens at dy=-2 ->
-        # (1024,1023), the first legal free slot.
+        # Preferred (1025,1024) is out of bounds; diamond ring 1 (dy,dx)-
+        # sorted: (1024,1024) occupied by the current node, (1025,1023)/
+        # (1026,1024)/(1025,1025) out of bounds; ring 2 opens at
+        # (dy=-1,dx=-1) -> (1024,1023), the first legal free slot.
         self.assertEqual((gate_node["x"], gate_node["y"]), (1024, 1023))
         self.assertIsNotNone(gate_node["action"])
 
@@ -204,29 +211,29 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_occupied_preferred_slot_probes_deterministically(self):
-        # Plaza (2,2): a registered gate's north slot (2,3) is an in-range
-        # node; the gate takes the nearest free slot, not a dropped identity.
+        # Plaza (3,3): a registered gate's east slot (4,3) is a real,
+        # already-occupied in-range city node; the gate takes the nearest
+        # free slot, not a dropped identity.
         gate = self._make_gate(self.plaza)
         self.char1.location = self.plaza
         record_arrival(self.char1)
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         by_id = {node["id"]: node for node in payload["nodes"]}
-        self.assertIn(_t_grid_id(2, 3), by_id)
+        self.assertIn(_t_grid_id(4, 3), by_id)
         self.assertIn(self.ENTRY_ID, by_id)
         gate_node = by_id[self.ENTRY_ID]
-        # Sweep from (2,3): ring 1 visits (2,2),(1,3),(3,3),(2,4) -- all
-        # in-range city nodes; ring 2 visits (2,1),(1,2),(3,2) (city nodes)
-        # before (0,3), which no city node occupies. Renderer-local geometry
-        # is slot freedom, never identity.
-        self.assertEqual((gate_node["x"], gate_node["y"]), (0, 3))
+        # (4,3) is occupied; ring 1's first candidate (dy=-1, dx=0) from
+        # (4,3) is (4,2), which no city node occupies. Renderer-local
+        # geometry is slot freedom, never identity.
+        self.assertEqual((gate_node["x"], gate_node["y"]), (4, 2))
         slots = [(n["x"], n["y"]) for n in payload["nodes"] if n["id"] != self.ENTRY_ID]
         self.assertNotIn((gate_node["x"], gate_node["y"]), slots)
         self.assertEqual(gate_node["action"]["exit_ref"], str(int(gate.id)))
         edge = next(
             e for e in payload["edges"] if e["destination"] == self.ENTRY_ID
         )
-        self.assertEqual(edge["label"], "n")
+        self.assertEqual(edge["label"], "e")
         self.assertTrue(edge["traversable"])
 
     @covers_requirement(
@@ -234,17 +241,17 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
     )
     def test_slot_direction_follows_registry_face_not_key_aliases(self):
         # wilderness-anchor-footprint-local-map D2: the slot direction is the
-        # registry gate face (db.gate_direction "s" -> face "n"), never a
+        # registry gate face (db.gate_direction "w" -> face "e"), never a
         # parse of the exit's key or aliases -- key/alias direction parsing is
         # deleted, and display aliases may name any direction they like.
-        self._make_gate(self.plaza, key="捷徑", aliases=("southeast", "east"))
+        self._make_gate(self.plaza, key="捷徑", aliases=("southeast", "north"))
         self.char1.location = self.plaza
         record_arrival(self.char1)
         payload = self._registry().render("local_map", _context(self.char1))
         edge = next(
             e for e in payload["edges"] if e["destination"] == self.ENTRY_ID
         )
-        self.assertEqual(edge["label"], "n")
+        self.assertEqual(edge["label"], "e")
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
         self.assertIsNotNone(gate_node["action"])
         # Exactly one gate edge exists and it names the face, never a
@@ -254,7 +261,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
             for edge in payload["edges"]
             if edge["destination"] == self.ENTRY_ID
         }
-        self.assertEqual(labels, {"n"})
+        self.assertEqual(labels, {"e"})
 
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
@@ -304,8 +311,8 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # gates and a full-budget fake map the trim absorbs the pressure for
         # BOTH reservations -- neither gate may be silently omitted, and only
         # ordinary farthest nodes are trimmed in the pinned order.
-        self._make_gate(self.plaza, gate_direction="s")  # -> 60:103, face n
-        self._make_gate(self.plaza, key="北境之門", gate_direction="n")  # -> 60:97, face s
+        self._make_gate(self.plaza, gate_direction="w")  # -> east approach, face e
+        self._make_gate(self.plaza, key="北境之門", gate_direction="n")  # -> south approach, face s
         nodes = [
             types.SimpleNamespace(
                 X=col, Y=row, node_index=row * 100 + col, links={}, symbol="#"
@@ -348,20 +355,24 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertEqual(len(payload["nodes"]), 4)
         self.assertIn(_t_grid_id(0, 0), by_id)
         self.assertIn(_t_grid_id(1, 0), by_id)
-        self.assertIn("wild:elosern:60:103", by_id)
-        self.assertIn("wild:elosern:60:97", by_id)
-        self.assertIsNotNone(by_id["wild:elosern:60:103"]["action"])
-        self.assertIsNotNone(by_id["wild:elosern:60:97"]["action"])
-        # Faces: 60:103 draws north to (0, 1), 60:97 draws south to (0, -1);
-        # both preferred slots are free after the trim.
-        self.assertEqual((by_id["wild:elosern:60:103"]["x"], by_id["wild:elosern:60:103"]["y"]), (0, 1))
-        self.assertEqual((by_id["wild:elosern:60:97"]["x"], by_id["wild:elosern:60:97"]["y"]), (0, -1))
+        east_id = _t_wild_id(*EAST_APPROACH)
+        south_id = _t_wild_id(*SOUTH_APPROACH)
+        self.assertIn(east_id, by_id)
+        self.assertIn(south_id, by_id)
+        self.assertIsNotNone(by_id[east_id]["action"])
+        self.assertIsNotNone(by_id[south_id]["action"])
+        # Faces: the east gate draws east from (0,0) -> preferred (1,0) is
+        # occupied by the kept (1,0) node, so ring 1's first candidate
+        # (dy=-1) lands at (1,-1); the south gate draws south to (0,-1)
+        # directly (free).
+        self.assertEqual((by_id[east_id]["x"], by_id[east_id]["y"]), (1, -1))
+        self.assertEqual((by_id[south_id]["x"], by_id[south_id]["y"]), (0, -1))
         edge_labels = {
             edge["label"]
             for edge in payload["edges"]
-            if edge["destination"] in ("wild:elosern:60:103", "wild:elosern:60:97")
+            if edge["destination"] in (east_id, south_id)
         }
-        self.assertEqual(edge_labels, {"n", "s"})
+        self.assertEqual(edge_labels, {"e", "s"})
 
 
 if __name__ == "__main__":

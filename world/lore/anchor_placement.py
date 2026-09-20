@@ -19,6 +19,6 @@ class AnchorPlacement:
 # Kept deliberately partial: only anchors built into the grid so far get an
 # entry. Future changes (13/14 and later world-building passes) add more.
 ANCHOR_PLACEMENT_REGISTRY: dict[str, AnchorPlacement] = {
-    "capital_altoria": AnchorPlacement("capital_altoria", "capital_altoria", (2, 2)),
+    "capital_altoria": AnchorPlacement("capital_altoria", "capital_altoria", (3, 3)),
     "village_ciaran": AnchorPlacement("village_ciaran", "village_ciaran", (1, 1)),
 }

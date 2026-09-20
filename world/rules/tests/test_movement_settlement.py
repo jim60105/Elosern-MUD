@@ -23,7 +23,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
-from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.map_knowledge import KnowledgeError, parse_knowledge
@@ -31,11 +31,11 @@ from world.rules.party import join_party
 
 
 def _gate_anchor_entry():
-    """The entry row behind the production north gate, resolved by probe.
+    """The entry row behind the production east gate, resolved by probe.
 
     The xyzgrid sync path is keyed to the shipped capital map's prototype
-    coordinates (a production constant, ``NORTH_GATE_XYZ``), which the kit
-    cannot replace; the entry row whose gates point back at that map is
+    coordinates (a production identity the kit cannot replace), which the
+    kit cannot replace; the entry row whose gates point back at that map is
     therefore resolved at runtime (the P03/P06 live-registry idiom) instead
     of being named. Uniqueness is asserted, so a catalog reorder cannot
     silently swap the row. All assertions below are rollback/bookkeeping
@@ -48,14 +48,17 @@ def _gate_anchor_entry():
     matches = [
         entry
         for entry in registry.values()
-        if any(gate.z_map_key == NORTH_GATE_XYZ[2] for gate in entry.gates)
+        if entry.gate_for("w") is not None
+        and entry.gate_for("n") is not None
     ]
     assert len(matches) == 1, matches
     return matches[0]
 
 
 _CAPITAL = _gate_anchor_entry()
-ENTRY_XY = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))
+_EAST_GATE = _CAPITAL.gate_for("w")
+EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
+ENTRY_XY = _CAPITAL.approach_cell(_EAST_GATE)
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
 
@@ -212,8 +215,8 @@ class MovementSettlementWildernessTests(EvenniaTest):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 
     def _exit(self, direction):
         return [e for e in self.char1.location.exits if e.key == direction][0]
@@ -236,13 +239,13 @@ class MovementSettlementWildernessTests(EvenniaTest):
 
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_returns_player_to_the_grid_room(self):
-        self.char1.location = self.north_gate
+        self.char1.location = self.east_gate
         before_bookkeeping = self._bookkeeping()
         before = get_world_clock().tick
         with patch.object(WorldClock, "advance", _failing_advance):
             with self.assertRaises(RuntimeError):
-                self.gate.at_traverse(self.char1, self.north_gate)
-        self.assertIs(self.char1.location, self.north_gate)
+                self.gate.at_traverse(self.char1, self.east_gate)
+        self.assertIs(self.char1.location, self.east_gate)
         self.assertNotIn(self.char1, self._script().db.itemcoordinates)
         self.assertEqual(get_world_clock().tick, before)
         # The fresh entry room (and its exits and population monster) rolled
@@ -252,21 +255,21 @@ class MovementSettlementWildernessTests(EvenniaTest):
 
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_with_fresh_room_keeps_no_zombie_rooms(self):
-        self.char1.location = self.north_gate
+        self.char1.location = self.east_gate
         # The first entry creates a fresh wilderness room; after the failure
         # the bookkeeping must be empty with nothing left in unused_rooms.
         self.assertEqual(self._bookkeeping()[2], [])
         with patch.object(WorldClock, "advance", _failing_advance):
             with self.assertRaises(RuntimeError):
-                self.gate.at_traverse(self.char1, self.north_gate)
+                self.gate.at_traverse(self.char1, self.east_gate)
         itemcoordinates, rooms, unused_rooms = self._bookkeeping()
         self.assertEqual((itemcoordinates, rooms, unused_rooms), ({}, {}, []))
         self._assert_rooms_coherent()
 
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_failure_after_follow_returns_the_wilderness_companion(self):
-        self.char1.location = self.north_gate
-        npc = create_object(NPC, key="同伴", location=self.north_gate)
+        self.char1.location = self.east_gate
+        npc = create_object(NPC, key="同伴", location=self.east_gate)
         join_party(npc, self.char1)
         before_tick = get_world_clock().tick
         before_bookkeeping = self._bookkeeping()
@@ -280,11 +283,11 @@ class MovementSettlementWildernessTests(EvenniaTest):
 
         with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
             with self.assertRaises(RuntimeError):
-                self.gate.at_traverse(self.char1, self.north_gate)
-        self.assertIs(self.char1.location, self.north_gate)
-        self.assertIs(npc.location, self.north_gate)
-        self.assertIn(self.char1, self.north_gate.contents)
-        self.assertIn(npc, self.north_gate.contents)
+                self.gate.at_traverse(self.char1, self.east_gate)
+        self.assertIs(self.char1.location, self.east_gate)
+        self.assertIs(npc.location, self.east_gate)
+        self.assertIn(self.char1, self.east_gate.contents)
+        self.assertIn(npc, self.east_gate.contents)
         self.assertEqual(get_world_clock().tick, before_tick)
         script = self._script()
         self.assertNotIn(self.char1, script.db.itemcoordinates)
@@ -297,11 +300,13 @@ class MovementSettlementWildernessTests(EvenniaTest):
         script = self._script()
         real_advance = WorldClock.advance
         with patch.object(WorldClock, "advance", _flaky_advance(real_advance)):
-            self.gate.at_traverse(self.char1, self.north_gate)
+            self.gate.at_traverse(self.char1, self.east_gate)
             before_tick = get_world_clock().tick
             before_coords = self.char1.location.coordinates
             before_bookkeeping = self._bookkeeping()
             with self.assertRaises(RuntimeError):
+                # The east-gate approach's open plain step; the footprint
+                # lies west, the diagonals into it are refused steps.
                 self._exit("east").at_traverse(self.char1, self.char1.location)
         self.assertEqual(get_world_clock().tick, before_tick)
         self.assertEqual(self.char1.location.coordinates, before_coords)
@@ -314,12 +319,12 @@ class MovementSettlementWildernessTests(EvenniaTest):
         script = self._script()
         real_advance = WorldClock.advance
         with patch.object(WorldClock, "advance", _flaky_advance(real_advance)):
-            self.gate.at_traverse(self.char1, self.north_gate)
+            self.gate.at_traverse(self.char1, self.east_gate)
             before_tick = get_world_clock().tick
             before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
             before_bookkeeping = self._bookkeeping()
             with self.assertRaises(RuntimeError):
-                self._exit("south").at_traverse(self.char1, self.char1.location)
+                self._exit("west").at_traverse(self.char1, self.char1.location)
         # The grid return relocated the player and deregistered them; the
         # failed charge is compensated by re-registering at the source
         # coordinates, with the recycled source room recreated or reused.
@@ -336,7 +341,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_falsy_return_after_relocation_is_compensated(self):
         script = self._script()
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         before_tick = get_world_clock().tick
         before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
         before_bookkeeping = self._bookkeeping()
@@ -344,9 +349,9 @@ class MovementSettlementWildernessTests(EvenniaTest):
         # False with the player already standing in the grid room: the boundary
         # compensates the falsy return as a failure.
         with patch.object(
-            self.north_gate, "at_object_receive", side_effect=RuntimeError("hook failed")
+            self.east_gate, "at_object_receive", side_effect=RuntimeError("hook failed")
         ):
-            result = self._exit("south").at_traverse(self.char1, self.char1.location)
+            result = self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertFalse(result)
         self.assertEqual(get_world_clock().tick, before_tick)
         self.assertIsInstance(self.char1.location, TerrainRoom)

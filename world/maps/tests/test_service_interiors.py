@@ -91,9 +91,9 @@ class ServiceInteriorTests(EvenniaTestCase):
     @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
         sync_service_interiors()
-        # Two settlements are spawned (13 capital + 6 village nodes); the
+        # Two settlements are spawned (21 capital + 6 village nodes); the
         # interiors are still not xyzgrid nodes.
-        self.assertEqual(self._count_grid_rooms(), 19)
+        self.assertEqual(self._count_grid_rooms(), 27)
 
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()
@@ -166,6 +166,40 @@ class ServiceInteriorTests(EvenniaTestCase):
                 place.key,
             )
             self.assertIn(exterior, {e.destination for e in interior.exits})
+
+    @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
+    def test_one_exterior_carrying_two_places_yields_two_doorways(self):
+        # The craft-alley scenario (altoria-capital-replan): one exterior with
+        # two interiors is one street with two doors. Discovered dynamically
+        # from the live registry — this suite follows the rows, never names a
+        # shipped place.
+        sync_service_interiors()
+        groups: dict[tuple, list] = {}
+        for place in _places().values():
+            groups.setdefault((place.settlement_key, place.exterior_xy), []).append(place)
+        shared = [row for row in groups.values() if len(row) >= 2]
+        self.assertTrue(shared, "no exterior carries two places for the scenario")
+        for places_on_one in shared:
+            exterior = self._exterior(places_on_one[0])
+            interiors = [self._interior(place) for place in places_on_one]
+            self.assertTrue(all(room is not None for room in interiors))
+            # One doorway exit per place on the exterior, keys distinct.
+            forward = [
+                exit_obj for exit_obj in exterior.exits
+                if exit_obj.destination in interiors
+            ]
+            self.assertEqual(len(forward), len(places_on_one))
+            self.assertEqual(
+                sorted(exit_obj.key for exit_obj in forward),
+                sorted(place.doorway_key_zh for place in places_on_one),
+            )
+            # Each interior leads back through exactly one 外 exit.
+            for room, place in zip(interiors, places_on_one):
+                back = [
+                    exit_obj for exit_obj in room.exits
+                    if exit_obj.destination == exterior and exit_obj.key == "外"
+                ]
+                self.assertEqual(len(back), 1, place.key)
 
     @covers_requirement("guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster")
     @covers_requirement(

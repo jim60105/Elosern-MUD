@@ -22,8 +22,8 @@ from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KE
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
-SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
-NORTH_GATE_XYZ = (2, 4, "capital_altoria")
+SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
+EAST_GATE_XYZ = (6, 3, "capital_altoria")
 
 
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -68,13 +68,13 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
-        # Two settlements: the capital's thirteen rooms and the village's six.
-        self.assertEqual(self._count_grid_rooms(), 19)
-        # 24 capital directed links + 10 village directed links.
-        self.assertEqual(self._count_city_exits(), 34)
+        # Two settlements: the capital's twenty-one rooms and the village's six.
+        self.assertEqual(self._count_grid_rooms(), 27)
+        # 52 capital directed links + 10 village directed links.
+        self.assertEqual(self._count_city_exits(), 62)
         # One forward Limbo bridge per CITY_GATE_REGISTRY row.
         self.assertEqual(len(self._bridging_exits()), 2)
-        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 36)
+        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 64)
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -90,17 +90,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             for room in GridRoom.objects.all_family()
         }
 
-        self.assertEqual(self._count_grid_rooms(), 19)
-        self.assertEqual(self._count_city_exits(), 34)
+        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_city_exits(), 62)
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(first_ids, second_ids)
 
-    def test_single_call_on_fresh_grid_spawns_all_nineteen_rooms(self):
+    def test_single_call_on_fresh_grid_spawns_all_twenty_seven_rooms(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
 
         self.assertEqual(XYZGrid.objects.all().count(), 0)
         sync_grid()
-        self.assertEqual(self._count_grid_rooms(), 19)
+        self.assertEqual(self._count_grid_rooms(), 27)
 
     def test_in_place_update_changes_desc_without_new_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -111,8 +111,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         changed = dict(XYMAP_DATA)
         changed["prototypes"] = dict(XYMAP_DATA["prototypes"])
-        changed["prototypes"][(2, 0)] = dict(changed["prototypes"][(2, 0)])
-        changed["prototypes"][(2, 0)]["desc"] = "A rebuilt southern gate."
+        changed["prototypes"][(3, 0)] = dict(changed["prototypes"][(3, 0)])
+        changed["prototypes"][(3, 0)]["desc"] = "A rebuilt southern gate."
 
         from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
 
@@ -121,7 +121,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         grid.reload()
         grid.spawn()
 
-        self.assertEqual(self._count_grid_rooms(), 19)
+        self.assertEqual(self._count_grid_rooms(), 27)
         south_gate = GridRoom.objects.get(db_key="南門")
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
@@ -184,20 +184,23 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             ["南門", "隱密小徑"],
         )
 
-    def test_north_gate_is_a_dead_end(self):
+    def test_east_gate_holds_only_its_west_grid_link_before_wilderness_sync(self):
+        # Before sync_wilderness() the 東門 is the one room whose sole grid
+        # link runs west to 東市; the wilderness gate exit it later carries
+        # is provisioned per-gate (wilderness-anchor-footprint).
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
-        north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
-        exits = list(north_gate.exits)
+        east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        exits = list(east_gate.exits)
         self.assertEqual(len(exits), 1)
-        self.assertEqual(exits[0].destination.xyz, (2, 3, "capital_altoria"))
+        self.assertEqual(exits[0].destination.xyz, (5, 3, "capital_altoria"))
 
     def test_absent_limbo_degrades_without_raising(self):
         sync_grid()
 
-        self.assertEqual(self._count_grid_rooms(), 19)
-        self.assertEqual(self._count_city_exits(), 34)
+        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_city_exits(), 62)
         self.assertEqual(len(self._bridging_exits()), 0)
 
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
@@ -225,7 +228,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
         row = CITY_GATE_REGISTRY["capital_altoria"]
-        self.assertEqual(row.gate_xyz, (2, 0, "capital_altoria"))
+        self.assertEqual(row.gate_xyz, (3, 0, "capital_altoria"))
         self.assertEqual(row.exit_key, "南門")
         self.assertEqual(row.exit_aliases, ("王都", "城門"))
         village = CITY_GATE_REGISTRY["village_ciaran"]
@@ -364,7 +367,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_same_coordinate_resolves_to_different_rooms_in_each_settlement(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
-        # (2,1) exists on both maps: 南大道 in the capital, 練刀場 in the
+        # (2,1) exists on both maps: 河岸道 in the capital, 練刀場 in the
         # village — the shared (X, Y) still names two different rooms.
         capital_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "capital_altoria")).first()
         village_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "village_ciaran")).first()
@@ -372,7 +375,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertIsNotNone(village_room)
         self.assertIsNot(capital_room, village_room)
         self.assertNotEqual(capital_room.id, village_room.id)
-        self.assertEqual(capital_room.key, "南大道")
+        self.assertEqual(capital_room.key, "河岸道")
         self.assertEqual(village_room.key, "練刀場")
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
@@ -412,7 +415,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         second_row = CityGateDef(
             map_id="capital_altoria",
-            gate_xyz=NORTH_GATE_XYZ,
+            gate_xyz=EAST_GATE_XYZ,
             exit_key="北門",
             exit_aliases=("王都北",),
         )
@@ -422,7 +425,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         with patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound):
             sync_grid()
 
-        north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        second_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         keys = sorted(exit_obj.key for exit_obj in limbo.exits)
         self.assertEqual(
             keys,
@@ -431,12 +434,12 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(len(limbo.exits), len(rebound))
         # Every gate exists; neither city side leads back into 虛境.
         self.assertIsNone(
-            [exit_obj for exit_obj in north_gate.exits if exit_obj.destination == limbo] or None
+            [exit_obj for exit_obj in second_gate.exits if exit_obj.destination == limbo] or None
         )
         # And a seeded reverse exit for the NEW gate prunes the same way.
-        create_object(Exit, key="回虛境二", location=north_gate, destination=limbo)
+        create_object(Exit, key="回虛境二", location=second_gate, destination=limbo)
         sync_grid()
-        self.assertEqual([exit_obj for exit_obj in north_gate.exits if exit_obj.destination == limbo], [])
+        self.assertEqual([exit_obj for exit_obj in second_gate.exits if exit_obj.destination == limbo], [])
         sync_grid()
         self.assertEqual(len(limbo.exits), len(rebound))
 
@@ -453,8 +456,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 19)
-        self.assertEqual(self._count_city_exits(), 34)
+        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_city_exits(), 62)
         self.assertEqual(len(self._bridging_exits()), 0)
         from evennia.utils.search import search_script
 
@@ -464,8 +467,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 19)
-        self.assertEqual(self._count_city_exits(), 34)
+        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_city_exits(), 62)
         self.assertEqual(len(self._bridging_exits()), 2)
 
 
@@ -483,8 +486,8 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     def _count_grid_rooms(self):
         return GridRoom.objects.all_family().count()
 
-    def _north_gate(self):
-        return GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+    def _east_gate(self):
+        return GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
 
     def _south_gate(self):
         return GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
@@ -493,7 +496,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        gate = gate if gate is not None else self._north_gate()
+        gate = gate if gate is not None else self._east_gate()
         gates = [e for e in gate.exits if isinstance(e, WildernessGateExit)]
         return script, gates
 
@@ -508,17 +511,17 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
         self.assertEqual(gates[0].key, "荒野")
-        # Per-gate provisioning (wilderness-anchor-footprint): the 北門 room
-        # holds the return-direction "s" gate, the 南門 room the "n" gate.
-        self.assertEqual(gates[0].db.gate_direction, "s")
+        # Per-gate provisioning (wilderness-anchor-footprint): the 東門 room
+        # holds the return-direction "w" gate, the 南門 room the "n" gate.
+        self.assertEqual(gates[0].db.gate_direction, "w")
         south_gates = self._gate_exits(self._south_gate())[1]
         self.assertEqual(len(south_gates), 1)
         self.assertEqual(south_gates[0].db.anchor_key, "capital_altoria")
         self.assertEqual(south_gates[0].db.gate_direction, "n")
         self.assertEqual(south_gates[0].key, "荒野")
-        # Exact outward-face aliases: the 北門 keeps its v1 surface; the
+        # Exact outward-face aliases: the 東門 faces east; the
         # 南門 faces south.
-        self.assertEqual(sorted(gates[0].aliases.all()), ["n", "north", "wilderness"])
+        self.assertEqual(sorted(gates[0].aliases.all()), ["e", "east", "wilderness"])
         self.assertEqual(sorted(south_gates[0].aliases.all()), ["s", "south", "wilderness"])
         # The village's single gate provisions exactly one exit on the
         # entrance node 隱密小徑, facing the wilderness with the authored
@@ -544,10 +547,10 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
-        north_gate = self._gate_exits()[1][0]
-        north_gate.at_traverse(self.char1, self._north_gate())
-        self.assertEqual(self.char1.location.coordinates, (60, 103))
-        self.char1.move_to(self._north_gate())
+        east_gate = self._gate_exits()[1][0]
+        east_gate.at_traverse(self.char1, self._east_gate())
+        self.assertEqual(self.char1.location.coordinates, (63, 100))
+        self.char1.move_to(self._east_gate())
         south_gate = self._gate_exits(self._south_gate())[1][0]
         south_gate.at_traverse(self.char1, self._south_gate())
         self.assertEqual(self.char1.location.coordinates, (60, 97))
@@ -565,7 +568,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(len(gates), 1)
         self.assertEqual(WildernessGateExit.objects.all().count(), 3)
 
-    def test_sync_wilderness_without_north_gate_degrades_gracefully(self):
+    def test_sync_wilderness_without_east_gate_degrades_gracefully(self):
         sync_wilderness()
 
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
@@ -591,7 +594,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     def test_at_server_start_provisions_wilderness_too(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 19)
+        self.assertEqual(self._count_grid_rooms(), 27)
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         scripts = WildernessScript.objects.filter(db_key=WILDERNESS_NAME)
@@ -636,16 +639,16 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.maps.wilderness_provider import terrain_description
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(60, 103), name=WILDERNESS_NAME)
+        ok = enter_wilderness(self.char1, coordinates=(63, 100), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(60, 103))
+        self.assertEqual(room.ndb.active_desc, terrain_description(63, 100))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(60, 103))
+        self.assertEqual(room.ndb.active_desc, terrain_description(63, 100))
         self.assertEqual(room.scene_archetype, "western_hills_valleys")
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
@@ -661,7 +664,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         script, gates = self._gate_exits()
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
-        self.assertEqual(gates[0].db.gate_direction, "s")
+        self.assertEqual(gates[0].db.gate_direction, "w")
 
     def test_sync_wilderness_heals_misdirected_gate(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -672,7 +675,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_wilderness()
         gates = self._gate_exits()[1]
         self.assertEqual(len(gates), 1)
-        self.assertEqual(gates[0].db.gate_direction, "s")
+        self.assertEqual(gates[0].db.gate_direction, "w")
 
     def test_sync_wilderness_heals_a_misattributed_single_gate_exit(self):
         # A lone WildernessGateExit with foreign attrs on a gate room IS that
@@ -706,7 +709,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         create_object(WildernessGateExit, key="荒野二", location=south_gate, destination=south_gate)
         sync_wilderness()
         self.assertEqual(len(self._gate_exits(south_gate)[1]), 2)
-        # The unaffected north gate provisions to exactly one exit.
+        # The unaffected east gate provisions to exactly one exit.
         self.assertEqual(len(self._gate_exits()[1]), 1)
 
     def test_sync_wilderness_leaves_same_key_foreign_exit_alone(self):
@@ -716,12 +719,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_grid()
         sync_wilderness()
         # Plant a plain Exit that occupies the gate key.
-        north_gate = self._north_gate()
+        east_gate = self._east_gate()
         create_object(
             Exit,
             key="荒野",
-            location=north_gate,
-            destination=north_gate,
+            location=east_gate,
+            destination=east_gate,
         )
         sync_wilderness()
         script, gates = self._gate_exits()
@@ -729,6 +732,6 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
         # The foreign exit is untouched (not replaced, not duplicated), and the
         # gate count stays at exactly one WildernessGateExit.
-        foreign = [e for e in north_gate.exits if isinstance(e, Exit) and not isinstance(e, WildernessGateExit)]
+        foreign = [e for e in east_gate.exits if isinstance(e, Exit) and not isinstance(e, WildernessGateExit)]
         self.assertEqual(len(foreign), 1)
         self.assertEqual(foreign[0].key, "荒野")

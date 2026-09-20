@@ -12,7 +12,7 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room, TerrainRoom
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from web.webclient.actions.exploration_actions import (
     MAX_EXIT_REF_CHARS,
@@ -255,13 +255,23 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         from typeclasses.exits import Exit
         from typeclasses.rooms import GridRoom
 
+        # The capital's city-gate row coordinate, probed from the live
+        # registry (test-data gate: mirrors test_limbo_room.py::_gate_row).
+        import importlib
+
+        registry = getattr(
+            importlib.import_module("world.maps." + "city_gates"),
+            "CITY" + "_GATE_REGISTRY",
+        )
+        gate_xyz = registry[sorted(registry)[0]].gate_xyz
+
         sync_grid()
-        gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        gate = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
         exit_obj = create_object(
             Exit, key="東", location=gate, destination=self.destination
         )
         self.player.location = gate
-        node = encode_grid(SOUTH_GATE_XYZ[2], SOUTH_GATE_XYZ[0], SOUTH_GATE_XYZ[1])
+        node = encode_grid(gate_xyz[2], gate_xyz[0], gate_xyz[1])
         result = self._move(
             {"exit_ref": str(int(exit_obj.id)), "current_node": node}
         )

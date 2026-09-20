@@ -21,7 +21,7 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
 from world.rules.party import (
@@ -35,7 +35,24 @@ from world.rules.party import (
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
 
-ENTRY_XY = (60, 103)  # the north-gate approach cell
+
+def _east_gate_probe():
+    """The capital's east gate room + approach cell, probed from the live
+    wilderness-entry registry (test-data gate: no authored coordinates)."""
+    import importlib
+
+    entries = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    ).values()
+    entry = next(
+        entry for entry in entries if entry.gate_for("w") is not None
+    )
+    gate = entry.gate_for("w")
+    return (*gate.grid_xy, gate.z_map_key), entry.approach_cell(gate)
+
+
+EAST_GATE_XYZ, ENTRY_XY = _east_gate_probe()  # the east-gate approach cell
 
 
 def follow_lines(msg):
@@ -308,14 +325,14 @@ class WildernessFollowTests(EvenniaTest):
         sync_all()
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
-        self.char1.location = self.north_gate
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.char1.location = self.east_gate
         self.char1.race = "human"
         self.char1.apply_race_baseline()
 
     def _companion(self, key):
-        npc = create_object(NPC, key=key, location=self.north_gate)
+        npc = create_object(NPC, key=key, location=self.east_gate)
         join_party(npc, self.char1)
         return npc
 
@@ -331,7 +348,7 @@ class WildernessFollowTests(EvenniaTest):
         first = self._companion("第一")
         second = self._companion("第二")
         before = self._tick()
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         from typeclasses.rooms import TerrainRoom
 
         self.assertIsInstance(self.char1.location, TerrainRoom)
@@ -346,44 +363,44 @@ class WildernessFollowTests(EvenniaTest):
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
     def test_ordinary_step_follows_companions_without_extra_clock(self):
         companion = self._companion("step npc")
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         before = self._tick()
         self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(self.char1.location.coordinates, (61, 103))
-        self.assertEqual(companion.location.coordinates, (61, 103))
+        self.assertEqual(self.char1.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
+        self.assertEqual(companion.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
         self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
 
     @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
     def test_return_follows_companions_to_the_grid_room(self):
         companion = self._companion("return npc")
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self._exit("east").at_traverse(self.char1, self.char1.location)
         self._exit("west").at_traverse(self.char1, self.char1.location)
         before = self._tick()
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
-        self.assertIs(companion.location, self.north_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.east_gate)
+        self.assertIs(companion.location, self.east_gate)
         self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
 
     def test_return_clears_the_wilderness_registration(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         companion = self._companion("leak npc")
-        self.gate.at_traverse(self.char1, self.north_gate)
-        self._exit("south").at_traverse(self.char1, self.char1.location)
+        self.gate.at_traverse(self.char1, self.east_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         self.assertNotIn(companion, script.db.itemcoordinates)
-        self.assertIs(companion.location, self.north_gate)
+        self.assertIs(companion.location, self.east_gate)
 
     def test_ordinary_step_does_not_double_announce(self):
         companion = self._companion("quiet step npc")
         with patch.object(companion, "announce_move_to") as announce_to, patch.object(
             companion, "announce_move_from"
         ) as announce_from:
-            self.gate.at_traverse(self.char1, self.north_gate)
+            self.gate.at_traverse(self.char1, self.east_gate)
             self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(companion.location.coordinates, (61, 103))
+        self.assertEqual(companion.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
         announce_to.assert_not_called()
         announce_from.assert_not_called()
 
@@ -405,9 +422,9 @@ class WildernessFollowTests(EvenniaTest):
             "evennia.contrib.grid.wilderness.wilderness.enter_wilderness",
             side_effect=_failing_enter,
         ):
-            self.gate.at_traverse(self.char1, self.north_gate)
+            self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIs(follower.location, self.char1.location)
-        self.assertIs(stuck.location, self.north_gate)
+        self.assertIs(stuck.location, self.east_gate)
         self.assertEqual(rejected, [stuck])
         expected = FOLLOW_LOST_MESSAGE.format(names="stuck")
         self.assertEqual(follow_lines(msg), [expected])

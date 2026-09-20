@@ -8,11 +8,11 @@ back into the starting room, and the hard gate that admits no character into
 ## Requirements
 
 ### Requirement: The city-gate registry is the sole authored source of 虛境 city gates
-`world/maps/city_gates.py` SHALL define a frozen, slotted `CityGateDef` dataclass with the fields `map_id` (str), `gate_xyz` (a `(int, int, str)` grid coordinate), `exit_key` (str), and `exit_aliases` (a tuple of strings), and SHALL expose `CITY_GATE_REGISTRY` as a `MappingProxyType` keyed by map id. Today it SHALL carry exactly two rows — `capital_altoria` with `gate_xyz` `(2, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`, and `village_ciaran` with `gate_xyz` at the village's entrance node, `exit_key` 「隱密小徑」, and its own aliases. A row SHALL NOT be assumed to describe a walled settlement: the registry slot expresses "the authored way in from 虛境", and an entry may name a concealed path where the destination has no gate. `world/maps/bootstrap.py` SHALL author gate exits exclusively from this registry: no gate exit key, alias, or coordinate SHALL be duplicated as a bootstrap constant (the former `EXIT_TO_CITY` / `EXIT_TO_LIMBO` constants SHALL NOT exist), and no reverse-direction gate data SHALL be authored anywhere.
+`world/maps/city_gates.py` SHALL define a frozen, slotted `CityGateDef` dataclass with the fields `map_id` (str), `gate_xyz` (a `(int, int, str)` grid coordinate), `exit_key` (str), and `exit_aliases` (a tuple of strings), and SHALL expose `CITY_GATE_REGISTRY` as a `MappingProxyType` keyed by map id. Today it SHALL carry exactly two rows — `capital_altoria` with `gate_xyz` `(3, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`, and `village_ciaran` with `gate_xyz` at the village's entrance node, `exit_key` 「隱密小徑」, and its own aliases. A row SHALL NOT be assumed to describe a walled settlement: the registry slot expresses "the authored way in from 虛境", and an entry may name a concealed path where the destination has no gate. `world/maps/bootstrap.py` SHALL author gate exits exclusively from this registry: no gate exit key, alias, or coordinate SHALL be duplicated as a bootstrap constant (the former `EXIT_TO_CITY` / `EXIT_TO_LIMBO` constants SHALL NOT exist), and no reverse-direction gate data SHALL be authored anywhere.
 
 #### Scenario: The registry pins the single capital row
 - **WHEN** `CITY_GATE_REGISTRY` is inspected
-- **THEN** its `capital_altoria` row carries `gate_xyz` `(2, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`
+- **THEN** its `capital_altoria` row carries `gate_xyz` `(3, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`
 
 #### Scenario: Every registry row yields exactly one forward exit
 - **WHEN** `sync_grid()` runs against a database holding every registered map
@@ -31,7 +31,7 @@ For every row of `CITY_GATE_REGISTRY`, `sync_grid()` SHALL idempotently ensure e
 
 #### Scenario: One forward exit per row after sync
 - **WHEN** `sync_grid()` runs against a database containing a room keyed `LIMBO_KEY` and the spawned `capital_altoria` grid
-- **THEN** the starting room has exactly one exit leading to `(2, 0, "capital_altoria")` keyed 「南門」 with aliases 「王都」 and 「城門」, and the South Gate room has no exit leading back to the starting room
+- **THEN** the starting room has exactly one exit leading to `(3, 0, "capital_altoria")` keyed 「南門」 with aliases 「王都」 and 「城門」, and the South Gate room has no exit leading back to the starting room
 
 #### Scenario: Repeated sync does not duplicate gate exits
 - **WHEN** `sync_grid()` is called twice against the same database
@@ -56,7 +56,7 @@ On every call, after the forward gate pass, `sync_grid()` SHALL delete every per
 When the grid room at a registry row's `gate_xyz` does not exist, `sync_grid()` SHALL log the warning event `bootstrap_grid_gate_missing` with context carrying `map_id`, `xyz`, and `action`, SHALL skip creating that row's forward exit, and SHALL NOT raise. Every other registry row SHALL still be converged, and the rest of `sync_grid()` (grid spawn, the prune pass, wilderness-independent work) SHALL proceed unchanged.
 
 #### Scenario: A missing gate room degrades per row
-- **WHEN** `sync_grid()` runs against a database whose `(2, 0, "capital_altoria")` room is absent
+- **WHEN** `sync_grid()` runs against a database whose `(3, 0, "capital_altoria")` room is absent
 - **THEN** a `bootstrap_grid_gate_missing` warning is logged, no gate exit is created for that row, the starting room gains no exit, and `sync_grid()` does not raise
 
 #### Scenario: A bad row does not block a good row
@@ -119,7 +119,7 @@ traversal of any gate SHALL overwrite it.
 
 #### Scenario: The first gate traversal re-homes a 虛境-born character
 - **WHEN** a player character whose `home` is the 虛境 starting room successfully traverses the
-  「南門」 forward gate exit to `(2, 0, "capital_altoria")`
+  「南門」 forward gate exit to `(3, 0, "capital_altoria")`
 - **THEN** the character's `home` is the South Gate arrival room, and issuing the `home` command
   afterwards moves the character to that gate room — never to 虛境
 

@@ -1,7 +1,7 @@
 """Grid map data for 暗影谷村 (village_ciaran), map-anchor-grid.
 
 A six-node tree rather than a grid: one concealed entrance, one gathering
-plaza, and four dwelling approaches. The capital is a thirteen-node cross;
+plaza, and four dwelling approaches. The capital is a three-terrace city;
 a village of a hundred people copying that shape would read as a small town,
 so this settlement deliberately carries no crossroads (settlement-shops
 design §6.2, ciaran-village-map D2).

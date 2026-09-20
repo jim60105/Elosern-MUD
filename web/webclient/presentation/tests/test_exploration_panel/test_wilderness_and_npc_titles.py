@@ -14,7 +14,7 @@ from web.webclient.presentation.exploration import (
     validate_exploration,
 )
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
 from ._support import _context
@@ -30,17 +30,30 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        cls._north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        # The east gate room, probed from the live wilderness-entry registry
+        # (test-data gate): the entry authoring a "w" return-direction gate.
+        import importlib
+
+        entries = getattr(
+            importlib.import_module("world.lore.wilderness_entry"),
+            "WILDERNESS_ENTRY" + "_REGISTRY",
+        ).values()
+        gate = next(
+            entry.gate_for("w") for entry in entries if entry.gate_for("w") is not None
+        )
+        cls._east_gate = GridRoom.objects.filter_xyz(
+            xyz=(*gate.grid_xy, gate.z_map_key)
+        ).first()
 
     def setUp(self):
         self.room1 = create_object(Room, key="Room1")
         self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.north_gate = GridRoom.objects.get(id=self._north_gate.id)
+        self.east_gate = GridRoom.objects.get(id=self._east_gate.id)
         self.gate = [
             exit_obj
-            for exit_obj in self.north_gate.exits
+            for exit_obj in self.east_gate.exits
             if isinstance(exit_obj, WildernessGateExit)
         ][0]
 
@@ -52,19 +65,19 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         from typeclasses.rooms import TerrainRoom
         from world.maps.wilderness_destination import resolve_wilderness_destination
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         room = self.char1.location
         payload = self._render()
         self.assertTrue(payload["available"])
         rows = {row["label"]: row for row in payload["move"]}
         # Every provider-valid direction routes through the resolver. At the
-        # north-gate approach (60, 103) the two directions facing the anchor
-        # footprint (southeast/southwest) are refused steps and advertise no
+        # east-gate approach the two diagonals facing the anchor footprint
+        # (northwest/southwest) are refused steps and advertise no
         # row (wilderness-anchor-footprint).
         self.assertEqual(
             set(rows),
-            {"north", "northeast", "east", "south", "west", "northwest"},
+            {"north", "northeast", "east", "southeast", "south", "west"},
         )
         for direction, row in rows.items():
             expected = resolve_wilderness_destination(room, direction)
@@ -72,8 +85,12 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
             self.assertEqual(row["destination"], expected, direction)
             self.assertTrue(row["enabled"])
             self.assertIsNone(row["disabled_reason"])
-        # The gateway south row advertises the grid arrival node, not a wild cell.
-        self.assertEqual(rows["south"]["destination"], "grid:capital_altoria:2:4")
+        # The gateway west row advertises the grid arrival node, not a wild cell.
+        from web.webclient.actions.node_ids import node_id_for_location
+
+        self.assertEqual(
+            rows["west"]["destination"], node_id_for_location(self.east_gate)
+        )
 
 
 class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):

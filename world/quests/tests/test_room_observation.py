@@ -28,7 +28,21 @@ from world.quests.definitions import (
 )
 from world.quests.room_observation import QuestObservableRoomMixin
 from world.quests.runtime import QuestState, read_records, to_storage
-from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
+
+
+def _east_gate_xyz():
+    """The capital's east gate room coordinate, probed from the live
+    wilderness-entry registry (test-data gate: no authored coordinates)."""
+    import importlib
+
+    entries = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    ).values()
+    entry = next(entry for entry in entries if entry.gate_for("w") is not None)
+    gate = entry.gate_for("w")
+    return (*gate.grid_xy, gate.z_map_key)
 from world.rules.party import join_party
 
 from ._fixtures import (
@@ -488,8 +502,8 @@ class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.gate = [e for e in self.north_gate.exits if e.key == "荒野"][0]
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=_east_gate_xyz()).first()
+        self.gate = [e for e in self.east_gate.exits if e.key == "荒野"][0]
 
     def _step(self, direction: str):
         exit_obj = [e for e in self.char1.location.exits if e.key == direction][0]
@@ -500,7 +514,7 @@ class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):
         with patch(
             "world.quests.room_observation.observe_room_entry",
         ) as observer:
-            self.gate.at_traverse(self.char1, self.north_gate)
+            self.gate.at_traverse(self.char1, self.east_gate)
             self.assertIsInstance(self.char1.location, TerrainRoom)
             self._step("east")
         observer.assert_not_called()

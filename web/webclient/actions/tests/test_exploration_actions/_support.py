@@ -60,7 +60,7 @@ from world.ai.guardrail import _degrade_fallbacks, _semantic_validators
 from world.ai.npc_dialogue import register_npc_dialogue
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.quests.definitions import QuestStage
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock

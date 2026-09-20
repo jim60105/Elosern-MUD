@@ -38,10 +38,10 @@ from ._knowledge_probes import live_city_gate_registry, live_map_key, live_wilde
 # record exactly the derived destination node) is unchanged.
 
 
-def _entry_with_south_gate_on(map_key: str):
-    """The wilderness entry whose south-returning gate lands on ``map_key``."""
+def _entry_with_west_gate_on(map_key: str):
+    """The wilderness entry whose west-returning gate lands on ``map_key``."""
     for entry in live_wilderness_entry_registry().values():
-        gate = entry.gate_for("s")
+        gate = entry.gate_for("w")
         if gate is not None and gate.z_map_key == map_key:
             return entry, gate
     raise AssertionError(f"no wilderness entry gate returns to map {map_key!r}")
@@ -80,13 +80,13 @@ class MapKnowledgeSeamTests(EvenniaTest):
         # The city-gate row's own gate_xyz is the south gate room's
         # coordinate — read from the live registry, not a shipped constant.
         self.south_gate_xyz = self.gate_row.gate_xyz
-        entry, south_row = _entry_with_south_gate_on(self.map)
-        self.north_gate_xyz = (*south_row.grid_xy, south_row.z_map_key)
-        self.entry_xy = entry.approach_cell(south_row)
+        entry, west_row = _entry_with_west_gate_on(self.map)
+        self.east_gate_xyz = (*west_row.grid_xy, west_row.z_map_key)
+        self.entry_xy = entry.approach_cell(west_row)
         self.wild = getattr(wilderness_provider, "WILDERNESS_NAME")
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=self.north_gate_xyz).first()
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=self.east_gate_xyz).first()
         self.south_gate = GridRoom.objects.filter_xyz(xyz=self.south_gate_xyz).first()
-        self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.gate = [e for e in self.east_gate.exits if isinstance(e, WildernessGateExit)][0]
 
     def _exit(self, direction):
         return [e for e in self.char1.location.exits if e.key == direction][0]
@@ -143,7 +143,7 @@ class MapKnowledgeSeamTests(EvenniaTest):
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_gate_entry_records_wilderness_node(self):
         before = get_world_clock().tick
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         self.assertEqual(self.char1.location.coordinates, self.entry_xy)
         expected = f"wild:{self.wild}:{self.entry_xy[0]}:{self.entry_xy[1]}"
@@ -152,25 +152,25 @@ class MapKnowledgeSeamTests(EvenniaTest):
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_ordinary_wilderness_step_records_wilderness_node(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         start = self.char1.location.coordinates
         self._exit("east").at_traverse(self.char1, self.char1.location)
         expected = f"wild:{self.wild}:{start[0] + 1}:{start[1]}"
         self.assertIn(expected, _node_ids(self.char1))
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
-    def test_south_return_records_grid_node(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertIs(self.char1.location, self.north_gate)
-        self.assertIn(_grid_node(self.north_gate), _node_ids(self.char1))
+    def test_west_return_records_grid_node(self):
+        self.gate.at_traverse(self.char1, self.east_gate)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.east_gate)
+        self.assertIn(_grid_node(self.east_gate), _node_ids(self.char1))
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_failed_gate_entry_records_nothing(self):
         original_location = self.char1.location
         before = get_world_clock().tick
         with patch("typeclasses.exits.enter_wilderness", return_value=False):
-            result = self.gate.at_traverse(self.char1, self.north_gate)
+            result = self.gate.at_traverse(self.char1, self.east_gate)
         self.assertFalse(result)
         self.assertIs(self.char1.location, original_location)
         self.assertEqual(get_world_clock().tick, before)

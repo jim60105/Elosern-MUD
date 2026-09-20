@@ -19,8 +19,6 @@ def _minimap_fixture(character) -> None:
     """
     from evennia.utils.search import search_object_by_tag
     from world.maps.bootstrap import (
-        NORTH_GATE_XYZ,
-        SOUTH_GATE_XYZ,
         sync_grid,
         sync_service_interiors,
         sync_wilderness,
@@ -37,30 +35,50 @@ def _minimap_fixture(character) -> None:
     def grid(xyz):
         return XYZRoom.objects.filter_xyz(xyz=xyz).first()
 
+    # Registry probes (mirror the browser_fixtures_data harness idiom): the
+    # city-gate row is the South Gate; the capital's wilderness entry authors
+    # a second gate (the East Gate) whose grid room serves as the distant
+    # remembered node.
+    import importlib
+
+    city_gate_registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    SOUTH_GATE_XYZ = city_gate_registry[sorted(city_gate_registry)[0]].gate_xyz
+
+    from web.browser_support.browser_fixtures_data import (
+        first_live_wilderness_entry,
+    )
+
+    entry = first_live_wilderness_entry()
+    second_gate = next(
+        (gate for gate in entry.gates if gate.return_direction != "n"), None
+    )
+    NORTH_GATE_XYZ = (
+        (*second_gate.grid_xy, second_gate.z_map_key) if second_gate else None
+    )
+
     south_gate = grid(SOUTH_GATE_XYZ)
     if south_gate is None:
         return
     character.location = south_gate
     record_arrival(character)
 
-    # Record a distant grid node (北門) so the grid layer at 南門 carries a
+    # Record a distant grid node (東門) so the grid layer at 南門 carries a
     # remembered node outside the visual range for focus journeys.
-    north_gate = grid(NORTH_GATE_XYZ)
+    north_gate = grid(NORTH_GATE_XYZ) if NORTH_GATE_XYZ is not None else None
     if north_gate is not None:
         character.location = north_gate
         record_arrival(character)
         character.location = south_gate
 
-    # Synthetic install: the shipped bootstrap's 北門 gateway is not part of
+    # Synthetic install: the shipped bootstrap's 東門 gateway is not part of
     # the kit; the presenter resolves gateway rooms from the live
     # wilderness-entry registry, so record the kit gate's own grid room here.
-    # (Under the shipped install this resolves to 北門 again — idempotent.)
+    # (Under the shipped install this resolves to 東門 again — idempotent.)
     if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
-        from web.browser_support.browser_fixtures_data import (
-            first_live_wilderness_entry,
-        )
-
-        gate = first_live_wilderness_entry().gate_for("s")
+        gate = second_gate
         kit_gate = grid(gate.grid_xy + (gate.z_map_key,)) if gate else None
         if kit_gate is not None and kit_gate.id != north_gate.id:
             character.location = kit_gate
@@ -88,18 +106,14 @@ def _minimap_fixture(character) -> None:
     # (enter_wilderness moves without charging the clock -- the gate exit's
     # wilderness_move charge is a gameplay cost this fixture does not need;
     # only the visited node must be recorded), then return to 南門.
-    if north_gate is not None:
+    if second_gate is not None:
         from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
         from typeclasses.rooms import TerrainRoom
-        from web.browser_support.browser_fixtures_data import (
-            first_live_wilderness_entry,
-        )
         from world.maps.wilderness_provider import WILDERNESS_NAME
 
-        entry = first_live_wilderness_entry()
         entered = enter_wilderness(
             character,
-            coordinates=entry.approach_cell(entry.gate_for("s")),
+            coordinates=entry.approach_cell(second_gate),
             name=WILDERNESS_NAME,
         )
         if entered and isinstance(character.location, TerrainRoom):

@@ -182,7 +182,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             service_id="t_altoria_trading_post",
             room_name_zh="測試交易站",
             room_desc_zh="A synthetic trading post with no module constant.",
-            exterior_xy=(4, 2),
+            exterior_xy=(4, 1),
             doorway_key_zh="測試交易站往來通道",
             doorway_aliases=("test trading post",),
             host_name="測試商人",
@@ -229,7 +229,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         interior = search_object_by_tag("t_trading_post")[0]
         self.assertIsNotNone(interior)
         zcoord = _settlements()[_place_by_kind("guild_hall").settlement_key].zcoord
-        exterior = GridRoom.objects.filter_xyz(xyz=(4, 2, zcoord)).first()
+        exterior = GridRoom.objects.filter_xyz(
+            xyz=(*new_place.exterior_xy, zcoord)
+        ).first()
         self.assertIsNotNone(exterior)
         self.assertIn(interior, {exit_obj.destination for exit_obj in exterior.exits})
         self.assertIn(
