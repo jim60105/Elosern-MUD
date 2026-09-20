@@ -190,10 +190,17 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertIn("human_commoner", STATIC_TIER_REGISTRY)
         # The import example and browser fixtures are shipped data too: read
         # them as text so a retired key cannot hide in either loader input.
+        # The fixtures support module is a package (the former single
+        # browser_fixtures_data.py split into domain slices): every source
+        # file of the package is shipped data, so the scan covers them all.
         repo_root = Path(__file__).resolve().parents[3]
+        fixture_pkg = repo_root / "web/browser_support/browser_fixtures_data"
         for rel in (
             "world/imports/examples/example_character.json",
-            "web/browser_support/browser_fixtures_data.py",
+            *(
+                str(path.relative_to(repo_root))
+                for path in sorted(fixture_pkg.glob("*.py"))
+            ),
         ):
             source = (repo_root / rel).read_text(encoding="utf-8")
             for key in retired:

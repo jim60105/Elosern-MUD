@@ -8,7 +8,7 @@ contract re-derives the gate over exactly those files: none may carry a
 ledger DEBT or CONTRACT exemption, and all must hold zero lint findings —
 so a future edit that reintroduces a shipped identifier cannot silently
 re-register debt. Every manifest file resolves game data through the
-support module ``web/browser_support/browser_fixtures_data.py`` (boot-mode
+support package ``web/browser_support/browser_fixtures_data/`` (boot-mode
 ``SHIPPED_*``/``SYNTH_*`` vocabularies and journey-value helpers), the
 synthetic kit ``world/tests/synthetic_data.py``, or values read from the
 committed panel snapshots at runtime; the support module lives outside the
