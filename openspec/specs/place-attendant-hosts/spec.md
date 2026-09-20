@@ -1,7 +1,9 @@
 # place-attendant-hosts Specification
 
 ## Purpose
-TBD - created by archiving change place-attendant-profession. Update Purpose after archive.
+Define the `attendant` profession blueprint: the place-bound, talk-only service host whose
+service is conversation — the authored dialogue seam that binds a host to a dialogue table
+that exists, and the rule that adding the blueprint changes no shipped host.
 
 ## Requirements
 
