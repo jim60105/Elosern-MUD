@@ -29,7 +29,9 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_GUILD_RANKS,
     SYNTH_NAME_PACKS,
     SYNTH_NATIONS,
+    SYNTH_PLACES,
     SYNTH_REGIONS,
+    SYNTH_SETTLEMENTS,
     SYNTH_SHOPS,
     SYNTH_TITLES,
     SYNTH_WILDERNESS_ENTRIES,
@@ -64,6 +66,8 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "wilderness_entries": lambda: SYNTH_WILDERNESS_ENTRIES,
         "city_gates": lambda: SYNTH_CITY_GATES,
         "archetypes": lambda: SYNTH_ARCHETYPES,
+        "settlements": lambda: SYNTH_SETTLEMENTS,
+        "places": lambda: SYNTH_PLACES,
         _BUNDLES_LOGICAL: lambda: SYNTH_ASSORTMENTS,
         "shops": lambda: SYNTH_SHOPS,
         "prices": lambda: SYNTH_PRICES,
@@ -103,6 +107,8 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "monster_tiers": content["monster_tiers"](),
         "anchors": content["anchors"](),
         "anchor_placements": content["anchor_placements"](),
+        "settlements": content["settlements"](),
+        "places": content["places"](),
         "name_packs": content["name_packs"](),
         "wilderness_regions": content["regions"](),
         "wilderness_entries": content["wilderness_entries"](),
@@ -129,8 +135,10 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "wilderness_entries": ("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"),
     "city_gates": ("world.maps.city_gates", "CITY_GATE" + "_REGISTRY"),
     "archetypes": ("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY"),
+    "settlements": ("world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"),
+    "places": ("world.lore.settlements.places", "PLACE" + "_REGISTRY"),
     _BUNDLES_LOGICAL: ("world.lore.settlements." + "assortments", "ASSORTMENT" + "_REGISTRY"),
-    "shops": ("world.lore.shops", "SHOP" + "_REGISTRY"),
+    "shops": ("world.lore.settlements.shops", "SHOP" + "_REGISTRY"),
     "prices": ("world.lore.economy", "PRICE" + "_TABLE"),
     "mp_cost_tiers": ("world.skills.cost_tiers", "MP_COST" + "_TIERS"),
     "titles": ("world.lore.titles", "FIXED_TITLE" + "_REGISTRY"),
@@ -159,6 +167,9 @@ _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     # Bundle rows carry band-bound items: validating them reads the live
     # price table, so every bundle scope brings items and prices with it.
     _BUNDLES_LOGICAL: ("items", "prices"),
+    # Place rows carry a settlement key; the settlement registry is patched
+    # first so scope construction sees the synthetic coordinate space.
+    "places": ("settlements",),
     # Shop rows reference bundles; the derived offered set reads the patched
     # bundle registry at access time.
     "shops": (_BUNDLES_LOGICAL,),

@@ -11,7 +11,12 @@ from world.lore.names import FrozenDict, NamePack, NamePart
 from world.lore.nations import Nation
 from world.lore.scene_archetypes import SceneArchetype
 from world.lore.settlements.assortments import AssortmentDefinition
-from world.lore.shops import ShopDefinition
+from world.lore.settlements.places import PlaceDefinition, PlaceKind
+from world.lore.settlements.settlements import (
+    SettlementArchetype,
+    SettlementDefinition,
+)
+from world.lore.settlements.shops import ShopDefinition
 from world.lore.titles import (
     FixedTitleDef,
     TitleCategory,
@@ -186,6 +191,58 @@ SYNTH_ASSORTMENTS: dict[str, AssortmentDefinition] = {
         key="t_mossgate_goods",
         display_name_zh="苔徑市集合成商品",
         item_keys=("t_ember_spray", "t_iron_fang", "t_huskapple"),
+    ),
+}
+
+SYNTH_SETTLEMENTS: dict[str, SettlementDefinition] = {
+    "t_mossgate": SettlementDefinition(
+        key="t_mossgate",
+        archetype=SettlementArchetype.TOWN,
+        zcoord="t_mossgate",
+    ),
+}
+
+SYNTH_PLACES: dict[str, PlaceDefinition] = {
+    "t_mossgate_guild_hall": PlaceDefinition(
+        key="t_mossgate_guild_hall",
+        settlement_key="t_mossgate",
+        kind=PlaceKind.GUILD_HALL,
+        room_name_zh="合成苔徑公會廳",
+        room_desc_zh="A synthetic guild hall for the mossgate stand-in world.",
+        exterior_xy=(0, 0),
+        doorway_key_zh="合成公會廳入口",
+        doorway_aliases=("synthetic hall",),
+        host_name="合成苔徑會長",
+        host_title="合成苔徑分會館長",
+        host_race="human",
+        host_subrace=None,
+        host_sex="other",
+        profession="t_mossgate_staff",
+        service_id="t_mossgate_guild_master",
+        assortment_keys=(),
+        authored_kwargs=(
+            ("branch_key", "t_mossgate_branch"),
+            ("dialogue_key", "t_mossgate_staff"),
+        ),
+    ),
+    "t_mossgate_store": PlaceDefinition(
+        key="t_mossgate_store",
+        settlement_key="t_mossgate",
+        kind=PlaceKind.GENERAL_STORE,
+        room_name_zh="合成苔徑雜貨店",
+        room_desc_zh="A synthetic general store for the mossgate stand-in world.",
+        exterior_xy=(1, 1),
+        doorway_key_zh="合成雜貨店入口",
+        doorway_aliases=("synthetic store",),
+        host_name="合成苔徑店主",
+        host_title="合成苔徑雜貨店主",
+        host_race="human",
+        host_subrace=None,
+        host_sex="other",
+        profession="t_mossgate_merchant",
+        service_id="t_mossgate_merchant",
+        assortment_keys=("t_mossgate_goods",),
+        authored_kwargs=(("shop_key", "t_mossgate_stall"),),
     ),
 }
 

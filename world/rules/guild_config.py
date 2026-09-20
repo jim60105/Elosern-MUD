@@ -1,11 +1,12 @@
 """Catalog loader joining the guild-economy and commerce rulebooks to immutable lore identities (D-1/D-8).
 
-``guild_economy.yaml`` carries merit thresholds, exam opponent profiles,
-quest rewards and the service-host roster; ``commerce.yaml`` carries
-assortment offer rules and per-shop hours (settlement-shops design §3.1).
-This module validates every entry against the immutable registries and
-exposes frozen dataclasses, so deterministic APIs never duplicate balance
-constants.
+``guild_economy.yaml`` carries merit thresholds, exam opponent profiles and
+quest rewards; ``commerce.yaml`` carries assortment offer rules and per-shop
+hours (settlement-shops design §3.1). The service-host roster is DERIVED from
+the place registry (``world/lore/settlements/places.py``), so a service host
+is declared exactly once. This module validates every entry against the
+immutable registries and exposes frozen dataclasses, so deterministic APIs
+never duplicate balance constants.
 """
 
 from collections.abc import Callable
@@ -23,7 +24,8 @@ from world.lore.settlements.assortments import (
     ASSORTMENT_REGISTRY,
     KEEPSAKE_BAND_KEY,
 )
-from world.lore.shops import SHOP_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.guild_offers import (
     GuildOfferError,
     GuildQuestOffer,
@@ -91,10 +93,6 @@ class ShopConfig:
     close_hour: int
     restock_hour: int
     offers: tuple[ItemOfferRule, ...]
-
-
-_SERVICE_HOST_REQUIRED_FIELDS = ("name", "title", "profession", "anchor_room", "service_id")
-_SERVICE_HOST_KWARG_FIELDS = ("shop_key", "branch_key", "dialogue_key")
 
 
 @dataclass(frozen=True)
@@ -506,8 +504,18 @@ def validate_shop_configs(
     return configs
 
 
-def validate_service_hosts(raw: Any) -> tuple[ServiceHostRow, ...]:
-    """Validate the declarative service-host roster (declarative-service-hosts D7).
+def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
+    """Batch-validate the service-host roster derived from the place registry (design §3.2).
+
+    The roster is no longer authored: each place yields one row declaring
+    ``name``/``title`` (the host identity), ``profession``, the interior room
+    tag the place anchors to (its key), ``service_id``, and the authored
+    component identity kwargs. Every rejection the hand-authored roster
+    carried runs unchanged over the derived rows: a profession naming no
+    registry row, a blueprint component whose identity kwargs the place fails
+    to supply, surplus kwargs no component consumes, a person-bound profession
+    anchored to a row, a duplicate service anchor, or a non-text field each
+    raise the catalog's named error family.
 
     Config load never touches the database: ``anchor_room`` is validated as a
     non-empty tag string only (room existence is a sync-time fact), and the
@@ -518,37 +526,28 @@ def validate_service_hosts(raw: Any) -> tuple[ServiceHostRow, ...]:
     from world.rules import profession_config
     from world.rules.profession_assembly import identity_fields
 
-    if not isinstance(raw, list):
-        raise _error("service_hosts must be a list")
     rows: list[ServiceHostRow] = []
     seen_service_ids: set[str] = set()
-    for position, entry in enumerate(raw, start=1):
-        if not isinstance(entry, Mapping):
-            raise _error(f"service_hosts[{position}] must be a mapping")
-        unknown = sorted(set(entry) - set(_SERVICE_HOST_REQUIRED_FIELDS) - set(_SERVICE_HOST_KWARG_FIELDS))
-        if unknown:
-            raise _error(f"service_hosts[{position}] has unknown field(s) {unknown}")
-        fields = {
-            name: _require_text(entry.get(name), f"service_hosts[{position}].{name}")
-            for name in _SERVICE_HOST_REQUIRED_FIELDS
-        }
-        service_id = fields["service_id"]
+    for place in PLACE_REGISTRY.values():
+        what = f"place {place.key!r}"
+        name = _require_text(place.host_name, f"{what}.host_name")
+        title = _require_text(place.host_title, f"{what}.host_title")
+        anchor_room = _require_text(place.key, f"{what}.key (anchor room tag)")
+        service_id = _require_text(place.service_id, f"{what}.service_id")
+        profession_key = _require_text(place.profession, f"{what}.profession")
         if service_id in seen_service_ids:
             raise _error(
-                f"duplicate service_id {service_id!r} in service_hosts; "
+                f"duplicate service_id {service_id!r} in the place registry; "
                 "one roster row per service anchor"
             )
         seen_service_ids.add(service_id)
         try:
-            profession = profession_config.get_profession(fields["profession"])
+            profession = profession_config.get_profession(profession_key)
         except profession_config.ProfessionConfigError as error:
-            raise _error(
-                f"service_hosts[{position}].profession {fields['profession']!r} "
-                f"cannot load: {error}"
-            ) from error
+            raise _error(f"{what} profession {profession_key!r} cannot load: {error}") from error
         if profession is None:
             raise _error(
-                f"service_hosts[{position}].profession {fields['profession']!r} "
+                f"{what} profession {profession_key!r} "
                 "is not a profession rulebook row"
             )
         # A roster row IS an anchor registration: its mandatory anchor_room
@@ -562,44 +561,54 @@ def validate_service_hosts(raw: Any) -> tuple[ServiceHostRow, ...]:
         )
         if person_bound:
             raise _error(
-                f"service_hosts[{position}] profession {fields['profession']!r} "
+                f"{what} profession {profession_key!r} "
                 f"component(s) {person_bound} are person-bound; a roster row "
                 "anchors only place-bound components"
             )
-        authored = {
-            name: _require_text(entry[name], f"service_hosts[{position}].{name}")
-            for name in _SERVICE_HOST_KWARG_FIELDS
-            if name in entry
-        }
+        authored = _require_place_kwargs(place)
         # Blueprint coverage: every component's identity fields except the
-        # row-level service_id anchor must be authored by the row.
+        # row-level service_id anchor must be authored by the place.
         consumed: set[str] = set()
         for component in profession.components:
             needed = set(identity_fields(component.type_key)) - {"service_id"}
             lacking = sorted(needed - set(authored))
             if lacking:
                 raise _error(
-                    f"service_hosts[{position}] profession {fields['profession']!r} "
+                    f"{what} profession {profession_key!r} "
                     f"component {component.type_key!r} needs authored kwargs {lacking}"
                 )
             consumed |= needed
         dead = sorted(set(authored) - consumed)
         if dead:
             raise _error(
-                f"service_hosts[{position}] authors kwargs {dead} that no component "
-                f"of profession {fields['profession']!r} consumes"
+                f"{what} authors kwargs {dead} that no component "
+                f"of profession {profession_key!r} consumes"
             )
         rows.append(
             ServiceHostRow(
-                name=fields["name"],
-                title=fields["title"],
+                name=name,
+                title=title,
                 profession=profession,
-                anchor_room=fields["anchor_room"],
+                anchor_room=anchor_room,
                 service_id=service_id,
                 authored_kwargs=authored,
             )
         )
     return tuple(rows)
+
+
+def _require_place_kwargs(place: Any) -> dict[str, str]:
+    """Flatten a place's authored kwargs, rejecting a non-mapping shape."""
+    authored = place.authored_kwargs
+    if not isinstance(authored, (tuple, list)):
+        raise _error(f"place {place.key!r} authored_kwargs must be a sequence of pairs")
+    out: dict[str, str] = {}
+    for position, pair in enumerate(authored):
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            raise _error(f"place {place.key!r} authored_kwargs[{position}] must be a pair")
+        key, value = pair
+        out[key] = _require_text(value, f"place {place.key!r}.authored_kwargs[{position}]")
+    return out
 
 
 def validate_quest_rewards(raw: Any, definition_registry: Mapping[str, Any]) -> list[GuildQuestOffer]:
@@ -696,8 +705,6 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
     """
     raw = load_config()
     commerce = load_commerce_config()
-    if "service_hosts" not in raw:
-        raise _error("service_hosts section is required")
     if "assortments" not in commerce:
         raise _commerce_error("assortments section is required")
     if "shops" not in commerce:
@@ -708,7 +715,7 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
         exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
         shop_configs=validate_shop_configs(commerce["shops"], assortment_offers),
         quest_offers=validate_quest_rewards(raw["quest_rewards"], definition_registry),
-        service_hosts=validate_service_hosts(raw["service_hosts"]),
+        service_hosts=validate_service_hosts(),
     )
 
 

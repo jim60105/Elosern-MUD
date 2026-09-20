@@ -100,6 +100,6 @@ def validate_guild_npc_identities(
 # the whole authored-name set (design D4/D9).
 validate_guild_npc_identities()
 
-from world.lore.shops import validate_registry_identity_uniqueness  # noqa: E402
+from world.lore.settlements.shops import validate_registry_identity_uniqueness  # noqa: E402
 
 validate_registry_identity_uniqueness(branch_rows=GUILD_BRANCH_REGISTRY, rank_rows=GUILD_RANK_REGISTRY)

@@ -88,7 +88,7 @@ from world.lore.races import (
 )
 from world.lore.scene_archetypes import SceneArchetype
 from world.lore.sexual_vocab import BODY_PARTS
-from world.lore.shops import ShopDefinition
+from world.lore.settlements.shops import ShopDefinition
 from world.lore.starting_kits import SubraceStartingKit
 from world.lore.titles import (
     FixedTitleDef,

@@ -69,6 +69,10 @@
       "reason": "scene archetype data contract"
     },
     {
+      "path": "world/lore/tests/test_settlements.py",
+      "reason": "settlement and place registry content contract"
+    },
+    {
       "path": "world/lore/tests/test_sex.py",
       "reason": "lore registry content contract"
     },

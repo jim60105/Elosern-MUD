@@ -114,18 +114,19 @@ rejected registration SHALL grant no title.
 #### Scenario: Repeated registration is inert on titles
 - **WHEN** an already-registered member registers again
 - **THEN** `title_collection` and `title_equipped` are unchanged
+
 ### Requirement: Service hosts are created and converged from a declarative YAML roster
-`world/rules/rulebook/guild_economy.yaml` SHALL carry a `service_hosts:` roster where each row
-declares `name`, `title`, `profession`, `anchor_room` (a room tag), `service_id`, and the authored
-component identity kwargs. `world/rules/guild_config.py` SHALL parse and batch-validate the roster
-(config load never touches the database): missing fields, a `profession` naming no registry row,
-a blueprint component type whose identity kwargs the row fails to supply, or a non-string
-`anchor_room` each raise the catalog's named error and cache nothing.
+The service-host roster SHALL be derived from the place registry rather than hand-authored: each
+place yields one row declaring `name`, `title`, `profession`, the interior room tag it anchors to,
+`service_id`, and the authored component identity kwargs. `world/rules/guild_config.py` SHALL
+batch-validate the derived roster (config load never touches the database): missing fields, a
+`profession` naming no registry row, a blueprint component type whose identity kwargs the place
+fails to supply, or a non-string room tag each raise the catalog's named error and cache nothing.
 `world/rules/guild_economy.py::sync_service_content` SHALL be an interpreter of the roster: per
 row it resolves the room by tag, finds-or-creates the host NPC on the `service_id` anchor with
 the unchanged never-rename/never-retitle reuse contract, and assembles components through the
 shared `world/rules/profession_assembly.py` helper — never through a code-side component literal.
-The shipped roster SHALL reproduce the pre-change two hosts exactly (same names, titles, rooms,
+The derived roster SHALL reproduce the pre-change two hosts exactly (same names, titles, rooms,
 `service_id`s `altoria_guild_master` / `altoria_merchant`, and component kwargs), keeping sync
 behavior-neutral.
 
@@ -135,12 +136,12 @@ behavior-neutral.
   baseline, canonical ages, and component kwargs as the pre-change sync produced
 
 #### Scenario: Config-time roster validation rejects a nameable offense without DB access
-- **WHEN** a roster row declares `profession: blacksmith` (no such registry row) or omits the
-  merchant row's `shop_key`
+- **WHEN** a place declares `profession: blacksmith` (no such registry row) or omits the
+  merchant place's `shop_key`
 - **THEN** config loading raises the named catalog error and no host sync occurs
 
 #### Scenario: An unresolvable anchor room fails sync closed and names the row
-- **WHEN** sync resolves a row whose `anchor_room` tag matches no room
+- **WHEN** sync resolves a row whose room tag matches no room
 - **THEN** the named warning event carries the row's `service_id`, no host is created or moved,
   and the remaining rows still process exactly as the pre-change missing-interiors path
 
@@ -153,6 +154,10 @@ behavior-neutral.
 - **WHEN** the roster-driven sync runs twice in a row
 - **THEN** the second run creates no host, renames nothing, attaches no duplicate component, and
   deletes nothing
+
+#### Scenario: A host is declared exactly once
+- **WHEN** the rulebook is searched for a hand-authored `service_hosts:` roster
+- **THEN** none remains, and every host's name, title and profession appear only on its place
 
 ### Requirement: Roster convergence deletes service hosts absent from the roster
 Sync SHALL treat the roster as authoritative, and the roster's authority SHALL NOT depend on

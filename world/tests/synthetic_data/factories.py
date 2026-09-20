@@ -34,7 +34,7 @@ from world.lore.races import (
 )
 from world.lore.scene_archetypes import SceneArchetype
 from world.lore.settlements.assortments import AssortmentDefinition
-from world.lore.shops import ShopDefinition
+from world.lore.settlements.shops import ShopDefinition
 from world.lore.titles import (
     FixedTitleDef,
     TitleCategory,

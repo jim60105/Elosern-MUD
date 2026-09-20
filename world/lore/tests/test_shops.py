@@ -4,7 +4,7 @@ Self-consistency checks for the shop registry (authored host identity)."""
 import unittest
 
 from tools.spec_traceability import covers_requirement
-from world.lore.shops import (
+from world.lore.settlements.shops import (
     SHOP_REGISTRY,
     ShopDefinition,
     validate_registry_identity_uniqueness,

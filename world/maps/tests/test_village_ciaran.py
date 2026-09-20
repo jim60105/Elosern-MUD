@@ -65,6 +65,9 @@ class VillageCiaranMapTests(unittest.TestCase):
         # graph with n-1 edges is a tree).
         self.assertEqual(len(edges), 5)
 
+    @covers_requirement(
+        "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
+    )
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
     def test_only_plaza_is_an_anchor_room(self):
         for coordinate, prototype in PROTOTYPES.items():
@@ -92,6 +95,9 @@ class VillageCiaranMapTests(unittest.TestCase):
         village_nodes = {(node.X, node.Y) for node in self.map.node_index_map.values()}
         self.assertTrue(capital_nodes & village_nodes)
 
+    @covers_requirement(
+        "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
+    )
     @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit")
     def test_village_movement_uses_the_costed_exit_override(self):
         wildcard = XYMAP_DATA["prototypes"].get(("*", "*", "*"))

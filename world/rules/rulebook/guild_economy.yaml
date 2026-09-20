@@ -1,10 +1,11 @@
 # Tunable guild-economy balance data (guild-economy D-1/D-8).
 # All money values are integer copper. Strictly increasing E-through-S merit
-# thresholds, exam opponent profiles, quest rewards and the service-host
-# roster are joined to immutable lore identities by the catalog loader in
-# world/rules/guild_config.py. Commerce balance (assortment offers and shop
-# hours) lives in the sibling rulebook commerce.yaml (settlement-shops design
-# §3.1).
+# thresholds, exam opponent profiles and quest rewards are joined to immutable
+# lore identities by the catalog loader in world/rules/guild_config.py. The
+# service-host roster is DERIVED from the place registry
+# (world/lore/settlements/places.py) — a host is declared exactly once, never
+# here. Commerce balance (assortment offers and shop hours) lives in the
+# sibling rulebook commerce.yaml (settlement-shops design §3.1).
 #
 # Cumulative true `guild_merit` required to be eligible for each rank's exam.
 merit_thresholds:
@@ -94,25 +95,3 @@ exam_profiles:
     magic_power: 35
     skills:
       - basic_attack
-
-# Declarative service-host roster (declarative-service-hosts D7). One row per
-# permanent service NPC: `anchor_room` is a placement-only room tag (the
-# service-anchoring change owns its anchoring semantics); `service_id` is the
-# stable component anchor reuse identity (D8); the flat identity kwargs
-# (shop_key / branch_key / dialogue_key) are authored per row and projected
-# onto the profession blueprint's components. Surplus live hosts whose
-# service_id is absent from this roster are converged away (D9, no back-compat).
-service_hosts:
-  - name: 葛里安·衛登
-    title: 阿爾托利亞分會會長
-    profession: guild_staff
-    anchor_room: altoria_guild_hall
-    service_id: altoria_guild_master
-    branch_key: guild_branch_altoria
-    dialogue_key: guild_staff
-  - name: 瑪爾特·金秤
-    title: 阿爾托利亞雜貨商店老闆
-    profession: merchant
-    anchor_room: altoria_general_store
-    service_id: altoria_merchant
-    shop_key: altoria_general_store

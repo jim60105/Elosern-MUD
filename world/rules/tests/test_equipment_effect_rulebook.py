@@ -27,7 +27,7 @@ from world.lore.items import (
     ItemDefinition,
     ItemRarity,
 )
-from world.lore.shops import SHOP_REGISTRY
+from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.equipment_effects import (
     EQUIPMENT_EFFECT_RULES,

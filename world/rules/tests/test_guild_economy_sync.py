@@ -313,7 +313,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             name="改名後",
             title=before.npc_title,
             profession=before_row_profession(catalog),
-            anchor_room="altoria_guild_hall",
+            anchor_room=_guild_row().anchor_room,
             service_id=GUILD_SERVICE_ID,
             authored_kwargs=dict(_guild_row().authored_kwargs),
         )
