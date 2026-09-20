@@ -10,7 +10,7 @@ input — an inline prefix is rejected by the Evennia test guard.
   continue with the remaining places — and verify one bad place does not stop the others.
 - [ ] 1.3 Verify a repeated run reuses the tagged room, re-applies the authored description in
   place, and duplicates no doorway, with
-  `uv run --locked evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap`.
+  `uv run --locked evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap world.maps.tests.test_service_interiors`.
 
 ## 2. Authored host identity
 
@@ -31,7 +31,7 @@ input — an inline prefix is rejected by the Evennia test guard.
 ## 4. Handoff
 
 - [ ] 4.1 Verify the two shipped hosts are recreated correctly against an emptied database with
-  `uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy`.
+  `uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy_sync`.
   If `places_altoria.py` authors a subrace for them rather than `None`, compare stats too, not just
   identity fields.
 - [ ] 4.2 Verify adding a place row produces its interior, both doorways, its host and its
