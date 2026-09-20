@@ -25,7 +25,12 @@ from world.lore.items import (
     SUMMARY_MAX,
 )
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY, AssortmentDefinition
-from world.lore.shops import SHOP_REGISTRY, ShopDefinition
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.shops import (
+    SHOP_REGISTRY,
+    ShopDefinition,
+    validate_registry_identity_uniqueness,
+)
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.catalog import register_catalog
 from world.rules.guild_config import (
@@ -900,86 +905,127 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
 
 
 class ServiceHostRosterTests(CatalogRegistryIsolation):
-    """Declarative service-host roster parsing and batch validation (tasks 1.2/4.1)."""
+    """Derived service-host roster: places yield rows; rejections are unchanged (design §3.2)."""
 
-    def _raw(self):
-        return raw_rulebook()["service_hosts"]
+    # The rows the hand-authored service_hosts roster shipped before this
+    # change removed it. The derived roster must reproduce them field for
+    # field — that is the change's behaviour-neutrality gate.
+    FORMER_YAML_ROWS = (
+        {
+            "name": "葛里安·衛登",
+            "title": "阿爾托利亞分會會長",
+            "profession": "guild_staff",
+            "anchor_room": "altoria_guild_hall",
+            "service_id": "altoria_guild_master",
+            "branch_key": "guild_branch_altoria",
+            "dialogue_key": "guild_staff",
+        },
+        {
+            "name": "瑪爾特·金秤",
+            "title": "阿爾托利亞雜貨商店老闆",
+            "profession": "merchant",
+            "anchor_room": "altoria_general_store",
+            "service_id": "altoria_merchant",
+            "shop_key": "altoria_general_store",
+        },
+    )
+
+    def _assert_reproduces_former_rows(self, rows):
+        self.assertEqual(
+            [row.service_id for row in rows],
+            ["altoria_guild_master", "altoria_merchant"],
+        )
+        for row, former in zip(rows, self.FORMER_YAML_ROWS):
+            self.assertEqual(row.name, former["name"])
+            self.assertEqual(row.title, former["title"])
+            self.assertEqual(row.profession.key, former["profession"])
+            self.assertEqual(row.anchor_room, former["anchor_room"])
+            self.assertEqual(row.service_id, former["service_id"])
+            expected_kwargs = {
+                key: value
+                for key, value in former.items()
+                if key not in ("name", "title", "profession", "anchor_room", "service_id")
+            }
+            self.assertEqual(row.authored_kwargs, expected_kwargs)
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
-    def test_shipped_roster_parses_to_two_rows_reproducing_the_hardcoded_pair(self):
-        rows = validate_service_hosts(self._raw())
-        self.assertEqual([row.service_id for row in rows], ["altoria_guild_master", "altoria_merchant"])
+    def test_shipped_roster_reproduces_the_removed_yaml_rows_exactly(self):
+        rows = validate_service_hosts()
+        self._assert_reproduces_former_rows(rows)
         guild, merchant = rows
         branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
         store = SHOP_REGISTRY["altoria_general_store"]
+        # The identity join that used to be hand-synchronized across four
+        # files still holds: the guild host's authored identity is the guild
+        # branch's, and the merchant host's is the derived shop's.
         self.assertEqual((guild.name, guild.title), (branch.host_name, branch.host_title))
         self.assertEqual((merchant.name, merchant.title), (store.host_name, store.host_title))
-        self.assertEqual(guild.anchor_room, "altoria_guild_hall")
-        self.assertEqual(merchant.anchor_room, "altoria_general_store")
-        self.assertEqual(guild.profession.key, "guild_staff")
-        self.assertEqual(merchant.profession.key, "merchant")
-        self.assertEqual(
-            guild.authored_kwargs,
-            {"branch_key": "guild_branch_altoria", "dialogue_key": "guild_staff"},
-        )
-        self.assertEqual(merchant.authored_kwargs, {"shop_key": "altoria_general_store"})
 
     def test_catalog_exposes_the_roster(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertEqual([row.service_id for row in catalog.service_hosts], ["altoria_guild_master", "altoria_merchant"])
         self.assertEqual(set(catalog.host_by_service_id), {"altoria_guild_master", "altoria_merchant"})
 
-    def test_missing_roster_section_is_a_named_catalog_error(self):
-        # A rulebook without the required section surfaces through the
-        # catalog's named error family, never a raw KeyError.
-        from world.rules import guild_config
-
-        raw = raw_rulebook()
-        del raw["service_hosts"]
-        with mock.patch.object(guild_config, "load_config", return_value=raw):
-            with self.assertRaises(GuildConfigError):
-                load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+    def test_rulebook_no_longer_hand_authors_a_service_hosts_roster(self):
+        # The roster is derived from the place registry; a hand-authored
+        # section would declare each host a second time. Derivation makes
+        # disagreement unrepresentable, so the YAML section is gone and the
+        # catalog still loads the full derived roster.
+        self.assertNotIn("service_hosts", raw_rulebook())
+        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        self.assertEqual(
+            [row.service_id for row in catalog.service_hosts],
+            ["altoria_guild_master", "altoria_merchant"],
+        )
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
     def test_named_offenses_raise_the_catalog_error_family_without_db_access(self):
-        base = self._raw()
-        cases = {
-            "roster must be a list": "not-a-list",
-        }
-        for message, payload in cases.items():
-            with self.subTest(message):
-                with self.assertRaises(GuildConfigError):
-                    validate_service_hosts(payload)
+        store = PLACE_REGISTRY["altoria_general_store"]
         mutations = [
-            # Row is not a mapping.
-            ["just-a-string"],
-            # Unknown field.
-            [{**base[1], "shop_hours": "daily"}],
-            # Missing required field.
-            [{k: v for k, v in base[0].items() if k != "title"}],
             # Empty (whitespace-only) required field.
-            [{**base[0], "anchor_room": "  "}],
-            # Non-string anchor tag.
-            [{**base[0], "anchor_room": 7}],
+            replace(store, key="t_offense", service_id="t_offense", host_title="   "),
+            # Missing (empty) required field.
+            replace(store, key="t_offense", service_id="t_offense", host_name=""),
+            # Non-string anchor tag (the place key doubles as the room tag).
+            replace(store, key=7, service_id="t_offense"),
             # Profession naming no registry row.
-            [{**base[0], "profession": "blacksmith"}],
-            # Duplicate service anchor.
-            [base[0], {**base[1], "service_id": base[0]["service_id"]}],
-            # Blueprint component identity kwargs the row fails to supply.
-            [{k: v for k, v in base[1].items() if k != "shop_key"}],
+            replace(store, key="t_offense", service_id="t_offense", profession="blacksmith"),
+            # Blueprint component identity kwargs the place fails to supply.
+            replace(store, key="t_offense", service_id="t_offense", authored_kwargs=()),
             # Authored kwargs no blueprint component consumes.
-            [{**base[1], "branch_key": "guild_branch_altoria"}],
+            replace(
+                store,
+                key="t_offense",
+                service_id="t_offense",
+                authored_kwargs=(
+                    ("shop_key", "t_offense_shop"),
+                    ("branch_key", "guild_branch_altoria"),
+                ),
+            ),
         ]
-        for position, mutated in enumerate(mutations):
+        for position, place in enumerate(mutations):
             with self.subTest(mutation=position):
-                with self.assertRaises(GuildConfigError):
-                    validate_service_hosts(mutated)
+                with mock.patch.dict(
+                    PLACE_REGISTRY, {"t_offense_place": place}, clear=True
+                ):
+                    with self.assertRaises(GuildConfigError):
+                        validate_service_hosts()
 
-    def test_person_bound_profession_row_is_rejected_as_an_anchor(self):
+    def test_duplicate_service_anchor_in_the_place_registry_is_rejected(self):
+        guild = PLACE_REGISTRY["altoria_guild_hall"]
+        store = PLACE_REGISTRY["altoria_general_store"]
+        colliding = replace(guild, key="t_colliding", service_id=store.service_id)
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_colliding": colliding}, clear=False
+        ):
+            with self.assertRaises(GuildConfigError):
+                validate_service_hosts()
+
+    def test_person_bound_profession_place_is_rejected_as_an_anchor(self):
         # The roster row IS the anchor registration: anchoring a blueprint
         # whose components co-presence by design (service-anchoring) is the
         # invalid combination, rejected before any host is ever created.
@@ -992,10 +1038,18 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             schedule_template=None,
             default_tier=None,
         )
-        row = {**self._raw()[0], "profession": "courier"}
+        place = replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key="t_courier_place",
+            service_id="t_courier",
+            profession="courier",
+        )
         with mock.patch.object(profession_config, "TABLE", {"courier": courier}):
-            with self.assertRaises(GuildConfigError):
-                validate_service_hosts([row])
+            with mock.patch.dict(
+                PLACE_REGISTRY, {"t_courier_place": place}, clear=True
+            ):
+                with self.assertRaises(GuildConfigError):
+                    validate_service_hosts()
 
     def test_malformed_profession_rulebook_surfaces_as_catalog_error(self):
         from world.rules import profession_config
@@ -1006,7 +1060,32 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             side_effect=profession_config.ProfessionConfigError("broken rulebook"),
         ):
             with self.assertRaises(GuildConfigError):
-                validate_service_hosts(self._raw())
+                validate_service_hosts()
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_derived_shop_row_collision_with_guild_registry_row_is_rejected(self):
+        # The authored-name uniqueness rule (shops x guild branches x guild
+        # ranks) runs unchanged over the DERIVED shop rows: a planted
+        # collision between the derived merchant row and a guild branch row
+        # names both holders.
+        merchant = SHOP_REGISTRY["altoria_general_store"]
+        collision = replace(
+            GUILD_BRANCH_REGISTRY["guild_branch_altoria"],
+            host_name=merchant.host_name,
+        )
+        with self.assertRaises(ValueError) as caught:
+            validate_registry_identity_uniqueness(
+                branch_rows={
+                    **GUILD_BRANCH_REGISTRY,
+                    "guild_branch_altoria": collision,
+                },
+                rank_rows=GUILD_RANK_REGISTRY,
+            )
+        message = str(caught.exception)
+        self.assertIn("shop:altoria_general_store", message)
+        self.assertIn("guild_branch:guild_branch_altoria", message)
 
 
 if __name__ == "__main__":
