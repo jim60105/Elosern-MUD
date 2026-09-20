@@ -510,7 +510,8 @@ class ManagedServerTearDownMixin:
     Suites that boot one dedicated isolated server per test (``self.server``
     in ``setUp``) must stop it during teardown. The default order is
     byte-order (b): run the base teardown first, then stop the server. Two
-    suites (``test_browser_action_feedback`` and ``test_browser_creation``)
+    suites (``test_browser_action_feedback`` and
+    ``test_browser_creation_base``)
     instead read the attribute BEFORE the base teardown (byte-order (a));
     their ``tearDown`` overrides snapshot the attribute first, clear it so
     this mixin's own stop is skipped, then hand the snapshot to

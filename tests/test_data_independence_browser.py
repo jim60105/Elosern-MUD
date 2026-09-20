@@ -106,12 +106,29 @@ class BrowserTestDataMigrationContractTests(DataIndependenceContractMixin, unitt
         )
 
     def _area_with_seed_package(self):
-        """The live area plus the retired single-module manifest path,
-        standing in for the seed package it became (the frozen ledger
-        classification keeps naming ``web/tests/browser/seed.py``)."""
+        """The live area plus retired single-module manifest paths, each
+        standing in for the package or flat sibling family it became (the
+        frozen ledger classification keeps naming the retired path -- the
+        seed.py -> seed/ precedent applies to the six browser journey files
+        split into ``test_browser_<area>_<domain>.py`` sibling families)."""
         area = set(self._browser_area())
         if "web/tests/browser/seed/__init__.py" in area:
             area.add("web/tests/browser/seed.py")
+        live_names = {p.name for p in (
+            test_data_lint.REPO_ROOT / "web/tests/browser").glob("*.py")}
+        for stem in (
+            "test_browser_combat",
+            "test_browser_contextual_hud",
+            "test_browser_creation",
+            "test_browser_exploration",
+            "test_browser_local_map",
+            "test_browser_shell",
+        ):
+            retired = f"web/tests/browser/{stem}.py"
+            if retired not in live_names and any(
+                name.startswith(f"{stem}_") for name in live_names
+            ):
+                area.add(retired)
         return area
 
     def test_no_violation_naming_a_manifest_file(self):

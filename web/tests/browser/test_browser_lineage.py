@@ -13,7 +13,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .test_browser_contextual_hud import _inject_snapshot, _wait_mode
+from ._journey_support import _inject_snapshot, _wait_mode
 
 
 def _lineage_node(

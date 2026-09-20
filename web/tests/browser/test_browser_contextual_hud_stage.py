@@ -1,0 +1,571 @@
+"""Contextual HUD stage acceptance (webclient-contextual-hud): the mode-gated stage, the truthful scene backdrop, the bounded narrative caption/full log, drawer/overlay stage recession, the island affordance, and the command-line/dock clearance.
+"""
+
+from __future__ import annotations
+
+from tools.spec_traceability import covers_requirement
+from .browser_base import BrowserAcceptanceTest
+from .browser_helpers import (
+    focus_action_dock,
+    install_outbound_recorder,
+    inject_snapshot,
+    outbound_messages,
+    sent_action_count,
+    store_state,
+    valid_character_panel,
+    valid_lore_codex_panel,
+    valid_local_map_panel,
+    valid_status_panel,
+    wait_for_store_state,
+)
+from ._journey_support import (
+    _interact_target,
+    _exploration_panel,
+    _exploration_context_actions_panel,
+    _art_panel,
+    _SCENE_PNG_BYTES,
+    _inject_snapshot,
+    _wait_mode,
+    _press,
+)
+
+
+class ContextualHudBrowserTest(BrowserAcceptanceTest):
+    """Contextual HUD action-dock behavior on the shared managed server."""
+    @covers_requirement(
+        "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"
+    )
+    def test_surface_visibility_gated_by_committed_game_mode(self):
+        """The stage exposes the committed mode and gates surface visibility on it."""
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        map_panel = valid_local_map_panel()
+        _inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        self.assertEqual(
+            stage.get_attribute("data-elosern-mode"),
+            "exploration",
+            "the stage root exposes the committed exploration mode",
+        )
+        minimap = page.locator('[data-testid="local-map"]')
+        self.assertEqual(minimap.count(), 1, "the minimap island renders in exploration")
+        self.assertTrue(minimap.is_visible(), "the minimap is visible in exploration")
+
+        # H5 (task 8.6): the command line's `#inputfield` is present and
+        # visible in exploration with no opening action (the field is always
+        # in the DOM, design D1).
+        field = page.locator("#inputfield")
+        self.assertEqual(field.count(), 1, "the command field is present in exploration")
+        self.assertTrue(field.is_visible(), "the command field is visible in exploration")
+
+        # Commit combat: the minimap is removed from the layout with
+        # display:none (never merely dimmed); the other mode-visible surfaces
+        # (narrative feed, command line, action dock) stay up (H5: the command
+        # line is permanently present, webclient-hud-05-overlays-and-command-line).
+        _inject_snapshot(page, {"local_map": map_panel}, mode="combat")
+        _wait_mode(page, "combat")
+        self.assertEqual(
+            stage.get_attribute("data-elosern-mode"),
+            "combat",
+            "the stage root exposes the committed combat mode",
+        )
+        self.assertEqual(minimap.count(), 1, "the minimap element stays in the DOM in combat")
+        hidden = page.evaluate(
+            "() => { const el = document.querySelector('[data-testid=\"local-map\"]'); "
+            "return el ? (el.offsetParent === null) : false; }"
+        )
+        self.assertTrue(hidden, "the minimap is display:none in combat, not merely dimmed")
+        for selector in (
+            '[data-testid="narrative-feed"]',
+            # H5 (webclient-hud-05-overlays-and-command-line): the command
+            # line is permanently present (design D1) — it stays visible in
+            # combat mode.
+            '[data-testid="command-line"]',
+            "#action-dock",
+        ):
+            self.assertTrue(
+                page.locator(selector).is_visible(),
+                f"{selector} must stay visible in combat",
+            )
+        # H5 (task 8.6): the command field stays present and visible in
+        # combat (the command line is never closed).
+        self.assertEqual(page.locator("#inputfield").count(), 1, "the command field is present in combat")
+        self.assertTrue(
+            page.locator("#inputfield").is_visible(),
+            "the command field is visible in combat",
+        )
+
+        # Commit creation: per H1's mode matrix, the command-line anchor is
+        # display:none, so the command field is absent from the layout.
+        _inject_snapshot(page, {"local_map": map_panel}, mode="creation")
+        _wait_mode(page, "creation")
+        self.assertEqual(
+            stage.get_attribute("data-elosern-mode"),
+            "creation",
+            "the stage root exposes the committed creation mode",
+        )
+        field_absent = page.evaluate(
+            "() => { const el = document.querySelector('#inputfield'); "
+            "return el ? (el.offsetParent === null) : true; }"
+        )
+        self.assertTrue(field_absent, "the command field is absent (display:none) in creation mode")
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage"
+    )
+    def test_scene_backdrop_renders_art_payload_truthfully(self):
+        """The backdrop renders the committed art scene behind the stage."""
+        page = self.logged_in_page()
+        page.route(
+            "**/art/scene.png",
+            lambda route: route.fulfill(
+                status=200, content_type="image/png", body=_SCENE_PNG_BYTES
+            ),
+        )
+        art = _art_panel(["1", "2"])
+        _inject_snapshot(page, {"art": art}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # Read the committed scene URL straight from the DOM in a single
+        # (existence + attribute) DOM read instead of `get_attribute`, which
+        # auto-waits on the image element. The fixture URL is not a served art
+        # asset, so the component's load-failure path (task 4.7) removes the
+        # `<img>` from the DOM; a locator that waits for a removed element would
+        # time out. A single evaluate that both checks presence and reads `src`
+        # is race-free (no window in which the element can vanish mid-assertion).
+        image_dom = page.evaluate(
+            """() => { const el = document.querySelector('[data-testid="scene-backdrop-image"]');
+              return { present: !!el, src: el ? el.getAttribute("src") : null }; }"""
+        )
+        self.assertTrue(
+            image_dom["present"],
+            "the done scene image renders behind the stage",
+        )
+        self.assertEqual(
+            image_dom["src"],
+            "/art/scene.png",
+            "the backdrop renders the committed scene URL",
+        )
+        backdrop = page.locator('[data-testid="scene-backdrop"]')
+        self.assertEqual(
+            backdrop.get_attribute("data-scene-status"),
+            "done",
+            "the backdrop reports the committed scene status",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-label"]').inner_text(),
+            "南門街道",
+            "the scene label renders as text outside the bitmap",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-alt"]').inner_text(),
+            "當前場景",
+            "the scene alternative text renders as text outside the bitmap",
+        )
+
+        # The per-mode gradient stages are visually distinct (exploration vs
+        # combat). The backdrop's inline background carries the mode token.
+        explore_bg = page.evaluate(
+            "() => document.querySelector('[data-testid=\"scene-backdrop\"]').style.background"
+        )
+        _inject_snapshot(page, {"art": art}, mode="combat")
+        _wait_mode(page, "combat")
+        combat_bg = page.evaluate(
+            "() => document.querySelector('[data-testid=\"scene-backdrop\"]').style.background"
+        )
+        self.assertNotEqual(
+            explore_bg,
+            combat_bg,
+            "the mode's gradient stage differs per mode (exploration vs combat)",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+    )
+    def test_narrative_caption_bounded_full_log_one_action(self):
+        """The narrative caption is bounded and the full log opens in one action."""
+        page = self.logged_in_page()
+        for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
+            page.evaluate("(text) => window.__elosernBridge.store.appendText('out', text)", line)
+
+        # The caption card is bounded: its rendered height never fills the stage.
+        feed = page.locator('[data-testid="narrative-feed"]')
+        self.assertTrue(feed.is_visible(), "the narrative caption card renders")
+        geometry = page.evaluate(
+            """() => {
+              const f = document.querySelector('[data-testid="narrative-feed"]');
+              const st = document.querySelector('[data-testid="elosern-stage"]');
+              return {
+                feedHeight: f.getBoundingClientRect().height,
+                stageHeight: st.getBoundingClientRect().height,
+              };
+            }"""
+        )
+        self.assertLess(
+            geometry["feedHeight"],
+            geometry["stageHeight"],
+            "the caption card is bounded, not filling the stage",
+        )
+
+        # One action opens the complete log, rendered through the same renderer.
+        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        overlay = page.locator('[data-testid="fulllog-overlay"]')
+        self.assertTrue(overlay.is_visible(), "the full log opens in one action")
+        log_text = overlay.inner_text()
+        for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
+            self.assertIn(line, log_text, "the full log shows the complete retained narrative")
+
+        # Focus is trapped while the full log is open.
+        focus_trapped = page.evaluate(
+            "() => { const o = document.querySelector('[data-testid=\"fulllog-overlay\"]');"
+            " const a = document.activeElement; return o && (o === a || o.contains(a)); }"
+        )
+        self.assertTrue(focus_trapped, "focus is trapped in the full log while open")
+
+        # Escape closes the full log and restores focus to the control that opened it.
+        _press(page, "Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"fulllog-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.locator('[data-testid="fulllog-overlay"]').count(),
+            0,
+            "the full log closes on Escape",
+        )
+        focus_restored = page.evaluate(
+            "() => { const c = document.querySelector('[data-testid=\"narrative-fulllog-control\"]');"
+            " const a = document.activeElement; return c && c === a; }"
+        )
+        self.assertTrue(focus_restored, "focus is restored to the control that opened the log")
+
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    def test_open_drawer_or_overlay_dims_stage(self):
+        """An open drawer or overlay recesses the stage; the mark clears only when all close.
+
+        H5 (webclient-hud-05-overlays-and-command-line): the command drawer
+        is replaced by the permanently-present command line (design D1), so
+        the second open surface is now an H5 full-screen overlay (settings)
+        opened through the store's overlay slice (design D8/D9).
+        """
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the stage is not recessed while no surface is open",
+        )
+
+        # Open the full-log overlay: the stage behind it is recessed.
+        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "an open overlay recesses the stage",
+        )
+
+        # Open the H5 settings overlay through the store's overlay slice: the
+        # full-log overlay is an aria-modal dialog that intercepts pointer
+        # events, so the overlay opens via the store's `openOverlay` (design
+        # D8), not a pointer click on the command line's 設定 button.
+        page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the stage stays recessed while two surfaces are open",
+        )
+
+        # Close the full log: the settings overlay remains open, so the stage
+        # stays recessed.
+        page.locator('[data-testid="fulllog-close"]').click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"fulllog-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the stage stays recessed until the last open surface closes",
+        )
+
+        # Close the settings overlay (the shared overlay host's close button):
+        # the recess mark clears.
+        page.locator('[data-testid="overlay-host-close"]').click()
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recess mark clears only when no drawer and no overlay remain open",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-map-settings-and-help-surfaces-are-reachable-from-the-live-client"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    def test_h5_overlay_triggers_exclusion_and_focus_restoration(self):
+        """H5 overlay contract (task 8.7): each trigger opens exactly its own
+        overlay; at most one overlay is open at a time (opening a second closes
+        the first); Escape and the close control each restore focus to the
+        trigger (the opener captured at open time); the stage recession mark
+        is set while an overlay is open and clears when the last closes.
+        """
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # Each of the three triggers opens exactly its own overlay.
+        # settings trigger -> settings overlay.
+        page.locator('[data-testid="command-line-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the settings overlay recesses the stage",
+        )
+        # Close it so the next trigger is reachable (the command line is behind
+        # an open overlay).
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-overlay\"]') === null",
+            timeout=15000,
+        )
+
+        # help trigger -> help overlay.
+        page.locator('[data-testid="command-line-help"]').click()
+        page.wait_for_selector('[data-testid="help-overlay"]', timeout=15000)
+
+        # Mutual exclusion: opening a second overlay closes the first (the store
+        # keeps a single open-overlay name, design D8).
+        page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="help-overlay"]').count(),
+            0,
+            "opening settings closes the open help overlay (at most one overlay open)",
+        )
+        page.locator('[data-testid="overlay-host-close"]').click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recession mark clears when the last overlay closes",
+        )
+
+        # map trigger (the minimap island's 展開全地圖) -> map overlay; Escape
+        # restores focus to that trigger (the opener captured at open time).
+        page.locator('[data-testid="local-map__expand"]').click()
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the map overlay recesses the stage",
+        )
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recession mark clears after the map overlay closes",
+        )
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "local-map__expand",
+            "Escape restores focus to the map trigger that opened the overlay",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention"
+    )
+    def test_minimap_island_single_affordance_keyboard_and_movement(self):
+        """Single full-map affordance contract (webclient-minimap-04-island-single-affordance):
+        the island renders exactly one full-map affordance (a full-bleed button
+        with 展開全地圖) and no visible button chrome in the header; pressing
+        Enter on the focused affordance opens the overlay; activating an
+        actionable lattice node moves without opening the overlay.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        page.wait_for_selector('[data-testid="local-map"]', timeout=15000)
+
+        # Axis/words coupling (Task 3.5):
+        # On coordinate-bearing layer (lattice variant), orientation marks "北↑ 東→" are stated
+        # and the island draws the axis cross.
+        orientation = page.locator('[data-testid="local-map__orientation"]')
+        self.assertEqual(orientation.count(), 1)
+        self.assertIn("北↑ 東→", orientation.inner_text())
+        self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 1)
+
+        # Exactly one affordance exists, carrying the accessible name.
+        affordances = page.locator('[data-testid="local-map__expand"]')
+        self.assertEqual(affordances.count(), 1)
+        self.assertEqual(affordances.get_attribute("aria-label"), "展開全地圖")
+        # No button in the header meta row.
+        self.assertEqual(page.locator(".local-map__meta button").count(), 0)
+        # Exactly one tab stop on the island in lattice variant
+        self.assertEqual(
+            page.evaluate("() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"),
+            1,
+        )
+
+        # Keyboard Enter on the focused affordance opens the map overlay.
+        affordances.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        # The full-map overlay states no orientation marks and draws no axis cross
+        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__orientation"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__axis"]').count(), 0)
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            timeout=15000,
+        )
+
+        # Activating an actionable lattice node moves without opening the overlay.
+        actionable = page.locator('[data-testid="local-map__actionable"]')
+        self.assertEqual(actionable.count(), 1)
+        moves_before = sent_action_count(page, "explore.move")
+        actionable.first.click()
+        self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
+        self.assertEqual(
+            sent_action_count(page, "explore.move"),
+            moves_before + 1,
+            "clicking an actionable lattice node dispatches one explore.move intent",
+        )
+
+        # Inject an interior graph payload with remembered nodes
+        interior_payload = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "interior",
+            "current_node": "room:201",
+            "title": "公會大廳",
+            "nodes": [
+                {
+                    "id": "room:201",
+                    "label": "公會大廳",
+                    "x": 0,
+                    "y": 0,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+                {
+                    "id": "room:202",
+                    "label": "訓練場",
+                    "x": 1,
+                    "y": 0,
+                    "visibility": "visible_visited",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": {"kind": "move", "exit_ref": "e_hall_training", "destination": "room:202"},
+                },
+                {
+                    "id": "room:203",
+                    "label": "地下金庫",
+                    "x": 0,
+                    "y": 1,
+                    "visibility": "remembered",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+            ],
+            "edges": [
+                {"source": "room:201", "destination": "room:202", "label": "訓練場", "known": True, "traversable": True},
+            ],
+            "legend": ["你目前所在的位置", "已經探索過的相鄰位置", "曾經到過、但不在附近的遠方位置"],
+        }
+        _inject_snapshot(page, {"local_map": interior_payload}, mode="exploration")
+        page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
+        # On coordinate-free layer (radial graph variant), orientation marks and axis are absent
+        self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
+        self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 0)
+        # Island still offers exactly one tab stop (the affordance)
+        self.assertEqual(
+            page.evaluate("() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"),
+            1,
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
+    )
+    def test_command_line_never_overlaps_dock_caption_or_hud(self):
+        """H5 (task 8.8): at both supported viewports and at each of the
+        three prose-scale steps, the command line does not overlap the action
+        dock, the narrative caption, or the HUD island anchors.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            exploration = _exploration_panel([_interact_target(11, "小販")])
+            _inject_snapshot(
+                page,
+                {
+                    "exploration": exploration,
+                    "context_actions": _exploration_context_actions_panel(
+                        {"status": "unavailable"}
+                    ),
+                    "local_map": valid_local_map_panel(),
+                },
+                mode="exploration",
+            )
+            _wait_mode(page, "exploration")
+            for scale in (0.92, 1, 1.12):
+                page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
+                overlaps = page.evaluate(
+                    """() => {
+                      const byId = (sel) => {
+                        const el = document.querySelector(sel);
+                        return el && el.getBoundingClientRect();
+                      };
+                      const cmd = byId('[data-testid="command-line"]');
+                      if (!cmd) { return ["command-line missing"]; }
+                      const targets = {
+                        dock: byId('#action-dock'),
+                        caption: byId('[data-testid="narrative-feed"]'),
+                        hudLeft: byId('[data-testid="anchor-hud-left"]'),
+                        hudRight: byId('[data-testid="anchor-hud-right"]'),
+                      };
+                      const hits = [];
+                      for (const key of Object.keys(targets)) {
+                        const b = targets[key];
+                        if (!b) { continue; }
+                        const overlap = !(
+                          cmd.right <= b.left || b.right <= cmd.left ||
+                          cmd.bottom <= b.top || b.bottom <= cmd.top
+                        );
+                        if (overlap) { hits.push(key); }
+                      }
+                      return hits;
+                    }"""
+                )
+                self.assertEqual(
+                    overlaps,
+                    [],
+                    "the command line overlaps %s at %dx%d @ scale %s" % (
+                        ", ".join(overlaps), viewport[0], viewport[1], scale,
+                    ),
+                )

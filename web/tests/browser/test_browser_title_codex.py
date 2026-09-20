@@ -29,7 +29,7 @@ from .browser_helpers import (
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
-from .test_browser_contextual_hud import _wait_mode
+from ._journey_support import _wait_mode
 from .test_browser_input_narrative import _wait_inp_line
 
 CODEX = title_codex_values()
