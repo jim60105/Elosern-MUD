@@ -185,7 +185,10 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
                 "type": _GUILD_EXAMINER,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "plaza_stall"},
             },
-            {"type": _SCRIPTED_DIALOGUE, "kwargs": {"dialogue_key": "dock_gossip"}},
+            {
+                "type": _SCRIPTED_DIALOGUE,
+                "kwargs": {"service_id": "silver_scales", "dialogue_key": "dock_gossip"},
+            },
         ]
         npc = self.assembled(record)
         self.assertTrue(npc.components.has(_GUILD_STAFF))
@@ -196,6 +199,7 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
         self.assertEqual(staff.branch_key, "plaza_stall")
         dialogue = npc.components.get(_SCRIPTED_DIALOGUE)
         self.assertEqual(dialogue.dialogue_key, "dock_gossip")
+        self.assertEqual(dialogue.service_id, "silver_scales")
         examiner = npc.components.get(_GUILD_EXAMINER)
         self.assertEqual(examiner.branch_key, "plaza_stall")
         # Exactly one component instance per slot.
@@ -226,7 +230,10 @@ class ExplicitPrecedenceTests(ProfessionAssemblyHarness):
                 "type": _GUILD_EXAMINER,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "hall"},
             },
-            {"type": _SCRIPTED_DIALOGUE, "kwargs": {"dialogue_key": "dock"}},
+            {
+                "type": _SCRIPTED_DIALOGUE,
+                "kwargs": {"service_id": "silver_scales", "dialogue_key": "dock"},
+            },
             {
                 "type": _MERCHANT,
                 "kwargs": {"service_id": "silver_scales", "shop_key": "side_stall"},
@@ -330,7 +337,10 @@ class IdentityGateTests(ProfessionAssemblyHarness):
                 "type": _GUILD_EXAMINER,
                 "kwargs": {"service_id": "silver_scales", "branch_key": "hall"},
             },
-            {"type": _SCRIPTED_DIALOGUE, "kwargs": {"dialogue_key": "dock"}},
+            {
+                "type": _SCRIPTED_DIALOGUE,
+                "kwargs": {"service_id": "silver_scales", "dialogue_key": "dock"},
+            },
         ]
         path = self.write("fail.json", record)
         from evennia.contrib.base_systems.components.holder import ComponentHandler
@@ -563,7 +573,10 @@ class AnchorRoomTests(ProfessionAssemblyHarness):
         record["key"] = key
         record["profession"] = COURIER_PROBE.key
         record["components"] = [
-            {"type": _SCRIPTED_DIALOGUE, "kwargs": {"dialogue_key": "dock"}}
+            {
+                "type": _SCRIPTED_DIALOGUE,
+                "kwargs": {"service_id": "courier_slot", "dialogue_key": "dock"},
+            }
         ]
         return record
 

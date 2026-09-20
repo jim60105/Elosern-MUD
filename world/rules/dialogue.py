@@ -1,7 +1,11 @@
-"""Scripted dialogue: authored tables, read-only resolution, and the talk writer.
+"""Scripted dialogue: keyed read surface, read-only resolution, and the talk writer.
 
-This module owns authored scripted dialogue end to end: the immutable keyed
-tables, component resolution, the keyword lookup, and the no-keyword greeting.
+The authored tables live in the lore package ``world/lore/dialogue/``
+(place-attendant-profession: authored prose is authored identity); this
+module is the rules-side read surface over them: the immutable keyed
+``DIALOGUE_TABLE``, component resolution, the keyword lookup, and the
+no-keyword greeting. The authored dataclasses are re-exported so every
+``world.rules.dialogue`` import path keeps working unchanged.
 The lookup surface performs no state writes, preserving the read-side
 discipline of the runtime; the ``guild_staff`` action keyword is the one
 authored exception: keyword ``回報`` resolves the read-only reportable-quest
@@ -34,6 +38,8 @@ from typing import Any
 
 from typeclasses.components import ScriptedDialogue
 
+from world.lore.dialogue import DIALOGUE_ROWS
+from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 from world.observability import log_info
 
 GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
@@ -50,77 +56,10 @@ NO_UNDERSTANDING_LINE = "對方皺起眉頭：「我不太明白你的意思。�
 MAX_DIALOGUE_SESSION_LINE_CODE_POINTS = 2000
 
 
-@dataclass(frozen=True)
-class KeywordResponse:
-    """One authored response to a player keyword."""
-
-    keyword: str
-    response: str
-
-
-@dataclass(frozen=True)
-class DialogueDefinition:
-    """One immutable dialogue table: an optional greeting plus keyword responses.
-
-    ``greeting`` is the no-keyword topic line shown by ``talk <npc>``. ``None``
-    means the host has no authored greeting and falls back to the no-response
-    line for a keyword-less talk.
-    """
-
-    greeting: str | None
-    responses: tuple[KeywordResponse, ...]
-
-
-GUILD_STAFF_RESPONSES: tuple[KeywordResponse, ...] = (
-    KeywordResponse(
-        "註冊",
-        "「先在櫃檯註冊成為冒險者（guild register），你的階級會是 F，"
-        "之後就可以接取任務了。」",
-    ),
-    KeywordResponse(
-        "任務",
-        "「用 guild list 查看任務板上適合你階級的委託，用 guild accept "
-        "<任務名> 接取，完成後回來對我說『回報』並指定任務編號，"
-        "或直接用 guild turnin <任務編號> 交回任務。」",
-    ),
-    KeywordResponse(
-        "公會",
-        "「這裡是埃洛西恩冒險者公會的阿爾托利亞分會。公會命令有 "
-        "guild register、guild list、guild accept、guild log、guild show、"
-        "guild turnin、guild abandon 與 guild merit。」",
-    ),
-    KeywordResponse(
-        "工會",
-        "「你是想問冒險者公會的事吧？用 guild 相關命令可以註冊、接取"
-        "任務、查看進度與回報；完成任務後對我說『回報』再指定任務編號，"
-        "即可交回任務。」",
-    ),
-    KeywordResponse(
-        "回報",
-        "「想交回任務，得先成為註冊冒險者（guild register）。註冊後完成"
-        "委託，對我說『回報』並指定任務編號，或直接用 guild turnin "
-        "<任務編號>。」",
-    ),
-    KeywordResponse(
-        "再見",
-        "「願你的冒險順遂。需要的時候，隨時回來公會。」",
-    ),
-)
-
-DIALOGUE_TABLE: MappingProxyType = MappingProxyType(
-    {
-        GUILD_STAFF_DIALOGUE_KEY: DialogueDefinition(
-            greeting=(
-                "櫃檯的公會職員抬起頭：「歡迎來到冒險者公會。想成為冒險者，"
-                "就用 guild register 註冊；之後用 guild list 查看任務、"
-                "guild accept 接取、guild log 與 guild show 查看進度，"
-                "完成後對我說『回報』並指定任務編號（或直接用 guild "
-                "turnin），還有 guild abandon 與 guild merit。」"
-            ),
-            responses=GUILD_STAFF_RESPONSES,
-        ),
-    }
-)
+# The frozen keyed read over the lore-assembled rows (``world/lore/dialogue/``);
+# every table row is authored there, split by domain slice. The dataclasses are
+# re-exported above, so the historical import surface is bit-for-bit unchanged.
+DIALOGUE_TABLE: MappingProxyType = MappingProxyType(DIALOGUE_ROWS)
 
 
 def resolve_dialogue_component(npc: Any) -> Any | None:

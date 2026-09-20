@@ -7,9 +7,12 @@ from unittest import mock
 from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import validate_place_registry
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.lore.settlements.shops import validate_registry_identity_uniqueness
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.rules.dialogue import NO_UNDERSTANDING_LINE
+from world.rules.dialogue import table_response
 from world.rules.guild_config import GuildConfigError
 from world.rules.guild_config import load_guild_catalog
 from world.rules.guild_config import validate_service_hosts
@@ -111,16 +114,118 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # disagreement unrepresentable, so the YAML section is gone and the
         # catalog still loads the full derived roster.
         self.assertNotIn("service_hosts", raw_rulebook())
-        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
-        self.assertEqual(
-            [row.service_id for row in catalog.service_hosts],
-            [
-                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor",
-                "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_valwyn", "ciaran_vethiel",
-            ],
-        )
+
+    def test_the_attendant_blueprint_ships_unused(self):
+        # Neutrality gate (place-attendant-profession): every derived row
+        # equals the FULL pre-change baseline field by field — name, title,
+        # profession, anchor, service_id, authored identity — so a shipped
+        # host's identity cannot silently move while the two-row former-YAML
+        # zip above still passes. NOT ONE row names the new attendant
+        # blueprint: it ships available for content changes, used by nothing.
+        rows = validate_service_hosts()
+        self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
+        for row, expected in zip(rows, self.PRE_CHANGE_BASELINE):
+            with self.subTest(service_id=row.service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    (
+                        expected["name"],
+                        expected["title"],
+                        expected["profession"],
+                        expected["anchor_room"],
+                        expected["service_id"],
+                        expected["authored_kwargs"],
+                    ),
+                )
+        self.assertNotIn("attendant", {row.profession.key for row in rows})
+
+    # The complete roster as it shipped BEFORE place-attendant-profession,
+    # written as literals (never derived from the live registry): the fixed
+    # nine rows the blueprint addition must reproduce untouched.
+    PRE_CHANGE_BASELINE = (
+        {
+            "name": "葛里安·衛登",
+            "title": "阿爾托利亞分會會長",
+            "profession": "guild_staff",
+            "anchor_room": "altoria_guild_hall",
+            "service_id": "altoria_guild_master",
+            "authored_kwargs": {
+                "branch_key": "guild_branch_altoria",
+                "dialogue_key": "guild_staff",
+            },
+        },
+        {
+            "name": "瑪爾特·金秤",
+            "title": "阿爾托利亞雜貨商店老闆",
+            "profession": "merchant",
+            "anchor_room": "altoria_general_store",
+            "service_id": "altoria_merchant",
+            "authored_kwargs": {"shop_key": "altoria_general_store"},
+        },
+        {
+            "name": "維爾登·黑潭",
+            "title": "聖潔王都鍛造鋪鐵匠",
+            "profession": "merchant",
+            "anchor_room": "altoria_forge",
+            "service_id": "altoria_blacksmith",
+            "authored_kwargs": {"shop_key": "altoria_forge"},
+        },
+        {
+            "name": "西格瑪·庫柏",
+            "title": "聖潔王都餐館老闆",
+            "profession": "merchant",
+            "anchor_room": "altoria_eatery",
+            "service_id": "altoria_eatery_owner",
+            "authored_kwargs": {"shop_key": "altoria_eatery"},
+        },
+        {
+            "name": "妮絲塔·狐溪",
+            "title": "聖潔王都裁縫坊坊主",
+            "profession": "merchant",
+            "anchor_room": "altoria_tailor",
+            "service_id": "altoria_tailor",
+            "authored_kwargs": {"shop_key": "altoria_tailor"},
+        },
+        {
+            "name": "海莉爾·斯塔爾法爾",
+            "title": "暗影谷村鑄刃者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_hailiel_home",
+            "service_id": "ciaran_hailiel",
+            "authored_kwargs": {"shop_key": "ciaran_hailiel_home"},
+        },
+        {
+            "name": "拉瑞內斯·妮特布倫",
+            "title": "暗影谷村花饌好手",
+            "profession": "merchant",
+            "anchor_room": "ciaran_lareneth_home",
+            "service_id": "ciaran_lareneth",
+            "authored_kwargs": {"shop_key": "ciaran_lareneth_home"},
+        },
+        {
+            "name": "瓦爾溫·斯蒂爾瓦特爾",
+            "title": "暗影谷村蒐羅者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_valwyn_home",
+            "service_id": "ciaran_valwyn",
+            "authored_kwargs": {"shop_key": "ciaran_valwyn_home"},
+        },
+        {
+            "name": "維特希爾·威爾德布瑞亞爾",
+            "title": "暗影谷村織衣者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_vethiel_home",
+            "service_id": "ciaran_vethiel",
+            "authored_kwargs": {"shop_key": "ciaran_vethiel_home"},
+        },
+    )
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
@@ -228,6 +333,94 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         message = str(caught.exception)
         self.assertIn("shop:altoria_general_store", message)
         self.assertIn("guild_branch:guild_branch_altoria", message)
+
+    # ---- the attendant blueprint's rejections (place-attendant-profession) --
+
+    def _attendant(self, **overrides):
+        """A synthetic place naming the shipped attendant blueprint."""
+        base = dict(
+            key="t_attendant_place",
+            service_id="t_attendant",
+            profession="attendant",
+            assortment_keys=(),
+            authored_kwargs=(("dialogue_key", "guild_staff"),),
+        )
+        base.update(overrides)
+        return replace(PLACE_REGISTRY["altoria_general_store"], **base)
+
+    def test_an_attendant_authoring_a_trade_kwarg_is_rejected_as_dead(self):
+        # The dialogue component consumes dialogue_key only: a shop_key on an
+        # attendant row is exactly the dead-kwarg offense every profession
+        # already obeys, named by place and kwarg.
+        place = self._attendant(
+            authored_kwargs=(
+                ("dialogue_key", "guild_staff"),
+                ("shop_key", "t_attendant_shop"),
+            )
+        )
+        with mock.patch.dict(PLACE_REGISTRY, {"t_attendant_place": place}, clear=True):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("t_attendant_place", message)
+        self.assertIn("shop_key", message)
+
+    def test_an_attendant_place_declaring_assortments_is_rejected(self):
+        # Goods require a shop identity; the lore validator owns that rule
+        # and fires on the place row alone.
+        place = self._attendant(assortment_keys=("altoria_general_goods",))
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry({"t_attendant_place": place})
+        message = str(caught.exception)
+        self.assertIn("t_attendant_place", message)
+        self.assertIn("assortments without a shop identity", message)
+
+    def test_a_place_authoring_an_unregistered_dialogue_key_fails_load(self):
+        # Authored resolution: the kwarg exists but resolves to nothing —
+        # load names the place and the dead key (spec: bind to a table that
+        # exists).
+        place = self._attendant(
+            key="t_dead_dialogue_place",
+            service_id="t_dead_dialogue",
+            authored_kwargs=(("dialogue_key", "t_unregistered_table"),),
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_dead_dialogue_place": place}, clear=True
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("t_dead_dialogue_place", message)
+        self.assertIn("t_unregistered_table", message)
+
+    def test_a_runtime_lookup_of_an_unregistered_key_still_degrades(self):
+        # The load-time rejection above must NOT collapse into a runtime
+        # raise: a key reaching the lookup from any other route still gets
+        # the no-understanding line.
+        self.assertEqual(
+            table_response("t_unregistered_table", "住宿"),
+            NO_UNDERSTANDING_LINE,
+        )
+
+    def test_the_dialogue_key_check_covers_every_dialogue_bearing_row(self):
+        # The check keys off the COMPONENT, not the profession: the shipped
+        # guild hall (a multi-component blueprint) must fail load just the
+        # same when its authored table disappears — narrowing the rule to
+        # attendants only would silently leave the guild host mute.
+        guild = PLACE_REGISTRY["altoria_guild_hall"]
+        broken = replace(
+            guild,
+            authored_kwargs=(
+                ("branch_key", "guild_branch_altoria"),
+                ("dialogue_key", "t_guild_table_gone"),
+            ),
+        )
+        with mock.patch.dict(PLACE_REGISTRY, {"altoria_guild_hall": broken}):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("altoria_guild_hall", message)
+        self.assertIn("t_guild_table_gone", message)
 
 
 if __name__ == "__main__":

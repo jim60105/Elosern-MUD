@@ -49,6 +49,8 @@ from world.rules.combat_session import engage, is_in_active_session
 from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     MAX_DIALOGUE_SESSION_LINE_CODE_POINTS,
+    DialogueDefinition,
+    KeywordResponse,
     clear_dialogue_session,
     open_or_refresh_dialogue,
 )
@@ -56,6 +58,7 @@ from world.rules.movement_settlement import settle_movement
 from world.rules.npc_identity import npc_display_name
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.catalog import register_catalog
+from world.tests.synthetic_data import synthetic_registries
 
 UNAVAILABLE_PAYLOAD = {
     "schema_version": DIALOGUE_SCHEMA_VERSION,
@@ -82,11 +85,29 @@ def _player(key="對話面板測試者"):
 
 
 def _host(room, key="公會職員"):
+    return _host_with_key(room, GUILD_STAFF_DIALOGUE_KEY, key=key)
+
+
+def _host_with_key(room, dialogue_key, key="公會職員"):
     npc = create_object(NPC, key=key, location=room)
     npc.components.add(
-        ScriptedDialogue.create(npc, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        ScriptedDialogue.create(npc, dialogue_key=dialogue_key)
     )
     return npc
+
+
+# File-local six-keyword dialogue row: the panel-cap decoupling below is a
+# panel-vs-affordance mechanic, so it proves itself against a locally authored
+# over-cap table rather than an incidental shipped row's keyword count.
+_T_OVER_CAP_KEY = "t_panel_over_cap_host"
+
+_T_OVER_CAP_ROW = DialogueDefinition(
+    greeting="櫃檯後的人抬起眼：「有事說一聲就好。」",
+    responses=tuple(
+        KeywordResponse(f"合成關鍵詞{index}", f"「合成回應{index}。」")
+        for index in range(6)
+    ),
+)
 
 
 class _RecordingSession:
@@ -175,12 +196,9 @@ class DialoguePresenterTests(EvenniaTest):
             _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
         )
         self.assertTrue(payload["choices"])
-        # The guild_staff table authors six keywords: the panel shows exactly
-        # the first four, independent of the affordance pool's 16 bound.
-        self.assertEqual(len(payload["choices"]), 4)
-        self.assertGreater(
-            len(_scripted_keyword_descriptors(self.host)), 4
-        )
+        # The shipped guild_staff row authors exactly the panel's pressable
+        # four (a fifth keyword could never be rendered); the cap-vs-pool
+        # truncation itself is proven against an over-cap synthetic row below.
         # The raw affinity number never rides the wire.
         self.assertNotIn(affinity_value, payload.values())
 
@@ -190,14 +208,17 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertIsNone(payload["bond_stage"])
         self.assertIs(payload["available"], True)
 
+    @synthetic_registries(
+        "dialogue", extra={"dialogue": {_T_OVER_CAP_KEY: _T_OVER_CAP_ROW}}
+    )
     def test_panel_choice_cap_is_independent_of_the_affordance_keyword_pool(self):
-        # The authored guild_staff table carries six keywords. The dialogue
-        # panel truncates to its own four-row bound while the shared keyword
-        # descriptor owner — the interact-target affordance pool — still
-        # exposes every authored entry up to its independent 16 bound
+        # A six-keyword dialogue row renders its full pool through the shared
+        # keyword descriptor owner — the interact-target affordance pool —
+        # while the dialogue panel truncates to its own four-row bound
         # (webclient-align-11 decoupling).
-        open_or_refresh_dialogue(self.player, self.host, "歡迎。")
-        full_pool = _scripted_keyword_descriptors(self.host)
+        host = _host_with_key(self.room, _T_OVER_CAP_KEY, key="合成對話主")
+        open_or_refresh_dialogue(self.player, host, "歡迎。")
+        full_pool = _scripted_keyword_descriptors(host)
         self.assertEqual(len(full_pool), 6)
         payload = self._render()
         self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)

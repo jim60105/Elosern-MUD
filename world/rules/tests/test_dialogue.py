@@ -8,6 +8,8 @@ The guild-master dialogue is exercised through the sync-attached
 
 from tools.spec_traceability import covers_requirement
 
+import unittest
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
@@ -363,6 +365,27 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self.call(CmdsTalk(), f"{self.guild_master.key} 謎語", caller=self.char1)
         self.call(CmdsTalk(), self.guild_master.key, caller=self.char1)
         self.assertEqual(self._player_state(), before)
+
+
+class DialogueTableImmutabilityTests(unittest.TestCase):
+    """The authored table is frozen at the lore assembly, not just the view.
+
+    The scripted-dialogue registry contract makes the table read-only at
+    runtime (place-attendant-profession): DIALOGUE_ROWS itself is a
+    MappingProxyType, so no consumer can grow or replace the rows that
+    DIALOGUE_TABLE and the service-host validators read through it.
+    """
+
+    def test_a_write_through_the_lore_mapping_is_blocked(self):
+        from world.lore.dialogue import DIALOGUE_ROWS
+        from world.rules.dialogue import DIALOGUE_TABLE, GUILD_STAFF_DIALOGUE_KEY
+
+        with self.assertRaises(TypeError):
+            DIALOGUE_ROWS["t_frozen_probe"] = DIALOGUE_ROWS[GUILD_STAFF_DIALOGUE_KEY]
+        with self.assertRaises(TypeError):
+            DIALOGUE_TABLE["t_frozen_probe"] = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        # The blocked write left the table untouched.
+        self.assertNotIn("t_frozen_probe", DIALOGUE_TABLE)
 
 
 if __name__ == "__main__":

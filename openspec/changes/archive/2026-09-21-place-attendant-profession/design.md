@@ -2,7 +2,7 @@
 
 Every place in `PLACE_REGISTRY` must name a profession, and `validate_service_hosts` derives one roster row per place. Of the four shipped professions only three are place-bound, and all three carry trade or guild capability. So today "a place exists" and "a place sells something or runs guild business" are the same statement. Twelve of the eighteen location types in `docs/lore/settlement-locations.md` are neither.
 
-`ScriptedDialogue` already exists as a component, is already place-bound in the `guild_staff` and `guild_examiner` blueprints, and already declares exactly the identity fields a talk host needs (`service_id`, `dialogue_key`). Nothing needs inventing — the blueprint that combines it alone is simply missing.
+`ScriptedDialogue` already exists as a component and is already place-bound in the `guild_staff` and `guild_examiner` blueprints. It did NOT yet declare the identity fields a talk host needs: it carried `dialogue_key` alone, so a dialogue-first row could never anchor on it (the profession anchor contract rejects a first component without `service_id`). This change adds the missing `service_id` field — mirroring the `QuestIssuer` precedent — and the blueprint that combines the class alone is what was simply missing.
 
 ## Goals / Non-Goals
 
@@ -24,7 +24,7 @@ The alternative was one profession per role — `innkeeper`, `bathhouse_keeper`,
 
 The package is split by domain rather than dumped in one module: `shape.py`, `guild.py`, `altoria.py`, `ciaran.py`, and an `__init__.py` that assembles `DIALOGUE_ROWS` in a fixed order — exactly as `PLACE_REGISTRY` assembles from its per-settlement slices. Splitting now rather than when a file gets long means the five content changes that each add tables are not all editing one file.
 
-The guild row moves verbatim and every existing lookup keeps its import.
+The guild row moves with every contract-pinned substring intact (the `回報` keyword, the unregistered register-first fallback, the eight taught `guild` commands) and every existing lookup keeps its import. Its prose is re-authored in the clerk's in-character 正體中文 voice rather than recited as a command manual, and it carries at most four keyword answers: the dialogue panel ships `DIALOGUE_MAX_CHOICES` entries and silently drops the rest, so a fifth authored keyword is one no player can ever press.
 
 `world/lore/` must not import `world/rules/`, so the dataclasses are imported the other way: `dialogue.py` imports the rows, not the reverse. That means the package needs the two dataclasses — and taking them from `dialogue.py`, a rules module, is backwards.
 
