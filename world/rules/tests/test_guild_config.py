@@ -429,8 +429,12 @@ class AssortmentRuleTests(unittest.TestCase):
             validate_assortment_configs(rows + [rows[0]])
 
     def test_assortments_root_must_be_a_list(self):
-        with self.assertRaises(GuildConfigError):
+        with self.assertRaises(GuildConfigError) as caught:
             validate_assortment_configs({"common_arms": {}})
+        self.assertTrue(
+            str(caught.exception).startswith("commerce.yaml: "),
+            "assortment rejections must name their rulebook source",
+        )
 
     def test_non_mapping_assortment_entry_is_rejected(self):
         with self.assertRaises(GuildConfigError):

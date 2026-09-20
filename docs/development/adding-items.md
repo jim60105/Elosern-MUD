@@ -18,7 +18,7 @@
 |---|---|---|
 | 身份＋外觀＋機制宣告 | `world/lore/items.py::ITEM_REGISTRY` | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
-| 商店成交值 | `world/rules/rulebook/guild_economy.yaml` | 各店 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨 |
+| 商店成交值 | `world/rules/rulebook/commerce.yaml` | 各分類 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨；商店時段也在同一檔 |
 | 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all-allies`／`all-enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
