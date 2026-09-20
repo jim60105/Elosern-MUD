@@ -10,9 +10,10 @@ input — an inline prefix is rejected by the Evennia test guard.
 - [ ] 1.2 Write Traditional Chinese keys and descriptions that read as a concealed forest
   settlement — no wall, gate, guard or marketplace anywhere in the text.
 - [ ] 1.3 Introduce a shared map assembly exporting both settlements' map data. `XYMAP_DATA_LIST`
-  is defined in `world/maps/altoria_capital.py` and only imported by `world/maps/bootstrap.py:19`,
-  so this is an assembly edit rather than an append to a bootstrap-native list. Repoint
-  `bootstrap.py` at it and verify `sync_grid()` spawns both settlements' rooms with
+  is defined in `world/maps/altoria_capital.py` and imported by `world/maps/bootstrap.py:19`,
+  `world/lore/wilderness_entry.py:180` (deferred) and `world/quests/definitions.py:16` (feeds
+  `KNOWN_GRID_MAP_KEYS`), so this is an assembly edit rather than an append to a bootstrap-native
+  list. Repoint `bootstrap.py` at it and verify `sync_grid()` spawns both settlements' rooms with
   `uv run --locked evennia test --settings test_settings.py --keepdb world.maps.tests`.
 
 ## 2. Geography registries
