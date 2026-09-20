@@ -584,10 +584,14 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         rules = self._validate(registry, document)
         self.assertIn(EquipmentModifierKey.WOODEN_CLUB, rules)
         self.assertEqual(rules[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 3)
-        from world.rules.guild_config import validate_shop_configs
-        economy_path = Path(__file__).parents[1] / "rulebook" / "guild_economy.yaml"
-        raw_economy = yaml.safe_load(economy_path.read_text(encoding="utf-8"))
-        configs = validate_shop_configs(raw_economy["shops"])
+        from world.rules.guild_config import (
+            validate_assortment_configs,
+            validate_shop_configs,
+        )
+        commerce_path = Path(__file__).parents[1] / "rulebook" / "commerce.yaml"
+        raw_commerce = yaml.safe_load(commerce_path.read_text(encoding="utf-8"))
+        assortment_offers = validate_assortment_configs(raw_commerce["assortments"])
+        configs = validate_shop_configs(raw_commerce["shops"], assortment_offers)
         self.assertFalse(
             any(offer.item_key == "wooden_club" for offer in configs["altoria_general_store"].offers)
         )
