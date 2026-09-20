@@ -125,6 +125,27 @@ class PlaceRegistryTests(unittest.TestCase):
         )
         self._assert_rejected(place)
 
+    def test_duplicate_shop_identity_across_places_is_rejected(self):
+        # Two places authoring one shop_key would silently overwrite each
+        # other in a plain dict; the derivation fails closed instead, naming
+        # both holders.
+        from world.lore.settlements.shops import _derive_shop_registry
+
+        duplicate = replace(
+            self.store,
+            key="t_second_shop_place",
+            service_id="t_second_shop_place",
+            authored_kwargs=(("shop_key", "altoria_general_store"),),
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_second_shop_place": duplicate}, clear=False
+        ):
+            with self.assertRaises(ValueError) as caught:
+                _derive_shop_registry()
+        message = str(caught.exception)
+        self.assertIn("altoria_general_store", message)
+        self.assertIn("t_second_shop_place", message)
+
 
 class DerivedShopRegistryTests(unittest.TestCase):
     """Shop identities are a view over the places that author a shop_key."""
