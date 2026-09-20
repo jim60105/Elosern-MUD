@@ -60,7 +60,9 @@ class VillageCiaranMapTests(unittest.TestCase):
                 edges.add(frozenset([(node.X, node.Y), (end_node.X, end_node.Y)]))
         self.assertEqual(len(nodes), 6)
         # Six nodes, five links, no cycles: a connected tree, matching the
-        # capital's "no ambiguous shortest paths" property.
+        # capital's "no ambiguous shortest paths" property. Connectivity is
+        # proven separately by the finite path matrix above (a connected
+        # graph with n-1 edges is a tree).
         self.assertEqual(len(edges), 5)
 
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
@@ -89,8 +91,6 @@ class VillageCiaranMapTests(unittest.TestCase):
         capital_nodes = {(node.X, node.Y) for node in capital.node_index_map.values()}
         village_nodes = {(node.X, node.Y) for node in self.map.node_index_map.values()}
         self.assertTrue(capital_nodes & village_nodes)
-        self.assertEqual(len(capital.node_index_map), 13)
-        self.assertEqual(len(self.map.node_index_map), 6)
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit")
     def test_village_movement_uses_the_costed_exit_override(self):

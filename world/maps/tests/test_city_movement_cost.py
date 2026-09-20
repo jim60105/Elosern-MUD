@@ -84,6 +84,21 @@ class SampleCityCostedExitTests(EvenniaTest):
         self.assertEqual(self.char1.location.key, "南大道")
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
+    def test_village_traversal_advances_clock_by_move_like_city_movement(self):
+        # map-movement-clock: the village's wildcard link override spawns
+        # CostedXYZExit for every intra-village link, so a step inside the
+        # village charges exactly the ordinary move cost a capital street
+        # step charges (ciaran-village-map scenario).
+        sync_grid()
+        entrance = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
+        self.char1.location = entrance
+        village_exit = [e for e in entrance.exits if e.destination.key == "村中廣場"][0]
+        self.assertIsInstance(village_exit, CostedXYZExit)
+        before = get_world_clock().tick
+        village_exit.at_traverse(self.char1, village_exit.destination)
+        self.assertEqual(self.char1.location.key, "村中廣場")
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
     @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
         sync_grid()
