@@ -378,3 +378,15 @@ shops:
     open_hour: 8
     close_hour: 20
     restock_hour: 6
+  - shop_key: altoria_forge
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+  - shop_key: altoria_eatery
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+  - shop_key: altoria_tailor
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
