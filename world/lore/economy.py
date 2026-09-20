@@ -54,6 +54,11 @@ PRICE_TABLE: dict[str, PriceEntry] = {
     "intimacy_tool": PriceEntry(
         "intimacy_tool", "情趣器具", 50, 20_000, "Wearable and usable intimacy devices."
     ),
+    "masterwork_gear": PriceEntry(
+        "masterwork_gear", "名匠裝備", 100, 500_000,
+        "Master-crafted gear priced by scarcity, not materials: ordinary "
+        "inside the maker's community, extraordinary outside it.",
+    ),
     "relic": PriceEntry(
         "relic", "信物", 999_999, None, "One-of-a-kind keepsake, never traded."
     ),
