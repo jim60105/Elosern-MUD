@@ -67,12 +67,12 @@ def live_anchor_entry():
 # read from the live registry rather than duplicated.
 CAPITAL_ANCHOR = live_anchor_entry().anchor_cell
 SOUTH_APPROACH = live_anchor_entry().approach_cell(live_anchor_entry().gate_for("n"))
-NORTH_APPROACH = live_anchor_entry().approach_cell(live_anchor_entry().gate_for("s"))
+EAST_APPROACH = live_anchor_entry().approach_cell(live_anchor_entry().gate_for("w"))
 
 
 class TerrainModelTests(unittest.TestCase):
     def test_functions_are_pure(self):
-        for x, y in ((0, 0), (60, 103), (123, 189), (223, 223)):
+        for x, y in ((0, 0), EAST_APPROACH, (123, 189), (223, 223)):
             self.assertEqual(region_for_coordinates(x, y), region_for_coordinates(x, y))
             self.assertEqual(terrain_description(x, y), terrain_description(x, y))
 
@@ -105,28 +105,28 @@ class TerrainModelTests(unittest.TestCase):
         cells = {entry.anchor_cell} | {
             entry.approach_cell(gate) for gate in entry.gates
         }
-        self.assertEqual(cells, {CAPITAL_ANCHOR, SOUTH_APPROACH, NORTH_APPROACH})
+        self.assertEqual(cells, {CAPITAL_ANCHOR, SOUTH_APPROACH, EAST_APPROACH})
         regions = {region_for_coordinates(x, y) for x, y in cells}
         # The settlement sits in one region, and that region is a registry row.
         self.assertEqual(len(regions), 1)
         self.assertIn(next(iter(regions)), live_region_registry())
 
     def test_description_always_matches_its_regions_variants(self):
-        for x, y in ((0, 0), (60, 103), (111, 50), (200, 200), (223, 223)):
+        for x, y in ((0, 0), EAST_APPROACH, (111, 50), (200, 200), (223, 223)):
             region = live_region_registry()[region_for_coordinates(x, y)]
             self.assertIn(terrain_description(x, y), region.terrain_flavor_zh)
 
     @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
-    def test_terrain_description_at_north_gate_approach_follows_the_registry(self):
-        # The north-gate approach cell -- the wilderness-side landing of the
-        # 北門 gate -- resolves through the formula AND the live registry row:
+    def test_terrain_description_at_east_gate_approach_follows_the_registry(self):
+        # The east-gate approach cell -- the wilderness-side landing of the
+        # 東門 gate -- resolves through the formula AND the live registry row:
         # the description is one of the region's variants, deterministic, and
         # the region is the settlement's own region (formula and entry agree).
-        description = terrain_description(*NORTH_APPROACH)
-        region_key = region_for_coordinates(*NORTH_APPROACH)
+        description = terrain_description(*EAST_APPROACH)
+        region_key = region_for_coordinates(*EAST_APPROACH)
         region = live_region_registry()[region_key]
         self.assertIn(description, region.terrain_flavor_zh)
-        self.assertEqual(description, terrain_description(*NORTH_APPROACH))
+        self.assertEqual(description, terrain_description(*EAST_APPROACH))
         self.assertEqual(region_key, region_for_coordinates(*CAPITAL_ANCHOR))
 
     def test_no_llm_or_random_dependency_in_source(self):
@@ -180,7 +180,7 @@ class MapProviderTests(EvenniaTest):
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
         self.assertFalse(self.provider.is_valid_coordinates(None, (58, 98)))
         self.assertTrue(self.provider.is_valid_coordinates(None, SOUTH_APPROACH))
-        self.assertTrue(self.provider.is_valid_coordinates(None, NORTH_APPROACH))
+        self.assertTrue(self.provider.is_valid_coordinates(None, EAST_APPROACH))
 
     @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
     def test_registry_patches_change_footprint_validity_without_patching_the_provider(self):
@@ -234,7 +234,7 @@ class MapProviderTests(EvenniaTest):
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_get_location_name_matches_region_registry(self):
-        for x, y in ((60, 103), (111, 189), (200, 30), (0, 220)):
+        for x, y in (EAST_APPROACH, (111, 189), (200, 30), (0, 220)):
             expected = live_region_registry()[region_for_coordinates(x, y)].display_name_zh
             self.assertEqual(self.provider.get_location_name((x, y)), expected)
 
@@ -246,12 +246,12 @@ class MapProviderTests(EvenniaTest):
         )
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=self.provider)
-        ok = enter_wilderness(self.char1, coordinates=NORTH_APPROACH, name=WILDERNESS_NAME)
+        ok = enter_wilderness(self.char1, coordinates=EAST_APPROACH, name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
         self.assertIsInstance(room, TerrainRoom)
-        self.assertEqual(room.ndb.active_desc, terrain_description(*NORTH_APPROACH))
-        self.assertEqual(room.scene_archetype, region_for_coordinates(*NORTH_APPROACH))
+        self.assertEqual(room.ndb.active_desc, terrain_description(*EAST_APPROACH))
+        self.assertEqual(room.scene_archetype, region_for_coordinates(*EAST_APPROACH))
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_enter_wilderness_refuses_a_footprint_cell(self):
@@ -276,9 +276,9 @@ class MapProviderTests(EvenniaTest):
 
         room = create_object(TerrainRoom, key="scriptless")
         self.assertIsNone(room.wilderness)
-        self.provider.at_prepare_room(NORTH_APPROACH, None, room)
-        self.assertEqual(room.scene_archetype, region_for_coordinates(*NORTH_APPROACH))
-        self.assertEqual(room.ndb.active_desc, _terrain_description(*NORTH_APPROACH))
+        self.provider.at_prepare_room(EAST_APPROACH, None, room)
+        self.assertEqual(room.scene_archetype, region_for_coordinates(*EAST_APPROACH))
+        self.assertEqual(room.ndb.active_desc, _terrain_description(*EAST_APPROACH))
         self.assertEqual(Monster.objects.all().count(), 0)
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
@@ -308,14 +308,14 @@ class MapProviderTests(EvenniaTest):
         for exit_obj in room.exits:
             self.assertFalse(self._locks_allow(exit_obj, "traverse"))
 
-        # The NORTH approach opens only its own "south" exit -- never the other
+        # The EAST approach opens only its own "west" exit -- never the other
         # gate's.
         room_b = self._eight_exits(create_object(TerrainRoom, key="approach-c"))
         for exit_obj in room_b.exits:
             exit_obj.locks.add("traverse:false();view:false()")
-        self.provider.at_prepare_room(NORTH_APPROACH, None, room_b)
+        self.provider.at_prepare_room(EAST_APPROACH, None, room_b)
         by_key = {exit_obj.key: exit_obj for exit_obj in room_b.exits}
-        self.assertTrue(self._locks_allow(by_key[LONG_DIRECTIONS["s"]], "traverse"))
+        self.assertTrue(self._locks_allow(by_key[LONG_DIRECTIONS["w"]], "traverse"))
         self.assertFalse(self._locks_allow(by_key[LONG_DIRECTIONS["n"]], "traverse"))
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
@@ -364,13 +364,13 @@ class MapProviderTests(EvenniaTest):
         from typeclasses.monsters import Monster
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=self.provider)
-        enter_wilderness(self.char1, coordinates=NORTH_APPROACH, name=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=EAST_APPROACH, name=WILDERNESS_NAME)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         monsters = [
-            obj for obj in script.get_objs_at_coordinates(NORTH_APPROACH) if isinstance(obj, Monster)
+            obj for obj in script.get_objs_at_coordinates(EAST_APPROACH) if isinstance(obj, Monster)
         ]
         self.assertEqual(len(monsters), 1)
-        nx, ny = NORTH_APPROACH
+        nx, ny = EAST_APPROACH
         self.assertEqual(monsters[0].db.population_key, f"wilderness:{nx}:{ny}")
         self.assertIs(monsters[0].location, self.char1.location)
 
@@ -384,15 +384,15 @@ class MapProviderTests(EvenniaTest):
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=self.provider)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        # Enter at the north-gate approach in western_hills_valleys.
-        enter_wilderness(self.char1, coordinates=NORTH_APPROACH, name=WILDERNESS_NAME)
+        # Enter at the east-gate approach in western_hills_valleys.
+        enter_wilderness(self.char1, coordinates=EAST_APPROACH, name=WILDERNESS_NAME)
         room_a = self.char1.location
-        self.assertEqual(room_a.scene_archetype, region_for_coordinates(*NORTH_APPROACH))
+        self.assertEqual(room_a.scene_archetype, region_for_coordinates(*EAST_APPROACH))
         # Leave the wilderness; then force the room back into the reuse pool
         # (the sanctioned "inspect unused_rooms directly" route) so the
         # next entry is guaranteed to be handed this exact object again.
         self.char1.move_to(self.room1)
-        del script.db.rooms[NORTH_APPROACH]
+        del script.db.rooms[EAST_APPROACH]
         del room_a.ndb.active_coordinates
         script.db.unused_rooms.append(room_a)
         # Re-enter at a coordinate in a different region: the pooled room is

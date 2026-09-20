@@ -58,6 +58,19 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.synthetic_data import make_item, synthetic_registries
 
 
+def _gate_row():
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    keys = sorted(registry)
+    if not keys:
+        raise AssertionError("no city gate row exists")
+    return registry[keys[0]]
+
+
 class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -72,9 +85,7 @@ class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         sync_grid()
         from typeclasses.rooms import GridRoom
 
-        from world.maps.bootstrap import SOUTH_GATE_XYZ
-
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=_gate_row().gate_xyz).first()
         self.char1.location = self.south_gate
 
     def test_map_command_off_grid_zh_tw(self):

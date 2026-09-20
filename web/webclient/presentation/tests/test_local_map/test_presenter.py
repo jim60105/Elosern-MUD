@@ -7,10 +7,10 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS
 from web.webclient.presentation.registry import PanelUnavailableError, build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import _T_MAP_KEY, _T_PLAZA_XYZ, _context, _t_grid_id
+from ._support import SOUTH_GATE_XYZ, _T_MAP_KEY, _T_PLAZA_XYZ, _context, _t_grid_id
 
 
 
@@ -41,7 +41,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
         payload = self._registry().render("local_map", _context(actor))
         self.assertTrue(payload["available"])
         self.assertEqual(payload["layer"], "grid")
-        self.assertEqual(payload["current_node"], _t_grid_id(2, 0))
+        self.assertEqual(payload["current_node"], _t_grid_id(*SOUTH_GATE_XYZ[:2]))
         current = next(node for node in payload["nodes"] if node["current"])
         self.assertEqual(current["visibility"], "current")
         # The payload includes at least one visible unvisited neighbor.
@@ -272,23 +272,29 @@ class LocalMapPresenterTests(EvenniaTestCase):
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))
         valid = {
-            _t_grid_id(2, 0),
-            # The 南門 room carries its own registered gate exit after
-            # wilderness-anchor-footprint: its south approach cell renders as
-            # a gate node here (a known identity, not an unknown grid node).
+            _t_grid_id(*SOUTH_GATE_XYZ[:2]),
             "wild:elosern:60:97",
-            _t_grid_id(2, 1),
+            "wild:elosern:63:100",
             _t_grid_id(1, 1),
+            _t_grid_id(2, 1),
             _t_grid_id(3, 1),
-            _t_grid_id(0, 2),
-            _t_grid_id(1, 2),
+            _t_grid_id(4, 1),
+            _t_grid_id(5, 1),
             _t_grid_id(2, 2),
             _t_grid_id(3, 2),
-            _t_grid_id(4, 2),
-            _t_grid_id(2, 3),
             _t_grid_id(1, 3),
+            _t_grid_id(2, 3),
             _t_grid_id(3, 3),
+            _t_grid_id(4, 3),
+            _t_grid_id(5, 3),
+            _t_grid_id(6, 3),
             _t_grid_id(2, 4),
+            _t_grid_id(3, 4),
+            _t_grid_id(4, 4),
+            _t_grid_id(3, 5),
+            _t_grid_id(4, 5),
+            _t_grid_id(5, 5),
+            _t_grid_id(4, 6),
         }
         for node in payload["nodes"]:
             self.assertIn(node["id"], valid)

@@ -7,10 +7,10 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS, MAX_LEGEND, MAX_STRING_CODE_POINTS
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import _T_MAP_KEY, _context, _t_anchor_display, _t_grid_id, _t_region_display_for
+from ._support import EAST_GATE_XYZ, SOUTH_GATE_XYZ, _T_MAP_KEY, _context, _t_anchor_display, _t_grid_id, _t_region_display_for
 
 
 
@@ -23,16 +23,16 @@ class LocalMapWildernessTests(EvenniaTestCase):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        cls._north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        cls._gate = [e for e in cls._north_gate.exits if e.key == "荒野"][0]
+        cls._east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
+        cls._gate = [e for e in cls._east_gate.exits if e.key == "荒野"][0]
 
     def setUp(self):
         self.room1 = create_object(Room, key="Room1")
         self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.north_gate = GridRoom.objects.get(id=self._north_gate.id)
-        self.gate = [e for e in self.north_gate.exits if e.key == "荒野"][0]
+        self.east_gate = GridRoom.objects.get(id=self._east_gate.id)
+        self.gate = [e for e in self.east_gate.exits if e.key == "荒野"][0]
 
     def _registry(self):
         return build_production_registry()
@@ -41,7 +41,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
     def test_wilderness_payload_uses_provider_bounds_and_terrain_labels(self):
         from typeclasses.rooms import TerrainRoom
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
@@ -64,7 +64,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
 
     @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
     def test_wilderness_legend_appends_scale_note_after_the_states(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertEqual(payload["layer"], "wilderness")
         # The four state labels keep their exact order/positions, and the
@@ -83,7 +83,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
 
     @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
     def test_scale_note_figure_follows_the_provider_module_attribute(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         with patch("world.maps.wilderness_provider.WILDERNESS_KM_PER_CELL", 42):
             payload = self._registry().render("local_map", _context(self.char1))
         self.assertEqual(payload["layer"], "wilderness")
@@ -105,15 +105,15 @@ class LocalMapWildernessTests(EvenniaTestCase):
     def test_wilderness_adjacent_nodes_carry_move_actions_with_canonical_destinations(self):
         from world.maps.wilderness_destination import resolve_wilderness_destination
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         room = self.char1.location
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertEqual(payload["layer"], "wilderness")
         current = payload["current_node"]
         moves = [node for node in payload["nodes"] if node["action"] is not None]
-        # At the north-gate approach (60, 103) six directions are actionable:
-        # the gate (s) plus five ordinary steps. The two directions facing the
-        # anchor footprint (se, sw -- cells (61, 102) and (59, 102)) are
+        # At the east-gate approach (63, 100) six directions are actionable:
+        # the gate (w) plus five ordinary steps. The two directions facing the
+        # anchor footprint (nw, sw -- cells (62, 101) and (62, 99)) are
         # refused by the provider and render nothing (wilderness-anchor-
         # footprint).
         self.assertEqual(len(moves), 6)
@@ -126,7 +126,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
             if edge["source"] == current
         }
         self.assertEqual(len(directions), 6)
-        self.assertNotIn("se", directions)
+        self.assertNotIn("nw", directions)
         self.assertNotIn("sw", directions)
         for direction, node_id in directions.items():
             node = next(node for node in payload["nodes"] if node["id"] == node_id)
@@ -138,22 +138,22 @@ class LocalMapWildernessTests(EvenniaTestCase):
                 if edge["source"] == current and edge["label"] == direction
             )
             self.assertTrue(edge["traversable"], direction)
-        # The gateway south node advertises the grid arrival node, not a wild cell.
-        south_node_id = directions["s"]
-        south_node = next(node for node in payload["nodes"] if node["id"] == south_node_id)
-        self.assertEqual(south_node["action"]["destination"], _t_grid_id(2, 4))
+        # The gateway west node advertises the grid arrival node, not a wild cell.
+        west_node_id = directions["w"]
+        west_node = next(node for node in payload["nodes"] if node["id"] == west_node_id)
+        self.assertEqual(west_node["action"]["destination"], _t_grid_id(6, 3))
 
     @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
     def test_locked_wilderness_node_stays_inert(self):
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         room = self.char1.location
-        south_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "south"][0]
-        south_exit.locks.add("traverse:false()")
+        west_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "west"][0]
+        west_exit.locks.add("traverse:false()")
         payload = self._registry().render("local_map", _context(self.char1))
         current = payload["current_node"]
         edge = next(
             edge for edge in payload["edges"]
-            if edge["source"] == current and edge["label"] == "s"
+            if edge["source"] == current and edge["label"] == "w"
         )
         node = next(node for node in payload["nodes"] if node["id"] == edge["destination"])
         self.assertIsNone(node["action"])
@@ -164,18 +164,18 @@ class LocalMapWildernessTests(EvenniaTestCase):
             5,
         )
 
-    def test_aliased_unrelated_exit_does_not_hijack_the_south_action(self):
+    def test_aliased_unrelated_exit_does_not_hijack_the_west_action(self):
         from typeclasses.exits import WildernessReturnExit
 
-        self.gate.at_traverse(self.char1, self.north_gate)
+        self.gate.at_traverse(self.char1, self.east_gate)
         room = self.char1.location
-        south_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "south"][0]
-        # An unrelated exit aliased "s" must never replace the real south
+        west_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "west"][0]
+        # An unrelated exit aliased "w" must never replace the real west
         # exit in the move descriptor (direction mapping is key-based only).
         extra = create_object(
             WildernessReturnExit,
             key="密道",
-            aliases=["s"],
+            aliases=["w"],
             location=room,
             destination=room,
         )
@@ -183,10 +183,10 @@ class LocalMapWildernessTests(EvenniaTestCase):
         current = payload["current_node"]
         edge = next(
             edge for edge in payload["edges"]
-            if edge["source"] == current and edge["label"] == "s"
+            if edge["source"] == current and edge["label"] == "w"
         )
         node = next(node for node in payload["nodes"] if node["id"] == edge["destination"])
-        self.assertEqual(node["action"]["exit_ref"], str(int(south_exit.id)))
+        self.assertEqual(node["action"]["exit_ref"], str(int(west_exit.id)))
         self.assertNotEqual(node["action"]["exit_ref"], str(int(extra.id)))
 
 
@@ -203,7 +203,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         sync_grid()
         sync_wilderness()
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
 
     def _registry(self):
         return build_production_registry()
@@ -218,18 +218,18 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_only_stood_on_gateways_are_remembered_in_the_wilderness(self):
-        # Stand on the north gate's approach cell (records it honestly, the
+        # Stand on the east gate's approach cell (records it honestly, the
         # way arrival recording already works), then walk far enough away
         # that it drops out of the drawn 3x3 field of view.
-        self._at_wild((60, 103))
-        self._at_wild((70, 103))
+        self._at_wild((63, 100))
+        self._at_wild((73, 100))
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         self.assertEqual(len(remembered), 1)
         node = remembered[0]
-        self.assertEqual(node["id"], "wild:elosern:60:103")
-        self.assertEqual((node["x"], node["y"]), (60, 103))
+        self.assertEqual(node["id"], "wild:elosern:63:100")
+        self.assertEqual((node["x"], node["y"]), (63, 100))
         self.assertEqual(node["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
@@ -240,9 +240,9 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # The gate room (grid side) was visited, but the approach cell (wild
         # side) never was -- design D4: an honest "you don't know where in
         # the wilds this comes out."
-        self.char1.location = self.north_gate
+        self.char1.location = self.east_gate
         record_arrival(self.char1)
-        self._at_wild((70, 103))
+        self._at_wild((73, 100))
         payload = self._registry().render("local_map", _context(self.char1))
         remembered_ids = {node["id"] for node in payload["nodes"] if node["visibility"] == "remembered"}
         self.assertEqual(remembered_ids, set())
@@ -264,12 +264,12 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # through the gate leaves both the approach cell and the gate room
         # in the knowledge record.
         gate = [
-            exit_obj for exit_obj in self.north_gate.exits if exit_obj.key == "荒野"
+            exit_obj for exit_obj in self.east_gate.exits if exit_obj.key == "荒野"
         ][0]
-        self.char1.location = self.north_gate
+        self.char1.location = self.east_gate
         record_arrival(self.char1)
-        gate.at_traverse(self.char1, self.north_gate)  # now at (60, 103)
-        self._at_wild((70, 103))  # walk far away, keeping both memories
+        gate.at_traverse(self.char1, self.east_gate)  # now at (63, 100)
+        self._at_wild((73, 100))  # walk far away, keeping both memories
 
         wild_payload = self._registry().render("local_map", _context(self.char1))
         self.assertEqual(wild_payload["layer"], "wilderness")
@@ -300,13 +300,13 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     @covers_requirement("webclient-local-map::the-map-surfaces-state-a-place-name-only-where-it-adds-information")
     def test_an_in_view_gate_approach_cell_names_the_place_behind_it(self):
         # FLAGGED/STRIKEABLE wave 6 (design D8a): standing one cell from the
-        # north gate's approach cell, that in-view neighbour is named for
+        # east gate's approach cell, that in-view neighbour is named for
         # what it leads to, not the region it stands on -- while its ID,
         # action, and edge stay exactly what they already were.
-        self._at_wild((60, 104))
+        self._at_wild((64, 100))
         payload = self._registry().render("local_map", _context(self.char1))
         neighbor = next(
-            node for node in payload["nodes"] if node["id"] == "wild:elosern:60:103"
+            node for node in payload["nodes"] if node["id"] == "wild:elosern:63:100"
         )
         self.assertEqual(neighbor["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertEqual(neighbor["visibility"], "visible_unvisited")
@@ -315,18 +315,18 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             for edge in payload["edges"]
             if edge["source"] == payload["current_node"] and edge["destination"] == neighbor["id"]
         )
-        self.assertEqual(edge["label"], "s")
+        self.assertEqual(edge["label"], "w")
 
     @covers_requirement("webclient-local-map::the-map-surfaces-state-a-place-name-only-where-it-adds-information")
     def test_a_cell_in_a_different_region_still_says_so(self):
         # A same-region in-view neighbour still gets the plain region label
         # (only registered gate approach cells get the far-side name).
-        self._at_wild((70, 103))
+        self._at_wild((73, 100))
         payload = self._registry().render("local_map", _context(self.char1))
         neighbor = next(
-            node for node in payload["nodes"] if node["id"] == "wild:elosern:71:103"
+            node for node in payload["nodes"] if node["id"] == "wild:elosern:74:100"
         )
-        self.assertEqual(neighbor["label"], _t_region_display_for(60, 103))
+        self.assertEqual(neighbor["label"], _t_region_display_for(73, 100))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
@@ -338,8 +338,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # identical anchor-name chip, reproducing this change's own target
         # defect.
         self._at_wild((60, 97))  # 南門's approach cell
-        self._at_wild((60, 103))  # 北門's approach cell
-        self._at_wild((90, 103))  # far from both
+        self._at_wild((63, 100))  # 東門's approach cell
+        self._at_wild((90, 100))  # far from both
         payload = self._registry().render("local_map", _context(self.char1))
         remembered = {
             node["id"]: node["label"]
@@ -350,7 +350,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             remembered,
             {
                 "wild:elosern:60:97": f"{_t_anchor_display(_T_MAP_KEY)}（南門）",
-                "wild:elosern:60:103": f"{_t_anchor_display(_T_MAP_KEY)}（北門）",
+                "wild:elosern:63:100": f"{_t_anchor_display(_T_MAP_KEY)}（東門）",
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)

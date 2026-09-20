@@ -6,9 +6,11 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.lore.sync import sync_all
+
+SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
 
 
 class SampleCityWalkthroughTests(EvenniaTest):
@@ -34,9 +36,14 @@ class SampleCityWalkthroughTests(EvenniaTest):
             for exit_obj in south_gate.exits
             if exit_obj.destination.key == "南大道"
         )
-        plaza = next(
+        north_street = next(
             exit_obj.destination
             for exit_obj in south_street.exits
+            if exit_obj.destination.key == "大道北段"
+        )
+        plaza = next(
+            exit_obj.destination
+            for exit_obj in north_street.exits
             if exit_obj.destination.key == "中央廣場"
         )
         self.assertIsInstance(plaza, AnchorRoom)
@@ -57,5 +64,5 @@ class SampleCityWalkthroughTests(EvenniaTest):
                     seen.add(room)
                     frontier.append(room)
 
-        self.assertEqual(len(seen), 13)
+        self.assertEqual(len(seen), 21)
         self.assertEqual(len([room for room in seen if isinstance(room, AnchorRoom)]), 1)
