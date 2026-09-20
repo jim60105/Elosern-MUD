@@ -21,7 +21,7 @@ from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.lore.settlements.assortments import AssortmentDefinition
-from world.lore.shops import ShopDefinition
+from world.lore.settlements.shops import ShopDefinition
 from world.rules.clock import WorldClock
 from world.rules.economy import (
     TradeError,
