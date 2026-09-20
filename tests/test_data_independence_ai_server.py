@@ -42,6 +42,32 @@ MIGRATED_FILES = (
 )
 
 
+#: Oversized modules later split into same-named packages (server.conf test
+#: split). The ledger/seed checks stay pinned on the original flat paths; the
+#: zero-findings scan below expands each split path onto its package slices so
+#: the guarantee covers every slice verbatim.
+_SPLIT_PACKAGES = (
+    "test_option_proposal_service",
+)
+
+
+def _finding_scan_files() -> tuple[str, ...]:
+    """Every manifest file to scan, following split modules into slices."""
+    files: list[str] = []
+    for rel in MIGRATED_FILES:
+        name = rel.rsplit("/", 1)[-1][: -len(".py")]
+        if name in _SPLIT_PACKAGES:
+            package = (REPO_ROOT / rel).with_suffix("")
+            files.extend(
+                str(path.relative_to(REPO_ROOT))
+                for path in sorted(package.rglob("*.py"))
+                if "__pycache__" not in path.parts
+            )
+        else:
+            files.append(rel)
+    return tuple(files)
+
+
 class AiServerTestDataMigrationContractTests(DataIndependenceContractMixin, unittest.TestCase):
 
     @covers_requirement(
@@ -58,7 +84,7 @@ class AiServerTestDataMigrationContractTests(DataIndependenceContractMixin, unit
         "synthetic-fixtures"
     )
     def test_migrated_files_carry_zero_findings(self):
-        self.assert_zero_findings(MIGRATED_FILES)
+        self.assert_zero_findings(_finding_scan_files())
 
     def test_no_violation_naming_a_manifest_file(self):
         self.assert_no_violation_naming_manifest(MIGRATED_FILES)
