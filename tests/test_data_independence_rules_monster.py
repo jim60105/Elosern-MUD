@@ -45,6 +45,7 @@ MIGRATED_FILES = (
 #: the zero-findings guarantee covers every slice verbatim.
 _SPLIT_PACKAGES = (
     "test_defeat_aftermath_core",
+    "test_defeat_aftermath_violation",
 )
 
 

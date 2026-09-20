@@ -53,6 +53,7 @@ MIGRATED_FILES = (
 #: the guarantee covers every slice verbatim.
 _SPLIT_PACKAGES = (
     "test_character_creation",
+    "test_progression",
 )
 
 
