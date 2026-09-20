@@ -30,6 +30,15 @@ class AssortmentDefinition:
 # is deliberately non-overlapping; the general store references sundries
 # alone, and each specialist references exactly one other assortment
 # (altoria-trading-places §6.1).
+#
+# The four elven-craft assortments serve 暗影谷村 (design §6.2, §10 change 7):
+# each villager's home carries one shelf of what its host happens to make or
+# collect. They share keys with the capital where the world document
+# requires it — ``elven_spider_silk`` and ``elven_candied_blossom`` are also
+# capital goods, offered in the village at everyday prices. Two shops
+# offering one key through two different assortments is the case this model
+# exists to serve; only one shop referencing two overlapping assortments is
+# rejected (design §4.1).
 ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
     definition.key: definition
     for definition in (
@@ -77,6 +86,35 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "camp_ward_kit", "goblin_ear", "slime_residue",
                 "earth_drake_scale", "troll_fang", "miners_bracing_broth",
                 "beastfolk_herbal_salve", "passion_draught", "spirit_dew",
+            ),
+        ),
+        AssortmentDefinition(
+            key="elven_crafted_arms",
+            display_name_zh="精靈兵刃",
+            item_keys=(
+                "shadow_blade", "shadow_blade_echo",
+            ),
+        ),
+        AssortmentDefinition(
+            key="elven_attire",
+            display_name_zh="精靈衣飾",
+            item_keys=(
+                "dark_elf_kimono", "dark_elf_ninja_garb",
+                "elven_traditional_robe", "elven_forest_veil",
+            ),
+        ),
+        AssortmentDefinition(
+            key="elven_fare",
+            display_name_zh="精靈飯食",
+            item_keys=(
+                "elven_candied_blossom",
+            ),
+        ),
+        AssortmentDefinition(
+            key="elven_sundries",
+            display_name_zh="精靈雜貨",
+            item_keys=(
+                "elven_spider_silk", "crescent_earring",
             ),
         ),
     )
