@@ -139,9 +139,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
-      - name: Enable Corepack and install locked pnpm toolchain
+      - name: Install locked pnpm toolchain
         run: |
-          corepack enable
+          npm install --global pnpm@12.5.1
           pnpm install --frozen-lockfile
 
       - name: Prepare Evennia runtime directories
@@ -215,8 +215,9 @@ jobs:
       # (webclient-vue-01-foundation, design D2).
       - name: Build Vue dist in browser workspaces
         run: |
-          (cd w-a && corepack enable && pnpm install --frozen-lockfile && pnpm run build)
-          (cd w-b && corepack enable && pnpm install --frozen-lockfile && pnpm run build)
+          npm install --global pnpm@12.5.1
+          (cd w-a && pnpm install --frozen-lockfile && pnpm run build)
+          (cd w-b && pnpm install --frozen-lockfile && pnpm run build)
 
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
@@ -304,9 +305,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
-      - name: Enable Corepack and install locked pnpm toolchain
+      - name: Install locked pnpm toolchain
         run: |
-          corepack enable
+          npm install --global pnpm@12.5.1
           pnpm install --frozen-lockfile
 
       - name: Build Vue application with Vite
@@ -340,8 +341,8 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Install locked pnpm toolchain
+        run: npm install --global pnpm@12.5.1
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.0
