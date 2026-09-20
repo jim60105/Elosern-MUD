@@ -76,9 +76,8 @@ class PlaceRegistryTests(unittest.TestCase):
         "settlement-place-registry::a-settlement-declares-its-archetype-and-coordinate-space"
     )
     def test_shipped_places_transcribe_the_bootstrap_interiors(self):
-        # Transcribed from the bootstrap module constants; the place row now
-        # carries the interior identity that sync_service_interiors reads from
-        # module constants until place-driven-service-sync lands.
+        # Transcribed from the bootstrap module constants these rows replaced:
+        # the place row is now the only source sync_service_interiors reads.
         self.assertEqual(self.guild.room_name_zh, "阿爾托利亞冒險者公會大廳")
         self.assertEqual(self.guild.exterior_xy, (3, 1))  # GUILD_HALL_EXTERIOR_XYZ
         self.assertEqual(self.store.room_name_zh, "阿爾托利亞雜貨店")
@@ -86,9 +85,9 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_shipped_hosts_author_human_race_and_default_sex(self):
         # host_race/host_subrace/host_sex are creation-time authored identity,
-        # carried now and read by place-driven-service-sync later. The two
+        # read by sync_service_content when it creates the host. The two
         # pre-existing hosts are authored the safe way (design risk note):
-        # None subrace, matching the human baseline today's sync applies.
+        # None subrace, matching the human baseline the sync applies.
         for place in (self.guild, self.store):
             self.assertEqual(place.host_race, "human")
             self.assertIsNone(place.host_subrace)

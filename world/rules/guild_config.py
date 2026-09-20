@@ -441,21 +441,6 @@ def _scaled_price(base_copper: int, scale: int) -> int:
     return (base_copper * scale + 50) // 100
 
 
-def _authoring_place(shop_key: str):
-    """The place registry row that authors ``shop_key`` (design §3.2).
-
-    SHOP_REGISTRY is a projection of PLACE_REGISTRY: every shop identity is
-    authored on exactly one place. A commerce row whose shop_key no place
-    authors is unreachable in production and fails closed here, so a
-    place-level operation (scale, additions, removals) always has a row to
-    resolve against.
-    """
-    for place in PLACE_REGISTRY.values():
-        if dict(place.authored_kwargs).get("shop_key") == shop_key:
-            return place
-    raise _commerce_error(f"shops.{shop_key} is authored by no place registry row")
-
-
 def _resolve_shop_scale(
     shop_key: str, entry: Mapping[str, Any], place: Any, price_scales: Mapping[str, int]
 ) -> int:
@@ -767,7 +752,7 @@ def validate_shop_configs(
                 )
         if open_hour == close_hour:
             raise _commerce_error(f"shops.{shop_key} open and close hours cannot be equal")
-        place = _authoring_place(shop_key)
+        place = _place_for_shop(shop_key)
         scale = _resolve_shop_scale(shop_key, entry, place, price_scales)
         overrides = _parse_shop_overrides(entry, shop_key, place)
         offers = _resolve_shop_offers(
@@ -777,7 +762,7 @@ def validate_shop_configs(
             _validate_resolved_rule(shop_key, place, rule)
         configs[shop_key] = ShopConfig(
             shop_key=shop_key,
-            display_name_zh=_place_for_shop(shop_key).room_name_zh,
+            display_name_zh=place.room_name_zh,
             open_hour=open_hour,
             close_hour=close_hour,
             restock_hour=restock_hour,
@@ -899,13 +884,15 @@ def _require_place_kwargs(place: Any) -> dict[str, str]:
 
 
 def _place_for_shop(shop_key: str):
-    """Return the place row authoring this shop identity.
+    """Return the place row authoring this shop identity (design §3.2).
 
     A shop identity is authored on exactly one place (the derived
     ``SHOP_REGISTRY`` fails a duplicate at load), so the first match is the
-    owning place. ``validate_shop_configs`` has already rejected any
-    ``shop_key`` outside ``SHOP_REGISTRY``, so a miss here is an internal
-    load invariant violating fail-closed rather than a user error.
+    owning place, and every place-level operation (display name, scale,
+    additions, removals) always has a row to resolve against.
+    ``validate_shop_configs`` has already rejected any ``shop_key`` outside
+    ``SHOP_REGISTRY``, so a miss here is an internal load invariant violating
+    fail-closed rather than a user error.
     """
     for place in PLACE_REGISTRY.values():
         if dict(place.authored_kwargs).get("shop_key") == shop_key:

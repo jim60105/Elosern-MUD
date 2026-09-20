@@ -8,9 +8,9 @@ component identity kwargs, and the assortments the place sells. Nothing a
 place declares is declared anywhere else.
 
 ``host_race`` / ``host_subrace`` / ``host_sex`` are creation-time authored
-identity carried by the record now but not read until
-``place-driven-service-sync`` moves interior and host creation onto the
-registry (spec documents this seam).
+identity: ``sync_service_content`` writes them once when it creates the host
+and never rewrites them on a later sync, so an authored edit takes effect
+through roster convergence rather than a backfill.
 """
 
 from dataclasses import dataclass

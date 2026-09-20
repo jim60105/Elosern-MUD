@@ -407,7 +407,7 @@ without mutating the shipped registries.
 - **THEN** it raises a named `ValueError`
 
 #### Scenario: The shipped registries load clean
-- **WHEN** `world.lore.shops` and `world.lore.guild` are imported
+- **WHEN** `world.lore.settlements.shops` and `world.lore.guild` are imported
 - **THEN** every shipped row passes name, title, and cross-registry uniqueness validation
 
 ### Requirement: Guild service hosts reuse by service anchor and never rename
