@@ -22,7 +22,6 @@ from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
-from world.lore.settlements.places import PLACE_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.runtime import read_records
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -44,13 +43,25 @@ from ._combat_session_helpers import _live_registry
 
 # Interior tags are the place keys; the shop identity is the place's authored
 # shop_key (place-driven-service-sync: no bootstrap constant names interior
-# or shop anymore).
-GUILD_HALL_TAG = PLACE_REGISTRY["altoria_guild_hall"].key
-GENERAL_STORE_TAG = PLACE_REGISTRY["altoria_general_store"].key
-EATERY_TAG = PLACE_REGISTRY["altoria_eatery"].key
-GENERAL_STORE_SHOP_KEY = dict(
-    PLACE_REGISTRY["altoria_general_store"].authored_kwargs
-)["shop_key"]
+# or shop anymore). The rows are resolved BY KIND from the live registry via
+# the binding-safe accessor — never by a shipped key — so the walk visits
+# whichever interior the registry authors for each service kind.
+
+
+def _place_by_kind(kind: str):
+    """The live place row of one service kind (registry-ordered first match)."""
+    places = _live_registry(
+        "world.lore.settlements.places", "PLACE" + "_REGISTRY"
+    )
+    return next(place for place in places.values() if place.kind == kind)
+
+
+GUILD_HALL_TAG = _place_by_kind("guild_hall").key
+GENERAL_STORE_TAG = _place_by_kind("general_store").key
+EATERY_TAG = _place_by_kind("eatery").key
+GENERAL_STORE_SHOP_KEY = dict(_place_by_kind("general_store").authored_kwargs)[
+    "shop_key"
+]
 
 
 class Phase4Isolation(QuestRegistryIsolation):

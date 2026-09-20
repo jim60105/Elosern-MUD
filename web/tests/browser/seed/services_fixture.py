@@ -26,12 +26,12 @@ def _services_fixture(character) -> None:
         SHIPPED_MEAL_KEY,
         SHIPPED_POTION_KEY,
         SHIPPED_WEAPON_KEY,
+        live_place_by_kind,
     )
     from world.maps.bootstrap import (
         sync_grid,
         sync_service_interiors,
     )
-    from world.lore.settlements.places import PLACE_REGISTRY
     from world.quests.catalog import register_catalog
     from world.rules.clock import get_world_clock
     from world.rules.guild import register_adventurer
@@ -55,8 +55,14 @@ def _services_fixture(character) -> None:
     register_catalog_offers(catalog)
     sync_guild_economy()
 
-    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
-    stores = search_object_by_tag(PLACE_REGISTRY["altoria_general_store"].key)
+    # The two service rooms are resolved by kind from the CURRENT live
+    # registry (the harness probe), never by a shipped row name: under the
+    # shipped boot this branch reaches the capital's hall/store exactly as
+    # before.
+    hall_place = live_place_by_kind("guild_hall")
+    store_place = live_place_by_kind("general_store")
+    halls = search_object_by_tag(hall_place.key) if hall_place else []
+    stores = search_object_by_tag(store_place.key) if store_place else []
     hall = halls[0] if halls else None
     store = stores[0] if stores else None
     staff = None

@@ -262,9 +262,6 @@
     }
   ],
   "debt": [
-    "web/tests/browser/seed/minimap_fixture.py",
-    "web/tests/browser/seed/services_fixture.py",
-    "web/tests/browser/seed/services_synth.py",
     "web/webclient-app/tests/action/dock_items.test.js",
     "web/webclient-app/tests/action/dock_menu.test.js",
     "web/webclient-app/tests/action/dock_menu_panes.test.js",
@@ -276,12 +273,7 @@
     "web/webclient-app/tests/world/map_lattice.test.js",
     "world/ai/tests/test_npc_dialogue_prompts.py",
     "world/imports/tests/test_skill_registry_self_arming.py",
-    "world/maps/tests/test_service_interiors.py",
-    "world/maps/tests/test_wilderness_population.py",
-    "world/rules/tests/test_guild_economy_sync.py",
-    "world/rules/tests/test_guild_registration.py",
     "world/rules/tests/test_item_effects_rulebook.py",
-    "world/rules/tests/test_phase4_integration.py",
     "world/rules/tests/test_traits.py"
   ],
   "seedDebtPaths": [

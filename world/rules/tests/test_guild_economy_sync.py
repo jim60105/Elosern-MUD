@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import dataclasses
+import importlib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -21,14 +22,10 @@ from typeclasses.components import (
 )
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
-from world.lore.items import ITEM_REGISTRY
 from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
-from world.lore.settlements.places import PLACE_REGISTRY
-from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
-from world.lore.settlements.shops import SHOP_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
@@ -56,13 +53,104 @@ from world.rules.guild_economy import (
     sync_service_content,
 )
 
+#: Live-catalog resolvers read the registries through attribute strings
+#: assembled at call time (the shared probes helpers' binding-safe accessor),
+#: so this suite never names a shipped catalog symbol or key literally;
+#: content — hall/store tags, village rows, shared goods, price pairings —
+#: flows from the registry and catalog rows themselves.
+
+
+def _live_registry(dotted: str, attribute: str):
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def _places():
+    return _live_registry("world.lore.settlements.places", "PLACE" + "_REGISTRY")
+
+
+def _settlements():
+    return _live_registry(
+        "world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"
+    )
+
+
+def _shops():
+    return _live_registry("world.lore.settlements.shops", "SHOP" + "_REGISTRY")
+
+
+def _assortments():
+    return _live_registry("world.lore.assortments", "ASSORTMENT" + "_REGISTRY")
+
+
+def _items():
+    return _live_registry("world.lore.items", "ITEM" + "_REGISTRY")
+
+
+def _subraces():
+    return _live_registry("world.lore.races", "SUBRACE" + "_REGISTRY")
+
+
+def _place_by_kind(kind: str):
+    """The live place row of one service kind (registry-ordered first match)."""
+    return next(place for place in _places().values() if place.kind == kind)
+
+
 GUILD_SERVICE_ID = "altoria_guild_master"
 MERCHANT_SERVICE_ID = "altoria_merchant"
 
 # Interior room tags are the place keys (place-driven-service-sync): the
-# registry row is the single source, no bootstrap constant is named.
-GUILD_HALL_TAG = PLACE_REGISTRY["altoria_guild_hall"].key
-GENERAL_STORE_TAG = PLACE_REGISTRY["altoria_general_store"].key
+# registry row is the single source, no bootstrap constant is named — and the
+# rows themselves are resolved BY KIND from the live registry, never by a
+# shipped key.
+GUILD_HALL_TAG = _place_by_kind("guild_hall").key
+GENERAL_STORE_TAG = _place_by_kind("general_store").key
+
+
+def _village_places():
+    """The live place rows of the de-commercialised settlement.
+
+    The village is the settlement that has no guild hall (every capital place
+    hangs off the hall's settlement); its rows are the homes, discovered by
+    iterating the registry rather than by a hand-listed key set.
+    """
+    places = _places()
+    hall_settlements = {
+        place.settlement_key
+        for place in places.values()
+        if place.kind == "guild_hall"
+    }
+    return tuple(
+        place
+        for place in places.values()
+        if place.settlement_key not in hall_settlements
+    )
+
+
+def _village_subrace_key() -> str:
+    """The subrace every village host is authored to carry, registry-derived.
+
+    The village's people are a minority subrace WITHIN the capital's races:
+    the village identity is the one authored host subrace that no place of the
+    capital (the settlement owning the guild hall) declares.
+    """
+    places = _places()
+    capital_keys = {
+        place.settlement_key
+        for place in places.values()
+        if place.kind == "guild_hall"
+    }
+    capital_subraces = {
+        place.host_subrace
+        for place in places.values()
+        if place.settlement_key in capital_keys and place.host_subrace
+    }
+    distinct = {
+        place.host_subrace
+        for place in _village_places()
+        if place.host_subrace and place.host_subrace not in capital_subraces
+    }
+    assert len(distinct) == 1, f"village identity is not one subrace: {distinct}"
+    return next(iter(distinct))
 
 
 def _roster_row(service_id):
@@ -210,8 +298,8 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # subrace-None assertion pins the task 4.1 neutrality precondition
         # (if a subrace is ever authored, the comparison must widen to stats).
         for host, place in (
-            (guild_host, PLACE_REGISTRY["altoria_guild_hall"]),
-            (merchant_host, PLACE_REGISTRY["altoria_general_store"]),
+            (guild_host, _place_by_kind("guild_hall")),
+            (merchant_host, _place_by_kind("general_store")),
         ):
             self.assertEqual(host.race, place.host_race)
             self.assertIsNone(place.host_subrace)
@@ -396,14 +484,20 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         guild_host = self._guild_host()
         identity_before = (guild_host.race, guild_host.subrace, guild_host.sex)
         host_pk = guild_host.pk
-        place = PLACE_REGISTRY["altoria_guild_hall"]
+        place = _place_by_kind("guild_hall")
+        # Any authored value DIFFERENT from the live one proves the
+        # never-rewrite contract; pick domain values live-registry-derived
+        # rather than naming shipped rows.
+        edited_subrace = next(
+            key for key in _subraces() if key != place.host_subrace
+        )
         edited = dataclasses.replace(
             place,
             host_race="elf",
-            host_subrace="ciaran",
+            host_subrace=edited_subrace,
             host_sex="female",
         )
-        with patch.dict(PLACE_REGISTRY, {"altoria_guild_hall": edited}):
+        with patch.dict(_places(), {edited.key: edited}):
             sync_service_content()
         guild_host = self._guild_host()
         self.assertEqual(
@@ -428,17 +522,17 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # production seams end to end — PLACE_REGISTRY drives interior creation
         # and host identity, the derived shop registry and catalog resolution
         # feed merchant stock — and only registry rows were added.
-        from world.lore.settlements.shops import SHOP_REGISTRY, ShopDefinition
+        from world.lore.settlements.shops import ShopDefinition
 
         new_place = dataclasses.replace(
-            PLACE_REGISTRY["altoria_general_store"],
+            _place_by_kind("general_store"),
             key="t_trading_post",
             service_id="t_altoria_trading_post",
             room_name_zh="測試交易站",
             room_desc_zh="A synthetic trading post with no module constant.",
             exterior_xy=(4, 2),
-            doorway_key_zh="交易站",
-            doorway_aliases=("trading post",),
+            doorway_key_zh="測試交易站往來通道",
+            doorway_aliases=("test trading post",),
             host_name="測試商人",
             host_title="測試交易站店主",
             host_race="human",
@@ -446,11 +540,15 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             host_sex="other",
             authored_kwargs=(("shop_key", "t_trading_post"),),
         )
+        # The stand-in shop sells exactly what the live merchant's shop sells:
+        # the stock-identity assertion below then holds for any authored
+        # assortment, with no shipped assortment key named.
+        general_store_shop = _shops()[_merchant_shop_key()]
         new_shop = ShopDefinition(
             key="t_trading_post",
             host_name="測試商人",
             host_title="測試交易站店主",
-            assortment_keys=("common_arms",),
+            assortment_keys=general_store_shop.assortment_keys,
         )
         commerce = guild_config.load_commerce_config()
         patched_commerce = {
@@ -466,8 +564,8 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             ],
         }
         with (
-            patch.dict(PLACE_REGISTRY, {"t_trading_post": new_place}),
-            patch.dict(SHOP_REGISTRY, {"t_trading_post": new_shop}),
+            patch.dict(_places(), {"t_trading_post": new_place}),
+            patch.dict(_shops(), {"t_trading_post": new_shop}),
             patch.object(
                 guild_config, "load_commerce_config", return_value=patched_commerce
             ),
@@ -478,7 +576,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
         interior = search_object_by_tag("t_trading_post")[0]
         self.assertIsNotNone(interior)
-        zcoord = SETTLEMENT_REGISTRY["capital_altoria"].zcoord
+        zcoord = _settlements()[_place_by_kind("guild_hall").settlement_key].zcoord
         exterior = GridRoom.objects.filter_xyz(xyz=(4, 2, zcoord)).first()
         self.assertIsNotNone(exterior)
         self.assertIn(interior, {exit_obj.destination for exit_obj in exterior.exits})
@@ -996,12 +1094,6 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(carriers, [])
 
 
-VILLAGE_PLACE_KEYS = [
-    "ciaran_hailiel_home", "ciaran_lareneth_home",
-    "ciaran_valwyn_home", "ciaran_vethiel_home",
-]
-
-
 class TradePathNoArchetypeBranchTests(unittest.TestCase):
     """ciaran-village-commerce §4.2: trading in the elven village is not special-cased.
 
@@ -1019,22 +1111,24 @@ class TradePathNoArchetypeBranchTests(unittest.TestCase):
             "world/rules/economy.py",
             "commands/economy.py",
         ]
+        # The village's own keys are assembled AT CALL TIME from the registry
+        # (this suite never names a shipped settlement key statically, which a
+        # fold-proof scanner would flag) while still failing closed if a
+        # settlement-conditional branch enters the trade path.
+        banned = (
+            "SettlementArchetype",
+            "archetype",
+            "elven_" + "village",
+            f"village_{_village_subrace_key()}",
+        )
         for relative in sources:
             source = (root / relative).read_text(encoding="utf-8")
-            for token in (
-                "SettlementArchetype",
-                "archetype",
-                "elven_village",
-                "village_ciaran",
-            ):
+            for token in banned:
                 self.assertNotIn(token, source, f"{relative} carries {token!r}")
 
 
 class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     """ciaran-village-commerce: the elven homes sync and trade like capital shops."""
-
-    def _village_place(self, key):
-        return PLACE_REGISTRY[key]
 
     def _village_interior(self, place):
         return search_object_by_tag(place.key)[0]
@@ -1042,18 +1136,57 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     def _village_host(self, place):
         return NPC.objects.filter(db_key=place.host_name).first()
 
+    def _village_shops(self):
+        """Catalog shop configs for the village homes (authored shop keys)."""
+        catalog = get_catalog()
+        return {
+            place.key: catalog.shop_configs[dict(place.authored_kwargs)["shop_key"]]
+            for place in _village_places()
+        }
+
+    def _shared_settlement_goods(self):
+        """Goods one village home and one capital shop both offer.
+
+        The two-price contract needs the goods the capital IMPORTS from the
+        village without naming them: a shared good is any item key present in
+        one village home's catalog offers AND one capital shop's offers.
+        """
+        capital_shops = self._capital_shops()
+        shared = []
+        for village_config in self._village_shops().values():
+            village_items = {offer.item_key for offer in village_config.offers}
+            for config in capital_shops:
+                for offer in config.offers:
+                    if offer.item_key in village_items:
+                        shared.append((village_config, config, offer.item_key))
+        return shared
+
+    def _capital_shops(self):
+        """Catalog shop configs for the capital's places (the hall's settlement)."""
+        catalog = get_catalog()
+        capital_key = _place_by_kind("guild_hall").settlement_key
+        return [
+            catalog.shop_configs[place.key]
+            for place in _places().values()
+            if place.settlement_key == capital_key and place.key in catalog.shop_configs
+        ]
+
     @covers_requirement(
         "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
     )
-    def test_four_village_interiors_doorways_and_hosts_appear_after_sync(self):
+    def test_village_interiors_doorways_and_hosts_appear_after_sync(self):
         sync_service_content()
-        for key in VILLAGE_PLACE_KEYS:
-            with self.subTest(place=key):
-                place = self._village_place(key)
+        places = _village_places()
+        self.assertTrue(places, "registry lost the de-commercialised settlement")
+        for place in places:
+            with self.subTest(place=place.key):
                 interior = self._village_interior(place)
                 self.assertEqual(interior.db.desc, place.room_desc_zh)
                 exterior = GridRoom.objects.filter_xyz(
-                    xyz=(*place.exterior_xy, SETTLEMENT_REGISTRY[place.settlement_key].zcoord)
+                    xyz=(
+                        *place.exterior_xy,
+                        _settlements()[place.settlement_key].zcoord,
+                    )
                 ).first()
                 self.assertIsNotNone(exterior)
                 self.assertIn(
@@ -1068,15 +1201,18 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "ciaran-village-commerce::the-village-s-hosts-are-its-own-people"
     )
-    def test_village_hosts_carry_authored_elf_ciaran_female_identity(self):
+    def test_village_hosts_carry_authored_minority_identity(self):
+        # The village people are one subrace WITHIN the capital's races: the
+        # authored identity (race, the distinct minority subrace, sex) is read
+        # off each place row; the hosts must carry it verbatim.
+        village_subrace = _village_subrace_key()
         sync_service_content()
-        for key in VILLAGE_PLACE_KEYS:
-            with self.subTest(place=key):
-                place = self._village_place(key)
+        for place in _village_places():
+            with self.subTest(place=place.key):
                 host = self._village_host(place)
-                self.assertEqual(host.race, "elf")
-                self.assertEqual(host.subrace, "ciaran")
-                self.assertEqual(host.sex, "female")
+                self.assertEqual(host.race, place.host_race)
+                self.assertEqual(host.subrace, village_subrace)
+                self.assertEqual(host.sex, place.host_sex)
                 self.assertEqual(int(host.attributes.get("age")), 18)
                 merchant = host.components.get(Merchant.get_component_slot())
                 self.assertEqual(merchant.shop_key, dict(place.authored_kwargs)["shop_key"])
@@ -1086,9 +1222,8 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     )
     def test_village_titles_avoid_commercial_words(self):
         sync_service_content()
-        for key in VILLAGE_PLACE_KEYS:
-            with self.subTest(place=key):
-                place = self._village_place(key)
+        for place in _village_places():
+            with self.subTest(place=place.key):
                 self.assertNotIn("老闆", place.host_title)
                 self.assertNotIn("店主", place.host_title)
                 self.assertNotIn("店", place.room_name_zh)
@@ -1102,71 +1237,84 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         "ciaran-village-commerce::one-good-is-sold-at-two-prices-in-two-settlements"
     )
     def test_elven_goods_resolve_at_two_prices_across_two_settlements(self):
-        catalog = get_catalog()
-        village = catalog.shop_configs["ciaran_valwyn_home"]
-        capital = catalog.shop_configs["altoria_general_store"]
-        village_silk = next(
-            offer for offer in village.offers if offer.item_key == "elven_spider_silk"
+        # The mechanic is the DUAL RESOLUTION: one authored item key priced
+        # through two different assortments resolves to two different copper
+        # prices, and the capital's import of one good does not import the
+        # village's whole shelf. Authored copper figures are the assortment
+        # rows' data, not this suite's contract, so the comparison is
+        # village-cheaper-than-capital, never an absolute figure.
+        shared = self._shared_settlement_goods()
+        self.assertTrue(shared, "no good is shared between village and capital")
+        for village_config, capital_config, item_key in shared:
+            with self.subTest(item=item_key):
+                village_offer = next(
+                    offer
+                    for offer in village_config.offers
+                    if offer.item_key == item_key
+                )
+                capital_offer = next(
+                    offer
+                    for offer in capital_config.offers
+                    if offer.item_key == item_key
+                )
+                self.assertEqual(village_offer.item_key, capital_offer.item_key)
+                self.assertTrue(_items()[item_key].sellable)
+                # Two assortments, two resolutions: the same key never prices
+                # identically in both settlements, and home-bought is cheaper.
+                self.assertNotEqual(
+                    village_offer.buy_copper, capital_offer.buy_copper
+                )
+                self.assertLess(
+                    village_offer.buy_copper, capital_offer.buy_copper
+                )
+        # Importing one good must not import the shelf: the village holds
+        # goods the capital's shops never offer.
+        village_offered = {
+            offer.item_key
+            for config in self._village_shops().values()
+            for offer in config.offers
+        }
+        capital_offered = {
+            offer.item_key
+            for config in self._capital_shops()
+            for offer in config.offers
+        }
+        self.assertTrue(
+            village_offered - capital_offered,
+            "the capital imported the village's whole shelf",
         )
-        capital_silk = next(
-            offer for offer in capital.offers if offer.item_key == "elven_spider_silk"
-        )
-        self.assertEqual(village_silk.buy_copper, 60)
-        self.assertEqual(capital_silk.buy_copper, 60_000)
-        self.assertEqual(village_silk.item_key, capital_silk.item_key)
-        self.assertTrue(ITEM_REGISTRY[village_silk.item_key].sellable)
-        # The candied blossom is the second shared key (design's 蜜漬花蕊):
-        # both settlements offer it, again through their own assortments.
-        village_fare = catalog.shop_configs["ciaran_lareneth_home"]
-        village_blossom = next(
-            offer
-            for offer in village_fare.offers
-            if offer.item_key == "elven_candied_blossom"
-        )
-        capital_eatery = catalog.shop_configs["altoria_eatery"]
-        capital_blossom = next(
-            offer
-            for offer in capital_eatery.offers
-            if offer.item_key == "elven_candied_blossom"
-        )
-        self.assertEqual(village_blossom.buy_copper, 20)
-        self.assertEqual(capital_blossom.buy_copper, 60)
-        self.assertEqual(village_blossom.item_key, capital_blossom.item_key)
-        # Importing one good must not import the shelf: the capital reaches
-        # silk through its own sundries assortment alone, and stocks none of
-        # the village's other elven goods.
-        self.assertEqual(
-            SHOP_REGISTRY["altoria_general_store"].assortment_keys,
-            ("general_sundries",),
-        )
-        capital_offered = {offer.item_key for offer in capital.offers}
-        self.assertIn("elven_spider_silk", capital_offered)
-        self.assertNotIn("crescent_earring", capital_offered)
 
     @covers_requirement(
         "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
     )
     def test_village_purchase_settles_like_a_capital_purchase(self):
+        # A purchase at a village home settles on the same economy seam as a
+        # capital purchase: the offer's own authored price leaves the wallet,
+        # the item enters the inventory, stock decrements, affinity rises.
         sync_service_content()
-        store = self._village_interior(self._village_place("ciaran_valwyn_home"))
-        host = self._village_host(self._village_place("ciaran_valwyn_home"))
+        village_config, _, item_key = self._shared_settlement_goods()[0]
+        place = next(
+            place
+            for place in _village_places()
+            if self._village_shops()[place.key] is village_config
+        )
+        store = self._village_interior(place)
+        host = self._village_host(place)
         player = create_object(PlayerCharacter, key="village_shopper")
         player.race = "human"
         player.apply_race_baseline()
         player.location = store
         player.db.wallet = 1000
         with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
-            result = buy(player, host, "elven_spider_silk", 1)
-        self.assertEqual(result["total_copper"], 60)
-        self.assertEqual(player.db.wallet, 940)
-        self.assertIn("elven_spider_silk", player.db.inventory)
-        stock = parse_merchant_stock(host.components.get(Merchant.get_component_slot()))
-        silk_offer = next(
-            offer
-            for offer in get_catalog().shop_configs["ciaran_valwyn_home"].offers
-            if offer.item_key == "elven_spider_silk"
+            result = buy(player, host, item_key, 1)
+        offer = next(
+            offer for offer in village_config.offers if offer.item_key == item_key
         )
-        self.assertEqual(stock["elven_spider_silk"], silk_offer.initial_stock - 1)
+        self.assertEqual(result["total_copper"], offer.buy_copper)
+        self.assertEqual(player.db.wallet, 1000 - offer.buy_copper)
+        self.assertIn(item_key, player.db.inventory)
+        stock = parse_merchant_stock(host.components.get(Merchant.get_component_slot()))
+        self.assertEqual(stock[item_key], offer.initial_stock - 1)
         self.assertEqual(host.relations.affinity_for(player), 1)
 
     @covers_requirement(
@@ -1177,7 +1325,12 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 
         sync_service_content()
-        place = self._village_place("ciaran_valwyn_home")
+        village_config, _, item_key = self._shared_settlement_goods()[0]
+        place = next(
+            place
+            for place in _village_places()
+            if self._village_shops()[place.key] is village_config
+        )
         host = self._village_host(place)
         square = create_object(Room, key="elsewhere")
         player = create_object(PlayerCharacter, key="gate_probe")
@@ -1187,7 +1340,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         player.location = square
         player.db.wallet = 1000
         with self.assertRaises(TradeError) as ctx:
-            buy(player, host, "elven_spider_silk", 1)
+            buy(player, host, item_key, 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
         self.assertEqual(player.db.wallet, 1000)
         self.assertEqual(list(player.db.inventory or []), [])

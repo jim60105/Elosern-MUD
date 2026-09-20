@@ -25,7 +25,6 @@ def _minimap_fixture(character) -> None:
         sync_service_interiors,
         sync_wilderness,
     )
-    from world.lore.settlements.places import PLACE_REGISTRY
     from world.maps.instance import spawn_instance_room
     from world.rules.map_knowledge import record_arrival
 
@@ -68,8 +67,18 @@ def _minimap_fixture(character) -> None:
             record_arrival(character)
             character.location = south_gate
 
-    # Interior layer: the permanent guild hall.
-    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
+    # Interior layer: the permanent guild hall. The place row is resolved by
+    # kind from the CURRENT live registry (the harness probe), so the shipped
+    # boot records the capital hall and the synthetic install resolves its own
+    # kit row; under the kit no permanent interior exists (the kit settlement
+    # has no grid map, so the place-driven sync warn-skips every place) and
+    # the optional interior layer auto-skips exactly like the gate-room guard.
+    from web.browser_support.browser_fixtures_data import live_place_by_kind
+
+    halls = []
+    hall_place = live_place_by_kind("guild_hall")
+    if hall_place is not None:
+        halls = search_object_by_tag(hall_place.key)
     if halls:
         character.location = halls[0]
         record_arrival(character)

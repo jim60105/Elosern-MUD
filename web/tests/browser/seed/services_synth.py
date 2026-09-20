@@ -27,6 +27,7 @@ def _services_fixture_synth(character, mode: str) -> None:
     from web.browser_support.browser_fixtures_data import (
         SYNTH_INVENTORY_BY_MODE,
         SYNTH_SHOP_KEY,
+        live_place_by_kind,
     )
     from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
@@ -34,7 +35,6 @@ def _services_fixture_synth(character, mode: str) -> None:
         sync_grid,
         sync_service_interiors,
     )
-    from world.lore.settlements.places import PLACE_REGISTRY
 
     # The shared catalog was assigned process-globally by the harness install
     # (same builder the server calls), so the board offer and shop rows are
@@ -46,12 +46,33 @@ def _services_fixture_synth(character, mode: str) -> None:
     sync_grid()
     sync_service_interiors()
 
-    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
-    stores = search_object_by_tag(PLACE_REGISTRY["altoria_general_store"].key)
-    hall = halls[0] if halls else None
-    store = stores[0] if stores else None
-    if hall is None or store is None:
-        raise AssertionError("services fixture: service interiors missing")
+    # The two service rooms come from the kit's OWN place rows (resolved by
+    # kind from the live registry — never a shipped row name). The place-driven
+    # interior sync warn-skips a place whose exterior coordinate has no grid
+    # room, and the kit settlement has no grid map, so this fixture stands the
+    # rooms up itself: the same authored row the shipped bootstrap would have
+    # created, tagged by the place key exactly like ``_ensure_interior`` does,
+    # and idempotent across reseeds.
+    from typeclasses.rooms import Room
+
+    def _kit_interior(kind: str):
+        place = live_place_by_kind(kind)
+        if place is None:
+            raise AssertionError(f"services fixture (synth): no live {kind} place")
+        rooms = search_object_by_tag(place.key)
+        if rooms:
+            return rooms[0]
+        room = create_object(
+            Room,
+            key=place.room_name_zh,
+            tags=[place.key],
+            location=None,
+        )
+        room.db.desc = place.room_desc_zh
+        return room
+
+    hall = _kit_interior("guild_hall")
+    store = _kit_interior("general_store")
 
     def _make_host(key: str, room) -> NPC:
         host = next(

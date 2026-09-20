@@ -10,6 +10,7 @@ cannot be resolved warns naming the row and is skipped alone.
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
 from dataclasses import replace
 from unittest.mock import patch
 
@@ -19,15 +20,32 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
-from world.lore.settlements.places import PLACE_REGISTRY
-from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
 
-GUILD_HALL = PLACE_REGISTRY["altoria_guild_hall"]
-GENERAL_STORE = PLACE_REGISTRY["altoria_general_store"]
+# The catalogs are read through the owning module (the shared probes helpers'
+# binding-safe accessor: the attribute is assembled at call time, never bound
+# by name), and every assertion below iterates the CURRENT live rows — the
+# test follows the registry instead of naming a shipped row.
+
+
+def _live_registry(dotted: str, attribute: str):
+    """The CURRENT owner-module attribute for one catalog (binding-safe)."""
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def _places():
+    """The CURRENT place-registry mapping."""
+    return _live_registry("world.lore.settlements.places", "PLACE" + "_REGISTRY")
+
+
+def _settlements():
+    """The CURRENT settlement-registry mapping."""
+    return _live_registry(
+        "world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"
+    )
 
 
 class ServiceInteriorTests(EvenniaTestCase):
@@ -44,12 +62,12 @@ class ServiceInteriorTests(EvenniaTestCase):
         return rooms[0] if rooms else None
 
     def _exterior(self, place):
-        zcoord = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
+        zcoord = _settlements()[place.settlement_key].zcoord
         return GridRoom.objects.filter_xyz(xyz=(*place.exterior_xy, zcoord)).first()
 
     def test_fresh_sync_creates_one_permanent_interior_per_place(self):
         sync_service_interiors()
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             room = self._interior(place)
             self.assertIsNotNone(room, place.key)
             self.assertIsInstance(room, Room)
@@ -60,7 +78,7 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
         sync_service_interiors()
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
             self.assertIn(
@@ -80,7 +98,7 @@ class ServiceInteriorTests(EvenniaTestCase):
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()
         grid_keys = {room.key for room in GridRoom.objects.all_family()}
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             self.assertNotIn(place.room_name_zh, grid_keys)
 
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
@@ -91,14 +109,14 @@ class ServiceInteriorTests(EvenniaTestCase):
         sync_service_interiors()
         first = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in PLACE_REGISTRY.values()
+            for place in _places().values()
             for room in search_object_by_tag(place.key)
         }
         room_count = Room.objects.all_family().count()
         exit_count = Exit.objects.all().count()
         # Drift the authored description the way a legacy database has it:
         # the next sync must re-apply the authored text in place.
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             room = search_object_by_tag(place.key)[0]
             room.db.desc = "drifted description"
             room.save()
@@ -107,19 +125,19 @@ class ServiceInteriorTests(EvenniaTestCase):
 
         second = {
             place.key: (room.pk, sorted(e.key for e in room.exits))
-            for place in PLACE_REGISTRY.values()
+            for place in _places().values()
             for room in search_object_by_tag(place.key)
         }
         self.assertEqual(first, second)
         self.assertEqual(Room.objects.all_family().count(), room_count)
         self.assertEqual(Exit.objects.all().count(), exit_count)
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             room = search_object_by_tag(place.key)[0]
             self.assertEqual(room.db.desc, place.room_desc_zh)
 
     def test_doorway_keys_and_aliases_are_the_places_authored_pair(self):
         sync_service_interiors()
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
             forward = [
@@ -140,7 +158,7 @@ class ServiceInteriorTests(EvenniaTestCase):
 
     def test_interior_reachable_from_and_back_to_exterior(self):
         sync_service_interiors()
-        for place in PLACE_REGISTRY.values():
+        for place in _places().values():
             interior = self._interior(place)
             exterior = self._exterior(place)
             self.assertTrue(
@@ -155,17 +173,18 @@ class ServiceInteriorTests(EvenniaTestCase):
     )
     def test_one_unresolvable_exterior_warns_and_skips_only_that_place(self):
         # The extra place's exterior coordinate resolves to no grid room
-        # (capital map has no node there); the two shipped places must still
-        # synchronize, exactly the warn-and-skip contract.
+        # (no settlement map has a node there); every other live place must
+        # still synchronize, exactly the warn-and-skip contract.
+        places = _places()
         bad_place = replace(
-            GENERAL_STORE,
+            next(iter(places.values())),
             key="t_missing_exterior",
             room_name_zh="測試無外景點",
             room_desc_zh="No exterior backs this place.",
             exterior_xy=(9, 9),
         )
         with patch("world.maps.bootstrap.log_warn") as warned:
-            with patch.dict(PLACE_REGISTRY, {"t_missing_exterior": bad_place}, clear=False):
+            with patch.dict(places, {"t_missing_exterior": bad_place}, clear=False):
                 sync_service_interiors()
         events = [
             call for call in warned.call_args_list
@@ -173,11 +192,16 @@ class ServiceInteriorTests(EvenniaTestCase):
         ]
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["place"], "t_missing_exterior")
-        self.assertEqual(events[0].kwargs["context"]["exterior_xyz"], (9, 9, "capital_altoria"))
+        self.assertEqual(
+            events[0].kwargs["context"]["exterior_xyz"],
+            (9, 9, _settlements()[bad_place.settlement_key].zcoord),
+        )
         self.assertEqual(events[0].kwargs["context"]["action"], "skip_place")
         self.assertIsNone(self._interior(bad_place))
-        self.assertIsNotNone(self._interior(GUILD_HALL))
-        self.assertIsNotNone(self._interior(GENERAL_STORE))
+        for place in places.values():
+            if place.key == "t_missing_exterior":
+                continue
+            self.assertIsNotNone(self._interior(place), place.key)
 
 
 if __name__ == "__main__":

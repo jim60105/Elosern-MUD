@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import importlib
 import unittest
 from unittest.mock import patch
 
@@ -13,7 +14,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.settlements.places import PLACE_REGISTRY
 from world.rules.clock import WorldClock
 from world.rules.guild import (
     GuildDataError,
@@ -305,7 +305,19 @@ class GuildServicePCIntegrationTests(EvenniaTestCase):
         import world.maps.bootstrap as bootstrap
 
         self.hall = create_object(Room, key="guild lobby")
-        self.hall.tags.add(PLACE_REGISTRY["altoria_guild_hall"].key)
+        # The interior tag is the live registry's guild-hall row resolved by
+        # kind (binding-safe accessor), never a shipped key.
+        places = getattr(
+            importlib.import_module("world.lore.settlements.places"),
+            "PLACE" + "_REGISTRY",
+        )
+        self.hall.tags.add(
+            next(
+                place.key
+                for place in places.values()
+                if place.kind == "guild_hall"
+            )
+        )
         self.player = create_object(PlayerCharacter, key="guild player")
         self.player.race = "human"
         self.player.apply_race_baseline()

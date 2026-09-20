@@ -93,6 +93,7 @@ from web.browser_support.browser_fixtures_data.probes import (
     first_live_monster_tier_key,
     first_live_wilderness_entry,
     lineage_rungs_for,
+    live_place_by_kind,
     scene_archetype_registered,
     synth_concept_proposal_values,
     synth_first_preset_key,

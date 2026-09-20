@@ -145,3 +145,22 @@ def scene_archetype_registered(key: str) -> bool:
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
     return key in SCENE_ARCHETYPE_REGISTRY
+
+
+def live_place_by_kind(kind: str):
+    """The first registered place row of one kind, from the CURRENT live registry.
+
+    Kind membership is compared through the definition's ``kind`` value, so
+    the caller never names a registry key: the shipped boot resolves the
+    capital row, the synthetic install resolves the kit's own ``t_`` row, and
+    a registry with no row of that kind answers ``None`` (the caller then
+    auto-skips its optional shipped-fixture layer, the documented synth-mode
+    behavior for shipped-key fixtures). Callers read ``row.key`` for the
+    room tag and the row's authored fields for their stand-in rooms.
+    """
+    from world.lore.settlements.places import PLACE_REGISTRY
+
+    for place in PLACE_REGISTRY.values():
+        if place.kind == kind:
+            return place
+    return None
