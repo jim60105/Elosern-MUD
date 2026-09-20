@@ -7,9 +7,12 @@ from unittest import mock
 from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import validate_place_registry
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.lore.settlements.shops import validate_registry_identity_uniqueness
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.rules.dialogue import NO_UNDERSTANDING_LINE
+from world.rules.dialogue import table_response
 from world.rules.guild_config import GuildConfigError
 from world.rules.guild_config import load_guild_catalog
 from world.rules.guild_config import validate_service_hosts
@@ -111,16 +114,30 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # disagreement unrepresentable, so the YAML section is gone and the
         # catalog still loads the full derived roster.
         self.assertNotIn("service_hosts", raw_rulebook())
-        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+
+    def test_the_attendant_blueprint_ships_unused(self):
+        # Neutrality gate (place-attendant-profession): the derived roster is
+        # exactly the fixed pre-change baseline — nine rows, unchanged
+        # professions and anchors (field-by-field equality is pinned by
+        # test_shipped_roster_reproduces_the_removed_yaml_rows_exactly) — and
+        # NOT ONE row names the new attendant blueprint. The blueprint ships
+        # available for content changes, used by nothing.
+        rows = validate_service_hosts()
         self.assertEqual(
-            [row.service_id for row in catalog.service_hosts],
+            [(row.service_id, row.profession.key) for row in rows],
             [
-                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor",
-                "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_valwyn", "ciaran_vethiel",
+                ("altoria_guild_master", "guild_staff"),
+                ("altoria_merchant", "merchant"),
+                ("altoria_blacksmith", "merchant"),
+                ("altoria_eatery_owner", "merchant"),
+                ("altoria_tailor", "merchant"),
+                ("ciaran_hailiel", "merchant"),
+                ("ciaran_lareneth", "merchant"),
+                ("ciaran_valwyn", "merchant"),
+                ("ciaran_vethiel", "merchant"),
             ],
         )
+        self.assertNotIn("attendant", {row.profession.key for row in rows})
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
@@ -228,6 +245,74 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         message = str(caught.exception)
         self.assertIn("shop:altoria_general_store", message)
         self.assertIn("guild_branch:guild_branch_altoria", message)
+
+    # ---- the attendant blueprint's rejections (place-attendant-profession) --
+
+    def _attendant(self, **overrides):
+        """A synthetic place naming the shipped attendant blueprint."""
+        base = dict(
+            key="t_attendant_place",
+            service_id="t_attendant",
+            profession="attendant",
+            assortment_keys=(),
+            authored_kwargs=(("dialogue_key", "guild_staff"),),
+        )
+        base.update(overrides)
+        return replace(PLACE_REGISTRY["altoria_general_store"], **base)
+
+    def test_an_attendant_authoring_a_trade_kwarg_is_rejected_as_dead(self):
+        # The dialogue component consumes dialogue_key only: a shop_key on an
+        # attendant row is exactly the dead-kwarg offense every profession
+        # already obeys, named by place and kwarg.
+        place = self._attendant(
+            authored_kwargs=(
+                ("dialogue_key", "guild_staff"),
+                ("shop_key", "t_attendant_shop"),
+            )
+        )
+        with mock.patch.dict(PLACE_REGISTRY, {"t_attendant_place": place}, clear=True):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("t_attendant_place", message)
+        self.assertIn("shop_key", message)
+
+    def test_an_attendant_place_declaring_assortments_is_rejected(self):
+        # Goods require a shop identity; the lore validator owns that rule
+        # and fires on the place row alone.
+        place = self._attendant(assortment_keys=("altoria_general_goods",))
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry({"t_attendant_place": place})
+        message = str(caught.exception)
+        self.assertIn("t_attendant_place", message)
+        self.assertIn("assortments without a shop identity", message)
+
+    def test_a_place_authoring_an_unregistered_dialogue_key_fails_load(self):
+        # Authored resolution: the kwarg exists but resolves to nothing —
+        # load names the place and the dead key (spec: bind to a table that
+        # exists).
+        place = self._attendant(
+            key="t_dead_dialogue_place",
+            service_id="t_dead_dialogue",
+            authored_kwargs=(("dialogue_key", "t_unregistered_table"),),
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_dead_dialogue_place": place}, clear=True
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("t_dead_dialogue_place", message)
+        self.assertIn("t_unregistered_table", message)
+
+    def test_a_runtime_lookup_of_an_unregistered_key_still_degrades(self):
+        # The load-time rejection above must NOT collapse into a runtime
+        # raise: a key reaching the lookup from any other route still gets
+        # the no-understanding line.
+        self.assertEqual(
+            table_response("t_unregistered_table", "住宿"),
+            NO_UNDERSTANDING_LINE,
+        )
 
 
 if __name__ == "__main__":
