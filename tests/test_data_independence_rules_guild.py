@@ -62,6 +62,7 @@ BEHAVIOR_FILES = (*MIGRATED_FILES, *NEW_HELPER_FILES)
 _SPLIT_PACKAGES = (
     "test_npc_intents",
     "test_service_view",
+    "test_guild_economy_sync",
 )
 
 

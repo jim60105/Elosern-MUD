@@ -20,10 +20,13 @@ SPECS_ROOT = (
 )
 
 MODULES = {
-    "config": "world.rules.tests.test_guild_config",
+    # The config and sync suites moved into same-named packages; each mapped
+    # class now resolves through its slice module.
+    "config_exam": "world.rules.tests.test_guild_config.test_merit_exam_rulebook",
+    "config_shop": "world.rules.tests.test_guild_config.test_assortment_shop_rules",
     "components": "typeclasses.tests.test_components",
     "interiors": "world.maps.tests.test_service_interiors",
-    "sync": "world.rules.tests.test_guild_economy_sync",
+    "sync": "world.rules.tests.test_guild_economy_sync.test_service_content_sync",
     "registration": "world.rules.tests.test_guild_registration",
     "acquire": "world.quests.tests.test_acquire",
     "rewards": "world.rules.tests.test_guild_rewards",
@@ -161,7 +164,7 @@ SCENARIO_TO_TEST = {
         "exams", "ExamStartTests", "test_duplicate_active_exam_is_rejected"
     ),
     "Every rank profile stays inside its lore band": ref(
-        "config", "ExamProfileTests", "test_every_profile_stays_inside_its_lore_band"
+        "config_exam", "ExamProfileTests", "test_every_profile_stays_inside_its_lore_band"
     ),
     "Disguised candidate receives the same opponent": ref(
         "exams", "ExamProfileValidationTests", "test_spawned_opponent_uses_true_profile_stats"
@@ -227,10 +230,10 @@ SCENARIO_TO_TEST = {
     ),
     # shop-economy
     "Initial ordinary goods validate": ref(
-        "config", "ShopRuleTests", "test_loaded_shops_are_integer_and_band_consistent"
+        "config_shop", "ShopRuleTests", "test_loaded_shops_are_integer_and_band_consistent"
     ),
     "Floating price is rejected": ref(
-        "config", "ShopRuleTests", "test_float_price_is_rejected"
+        "config_shop", "ShopRuleTests", "test_float_price_is_rejected"
     ),
     "Repeated startup preserves a sold-out item": ref(
         "sync", "ServiceContentSyncTests", "test_merchant_stock_initializes_only_when_absent"
