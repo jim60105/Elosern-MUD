@@ -4,13 +4,14 @@ Tests for immutable economy identities and the guild-economy catalog loader (tas
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from contextlib import contextmanager
 from dataclasses import fields, replace
 from pathlib import Path
 from unittest import mock
 
 import yaml
 
-from world.lore.economy import PRICE_TABLE
+from world.lore.economy import PRICE_TABLE, PriceEntry
 from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import (
@@ -25,7 +26,7 @@ from world.lore.items import (
     SUMMARY_MAX,
 )
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY, AssortmentDefinition
-from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, PlaceDefinition, PlaceKind
 from world.lore.settlements.shops import (
     SHOP_REGISTRY,
     ShopDefinition,
@@ -44,6 +45,7 @@ from world.rules.guild_config import (
     validate_assortment_configs,
     validate_exam_profiles,
     validate_merit_thresholds,
+    validate_price_scales,
     validate_quest_rewards,
     validate_service_hosts,
     validate_shop_configs,
@@ -89,6 +91,11 @@ def raw_rulebook() -> dict:
 
 def raw_commerce() -> dict:
     return yaml.safe_load(COMMERCE.read_text(encoding="utf-8"))
+
+
+def _shipped_scales() -> dict:
+    """The shipped price_scales section, validated like catalog load does."""
+    return validate_price_scales(raw_commerce()["price_scales"])
 
 
 def _assortment_row(
@@ -151,7 +158,9 @@ class ItemDefinitionTests(unittest.TestCase):
     def test_presentation_swap_leaves_economy_outputs_unchanged(self):
         raw = raw_commerce()
         baseline = validate_shop_configs(
-            raw["shops"], validate_assortment_configs(raw["assortments"])
+            raw["shops"],
+            validate_assortment_configs(raw["assortments"]),
+            _shipped_scales(),
         )
         original = ITEM_REGISTRY["meal"]
         altered = ItemDefinition(
@@ -169,7 +178,9 @@ class ItemDefinitionTests(unittest.TestCase):
         ITEM_REGISTRY["meal"] = altered
         try:
             changed = validate_shop_configs(
-                raw["shops"], validate_assortment_configs(raw["assortments"])
+                raw["shops"],
+                validate_assortment_configs(raw["assortments"]),
+                _shipped_scales(),
             )
             self.assertEqual(changed, baseline)
         finally:
@@ -477,17 +488,6 @@ class AssortmentRuleTests(unittest.TestCase):
         with self.assertRaises(GuildConfigError):
             validate_assortment_configs(rows)
 
-    def test_sell_above_buy_is_rejected(self):
-        rows = _assortment_row(
-            "staple_meals",
-            lambda offers: [
-                {**offer, "sell_copper": 500} if offer["item_key"] == "meal" else offer
-                for offer in offers
-            ],
-        )
-        with self.assertRaises(GuildConfigError):
-            validate_assortment_configs(rows)
-
     def test_initial_exceeding_max_is_rejected(self):
         rows = _assortment_row(
             "staple_meals",
@@ -563,7 +563,7 @@ class ShopRuleTests(unittest.TestCase):
 
     def test_loaded_shops_are_integer_and_band_consistent(self):
         offers = self._shipped_offers()
-        configs = validate_shop_configs(raw_commerce()["shops"], offers)
+        configs = validate_shop_configs(raw_commerce()["shops"], offers, _shipped_scales())
         self.assertEqual(set(configs), {"altoria_general_store"})
         config = configs["altoria_general_store"]
         self.assertIsInstance(config, ShopConfig)
@@ -597,42 +597,55 @@ class ShopRuleTests(unittest.TestCase):
             validate_shop_configs(
                 raw_commerce()["shops"],
                 validate_assortment_configs(rows),
+                _shipped_scales(),
             )
 
     def test_unknown_shop_key_is_rejected(self):
         row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([{**row, "shop_key": "not_a_shop"}], self._shipped_offers())
+            validate_shop_configs(
+                [{**row, "shop_key": "not_a_shop"}],
+                self._shipped_offers(),
+                _shipped_scales(),
+            )
 
     def test_shops_root_must_be_a_list(self):
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs({"altoria_general_store": {}}, self._shipped_offers())
+            validate_shop_configs(
+                {"altoria_general_store": {}},
+                self._shipped_offers(),
+                _shipped_scales(),
+            )
 
     def test_non_mapping_shop_entry_is_rejected(self):
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs(["nope"], self._shipped_offers())
+            validate_shop_configs(["nope"], self._shipped_offers(), _shipped_scales())
 
     def test_duplicate_shop_key_is_rejected(self):
         rows = raw_commerce()["shops"]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs(rows + [rows[0]], self._shipped_offers())
+            validate_shop_configs(rows + [rows[0]], self._shipped_offers(), _shipped_scales())
 
     def test_hour_at_or_above_day_length_is_rejected(self):
         row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([{**row, "open_hour": 25}], self._shipped_offers())
+            validate_shop_configs([{**row, "open_hour": 25}], self._shipped_offers(), _shipped_scales())
 
     def test_equal_open_and_close_hours_are_rejected(self):
         row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([{**row, "close_hour": row["open_hour"]}], self._shipped_offers())
+            validate_shop_configs(
+                [{**row, "close_hour": row["open_hour"]}],
+                self._shipped_offers(),
+                _shipped_scales(),
+            )
 
     def test_shop_row_carrying_offers_is_rejected(self):
         # Commerce data moved under assortments: a leftover per-shop offers
         # block must fail closed instead of being silently ignored.
         row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError) as caught:
-            validate_shop_configs([{**row, "offers": []}], self._shipped_offers())
+            validate_shop_configs([{**row, "offers": []}], self._shipped_offers(), _shipped_scales())
         self.assertIn("offers", str(caught.exception))
 
     def test_shop_referencing_unknown_assortment_is_rejected(self):
@@ -640,7 +653,7 @@ class ShopRuleTests(unittest.TestCase):
         shop = replace(SHOP_REGISTRY["altoria_general_store"], assortment_keys=("no_such_assortment",))
         with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([row], self._shipped_offers())
+                validate_shop_configs([row], self._shipped_offers(), _shipped_scales())
             message = str(caught.exception)
             self.assertIn("altoria_general_store", message)
             self.assertIn("no_such_assortment", message)
@@ -650,7 +663,7 @@ class ShopRuleTests(unittest.TestCase):
         shop = replace(SHOP_REGISTRY["altoria_general_store"], assortment_keys=())
         with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([row], self._shipped_offers())
+                validate_shop_configs([row], self._shipped_offers(), _shipped_scales())
             self.assertIn("altoria_general_store", str(caught.exception))
 
     def test_duplicate_assortment_reference_is_rejected(self):
@@ -661,7 +674,7 @@ class ShopRuleTests(unittest.TestCase):
         )
         with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([row], self._shipped_offers())
+                validate_shop_configs([row], self._shipped_offers(), _shipped_scales())
             self.assertIn("common_arms", str(caught.exception))
 
     @covers_requirement(
@@ -681,7 +694,7 @@ class ShopRuleTests(unittest.TestCase):
              mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
             row = raw_commerce()["shops"][0]
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([row], offers)
+                validate_shop_configs([row], offers, _shipped_scales())
             message = str(caught.exception)
             self.assertIn("altoria_general_store", message)
             self.assertIn("meal", message)
@@ -710,9 +723,17 @@ class ShopRuleTests(unittest.TestCase):
             {**raw_commerce()["shops"][0]},
             {"shop_key": "t_second_shop", "open_hour": 9, "close_hour": 19, "restock_hour": 7},
         ]
+        second_place = replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key="t_second_shop_place",
+            settlement_key="capital_altoria",
+            assortment_keys=("t_shared_goods",),
+            authored_kwargs=(("shop_key", "t_second_shop"),),
+        )
         with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
-             mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": first, "t_second_shop": second}):
-            configs = validate_shop_configs(rows, offers)
+             mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": first, "t_second_shop": second}), \
+             mock.patch.dict(PLACE_REGISTRY, {"t_second_shop_place": second_place}, clear=False):
+            configs = validate_shop_configs(rows, offers, _shipped_scales())
             self.assertEqual(
                 {offer.item_key for offer in configs["t_second_shop"].offers},
                 {"meal"},
@@ -725,6 +746,474 @@ class ShopRuleTests(unittest.TestCase):
                 {offer.item_key for offer in configs["altoria_general_store"].offers},
                 set(first.offered_item_keys),
             )
+
+
+def _price_shop_env(
+    *,
+    shop_key="t_price_stall",
+    place_key="t_price_store",
+    assortment_key="t_price_goods",
+    item_key="t_price_probe",
+    band_key="t_price_band",
+    band_min=20,
+    band_max=None,
+    base_buy=25,
+    base_sell=10,
+    price_scale=None,
+    overrides=(),
+    extra_item_keys=(),
+    excluded_item_keys=(),
+    settlement_key="t_scale_city",
+    scales=None,
+) -> dict:
+    """One synthetic price-scaling shop environment (design §8).
+
+    A single place authoring one shop over one assortment of one item with
+    its own price band — everything the scale/override pipeline touches.
+    Returns the raw parse inputs (``row``, ``offers``, ``scales``) plus the
+    registry rows for ``_price_shop_scope``.
+    """
+    item = ItemDefinition(
+        key=item_key,
+        display_name_zh="合成價格探針",
+        price_table_key=band_key,
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.TOOL,
+            icon_key=ItemIconKey.TOOL,
+            rarity=ItemRarity.COMMON,
+            summary_zh="合成價格縮放測試物。",
+        ),
+    )
+    band = PriceEntry(band_key, "合成價格頻帶", band_min, band_max, "synthetic probe band")
+    assortment = AssortmentDefinition(assortment_key, "合成價格貨架", (item_key,))
+    shop = ShopDefinition(
+        key=shop_key,
+        host_name="合成價格攤主",
+        host_title="合成價格攤主",
+        assortment_keys=(assortment_key,),
+    )
+    place = PlaceDefinition(
+        key=place_key,
+        settlement_key=settlement_key,
+        kind=PlaceKind.GENERAL_STORE,
+        room_name_zh="合成價格雜貨店",
+        room_desc_zh="A synthetic price-scaling store.",
+        exterior_xy=(0, 0),
+        doorway_key_zh="合成價格入口",
+        doorway_aliases=("probe store",),
+        host_name="合成價格店主",
+        host_title="合成價格雜貨店主",
+        host_race="human",
+        host_subrace=None,
+        host_sex="other",
+        profession="t_price_merchant",
+        service_id="t_price_merchant",
+        assortment_keys=(assortment_key,),
+        authored_kwargs=(("shop_key", shop_key),),
+        extra_item_keys=extra_item_keys,
+        excluded_item_keys=excluded_item_keys,
+    )
+    row = {"shop_key": shop_key, "open_hour": 8, "close_hour": 20, "restock_hour": 6}
+    if price_scale is not None:
+        row["price_scale"] = price_scale
+    if overrides:
+        row["overrides"] = list(overrides)
+    offers = {
+        assortment_key: {
+            item_key: ItemOfferRule(
+                item_key=item_key,
+                buy_copper=base_buy,
+                sell_copper=base_sell,
+                max_stock=5,
+                initial_stock=2,
+                restock_quantity=1,
+            )
+        }
+    }
+    return {
+        "row": row,
+        "offers": offers,
+        "scales": {settlement_key: 100} if scales is None else scales,
+        "items": {item.key: item},
+        "bands": {band.key: band},
+        "assortments": {assortment.key: assortment},
+        "shops": {shop.key: shop},
+        "places": {place.key: place},
+    }
+
+
+@contextmanager
+def _price_shop_scope(*envs):
+    """Patch the registries for one or more synthetic price-shop environments."""
+    items: dict = {}
+    bands: dict = {}
+    assortments: dict = {}
+    shops: dict = {}
+    places: dict = {}
+    for env in envs:
+        items.update(env["items"])
+        bands.update(env["bands"])
+        assortments.update(env["assortments"])
+        shops.update(env["shops"])
+        places.update(env["places"])
+    with mock.patch.dict(ITEM_REGISTRY, items, clear=False), \
+         mock.patch.dict(PRICE_TABLE, bands, clear=False), \
+         mock.patch.dict(ASSORTMENT_REGISTRY, assortments, clear=False), \
+         mock.patch.dict(SHOP_REGISTRY, shops, clear=True), \
+         mock.patch.dict(PLACE_REGISTRY, places, clear=True):
+        yield
+
+
+class PriceScaleSectionTests(unittest.TestCase):
+    """``price_scales`` section and per-shop scale validation (design §4)."""
+
+    def test_shipped_section_is_par(self):
+        self.assertEqual(_shipped_scales(), {"capital_altoria": 100})
+
+    def test_price_scales_must_be_a_mapping(self):
+        with self.assertRaises(GuildConfigError):
+            validate_price_scales([("capital_altoria", 100)])
+
+    def test_unknown_settlement_key_is_rejected(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_price_scales({"t_no_such_city": 100})
+        self.assertIn("t_no_such_city", str(caught.exception))
+
+    def test_scale_must_be_an_integer(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_price_scales({"capital_altoria": 1.5})
+        self.assertIn("capital_altoria", str(caught.exception))
+
+    def test_scale_bounds_reject_zero_and_negative(self):
+        for bad in (0, -1):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_price_scales({"capital_altoria": bad})
+            self.assertIn("capital_altoria", str(caught.exception))
+
+    def test_scale_bounds_accept_one_and_thousand(self):
+        for keep in (1, 1000):
+            self.assertEqual(
+                validate_price_scales({"capital_altoria": keep}),
+                {"capital_altoria": keep},
+            )
+
+    def test_scale_bounds_reject_above_thousand(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_price_scales({"capital_altoria": 1001})
+        self.assertIn("capital_altoria", str(caught.exception))
+
+    def test_shop_scale_must_be_an_integer(self):
+        env = _price_shop_env(price_scale=1.5)
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        self.assertIn("t_price_stall", str(caught.exception))
+
+    def test_shop_scale_bounds_reject_bad_values(self):
+        for bad in (0, -1, 1001):
+            env = _price_shop_env(price_scale=bad)
+            with _price_shop_scope(env):
+                with self.assertRaises(GuildConfigError):
+                    validate_shop_configs([env["row"]], env["offers"], env["scales"])
+
+    @covers_requirement(
+        "place-price-scaling::a-place-s-final-offer-is-a-shared-base-adjusted-by-one-local-rule"
+    )
+    def test_shop_scale_overrides_settlement_entry(self):
+        env = _price_shop_env(price_scale=150)
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(config.offers[0].buy_copper, (25 * 150 + 50) // 100)
+
+    @covers_requirement(
+        "place-price-scaling::a-place-s-final-offer-is-a-shared-base-adjusted-by-one-local-rule"
+    )
+    def test_shop_inherits_settlement_scale(self):
+        env = _price_shop_env(scales={"t_scale_city": 150})
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(config.offers[0].buy_copper, (25 * 150 + 50) // 100)
+
+    def test_shop_settlement_without_scale_entry_fails_load(self):
+        env = _price_shop_env(scales={"t_other_city": 100})
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        message = str(caught.exception)
+        self.assertIn("t_scale_city", message)
+        self.assertIn("t_price_store", message)
+
+
+class PlacePriceScalingTests(unittest.TestCase):
+    """Resolved price model over synthetic places (place-price-scaling §4/§8)."""
+
+    @covers_requirement(
+        "place-price-scaling::a-place-s-final-offer-is-a-shared-base-adjusted-by-one-local-rule"
+    )
+    def test_rounding_boundaries_are_half_up(self):
+        # (base * scale + 50) // 100: 25@150 -> 37.5 rounds up to 38;
+        # 10@150 -> 15 exact; 33@150 -> 49.5 rounds up to 50.
+        env = _price_shop_env(base_buy=25, base_sell=10, price_scale=150)
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(
+            (config.offers[0].buy_copper, config.offers[0].sell_copper),
+            (38, 15),
+        )
+
+        env = _price_shop_env(base_buy=33, base_sell=33, price_scale=150)
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(config.offers[0].buy_copper, 50)
+
+    @covers_requirement(
+        "place-price-scaling::a-place-s-final-offer-is-a-shared-base-adjusted-by-one-local-rule"
+    )
+    def test_par_scale_leaves_prices_unchanged(self):
+        env = _price_shop_env(base_buy=25, base_sell=10, price_scale=100)
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(
+            (config.offers[0].buy_copper, config.offers[0].sell_copper),
+            (25, 10),
+        )
+
+    @covers_requirement(
+        "place-price-scaling::resolved-prices-are-validated-not-the-bases"
+    )
+    def test_scaled_price_outside_band_fails_load(self):
+        # Base 25 is legal inside band 20..30 at par; at scale 150 it
+        # resolves to 38, above the ceiling, and load fails naming the
+        # place, the item and the resolved value.
+        env = _price_shop_env(band_min=20, band_max=30, base_buy=25, price_scale=150)
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        message = str(caught.exception)
+        self.assertIn("t_price_store", message)
+        self.assertIn("t_price_probe", message)
+        self.assertIn("38", message)
+
+    @covers_requirement(
+        "place-price-scaling::resolved-prices-are-validated-not-the-bases"
+    )
+    def test_scaled_sell_above_buy_fails_load(self):
+        # The inverted base (sell 30 > buy 25) is legal at assortment level
+        # now; the moved rejection fires on the resolved values here.
+        env = _price_shop_env(base_buy=25, base_sell=30)
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        message = str(caught.exception)
+        self.assertIn("t_price_store", message)
+        self.assertIn("t_price_probe", message)
+        self.assertIn("30", message)
+
+    @covers_requirement(
+        "place-price-scaling::an-override-is-complete-or-rejected"
+    )
+    def test_override_is_absolute_and_not_scaled(self):
+        override = {
+            "item_key": "t_price_probe",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+            "restock_quantity": 1,
+        }
+        env = _price_shop_env(price_scale=200, overrides=(override,))
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(
+            (config.offers[0].buy_copper, config.offers[0].sell_copper),
+            (42, 21),
+        )
+
+    @covers_requirement(
+        "place-price-scaling::an-override-is-complete-or-rejected"
+    )
+    def test_partial_override_fails_naming_missing_fields(self):
+        partial = {
+            "item_key": "t_price_probe",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+        }
+        env = _price_shop_env(overrides=(partial,))
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        message = str(caught.exception)
+        self.assertIn("t_price_store", message)
+        self.assertIn("t_price_probe", message)
+        self.assertIn("restock_quantity", message)
+
+    @covers_requirement(
+        "place-price-scaling::an-override-is-complete-or-rejected"
+    )
+    def test_override_for_unoffered_item_fails_load(self):
+        # A known item that is in none of the place's assortments and is not
+        # one of its additions: the override names an unoffered good.
+        curio = ItemDefinition(
+            key="t_price_curio",
+            display_name_zh="合成珍奇",
+            price_table_key="t_price_band",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.MISC,
+                icon_key=ItemIconKey.MISC,
+                rarity=ItemRarity.COMMON,
+                summary_zh="合成價格縮放的珍奇物。",
+            ),
+        )
+        override = {
+            "item_key": "t_price_curio",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+            "restock_quantity": 1,
+        }
+        env = _price_shop_env(overrides=(override,))
+        env["items"]["t_price_curio"] = curio
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        message = str(caught.exception)
+        self.assertIn("t_price_store", message)
+        self.assertIn("t_price_curio", message)
+
+    @covers_requirement(
+        "place-price-scaling::a-place-may-add-and-remove-individual-items"
+    )
+    def test_extra_without_override_fails_load(self):
+        env = _price_shop_env(extra_item_keys=("t_price_curio",))
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        self.assertIn("t_price_curio", str(caught.exception))
+
+    @covers_requirement(
+        "place-price-scaling::a-place-may-add-and-remove-individual-items"
+    )
+    def test_extra_with_complete_override_is_offered(self):
+        curio = ItemDefinition(
+            key="t_price_curio",
+            display_name_zh="合成珍奇",
+            price_table_key="t_price_band",
+            sellable=True,
+            presentation=ItemPresentation(
+                kind=ItemKind.MISC,
+                icon_key=ItemIconKey.MISC,
+                rarity=ItemRarity.COMMON,
+                summary_zh="合成價格縮放的珍奇物。",
+            ),
+        )
+        override = {
+            "item_key": "t_price_curio",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+            "restock_quantity": 1,
+        }
+        env = _price_shop_env(extra_item_keys=("t_price_curio",), overrides=(override,))
+        env["items"]["t_price_curio"] = curio
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(
+            {offer.item_key for offer in config.offers},
+            {"t_price_probe", "t_price_curio"},
+        )
+
+    @covers_requirement(
+        "place-price-scaling::a-place-may-add-and-remove-individual-items"
+    )
+    def test_removal_matching_no_assortment_item_fails_load(self):
+        env = _price_shop_env(excluded_item_keys=("t_no_such_item",))
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        self.assertIn("t_no_such_item", str(caught.exception))
+
+    @covers_requirement(
+        "place-price-scaling::a-place-may-add-and-remove-individual-items"
+    )
+    def test_removal_drops_the_item_from_offers(self):
+        env = _price_shop_env(excluded_item_keys=("t_price_probe",))
+        with _price_shop_scope(env):
+            config = validate_shop_configs(
+                [env["row"]], env["offers"], env["scales"]
+            )["t_price_stall"]
+        self.assertEqual(config.offers, ())
+
+    @covers_requirement(
+        "place-price-scaling::a-place-may-add-and-remove-individual-items"
+    )
+    def test_override_for_removed_item_fails_load(self):
+        override = {
+            "item_key": "t_price_probe",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+            "restock_quantity": 1,
+        }
+        env = _price_shop_env(
+            excluded_item_keys=("t_price_probe",), overrides=(override,)
+        )
+        with _price_shop_scope(env):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([env["row"]], env["offers"], env["scales"])
+        self.assertIn("t_price_probe", str(caught.exception))
+
+    @covers_requirement(
+        "place-price-scaling::a-place-s-final-offer-is-a-shared-base-adjusted-by-one-local-rule"
+    )
+    def test_same_item_two_places_stays_one_definition(self):
+        # Design §8: one item at two resolved prices is one item definition.
+        scaled = _price_shop_env()
+        override = {
+            "item_key": "t_price_probe",
+            "buy_copper": 42,
+            "sell_copper": 21,
+            "max_stock": 3,
+            "initial_stock": 1,
+            "restock_quantity": 1,
+        }
+        overridden = _price_shop_env(
+            shop_key="t_price_stall_b",
+            place_key="t_price_store_b",
+            overrides=(override,),
+        )
+        with _price_shop_scope(scaled, overridden):
+            configs = validate_shop_configs(
+                [scaled["row"], overridden["row"]],
+                scaled["offers"],
+                scaled["scales"],
+            )
+            first = configs["t_price_stall"].offers[0]
+            second = configs["t_price_stall_b"].offers[0]
+            self.assertEqual(first.item_key, second.item_key)
+            self.assertIs(ITEM_REGISTRY[first.item_key], ITEM_REGISTRY[second.item_key])
+            self.assertNotEqual(first.buy_copper, second.buy_copper)
+
 
 class CatalogLoadingTests(CatalogRegistryIsolation):
     def test_full_catalog_loads_and_joins_registries(self):

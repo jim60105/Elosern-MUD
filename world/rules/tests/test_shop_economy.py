@@ -44,6 +44,7 @@ from world.rules.tests._guild_service_probes import (
 )
 from world.skills.equipment import list_items
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS, make_item
+from world.tests.synthetic_data.data_world import SYNTH_PLACES
 
 T_SHOP = next(iter(SYNTH_SHOPS))
 _T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
@@ -670,6 +671,20 @@ def _mossgate_offers() -> dict:
     }
 
 
+_MOSSGATE_SCALES = {"t_mossgate": 100}
+
+
+def _place_row(shop_key: str) -> "PlaceDefinition":
+    """A place row authoring ``shop_key`` (kit store template)."""
+    base = SYNTH_PLACES["t_mossgate_store"]
+    return replace(
+        base,
+        key=f"t_place_for_{shop_key}",
+        authored_kwargs=(("shop_key", shop_key),),
+        assortment_keys=("t_mossgate_goods",),
+    )
+
+
 class ShopCompletenessDefectTests(EvenniaTestCase):
     """The shops-completeness check is keyed on shop identity (design §1.1).
 
@@ -692,8 +707,12 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
             self,
             "items",
             "prices",
+            "places",
             "shops",
-            extra={"shops": {self.SECOND_SHOP: second_shop}},
+            extra={
+                "shops": {self.SECOND_SHOP: second_shop},
+                "places": {_place_row(self.SECOND_SHOP).key: _place_row(self.SECOND_SHOP)},
+            },
         )
         super().setUp()
 
@@ -705,6 +724,7 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
             validate_shop_configs(
                 [_shop_row(T_SHOP)],
                 _mossgate_offers(),
+                _MOSSGATE_SCALES,
             )
         message = str(caught.exception)
         self.assertIn("missing rules", message)
@@ -718,6 +738,7 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
             validate_shop_configs(
                 [_shop_row("t_no_such_shop")],
                 _mossgate_offers(),
+                _MOSSGATE_SCALES,
             )
         self.assertIn("t_no_such_shop", str(caught.exception))
 
@@ -725,6 +746,7 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
         configs = validate_shop_configs(
             [_shop_row(T_SHOP), _shop_row(self.SECOND_SHOP)],
             _mossgate_offers(),
+            _MOSSGATE_SCALES,
         )
         expected = {_T_SPRAY, _T_FANG, _T_APPLE}
         self.assertEqual(
@@ -760,6 +782,7 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
             self,
             "items",
             "prices",
+            "places",
             "shops",
             extra={"shops": {shop.key: shop}},
         )
@@ -767,6 +790,7 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
             validate_shop_configs(
                 [_shop_row(shop.key)],
                 _mossgate_offers(),
+                _MOSSGATE_SCALES,
             )
         message = str(caught.exception)
         self.assertIn(shop.key, message)
@@ -787,10 +811,12 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
             self,
             "items",
             "prices",
+            "places",
             "shops",
             extra={
                 "assortments": {self.OVERLAP_ASSORTMENT: overlap},
                 "shops": {shop.key: shop},
+                "places": {_place_row(shop.key).key: _place_row(shop.key)},
             },
         )
         floor, _ceiling = price_band(_T_APPLE)
@@ -802,7 +828,7 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
             ),
         }
         with self.assertRaises(GuildConfigError) as caught:
-            validate_shop_configs([_shop_row(shop.key)], offers)
+            validate_shop_configs([_shop_row(shop.key)], offers, _MOSSGATE_SCALES)
         message = str(caught.exception)
         self.assertIn(shop.key, message)
         self.assertIn(_T_APPLE, message)
@@ -826,10 +852,12 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
             self,
             "items",
             "prices",
+            "places",
             "shops",
             extra={
                 "assortments": {self.OVERLAP_ASSORTMENT: overlap},
                 "shops": {shop.key: shop},
+                "places": {_place_row(shop.key).key: _place_row(shop.key)},
             },
         )
         floor, _ceiling = price_band(_T_APPLE)
@@ -843,6 +871,7 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         configs = validate_shop_configs(
             [_shop_row(T_SHOP), _shop_row(shop.key)],
             offers,
+            _MOSSGATE_SCALES,
         )
         mossgate_apple = next(
             offer for offer in configs[T_SHOP].offers if offer.item_key == _T_APPLE

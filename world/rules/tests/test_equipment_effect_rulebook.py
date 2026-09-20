@@ -586,12 +586,17 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         self.assertEqual(rules[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 3)
         from world.rules.guild_config import (
             validate_assortment_configs,
+            validate_price_scales,
             validate_shop_configs,
         )
         commerce_path = Path(__file__).parents[1] / "rulebook" / "commerce.yaml"
         raw_commerce = yaml.safe_load(commerce_path.read_text(encoding="utf-8"))
         assortment_offers = validate_assortment_configs(raw_commerce["assortments"])
-        configs = validate_shop_configs(raw_commerce["shops"], assortment_offers)
+        configs = validate_shop_configs(
+            raw_commerce["shops"],
+            assortment_offers,
+            validate_price_scales(raw_commerce["price_scales"]),
+        )
         self.assertFalse(
             any(offer.item_key == "wooden_club" for offer in configs["altoria_general_store"].offers)
         )

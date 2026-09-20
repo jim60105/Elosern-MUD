@@ -55,6 +55,14 @@ class PlaceDefinition:
     # branch_key / dialogue_key), frozen as a mapping. Projected onto the
     # blueprint exactly as validate_service_hosts projects roster kwargs today.
     authored_kwargs: tuple[tuple[str, str], ...]
+    # Per-place assortment adjustments (settlement-shops design §4). Additions
+    # stock items outside the referenced assortments — each addition MUST
+    # carry a complete override in the shop row (commerce.yaml) because it has
+    # no assortment base rule. Removals decline items the referenced
+    # assortments contain. Both are shop-only concepts: a place without a
+    # shop identity may declare neither.
+    extra_item_keys: tuple[str, ...] = ()
+    excluded_item_keys: tuple[str, ...] = ()
 
 
 def _authored_kwargs_map(place: PlaceDefinition) -> dict[str, str]:
@@ -139,6 +147,22 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 )
             raise ValueError(
                 f"place {place.key!r} declares a shop identity (shop_key) without assortments"
+            )
+        for field_name in ("extra_item_keys", "excluded_item_keys"):
+            keys = getattr(place, field_name)
+            if not isinstance(keys, tuple) or any(
+                not isinstance(key, str) or not key.strip() for key in keys
+            ):
+                raise ValueError(
+                    f"place {place.key!r} {field_name} must be a tuple of "
+                    "non-empty item keys"
+                )
+            if len(set(keys)) != len(keys):
+                raise ValueError(f"place {place.key!r} {field_name} has duplicate item keys")
+        if (place.extra_item_keys or place.excluded_item_keys) and not has_shop_identity:
+            raise ValueError(
+                f"place {place.key!r} declares extra_item_keys/excluded_item_keys "
+                "without a shop identity (shop_key)"
             )
 
 

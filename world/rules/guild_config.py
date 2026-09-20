@@ -10,7 +10,7 @@ never duplicate balance constants.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -25,6 +25,7 @@ from world.lore.settlements.assortments import (
     KEEPSAKE_BAND_KEY,
 )
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.guild_offers import (
     GuildOfferError,
@@ -250,7 +251,17 @@ def validate_exam_profiles(raw: Mapping[str, Any]) -> dict[str, ExamProfile]:
 
 
 _ASSORTMENT_ROW_FIELDS = frozenset({"key", "offers"})
-_SHOPS_ROW_FIELDS = frozenset({"shop_key", "open_hour", "close_hour", "restock_hour"})
+_SHOPS_ROW_FIELDS = frozenset(
+    {"shop_key", "open_hour", "close_hour", "restock_hour", "price_scale", "overrides"}
+)
+_SHOP_SCALE_MIN = 1
+_SHOP_SCALE_MAX = 1000
+_OVERRIDE_ROW_FIELDS = frozenset(
+    {"item_key", "buy_copper", "sell_copper", "max_stock", "initial_stock", "restock_quantity"}
+)
+_OFFER_PRICE_FIELDS = frozenset(
+    {"buy_copper", "sell_copper", "max_stock", "initial_stock", "restock_quantity"}
+)
 
 
 def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]:
@@ -259,8 +270,11 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
     Every item/offer alignment, money, band, stock and keepsake rejection the
     old per-shop join enforced is now evaluated once per assortment, however
     many shops reference it. An assortment SHALL NOT declare hours, a host or
-    a location, so stray fields are rejected. Returns
-    ``assortment_key -> {item_key: ItemOfferRule}`` in YAML offer order.
+    a location, so stray fields are rejected. Prices are validated as exact
+    integers here; the band containment, sell-not-above-buy and
+    non-negative checks run against the RESOLVED values at shop resolution
+    (place-price-scaling §4), because scaling is what a player is charged.
+    Returns ``assortment_key -> {item_key: ItemOfferRule}`` in YAML offer order.
     """
     if not isinstance(raw, list):
         raise _commerce_error("assortments must be a list")
@@ -323,30 +337,17 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
             buy_copper = _require_int(
                 offer.get("buy_copper"),
                 f"assortments.{assortment_key}.{item_key}.buy_copper",
-                minimum=0,
                 raise_error=_commerce_error,
             )
             sell_copper = _require_int(
                 offer.get("sell_copper"),
                 f"assortments.{assortment_key}.{item_key}.sell_copper",
-                minimum=0,
                 raise_error=_commerce_error,
             )
-            if sell_copper > buy_copper:
-                raise _commerce_error(
-                    f"assortments.{assortment_key}.{item_key}: sell_copper {sell_copper} "
-                    f"exceeds buy_copper {buy_copper}"
-                )
             price_entry = PRICE_TABLE.get(ITEM_REGISTRY[item_key].price_table_key)
             if price_entry is None:
                 raise _commerce_error(
                     f"assortments.{assortment_key}.{item_key} has no price-table entry"
-                )
-            band_floor, band_ceiling = price_entry.min_copper, price_entry.max_copper
-            if not band_floor <= buy_copper <= (band_ceiling if band_ceiling is not None else buy_copper):
-                raise _commerce_error(
-                    f"assortments.{assortment_key}.{item_key} buy_copper {buy_copper} is "
-                    f"outside price-table band {(band_floor, band_ceiling)}"
                 )
             max_stock = _require_int(
                 offer.get("max_stock"),
@@ -393,17 +394,294 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
     return validated
 
 
+def validate_price_scales(raw: Any) -> dict[str, int]:
+    """Validate the ``price_scales:`` section of commerce.yaml (design §4).
+
+    The section is keyed by settlement, and each value is an integer
+    percentage in ``1..1000`` where ``100`` is par. A settlement may be
+    declared at par only explicitly — ``100`` is an authored value, not a
+    silent fallback. An unknown settlement key, a non-integer scale, or a
+    scale outside the bounded range each fail catalog load naming the
+    declaring settlement.
+    """
+    if not isinstance(raw, Mapping):
+        raise _commerce_error("price_scales must be a mapping")
+    scales: dict[str, int] = {}
+    for settlement_key, scale in raw.items():
+        if settlement_key not in SETTLEMENT_REGISTRY:
+            raise _commerce_error(
+                f"price_scales names unknown settlement {settlement_key!r}"
+            )
+        if settlement_key in scales:
+            raise _commerce_error(
+                f"duplicate settlement {settlement_key!r} in price_scales"
+            )
+        value = _require_int(
+            scale,
+            f"price_scales.{settlement_key}",
+            minimum=_SHOP_SCALE_MIN,
+            raise_error=_commerce_error,
+        )
+        if value > _SHOP_SCALE_MAX:
+            raise _commerce_error(
+                f"price_scales.{settlement_key} scale {value} must be at most "
+                f"{_SHOP_SCALE_MAX}"
+            )
+        scales[str(settlement_key)] = value
+    return scales
+
+
+def _scaled_price(base_copper: int, scale: int) -> int:
+    """Half-up rounding ``(base * scale + 50) // 100`` — exact integer copper.
+
+    Precondition: ``scale`` was already validated in 1..1000 by the caller
+    (``validate_price_scales`` / ``_resolve_scale``); this helper stays a bare
+    integer multiply with no float entering the copper path.
+    """
+    return (base_copper * scale + 50) // 100
+
+
+def _authoring_place(shop_key: str):
+    """The place registry row that authors ``shop_key`` (design §3.2).
+
+    SHOP_REGISTRY is a projection of PLACE_REGISTRY: every shop identity is
+    authored on exactly one place. A commerce row whose shop_key no place
+    authors is unreachable in production and fails closed here, so a
+    place-level operation (scale, additions, removals) always has a row to
+    resolve against.
+    """
+    for place in PLACE_REGISTRY.values():
+        if dict(place.authored_kwargs).get("shop_key") == shop_key:
+            return place
+    raise _commerce_error(f"shops.{shop_key} is authored by no place registry row")
+
+
+def _resolve_shop_scale(
+    shop_key: str, entry: Mapping[str, Any], place: Any, price_scales: Mapping[str, int]
+) -> int:
+    """The effective integer scale for one shop (design §4).
+
+    A shop row's own ``price_scale`` overrides its settlement's entry; a shop
+    whose settlement declares no scale fails load naming the settlement and
+    the place, because a silent par would hide an authoring gap.
+    """
+    declared = entry.get("price_scale")
+    if declared is not None:
+        scale = _require_int(
+            declared,
+            f"shops.{shop_key}.price_scale",
+            minimum=_SHOP_SCALE_MIN,
+            raise_error=_commerce_error,
+        )
+        if scale > _SHOP_SCALE_MAX:
+            raise _commerce_error(
+                f"shops.{shop_key} price_scale {scale} must be at most {_SHOP_SCALE_MAX}"
+            )
+        return scale
+    scale = price_scales.get(place.settlement_key)
+    if scale is None:
+        raise _commerce_error(
+            f"shops.{shop_key} (place {place.key!r}) has no price_scales entry "
+            f"for settlement {place.settlement_key!r}"
+        )
+    return scale
+
+
+def _validate_overrides_row(
+    shop_key: str, position: int, row: Any, place: Any
+) -> ItemOfferRule:
+    """One complete-or-rejected override row, wholly replacing an offer rule."""
+    what = f"shops.{shop_key} (place {place.key!r}) overrides[{position}]"
+    if not isinstance(row, Mapping):
+        raise _commerce_error(f"{what} must be a mapping")
+    unknown_fields = set(row) - _OVERRIDE_ROW_FIELDS
+    if unknown_fields:
+        raise _commerce_error(f"{what} has unknown field(s) {sorted(unknown_fields)}")
+    item_key = row.get("item_key")
+    if item_key is None or item_key not in ITEM_REGISTRY:
+        raise _commerce_error(
+            f"shops.{shop_key} (place {place.key!r}) override {item_key!r} "
+            "must name a known item"
+        )
+    missing_fields = sorted(_OFFER_PRICE_FIELDS - set(row))
+    if missing_fields:
+        raise _commerce_error(
+            f"shops.{shop_key} (place {place.key!r}) override for {item_key!r} "
+            f"is missing field(s) {missing_fields}"
+        )
+    buy_copper = _require_int(
+        row.get("buy_copper"),
+        f"{what}.{item_key}.buy_copper",
+        raise_error=_commerce_error,
+    )
+    sell_copper = _require_int(
+        row.get("sell_copper"),
+        f"{what}.{item_key}.sell_copper",
+        raise_error=_commerce_error,
+    )
+    max_stock = _require_int(
+        row.get("max_stock"),
+        f"{what}.{item_key}.max_stock",
+        minimum=1,
+        raise_error=_commerce_error,
+    )
+    initial_stock = _require_int(
+        row.get("initial_stock"),
+        f"{what}.{item_key}.initial_stock",
+        minimum=0,
+        raise_error=_commerce_error,
+    )
+    if initial_stock > max_stock:
+        raise _commerce_error(
+            f"{what}.{item_key}: initial_stock {initial_stock} exceeds "
+            f"max_stock {max_stock}"
+        )
+    restock_quantity = _require_int(
+        row.get("restock_quantity"),
+        f"{what}.{item_key}.restock_quantity",
+        minimum=1,
+        raise_error=_commerce_error,
+    )
+    return ItemOfferRule(
+        item_key=item_key,
+        buy_copper=buy_copper,
+        sell_copper=sell_copper,
+        max_stock=max_stock,
+        initial_stock=initial_stock,
+        restock_quantity=restock_quantity,
+    )
+
+
+def _validate_resolved_rule(shop_key: str, place: Any, rule: ItemOfferRule) -> None:
+    """Rejections run against the RESOLVED value a player is charged (design §4)."""
+    what = f"shops.{shop_key} (place {place.key!r}) item {rule.item_key!r}"
+    if rule.buy_copper < 0 or rule.sell_copper < 0:
+        raise _commerce_error(
+            f"{what} resolved price must be a non-negative integer, "
+            f"got buy {rule.buy_copper} sell {rule.sell_copper}"
+        )
+    if rule.sell_copper > rule.buy_copper:
+        raise _commerce_error(
+            f"{what}: resolved sell_copper {rule.sell_copper} exceeds "
+            f"resolved buy_copper {rule.buy_copper}"
+        )
+    price_entry = PRICE_TABLE.get(ITEM_REGISTRY[rule.item_key].price_table_key)
+    if price_entry is None:
+        raise _commerce_error(f"{what} has no price-table entry")
+    band_floor, band_ceiling = price_entry.min_copper, price_entry.max_copper
+    if not band_floor <= rule.buy_copper <= (
+        band_ceiling if band_ceiling is not None else rule.buy_copper
+    ):
+        raise _commerce_error(
+            f"{what} resolved buy_copper {rule.buy_copper} is "
+            f"outside price-table band {(band_floor, band_ceiling)}"
+        )
+
+
+def _parse_shop_overrides(
+    entry: Mapping[str, Any], shop_key: str, place: Any
+) -> dict[str, ItemOfferRule]:
+    """Parse a shop row's ``overrides:`` list into item-keyed rules.
+
+    Every override row is complete or rejected: all five offer fields, else
+    a load error naming the place, the item and the missing fields. Two
+    rows for one item, or a row naming an unknown item, also fail closed.
+    """
+    raw_overrides = entry.get("overrides")
+    if raw_overrides is None:
+        return {}
+    if not isinstance(raw_overrides, list):
+        raise _commerce_error(f"shops.{shop_key}.overrides must be a list")
+    overrides: dict[str, ItemOfferRule] = {}
+    for position, row in enumerate(raw_overrides, start=1):
+        item_key = row.get("item_key") if isinstance(row, Mapping) else None
+        rule = _validate_overrides_row(shop_key, position, row, place)
+        if item_key in overrides:
+            raise _commerce_error(
+                f"shops.{shop_key} (place {place.key!r}) overrides "
+                f"{item_key!r} more than once"
+            )
+        overrides[item_key] = rule
+    return overrides
+
+
+def _resolve_shop_offers(
+    shop: Any,
+    place: Any,
+    overrides: dict[str, ItemOfferRule],
+    assortment_offers: Mapping[str, Mapping[str, ItemOfferRule]],
+    scale: int,
+) -> tuple[ItemOfferRule, ...]:
+    """Resolve one shop's final offers: additions, removals, scale, overrides.
+
+    Offered goods are the assortment union plus the place's additions minus
+    its removals (design §3.2). Every override must name an item the place
+    offers, and every addition must carry a complete override — both
+    directions fail load naming the place and the item. A base rule is used
+    either verbatim (overridden) or scaled once with half-up rounding; an
+    override is absolute and is never scaled.
+    """
+    what = f"place {place.key!r} (shop {shop.key!r})"
+    assortment_items = set(shop.offered_item_keys)
+    excluded = set(place.excluded_item_keys)
+    for item_key in excluded:
+        if item_key not in assortment_items:
+            raise _commerce_error(
+                f"{what} excludes {item_key!r} which no referenced "
+                "assortment contains"
+            )
+    extras = set(place.extra_item_keys)
+    for item_key in extras:
+        if item_key in assortment_items:
+            raise _commerce_error(
+                f"{what} adds {item_key!r} which a referenced assortment "
+                "already offers"
+            )
+        if item_key not in overrides:
+            raise _commerce_error(
+                f"{what} adds {item_key!r} without a complete override"
+            )
+    offered = (assortment_items - excluded) | extras
+    for item_key in overrides:
+        if item_key not in offered:
+            raise _commerce_error(
+                f"{what} overrides {item_key!r} which the place does not offer"
+            )
+    resolved: list[ItemOfferRule] = []
+    for assortment_key in shop.assortment_keys:
+        for base in assortment_offers[assortment_key].values():
+            if base.item_key in excluded:
+                continue
+            if base.item_key in overrides:
+                resolved.append(overrides[base.item_key])
+            else:
+                resolved.append(
+                    replace(
+                        base,
+                        buy_copper=_scaled_price(base.buy_copper, scale),
+                        sell_copper=_scaled_price(base.sell_copper, scale),
+                    )
+                )
+    for item_key in place.extra_item_keys:
+        resolved.append(overrides[item_key])
+    return tuple(resolved)
+
+
 def validate_shop_configs(
     raw: Any,
     assortment_offers: Mapping[str, Mapping[str, ItemOfferRule]],
+    price_scales: Mapping[str, int],
 ) -> dict[str, ShopConfig]:
     """Resolve the ``shops:`` section of commerce.yaml against assortments.
 
     A shop's offered goods are the union of its referenced assortments'
-    validated offer rules, handed downstream as the flat ``ShopConfig`` shape
-    (design §3.1). The shops-completeness accounting is keyed on shop
-    identity rather than a component-type field, so a shop whose rule row is
-    absent is named no matter how many shops the registry carries (§1.1).
+    validated offer rules, plus the owning place's additions minus its
+    removals, priced as either a complete absolute override or one half-up
+    scaling of the base (place-price-scaling §4). Every price rejection
+    runs against the RESOLVED value a player would be charged. The
+    shops-completeness accounting is keyed on shop identity rather than a
+    component-type field, so a shop whose rule row is absent is named no
+    matter how many shops the registry carries (§1.1).
     """
     if not isinstance(raw, list):
         raise _commerce_error("shops must be a list")
@@ -489,11 +767,14 @@ def validate_shop_configs(
                 )
         if open_hour == close_hour:
             raise _commerce_error(f"shops.{shop_key} open and close hours cannot be equal")
-        offers = [
-            rule
-            for assortment_key in shop.assortment_keys
-            for rule in assortment_offers[assortment_key].values()
-        ]
+        place = _authoring_place(shop_key)
+        scale = _resolve_shop_scale(shop_key, entry, place, price_scales)
+        overrides = _parse_shop_overrides(entry, shop_key, place)
+        offers = _resolve_shop_offers(
+            shop, place, overrides, assortment_offers, scale
+        )
+        for rule in offers:
+            _validate_resolved_rule(shop_key, place, rule)
         configs[shop_key] = ShopConfig(
             shop_key=shop_key,
             display_name_zh=_place_for_shop(shop_key).room_name_zh,
@@ -730,11 +1011,16 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
         raise _commerce_error("assortments section is required")
     if "shops" not in commerce:
         raise _commerce_error("shops section is required")
+    if "price_scales" not in commerce:
+        raise _commerce_error("price_scales section is required")
     assortment_offers = validate_assortment_configs(commerce["assortments"])
+    price_scales = validate_price_scales(commerce["price_scales"])
     return GuildCatalog(
         merit_thresholds=validate_merit_thresholds(raw["merit_thresholds"]),
         exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
-        shop_configs=validate_shop_configs(commerce["shops"], assortment_offers),
+        shop_configs=validate_shop_configs(
+            commerce["shops"], assortment_offers, price_scales
+        ),
         quest_offers=validate_quest_rewards(raw["quest_rewards"], definition_registry),
         service_hosts=validate_service_hosts(),
     )
