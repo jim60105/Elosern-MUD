@@ -29,7 +29,9 @@ from world.rules.player_messages import DEFEAT_AFTERMATH_TEMPLATES
 from tools.spec_traceability import covers_requirement
 from world.ai.narrator import render_aftermath
 
-from .test_defeat_aftermath_violation import (
+# The violation suite moved into a same-named package; its shared base and
+# log helpers live in the package's non-collected _support module.
+from .test_defeat_aftermath_violation._support import (
     ViolationBase,
     _aftermath_entries,
     _aftermath_logs,
