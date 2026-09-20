@@ -76,10 +76,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_name_zh="瓦爾溫的家",
         room_desc_zh=(
             "Roots cradle this house beneath the old tree at the village's "
-            "north edge. Shelves along every wall hold the collected oddments "
-            "of a long life — stones, feathers, lengths of silk, seeds — each "
-            "tenderly kept, each with a story. It is a home filled with "
-            "kept things, not a business."
+            "north edge. Along every wall, the collected oddments of a long "
+            "life sit in woven baskets and hollowed stones — feathers, seeds, "
+            "lengths of bundled silk — each tenderly kept, each with a story. "
+            "It is a home filled with kept things, not a business."
         ),
         exterior_xy=(1, 2),  # 村北古樹下
         doorway_key_zh="瓦爾溫的家",

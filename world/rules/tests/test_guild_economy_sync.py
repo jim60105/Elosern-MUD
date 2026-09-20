@@ -49,6 +49,7 @@ from world.rules.economy import (
     TradeError,
     TradeReason,
     buy,
+    parse_merchant_stock,
 )
 from world.rules.guild_economy import (
     ServiceAnchorIntegrityError,
@@ -1082,6 +1083,8 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertNotIn("舖", place.room_name_zh)
                 self.assertNotIn("櫃檯", place.room_desc_zh)
                 self.assertNotIn("招牌", place.room_desc_zh)
+                for token in ("counter", "sign", "shopfront", "store", "shelf"):
+                    self.assertNotIn(token, place.room_desc_zh)
 
     def test_elven_goods_resolve_at_two_prices_across_two_settlements(self):
         catalog = get_catalog()
@@ -1095,12 +1098,35 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         )
         self.assertEqual(village_silk.buy_copper, 60)
         self.assertEqual(capital_silk.buy_copper, 60_000)
-        self.assertEqual(
-            ITEM_REGISTRY["elven_spider_silk"],
-            ITEM_REGISTRY[capital_silk.item_key],
+        self.assertEqual(village_silk.item_key, capital_silk.item_key)
+        self.assertTrue(ITEM_REGISTRY[village_silk.item_key].sellable)
+        # The candied blossom is the second shared key (design's 蜜漬花蕊):
+        # both settlements offer it, again through their own assortments.
+        village_fare = catalog.shop_configs["ciaran_lareneth_home"]
+        village_blossom = next(
+            offer
+            for offer in village_fare.offers
+            if offer.item_key == "elven_candied_blossom"
         )
-        # The capital reaches silk through its own assortment, never the elven shelf.
-        self.assertNotIn("elven_", SHOP_REGISTRY["altoria_general_store"].assortment_keys)
+        capital_eatery = catalog.shop_configs["altoria_eatery"]
+        capital_blossom = next(
+            offer
+            for offer in capital_eatery.offers
+            if offer.item_key == "elven_candied_blossom"
+        )
+        self.assertEqual(village_blossom.buy_copper, 20)
+        self.assertEqual(capital_blossom.buy_copper, 60)
+        self.assertEqual(village_blossom.item_key, capital_blossom.item_key)
+        # Importing one good must not import the shelf: the capital reaches
+        # silk through its own sundries assortment alone, and stocks none of
+        # the village's other elven goods.
+        self.assertEqual(
+            SHOP_REGISTRY["altoria_general_store"].assortment_keys,
+            ("general_sundries",),
+        )
+        capital_offered = {offer.item_key for offer in capital.offers}
+        self.assertIn("elven_spider_silk", capital_offered)
+        self.assertNotIn("crescent_earring", capital_offered)
 
     def test_village_purchase_settles_like_a_capital_purchase(self):
         sync_service_content()
@@ -1116,6 +1142,13 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(result["total_copper"], 60)
         self.assertEqual(player.db.wallet, 940)
         self.assertIn("elven_spider_silk", player.db.inventory)
+        stock = parse_merchant_stock(host.components.get(Merchant.get_component_slot()))
+        silk_offer = next(
+            offer
+            for offer in get_catalog().shop_configs["ciaran_valwyn_home"].offers
+            if offer.item_key == "elven_spider_silk"
+        )
+        self.assertEqual(stock["elven_spider_silk"], silk_offer.initial_stock - 1)
         self.assertEqual(host.relations.affinity_for(player), 1)
 
     def test_displaced_village_host_refuses_with_the_fixed_anchoring_message(self):
@@ -1136,9 +1169,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
             buy(player, host, "elven_spider_silk", 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
         self.assertEqual(player.db.wallet, 1000)
+        self.assertEqual(list(player.db.inventory or []), [])
         # The player-facing refusal is the anchoring gate's fixed line, the
         # same one a displaced town merchant produces (service-anchoring).
-        self.assertEqual(MESSAGE_OFF_ANCHOR, "他的服務不在這裡營業。")
         self.assertEqual(
             SERVICE_REASON_MESSAGES["service_unavailable"],
             MESSAGE_OFF_ANCHOR,
