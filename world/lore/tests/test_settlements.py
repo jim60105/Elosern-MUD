@@ -2,6 +2,8 @@
 Self-consistency checks for the settlement and place records (one authored
 record per service location, settlement-shops design §3.2/§3.3)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from dataclasses import replace
 from unittest import mock
@@ -22,6 +24,9 @@ from world.lore.settlements.shops import SHOP_REGISTRY
 class SettlementRegistryTests(unittest.TestCase):
     """Settlement records: closed archetype vocabulary and anchor-key parity."""
 
+    @covers_requirement(
+        "settlement-place-registry::a-settlement-declares-its-archetype-and-coordinate-space"
+    )
     def test_archetype_vocabulary_has_the_six_lore_archetypes(self):
         self.assertEqual(
             [archetype.value for archetype in SettlementArchetype],
@@ -58,6 +63,12 @@ class PlaceRegistryTests(unittest.TestCase):
     def test_shipped_place_registry_passes_validation(self):
         validate_place_registry(PLACE_REGISTRY)
 
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    @covers_requirement(
+        "settlement-place-registry::a-settlement-declares-its-archetype-and-coordinate-space"
+    )
     def test_shipped_places_transcribe_the_bootstrap_interiors(self):
         # Transcribed from the bootstrap module constants; the place row now
         # carries the interior identity that sync_service_interiors reads from
@@ -106,12 +117,18 @@ class PlaceRegistryTests(unittest.TestCase):
             "human_plains",
         )
 
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
     def test_assortments_without_a_shop_identity_are_rejected(self):
         self._assert_rejected(
             self._plant(self.guild, assortment_keys=("common_arms",)),
             "assortments",
         )
 
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
     def test_shop_identity_without_assortments_is_rejected(self):
         self._assert_rejected(self._plant(self.store, assortment_keys=()), "shop_key")
 
@@ -150,6 +167,9 @@ class PlaceRegistryTests(unittest.TestCase):
 class DerivedShopRegistryTests(unittest.TestCase):
     """Shop identities are a view over the places that author a shop_key."""
 
+    @covers_requirement(
+        "settlement-place-registry::shop-identities-and-the-service-host-roster-are-derived-from-places"
+    )
     def test_shops_are_derived_from_the_places_that_author_a_shop_identity(self):
         self.assertEqual(set(SHOP_REGISTRY), {"altoria_general_store"})
         shop = SHOP_REGISTRY["altoria_general_store"]
