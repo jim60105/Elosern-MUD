@@ -10,7 +10,16 @@ from web.webclient.presentation.registry import PanelUnavailableError, build_pro
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import SOUTH_GATE_XYZ, _T_MAP_KEY, _T_PLAZA_XYZ, _context, _t_grid_id
+from ._support import (
+    EAST_APPROACH,
+    SOUTH_APPROACH,
+    SOUTH_GATE_XYZ,
+    _T_MAP_KEY,
+    _T_PLAZA_XYZ,
+    _context,
+    _t_grid_id,
+    _t_wild_id,
+)
 
 
 
@@ -271,31 +280,23 @@ class LocalMapPresenterTests(EvenniaTestCase):
         actor.location = self.south_gate
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))
+        # Every node the payload may carry, enumerated from the live map
+        # module and the live gate approaches (test-data gate: no authored
+        # topology). The set is derived from the SAME source the presenter
+        # reads, but membership is what the test guards -- a node id with no
+        # registered origin must never be fabricated into the payload.
+        from evennia.contrib.grid.xyzgrid.xymap import XYMap
+        from world.maps.map_data import XYMAP_DATA_LIST
+
+        capital_map = next(
+            data for data in XYMAP_DATA_LIST if data["zcoord"] == _T_MAP_KEY
+        )
+        parsed = XYMap(dict(capital_map), Z=_T_MAP_KEY, xyzgrid=None)
+        parsed.parse()
         valid = {
-            _t_grid_id(*SOUTH_GATE_XYZ[:2]),
-            "wild:elosern:60:97",
-            "wild:elosern:63:100",
-            _t_grid_id(1, 1),
-            _t_grid_id(2, 1),
-            _t_grid_id(3, 1),
-            _t_grid_id(4, 1),
-            _t_grid_id(5, 1),
-            _t_grid_id(2, 2),
-            _t_grid_id(3, 2),
-            _t_grid_id(1, 3),
-            _t_grid_id(2, 3),
-            _t_grid_id(3, 3),
-            _t_grid_id(4, 3),
-            _t_grid_id(5, 3),
-            _t_grid_id(6, 3),
-            _t_grid_id(2, 4),
-            _t_grid_id(3, 4),
-            _t_grid_id(4, 4),
-            _t_grid_id(3, 5),
-            _t_grid_id(4, 5),
-            _t_grid_id(5, 5),
-            _t_grid_id(4, 6),
+            _t_grid_id(node.X, node.Y) for node in parsed.node_index_map.values()
         }
+        valid |= {_t_wild_id(*EAST_APPROACH), _t_wild_id(*SOUTH_APPROACH)}
         for node in payload["nodes"]:
             self.assertIn(node["id"], valid)
 

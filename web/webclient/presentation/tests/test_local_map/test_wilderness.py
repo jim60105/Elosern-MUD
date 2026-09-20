@@ -10,7 +10,19 @@ from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import EAST_GATE_XYZ, SOUTH_GATE_XYZ, _T_MAP_KEY, _context, _t_anchor_display, _t_grid_id, _t_region_display_for
+from ._support import (
+    EAST_APPROACH,
+    EAST_GATE_XYZ,
+    SOUTH_APPROACH,
+    SOUTH_GATE_XYZ,
+    _T_MAP_KEY,
+    _context,
+    _live_gateway_entry,
+    _t_anchor_display,
+    _t_grid_id,
+    _t_region_display_for,
+    _t_wild_id,
+)
 
 
 
@@ -111,11 +123,10 @@ class LocalMapWildernessTests(EvenniaTestCase):
         self.assertEqual(payload["layer"], "wilderness")
         current = payload["current_node"]
         moves = [node for node in payload["nodes"] if node["action"] is not None]
-        # At the east-gate approach (63, 100) six directions are actionable:
-        # the gate (w) plus five ordinary steps. The two directions facing the
-        # anchor footprint (nw, sw -- cells (62, 101) and (62, 99)) are
-        # refused by the provider and render nothing (wilderness-anchor-
-        # footprint).
+        # At the east gate's approach cell six directions are actionable:
+        # the gate (w) plus five ordinary steps. The two diagonals facing the
+        # anchor footprint (nw, sw) are refused by the provider and render
+        # nothing (wilderness-anchor-footprint).
         self.assertEqual(len(moves), 6)
         for move in moves:
             self.assertEqual(move["action"]["kind"], "move")
@@ -221,15 +232,16 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # Stand on the east gate's approach cell (records it honestly, the
         # way arrival recording already works), then walk far enough away
         # that it drops out of the drawn 3x3 field of view.
-        self._at_wild((63, 100))
-        self._at_wild((73, 100))
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex, ey))
+        self._at_wild((ex + 10, ey))
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         self.assertEqual(len(remembered), 1)
         node = remembered[0]
-        self.assertEqual(node["id"], "wild:elosern:63:100")
-        self.assertEqual((node["x"], node["y"]), (63, 100))
+        self.assertEqual(node["id"], _t_wild_id(ex, ey))
+        self.assertEqual((node["x"], node["y"]), (ex, ey))
         self.assertEqual(node["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
@@ -268,8 +280,9 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         ][0]
         self.char1.location = self.east_gate
         record_arrival(self.char1)
-        gate.at_traverse(self.char1, self.east_gate)  # now at (63, 100)
-        self._at_wild((73, 100))  # walk far away, keeping both memories
+        gate.at_traverse(self.char1, self.east_gate)  # now at the approach
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 10, ey))  # walk far away, keeping both memories
 
         wild_payload = self._registry().render("local_map", _context(self.char1))
         self.assertEqual(wild_payload["layer"], "wilderness")
@@ -303,10 +316,11 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # east gate's approach cell, that in-view neighbour is named for
         # what it leads to, not the region it stands on -- while its ID,
         # action, and edge stay exactly what they already were.
-        self._at_wild((64, 100))
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 1, ey))
         payload = self._registry().render("local_map", _context(self.char1))
         neighbor = next(
-            node for node in payload["nodes"] if node["id"] == "wild:elosern:63:100"
+            node for node in payload["nodes"] if node["id"] == _t_wild_id(ex, ey)
         )
         self.assertEqual(neighbor["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertEqual(neighbor["visibility"], "visible_unvisited")
@@ -337,8 +351,11 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # also apply here, or two genuinely different boundaries render the
         # identical anchor-name chip, reproducing this change's own target
         # defect.
-        self._at_wild((60, 97))  # 南門's approach cell
-        self._at_wild((63, 100))  # 東門's approach cell
+        entry = _live_gateway_entry()
+        south_approach = entry.approach_cell(entry.gate_for("n"))
+        east_approach = entry.approach_cell(entry.gate_for("w"))
+        self._at_wild(south_approach)  # the south gate's approach cell
+        self._at_wild(east_approach)  # the east gate's approach cell
         self._at_wild((90, 100))  # far from both
         payload = self._registry().render("local_map", _context(self.char1))
         remembered = {
@@ -346,11 +363,15 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             for node in payload["nodes"]
             if node["visibility"] == "remembered"
         }
+        # Labels qualify by the gate room's own key (the shipped city gate
+        # rooms), read from the live rooms -- never authored here.
+        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.assertEqual(
             remembered,
             {
-                "wild:elosern:60:97": f"{_t_anchor_display(_T_MAP_KEY)}（南門）",
-                "wild:elosern:63:100": f"{_t_anchor_display(_T_MAP_KEY)}（東門）",
+                _t_wild_id(*south_approach): f"{_t_anchor_display(_T_MAP_KEY)}（{south_gate.key}）",
+                _t_wild_id(*east_approach): f"{_t_anchor_display(_T_MAP_KEY)}（{east_gate.key}）",
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)

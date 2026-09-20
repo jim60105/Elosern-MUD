@@ -17,14 +17,6 @@ def _live(module: str, attribute: str):
 # than imported as authored constants (test-data gate). Idiom mirrors
 # world/maps/tests/test_limbo_room.py::_gate_row and
 # typeclasses/tests/test_exits.py::live_gateway_entry.
-def _gate_row():
-    registry = _live("world.maps." + "city_gates", "CITY" + "_GATE_REGISTRY")
-    keys = sorted(registry)
-    if not keys:
-        raise AssertionError("no city gate row exists")
-    return registry[keys[0]]
-
-
 def _live_gateway_entry():
     """The settlement entry authoring both gateway faces (north + west)."""
     entries = _live(
@@ -40,11 +32,27 @@ def _live_gateway_entry():
     return candidates[0]
 
 
-SOUTH_GATE_XYZ = _gate_row().gate_xyz
-_EAST_GATE = _live_gateway_entry().gate_for("w")
+def _city_gate_row_for(gate):
+    """The city-gate row standing at ``gate``'s grid room (uniqueness
+    asserted, so a settlement reorder cannot silently misbind the row)."""
+    registry = _live("world.maps." + "city_gates", "CITY" + "_GATE_REGISTRY")
+    matches = [
+        row
+        for row in registry.values()
+        if row.gate_xyz == (*gate.grid_xy, gate.z_map_key)
+    ]
+    if len(matches) != 1:
+        raise AssertionError("exactly one city gate row stands at a gateway face")
+    return matches[0]
+
+
+_ENTRY = _live_gateway_entry()
+_NORTH_FACE = _ENTRY.gate_for("n")
+_EAST_GATE = _ENTRY.gate_for("w")
+SOUTH_GATE_XYZ = _city_gate_row_for(_NORTH_FACE).gate_xyz
 EAST_GATE_XYZ = (*_EAST_GATE.grid_xy, _EAST_GATE.z_map_key)
-EAST_APPROACH = _live_gateway_entry().approach_cell(_EAST_GATE)
-SOUTH_APPROACH = _live_gateway_entry().approach_cell(_live_gateway_entry().gate_for("n"))
+EAST_APPROACH = _ENTRY.approach_cell(_EAST_GATE)
+SOUTH_APPROACH = _ENTRY.approach_cell(_NORTH_FACE)
 
 # The sample city's z-map key rides in with the probed gate coordinates --
 # the map identity never appears as a literal in this file.
@@ -55,7 +63,7 @@ _T_MAP_KEY = SOUTH_GATE_XYZ[2]
 # placement registry instead of authoring its coordinate.
 _T_PLAZA_XYZ = (
     * _live("world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY")[
-        _gate_row().map_id
+        _city_gate_row_for(_NORTH_FACE).map_id
     ].entrance_xy,
     _T_MAP_KEY,
 )
@@ -63,6 +71,14 @@ _T_PLAZA_XYZ = (
 
 def _t_grid_id(x: int, y: int) -> str:
     return f"grid:{_T_MAP_KEY}:{x}:{y}"
+
+
+def _t_wild_id(x: int, y: int) -> str:
+    """The wilderness layer's node id for one cell (provider map name read
+    from the wilderness_provider module, never authored here)."""
+    from world.maps.wilderness_provider import WILDERNESS_NAME
+
+    return f"wild:{WILDERNESS_NAME}:{x}:{y}"
 
 
 def _t_anchor_display(anchor_key: str) -> str:

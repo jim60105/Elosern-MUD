@@ -11,14 +11,23 @@ from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
 
-from ._support import EAST_GATE_XYZ, _T_MAP_KEY, _T_PLAZA_XYZ, _context, _t_grid_id
+from ._support import (
+    EAST_APPROACH,
+    SOUTH_APPROACH,
+    EAST_GATE_XYZ,
+    _T_MAP_KEY,
+    _T_PLAZA_XYZ,
+    _context,
+    _t_grid_id,
+    _t_wild_id,
+)
 
 
 
 class LocalMapGridGateCapacityTests(EvenniaTestCase):
     """Capacity reservation and slot probing for grid-side gate nodes."""
 
-    ENTRY_ID = "wild:elosern:63:100"
+    ENTRY_ID = _t_wild_id(*EAST_APPROACH)
 
     @classmethod
     def setUpClass(cls):
@@ -66,9 +75,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         )
         gate.db.anchor_key = _T_MAP_KEY
         # The presenter refuses a gate row whose direction names no gate
-        # (same refusal as the traversal), so synthetic gates carry the
-        # identity the tests pin: "w" -> approach cell (63, 100), face "e";
-        # "n" -> approach cell (60, 97), face "s".
+        # (same refusal as the traversal), so synthetic gates carry an
+        # identity a shipped gate actually holds: the live entry's "w" face
+        # and its "n" face (approach cells derived, never authored).
         gate.db.gate_direction = gate_direction
         return gate
 
@@ -302,8 +311,8 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # gates and a full-budget fake map the trim absorbs the pressure for
         # BOTH reservations -- neither gate may be silently omitted, and only
         # ordinary farthest nodes are trimmed in the pinned order.
-        self._make_gate(self.plaza, gate_direction="w")  # -> 63:100, face e
-        self._make_gate(self.plaza, key="北境之門", gate_direction="n")  # -> 60:97, face s
+        self._make_gate(self.plaza, gate_direction="w")  # -> east approach, face e
+        self._make_gate(self.plaza, key="北境之門", gate_direction="n")  # -> south approach, face s
         nodes = [
             types.SimpleNamespace(
                 X=col, Y=row, node_index=row * 100 + col, links={}, symbol="#"
@@ -346,19 +355,22 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertEqual(len(payload["nodes"]), 4)
         self.assertIn(_t_grid_id(0, 0), by_id)
         self.assertIn(_t_grid_id(1, 0), by_id)
-        self.assertIn("wild:elosern:63:100", by_id)
-        self.assertIn("wild:elosern:60:97", by_id)
-        self.assertIsNotNone(by_id["wild:elosern:63:100"]["action"])
-        self.assertIsNotNone(by_id["wild:elosern:60:97"]["action"])
-        # Faces: 63:100 draws east from (0,0) -> preferred (1,0) is occupied
-        # by the kept (1,0) node, so ring 1's first candidate (dy=-1) lands
-        # at (1,-1); 60:97 draws south to (0,-1) directly (free).
-        self.assertEqual((by_id["wild:elosern:63:100"]["x"], by_id["wild:elosern:63:100"]["y"]), (1, -1))
-        self.assertEqual((by_id["wild:elosern:60:97"]["x"], by_id["wild:elosern:60:97"]["y"]), (0, -1))
+        east_id = _t_wild_id(*EAST_APPROACH)
+        south_id = _t_wild_id(*SOUTH_APPROACH)
+        self.assertIn(east_id, by_id)
+        self.assertIn(south_id, by_id)
+        self.assertIsNotNone(by_id[east_id]["action"])
+        self.assertIsNotNone(by_id[south_id]["action"])
+        # Faces: the east gate draws east from (0,0) -> preferred (1,0) is
+        # occupied by the kept (1,0) node, so ring 1's first candidate
+        # (dy=-1) lands at (1,-1); the south gate draws south to (0,-1)
+        # directly (free).
+        self.assertEqual((by_id[east_id]["x"], by_id[east_id]["y"]), (1, -1))
+        self.assertEqual((by_id[south_id]["x"], by_id[south_id]["y"]), (0, -1))
         edge_labels = {
             edge["label"]
             for edge in payload["edges"]
-            if edge["destination"] in ("wild:elosern:63:100", "wild:elosern:60:97")
+            if edge["destination"] in (east_id, south_id)
         }
         self.assertEqual(edge_labels, {"e", "s"})
 

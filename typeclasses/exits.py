@@ -260,7 +260,7 @@ class CostedXYZExit(MovementCostMixin, XYZExit):
 
 
 class WildernessGateExit(Exit):
-    """Ordinary Exit at a grid room (e.g. capital_altoria's North Gate) whose
+    """Ordinary Exit at a grid room (e.g. capital_altoria's East Gate) whose
     at_traverse is fully overridden -- mirrors WildernessExit's own pattern of
     ignoring target_location entirely. db.anchor_key and db.gate_direction are
     set by sync_wilderness() at creation time -- they are NOT optional: they
