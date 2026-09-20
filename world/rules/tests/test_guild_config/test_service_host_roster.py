@@ -115,6 +115,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # catalog still loads the full derived roster.
         self.assertNotIn("service_hosts", raw_rulebook())
 
+    @covers_requirement(
+        "place-attendant-hosts::adding-the-blueprint-changes-no-shipped-host"
+    )
     def test_the_attendant_blueprint_ships_unused(self):
         # Neutrality gate (place-attendant-profession): every derived row
         # equals the FULL pre-change baseline field by field — name, title,
@@ -348,6 +351,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         base.update(overrides)
         return replace(PLACE_REGISTRY["altoria_general_store"], **base)
 
+    @covers_requirement(
+        "place-attendant-hosts::a-place-whose-service-is-conversation-has-a-blueprint-to-host-it"
+    )
     def test_an_attendant_authoring_a_trade_kwarg_is_rejected_as_dead(self):
         # The dialogue component consumes dialogue_key only: a shop_key on an
         # attendant row is exactly the dead-kwarg offense every profession
@@ -365,6 +371,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertIn("t_attendant_place", message)
         self.assertIn("shop_key", message)
 
+    @covers_requirement(
+        "place-attendant-hosts::a-place-whose-service-is-conversation-has-a-blueprint-to-host-it"
+    )
     def test_an_attendant_place_declaring_assortments_is_rejected(self):
         # Goods require a shop identity; the lore validator owns that rule
         # and fires on the place row alone.
@@ -375,6 +384,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertIn("t_attendant_place", message)
         self.assertIn("assortments without a shop identity", message)
 
+    @covers_requirement(
+        "place-attendant-hosts::an-authored-host-is-bound-to-a-dialogue-table-that-exists"
+    )
     def test_a_place_authoring_an_unregistered_dialogue_key_fails_load(self):
         # Authored resolution: the kwarg exists but resolves to nothing —
         # load names the place and the dead key (spec: bind to a table that
@@ -393,6 +405,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertIn("t_dead_dialogue_place", message)
         self.assertIn("t_unregistered_table", message)
 
+    @covers_requirement(
+        "place-attendant-hosts::an-authored-host-is-bound-to-a-dialogue-table-that-exists"
+    )
     def test_a_runtime_lookup_of_an_unregistered_key_still_degrades(self):
         # The load-time rejection above must NOT collapse into a runtime
         # raise: a key reaching the lookup from any other route still gets
