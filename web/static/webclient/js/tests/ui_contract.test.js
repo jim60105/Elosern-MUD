@@ -34,7 +34,7 @@ test("the command line sends ordinary text, never a ui_action envelope", () => {
     false,
     "the command line must not construct or reference a ui_action envelope"
   );
-  const store = read("web/webclient-app/stores/elosern.js");
+  const store = read("web/webclient-app/stores/elosern/transport.js");
   assert.match(store, /function dispatchAction\(/);
   assert.match(store, /function sendText\(/);
 });
