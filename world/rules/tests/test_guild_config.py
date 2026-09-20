@@ -358,6 +358,9 @@ class AssortmentRuleTests(unittest.TestCase):
     per-shop join enforced are now evaluated once per assortment.
     """
 
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
     def test_shipped_assortments_validate_and_resolve(self):
         offers = validate_assortment_configs(raw_commerce()["assortments"])
         self.assertEqual(set(offers), set(ASSORTMENT_REGISTRY))
@@ -375,6 +378,9 @@ class AssortmentRuleTests(unittest.TestCase):
                     self.assertLessEqual(rule.buy_copper, band.max_copper)
                 self.assertLessEqual(rule.initial_stock, rule.max_stock)
 
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
     def test_assortment_missing_offer_is_rejected(self):
         rows = _assortment_row(
             "staple_meals",
@@ -391,6 +397,9 @@ class AssortmentRuleTests(unittest.TestCase):
         self.assertIn("staple_meals", message)
         self.assertIn("meal", message)
 
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
     def test_offer_for_item_outside_assortment_is_rejected(self):
         rows = _assortment_row(
             "common_arms",
@@ -440,6 +449,9 @@ class AssortmentRuleTests(unittest.TestCase):
         with self.assertRaises(GuildConfigError):
             validate_assortment_configs(["nope"])
 
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
     def test_assortment_declaring_hours_is_rejected(self):
         row = raw_commerce()["assortments"][0]
         with self.assertRaises(GuildConfigError) as caught:
@@ -486,6 +498,9 @@ class AssortmentRuleTests(unittest.TestCase):
                 validate_assortment_configs(raw_commerce()["assortments"])
             self.assertIn("t_orphan", str(caught.exception))
 
+    @covers_requirement(
+        "commerce-assortments::an-assortment-may-not-contain-a-keepsake-band-item"
+    )
     def test_keepsake_band_item_is_rejected_at_any_price(self):
         # A file-local keepsake-band fixture item, never a shipped keepsake:
         # the assortment validator must reject it before any price check.
@@ -638,6 +653,9 @@ class ShopRuleTests(unittest.TestCase):
                 validate_shop_configs([row], self._shipped_offers())
             self.assertIn("common_arms", str(caught.exception))
 
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
     def test_overlapping_assortments_within_one_shop_are_rejected(self):
         # ``meal`` ships inside staple_meals; a local assortment sharing it
         # creates the per-shop collision the resolver must refuse.

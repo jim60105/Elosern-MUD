@@ -697,6 +697,9 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
         )
         super().setUp()
 
+    @covers_requirement(
+        "commerce-assortments::every-shop-s-numeric-rules-are-accounted-for-at-load"
+    )
     def test_second_shop_with_no_rules_is_rejected(self):
         with self.assertRaises(GuildConfigError) as caught:
             validate_shop_configs(
@@ -707,6 +710,9 @@ class ShopCompletenessDefectTests(EvenniaTestCase):
         self.assertIn("missing rules", message)
         self.assertIn(self.SECOND_SHOP, message)
 
+    @covers_requirement(
+        "commerce-assortments::every-shop-s-numeric-rules-are-accounted-for-at-load"
+    )
     def test_rules_naming_a_shop_without_identity_are_rejected(self):
         with self.assertRaises(GuildConfigError) as caught:
             validate_shop_configs(
@@ -740,6 +746,9 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
 
     OVERLAP_ASSORTMENT = "t_overlap_goods"
 
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
     def test_shop_referencing_unknown_assortment_is_rejected(self):
         shop = ShopDefinition(
             key="t_unknown_ref_stall",
@@ -763,6 +772,9 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         self.assertIn(shop.key, message)
         self.assertIn("t_no_such_assortment", message)
 
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
     def test_one_shop_overlapping_its_own_assortments_is_rejected(self):
         overlap = AssortmentDefinition(self.OVERLAP_ASSORTMENT, "苔徑重疊貨", (_T_APPLE,))
         shop = ShopDefinition(
@@ -797,6 +809,9 @@ class ShopAssortmentResolutionTests(EvenniaTestCase):
         self.assertIn("t_mossgate_goods", message)
         self.assertIn(self.OVERLAP_ASSORTMENT, message)
 
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
     def test_two_shops_sharing_a_key_resolve_it_at_their_own_prices(self):
         # One good sold in two places at two prices is the model working,
         # not a collision: the overlap rejection is scoped to a single shop.
