@@ -29,7 +29,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PY_REGISTRY = REPO_ROOT / "web/webclient/presentation/registry.py"
 _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
-_VUE_STORE = REPO_ROOT / "web/webclient-app/stores/elosern.js"
+# The store composes from group modules; the Vue allowlist literal lives with
+# the panel/label helpers in the shared group (elosern store split).
+_VUE_STORE = REPO_ROOT / "web/webclient-app/stores/elosern/shared.js"
 
 # Stable production panel names, each with its presenter module (context_actions
 # lives in combat_panel.py; the rest are name-matched). Kept in registration
