@@ -3,7 +3,8 @@
 Interiors are created by iterating ``PLACE_REGISTRY`` grouped by settlement
 (place-driven-service-sync task 1.x): each place yields one tagged room in its
 settlement's coordinate space, two doorway exits to its exterior, and an
-authored description re-applied in place on every sync. A place whose exterior
+authored description re-applied in place on every sync, so every registry row —
+the capital's five places included — is exercised. A place whose exterior
 cannot be resolved warns naming the row and is skipped alone.
 """
 
