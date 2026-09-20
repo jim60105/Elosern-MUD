@@ -41,6 +41,6 @@ input — an inline prefix is rejected by the Evennia test guard.
   `world/rules/guild_economy.py`, `world/maps/bootstrap.py` and `commands/economy.py` are
   unmodified by this change.
 - [ ] 3.2 Verify startup still creates the two interiors and the two hosts unchanged with
-  `uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy`.
+  `uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy_sync`.
 - [ ] 3.3 Run `uv run --locked python -m tools.test_data_lint check` and
   `openspec validate settlement-place-registry --strict`.
