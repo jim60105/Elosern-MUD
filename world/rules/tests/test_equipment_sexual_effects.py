@@ -690,12 +690,16 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             Path("world/rules/sexual_transitions.py"),
             Path("world/imports/schema.py"),
             # Declaration-vocabulary exemption, not a live-state reader: the
-            # preset registry module trips the detector through authored
+            # preset registry package trips the detector through authored
             # baseline keywords (``exposure="..."`` card arguments) and the
             # validator's vocabulary table (``"exposure": EXPOSURE_LEVELS``).
             # It constructs baseline records and must never read
             # ``entity.sexual`` / stored or effective live exposure.
-            Path("world/lore/player_presets.py"),
+            # (Retargeted when the single module became a package: these are
+            # the package files that trip the detector.)
+            Path("world/lore/player_presets/data_pack_cards.py"),
+            Path("world/lore/player_presets/data_story_cards.py"),
+            Path("world/lore/player_presets/validation.py"),
         }
     )
     # Modules that must consume exposure through the effective overlay.
