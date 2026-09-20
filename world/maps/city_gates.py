@@ -38,7 +38,7 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType(
     {
         "capital_altoria": CityGateDef(
             map_id="capital_altoria",
-            gate_xyz=(2, 0, "capital_altoria"),
+            gate_xyz=(3, 0, "capital_altoria"),
             exit_key="南門",
             exit_aliases=("王都", "城門"),
         ),

@@ -76,12 +76,14 @@ class PlaceRegistryTests(unittest.TestCase):
         "settlement-place-registry::a-settlement-declares-its-archetype-and-coordinate-space"
     )
     def test_shipped_places_transcribe_the_bootstrap_interiors(self):
-        # Transcribed from the bootstrap module constants these rows replaced:
-        # the place row is now the only source sync_service_interiors reads.
+        # The place row is the only source sync_service_interiors reads. The
+        # capital five's addresses are the altoria-capital-replan exteriors;
+        # every other field these rows transcribe is untouched by the replan
+        # (the neutrality gate: test_capital_places_keep_their_identities).
         self.assertEqual(self.guild.room_name_zh, "阿爾托利亞冒險者公會大廳")
-        self.assertEqual(self.guild.exterior_xy, (3, 1))  # GUILD_HALL_EXTERIOR_XYZ
+        self.assertEqual(self.guild.exterior_xy, (4, 3))  # 公會前
         self.assertEqual(self.store.room_name_zh, "阿爾托利亞雜貨店")
-        self.assertEqual(self.store.exterior_xy, (1, 2))  # GENERAL_STORE_EXTERIOR_XYZ
+        self.assertEqual(self.store.exterior_xy, (2, 3))  # 市場街
 
     def test_shipped_hosts_author_human_race_and_default_sex(self):
         # host_race/host_subrace/host_sex are creation-time authored identity,
@@ -92,6 +94,60 @@ class PlaceRegistryTests(unittest.TestCase):
             self.assertEqual(place.host_race, "human")
             self.assertIsNone(place.host_subrace)
             self.assertEqual(place.host_sex, "other")
+
+    def test_capital_places_keep_their_identities_after_the_replan(self):
+        # The altoria-capital-replan neutrality gate: only exterior_xy moved.
+        # Every identity field and every resolved shop offer of the shipped
+        # capital five is pinned to its pre-replan value; the exteriors are
+        # pinned to the new teardrop addresses. A row edited beyond its
+        # address fails here.
+        expected = [
+            (
+                "altoria_guild_hall", "阿爾托利亞冒險者公會大廳", (4, 3),
+                "冒險者公會大廳", "葛里安·衛登", "阿爾托利亞分會會長",
+                "altoria_guild_master", (),
+            ),
+            (
+                "altoria_general_store", "阿爾托利亞雜貨店", (2, 3),
+                "雜貨店", "瑪爾特·金秤", "阿爾托利亞雜貨商店老闆",
+                "altoria_merchant", ("general_sundries",),
+            ),
+            (
+                "altoria_forge", "聖潔王都鍛造鋪", (1, 3),
+                "鍛造鋪", "維爾登·黑潭", "聖潔王都鍛造鋪鐵匠",
+                "altoria_blacksmith", ("common_arms",),
+            ),
+            (
+                "altoria_eatery", "聖潔王都餐館", (3, 1),
+                "餐館", "西格瑪·庫柏", "聖潔王都餐館老闆",
+                "altoria_eatery_owner", ("staple_meals",),
+            ),
+            (
+                "altoria_tailor", "聖潔王都裁縫坊", (1, 3),
+                "裁縫坊", "妮絲塔·狐溪", "聖潔王都裁縫坊坊主",
+                "altoria_tailor", ("common_outfits",),
+            ),
+        ]
+        shops = SHOP_REGISTRY
+        for (
+            key, room_name, exterior, doorway, host, title, service, assortments
+        ) in expected:
+            with self.subTest(place=key):
+                place = PLACE_REGISTRY[key]
+                self.assertEqual(place.room_name_zh, room_name)
+                self.assertEqual(place.exterior_xy, exterior)
+                self.assertEqual(place.doorway_key_zh, doorway)
+                self.assertEqual(place.host_name, host)
+                self.assertEqual(place.host_title, title)
+                self.assertEqual(place.service_id, service)
+                self.assertEqual(place.assortment_keys, assortments)
+                # The resolved offer set follows the assortment rows.
+                shop_key = dict(place.authored_kwargs).get("shop_key")
+                if shop_key is None:
+                    self.assertNotIn(key, shops)
+                    continue
+                self.assertEqual(shops[shop_key].assortment_keys, assortments)
+                self.assertEqual(shops[shop_key].host_name, host)
 
     def _plant(self, place, **changes):
         return replace(place, key="t_offense_place", service_id="t_offense", **changes)

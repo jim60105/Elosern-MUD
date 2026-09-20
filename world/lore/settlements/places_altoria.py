@@ -26,7 +26,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "The guild hall of 阿爾托利亞, with a grand board and a training "
             "ring (guild-economy D-9)."
         ),
-        exterior_xy=(3, 1),  # GUILD_HALL_EXTERIOR_XYZ
+        exterior_xy=(4, 3),  # 公會前
         doorway_key_zh="冒險者公會大廳",
         doorway_aliases=("guild hall", "hall"),
         host_name="葛里安·衛登",
@@ -51,7 +51,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "The general store of 阿爾托利亞, its shelves waiting for the "
             "next caravan (guild-economy D-9)."
         ),
-        exterior_xy=(1, 2),  # GENERAL_STORE_EXTERIOR_XYZ
+        exterior_xy=(2, 3),  # 市場街
         doorway_key_zh="雜貨店",
         doorway_aliases=("general store", "store", "shop"),
         host_name="瑪爾特·金秤",
@@ -78,7 +78,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "The forge of 聖潔王都, its anvil ringing under the capital's "
             "weapons trade (settlement-shops design §6.1)."
         ),
-        exterior_xy=(0, 2),  # 鐵匠鋪外
+        exterior_xy=(1, 3),  # 工匠巷
         doorway_key_zh="鍛造鋪",
         doorway_aliases=("forge", "smithy"),
         host_name="維爾登·黑潭",
@@ -102,7 +102,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "The eatery of 聖潔王都, steam rising from its kitchen over "
             "南大道's foot traffic (settlement-shops design §6.1)."
         ),
-        exterior_xy=(2, 1),  # 南大道
+        exterior_xy=(3, 1),  # 南大道
         doorway_key_zh="餐館",
         doorway_aliases=("eatery", "restaurant", "diner"),
         host_name="西格瑪·庫柏",
@@ -126,7 +126,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "The tailor's workshop of 聖潔王都, bolts of cloth beside the "
             "noble commissions of 北大道 (settlement-shops design §6.1)."
         ),
-        exterior_xy=(2, 3),  # 北大道
+        exterior_xy=(1, 3),  # 工匠巷
         doorway_key_zh="裁縫坊",
         doorway_aliases=("tailor", "tailor shop"),
         host_name="妮絲塔·狐溪",

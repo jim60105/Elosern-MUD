@@ -20,7 +20,7 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         capital = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
         self.assertEqual(capital.anchor_key, "capital_altoria")
         self.assertEqual(capital.zcoord, "capital_altoria")
-        self.assertEqual(capital.entrance_xy, (2, 2))
+        self.assertEqual(capital.entrance_xy, (3, 3))
         village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
         self.assertEqual(village.zcoord, "village_ciaran")
