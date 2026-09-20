@@ -46,7 +46,14 @@ MIGRATED_FILES = (
 #: split). The ledger/seed checks stay pinned on the original flat paths; the
 #: file-level checks below expand each split path onto its package slices so
 #: the zero-findings guarantee covers every slice verbatim.
-_SPLIT_PACKAGES = ("test_combat_panel", "test_exploration_panel", "test_local_map")
+_SPLIT_PACKAGES = (
+    "test_character_panel",
+    "test_combat_panel",
+    "test_creation_panel",
+    "test_exploration_panel",
+    "test_local_map",
+    "test_services_panel",
+)
 
 
 def _finding_scan_files() -> tuple[str, ...]:
