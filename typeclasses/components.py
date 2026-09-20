@@ -53,9 +53,16 @@ class ScriptedDialogue(Component):
 
     Any NPC carrying this component answers authored ``talk`` lines from the
     immutable keyed table in ``world/rules/dialogue.py``.
+    ``service_id`` is load-bearing for place-bound hosts: the roster-sync
+    reuse path reads it unconditionally on whichever component class anchors
+    a profession row (design D3), exactly like ``QuestIssuer`` — which is why
+    ``profession_config`` rejects a row anchored on a class that lacks it.
+    Place-bound rows receive it projected from the roster anchor, never
+    authored as a kwarg; person-bound imports author it like any identity.
     """
 
     name = "scripted_dialogue"
+    service_id = DBField(default=None)
     dialogue_key = DBField(default=None)
     service_binding = DBField(default=None)
     anchor_room_id = DBField(default=None)

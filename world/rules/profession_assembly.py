@@ -103,9 +103,10 @@ def project_row_kwargs(
 
     Every component receives EXACTLY its own identity fields: ``service_id``
     from the row's anchor only where the class defines it, every other identity
-    field from the row's authored kwargs. A ``ScriptedDialogue`` therefore
-    receives ``{"dialogue_key": ...}`` and never a stray ``service_id`` —
-    reproducing the historical per-component kwargs shapes bit-for-bit.
+    field from the row's authored kwargs. Since place-attendant-profession the
+    dialogue class declares ``service_id`` too (the anchor-read path needs it),
+    so a roster ``ScriptedDialogue`` receives both identity fields; components
+    whose class omits a field never see it.
     """
     projected: dict[str, dict[str, str]] = {}
     for component in profession.components:

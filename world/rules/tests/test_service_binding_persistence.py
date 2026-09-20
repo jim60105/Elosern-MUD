@@ -105,7 +105,10 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         assemble_profession_components(
             npc,
             person_probe,
-            {"scripted_dialogue": {"dialogue_key": "d"}},
+            # service_id is identity the person-bound import authors like any
+            # other component's (place-attendant-profession: the dialogue
+            # class declares it for the anchor-read path).
+            {"scripted_dialogue": {"service_id": "s", "dialogue_key": "d"}},
             # No anchor_room: person-bound plans never need one.
         )
         component = npc.components.get("scripted_dialogue")

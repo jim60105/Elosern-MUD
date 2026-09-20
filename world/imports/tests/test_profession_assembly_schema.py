@@ -264,7 +264,11 @@ class AssemblyPlanTests(TestCase):
         )
         self.assertEqual(
             profession_assembly.identity_fields(_SCRIPTED_DIALOGUE),
-            frozenset({"dialogue_key"}),
+            # service_id joins the required set: it is the class's anchor-read
+            # identity (design D3 — the roster-sync reuse path reads it on
+            # whichever class anchors a profession row), so an import entry
+            # must author it like every other component's identity.
+            frozenset({"service_id", "dialogue_key"}),
         )
         self.assertEqual(
             profession_assembly.missing_identity_kwargs(
@@ -275,6 +279,12 @@ class AssemblyPlanTests(TestCase):
         self.assertEqual(
             profession_assembly.missing_identity_kwargs(_MERCHANT, {}),
             ["service_id", "shop_key"],
+        )
+        self.assertEqual(
+            profession_assembly.missing_identity_kwargs(
+                _SCRIPTED_DIALOGUE, {"dialogue_key": "d"}
+            ),
+            ["service_id"],
         )
 
     @covers_requirement(

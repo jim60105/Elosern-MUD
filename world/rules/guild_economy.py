@@ -168,6 +168,13 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
                     # away for a commission the roster cannot re-create.
                     carries_person_anchor = True
                     continue
+                if component.service_id is None:
+                    # Pre-change residue: a place-bound component attached
+                    # before the class declared service_id carries no anchor
+                    # id. Claiming None would misread a live roster host as
+                    # titled-ambiguous residue at every sync; an id-less
+                    # component is no anchor claim.
+                    continue
                 claimed.append(component.service_id)
         if not claimed:
             continue

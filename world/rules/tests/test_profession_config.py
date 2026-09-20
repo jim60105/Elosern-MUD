@@ -56,10 +56,11 @@ class ShippedTableTests(ProfessionCacheIsolation):
     @covers_requirement(
         "profession-registries::professions-are-one-validated-rulebook-table-with-keyed-frozen-reads",
     )
-    def test_shipped_table_exposes_the_four_blueprint_professions(self):
+    def test_shipped_table_exposes_the_five_blueprint_professions(self):
         table = load_professions()
         self.assertEqual(
-            set(table), {"merchant", "guild_staff", "guild_examiner", "quest_issuer"}
+            set(table),
+            {"merchant", "guild_staff", "guild_examiner", "quest_issuer", "attendant"},
         )
 
         merchant = table["merchant"]
@@ -81,6 +82,12 @@ class ShippedTableTests(ProfessionCacheIsolation):
         self.assertEqual(
             [(c.type_key, c.default_binding) for c in issuer.components],
             [("quest_issuer", "person")],
+        )
+
+        attendant = table["attendant"]
+        self.assertEqual(
+            [(c.type_key, c.default_binding) for c in attendant.components],
+            [("scripted_dialogue", "place")],
         )
 
         for profession in table.values():
@@ -119,9 +126,10 @@ class ShippedTableTests(ProfessionCacheIsolation):
         logged.assert_called_once()
         event, kwargs = logged.call_args[0], logged.call_args[1]
         self.assertEqual(event, ("profession_rulebook_loaded",))
-        self.assertEqual(kwargs["context"]["count"], 4)
+        self.assertEqual(kwargs["context"]["count"], 5)
         self.assertEqual(
-            sorted(table), ["guild_examiner", "guild_staff", "merchant", "quest_issuer"]
+            sorted(table),
+            ["attendant", "guild_examiner", "guild_staff", "merchant", "quest_issuer"],
         )
 
 
@@ -382,9 +390,16 @@ class ServiceIdAnchorContractTests(ProfessionCacheIsolation):
     def test_a_row_anchored_on_an_identity_less_class_is_named(self):
         # The loader refuses to produce a table whose rows could crash the
         # startup sync: the raised error names the offending row and anchor.
+        # Every shipped vocabulary class now declares service_id (scripted
+        # dialogue hosts anchor through it too — place-attendant-profession),
+        # so the rejection is pinned against a synthetic anchor-less class.
+        class Anchorless:
+            name = "anchorless"
+            _fields = {}
+
         dialogue_first = {
             "key": "dialogue_first",
-            "components": [{"type": "scripted_dialogue", "default_binding": "place"}],
+            "components": [{"type": "anchorless", "default_binding": "place"}],
             "schedule_template": None,
             "default_tier": None,
         }
@@ -394,12 +409,15 @@ class ServiceIdAnchorContractTests(ProfessionCacheIsolation):
             path.write_text(yaml.safe_dump(base_file(*rows)), encoding="utf-8")
             sentinel = object()
             profession_config.TABLE = sentinel
-            with self.assertRaises(ProfessionConfigError) as caught:
-                load_professions(path)
+            with mock.patch.dict(
+                PROFESSION_COMPONENT_TYPES, {"anchorless": Anchorless}
+            ):
+                with self.assertRaises(ProfessionConfigError) as caught:
+                    load_professions(path)
             self.assertIs(profession_config.TABLE, sentinel)
         message = str(caught.exception)
         self.assertIn("dialogue_first", message)
-        self.assertIn("scripted_dialogue", message)
+        self.assertIn("anchorless", message)
         self.assertIn("service_id", message)
 
     @covers_requirement(
