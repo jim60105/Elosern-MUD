@@ -1010,6 +1010,9 @@ class TradePathNoArchetypeBranchTests(unittest.TestCase):
     for a settlement-archetype or village-conditional branch: none may exist.
     """
 
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
     def test_trade_and_shop_command_paths_have_no_archetype_branch(self):
         root = Path(__file__).resolve().parents[3]
         sources = [
@@ -1039,6 +1042,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     def _village_host(self, place):
         return NPC.objects.filter(db_key=place.host_name).first()
 
+    @covers_requirement(
+        "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
+    )
     def test_four_village_interiors_doorways_and_hosts_appear_after_sync(self):
         sync_service_content()
         for key in VILLAGE_PLACE_KEYS:
@@ -1059,6 +1065,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(host.location, interior)
                 self.assertEqual(host.npc_title, place.host_title)
 
+    @covers_requirement(
+        "ciaran-village-commerce::the-village-s-hosts-are-its-own-people"
+    )
     def test_village_hosts_carry_authored_elf_ciaran_female_identity(self):
         sync_service_content()
         for key in VILLAGE_PLACE_KEYS:
@@ -1072,6 +1081,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 merchant = host.components.get(Merchant.get_component_slot())
                 self.assertEqual(merchant.shop_key, dict(place.authored_kwargs)["shop_key"])
 
+    @covers_requirement(
+        "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
+    )
     def test_village_titles_avoid_commercial_words(self):
         sync_service_content()
         for key in VILLAGE_PLACE_KEYS:
@@ -1086,6 +1098,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 for token in ("counter", "sign", "shopfront", "store", "shelf"):
                     self.assertNotIn(token, place.room_desc_zh)
 
+    @covers_requirement(
+        "ciaran-village-commerce::one-good-is-sold-at-two-prices-in-two-settlements"
+    )
     def test_elven_goods_resolve_at_two_prices_across_two_settlements(self):
         catalog = get_catalog()
         village = catalog.shop_configs["ciaran_valwyn_home"]
@@ -1128,6 +1143,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIn("elven_spider_silk", capital_offered)
         self.assertNotIn("crescent_earring", capital_offered)
 
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
     def test_village_purchase_settles_like_a_capital_purchase(self):
         sync_service_content()
         store = self._village_interior(self._village_place("ciaran_valwyn_home"))
@@ -1151,6 +1169,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(stock["elven_spider_silk"], silk_offer.initial_stock - 1)
         self.assertEqual(host.relations.affinity_for(player), 1)
 
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
     def test_displaced_village_host_refuses_with_the_fixed_anchoring_message(self):
         from world.rules.service_messages import SERVICE_REASON_MESSAGES
         from world.rules.service_gate import MESSAGE_OFF_ANCHOR
