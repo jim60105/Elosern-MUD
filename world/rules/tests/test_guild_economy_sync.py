@@ -156,6 +156,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
+    @covers_requirement(
+        "place-driven-service-sync::a-place-authors-its-host-s-race-subrace-and-sex"
+    )
     def test_fresh_sync_creates_one_guild_and_one_merchant_host(self):
         sync_service_content()
         guild_host = self._guild_host()
@@ -357,6 +360,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
+    @covers_requirement(
+        "place-driven-service-sync::a-place-authors-its-host-s-race-subrace-and-sex"
+    )
     def test_resync_never_rewrites_authored_identity(self):
         # Race/subrace/sex are creation-time authored identity: an edited
         # authored value must leave the live host untouched on re-sync, exact-
@@ -384,6 +390,12 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    @covers_requirement(
+        "place-driven-service-sync::one-place-record-yields-a-complete-working-location"
+    )
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
     )
     def test_one_added_place_row_yields_a_complete_working_location(self):
         # Adding a place row must produce the whole location with no module

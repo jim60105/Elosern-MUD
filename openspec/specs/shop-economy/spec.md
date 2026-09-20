@@ -113,7 +113,9 @@ unchanged and continue valid hosts.
 
 ### Requirement: Player-facing shop commands use only a local unambiguous merchant
 The character cmdset SHALL expose stock listing, buy, and sell commands with Traditional Chinese
-output. Commands SHALL resolve one Merchant host in the caller's current room and SHALL not permit
+output. The stock listing SHALL identify the shop by its authored place name rather than a
+generic word, so two shops in one settlement are distinguishable by their listing alone.
+Commands SHALL resolve one Merchant host in the caller's current room and SHALL not permit
 remote dbref interaction. Host acceptance SHALL flow through
 `world/rules/service_gate.py::service_available`: `remote` keeps the existing remote-interaction
 rejection lineage, and an `off_anchor` or `malformed_binding` verdict SHALL refuse the trade with
@@ -123,6 +125,10 @@ at-anchor (or `person`-bound) merchant behaves exactly as before the gate existe
 #### Scenario: Altoria merchant is usable through commands
 - **WHEN** the player enters the general store during opening hours
 - **THEN** list, buy, and sell invoke the same deterministic APIs used by integration tests
+
+#### Scenario: Two shops are distinguishable by their stock listing
+- **WHEN** a player lists stock in one shop and then in another in the same settlement
+- **THEN** each listing names its own place, and the two headers differ
 
 #### Scenario: A traveling place-bound merchant refuses trade with the fixed line
 - **WHEN** the merchant host is moved to the town square beside the player and the player lists

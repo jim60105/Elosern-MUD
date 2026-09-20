@@ -85,6 +85,9 @@ class ServiceInteriorTests(EvenniaTestCase):
         self.assertNotIn(GENERAL_STORE.room_name_zh, grid_keys)
 
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
     def test_repeated_sync_reuses_tags_reapplies_desc_and_duplicates_no_doorway(self):
         sync_service_interiors()
         first = {
@@ -144,6 +147,9 @@ class ServiceInteriorTests(EvenniaTestCase):
         self.assertIn(guild_exterior, {e.destination for e in guild_hall.exits})
 
     @covers_requirement("guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster")
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
     def test_one_unresolvable_exterior_warns_and_skips_only_that_place(self):
         # The extra place's exterior coordinate resolves to no grid room
         # (capital map has no node there); the two shipped places must still
