@@ -19,8 +19,8 @@
       "token": "C"
     },
     {
-      "evidence": "world/rules/guild_config.py:39",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:39); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/guild_config/_types.py:21",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config/_types.py:21); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "D"
     },
@@ -37,8 +37,8 @@
       "token": "F"
     },
     {
-      "evidence": "world/rules/guild_config.py:39",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:39); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/guild_config/_types.py:21",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config/_types.py:21); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "S"
     },
@@ -49,8 +49,8 @@
       "token": "armor"
     },
     {
-      "evidence": "world/rules/guild_config.py:263",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:263); collides with general vendor/test vocabulary for the goods-bundle layer, not shipped-content coupling",
+      "evidence": "world/rules/guild_config/_commerce.py:50",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config/_commerce.py:50); collides with general vendor/test vocabulary for the goods-bundle layer, not shipped-content coupling",
       "rule": "production-independent",
       "token": "assortments"
     },
@@ -295,8 +295,8 @@
       "evidence": "world/rules/combat/healing.py:169"
     },
     {
-      "evidence": "world/rules/guild_config.py:526",
-      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:526); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/guild_config/_shops.py:30",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config/_shops.py:30); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "shops"
     },

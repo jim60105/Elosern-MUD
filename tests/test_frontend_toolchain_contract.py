@@ -151,10 +151,11 @@ class VueComponentGateTests(unittest.TestCase):
     )
     def test_pnpm_manifest_and_lockfile_invariants(self):
         package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(package.get("packageManager"), "pnpm@9.15.4")
-        pnpm_config = package.get("pnpm")
-        self.assertIsInstance(pnpm_config, dict)
-        self.assertEqual(pnpm_config.get("onlyBuiltDependencies"), ["esbuild"])
+        self.assertEqual(package.get("packageManager"), "pnpm@12.5.1")
+        # pnpm 12 moved the build-script allowlist out of package.json into
+        # pnpm-workspace.yaml (allowBuilds); pin the esbuild exemption there.
+        workspace = (REPO_ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8")
+        self.assertRegex(workspace, r"allowBuilds:\s*\n\s+esbuild:\s+true")
         self.assertNotIn("allowScripts", package)
         self.assertNotIn("dependencies", package)
         self.assertTrue(package.get("devDependencies"))

@@ -392,13 +392,16 @@ class ParseEffectTests(unittest.TestCase):
     def test_no_rules_consumer_reads_flavor_effect(self):
         from pathlib import Path
 
-        for relative in (
-            "world/rules/combat/battlefield.py",
-            "world/rules/combat/damage.py",
-            "world/rules/combat/healing.py",
-            "world/rules/combat/rounds.py",
-            "world/rules/progression.py",
-            "world/rules/combat_modifiers.py",
+        for relative, recursive in (
+            ("world/rules/combat/battlefield.py", False),
+            ("world/rules/combat/damage.py", False),
+            ("world/rules/combat/healing.py", False),
+            ("world/rules/combat/rounds.py", False),
+            ("world/rules/progression", True),
+            ("world/rules/combat_modifiers.py", False),
         ):
             path = Path(__file__).parents[3] / relative
-            self.assertNotIn("FlavorEffect", path.read_text(encoding="utf-8"))
+            sources = path.rglob("*.py") if recursive else [path]
+            for source in sources:
+                with self.subTest(source=relative):
+                    self.assertNotIn("FlavorEffect", source.read_text(encoding="utf-8"))

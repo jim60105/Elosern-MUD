@@ -55,7 +55,7 @@ class ContainerContractTests(unittest.TestCase):
         self.assertRegex(builder, r"uv sync\s+--locked\s+--no-dev")
         self.assertRegex(builder, r"id=uv-\$TARGETARCH\$TARGETVARIANT")
         self.assertRegex(builder, r"COPY[^\n]*pyproject\.toml uv\.lock")
-        self.assertRegex(vue_dist, r"RUN\s+corepack\s+enable")
+        self.assertRegex(vue_dist, r"RUN\s+npm\s+install\s+--global\s+pnpm@12\.5\.1")
         self.assertRegex(vue_dist, r"COPY[^\n]*package\.json pnpm-lock\.yaml")
         self.assertRegex(
             vue_dist,
