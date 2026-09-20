@@ -33,6 +33,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     """
     from world.rules import profession_config
     from world.rules.profession_assembly import identity_fields
+    from world.rules.dialogue import DIALOGUE_TABLE
 
     rows: list[ServiceHostRow] = []
     seen_service_ids: set[str] = set()
@@ -92,6 +93,21 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
                 f"{what} authors kwargs {dead} that no component "
                 f"of profession {profession_key!r} consumes"
             )
+        # Authored resolution (place-attendant-profession): a dialogue-bearing
+        # blueprint must bind to a table that EXISTS. Proving the kwarg was
+        # authored is not enough — a key resolving to nothing yields a host
+        # that greets no one, indistinguishable at runtime from an
+        # intentionally silent NPC. Runtime lookup keeps degrading to the
+        # no-understanding line; only the authored place row fails here.
+        if any(
+            component.type_key == "scripted_dialogue"
+            for component in profession.components
+        ) and (dialogue_key := authored.get("dialogue_key")) is not None:
+            if dialogue_key not in DIALOGUE_TABLE:
+                raise _error(
+                    f"{what} authors dialogue_key {dialogue_key!r} that the "
+                    "dialogue registry does not carry"
+                )
         rows.append(
             ServiceHostRow(
                 name=name,

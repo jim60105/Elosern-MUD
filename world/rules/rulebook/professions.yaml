@@ -21,6 +21,15 @@
 #     room. A person-bound row can never anchor a roster row (config rejects
 #     person-bound roster components); commissioners arrive through authored
 #     import content instead.
+#   - `attendant` is the talk-only counterpart of `merchant`
+#     (place-attendant-profession): the place-bound blueprint for a host whose
+#     service IS conversation — innkeeper, bathhouse keeper, guard captain,
+#     trainer. It carries exactly the one component the conversation needs
+#     (ScriptedDialogue, authored `dialogue_key`) and no trade, guild or
+#     commission capability. The occupation lives in the authored `host_title`
+#     and the dialogue table, never in a per-role profession: a profession is
+#     an assembly-time component tuple (D1), and twelve same-tuple rows would
+#     be twelve names for one blueprint.
 schema_version: 1
 professions:
   - key: merchant
@@ -44,5 +53,10 @@ professions:
   - key: quest_issuer
     components:
       - { type: quest_issuer, default_binding: person }
+    schedule_template: null
+    default_tier: null
+  - key: attendant
+    components:
+      - { type: scripted_dialogue, default_binding: place }
     schedule_template: null
     default_tier: null
