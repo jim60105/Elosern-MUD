@@ -33,7 +33,7 @@ from .browser_helpers import (
     wait_for_store_state,
 )
 from .test_browser_input_narrative import _wait_inp_line
-from .test_browser_services import ServicesBrowserTest
+from .test_browser_services_base import ServicesBrowserTest
 
 TILE = "inventory-panel__tile--{}"
 DIALOG = '[data-testid="inventory-panel__confirm"]'

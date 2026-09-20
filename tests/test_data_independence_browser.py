@@ -123,6 +123,7 @@ class BrowserTestDataMigrationContractTests(DataIndependenceContractMixin, unitt
             "test_browser_exploration",
             "test_browser_local_map",
             "test_browser_shell",
+            "test_browser_services",
         ):
             retired = f"web/tests/browser/{stem}.py"
             if retired not in live_names and any(

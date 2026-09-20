@@ -23,7 +23,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
-from .test_browser_services import ServicesBrowserTest
+from .test_browser_services_base import ServicesBrowserTest
 
 
 def _press(page, key, wait_ms=80):
