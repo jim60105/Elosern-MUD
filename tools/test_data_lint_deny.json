@@ -7,14 +7,14 @@
       "token": "A"
     },
     {
-      "evidence": "web/webclient-app/stories/fixtures.js:1237",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1237); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient-app/stories/fixtures/services_panels.js:16",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/services_panels.js:16); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "B"
     },
     {
-      "evidence": "web/webclient-app/stories/fixtures.js:1235",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1235); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient-app/stories/fixtures/services_panels.js:14",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/services_panels.js:14); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "C"
     },
@@ -193,8 +193,8 @@
       "token": "max_sleep_seconds"
     },
     {
-      "evidence": "web/webclient-app/stories/fixtures.js:1367",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1367); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient-app/stories/fixtures/services_panels.js:146",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/services_panels.js:146); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "meal"
     },
