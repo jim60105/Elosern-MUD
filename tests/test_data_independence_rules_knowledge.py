@@ -8,7 +8,7 @@ edit that reintroduces a shipped identifier cannot silently re-register debt.
 Every manifest file is a pure behavior suite: the shipped title/guild-rank
 pairing and passive-skill content claims already have registered Data-contract
 coverage (``world/lore/tests/test_titles_registry.py``,
-``world/skills/tests/test_skill_registry.py``), so no manifest file is
+``world/skills/tests/test_skill_registry`` package), so no manifest file is
 re-registered as a contract here; the whole manifest stays debt-free and
 finding-free.
 

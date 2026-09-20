@@ -2,7 +2,8 @@
 
 Covers ``SceneFlavorContextAndApplyTests``: the deterministic flavor-context
 seam for fresh instance scenes and the idempotent sole-writer flavor apply.
-The shared base is imported from ``test_scene_builder`` (single fixed home).
+The shared base is imported from the ``test_scene_builder`` package's
+``_support`` module (single fixed home).
 """
 from unittest.mock import patch
 import unittest
@@ -13,7 +14,7 @@ from evennia.utils.create import create_object
 from typeclasses.rooms import InstanceRoom
 
 from world.quests.scene_builder import apply_scene_flavor, materialize_stage
-from world.quests.tests.test_scene_builder import (
+from world.quests.tests.test_scene_builder._support import (
     SceneBuilderTestBase,
     _T_ROOM_NAME,
     _T_REGION,

@@ -3,7 +3,8 @@
 Covers ``SceneBuilderOfflineLoopTests``: the deterministic
 request->accept->enter->fight->turn-in loop and the ``CmdEnterScene``
 side-effect-free rejection families. Shared bases and payload helpers are
-imported from ``test_scene_builder`` (single fixed home).
+imported from the ``test_scene_builder`` package's ``_support`` module
+(single fixed home).
 """
 from unittest.mock import patch
 import unittest
@@ -25,7 +26,7 @@ from world.quests.compile import compile_quest_blueprint, register_generated_que
 from world.quests.runtime import QuestState, read_records
 from world.quests.compile import StageNpcCharacterization
 from world.quests.scene_builder import _spawn_npc, materialize_stage
-from world.quests.tests.test_scene_builder import (
+from world.quests.tests.test_scene_builder._support import (
     SceneBuilderIsolation,
     _T_ARCHETYPE,
     _T_ISSUER,

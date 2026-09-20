@@ -73,10 +73,16 @@ class SceneBuilderBoundaryTests(unittest.TestCase):
         import pathlib
 
         repo = pathlib.Path(__file__).resolve().parents[3]
-        for relative in (
-            "world/quests/tests/test_scene_builder.py",
+        # ``test_scene_builder`` is a split package: every module of the
+        # package counts, not just the original flat stem.
+        scene_builder_dir = repo / "world" / "quests" / "tests" / "test_scene_builder"
+        relatives = (
             "server/conf/tests/test_ai_director_service.py",
-        ):
+        ) + tuple(
+            f"world/quests/tests/test_scene_builder/{path.name}"
+            for path in sorted(scene_builder_dir.glob("*.py"))
+        )
+        for relative in relatives:
             source = (repo / relative).read_text(encoding="utf-8")
             client_constructor = "OpenAICompatClient" + "("
             socket_import = "import so" + "cket"

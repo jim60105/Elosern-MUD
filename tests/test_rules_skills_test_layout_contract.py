@@ -151,7 +151,8 @@ class RulesSkillsTestLayoutContractTests(unittest.TestCase):
     def test_skill_registry_family_splits_into_the_three_themed_modules(self):
         for relative in SKILL_REGISTRY_SPLIT_MODULES:
             self.assertTrue(
-                (SKILLS_TESTS / relative).is_file(),
+                (SKILLS_TESTS / relative).is_file()
+                or (SKILLS_TESTS / Path(relative).with_suffix("")).is_dir(),
                 f"{relative} is missing from world/skills/tests",
             )
         discovered = {
@@ -162,6 +163,11 @@ class RulesSkillsTestLayoutContractTests(unittest.TestCase):
             path.name
             for path in SKILLS_TESTS.glob("test_spell_catalogs.py")
             if path.name in SKILL_REGISTRY_SPLIT_MODULES
+        } | {
+            relative
+            for relative in _split_package_modules(
+                SKILLS_TESTS, SKILL_REGISTRY_SPLIT_MODULES
+            )
         }
         self.assertEqual(discovered, SKILL_REGISTRY_SPLIT_MODULES)
 

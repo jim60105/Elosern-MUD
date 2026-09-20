@@ -209,7 +209,15 @@
       "reason": "sexual act catalog contract"
     },
     {
-      "path": "world/skills/sexual_acts/tests/test_registry_structure.py",
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/_support.py",
+      "reason": "sexual act registry structure contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/test_divine_structure.py",
+      "reason": "sexual act registry structure contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/test_registry_assembly.py",
       "reason": "sexual act registry structure contract"
     },
     {
@@ -229,7 +237,23 @@
       "reason": "MP cost-tier assignment contract"
     },
     {
-      "path": "world/skills/tests/test_skill_registry.py",
+      "path": "world/skills/tests/test_skill_registry/_support.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_category_classification.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_content_completion.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_out_of_combat_policy.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_registry_contract.py",
       "reason": "skill registry content contract"
     },
     {

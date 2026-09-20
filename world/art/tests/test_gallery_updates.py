@@ -51,7 +51,7 @@ from tools.spec_traceability import covers_requirement
 def _open_synthetic_scope(case, *targets, extra=None):
     """Enter a synthetic-catalog scope bound to one test case's lifecycle.
 
-    The same kit pattern ``world/art/tests/test_service.py`` uses: the scope
+    The same kit pattern ``world/art/tests/test_service`` uses: the scope
     must open before ``super().setUp()`` and closes with the test.
     """
     scope = synthetic_registries(*targets, extra=extra)

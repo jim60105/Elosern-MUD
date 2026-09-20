@@ -300,7 +300,7 @@ class CutoutEventTests(EvenniaTest):
                 yield
 
     def _opaque_client(self):
-        from world.art.tests.test_worker import _OpaqueClient
+        from world.art.tests.test_worker._support import _OpaqueClient
 
         return _OpaqueClient()
 

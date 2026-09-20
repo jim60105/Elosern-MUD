@@ -51,6 +51,30 @@ SHARED_BASES = (
     "CompileRegistryIsolation",
 )
 
+#: Flat stems later converted into same-named packages. A split package keeps
+#: the original module stem as its directory name and holds its classes
+#: verbatim in ``test_*.py`` slice modules, so the pins above keep naming the
+#: flat stem while the scans below follow the package's slice modules.
+SPLIT_PACKAGES = ("test_scene_builder.py",)
+
+
+def _split_package_modules(tests_dir: Path) -> dict[str, Path]:
+    """Flat stems that exist as same-named packages under ``tests_dir``."""
+    packages: dict[str, Path] = {}
+    for relative in SPLIT_PACKAGES:
+        package = tests_dir / Path(relative).with_suffix("")
+        if package.is_dir():
+            packages[relative] = package
+    return packages
+
+
+def _scan_files(tests_dir: Path) -> list[Path]:
+    """Every class-carrying module: flat modules plus split-package modules."""
+    files = list(sorted(tests_dir.glob("*.py")))
+    for package in _split_package_modules(tests_dir).values():
+        files.extend(sorted(package.glob("*.py")))
+    return files
+
 
 def _module_class_occurrences(path: Path) -> dict[str, int]:
     """Count ClassDef occurrences per class name (AST only, no imports)."""
@@ -78,7 +102,7 @@ class QuestTestsLayoutContractTests(unittest.TestCase):
         "evennia-test-optimization::scene-builder-and-compile-test-modules-are-split-with-shared-bases-kept-importable"
     )
     def test_every_presplit_class_lives_in_exactly_one_module(self):
-        modules = sorted(QUESTS_TESTS.glob("*.py"))
+        modules = _scan_files(QUESTS_TESTS)
         self.assertTrue(modules, "world/quests/tests has no Python modules")
         per_class: dict[str, list[Path]] = {name: [] for name in PRE_SPLIT_TEST_CLASSES}
         occurrences: dict[str, int] = {name: 0 for name in PRE_SPLIT_TEST_CLASSES}
@@ -108,7 +132,7 @@ class QuestTestsLayoutContractTests(unittest.TestCase):
         "evennia-test-optimization::scene-builder-and-compile-test-modules-are-split-with-shared-bases-kept-importable"
     )
     def test_shared_bases_keep_a_single_fixed_home(self):
-        modules = sorted(QUESTS_TESTS.glob("*.py"))
+        modules = _scan_files(QUESTS_TESTS)
         per_base: dict[str, list[Path]] = {name: [] for name in SHARED_BASES}
         for path in modules:
             for name in _module_class_occurrences(path):
@@ -124,8 +148,8 @@ class QuestTestsLayoutContractTests(unittest.TestCase):
                 )
                 self.assertIn(
                     homes[0].name,
-                    ("test_scene_builder.py", "_compile_helpers.py"),
-                    f"{name} must live in the original module or a helpers module",
+                    ("test_scene_builder.py", "_compile_helpers.py", "_support.py"),
+                    f"{name} must live in the original module/package or a helpers module",
                 )
 
     @covers_requirement(

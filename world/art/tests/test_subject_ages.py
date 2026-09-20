@@ -1,7 +1,7 @@
 """Tests for canonical character-age eligibility (design D3).
 
 The "never reaches the worker" regression is asserted on the full lifecycle
-path in ``world/art/tests/test_service.py`` using the counting fixture; here we
+path in ``world/art/tests/test_service`` package using the counting fixture; here we
 cover the pure eligibility contract — canonical attribute presence and type —
 against real ``PlayerCharacter`` attributes.
 """

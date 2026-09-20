@@ -2,7 +2,7 @@
 
 The shipped-registry content claims these tests used to carry (dual-blade
 sibling, light-sword damage declaration, full-earth spell round-trip) live
-in the registered data-contract files (test_skill_registry.py,
+in the registered data-contract files (test_skill_registry package,
 test_spell_catalogs.py). What remains here is cast-resolution *behavior*
 exercised through synthetic rows: damage dispatch and cost deduction, self
 buffs committing to the caster only, target-spec rejection, and the
