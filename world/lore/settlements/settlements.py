@@ -63,6 +63,11 @@ SETTLEMENT_REGISTRY: dict[str, SettlementDefinition] = {
         archetype=SettlementArchetype.CAPITAL,
         zcoord="capital_altoria",
     ),
+    "village_ciaran": SettlementDefinition(
+        key="village_ciaran",
+        archetype=SettlementArchetype.ELVEN_VILLAGE,
+        zcoord="village_ciaran",
+    ),
 }
 
 validate_settlement_registry(SETTLEMENT_REGISTRY)

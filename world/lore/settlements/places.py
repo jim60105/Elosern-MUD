@@ -29,6 +29,7 @@ class PlaceKind(StrEnum):
     WEAPONSMITH = "weaponsmith"
     OUTFITTER = "outfitter"
     EATERY = "eatery"
+    HOME = "home"
 
 
 @dataclass(frozen=True)
@@ -171,10 +172,11 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
 # derived service-host roster and the derived SHOP_REGISTRY both iterate this
 # dict, and sync_service_content processes roster rows in this order.
 from world.lore.settlements.places_altoria import ROWS as ALTORIA_ROWS  # noqa: E402
+from world.lore.settlements.places_ciaran import ROWS as CIARAN_ROWS  # noqa: E402
 
 PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     definition.key: definition
-    for definition in (*ALTORIA_ROWS,)
+    for definition in (*ALTORIA_ROWS, *CIARAN_ROWS)
 }
 
 validate_place_registry(PLACE_REGISTRY)

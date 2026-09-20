@@ -96,11 +96,13 @@ class ShopNPCIdentityTests(unittest.TestCase):
         self.assertIn("guild_branch:guild_branch_altoria", str(caught.exception))
         self.assertIn("guild_rank:F", str(caught.exception))
 
-    def test_shipped_registry_carries_the_four_capital_shops(self):
+    def test_shipped_registry_carries_the_four_capital_and_four_village_shops(self):
         self.assertEqual(
             list(SHOP_REGISTRY),
             [
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],
         )

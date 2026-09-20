@@ -150,6 +150,8 @@ class ItemDefinitionTests(unittest.TestCase):
             {
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_valwyn_home", "ciaran_vethiel_home",
             },
         )
         for shop in SHOP_REGISTRY.values():
@@ -887,7 +889,10 @@ class PriceScaleSectionTests(unittest.TestCase):
     """``price_scales`` section and per-shop scale validation (design §4)."""
 
     def test_shipped_section_is_par(self):
-        self.assertEqual(_shipped_scales(), {"capital_altoria": 100})
+        self.assertEqual(
+            _shipped_scales(),
+            {"capital_altoria": 100, "village_ciaran": 100},
+        )
 
     def test_price_scales_must_be_a_mapping(self):
         with self.assertRaises(GuildConfigError):
@@ -1449,6 +1454,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             [
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor",
+                "ciaran_hailiel", "ciaran_lareneth",
+                "ciaran_valwyn", "ciaran_vethiel",
             ],
         )
         for row, former in zip(rows, self.FORMER_YAML_ROWS):
@@ -1486,6 +1493,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             [
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor",
+                "ciaran_hailiel", "ciaran_lareneth",
+                "ciaran_valwyn", "ciaran_vethiel",
             ],
         )
         self.assertEqual(
@@ -1493,6 +1502,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor",
+                "ciaran_hailiel", "ciaran_lareneth",
+                "ciaran_valwyn", "ciaran_vethiel",
             },
         )
 
@@ -1508,6 +1519,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             [
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor",
+                "ciaran_hailiel", "ciaran_lareneth",
+                "ciaran_valwyn", "ciaran_vethiel",
             ],
         )
 

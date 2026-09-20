@@ -3,12 +3,15 @@
 from tools.spec_traceability import covers_requirement
 
 import dataclasses
+import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
 
+from typeclasses.characters import PlayerCharacter
 from typeclasses.components import (
     GuildExaminer,
     GuildStaff,
@@ -18,17 +21,20 @@ from typeclasses.components import (
 )
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
+from world.lore.items import ITEM_REGISTRY
 from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+from world.lore.settlements.shops import SHOP_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules import guild_config
 from world.rules import guild_economy
+from world.rules.clock import WorldClock
 from world.rules.guild_config import (
     CATALOG,
     ServiceHostRow,
@@ -39,6 +45,12 @@ from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.profession_assembly import assemble_profession_components
 from world.rules.profession_config import get_profession
 from world.rules.quest_issuance import resolve_issuer_key
+from world.rules.economy import (
+    TradeError,
+    TradeReason,
+    buy,
+    parse_merchant_stock,
+)
 from world.rules.guild_economy import (
     ServiceAnchorIntegrityError,
     sync_service_content,
@@ -310,7 +322,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(events), 5)  # guild host + four merchant hosts
+        self.assertEqual(len(events), 9)  # guild host + four capital merchants + four village hosts
         self.assertEqual(events[0].kwargs["context"]["char"], _guild_host_name())
         self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_ID)
         self.assertEqual(events[0].kwargs["context"]["shop"], _guild_branch_key())
@@ -335,7 +347,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 5)
+        self.assertEqual(len(late), 9)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):
@@ -982,6 +994,209 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
             if host.components.has(QuestIssuer.name)
         ]
         self.assertEqual(carriers, [])
+
+
+VILLAGE_PLACE_KEYS = [
+    "ciaran_hailiel_home", "ciaran_lareneth_home",
+    "ciaran_valwyn_home", "ciaran_vethiel_home",
+]
+
+
+class TradePathNoArchetypeBranchTests(unittest.TestCase):
+    """ciaran-village-commerce §4.2: trading in the elven village is not special-cased.
+
+    The de-commercialised village SHALL run the identical trade code path as
+    a capital shop. This tripwire scans the trade and shop-command modules
+    for a settlement-archetype or village-conditional branch: none may exist.
+    """
+
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
+    def test_trade_and_shop_command_paths_have_no_archetype_branch(self):
+        root = Path(__file__).resolve().parents[3]
+        sources = [
+            "world/rules/economy.py",
+            "commands/economy.py",
+        ]
+        for relative in sources:
+            source = (root / relative).read_text(encoding="utf-8")
+            for token in (
+                "SettlementArchetype",
+                "archetype",
+                "elven_village",
+                "village_ciaran",
+            ):
+                self.assertNotIn(token, source, f"{relative} carries {token!r}")
+
+
+class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
+    """ciaran-village-commerce: the elven homes sync and trade like capital shops."""
+
+    def _village_place(self, key):
+        return PLACE_REGISTRY[key]
+
+    def _village_interior(self, place):
+        return search_object_by_tag(place.key)[0]
+
+    def _village_host(self, place):
+        return NPC.objects.filter(db_key=place.host_name).first()
+
+    @covers_requirement(
+        "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
+    )
+    def test_four_village_interiors_doorways_and_hosts_appear_after_sync(self):
+        sync_service_content()
+        for key in VILLAGE_PLACE_KEYS:
+            with self.subTest(place=key):
+                place = self._village_place(key)
+                interior = self._village_interior(place)
+                self.assertEqual(interior.db.desc, place.room_desc_zh)
+                exterior = GridRoom.objects.filter_xyz(
+                    xyz=(*place.exterior_xy, SETTLEMENT_REGISTRY[place.settlement_key].zcoord)
+                ).first()
+                self.assertIsNotNone(exterior)
+                self.assertIn(
+                    interior,
+                    {exit_obj.destination for exit_obj in exterior.exits},
+                )
+                host = self._village_host(place)
+                self.assertIsNotNone(host)
+                self.assertEqual(host.location, interior)
+                self.assertEqual(host.npc_title, place.host_title)
+
+    @covers_requirement(
+        "ciaran-village-commerce::the-village-s-hosts-are-its-own-people"
+    )
+    def test_village_hosts_carry_authored_elf_ciaran_female_identity(self):
+        sync_service_content()
+        for key in VILLAGE_PLACE_KEYS:
+            with self.subTest(place=key):
+                place = self._village_place(key)
+                host = self._village_host(place)
+                self.assertEqual(host.race, "elf")
+                self.assertEqual(host.subrace, "ciaran")
+                self.assertEqual(host.sex, "female")
+                self.assertEqual(int(host.attributes.get("age")), 18)
+                merchant = host.components.get(Merchant.get_component_slot())
+                self.assertEqual(merchant.shop_key, dict(place.authored_kwargs)["shop_key"])
+
+    @covers_requirement(
+        "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
+    )
+    def test_village_titles_avoid_commercial_words(self):
+        sync_service_content()
+        for key in VILLAGE_PLACE_KEYS:
+            with self.subTest(place=key):
+                place = self._village_place(key)
+                self.assertNotIn("老闆", place.host_title)
+                self.assertNotIn("店主", place.host_title)
+                self.assertNotIn("店", place.room_name_zh)
+                self.assertNotIn("舖", place.room_name_zh)
+                self.assertNotIn("櫃檯", place.room_desc_zh)
+                self.assertNotIn("招牌", place.room_desc_zh)
+                for token in ("counter", "sign", "shopfront", "store", "shelf"):
+                    self.assertNotIn(token, place.room_desc_zh)
+
+    @covers_requirement(
+        "ciaran-village-commerce::one-good-is-sold-at-two-prices-in-two-settlements"
+    )
+    def test_elven_goods_resolve_at_two_prices_across_two_settlements(self):
+        catalog = get_catalog()
+        village = catalog.shop_configs["ciaran_valwyn_home"]
+        capital = catalog.shop_configs["altoria_general_store"]
+        village_silk = next(
+            offer for offer in village.offers if offer.item_key == "elven_spider_silk"
+        )
+        capital_silk = next(
+            offer for offer in capital.offers if offer.item_key == "elven_spider_silk"
+        )
+        self.assertEqual(village_silk.buy_copper, 60)
+        self.assertEqual(capital_silk.buy_copper, 60_000)
+        self.assertEqual(village_silk.item_key, capital_silk.item_key)
+        self.assertTrue(ITEM_REGISTRY[village_silk.item_key].sellable)
+        # The candied blossom is the second shared key (design's 蜜漬花蕊):
+        # both settlements offer it, again through their own assortments.
+        village_fare = catalog.shop_configs["ciaran_lareneth_home"]
+        village_blossom = next(
+            offer
+            for offer in village_fare.offers
+            if offer.item_key == "elven_candied_blossom"
+        )
+        capital_eatery = catalog.shop_configs["altoria_eatery"]
+        capital_blossom = next(
+            offer
+            for offer in capital_eatery.offers
+            if offer.item_key == "elven_candied_blossom"
+        )
+        self.assertEqual(village_blossom.buy_copper, 20)
+        self.assertEqual(capital_blossom.buy_copper, 60)
+        self.assertEqual(village_blossom.item_key, capital_blossom.item_key)
+        # Importing one good must not import the shelf: the capital reaches
+        # silk through its own sundries assortment alone, and stocks none of
+        # the village's other elven goods.
+        self.assertEqual(
+            SHOP_REGISTRY["altoria_general_store"].assortment_keys,
+            ("general_sundries",),
+        )
+        capital_offered = {offer.item_key for offer in capital.offers}
+        self.assertIn("elven_spider_silk", capital_offered)
+        self.assertNotIn("crescent_earring", capital_offered)
+
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
+    def test_village_purchase_settles_like_a_capital_purchase(self):
+        sync_service_content()
+        store = self._village_interior(self._village_place("ciaran_valwyn_home"))
+        host = self._village_host(self._village_place("ciaran_valwyn_home"))
+        player = create_object(PlayerCharacter, key="village_shopper")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = store
+        player.db.wallet = 1000
+        with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
+            result = buy(player, host, "elven_spider_silk", 1)
+        self.assertEqual(result["total_copper"], 60)
+        self.assertEqual(player.db.wallet, 940)
+        self.assertIn("elven_spider_silk", player.db.inventory)
+        stock = parse_merchant_stock(host.components.get(Merchant.get_component_slot()))
+        silk_offer = next(
+            offer
+            for offer in get_catalog().shop_configs["ciaran_valwyn_home"].offers
+            if offer.item_key == "elven_spider_silk"
+        )
+        self.assertEqual(stock["elven_spider_silk"], silk_offer.initial_stock - 1)
+        self.assertEqual(host.relations.affinity_for(player), 1)
+
+    @covers_requirement(
+        "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"
+    )
+    def test_displaced_village_host_refuses_with_the_fixed_anchoring_message(self):
+        from world.rules.service_messages import SERVICE_REASON_MESSAGES
+        from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+
+        sync_service_content()
+        place = self._village_place("ciaran_valwyn_home")
+        host = self._village_host(place)
+        square = create_object(Room, key="elsewhere")
+        player = create_object(PlayerCharacter, key="gate_probe")
+        player.race = "human"
+        player.apply_race_baseline()
+        host.location = square
+        player.location = square
+        player.db.wallet = 1000
+        with self.assertRaises(TradeError) as ctx:
+            buy(player, host, "elven_spider_silk", 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
+        self.assertEqual(player.db.wallet, 1000)
+        self.assertEqual(list(player.db.inventory or []), [])
+        # The player-facing refusal is the anchoring gate's fixed line, the
+        # same one a displaced town merchant produces (service-anchoring).
+        self.assertEqual(
+            SERVICE_REASON_MESSAGES["service_unavailable"],
+            MESSAGE_OFF_ANCHOR,
+        )
 
 
 if __name__ == "__main__":
