@@ -25,7 +25,7 @@ This blocks nine of the twelve remaining 聖潔王都 locations and three of the
 
 - `world/rules/rulebook/professions.yaml` — one new row.
 - `world/rules/dialogue.py` — `DIALOGUE_TABLE` assembled from the new lore module; `resolve_dialogue_component`, `dialogue_key_for`, `table_response`, `dialogue_has_keyword` and every caller untouched.
-- `world/lore/dialogue/` (new package) — `shape.py` (the two dataclasses), `guild.py` (the existing row, moved verbatim), `altoria.py` and `ciaran.py` (empty until content changes fill them), and `__init__.py` assembling `DIALOGUE_ROWS`. No file is expected to pass 600 lines; if `altoria.py` approaches it, it splits by terrace the way the capital's place slices do.
+- `world/lore/dialogue/` (new package) — `shape.py` (the two dataclasses), `guild.py` (the existing row, moved with every contract-pinned substring retained and its prose re-authored in the clerk's in-character 正體中文 voice, capped at the panel's four pressable keywords), `altoria.py` and `ciaran.py` (empty until content changes fill them), and `__init__.py` assembling `DIALOGUE_ROWS`. No file is expected to pass 600 lines; if `altoria.py` approaches it, it splits by terrace the way the capital's place slices do.
 - `world/rules/guild_config.py` — `validate_service_hosts` gains the dialogue-key resolution check.
 - `world/lore/settlements/places.py` — untouched. A place already authors `dialogue_key` through `authored_kwargs`; `attendant` needs no new field.
 - `world/rules/guild_economy.py`, `world/maps/bootstrap.py`, `commands/` — untouched.
