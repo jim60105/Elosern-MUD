@@ -18,6 +18,7 @@ from evennia.utils.create import create_object
 
 from world.observability import log_info, log_warn
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
+from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.bootstrap import sync_service_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
 from world.rules.profession_assembly import (
@@ -77,9 +78,14 @@ def _sync_service_host(row, room) -> NPC:
     renamed and never has its authored title rewritten (runtime identity
     writes are forbidden — roster convergence deletes hosts instead of
     backfilling, design D8/D9). Creation persists the authored ``name`` as the
-    entity key and the validated ``title`` once. Components attach ONLY
-    through the shared profession-assembly helper: the row's blueprint plus
-    its projected per-component identity kwargs (design D7).
+    entity key and the validated ``title`` once, and applies the owning
+    place's authored race, subrace and sex with their race baseline —
+    creation-time identity written beside ``npc_title``, never rewritten on a
+    later sync (the never-rename/never-retitle contract extended to
+    race/subrace/sex: an authored edit takes effect through roster
+    convergence). Components attach ONLY through the shared
+    profession-assembly helper: the row's blueprint plus its projected
+    per-component identity kwargs (design D7).
     """
     from world.rules.npc_identity import validate_npc_name, validate_npc_title
 
@@ -89,6 +95,16 @@ def _sync_service_host(row, room) -> NPC:
     if host is None:
         host = create_object(NPC, key=validate_npc_name(row.name), location=room)
         host.npc_title = validate_npc_title(row.title)
+        place = PLACE_REGISTRY.get(row.anchor_room)
+        if place is None:
+            raise RuntimeError(
+                f"roster row {row.service_id!r} anchors at {row.anchor_room!r}, "
+                "which has no place registry row"
+            )
+        host.race = place.host_race
+        host.subrace = place.host_subrace
+        host.sex = place.host_sex
+        host.apply_race_baseline()
         first_kwargs = authored_map[row.profession.components[0].type_key]
         # Commit-bound: sync runs inside startup transactions; a creation event
         # must never describe a host a later rollback destroyed.
@@ -102,9 +118,6 @@ def _sync_service_host(row, room) -> NPC:
         )
     elif host.location is not room:
         host.location = room
-    if host.race is None:
-        host.race = "human"
-        host.apply_race_baseline()
     ensure_npc_canonical_age(host)
     # Binding/anchor convergence rides the shared assembly on EVERY sync,
     # reused hosts included: service_binding/anchor_room_id are authored

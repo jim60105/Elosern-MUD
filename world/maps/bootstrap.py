@@ -16,6 +16,8 @@ from world.observability import log_info, log_warn
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.maps.map_data import XYMAP_DATA_LIST
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
@@ -37,19 +39,6 @@ NORTH_GATE_XYZ = (2, 4, "capital_altoria")
 # The hard-gate starting-room typeclass (limbo-one-way-gates D4). Referenced
 # by module path so bootstrap never imports typeclasses.rooms' subclasses.
 LIMBO_ROOM_TYPECLASS = "typeclasses.rooms.LimboRoom"
-
-# Permanent service interiors (guild-economy D-9). They are ordinary permanent
-# rooms OUTSIDE the xyzgrid node count, linked bidirectionally to their
-# documented exterior grid rooms, and are not coordinates on the grid.
-GUILD_HALL_KEY = "altoria_guild_hall"
-GENERAL_STORE_KEY = "altoria_general_store"
-GUILD_HALL_EXTERIOR_XYZ = (3, 1, "capital_altoria")  # 冒險者公會外
-GENERAL_STORE_EXTERIOR_XYZ = (1, 2, "capital_altoria")  # 市場街
-GUILD_HALL_TAG = GUILD_HALL_KEY
-GENERAL_STORE_TAG = GENERAL_STORE_KEY
-GUILD_HALL_DESC = "The guild hall of 阿爾托利亞, with a grand board and a training ring (guild-economy D-9)."
-GENERAL_STORE_DESC = "The general store of 阿爾托利亞, its shelves waiting for the next caravan (guild-economy D-9)."
-
 
 def _find_exterior(xyz):
     return GridRoom.objects.filter_xyz(xyz=xyz).first()
@@ -85,49 +74,49 @@ def _ensure_interior_doorways(interior, exterior, interior_key, interior_aliases
 
 
 def sync_service_interiors() -> None:
-    """Create the two permanent guild-economy interiors idempotently.
+    """Create every registered place's permanent interior idempotently.
 
     The grid street topology is unchanged: these rooms are not xyzgrid nodes.
-    Each interior is tagged by stable key so repeated startup reuses the same
-    room rather than duplicating it, and every authored description is updated
-    in place on every sync.
+    Places are grouped by settlement so each exterior resolves in its own
+    settlement's coordinate space (the z derives from the settlement record,
+    never a code-side constant). Each interior is tagged by its place key so
+    repeated startup reuses the same room rather than duplicating it, and
+    every authored description is updated in place on every sync. A place
+    whose exterior cannot be resolved is warned (naming the row) and skipped;
+    the remaining places still synchronize.
     """
-    guild_exterior = _find_exterior(GUILD_HALL_EXTERIOR_XYZ)
-    store_exterior = _find_exterior(GENERAL_STORE_EXTERIOR_XYZ)
-    if guild_exterior is None or store_exterior is None:
-        log_warn(
-            "bootstrap_service_exterior_missing",
-            context={
-                "guild_hall_exterior": GUILD_HALL_EXTERIOR_XYZ,
-                "general_store_exterior": GENERAL_STORE_EXTERIOR_XYZ,
-                "action": "skip_service_interiors",
-            },
-        )
-        return
+    from collections import defaultdict
 
-    guild_hall = _ensure_interior(
-        "阿爾托利亞冒險者公會大廳",
-        GUILD_HALL_TAG,
-        GUILD_HALL_DESC,
-    )
-    general_store = _ensure_interior(
-        "阿爾托利亞雜貨店",
-        GENERAL_STORE_TAG,
-        GENERAL_STORE_DESC,
-    )
+    by_settlement: dict[str, list] = defaultdict(list)
+    for place in PLACE_REGISTRY.values():
+        by_settlement[place.settlement_key].append(place)
 
-    _ensure_interior_doorways(
-        guild_hall,
-        guild_exterior,
-        "冒險者公會大廳",
-        ["guild hall", "hall"],
-    )
-    _ensure_interior_doorways(
-        general_store,
-        store_exterior,
-        "雜貨店",
-        ["general store", "store", "shop"],
-    )
+    for settlement_key, places in by_settlement.items():
+        zcoord = SETTLEMENT_REGISTRY[settlement_key].zcoord
+        for place in places:
+            exterior_xyz = (*place.exterior_xy, zcoord)
+            exterior = _find_exterior(exterior_xyz)
+            if exterior is None:
+                log_warn(
+                    "bootstrap_service_exterior_missing",
+                    context={
+                        "place": place.key,
+                        "exterior_xyz": exterior_xyz,
+                        "action": "skip_place",
+                    },
+                )
+                continue
+            interior = _ensure_interior(
+                place.room_name_zh,
+                place.key,
+                place.room_desc_zh,
+            )
+            _ensure_interior_doorways(
+                interior,
+                exterior,
+                place.doorway_key_zh,
+                list(place.doorway_aliases),
+            )
 
 
 def sync_limbo() -> None:
