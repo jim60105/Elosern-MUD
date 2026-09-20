@@ -143,6 +143,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "movement must charge the world clock (design D3)",
         )
 
+    def _dispatch_move(self, page):
+        """Dispatch one explore.move for the first exit through the store."""
+        return page.evaluate(
+            """() => {
+              const s = window.__elosernBridge.store.view;
+              const row = s.panels.exploration.move[0];
+              return window.__elosernBridge.store.dispatchAction('explore.move', {
+                exit_ref: row.exit_ref,
+                current_node: s.panels.local_map.current_node,
+              });
+            }"""
+        )
+
     def _wait_admitted_move(self, page, node_before):
         """Dispatch real moves until one is admitted (a presentation revision
         can advance between the view read and admission; the dispatcher then
