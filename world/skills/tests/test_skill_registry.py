@@ -1254,12 +1254,23 @@ class OutOfCombatAvailabilityPolicyTests(unittest.TestCase):
         stay False so an omission can never pass unnoticed)."""
         root = pathlib.Path(__file__).resolve().parents[2]
         sources = {
-            "skills/registry.py": {"SkillDef", "_skill", "_spell"},
+            "skills/registry/builders.py": {"SkillDef", "_skill", "_spell"},
             "skills/sexual_acts/_builder.py": {"SkillDef"},
             "skills/sexual_acts/divine.py": {"SkillDef"},
             "rules/disengage.py": {"SkillDef"},
         }
-        for relative, call_names in sources.items():
+        # The registry package's data slices construct rows ONLY through the
+        # builders above (no bare SkillDef/_skill/_spell calls), which the
+        # per-data-module scan below re-proves for every shipped row.
+        data_sources = sorted(
+            path.relative_to(root).as_posix()
+            for path in (root / "skills" / "registry").glob("data_*.py")
+        )
+        for relative, call_names in (
+            *sources.items(),
+            *((relative, {"SkillDef", "_skill", "_spell"})
+              for relative in data_sources),
+        ):
             tree = ast.parse((root / relative).read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):

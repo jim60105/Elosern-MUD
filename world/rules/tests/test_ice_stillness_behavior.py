@@ -50,10 +50,14 @@ from world.rules.progression import (
 )
 from world.rules.rulebook.schema import Rule
 from world.rules.target_facts import matches_target_predicate
-from world.skills.effects import EffectAudience, EffectPolicy, ResolvedEffect
-from world.skills.registry import (
+from world.skills.effects import (
     DamageEffect,
     DamagePolicy,
+    EffectAudience,
+    EffectPolicy,
+    ResolvedEffect,
+)
+from world.skills.registry import (
     FactionConstraint,
     SkillCategory,
     SkillDef,

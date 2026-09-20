@@ -970,7 +970,14 @@ class DivineEighthRowStructuralTests(unittest.TestCase):
 def _main_registry_source() -> str:
     import world.skills.registry as main_registry
 
-    return inspect.getsource(main_registry)
+    # The registry is a package now: cover every shipped data/assembly module
+    # (the former single-module source) so the absence assertion still spans
+    # all hand-written registry rows.
+    package_root = Path(inspect.getsourcefile(main_registry)).parent
+    sources = [inspect.getsource(main_registry)]
+    for module_path in sorted(package_root.glob("*.py")):
+        sources.append(module_path.read_text(encoding="utf-8"))
+    return "\n".join(sources)
 
 
 class OwnershipDriftGuardTests(EvenniaTestCase):
