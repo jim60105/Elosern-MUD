@@ -47,6 +47,31 @@ MIGRATED_FILES = (
     "world/rules/tests/test_time_skip.py",
 )
 
+#: Oversized modules later split into same-named packages (rules test split).
+#: The ledger/seed checks stay pinned on the original flat paths; the
+#: zero-findings scan below expands each split path onto its package slices so
+#: the guarantee covers every slice verbatim.
+_SPLIT_PACKAGES = (
+    "test_character_creation",
+)
+
+
+def _finding_scan_files() -> tuple[str, ...]:
+    """Every manifest file to scan, following split modules into slices."""
+    files: list[str] = []
+    for rel in MIGRATED_FILES:
+        name = rel.rsplit("/", 1)[-1][: -len(".py")]
+        if name in _SPLIT_PACKAGES:
+            package = (REPO_ROOT / rel).with_suffix("")
+            files.extend(
+                str(path.relative_to(REPO_ROOT))
+                for path in sorted(package.rglob("*.py"))
+                if "__pycache__" not in path.parts
+            )
+        else:
+            files.append(rel)
+    return tuple(files)
+
 
 class RulesCreationProgressionTestDataMigrationContractTests(DataIndependenceContractMixin, unittest.TestCase):
 
@@ -59,7 +84,7 @@ class RulesCreationProgressionTestDataMigrationContractTests(DataIndependenceCon
         self.assert_no_ledger_exemption(MIGRATED_FILES)
 
     def test_migrated_files_carry_zero_findings(self):
-        self.assert_zero_findings(MIGRATED_FILES)
+        self.assert_zero_findings(_finding_scan_files())
 
     def test_gate_is_green_and_reports_no_violation_for_migrated_files(self):
         self.assert_gate_green_for_manifest()
