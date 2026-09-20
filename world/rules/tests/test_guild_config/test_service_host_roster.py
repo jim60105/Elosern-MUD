@@ -116,28 +116,116 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertNotIn("service_hosts", raw_rulebook())
 
     def test_the_attendant_blueprint_ships_unused(self):
-        # Neutrality gate (place-attendant-profession): the derived roster is
-        # exactly the fixed pre-change baseline — nine rows, unchanged
-        # professions and anchors (field-by-field equality is pinned by
-        # test_shipped_roster_reproduces_the_removed_yaml_rows_exactly) — and
-        # NOT ONE row names the new attendant blueprint. The blueprint ships
-        # available for content changes, used by nothing.
+        # Neutrality gate (place-attendant-profession): every derived row
+        # equals the FULL pre-change baseline field by field — name, title,
+        # profession, anchor, service_id, authored identity — so a shipped
+        # host's identity cannot silently move while the two-row former-YAML
+        # zip above still passes. NOT ONE row names the new attendant
+        # blueprint: it ships available for content changes, used by nothing.
         rows = validate_service_hosts()
-        self.assertEqual(
-            [(row.service_id, row.profession.key) for row in rows],
-            [
-                ("altoria_guild_master", "guild_staff"),
-                ("altoria_merchant", "merchant"),
-                ("altoria_blacksmith", "merchant"),
-                ("altoria_eatery_owner", "merchant"),
-                ("altoria_tailor", "merchant"),
-                ("ciaran_hailiel", "merchant"),
-                ("ciaran_lareneth", "merchant"),
-                ("ciaran_valwyn", "merchant"),
-                ("ciaran_vethiel", "merchant"),
-            ],
-        )
+        self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
+        for row, expected in zip(rows, self.PRE_CHANGE_BASELINE):
+            with self.subTest(service_id=row.service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    (
+                        expected["name"],
+                        expected["title"],
+                        expected["profession"],
+                        expected["anchor_room"],
+                        expected["service_id"],
+                        expected["authored_kwargs"],
+                    ),
+                )
         self.assertNotIn("attendant", {row.profession.key for row in rows})
+
+    # The complete roster as it shipped BEFORE place-attendant-profession,
+    # written as literals (never derived from the live registry): the fixed
+    # nine rows the blueprint addition must reproduce untouched.
+    PRE_CHANGE_BASELINE = (
+        {
+            "name": "葛里安·衛登",
+            "title": "阿爾托利亞分會會長",
+            "profession": "guild_staff",
+            "anchor_room": "altoria_guild_hall",
+            "service_id": "altoria_guild_master",
+            "authored_kwargs": {
+                "branch_key": "guild_branch_altoria",
+                "dialogue_key": "guild_staff",
+            },
+        },
+        {
+            "name": "瑪爾特·金秤",
+            "title": "阿爾托利亞雜貨商店老闆",
+            "profession": "merchant",
+            "anchor_room": "altoria_general_store",
+            "service_id": "altoria_merchant",
+            "authored_kwargs": {"shop_key": "altoria_general_store"},
+        },
+        {
+            "name": "維爾登·黑潭",
+            "title": "聖潔王都鍛造鋪鐵匠",
+            "profession": "merchant",
+            "anchor_room": "altoria_forge",
+            "service_id": "altoria_blacksmith",
+            "authored_kwargs": {"shop_key": "altoria_forge"},
+        },
+        {
+            "name": "西格瑪·庫柏",
+            "title": "聖潔王都餐館老闆",
+            "profession": "merchant",
+            "anchor_room": "altoria_eatery",
+            "service_id": "altoria_eatery_owner",
+            "authored_kwargs": {"shop_key": "altoria_eatery"},
+        },
+        {
+            "name": "妮絲塔·狐溪",
+            "title": "聖潔王都裁縫坊坊主",
+            "profession": "merchant",
+            "anchor_room": "altoria_tailor",
+            "service_id": "altoria_tailor",
+            "authored_kwargs": {"shop_key": "altoria_tailor"},
+        },
+        {
+            "name": "海莉爾·斯塔爾法爾",
+            "title": "暗影谷村鑄刃者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_hailiel_home",
+            "service_id": "ciaran_hailiel",
+            "authored_kwargs": {"shop_key": "ciaran_hailiel_home"},
+        },
+        {
+            "name": "拉瑞內斯·妮特布倫",
+            "title": "暗影谷村花饌好手",
+            "profession": "merchant",
+            "anchor_room": "ciaran_lareneth_home",
+            "service_id": "ciaran_lareneth",
+            "authored_kwargs": {"shop_key": "ciaran_lareneth_home"},
+        },
+        {
+            "name": "瓦爾溫·斯蒂爾瓦特爾",
+            "title": "暗影谷村蒐羅者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_valwyn_home",
+            "service_id": "ciaran_valwyn",
+            "authored_kwargs": {"shop_key": "ciaran_valwyn_home"},
+        },
+        {
+            "name": "維特希爾·威爾德布瑞亞爾",
+            "title": "暗影谷村織衣者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_vethiel_home",
+            "service_id": "ciaran_vethiel",
+            "authored_kwargs": {"shop_key": "ciaran_vethiel_home"},
+        },
+    )
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
@@ -313,6 +401,26 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             table_response("t_unregistered_table", "住宿"),
             NO_UNDERSTANDING_LINE,
         )
+
+    def test_the_dialogue_key_check_covers_every_dialogue_bearing_row(self):
+        # The check keys off the COMPONENT, not the profession: the shipped
+        # guild hall (a multi-component blueprint) must fail load just the
+        # same when its authored table disappears — narrowing the rule to
+        # attendants only would silently leave the guild host mute.
+        guild = PLACE_REGISTRY["altoria_guild_hall"]
+        broken = replace(
+            guild,
+            authored_kwargs=(
+                ("branch_key", "guild_branch_altoria"),
+                ("dialogue_key", "t_guild_table_gone"),
+            ),
+        )
+        with mock.patch.dict(PLACE_REGISTRY, {"altoria_guild_hall": broken}):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("altoria_guild_hall", message)
+        self.assertIn("t_guild_table_gone", message)
 
 
 if __name__ == "__main__":

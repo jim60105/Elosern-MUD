@@ -5,8 +5,10 @@
 # authoritative state is the NPC's component instances and attributes; runtime
 # gates read component fields, never this table.
 #
-# `default_binding` is validated for vocabulary and STORED BUT NOT READ by any
-# runtime gate until the service-anchoring change consumes it (D6 seam).
+# `default_binding` is validated for vocabulary and read at assembly time
+# (profession_assembly.plan_bindings): a `person` component makes its row
+# unrosterable (config rejects it as an anchor); `place` anchors the component
+# to the roster row's room (D6 seam).
 #
 # Row baselines:
 #   - `merchant` and `guild_staff` exactly mirror the component tuples

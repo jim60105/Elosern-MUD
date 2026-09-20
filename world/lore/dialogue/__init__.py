@@ -16,6 +16,8 @@ pairs. This package must never import ``world/rules/`` — the lore side is
 registry-only.
 """
 
+from types import MappingProxyType
+
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
 # The rows are assembled from the domain slices in fixed, commented order (the
@@ -26,11 +28,17 @@ from world.lore.dialogue.guild import ROWS as GUILD_STAFF_ROWS  # the guild hall
 from world.lore.dialogue.altoria import ROWS as ALTORIA_ROWS  # 聖潔王都's hosts
 from world.lore.dialogue.ciaran import ROWS as CIARAN_ROWS  # 暗影谷村's hosts
 
-DIALOGUE_ROWS: dict[str, DialogueDefinition] = {
-    key: definition
-    for rows in (GUILD_STAFF_ROWS, ALTORIA_ROWS, CIARAN_ROWS)
-    for key, definition in rows
-}
+# Authored identity is read-only at runtime (the scripted-dialogue registry
+# contract): the assembled mapping itself is frozen, not just the
+# world/rules/dialogue.py view over it — a consumer must never mutate the
+# table the service-host validators resolve against.
+DIALOGUE_ROWS: MappingProxyType = MappingProxyType(
+    {
+        key: definition
+        for rows in (GUILD_STAFF_ROWS, ALTORIA_ROWS, CIARAN_ROWS)
+        for key, definition in rows
+    }
+)
 
 __all__ = [
     "ALTORIA_ROWS",

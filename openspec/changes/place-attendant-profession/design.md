@@ -2,7 +2,7 @@
 
 Every place in `PLACE_REGISTRY` must name a profession, and `validate_service_hosts` derives one roster row per place. Of the four shipped professions only three are place-bound, and all three carry trade or guild capability. So today "a place exists" and "a place sells something or runs guild business" are the same statement. Twelve of the eighteen location types in `docs/lore/settlement-locations.md` are neither.
 
-`ScriptedDialogue` already exists as a component, is already place-bound in the `guild_staff` and `guild_examiner` blueprints, and already declares exactly the identity fields a talk host needs (`service_id`, `dialogue_key`). Nothing needs inventing — the blueprint that combines it alone is simply missing.
+`ScriptedDialogue` already exists as a component and is already place-bound in the `guild_staff` and `guild_examiner` blueprints. It did NOT yet declare the identity fields a talk host needs: it carried `dialogue_key` alone, so a dialogue-first row could never anchor on it (the profession anchor contract rejects a first component without `service_id`). This change adds the missing `service_id` field — mirroring the `QuestIssuer` precedent — and the blueprint that combines the class alone is what was simply missing.
 
 ## Goals / Non-Goals
 
