@@ -432,7 +432,12 @@ def validate_price_scales(raw: Any) -> dict[str, int]:
 
 
 def _scaled_price(base_copper: int, scale: int) -> int:
-    """Half-up rounding ``(base * scale + 50) // 100`` — exact integer copper."""
+    """Half-up rounding ``(base * scale + 50) // 100`` — exact integer copper.
+
+    Precondition: ``scale`` was already validated in 1..1000 by the caller
+    (``validate_price_scales`` / ``_resolve_scale``); this helper stays a bare
+    integer multiply with no float entering the copper path.
+    """
     return (base_copper * scale + 50) // 100
 
 
