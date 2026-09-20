@@ -310,20 +310,32 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(events), 2)  # guild host + merchant host
+        self.assertEqual(len(events), 5)  # guild host + four merchant hosts
         self.assertEqual(events[0].kwargs["context"]["char"], _guild_host_name())
         self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_ID)
         self.assertEqual(events[0].kwargs["context"]["shop"], _guild_branch_key())
         self.assertEqual(
             events[0].kwargs["context"]["profession"], _guild_row().profession.key
         )
+        # The specialist hosts follow the roster order (PLACE_REGISTRY slice
+        # order); every merchant reports its authored shop identity.
+        merchant_service_ids = [
+            row.service_id
+            for row in get_catalog().service_hosts
+            if row.service_id != GUILD_SERVICE_ID
+        ]
+        self.assertEqual(
+            [event.kwargs["context"]["service"] for event in events[1:]],
+            merchant_service_ids,
+        )
+        self.assertTrue(all(event.kwargs["context"]["shop"] for event in events[1:]))
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()  # reuse fires nothing
         late = [
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 2)
+        self.assertEqual(len(late), 5)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):

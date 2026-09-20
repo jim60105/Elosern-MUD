@@ -145,9 +145,15 @@ class ItemDefinitionTests(unittest.TestCase):
         self.assertEqual(ITEM_REGISTRY["meal"].display_name_zh, "普通餐食")
 
     def test_shop_definitions_reference_only_known_items(self):
-        self.assertEqual(set(SHOP_REGISTRY), {"altoria_general_store"})
-        shop = SHOP_REGISTRY["altoria_general_store"]
-        self.assertTrue(all(key in ITEM_REGISTRY for key in shop.offered_item_keys))
+        self.assertEqual(
+            set(SHOP_REGISTRY),
+            {
+                "altoria_general_store", "altoria_forge",
+                "altoria_eatery", "altoria_tailor",
+            },
+        )
+        for shop in SHOP_REGISTRY.values():
+            self.assertTrue(all(key in ITEM_REGISTRY for key in shop.offered_item_keys))
 
     @covers_requirement(
         "masterwork-price-band::goods-a-community-trades-everyday-do-not-sit-in-the-keepsake-band"
@@ -564,23 +570,23 @@ class ShopRuleTests(unittest.TestCase):
     def test_loaded_shops_are_integer_and_band_consistent(self):
         offers = self._shipped_offers()
         configs = validate_shop_configs(raw_commerce()["shops"], offers, _shipped_scales())
-        self.assertEqual(set(configs), {"altoria_general_store"})
-        config = configs["altoria_general_store"]
-        self.assertIsInstance(config, ShopConfig)
-        self.assertEqual(
-            {offer.item_key for offer in config.offers},
-            set(SHOP_REGISTRY["altoria_general_store"].offered_item_keys),
-        )
-        for offer in config.offers:
-            self.assertIsInstance(offer, ItemOfferRule)
-            self.assertIsInstance(offer.buy_copper, int)
-            self.assertNotIsInstance(offer.buy_copper, bool)
-            self.assertLessEqual(offer.sell_copper, offer.buy_copper)
-            band = PRICE_TABLE[ITEM_REGISTRY[offer.item_key].price_table_key]
-            self.assertGreaterEqual(offer.buy_copper, band.min_copper)
-            if band.max_copper is not None:
-                self.assertLessEqual(offer.buy_copper, band.max_copper)
-            self.assertLessEqual(offer.initial_stock, offer.max_stock)
+        self.assertEqual(set(configs), set(SHOP_REGISTRY))
+        for config in configs.values():
+            self.assertIsInstance(config, ShopConfig)
+            self.assertEqual(
+                {offer.item_key for offer in config.offers},
+                set(SHOP_REGISTRY[config.shop_key].offered_item_keys),
+            )
+            for offer in config.offers:
+                self.assertIsInstance(offer, ItemOfferRule)
+                self.assertIsInstance(offer.buy_copper, int)
+                self.assertNotIsInstance(offer.buy_copper, bool)
+                self.assertLessEqual(offer.sell_copper, offer.buy_copper)
+                band = PRICE_TABLE[ITEM_REGISTRY[offer.item_key].price_table_key]
+                self.assertGreaterEqual(offer.buy_copper, band.min_copper)
+                if band.max_copper is not None:
+                    self.assertLessEqual(offer.buy_copper, band.max_copper)
+                self.assertLessEqual(offer.initial_stock, offer.max_stock)
 
     def test_float_price_is_rejected(self):
         # The scenario pin for the legacy guild-economy spec: a floating
@@ -719,20 +725,32 @@ class ShopRuleTests(unittest.TestCase):
             host_title="合成二號店老闆",
             assortment_keys=("t_shared_goods",),
         )
+        # Per-shop display names resolve to the owning place's room name, so
+        # the synthetic shop needs a place row that authors its shop_key too.
+        second_place = replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key="t_second_shop",
+            service_id="t_second_shop_service",
+            room_name_zh="合成二號店",
+            host_name="合成二號",
+            host_title="合成二號店老闆",
+            authored_kwargs=(("shop_key", "t_second_shop"),),
+            assortment_keys=("t_shared_goods",),
+        )
         rows = [
             {**raw_commerce()["shops"][0]},
             {"shop_key": "t_second_shop", "open_hour": 9, "close_hour": 19, "restock_hour": 7},
         ]
-        second_place = replace(
-            PLACE_REGISTRY["altoria_general_store"],
-            key="t_second_shop_place",
-            settlement_key="capital_altoria",
-            assortment_keys=("t_shared_goods",),
-            authored_kwargs=(("shop_key", "t_second_shop"),),
-        )
         with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
-             mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": first, "t_second_shop": second}), \
-             mock.patch.dict(PLACE_REGISTRY, {"t_second_shop_place": second_place}, clear=False):
+             mock.patch.dict(
+                 SHOP_REGISTRY,
+                 {"altoria_general_store": first, "t_second_shop": second},
+                 clear=True,
+             ), mock.patch.dict(
+                 PLACE_REGISTRY,
+                 {"t_second_shop": second_place},
+                 clear=False,
+             ):
             configs = validate_shop_configs(rows, offers, _shipped_scales())
             self.assertEqual(
                 {offer.item_key for offer in configs["t_second_shop"].offers},
@@ -1428,7 +1446,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     def _assert_reproduces_former_rows(self, rows):
         self.assertEqual(
             [row.service_id for row in rows],
-            ["altoria_guild_master", "altoria_merchant"],
+            [
+                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
+                "altoria_eatery_owner", "altoria_tailor",
+            ],
         )
         for row, former in zip(rows, self.FORMER_YAML_ROWS):
             self.assertEqual(row.name, former["name"])
@@ -1449,7 +1470,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     def test_shipped_roster_reproduces_the_removed_yaml_rows_exactly(self):
         rows = validate_service_hosts()
         self._assert_reproduces_former_rows(rows)
-        guild, merchant = rows
+        guild, merchant = rows[0], rows[1]
         branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
         store = SHOP_REGISTRY["altoria_general_store"]
         # The identity join that used to be hand-synchronized across four
@@ -1460,8 +1481,20 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
 
     def test_catalog_exposes_the_roster(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
-        self.assertEqual([row.service_id for row in catalog.service_hosts], ["altoria_guild_master", "altoria_merchant"])
-        self.assertEqual(set(catalog.host_by_service_id), {"altoria_guild_master", "altoria_merchant"})
+        self.assertEqual(
+            [row.service_id for row in catalog.service_hosts],
+            [
+                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
+                "altoria_eatery_owner", "altoria_tailor",
+            ],
+        )
+        self.assertEqual(
+            set(catalog.host_by_service_id),
+            {
+                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
+                "altoria_eatery_owner", "altoria_tailor",
+            },
+        )
 
     def test_rulebook_no_longer_hand_authors_a_service_hosts_roster(self):
         # The roster is derived from the place registry; a hand-authored
@@ -1472,7 +1505,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertEqual(
             [row.service_id for row in catalog.service_hosts],
-            ["altoria_guild_master", "altoria_merchant"],
+            [
+                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
+                "altoria_eatery_owner", "altoria_tailor",
+            ],
         )
 
     @covers_requirement(

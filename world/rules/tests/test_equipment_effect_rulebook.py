@@ -652,7 +652,14 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         "equipment-effects::the-new-equipment-roster-is-registered-and-tradeable"
     )
     def test_new_items_are_registered_offered_and_price_resolvable(self):
-        shop = SHOP_REGISTRY["altoria_general_store"]
+        # The specialist split distributes the roster across shops: armour
+        # sells at the tailor, so "tradeable" means offered by SOME capital
+        # shop, not by the general store in particular.
+        offered = {
+            item_key
+            for shop in SHOP_REGISTRY.values()
+            for item_key in shop.offered_item_keys
+        }
         for key in self.NEW_ITEM_KEYS:
             with self.subTest(item=key):
                 definition = ITEM_REGISTRY[key]
@@ -660,7 +667,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
                 self.assertIsNotNone(definition.modifier_key)
                 self.assertTrue(definition.sellable)
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
-                self.assertIn(key, shop.offered_item_keys)
+                self.assertIn(key, offered)
                 self.assertIn(definition.modifier_key, EQUIPMENT_EFFECT_RULES)
 
     @covers_requirement(

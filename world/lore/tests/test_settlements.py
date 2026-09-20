@@ -53,11 +53,15 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_place_iteration_order_is_the_load_bearing_slice_order(self):
         # The derived roster and shop registry iterate this dict, and the
-        # roster must keep the pre-change [guild master, merchant] order
-        # (sync_service_content processes rows in dict order).
+        # roster must keep the pre-change [guild master, merchant] order first,
+        # with the specialist hosts appended after (sync_service_content
+        # processes rows in dict order).
         self.assertEqual(
             list(PLACE_REGISTRY),
-            ["altoria_guild_hall", "altoria_general_store"],
+            [
+                "altoria_guild_hall", "altoria_general_store", "altoria_forge",
+                "altoria_eatery", "altoria_tailor",
+            ],
         )
 
     def test_shipped_place_registry_passes_validation(self):
@@ -171,7 +175,13 @@ class DerivedShopRegistryTests(unittest.TestCase):
         "settlement-place-registry::shop-identities-and-the-service-host-roster-are-derived-from-places"
     )
     def test_shops_are_derived_from_the_places_that_author_a_shop_identity(self):
-        self.assertEqual(set(SHOP_REGISTRY), {"altoria_general_store"})
+        self.assertEqual(
+            set(SHOP_REGISTRY),
+            {
+                "altoria_general_store", "altoria_forge",
+                "altoria_eatery", "altoria_tailor",
+            },
+        )
         shop = SHOP_REGISTRY["altoria_general_store"]
         store = PLACE_REGISTRY["altoria_general_store"]
         self.assertEqual(shop.key, dict(store.authored_kwargs)["shop_key"])

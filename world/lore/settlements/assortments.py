@@ -25,10 +25,11 @@ class AssortmentDefinition:
 
 
 # The four capital assortments split the former 58-item general-store
-# monolith along the axis the specialist shops will use later: weapons,
-# armour, food, and the remaining sundries (design §3.1, §10 change 2).
-# The split is deliberately non-overlapping; the general store references
-# all four until ``altoria-trading-places`` narrows it to sundries.
+# monolith along the axis the specialist shops now use: weapons, armour,
+# food, and the remaining sundries (design §3.1, §10 change 2). The split
+# is deliberately non-overlapping; the general store references sundries
+# alone, and each specialist references exactly one other assortment
+# (altoria-trading-places §6.1).
 ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
     definition.key: definition
     for definition in (

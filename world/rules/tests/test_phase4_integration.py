@@ -47,6 +47,7 @@ from ._combat_session_helpers import _live_registry
 # or shop anymore).
 GUILD_HALL_TAG = PLACE_REGISTRY["altoria_guild_hall"].key
 GENERAL_STORE_TAG = PLACE_REGISTRY["altoria_general_store"].key
+EATERY_TAG = PLACE_REGISTRY["altoria_eatery"].key
 GENERAL_STORE_SHOP_KEY = dict(
     PLACE_REGISTRY["altoria_general_store"].authored_kwargs
 )["shop_key"]
@@ -81,6 +82,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         # reward 25 merit per completion, so two completions reach E.
         self.guild_hall = search_object_by_tag(GUILD_HALL_TAG)[0]
         self.store = search_object_by_tag(GENERAL_STORE_TAG)[0]
+        self.eatery = search_object_by_tag(EATERY_TAG)[0]
         self.player = self.char1
         self.player.location = self.guild_hall
         races = _live_registry("world.lore.races", "RACE_REGISTRY")
@@ -144,8 +146,9 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         # inventory grew by the definition's reward row, whatever item ships.
         self.assertGreater(len(self.player.db.inventory), len(inventory_before))
 
-        # 2. Buy an item at the store while open.
-        self.player.location = self.store
+        # 2. Buy an item at the eatery while open (meal is staple_meals, so
+        # it sells at 聖潔王都餐館, not the sundries-only general store).
+        self.player.location = self.eatery
         clock = WorldClock(12 * 3600)
         with patch("world.rules.economy.get_world_clock", return_value=clock):
             self.call(CmdBuy(), "meal 1", "你買了 1 個")
