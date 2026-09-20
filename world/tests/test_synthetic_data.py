@@ -29,7 +29,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 MIRROR_JS = "web/static/webclient/js/tests/support/synthetic-data.js"
 MIRROR_MJS = "web/webclient-app/tests/support/synthetic-data.mjs"
-KIT_REL = "world/tests/synthetic_data.py"
+# The kit is a package (the former single synthetic_data.py split into domain
+# slices): every source file of the package is gate-clean, so the scan covers
+# them all.
+KIT_RELS = tuple(
+    str(path.relative_to(REPO_ROOT))
+    for path in sorted((REPO_ROOT / "world" / "tests" / "synthetic_data").rglob("*.py"))
+    if "__pycache__" not in path.parts
+)
 SELF_REL = "world/tests/test_synthetic_data.py"
 
 _CANON_RE = re.compile("export const SYNTH_" + "CANONICAL" + r"_JSON = `([^`]*)`;")
@@ -106,7 +113,7 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
         "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
     )
     def test_kit_and_mirrors_are_gate_clean(self):
-        for rel in (KIT_REL, SELF_REL, MIRROR_JS, MIRROR_MJS):
+        for rel in (*KIT_RELS, SELF_REL, MIRROR_JS, MIRROR_MJS):
             with self.subTest(file=rel):
                 findings = self.lint.scan_file(REPO_ROOT, rel, self.universe)
                 self.assertEqual(findings, [], f"{rel} flagged: {findings}")

@@ -12,7 +12,7 @@ module. The seeding process imports it directly through
 ``DJANGO_SETTINGS_MODULE=web.tests.browser.browser_settings``.
 
  With ``ELOSERN_BROWSER_SYNTH_CATALOGS=1`` the process installs the synthetic
- test-data catalogs (``world/tests/synthetic_data.py``) before any startup
+ test-data catalogs (``world/tests/synthetic_data/``) before any startup
  world mirroring, so both this module's processes — the one-off seed and the
  managed Evennia server — mirror synthetic content into the private database.
  The seed stays runnable under the flag: its base character activates from the

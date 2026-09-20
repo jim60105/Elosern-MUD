@@ -1091,7 +1091,7 @@ Evennia 測試的主要優化空間通常存在於 fixture 粒度。
 
 行為測試（behavior test）驗證機制，不引用正式遊戲資料（shipped content）。需要物品、技能、區域等資料時：
 
-1. 優先使用 synthetic test-data kit（`world/tests/synthetic_data.py`，由
+1. 優先使用 synthetic test-data kit（`world/tests/synthetic_data/` 套件，由
    `add-test-synthetic-data-kit` 變更提供）；kit 尚未覆蓋的形狀，使用**檔內合成 fixture**
    （例如 `t_ember_spray` 這類明顯非正式的 id 與自製 display prose）。
 2. 只有「資料契約測試」可以引用正式資料：在 module docstring 的第一行加上
@@ -1113,7 +1113,7 @@ JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 
 
 ### Synthetic test-data kit 使用指引
 
-`world/tests/synthetic_data.py` 是全庫共用的替身世界：每個 catalog 都是**真實
+`world/tests/synthetic_data/`（import 路徑 `world.tests.synthetic_data`）是全庫共用的替身世界：每個 catalog 都是**真實
 definition dataclass** 組成的 `t_` 前綴字典（items、skills、races/subraces、presets、
 npc/monster tiers、anchors、regions、city gates、archetypes、shops/economy、quests、
 titles、dialogue、buffs、acts 等），display prose 全為自製正體中文，與 shipped token
