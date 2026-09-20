@@ -22,7 +22,8 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from typeclasses.exits import WildernessGateExit
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, GUILD_HALL_TAG, sync_grid, sync_wilderness
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.maps.wilderness_population import (
     CAPITAL_ENTRY_XY,
     ensure_population,
@@ -410,7 +411,9 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
         sync_guild_economy()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
         self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
-        self.guild_hall = search_object_by_tag(GUILD_HALL_TAG)[0]
+        self.guild_hall = search_object_by_tag(
+            PLACE_REGISTRY["altoria_guild_hall"].key
+        )[0]
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()

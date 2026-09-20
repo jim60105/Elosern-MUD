@@ -125,7 +125,7 @@ class CmdShopStock(_ShopCommandBase):
         except TradeError as error:
             self.caller.msg(f"商店資料有誤：{error}")
             return
-        lines = [f"商店（{'營業中' if open_now else '休息中'}）："]
+        lines = [f"{config.display_name_zh}（{'營業中' if open_now else '休息中'}）："]
         for offer in config.offers:
             definition = ITEM_REGISTRY[offer.item_key]
             lines.append(

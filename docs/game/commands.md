@@ -85,7 +85,7 @@ open **角色狀態 → 技能書**, then choose **修煉** beside an active ski
 
 | 指令 | 說明 |
 | --- | --- |
-| [`shop stock`](/game/command-reference?id=shop-stock) | 查看商店庫存。 |
+| [`shop stock`](/game/command-reference?id=shop-stock) | 查看商店庫存（標題冠以商店名稱）。 |
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包、背包與角色數值構成（與角色面板同源）。 |

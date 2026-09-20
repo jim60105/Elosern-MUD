@@ -31,11 +31,10 @@ def _services_fixture_synth(character, mode: str) -> None:
     from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
     from world.maps.bootstrap import (
-        GENERAL_STORE_TAG,
-        GUILD_HALL_TAG,
         sync_grid,
         sync_service_interiors,
     )
+    from world.lore.settlements.places import PLACE_REGISTRY
 
     # The shared catalog was assigned process-globally by the harness install
     # (same builder the server calls), so the board offer and shop rows are
@@ -47,8 +46,8 @@ def _services_fixture_synth(character, mode: str) -> None:
     sync_grid()
     sync_service_interiors()
 
-    halls = search_object_by_tag(GUILD_HALL_TAG)
-    stores = search_object_by_tag(GENERAL_STORE_TAG)
+    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
+    stores = search_object_by_tag(PLACE_REGISTRY["altoria_general_store"].key)
     hall = halls[0] if halls else None
     store = stores[0] if stores else None
     if hall is None or store is None:

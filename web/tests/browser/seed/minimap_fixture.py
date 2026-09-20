@@ -19,13 +19,13 @@ def _minimap_fixture(character) -> None:
     """
     from evennia.utils.search import search_object_by_tag
     from world.maps.bootstrap import (
-        GUILD_HALL_TAG,
         NORTH_GATE_XYZ,
         SOUTH_GATE_XYZ,
         sync_grid,
         sync_service_interiors,
         sync_wilderness,
     )
+    from world.lore.settlements.places import PLACE_REGISTRY
     from world.maps.instance import spawn_instance_room
     from world.rules.map_knowledge import record_arrival
 
@@ -69,7 +69,7 @@ def _minimap_fixture(character) -> None:
             character.location = south_gate
 
     # Interior layer: the permanent guild hall.
-    halls = search_object_by_tag(GUILD_HALL_TAG)
+    halls = search_object_by_tag(PLACE_REGISTRY["altoria_guild_hall"].key)
     if halls:
         character.location = halls[0]
         record_arrival(character)

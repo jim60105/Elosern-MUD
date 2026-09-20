@@ -1,6 +1,16 @@
-"""Integration tests for permanent Altoria service interiors (task 3.2, sample-city spec)."""
+"""Integration tests for registry-driven permanent service interiors (task 3.2, sample-city spec).
+
+Interiors are created by iterating ``PLACE_REGISTRY`` grouped by settlement
+(place-driven-service-sync task 1.x): each place yields one tagged room in its
+settlement's coordinate space, two doorway exits to its exterior, and an
+authored description re-applied in place on every sync. A place whose exterior
+cannot be resolved warns naming the row and is skipped alone.
+"""
 
 from tools.spec_traceability import covers_requirement
+
+from dataclasses import replace
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
@@ -8,46 +18,53 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.maps.bootstrap import (
-    GENERAL_STORE_EXTERIOR_XYZ,
-    GENERAL_STORE_TAG,
-    GUILD_HALL_EXTERIOR_XYZ,
-    GUILD_HALL_TAG,
     sync_grid,
     sync_service_interiors,
 )
+
+GUILD_HALL = PLACE_REGISTRY["altoria_guild_hall"]
+GENERAL_STORE = PLACE_REGISTRY["altoria_general_store"]
+
 
 class ServiceInteriorTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        self.grid = sync_grid()
-        self.grid = None
+        sync_grid()
 
     def _count_grid_rooms(self):
         return GridRoom.objects.all_family().count()
 
-    def _interior(self, tag):
-        rooms = search_object_by_tag(tag)
+    def _interior(self, place):
+        rooms = search_object_by_tag(place.key)
         return rooms[0] if rooms else None
 
-    def test_fresh_sync_creates_two_permanent_interiors(self):
+    def _exterior(self, place):
+        zcoord = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
+        return GridRoom.objects.filter_xyz(xyz=(*place.exterior_xy, zcoord)).first()
+
+    def test_fresh_sync_creates_one_permanent_interior_per_place(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL_TAG)
-        general_store = self._interior(GENERAL_STORE_TAG)
+        guild_hall = self._interior(GUILD_HALL)
+        general_store = self._interior(GENERAL_STORE)
         self.assertIsNotNone(guild_hall)
         self.assertIsNotNone(general_store)
-        for room in (guild_hall, general_store):
+        for place, room in ((GUILD_HALL, guild_hall), (GENERAL_STORE, general_store)):
             self.assertIsInstance(room, Room)
+            self.assertEqual(room.key, place.room_name_zh)
             self.assertIsNone(room.db.expire_tick)
             self.assertEqual(room.location, None)
+            self.assertEqual(room.db.desc, place.room_desc_zh)
 
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL_TAG)
-        general_store = self._interior(GENERAL_STORE_TAG)
-        guild_exterior = GridRoom.objects.filter_xyz(xyz=GUILD_HALL_EXTERIOR_XYZ).first()
-        store_exterior = GridRoom.objects.filter_xyz(xyz=GENERAL_STORE_EXTERIOR_XYZ).first()
+        guild_hall = self._interior(GUILD_HALL)
+        general_store = self._interior(GENERAL_STORE)
+        guild_exterior = self._exterior(GUILD_HALL)
+        store_exterior = self._exterior(GENERAL_STORE)
 
         self.assertIn(guild_hall, {exit_obj.destination for exit_obj in guild_exterior.exits})
         self.assertIn(general_store, {exit_obj.destination for exit_obj in store_exterior.exits})
@@ -64,36 +81,100 @@ class ServiceInteriorTests(EvenniaTestCase):
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()
         grid_keys = {room.key for room in GridRoom.objects.all_family()}
-        self.assertNotIn("阿爾托利亞冒險者公會大廳", grid_keys)
-        self.assertNotIn("阿爾托利亞雜貨店", grid_keys)
+        self.assertNotIn(GUILD_HALL.room_name_zh, grid_keys)
+        self.assertNotIn(GENERAL_STORE.room_name_zh, grid_keys)
 
-    def test_repeated_sync_creates_no_duplicates(self):
+    @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
+    def test_repeated_sync_reuses_tags_reapplies_desc_and_duplicates_no_doorway(self):
         sync_service_interiors()
         first = {
-            tag: (room.pk, sorted(e.key for e in room.exits))
-            for tag in (GUILD_HALL_TAG, GENERAL_STORE_TAG)
-            for room in search_object_by_tag(tag)
+            place.key: (room.pk, sorted(e.key for e in room.exits))
+            for place in (GUILD_HALL, GENERAL_STORE)
+            for room in search_object_by_tag(place.key)
         }
         room_count = Room.objects.all_family().count()
         exit_count = Exit.objects.all().count()
+        # Drift the authored description the way a legacy database has it:
+        # the next sync must re-apply the authored text in place.
+        for place in (GUILD_HALL, GENERAL_STORE):
+            room = search_object_by_tag(place.key)[0]
+            room.db.desc = "drifted description"
+            room.save()
 
         sync_service_interiors()
 
         second = {
-            tag: (room.pk, sorted(e.key for e in room.exits))
-            for tag in (GUILD_HALL_TAG, GENERAL_STORE_TAG)
-            for room in search_object_by_tag(tag)
+            place.key: (room.pk, sorted(e.key for e in room.exits))
+            for place in (GUILD_HALL, GENERAL_STORE)
+            for room in search_object_by_tag(place.key)
         }
         self.assertEqual(first, second)
         self.assertEqual(Room.objects.all_family().count(), room_count)
         self.assertEqual(Exit.objects.all().count(), exit_count)
+        for place in (GUILD_HALL, GENERAL_STORE):
+            room = search_object_by_tag(place.key)[0]
+            self.assertEqual(room.db.desc, place.room_desc_zh)
+
+    def test_doorway_keys_and_aliases_are_the_places_authored_pair(self):
+        sync_service_interiors()
+        for place in (GUILD_HALL, GENERAL_STORE):
+            interior = self._interior(place)
+            exterior = self._exterior(place)
+            forward = [
+                exit_obj
+                for exit_obj in exterior.exits
+                if exit_obj.destination == interior
+            ]
+            self.assertEqual(len(forward), 1)
+            self.assertEqual(forward[0].key, place.doorway_key_zh)
+            self.assertEqual(set(forward[0].aliases.all()), set(place.doorway_aliases))
+            back = [
+                exit_obj
+                for exit_obj in interior.exits
+                if exit_obj.destination == exterior
+            ]
+            self.assertEqual(len(back), 1)
+            self.assertEqual(back[0].key, "外")
 
     def test_interior_reachable_from_and_back_to_exterior(self):
         sync_service_interiors()
-        guild_hall = self._interior(GUILD_HALL_TAG)
-        guild_exterior = GridRoom.objects.filter_xyz(xyz=GUILD_HALL_EXTERIOR_XYZ).first()
+        guild_hall = self._interior(GUILD_HALL)
+        guild_exterior = self._exterior(GUILD_HALL)
         self.assertTrue(guild_hall.access(guild_exterior, "traverse", default=True))
         self.assertIn(guild_exterior, {e.destination for e in guild_hall.exits})
+
+    @covers_requirement("guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster")
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
+    def test_one_unresolvable_exterior_warns_and_skips_only_that_place(self):
+        # The extra place's exterior coordinate resolves to no grid room
+        # (capital map has no node there); the two shipped places must still
+        # synchronize, exactly the warn-and-skip contract.
+        bad_place = replace(
+            GENERAL_STORE,
+            key="t_missing_exterior",
+            room_name_zh="測試無外景點",
+            room_desc_zh="No exterior backs this place.",
+            exterior_xy=(9, 9),
+        )
+        with patch("world.maps.bootstrap.log_warn") as warned:
+            with patch.dict(PLACE_REGISTRY, {"t_missing_exterior": bad_place}, clear=False):
+                sync_service_interiors()
+        events = [
+            call for call in warned.call_args_list
+            if call.args and call.args[0] == "bootstrap_service_exterior_missing"
+        ]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"]["place"], "t_missing_exterior")
+        self.assertEqual(events[0].kwargs["context"]["exterior_xyz"], (9, 9, "capital_altoria"))
+        self.assertEqual(events[0].kwargs["context"]["action"], "skip_place")
+        self.assertIsNone(self._interior(bad_place))
+        self.assertIsNotNone(self._interior(GUILD_HALL))
+        self.assertIsNotNone(self._interior(GENERAL_STORE))
 
 
 if __name__ == "__main__":

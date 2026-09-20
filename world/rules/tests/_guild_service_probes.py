@@ -168,11 +168,14 @@ def synth_shop_config(
     close_hour: int = 20,
     restock_hour: int = 6,
     offer_rules: tuple[ItemOfferRule, ...] | None = None,
+    display_name_zh: str = "合成商店",
 ) -> ShopConfig:
     """One synthetic shop config over the caller's offered items.
 
     Hours stay below the live clock's hours-per-day (validator bound) and
     differ open/close; offers default to live-band-derived rules per item.
+    ``display_name_zh`` defaults to a synthetic placeholder; the stock
+    listing header prints it, so tests asserting the header name the shop.
     """
     per_day = clock_hours_per_day()
     offers = (
@@ -182,6 +185,7 @@ def synth_shop_config(
     )
     return ShopConfig(
         shop_key=shop_key,
+        display_name_zh=display_name_zh,
         open_hour=min(open_hour, per_day - 2),
         close_hour=min(close_hour, per_day - 1),
         restock_hour=min(restock_hour, per_day - 1),

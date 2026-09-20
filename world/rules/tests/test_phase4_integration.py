@@ -19,12 +19,10 @@ from commands.guild import (
 )
 from commands.economy import CmdBuy, CmdInventory
 from world.maps.bootstrap import (
-    GENERAL_STORE_KEY,
-    GENERAL_STORE_TAG,
-    GUILD_HALL_TAG,
     sync_grid,
     sync_service_interiors,
 )
+from world.lore.settlements.places import PLACE_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.runtime import read_records
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -43,6 +41,15 @@ from world.rules.traits import get_display_value
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 from ._combat_session_helpers import _live_registry
+
+# Interior tags are the place keys; the shop identity is the place's authored
+# shop_key (place-driven-service-sync: no bootstrap constant names interior
+# or shop anymore).
+GUILD_HALL_TAG = PLACE_REGISTRY["altoria_guild_hall"].key
+GENERAL_STORE_TAG = PLACE_REGISTRY["altoria_general_store"].key
+GENERAL_STORE_SHOP_KEY = dict(
+    PLACE_REGISTRY["altoria_general_store"].authored_kwargs
+)["shop_key"]
 
 
 class Phase4Isolation(QuestRegistryIsolation):
@@ -168,7 +175,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         kinds = [event.kind for event in first_events + second_events]
         self.assertIn("caravan_arrivals", kinds)
         self.assertIn("shop_hours", kinds)
-        self.assertTrue(shop_is_open(GENERAL_STORE_KEY))
+        self.assertTrue(shop_is_open(GENERAL_STORE_SHOP_KEY))
 
         # 4. Repeat the hunt to reach E merit threshold (second completion).
         self.player.location = self.guild_hall

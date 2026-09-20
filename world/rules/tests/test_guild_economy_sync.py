@@ -17,19 +17,24 @@ from typeclasses.components import (
     ScriptedDialogue,
 )
 from typeclasses.npcs import NPC
-from typeclasses.rooms import Room
+from typeclasses.rooms import GridRoom, Room
 from world.maps.bootstrap import (
-    GENERAL_STORE_TAG,
-    GUILD_HALL_TAG,
     sync_grid,
     sync_service_interiors,
 )
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules import guild_config
 from world.rules import guild_economy
-from world.rules.guild_config import CATALOG, ServiceHostRow, get_catalog
+from world.rules.guild_config import (
+    CATALOG,
+    ServiceHostRow,
+    get_catalog,
+    load_catalog_into_cache,
+)
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.profession_assembly import assemble_profession_components
 from world.rules.profession_config import get_profession
@@ -41,6 +46,11 @@ from world.rules.guild_economy import (
 
 GUILD_SERVICE_ID = "altoria_guild_master"
 MERCHANT_SERVICE_ID = "altoria_merchant"
+
+# Interior room tags are the place keys (place-driven-service-sync): the
+# registry row is the single source, no bootstrap constant is named.
+GUILD_HALL_TAG = PLACE_REGISTRY["altoria_guild_hall"].key
+GENERAL_STORE_TAG = PLACE_REGISTRY["altoria_general_store"].key
 
 
 def _roster_row(service_id):
@@ -146,6 +156,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
+    @covers_requirement(
+        "place-driven-service-sync::a-place-authors-its-host-s-race-subrace-and-sex"
+    )
     def test_fresh_sync_creates_one_guild_and_one_merchant_host(self):
         sync_service_content()
         guild_host = self._guild_host()
@@ -179,9 +192,19 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(
             merchant_host.location, search_object_by_tag(GENERAL_STORE_TAG)[0]
         )
-        # Race baseline + canonical ages are the unchanged creation guarantees.
-        for host in (guild_host, merchant_host):
-            self.assertEqual(host.race, "human")
+        # Authored identity + race baseline + canonical ages are the unchanged
+        # creation guarantees. place-driven-service-sync applies each place
+        # row's authored race/subrace/sex instead of a hard-coded human; the
+        # subrace-None assertion pins the task 4.1 neutrality precondition
+        # (if a subrace is ever authored, the comparison must widen to stats).
+        for host, place in (
+            (guild_host, PLACE_REGISTRY["altoria_guild_hall"]),
+            (merchant_host, PLACE_REGISTRY["altoria_general_store"]),
+        ):
+            self.assertEqual(host.race, place.host_race)
+            self.assertIsNone(place.host_subrace)
+            self.assertEqual(host.subrace, place.host_subrace)
+            self.assertEqual(host.sex, place.host_sex)
             self.assertEqual(int(host.attributes.get("age")), 18)
             self.assertEqual(int(host.attributes.get("apparent_age")), 18)
         self.assertEqual(guild_host.npc_title, _guild_row().title)
@@ -333,6 +356,121 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 1)
         self.assertEqual(NPC.objects.filter(db_key="改名後").count(), 0)
         self.assertEqual(self._guild_host().pk, before.pk)
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    @covers_requirement(
+        "place-driven-service-sync::a-place-authors-its-host-s-race-subrace-and-sex"
+    )
+    def test_resync_never_rewrites_authored_identity(self):
+        # Race/subrace/sex are creation-time authored identity: an edited
+        # authored value must leave the live host untouched on re-sync, exact-
+        # ly like an edited name or title (never-backfill contract). Taking
+        # effect requires roster convergence, never a runtime rewrite.
+        sync_service_content()
+        guild_host = self._guild_host()
+        identity_before = (guild_host.race, guild_host.subrace, guild_host.sex)
+        host_pk = guild_host.pk
+        place = PLACE_REGISTRY["altoria_guild_hall"]
+        edited = dataclasses.replace(
+            place,
+            host_race="elf",
+            host_subrace="ciaran",
+            host_sex="female",
+        )
+        with patch.dict(PLACE_REGISTRY, {"altoria_guild_hall": edited}):
+            sync_service_content()
+        guild_host = self._guild_host()
+        self.assertEqual(
+            (guild_host.race, guild_host.subrace, guild_host.sex),
+            identity_before,
+        )
+        self.assertEqual(guild_host.pk, host_pk)
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    @covers_requirement(
+        "place-driven-service-sync::one-place-record-yields-a-complete-working-location"
+    )
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
+    def test_one_added_place_row_yields_a_complete_working_location(self):
+        # Adding a place row must produce the whole location with no module
+        # constant for it: interior, both doorways, host and purchasable goods
+        # (place-driven-service-sync task 4.2). The synthetic row rides the
+        # production seams end to end — PLACE_REGISTRY drives interior creation
+        # and host identity, the derived shop registry and catalog resolution
+        # feed merchant stock — and only registry rows were added.
+        from world.lore.settlements.shops import SHOP_REGISTRY, ShopDefinition
+
+        new_place = dataclasses.replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key="t_trading_post",
+            service_id="t_altoria_trading_post",
+            room_name_zh="測試交易站",
+            room_desc_zh="A synthetic trading post with no module constant.",
+            exterior_xy=(4, 2),
+            doorway_key_zh="交易站",
+            doorway_aliases=("trading post",),
+            host_name="測試商人",
+            host_title="測試交易站店主",
+            host_race="human",
+            host_subrace=None,
+            host_sex="other",
+            authored_kwargs=(("shop_key", "t_trading_post"),),
+        )
+        new_shop = ShopDefinition(
+            key="t_trading_post",
+            host_name="測試商人",
+            host_title="測試交易站店主",
+            assortment_keys=("common_arms",),
+        )
+        commerce = guild_config.load_commerce_config()
+        patched_commerce = {
+            **commerce,
+            "shops": [
+                *commerce["shops"],
+                {
+                    "shop_key": "t_trading_post",
+                    "open_hour": 8,
+                    "close_hour": 20,
+                    "restock_hour": 6,
+                },
+            ],
+        }
+        with (
+            patch.dict(PLACE_REGISTRY, {"t_trading_post": new_place}),
+            patch.dict(SHOP_REGISTRY, {"t_trading_post": new_shop}),
+            patch.object(
+                guild_config, "load_commerce_config", return_value=patched_commerce
+            ),
+        ):
+            load_catalog_into_cache()
+            sync_service_interiors()
+            sync_service_content()
+
+        interior = search_object_by_tag("t_trading_post")[0]
+        self.assertIsNotNone(interior)
+        zcoord = SETTLEMENT_REGISTRY["capital_altoria"].zcoord
+        exterior = GridRoom.objects.filter_xyz(xyz=(4, 2, zcoord)).first()
+        self.assertIsNotNone(exterior)
+        self.assertIn(interior, {exit_obj.destination for exit_obj in exterior.exits})
+        self.assertIn(
+            exterior, {exit_obj.destination for exit_obj in interior.exits}
+        )
+        host = NPC.objects.filter(db_key="測試商人").first()
+        self.assertIsNotNone(host)
+        merchant = host.components.get(Merchant.get_component_slot())
+        self.assertIsNotNone(merchant)
+        self.assertEqual(merchant.service_id, "t_altoria_trading_post")
+        offers = get_catalog().shop_configs["t_trading_post"].offers
+        self.assertEqual(
+            {offer.item_key for offer in offers},
+            set(merchant.merchant_stock),
+        )
 
     def _anchored_legacy_host(self, key):
         # A pre-identity dev host anchored by service_id under a free key.

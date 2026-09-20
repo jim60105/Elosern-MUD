@@ -86,9 +86,14 @@ class ItemOfferRule:
 
 @dataclass(frozen=True)
 class ShopConfig:
-    """Validated opening-hour and offer rules for one shop."""
+    """Validated opening-hour and offer rules for one shop.
+
+    ``display_name_zh`` is the owning place's authored room name, populated
+    during shop resolution so the player-facing listing can name the shop.
+    """
 
     shop_key: str
+    display_name_zh: str
     open_hour: int
     close_hour: int
     restock_hour: int
@@ -491,6 +496,7 @@ def validate_shop_configs(
         ]
         configs[shop_key] = ShopConfig(
             shop_key=shop_key,
+            display_name_zh=_place_for_shop(shop_key).room_name_zh,
             open_hour=open_hour,
             close_hour=close_hour,
             restock_hour=restock_hour,
@@ -609,6 +615,21 @@ def _require_place_kwargs(place: Any) -> dict[str, str]:
         key, value = pair
         out[key] = _require_text(value, f"place {place.key!r}.authored_kwargs[{position}]")
     return out
+
+
+def _place_for_shop(shop_key: str):
+    """Return the place row authoring this shop identity.
+
+    A shop identity is authored on exactly one place (the derived
+    ``SHOP_REGISTRY`` fails a duplicate at load), so the first match is the
+    owning place. ``validate_shop_configs`` has already rejected any
+    ``shop_key`` outside ``SHOP_REGISTRY``, so a miss here is an internal
+    load invariant violating fail-closed rather than a user error.
+    """
+    for place in PLACE_REGISTRY.values():
+        if dict(place.authored_kwargs).get("shop_key") == shop_key:
+            return place
+    raise _commerce_error(f"shops.{shop_key} has no owning place row")
 
 
 def validate_quest_rewards(raw: Any, definition_registry: Mapping[str, Any]) -> list[GuildQuestOffer]:

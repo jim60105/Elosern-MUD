@@ -13,7 +13,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.maps.bootstrap import GUILD_HALL_TAG
+from world.lore.settlements.places import PLACE_REGISTRY
 from world.rules.clock import WorldClock
 from world.rules.guild import (
     GuildDataError,
@@ -305,7 +305,7 @@ class GuildServicePCIntegrationTests(EvenniaTestCase):
         import world.maps.bootstrap as bootstrap
 
         self.hall = create_object(Room, key="guild lobby")
-        self.hall.tags.add(GUILD_HALL_TAG)
+        self.hall.tags.add(PLACE_REGISTRY["altoria_guild_hall"].key)
         self.player = create_object(PlayerCharacter, key="guild player")
         self.player.race = "human"
         self.player.apply_race_baseline()
