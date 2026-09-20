@@ -5,7 +5,7 @@ See `proposal.md` — Why, and
 §6.3.
 
 This change is content. Every mechanism it uses exists: place rows
-(`settlement-place-registry`), assortments
+(`settlement-place-registry` and `place-driven-service-sync`), assortments
 (`commerce-assortment-registry`), and optionally scales and overrides
 (`place-price-scaling`). The only judgement calls are which goods go where,
 who keeps the shops, and where they stand.

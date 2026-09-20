@@ -81,9 +81,11 @@ its dependencies. This change is content that exercises them.
 - No change to `world/rules/economy.py`, `commands/economy.py` or
   `typeclasses/components.py` — which is the point.
 - **Depends on** `masterwork-gear-price-band` (the craft goods must be
-  sellable), `settlement-place-registry` (place rows and authored host
-  race/subrace/sex), `commerce-assortment-registry` (assortments) and
-  `ciaran-village-map` (the exteriors). It does **not** depend on
+  sellable), `settlement-place-registry` (the place row and its authored
+  host race/subrace/sex fields), `place-driven-service-sync` (which is what
+  applies those fields and builds the interiors),
+  `commerce-assortment-registry` (assortments) and `ciaran-village-map`
+  (the exteriors). It does **not** depend on
   `place-price-scaling`: with the two-assortment approach this change needs
   no scale and no override.
 - **Conflicts with `altoria-trading-places`** on

@@ -563,51 +563,72 @@ branch, which is the central claim this change validates.
 
 ## 10. OpenSpec Change Breakdown
 
-This design is delivered as seven OpenSpec changes under `openspec/changes/`,
+This design is delivered as eight OpenSpec changes under `openspec/changes/`,
 each sized for one workday by one engineer.
 
 | # | Change | Delivers | Est. |
 | --- | --- | --- | --- |
 | 1 | `masterwork-gear-price-band` | §5 — the `masterwork_gear` band, seven item migrations and three rarity raises. Item data only; the keepsake-offer rejection it states is enforced by change 2 | ~3h |
 | 2 | `commerce-assortment-registry` | §3.1 — assortments, `commerce.yaml`, the 58-item split into four capital assortments, the `merchant_component_key` completeness-check defect (§1.1), and the keepsake-band rejection | ~8h |
-| 3 | `settlement-place-registry` | §3.2, §3.3, §7 — place and settlement records, derived `SHOP_REGISTRY` and host roster, registry-driven interiors, authored host race/subrace/sex, shop display name | ~8h |
+| 3a | `settlement-place-registry` | §3.2, §3.3 — place and settlement records, derived `SHOP_REGISTRY` and host roster, `world/lore/shops.py` deleted. Load-time only; no runtime file touched | ~5h |
+| 3b | `place-driven-service-sync` | §7 — interiors built by iterating the place registry, authored host race/subrace/sex applied, shop name in the stock listing | ~4h |
 | 4 | `place-price-scaling` | §4 — price scale, absolute per-item overrides, additions and removals, post-scaling re-validation | ~5h |
 | 5 | `altoria-trading-places` | §6.1 — 鍛造鋪, 餐館, 裁縫坊, and narrowing the general store | ~5h |
 | 6 | `ciaran-village-map` | §6.2 map half — the six-node village grid, a shared map assembly for its two readers, and three geography registry rows | ~7h |
 | 7 | `ciaran-village-commerce` | §6.2 content half, §6.3 — four villagers' homes, four elven assortments, and the one-item-two-prices demonstration | ~6h |
 
-Roughly 42 engineer-hours.
+Roughly 43 engineer-hours.
+
+### Why change 3 is two changes
+
+The first draft had 3a and 3b as one change carrying two new registries, two
+derivations, three identity fields, a `world/maps/bootstrap.py` rewrite, a
+module deletion, a command change and a bit-for-bit neutrality proof. The
+seam chosen is **load-time versus runtime**, because it is the one that
+yields a provably neutral first half: after 3a, every byte
+`sync_service_content` and `sync_service_interiors` observe is identical to
+today's, so the neutrality proof is a real gate rather than a hopeful
+assertion. 3a still creates interiors from the old module constants and
+still builds hosts human; 3b moves both onto the registry.
+
+The alternative seam — splitting off host race/subrace/sex — would have left
+a 1.5-hour remainder against a 6.5-hour first half, which is barely a split.
+
+This also localises the `bootstrap.py` conflict with change 6: 3a does not
+touch that file at all, only 3b does.
 
 ### Dependencies
 
 ```
-1 masterwork-gear-price-band ───────────────────────────┐
-2 commerce-assortment-registry ──▶ 3 ──┬──▶ 4           ├──▶ 7 ciaran-village-commerce
-                                       └──▶ 5 altoria-trading-places
-6 ciaran-village-map ──▶ (bootstrap.py + wilderness_entry.py, before 3) ┘
+1 masterwork-gear-price-band ─────────────────────────────────┐
+2 commerce-assortment-registry ──▶ 3a ──┬──▶ 3b ──┬──▶ 5      ├──▶ 7
+                                        └──▶ 4     │          │
+6 ciaran-village-map ──▶ (bootstrap.py + wilderness_entry.py, before 3b) ┘
 ```
 
-- **3 ← 2.** Places reference assortments, and change 3 reshapes the shop
-  identity that change 2 defines.
-- **4 ← 3.** Scales and overrides are authored per place; additions and
-  removals are place fields.
-- **5 ← 3.** Needs the place row. It does *not* need 4: the capital's three
-  new shops sit at par with no overrides.
-- **7 ← 1, 3, 6.** Needs the craft goods to be sellable (1), the place row
-  and authored host race/sex (3), and the village exteriors to attach to (6).
-  It does **not** need 4: `elven_spider_silk` is already a shipped capital
-  offer, so the two-price demonstration is two assortments, not an override.
-- **1 and 6 depend on nothing.** Disjoint files from everything in the
-  2→3→4 chain. Change 1 is deliberately kept out of
-  `world/rules/guild_config.py` so it does not collide with change 2's
-  rewrite of `validate_shop_configs`.
+- **3a ← 2.** Places reference assortments, and 3a reshapes the shop
+  identity change 2 defines.
+- **3b ← 3a.** It reads the records 3a builds.
+- **4 ← 3a.** Scales, overrides, additions and removals are record shape and
+  catalog load. 4 does **not** need 3b, and the two share no file.
+- **5 ← 3b.** Needs the place row (3a) *and* something that builds an
+  interior and a host from it (3b). It does not need 4: the three new shops
+  sit at par with no overrides.
+- **7 ← 1, 3b, 6.** Needs the craft goods sellable (1), the records applied
+  at runtime (3b), and the village exteriors (6). It does **not** need 4:
+  `elven_spider_silk` is already a shipped capital offer, so the two-price
+  demonstration is two assortments, not an override.
+- **1 and 6 depend on nothing.** Change 1 is deliberately kept out of
+  `world/rules/guild_config.py` so it cannot collide with change 2's rewrite
+  of `validate_shop_configs`.
 
 ### File conflicts
 
 | Pair | File | Resolution |
 | --- | --- | --- |
-| 3 ↔ 6 | `world/maps/bootstrap.py` | **Land 6 first.** 6 edits the map assembly at the top of the file; 3 rewrites `sync_service_interiors`. In that order they touch different regions; concurrently they collide. |
+| 3b ↔ 6 | `world/maps/bootstrap.py` | **Land 6 first.** 6 edits the map assembly at the top of the file; 3b rewrites `sync_service_interiors`. In that order they touch different regions; concurrently they collide. 3a is unaffected — it never opens this file. |
 | 4 ↔ 5 ↔ 7 | `world/rules/rulebook/commerce.yaml` | Disjoint sections — 4 adds `price_scales:`, 5 and 7 append `shops:` and `assortments:` rows. Append-only, mechanical to resolve. |
+| 3b ↔ 4 | — | None. 3b takes `bootstrap.py`, `guild_economy.py` and `commands/economy.py`; 4 takes `places.py` and `commerce.yaml`. Both touch `guild_config.py`, 3b for one `ShopConfig` field and 4 for offer resolution — adjacent, not overlapping. |
 | 5 ↔ 7 | — | None. Places live in per-settlement modules, and 7 touches no capital file. |
 
 ### Parallel batch order
@@ -615,15 +636,19 @@ Roughly 42 engineer-hours.
 | Batch | Changes | Parallelism | Note |
 | --- | --- | --- | --- |
 | 1 | `masterwork-gear-price-band`, `commerce-assortment-registry`, `ciaran-village-map` | 3 | Fully independent — no shared file |
-| 2 | `settlement-place-registry` | 1 | Needs 2 landed; must follow 6 for `world/maps/bootstrap.py` |
-| 3 | `place-price-scaling`, `altoria-trading-places`, `ciaran-village-commerce` | 3 | All three depend only on 3 (plus 1 and 6 for 7). All append to `commerce.yaml` in disjoint sections |
+| 2 | `settlement-place-registry` (3a) | 1 | Needs 2 landed. Does not touch `bootstrap.py`, so it does not have to wait on 6 |
+| 3 | `place-driven-service-sync` (3b), `place-price-scaling` | 2 | 3b must follow 6 for `bootstrap.py`; 4 is independent of 3b |
+| 4 | `altoria-trading-places`, `ciaran-village-commerce` | 2 | Content only; the `commerce.yaml` overlap is append-scale |
 
-With three engineers this is three calendar days; with one, five.
+Four batches with three engineers, or five days with one. Splitting change 3
+adds a batch but removes the only change that was materially over a day, and
+it buys a genuinely verifiable checkpoint: batch 2 must end with the game
+behaving exactly as it did before it started.
 
 `place-price-scaling` is the one change with no content consumer in this
 set: its mechanism is proven by its own tests against synthetic places and
-is there for the settlements that follow. It can therefore be deferred past
-batch 3 without blocking anything here.
+is there for the settlements that follow. It can be deferred past batch 3
+without blocking anything here.
 
 ### One trap worth naming
 
@@ -643,7 +668,7 @@ Two capabilities carry deltas from more than one change. They target
 different requirements, so the deltas are disjoint, but the archive order
 must follow the batch order:
 
-- `shop-economy` — change 2 modifies the identity requirement; change 3
+- `shop-economy` — change 2 modifies the identity requirement; change 3b
   modifies the player-command requirement.
 - `sample-city-altoria` — change 6 modifies the bridging-exit requirement;
   change 5 modifies the service-interiors requirement.

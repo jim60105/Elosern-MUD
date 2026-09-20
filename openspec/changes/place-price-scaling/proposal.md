@@ -76,7 +76,10 @@ where the number being checked comes from, not what is checked.
   `typeclasses/components.py` — unchanged. Resolution still produces the
   same flat `ShopConfig`.
 - **Depends on `settlement-place-registry`**: scales and overrides are
-  authored per place, and additions and removals are place fields.
+  authored per place, and additions and removals are place fields. It does
+  **not** depend on `place-driven-service-sync`: everything here is record
+  shape and catalog load, so the two can run side by side — they share no
+  file.
 - **Conflicts with `altoria-trading-places` and `ciaran-village-commerce`**
   on `commerce.yaml`, in different sections. Land this first so both content
   changes author against the final schema.

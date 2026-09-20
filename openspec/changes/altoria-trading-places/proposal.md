@@ -67,8 +67,11 @@ separate future change and is deliberately not attempted here.
 - `world/maps/altoria_capital.py` — unchanged. No new exterior is needed.
 - `world/lore/wilderness_entry.py`, `world/maps/city_gates.py`,
   `world/lore/anchor_placement.py` — unchanged.
-- **Depends on `settlement-place-registry`** for the place row, and on
-  `commerce-assortment-registry` for the assortments it references.
+- **Depends on `settlement-place-registry`** for the place row, on
+  `place-driven-service-sync` for the interiors and hosts to be built from
+  that row at all, and on `commerce-assortment-registry` for the assortments
+  it references. It does **not** depend on `place-price-scaling`: the three
+  new shops sit at par with no overrides.
 - **Conflicts with `ciaran-village-commerce`** on
   `world/rules/rulebook/commerce.yaml` only, as disjoint appended rows;
   places live in separate per-settlement modules and do not collide.
