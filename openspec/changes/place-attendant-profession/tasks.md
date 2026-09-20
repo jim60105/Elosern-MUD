@@ -1,20 +1,25 @@
 ## 1. Move the authored dialogue rows to lore
 
-- [ ] 1.1 Create the `world/lore/dialogue/` package: `shape.py` holding `KeywordResponse` and
-  `DialogueDefinition`, `guild.py` holding the `guild_staff` row moved verbatim — byte for
-  byte — from `world/rules/dialogue.py`, and empty `altoria.py` and `ciaran.py` slices for the
-  content changes to fill. Do not reword a single response: the scripted-dialogue spec pins
-  the `回報` keyword and the guild-command guidance in that text.
-- [ ] 1.2 `__init__.py` assembles `DIALOGUE_ROWS` from the slices in a fixed, commented order,
+- [x] 1.1 Create the `world/lore/dialogue/` package: `shape.py` holding `KeywordResponse` and
+  `DialogueDefinition`, `guild.py` holding the `guild_staff` row moved from
+  `world/rules/dialogue.py`, and empty `altoria.py` and `ciaran.py` slices for the
+  content changes to fill. The moved row keeps every contract-pinned substring of the
+  original prose — the scripted-dialogue spec's `回報` keyword, the unregistered
+  register-first fallback, and all eight taught `guild` commands — but is re-authored in
+  the clerk's in-character 正體中文 voice (never a recited command manual) and carries
+  at most four keyword answers: the dialogue panel ships `DIALOGUE_MAX_CHOICES` entries
+  and silently drops the rest, so a fifth keyword is one no player can ever press.
+  Every content slice authored under this package follows both rules.
+- [x] 1.2 `__init__.py` assembles `DIALOGUE_ROWS` from the slices in a fixed, commented order,
   matching how `places.py` assembles its settlement slices.
-- [ ] 1.3 In `world/rules/dialogue.py`, re-export both dataclasses and assemble
+- [x] 1.3 In `world/rules/dialogue.py`, re-export both dataclasses and assemble
   `DIALOGUE_TABLE` from `DIALOGUE_ROWS` behind the same `MappingProxyType`. Every existing
   import path keeps working.
-- [ ] 1.4 Verify no importer is left naming a moved symbol from a module that no longer
+- [x] 1.4 Verify no importer is left naming a moved symbol from a module that no longer
   defines it: `grep -rn "DialogueDefinition\|KeywordResponse" --include="*.py" .` and confirm
   each hit still resolves. The synthetic kit and the webclient presentation tests both import
   from `world.rules.dialogue`; both must stay untouched.
-- [ ] 1.5 Run the scripted-dialogue suite and confirm it is green with no edits to it — that is
+- [x] 1.5 Run the scripted-dialogue suite and confirm it is green with no edits to it — that is
   the proof the move changed no answer.
 
 ## 2. The attendant blueprint
