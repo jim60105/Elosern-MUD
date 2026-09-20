@@ -1,12 +1,16 @@
 """Data-contract test: assortment registry content contract
-Self-consistency checks for the capital assortment registry (settlement-shops
-design §3.1): the four bundles split the former 58-item general-store monolith
-along the weapons/armour/food/sundries axis, non-overlapping, with every item
-known to the item registry. Borderline assignments are deliberate and stable:
+Self-consistency checks for the assortment registry (settlement-shops design
+§3.1): the four capital bundles split the former 58-item general-store
+monolith along the weapons/armour/food/sundries axis, non-overlapping, with
+every item known to the item registry; the four elven bundles serve 暗影谷村's
+homes (design §6.2) and deliberately share two keys with the capital —
+`elven_spider_silk` and `elven_candied_blossom` — because two shops offering
+one key through two different assortments is the model working, not a
+duplicate (design §4.1). Borderline assignments are deliberate and stable:
 `iron_shield` (armor band, off-hand) lives in outfits not arms; the potion
 consumables `miners_bracing_broth`, `beastfolk_herbal_salve`, `passion_draught`
-and `spirit_dew` stay in sundries rather than staple_meals; the jewellery and
-magic accessories wait in sundries for the unbuilt specialist shops."""
+and `spirit_dew` stay in sundries rather than staple_meals; the elven
+jewellery (`crescent_earring`) rides the collector's sundries."""
 
 import unittest
 
@@ -50,10 +54,14 @@ class AssortmentRegistryTests(unittest.TestCase):
             list(ASSORTMENT_REGISTRY), [definition.key for definition in ASSORTMENT_REGISTRY.values()]
         )
 
-    def test_registry_carries_the_four_capital_assortments(self):
+    def test_registry_carries_the_four_capital_and_four_elven_assortments(self):
         self.assertEqual(
             list(ASSORTMENT_REGISTRY),
-            ["common_arms", "common_outfits", "staple_meals", "general_sundries"],
+            [
+                "common_arms", "common_outfits", "staple_meals",
+                "general_sundries", "elven_crafted_arms", "elven_attire",
+                "elven_fare", "elven_sundries",
+            ],
         )
 
     def test_definitions_are_frozen(self):
@@ -63,21 +71,53 @@ class AssortmentRegistryTests(unittest.TestCase):
             self.assertTrue(dataclasses.is_dataclass(definition))
             self.assertTrue(dataclasses.is_dataclass(definition) and definition.__dataclass_params__.frozen)
 
-    def test_union_of_items_is_exactly_the_pre_split_offered_set(self):
+    def test_capital_union_of_items_is_exactly_the_pre_split_offered_set(self):
         union = [
             item_key
-            for definition in ASSORTMENT_REGISTRY.values()
+            for definition in (
+                ASSORTMENT_REGISTRY["common_arms"],
+                ASSORTMENT_REGISTRY["common_outfits"],
+                ASSORTMENT_REGISTRY["staple_meals"],
+                ASSORTMENT_REGISTRY["general_sundries"],
+            )
             for item_key in definition.item_keys
         ]
         self.assertEqual(set(union), set(PRE_SPLIT_OFFERED_KEYS))
         self.assertEqual(len(union), len(PRE_SPLIT_OFFERED_KEYS))
 
-    def test_no_item_lives_in_two_assortments(self):
+    def test_no_item_lives_in_two_capital_assortments(self):
         owner: dict[str, str] = {}
-        for definition in ASSORTMENT_REGISTRY.values():
+        for definition in (
+            ASSORTMENT_REGISTRY["common_arms"],
+            ASSORTMENT_REGISTRY["common_outfits"],
+            ASSORTMENT_REGISTRY["staple_meals"],
+            ASSORTMENT_REGISTRY["general_sundries"],
+        ):
             for item_key in definition.item_keys:
                 self.assertNotIn(item_key, owner, f"{item_key!r} split across assortments")
                 owner[item_key] = definition.key
+
+    def test_elven_assortments_share_exactly_the_two_inherited_keys(self):
+        # The village shelves are independent of the capital's except for the
+        # two goods the world document carries across: the silk (the design's
+        # worked example) and the candied blossom (蜜漬花蕊). Two shops, two
+        # assortments, one key, two prices — the case this model exists for.
+        elven_keys = {
+            item_key
+            for definition in ASSORTMENT_REGISTRY.values()
+            if definition.key.startswith("elven_")
+            for item_key in definition.item_keys
+        }
+        capital_keys = {
+            item_key
+            for definition in ASSORTMENT_REGISTRY.values()
+            if not definition.key.startswith("elven_")
+            for item_key in definition.item_keys
+        }
+        self.assertEqual(
+            elven_keys & capital_keys,
+            {"elven_spider_silk", "elven_candied_blossom"},
+        )
 
     def test_every_assortment_item_resolves_in_the_item_registry(self):
         for definition in ASSORTMENT_REGISTRY.values():
@@ -90,14 +130,18 @@ class AssortmentRegistryTests(unittest.TestCase):
     )
     def test_capital_shops_redistribute_the_pre_split_set_without_overlap(self):
         # The specialist split (altoria-trading-places §6.1) narrows the
-        # general store to sundries; the union across every trading place
-        # must still equal the 58-key pre-split offered set, with no key
-        # offered by two shops.
+        # general store to sundries; the union across every CAPITAL trading
+        # place must still equal the 58-key pre-split offered set, with no
+        # key offered by two capital shops. The village shops are out of
+        # scope here: they deliberately share two keys with the capital
+        # through their own assortments (design §4.1).
         from world.lore.settlements.shops import SHOP_REGISTRY
 
         union: list[str] = []
         owner: dict[str, str] = {}
-        for shop in SHOP_REGISTRY.values():
+        for shop_key, shop in SHOP_REGISTRY.items():
+            if not shop_key.startswith("altoria_"):
+                continue
             for item_key in shop.offered_item_keys:
                 self.assertNotIn(
                     item_key,

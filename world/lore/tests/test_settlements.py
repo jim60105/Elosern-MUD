@@ -61,6 +61,8 @@ class PlaceRegistryTests(unittest.TestCase):
             [
                 "altoria_guild_hall", "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],
         )
 
@@ -180,6 +182,8 @@ class DerivedShopRegistryTests(unittest.TestCase):
             {
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_valwyn_home", "ciaran_vethiel_home",
             },
         )
         shop = SHOP_REGISTRY["altoria_general_store"]
