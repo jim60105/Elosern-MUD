@@ -12,7 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
-from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.map_data import XYMAP_DATA_LIST
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -36,7 +36,7 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
         sync_grid()
         exits = self._intra_city_exits()
-        self.assertEqual(len(exits), 24)
+        self.assertEqual(len(exits), 34)
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 
