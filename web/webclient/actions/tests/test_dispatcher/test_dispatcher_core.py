@@ -1,0 +1,472 @@
+"""Dispatcher envelope, sequence-lock, dedupe, and publish-ordering tests."""
+from web.webclient.actions.registry import (
+    ActionRegistry,
+    ActionSpec,
+    build_production_action_registry,
+)
+from web.webclient.actions.dispatcher import (
+    CACHE_CAPACITY,
+    SequenceState,
+    handle_ui_action,
+    retire_sequence,
+)
+from twisted.internet.defer import Deferred, succeed
+from web.webclient.presentation.protocol import (
+    ProtocolValidationError,
+    new_presentation_epoch,
+    validate_ui_action_result,
+)
+from types import SimpleNamespace
+from tools.spec_traceability import covers_requirement
+import unittest
+from ._support import (
+    FakeActor,
+    FakeSession,
+    _coordinator,
+    _presenter_registry,
+    _proof_spec,
+    _sequence_state_for_test,
+)
+
+
+class DispatcherTests(unittest.TestCase):
+    def _session_with_coordinator(self):
+        session = FakeSession()
+        _coordinator(session)
+        session.puppet = FakeActor()
+        return session
+
+    def _envelope(self, *, base_revision=None, epoch=None, action_id="proof.noop", request_id="r1", payload=None):
+        coordinator = None
+        if base_revision is None or epoch is None:
+            # derive from a fresh coordinator to mirror live state
+            pass
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": epoch or "x" * 22,
+            "request_id": request_id,
+            "base_revision": base_revision if base_revision is not None else 1,
+            "action_id": action_id,
+            "payload": payload if payload is not None else {},
+        }
+
+    def _ui_action(self, session, envelope, registry):
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+
+    @covers_requirement(
+        "webclient-action-dispatch::action-identity-comes-only-from-the-authenticated-session"
+    )
+    def test_actor_like_unknown_field_is_rejected(self):
+        session = self._session_with_coordinator()
+        envelope = self._envelope(epoch=session.ndb.elosern_coordinator.epoch, base_revision=1, payload={})
+        envelope["actor"] = "me"
+        handle_ui_action(session, session.puppet, envelope, ActionRegistry("test"), _presenter_registry())
+        errors = [call for call in session.sent if "ui_protocol_error" in call]
+        self.assertTrue(errors)
+        self.assertEqual(errors[-1]["ui_protocol_error"][0][0]["code"], "malformed_envelope")
+
+    def test_malformed_envelope_gets_safe_error(self):
+        session = self._session_with_coordinator()
+        handle_ui_action(session, session.puppet, {"bad": 1}, ActionRegistry("test"), _presenter_registry())
+        errors = [call for call in session.sent if "ui_protocol_error" in call]
+        self.assertEqual(errors[-1]["ui_protocol_error"][0][0]["code"], "malformed_envelope")
+
+    @covers_requirement(
+        "webclient-action-dispatch::stale-presentation-state-prevents-adapter-invocation"
+    )
+    def test_stale_revision_calls_no_adapter_and_emits_snapshot(self):
+        calls = []
+        registry = ActionRegistry("test")
+        registry.register(_proof_spec(adapter=lambda actor, payload, session=None: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision - 1, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(calls, [])
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertEqual(results[-1]["ui_action_result"][0][0]["outcome"], "stale")
+        snapshots = [call for call in session.sent if "ui_snapshot" in call]
+        self.assertTrue(snapshots)
+
+    @covers_requirement(
+        "webclient-action-dispatch::stale-presentation-state-prevents-adapter-invocation"
+    )
+    def test_prior_epoch_calls_no_adapter(self):
+        calls = []
+        registry = ActionRegistry("test")
+        registry.register(_proof_spec(adapter=lambda actor, payload, session=None: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
+        session = self._session_with_coordinator()
+        envelope = self._envelope(epoch="a" * 22, base_revision=1, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(calls, [])
+
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"
+    )
+    def test_duplicate_request_executes_once(self):
+        calls = []
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: calls.append(1)
+                or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(calls, [1])
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertEqual(len(results), 2)
+
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"
+    )
+    def test_cache_remains_bounded(self):
+        session = self._session_with_coordinator()
+        state = SequenceState()
+        for i in range(CACHE_CAPACITY + 10):
+            from web.webclient.actions.dispatcher import _cache_result
+
+            _cache_result(state, f"r{i}", {"outcome": "success", "code": "ok", "message": "m"})
+        self.assertLessEqual(len(state.cache), CACHE_CAPACITY)
+        self.assertNotIn("r0", state.cache)
+
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"
+    )
+    def test_retire_sequence_discards_cache_and_marker(self):
+        session = self._session_with_coordinator()
+        state = _sequence_state_for_test(session)
+        from web.webclient.actions.dispatcher import _cache_result
+
+        _cache_result(state, "r1", {"outcome": "success", "code": "ok", "message": "m"})
+        state.in_flight = True
+        retire_sequence(session)
+        self.assertIsNone(getattr(session.ndb, "elosern_dispatch", None))
+
+    @covers_requirement(
+        "webclient-action-dispatch::each-session-admits-only-one-mutation-in-flight"
+    )
+    def test_concurrent_mutation_rejected_as_busy(self):
+        calls = []
+        held = Deferred()
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.slow",
+                validate_payload=lambda payload: payload,
+                adapter=lambda actor, payload, session=None: calls.append(1) or held,
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        first = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.slow", request_id="r1")
+        second = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.slow", request_id="r2")
+        handle_ui_action(session, session.puppet, first, registry, _presenter_registry())
+        handle_ui_action(session, session.puppet, second, registry, _presenter_registry())
+        self.assertEqual(calls, [1])
+        results = [call for call in session.sent if "ui_action_result" in call]
+        busy = [call for call in results if call["ui_action_result"][0][0]["outcome"] == "rejected"]
+        self.assertTrue(busy)
+        self.assertEqual(busy[-1]["ui_action_result"][0][0]["code"], "busy")
+        held.callback({"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)})
+
+    @covers_requirement(
+        "webclient-action-dispatch::admitted-action-completion-publishes-canonical-state-before-unlocking"
+    )
+    def test_success_publishes_update_before_result_and_unlocks(self):
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(_proof_spec())
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        # The synchronous adapter published update then result.
+        updates = [call for call in session.sent if "ui_update" in call]
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertTrue(updates)
+        update_rev = updates[-1]["ui_update"][0][0]["revision"]
+        result_rev = results[-1]["ui_action_result"][0][0]["presentation_revision"]
+        self.assertEqual(update_rev, result_rev)
+        self.assertEqual(results[-1]["ui_action_result"][0][0]["outcome"], "success")
+        self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
+
+    @covers_requirement(
+        "webclient-combat-menu::terminal-combat-outcomes-refresh-all-mode-relevant-panels"
+    )
+    def test_empty_affected_panels_publishes_full_snapshot(self):
+        # A terminal settlement (empty affected panels) must publish a full
+        # snapshot at a fresh revision, never a partial ui_update, so the mode
+        # flip to exploration carries every panel.
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: {
+                    "outcome": "success",
+                    "code": "fled",
+                    "message": "你脫離了戰鬥。",
+                    "affected_panels": (),
+                }
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        snapshots = [call for call in session.sent if "ui_snapshot" in call]
+        updates = [call for call in session.sent if "ui_update" in call]
+        self.assertTrue(snapshots, "terminal completion must publish a full snapshot")
+        self.assertFalse(updates, "terminal completion must not publish a partial update")
+        result = [
+            call for call in session.sent if "ui_action_result" in call
+        ][-1]["ui_action_result"][0][0]
+        self.assertEqual(result["presentation_revision"], snapshots[-1]["ui_snapshot"][0][0]["revision"])
+        self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
+
+    @covers_requirement(
+        "webclient-action-dispatch::dispatch-rejects-no-puppet-actions-with-a-bounded-response"
+    )
+    def test_reject_no_puppet_echoes_request_binding(self):
+        from web.webclient.actions.dispatcher import NO_PUPPET_CODE, reject_no_puppet
+
+        session = self._session_with_coordinator()
+        epoch = session.ndb.elosern_coordinator.epoch
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": epoch,
+            "request_id": "stale-9",
+            "base_revision": 4,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        reject_no_puppet(session, action)
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertEqual(len(results), 1)
+        envelope = results[0]["ui_action_result"][0][0]
+        self.assertEqual(envelope["outcome"], "rejected")
+        self.assertEqual(envelope["code"], NO_PUPPET_CODE)
+        self.assertEqual(envelope["presentation_epoch"], epoch)
+        self.assertEqual(envelope["request_id"], "stale-9")
+        self.assertEqual(envelope["presentation_revision"], 4)
+        self.assertNotIn("panels", envelope)
+        self.assertNotIn("correlation_id", envelope)
+
+    @covers_requirement(
+        "webclient-action-dispatch::admitted-action-completion-publishes-canonical-state-before-unlocking"
+    )
+    def test_internal_error_publishes_snapshot_and_unlocks(self):
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(adapter=lambda actor, payload, session=None: (_ for _ in ()).throw(RuntimeError("boom")))
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        results = [call for call in session.sent if "ui_action_result" in call]
+        result = results[-1]["ui_action_result"][0][0]
+        self.assertEqual(result["outcome"], "error")
+        self.assertEqual(len(result["correlation_id"]), 32)
+        self.assertNotIn("boom", repr(result))
+        self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
+
+    @covers_requirement(
+        "webclient-action-dispatch::action-results-are-safe-and-disconnects-are-never-retried-automatically"
+    )
+    def test_domain_rejection_is_stable_and_safe(self):
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: {"outcome": "rejected", "code": "insufficient_sp", "message": "SP 不足"}
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        results = [call for call in session.sent if "ui_action_result" in call]
+        result = results[-1]["ui_action_result"][0][0]
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "insufficient_sp")
+        self.assertNotIn("correlation_id", result)
+
+    @covers_requirement(
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe",
+        "webclient-action-dispatch::action-results-are-safe-and-disconnects-are-never-retried-automatically"
+    )
+    def test_unknown_action_gets_schema_valid_rejected_result(self):
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(_proof_spec())
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(
+            epoch=coordinator.epoch,
+            base_revision=coordinator.revision,
+            action_id="combat.cast",
+        )
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        # The rejection must be a schema-valid ui_action_result, never a
+        # protocol error with an unregistered code.
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertTrue(results)
+        result = results[-1]["ui_action_result"][0][0]
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "unknown_action")
+        self.assertEqual(result["request_id"], "r1")
+        errors = [call for call in session.sent if "ui_protocol_error" in call]
+        self.assertFalse(errors)
+
+    @covers_requirement(
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe",
+        "webclient-action-dispatch::action-results-are-safe-and-disconnects-are-never-retried-automatically"
+    )
+    def test_malformed_action_payload_gets_schema_valid_rejected_result(self):
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.strict",
+                validate_payload=lambda payload: (_ for _ in ()).throw(
+                    ProtocolValidationError("bad payload")
+                ),
+                adapter=lambda actor, payload, session=None: {"outcome": "success", "code": "ok", "message": "m"},
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(
+            epoch=coordinator.epoch,
+            base_revision=coordinator.revision,
+            action_id="proof.strict",
+        )
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        results = [call for call in session.sent if "ui_action_result" in call]
+        result = results[-1]["ui_action_result"][0][0]
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "malformed_payload")
+        errors = [call for call in session.sent if "ui_protocol_error" in call]
+        self.assertFalse(errors)
+
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"
+    )
+    def test_retired_sequence_cannot_publish_or_clear_replacement_lock(self):
+        from web.webclient.actions.dispatcher import retire_sequence
+
+        calls = []
+        held = Deferred()
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.slow",
+                validate_payload=lambda payload: payload,
+                adapter=lambda actor, payload, session=None: calls.append(actor) or held,
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(
+            epoch=coordinator.epoch,
+            base_revision=coordinator.revision,
+            action_id="proof.slow",
+            request_id="retire-1",
+        )
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        # Puppet change: coordinator reset + sequence retirement.
+        coordinator.reset()
+        retire_sequence(session)
+        held.callback({"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)})
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertFalse(results, "retired sequence must not publish a result")
+        state = getattr(session.ndb, "elosern_dispatch", None)
+        if state is not None:
+            # Any recreated state carries no epoch token and is not in flight.
+            self.assertIsNone(state.epoch)
+            self.assertFalse(state.in_flight)
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_proof_adapter_receives_the_session_as_the_third_argument(self):
+        received = []
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: received.append((actor, session))
+                or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(len(received), 1)
+        actor_arg, session_arg = received[0]
+        self.assertIs(actor_arg, session.puppet)
+        self.assertIs(session_arg, session)
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_two_argument_direct_invocation_defaults_session_to_none(self):
+        received = {}
+
+        def proof(actor, payload, session=None):
+            received["session"] = session
+            return {"outcome": "success", "code": "ok", "message": "完成"}
+
+        result = proof("actor", {"x": 1})
+        self.assertIsNone(received["session"])
+        self.assertEqual(result["outcome"], "success")
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_dispatcher_passes_three_positionals_without_introspection(self):
+        received = []
+
+        def proof(actor, payload, session=None, *extra):
+            # The declared three-parameter ABI plus a rest slot: the rest must
+            # stay empty, proving the dispatcher passes exactly three
+            # positional arguments unconditionally, never introspecting.
+            received.append((actor, payload, session, extra))
+            return {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.noop",
+                validate_payload=lambda payload: payload,
+                adapter=proof,
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(len(received), 1)
+        actor_arg, payload_arg, session_arg, extra = received[0]
+        self.assertIs(actor_arg, session.puppet)
+        self.assertEqual(payload_arg, {})
+        self.assertIs(session_arg, session)
+        self.assertEqual(extra, ())
+
+if __name__ == "__main__":
+    unittest.main()

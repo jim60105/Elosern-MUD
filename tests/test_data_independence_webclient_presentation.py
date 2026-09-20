@@ -47,6 +47,7 @@ MIGRATED_FILES = (
 #: file-level checks below expand each split path onto its package slices so
 #: the zero-findings guarantee covers every slice verbatim.
 _SPLIT_PACKAGES = (
+    "test_affordances",
     "test_character_panel",
     "test_combat_panel",
     "test_creation_panel",
