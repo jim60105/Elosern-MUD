@@ -1,6 +1,6 @@
 // Shared fixtures for the C1 (webclient-vue-07-wire-store) store integration
 // tests: the exact protocol envelope and panel shapes the Node-gated UMD
-// test suite (web/static/webclient/js/tests/protocol.test.js) already proves
+// test suites (web/static/webclient/js/tests/protocol_*.test.js) already prove
 // valid, so the store is driven by exactly the payloads the preserved reducer
 // accepts.
 

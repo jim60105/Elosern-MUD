@@ -156,7 +156,7 @@ describe("LocalMap (B4 world family)", () => {
   // presentation. The island passes the shared renderer's legend-display
   // switch off, so no legend element is mounted in its DOM for any payload
   // (the chip-pairing behavior itself stays pinned on the renderer/overlay
-  // suites: map_lattice.test.js, map_overlay.test.js).
+  // suites: map_lattice_renderer.test.js, map_overlay.test.js).
   for (const [name, sample] of Object.entries({
     grid: LOCAL_MAP_SAMPLE,
     wilderness: LOCAL_MAP_WILDERNESS_SAMPLE,

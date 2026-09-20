@@ -16,6 +16,7 @@ manifest stays debt-free and finding-free.
 """
 
 from pathlib import Path
+import glob
 import unittest
 
 from tools import test_data_lint
@@ -50,6 +51,26 @@ MIGRATED_FILES = (
     "web/webclient-app/tests/world/item_icons.test.js",
 )
 
+#: Manifest paths whose suite became a flat sibling family on disk. The
+#: retired stem stays listed for the ledger/seed pins (the frozen seed array
+#: is append-only history); the finding scan follows the sibling family.
+_SPLIT_FAMILIES = {
+    "web/static/webclient/js/tests/protocol.test.js":
+        "web/static/webclient/js/tests/protocol_*.js",
+}
+
+
+def _scan_files(paths: tuple[str, ...]) -> list[str]:
+    """Expand split stems into their on-disk sibling families."""
+    files: list[str] = []
+    for rel in paths:
+        pattern = _SPLIT_FAMILIES.get(rel)
+        if pattern is None:
+            files.append(rel)
+        else:
+            files.extend(sorted(glob.glob(str(REPO_ROOT / pattern))))
+    return files
+
 
 class WebclientJsTestDataMigrationContractTests(DataIndependenceContractMixin, unittest.TestCase):
 
@@ -59,7 +80,7 @@ class WebclientJsTestDataMigrationContractTests(DataIndependenceContractMixin, u
         "synthetic-fixtures"
     )
     def test_migrated_files_hold_no_ledger_exemption(self):
-        self.assert_no_ledger_exemption(MIGRATED_FILES)
+        self.assert_no_ledger_exemption(_scan_files(MIGRATED_FILES))
 
     @covers_requirement(
         "test-data-independence::"
@@ -67,10 +88,10 @@ class WebclientJsTestDataMigrationContractTests(DataIndependenceContractMixin, u
         "synthetic-fixtures"
     )
     def test_migrated_files_carry_zero_findings(self):
-        self.assert_zero_findings(MIGRATED_FILES)
+        self.assert_zero_findings(_scan_files(MIGRATED_FILES))
 
     def test_no_violation_naming_a_manifest_file(self):
-        self.assert_no_violation_naming_manifest(MIGRATED_FILES)
+        self.assert_no_violation_naming_manifest(_scan_files(MIGRATED_FILES))
 
     def test_freeze_ledger_seed_array_untouched_by_the_migration(self):
         self.assert_freeze_seed_untouched(MIGRATED_FILES)
