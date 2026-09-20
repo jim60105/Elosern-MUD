@@ -175,9 +175,12 @@ def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
 
     Deferred import: lore must not import ``world.maps`` at module scope, and
     this is only consulted by the sync-time validation call (no import cycle —
-    ``altoria_capital`` imports nothing from lore).
+    the shared ``world.maps.map_data`` assembly imports nothing from lore).
+    The assembly is the single home of ``XYMAP_DATA_LIST`` (settlement-shops
+    design §6.2 / §10): validation must see every map a gate names or a
+    second settlement's gate fails startup with ``unknown z_map_key``.
     """
-    from world.maps.altoria_capital import XYMAP_DATA_LIST
+    from world.maps.map_data import XYMAP_DATA_LIST
 
     extents: dict[str, set[tuple[int, int]]] = {}
     for data in XYMAP_DATA_LIST:
@@ -396,6 +399,17 @@ WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
             WildernessGate("n", (2, 0), "capital_altoria"),
             # 北門: a traveler at (60, 103) heading south enters the city.
             WildernessGate("s", (2, 4), "capital_altoria"),
+        ),
+    ),
+    "village_ciaran": WildernessEntryPoint(
+        anchor_key="village_ciaran",
+        shape=("###", "###", "###"),
+        origin_xy=(39, 139),
+        gates=(
+            # 隱密小徑: a hidden-settlement footprint far from the capital's
+            # (58,98)-(62,102) mask; a traveler at (40, 138) heading north
+            # enters the village.
+            WildernessGate("n", (0, 1), "village_ciaran"),
         ),
     ),
 }
