@@ -84,7 +84,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             presentation=ItemPresentation(
                 kind=ItemKind.FOOD,
                 icon_key=ItemIconKey.FOOD,
-                rarity=ItemRarity.UNCOMMON,
+                rarity=ItemRarity.RARE,
                 summary_zh="精靈少量流出人類社會的花蕊蜜餞，甜而不膩。",
             ),
         ),

@@ -70,8 +70,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="elven_traditional_robe",
             display_name_zh="精靈傳統服飾",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.ARMOR,
                 icon_key=ItemIconKey.ARMOR,
@@ -154,8 +154,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="crescent_earring",
             display_name_zh="月牙耳環",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.ACCESSORY,
                 icon_key=ItemIconKey.ACCESSORY,
@@ -168,8 +168,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="dark_elf_kimono",
             display_name_zh="精靈短袍傳統服飾",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.ARMOR,
                 icon_key=ItemIconKey.ARMOR,
@@ -182,8 +182,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="shadow_blade",
             display_name_zh="暗影鋼刀",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.WEAPON,
                 icon_key=ItemIconKey.WEAPON,
@@ -196,8 +196,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="shadow_blade_echo",
             display_name_zh="暗影鋼刀·影",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.WEAPON,
                 icon_key=ItemIconKey.WEAPON,
@@ -210,8 +210,8 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="dark_elf_ninja_garb",
             display_name_zh="精靈戰鬥服飾",
-            price_table_key="relic",
-            sellable=False,
+            price_table_key="masterwork_gear",
+            sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.ARMOR,
                 icon_key=ItemIconKey.ARMOR,

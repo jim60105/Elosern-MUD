@@ -18,13 +18,23 @@ class EconomyRegistryTests(unittest.TestCase):
         self.assertIsInstance(to_copper(gold=1, silver=2, copper=3), int)
 
     def test_price_references_are_integral_and_ordered(self):
-        self.assertEqual(len(PRICE_TABLE), 16)
+        self.assertEqual(len(PRICE_TABLE), 17)
         for entry in PRICE_TABLE.values():
             self.assertIsInstance(entry, PriceEntry)
             self.assertIsInstance(entry.min_copper, int)
             if entry.max_copper is not None:
                 self.assertIsInstance(entry.max_copper, int)
                 self.assertGreaterEqual(entry.max_copper, entry.min_copper)
+
+    def test_masterwork_band_ceiling_stays_below_keepsake_floor(self):
+        # The masterwork band is how a community-traded good carries a scarce
+        # outside price; it must never bleed into relic's exclusive region, or
+        # "never traded" would lose its meaning. Assert the relationship over
+        # the live table bounds, not the row's literal values.
+        masterwork = PRICE_TABLE["masterwork_gear"]
+        relic = PRICE_TABLE["relic"]
+        self.assertIsNotNone(masterwork.max_copper)
+        self.assertLess(masterwork.max_copper, relic.min_copper)
 
     def test_guild_rewards_are_integral(self):
         for rank in GUILD_RANK_REGISTRY.values():

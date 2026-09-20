@@ -124,7 +124,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             presentation=ItemPresentation(
                 kind=ItemKind.ACCESSORY,
                 icon_key=ItemIconKey.ACCESSORY,
-                rarity=ItemRarity.UNCOMMON,
+                rarity=ItemRarity.RARE,
                 summary_zh="精靈淬夢磨製的三稜晶飾符。",
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,

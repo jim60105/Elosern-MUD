@@ -98,7 +98,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             presentation=ItemPresentation(
                 kind=ItemKind.WEAPON,
                 icon_key=ItemIconKey.WEAPON,
-                rarity=ItemRarity.RARE,
+                rarity=ItemRarity.EPIC,
                 summary_zh="精靈以自產弓術淬鍊而成的長弓，箭無虛發。",
             ),
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
@@ -150,7 +150,7 @@ ROWS: tuple[ItemDefinition, ...] = (
         ItemDefinition(
             key="elven_forest_veil",
             display_name_zh="精靈森林輕紗",
-            price_table_key="armor",
+            price_table_key="masterwork_gear",
             sellable=True,
             presentation=ItemPresentation(
                 kind=ItemKind.ARMOR,
