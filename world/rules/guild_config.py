@@ -776,7 +776,7 @@ def validate_shop_configs(
             open_hour=open_hour,
             close_hour=close_hour,
             restock_hour=restock_hour,
-            offers=offers,
+            offers=tuple(offers),
         )
     missing_shops = set(SHOP_REGISTRY) - set(configs)
     if missing_shops:
