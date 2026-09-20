@@ -1,8 +1,17 @@
 # Tunable commerce balance data (settlement-shops design §3.1).
 # Assortment offer rules bind exact integer buy/sell copper, max/initial stock and
 # restock quantity to the immutable item sets in world/lore/settlements/assortments.py.
-# The shops section carries only opening/restock hours: a shop's goods are the union of
-# the assortments it references, joined by the catalog loader in world/rules/guild_config.py.
+# A shop's goods are the union of the assortments it references (plus per-place
+# additions, minus per-place removals), joined by the catalog loader in
+# world/rules/guild_config.py. The shops section carries opening/restock hours
+# and, optionally, a per-shop price_scale and absolute item overrides.
+
+# Settlement-wide price scale: an integer percentage where 100 is par. A shop
+# row may declare its own price_scale, which overrides its settlement's entry.
+# Scaling is integer half-up rounding, (base * scale + 50) // 100, applied once
+# per base value; overrides are absolute and never scaled (design §4).
+price_scales:
+  capital_altoria: 100
 
 assortments:
   - key: common_arms
