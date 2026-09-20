@@ -57,9 +57,13 @@ ARG TARGETVARIANT
 
 WORKDIR /build
 
-RUN corepack enable
+# Install pnpm directly, pinned to match packageManager in package.json.
+# Avoids corepack fetching the older pnpm release pinned by default; pnpm
+# still self-manages to the packageManager pin on invocation regardless of
+# install method, so the pin above is the actual source of truth.
+RUN npm install --global pnpm@12.5.1
 
-COPY --chown=root:0 package.json pnpm-lock.yaml vite.config.js ./
+COPY --chown=root:0 package.json pnpm-lock.yaml pnpm-workspace.yaml vite.config.js ./
 RUN --mount=type=cache,id=pnpm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
