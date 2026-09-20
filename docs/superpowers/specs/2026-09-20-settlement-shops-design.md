@@ -1,7 +1,7 @@
 # Settlement Places and Assortment-Driven Shops — Design
 
 **Date:** 2026-09-20
-**Status:** Draft
+**Status:** Approved
 **Scope:** Introduce a three-layer commerce data model (assortments, places,
 settlements) so a shop is one authored row instead of four hand-synced
 sources; add per-shop and per-item price variation; land four trading places
@@ -274,13 +274,13 @@ item or an extra). Both directions fail load.
 
 ```yaml
 shops:
-  - shop_key: altoria_general_store
-    open_hour: 8
-    close_hour: 20
-    restock_hour: 6
-    price_scale: 100          # optional; defaults to the settlement's
+  - shop_key: frontier_outpost_store
+    open_hour: 6
+    close_hour: 22
+    restock_hour: 4
+    price_scale: 115          # optional; defaults to the settlement's
     overrides:
-      - item_key: elven_spider_silk    # an extra_item_keys entry
+      - item_key: imported_spice    # an extra_item_keys entry
         buy_copper: 8000
         sell_copper: 4000
         max_stock: 1
@@ -299,18 +299,30 @@ startup, never at trade time.
 ### 4.1 Worked example
 
 `elven_spider_silk` (band `material`, floor 20, **no ceiling**). Both
-settlements take `scale = 100`, so the village price is the unscaled
-assortment base and the capital price comes from an override:
+settlements sit at `scale = 100`, and each reaches the item through its own
+assortment:
 
 | Place | Source | Final buy |
 | --- | --- | --- |
-| 瓦爾溫的家 (暗影谷村) | `elven_sundries` base, scale 100 | 60 copper |
-| 阿爾托利亞雜貨商店 (聖潔王都) | per-item override on the place row | 8,000 copper |
+| 瓦爾溫的家 (暗影谷村) | `elven_sundries` base | 60 copper |
+| 阿爾托利亞雜貨商店 (聖潔王都) | `general_sundries` base, already shipped | 60,000 copper |
 
 One `item_key`, one `ItemDefinition`. What the player carries away is
-identical in both places. The capital reaches the item through
-`extra_item_keys`, not by referencing the elven assortment — it stocks the
-silk, not the elves' whole shelf.
+identical in both places.
+
+This case needs **neither a scale nor an override**. The capital has offered
+this key since before this work began (`guild_economy.yaml:261` prices it at
+60,000 copper), so the split into assortments carries it across untouched
+and the village puts the same key in its own assortment at its own price.
+Two shops referencing two assortments that share a key is the model working;
+the duplicate rejection is scoped to *one* shop referencing two overlapping
+assortments.
+
+The capital must not reference the elven assortment — that would import the
+whole elven shelf, contradicting the lore document's line 178. An importing
+settlement that wants a good none of its own assortments carry uses
+`extra_item_keys` plus a complete override; that path exists and is
+specified, it is simply not what this case needs.
 
 ### 4.2 Known limitation
 
@@ -546,3 +558,92 @@ branch, which is the central claim this change validates.
 - Outside-world prices above 500,000 copper require a band widening or
   location-scoped bands (§4.2).
 - Restricting hidden-village access by race remains open (§6.2).
+
+---
+
+## 10. OpenSpec Change Breakdown
+
+This design is delivered as seven OpenSpec changes under `openspec/changes/`,
+each sized for one workday by one engineer.
+
+| # | Change | Delivers | Est. |
+| --- | --- | --- | --- |
+| 1 | `masterwork-gear-price-band` | §5 — the `masterwork_gear` band, seven item migrations and three rarity raises. Item data only; the keepsake-offer rejection it states is enforced by change 2 | ~3h |
+| 2 | `commerce-assortment-registry` | §3.1 — assortments, `commerce.yaml`, the 58-item split into four capital assortments, the `merchant_component_key` completeness-check defect (§1.1), and the keepsake-band rejection | ~8h |
+| 3 | `settlement-place-registry` | §3.2, §3.3, §7 — place and settlement records, derived `SHOP_REGISTRY` and host roster, registry-driven interiors, authored host race/subrace/sex, shop display name | ~8h |
+| 4 | `place-price-scaling` | §4 — price scale, absolute per-item overrides, additions and removals, post-scaling re-validation | ~5h |
+| 5 | `altoria-trading-places` | §6.1 — 鍛造鋪, 餐館, 裁縫坊, and narrowing the general store | ~5h |
+| 6 | `ciaran-village-map` | §6.2 map half — the six-node village grid, a shared map assembly for its two readers, and three geography registry rows | ~7h |
+| 7 | `ciaran-village-commerce` | §6.2 content half, §6.3 — four villagers' homes, four elven assortments, and the one-item-two-prices demonstration | ~6h |
+
+Roughly 42 engineer-hours.
+
+### Dependencies
+
+```
+1 masterwork-gear-price-band ───────────────────────────┐
+2 commerce-assortment-registry ──▶ 3 ──┬──▶ 4           ├──▶ 7 ciaran-village-commerce
+                                       └──▶ 5 altoria-trading-places
+6 ciaran-village-map ──▶ (bootstrap.py + wilderness_entry.py, before 3) ┘
+```
+
+- **3 ← 2.** Places reference assortments, and change 3 reshapes the shop
+  identity that change 2 defines.
+- **4 ← 3.** Scales and overrides are authored per place; additions and
+  removals are place fields.
+- **5 ← 3.** Needs the place row. It does *not* need 4: the capital's three
+  new shops sit at par with no overrides.
+- **7 ← 1, 3, 6.** Needs the craft goods to be sellable (1), the place row
+  and authored host race/sex (3), and the village exteriors to attach to (6).
+  It does **not** need 4: `elven_spider_silk` is already a shipped capital
+  offer, so the two-price demonstration is two assortments, not an override.
+- **1 and 6 depend on nothing.** Disjoint files from everything in the
+  2→3→4 chain. Change 1 is deliberately kept out of
+  `world/rules/guild_config.py` so it does not collide with change 2's
+  rewrite of `validate_shop_configs`.
+
+### File conflicts
+
+| Pair | File | Resolution |
+| --- | --- | --- |
+| 3 ↔ 6 | `world/maps/bootstrap.py` | **Land 6 first.** 6 edits the map assembly at the top of the file; 3 rewrites `sync_service_interiors`. In that order they touch different regions; concurrently they collide. |
+| 4 ↔ 5 ↔ 7 | `world/rules/rulebook/commerce.yaml` | Disjoint sections — 4 adds `price_scales:`, 5 and 7 append `shops:` and `assortments:` rows. Append-only, mechanical to resolve. |
+| 5 ↔ 7 | — | None. Places live in per-settlement modules, and 7 touches no capital file. |
+
+### Parallel batch order
+
+| Batch | Changes | Parallelism | Note |
+| --- | --- | --- | --- |
+| 1 | `masterwork-gear-price-band`, `commerce-assortment-registry`, `ciaran-village-map` | 3 | Fully independent — no shared file |
+| 2 | `settlement-place-registry` | 1 | Needs 2 landed; must follow 6 for `world/maps/bootstrap.py` |
+| 3 | `place-price-scaling`, `altoria-trading-places`, `ciaran-village-commerce` | 3 | All three depend only on 3 (plus 1 and 6 for 7). All append to `commerce.yaml` in disjoint sections |
+
+With three engineers this is three calendar days; with one, five.
+
+`place-price-scaling` is the one change with no content consumer in this
+set: its mechanism is proven by its own tests against synthetic places and
+is there for the settlements that follow. It can therefore be deferred past
+batch 3 without blocking anything here.
+
+### One trap worth naming
+
+`XYMAP_DATA_LIST` has **two** independent import sites:
+`world/maps/bootstrap.py:19` and `world/lore/wilderness_entry.py:180`'s
+`_iter_map_extents()`. Both read it from `world/maps/altoria_capital.py`.
+`validate_wilderness_entries()` runs from `sync_all()` at every startup and
+rejects a gate whose `z_map_key` names no map it can see, so adding a second
+settlement's wilderness gate while that lore-side import still points at the
+capital alone fails the whole lore load — not just the village.
+`ciaran-village-map` owns moving both readers onto a shared assembly, with
+the lore side keeping its import deferred inside the function.
+
+### Spec-delta archive ordering
+
+Two capabilities carry deltas from more than one change. They target
+different requirements, so the deltas are disjoint, but the archive order
+must follow the batch order:
+
+- `shop-economy` — change 2 modifies the identity requirement; change 3
+  modifies the player-command requirement.
+- `sample-city-altoria` — change 6 modifies the bridging-exit requirement;
+  change 5 modifies the service-interiors requirement.
