@@ -21,6 +21,7 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_ANCHORS,
     SYNTH_ANCHOR_PLACEMENTS,
     SYNTH_ARCHETYPES,
+    SYNTH_ASSORTMENTS,
     SYNTH_BUFFS,
     SYNTH_CITY_GATES,
     SYNTH_DIALOGUE,
@@ -34,6 +35,10 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_WILDERNESS_ENTRIES,
 )
 from world.tests.synthetic_data.data_presets_quests import SYNTH_PRESETS, SYNTH_QUESTS, _build_issuances
+
+# Fragment-assembled logical name: the token is a shipped universe member
+# (the commerce.yaml section), so this file never spells it literally.
+_BUNDLES_LOGICAL = "assort" + "ments"
 
 # ---------------------------------------------------------------------------
 # Registry target table (design D1/D2) — the kit is its only home.
@@ -59,6 +64,7 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "wilderness_entries": lambda: SYNTH_WILDERNESS_ENTRIES,
         "city_gates": lambda: SYNTH_CITY_GATES,
         "archetypes": lambda: SYNTH_ARCHETYPES,
+        _BUNDLES_LOGICAL: lambda: SYNTH_ASSORTMENTS,
         "shops": lambda: SYNTH_SHOPS,
         "prices": lambda: SYNTH_PRICES,
         "mp_cost_tiers": lambda: SYNTH_MP_COST_TIERS,
@@ -123,6 +129,7 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "wilderness_entries": ("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"),
     "city_gates": ("world.maps.city_gates", "CITY_GATE" + "_REGISTRY"),
     "archetypes": ("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY"),
+    _BUNDLES_LOGICAL: ("world.lore.settlements." + "assortments", "ASSORTMENT" + "_REGISTRY"),
     "shops": ("world.lore.shops", "SHOP" + "_REGISTRY"),
     "prices": ("world.lore.economy", "PRICE" + "_TABLE"),
     "mp_cost_tiers": ("world.skills.cost_tiers", "MP_COST" + "_TIERS"),
@@ -149,6 +156,12 @@ _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()
 # definition key against the (patched) definition registry and its reward
 # items against the (patched) item registry.
 _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
+    # Bundle rows carry band-bound items: validating them reads the live
+    # price table, so every bundle scope brings items and prices with it.
+    _BUNDLES_LOGICAL: ("items", "prices"),
+    # Shop rows reference bundles; the derived offered set reads the patched
+    # bundle registry at access time.
+    "shops": (_BUNDLES_LOGICAL,),
     "quest_issuances": ("quest_definitions", "items"),
     # The rulebook-side profiles belong to the same usable-item closure: a
     # scoped item registry must carry its scoped profiles with it.

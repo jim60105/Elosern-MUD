@@ -21,8 +21,8 @@ class ShopNPCIdentityTests(unittest.TestCase):
         row = SHOP_REGISTRY["altoria_general_store"]
         bad = {
             "s": ShopDefinition(
-                "s", row.merchant_component_key, row.host_name,
-                "含　全形分隔符的稱號", row.offered_item_keys,
+                "s", row.host_name,
+                "含　全形分隔符的稱號", row.assortment_keys,
             )
         }
         with self.assertRaises(ValueError) as caught:
@@ -35,8 +35,8 @@ class ShopNPCIdentityTests(unittest.TestCase):
         row = SHOP_REGISTRY["altoria_general_store"]
         bad = {
             "s": ShopDefinition(
-                "s", row.merchant_component_key, "", row.host_title,
-                row.offered_item_keys,
+                "s", "", row.host_title,
+                row.assortment_keys,
             )
         }
         with self.assertRaises(ValueError) as caught:

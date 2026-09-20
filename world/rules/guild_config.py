@@ -1,11 +1,14 @@
-"""Catalog loader joining the guild-economy rulebook to immutable lore identities (D-1/D-8).
+"""Catalog loader joining the guild-economy and commerce rulebooks to immutable lore identities (D-1/D-8).
 
-``guild_economy.yaml`` carries the tunable numbers: merit thresholds, exam
-opponent profiles, and per-shop price/hour/stock rules. This module validates
-every entry against the immutable registries and exposes frozen dataclasses,
-so deterministic APIs never duplicate balance constants.
+``guild_economy.yaml`` carries merit thresholds, exam opponent profiles,
+quest rewards and the service-host roster; ``commerce.yaml`` carries
+assortment offer rules and per-shop hours (settlement-shops design §3.1).
+This module validates every entry against the immutable registries and
+exposes frozen dataclasses, so deterministic APIs never duplicate balance
+constants.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
@@ -16,6 +19,10 @@ from world.lore.economy import PRICE_TABLE
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import STATIC_TIER_REGISTRY
+from world.lore.settlements.assortments import (
+    ASSORTMENT_REGISTRY,
+    KEEPSAKE_BAND_KEY,
+)
 from world.lore.shops import SHOP_REGISTRY
 from world.rules.guild_offers import (
     GuildOfferError,
@@ -114,17 +121,27 @@ def _error(message: str) -> GuildConfigError:
     return GuildConfigError(f"guild_economy.yaml: {message}")
 
 
+def _commerce_error(message: str) -> GuildConfigError:
+    return GuildConfigError(f"commerce.yaml: {message}")
+
+
 def _require_text(value: Any, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise _error(f"{field} must be a non-empty string")
     return value
 
 
-def _require_int(value: Any, field: str, *, minimum: int | None = None) -> int:
+def _require_int(
+    value: Any,
+    field: str,
+    *,
+    minimum: int | None = None,
+    raise_error: Callable[[str], GuildConfigError] = _error,
+) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise _error(f"{field} must be an integer")
+        raise raise_error(f"{field} must be an integer")
     if minimum is not None and value < minimum:
-        raise _error(f"{field} must be at least {minimum}")
+        raise raise_error(f"{field} must be at least {minimum}")
     return value
 
 
@@ -134,6 +151,15 @@ def load_config() -> dict[str, Any]:
     )
     if not isinstance(raw, Mapping):
         raise _error("rulebook must be a mapping")
+    return dict(raw)
+
+
+def load_commerce_config() -> dict[str, Any]:
+    raw = yaml.safe_load(
+        (Path(__file__).parent / "rulebook" / "commerce.yaml").read_text(encoding="utf-8")
+    )
+    if not isinstance(raw, Mapping):
+        raise _commerce_error("rulebook must be a mapping")
     return dict(raw)
 
 
@@ -220,105 +246,251 @@ def validate_exam_profiles(raw: Mapping[str, Any]) -> dict[str, ExamProfile]:
     return profiles
 
 
-def validate_shop_configs(raw: Any) -> dict[str, ShopConfig]:
-    """Join YAML shop rules to immutable ShopDefinition/ItemDefinition identities."""
+_ASSORTMENT_ROW_FIELDS = frozenset({"key", "offers"})
+_SHOPS_ROW_FIELDS = frozenset({"shop_key", "open_hour", "close_hour", "restock_hour"})
+
+
+def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]:
+    """Join YAML assortment offers to immutable AssortmentDefinition identities.
+
+    Every item/offer alignment, money, band, stock and keepsake rejection the
+    old per-shop join enforced is now evaluated once per assortment, however
+    many shops reference it. An assortment SHALL NOT declare hours, a host or
+    a location, so stray fields are rejected. Returns
+    ``assortment_key -> {item_key: ItemOfferRule}`` in YAML offer order.
+    """
     if not isinstance(raw, list):
-        raise _error("shops must be a list")
-    known_parents = {definition.merchant_component_key: definition.key for definition in SHOP_REGISTRY.values()}
+        raise _commerce_error("assortments must be a list")
+    validated: dict[str, dict[str, ItemOfferRule]] = {}
+    for position, entry in enumerate(raw, start=1):
+        if not isinstance(entry, Mapping):
+            raise _commerce_error(f"assortments[{position}] must be a mapping")
+        unknown_fields = set(entry) - _ASSORTMENT_ROW_FIELDS
+        if unknown_fields:
+            raise _commerce_error(
+                f"assortments[{position}] has unknown field(s) {sorted(unknown_fields)}"
+            )
+        assortment_key = entry.get("key")
+        definition = ASSORTMENT_REGISTRY.get(assortment_key)
+        if definition is None:
+            raise _commerce_error(
+                f"assortments[{position}].key {assortment_key!r} is unknown"
+            )
+        if assortment_key in validated:
+            raise _commerce_error(
+                f"duplicate assortment_key {assortment_key!r} in assortments"
+            )
+        item_set = set(definition.item_keys)
+        for item_key in definition.item_keys:
+            if item_key not in ITEM_REGISTRY:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.item_keys contains unknown item_key {item_key!r}"
+                )
+            if ITEM_REGISTRY[item_key].price_table_key == KEEPSAKE_BAND_KEY:
+                raise _commerce_error(
+                    f"assortments.{assortment_key} contains keepsake-band item "
+                    f"{item_key!r}: the {KEEPSAKE_BAND_KEY!r} band is never traded"
+                )
+        offers_entry = entry.get("offers")
+        if not isinstance(offers_entry, list):
+            raise _commerce_error(f"assortments.{assortment_key}.offers must be a list")
+        offers: dict[str, ItemOfferRule] = {}
+        seen_items: set[str] = set()
+        for offer_position, offer in enumerate(offers_entry, start=1):
+            if not isinstance(offer, Mapping):
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.offers[{offer_position}] must be a mapping"
+                )
+            item_key = offer.get("item_key")
+            if item_key not in ITEM_REGISTRY:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.offers[{offer_position}].item_key "
+                    f"{item_key!r} is unknown"
+                )
+            if item_key not in item_set:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.offers includes {item_key!r} which is "
+                    f"not offered by AssortmentDefinition {assortment_key!r}"
+                )
+            if item_key in seen_items:
+                raise _commerce_error(
+                    f"duplicate offered item {item_key!r} in assortment {assortment_key!r}"
+                )
+            seen_items.add(item_key)
+            buy_copper = _require_int(
+                offer.get("buy_copper"),
+                f"assortments.{assortment_key}.{item_key}.buy_copper",
+                minimum=0,
+                raise_error=_commerce_error,
+            )
+            sell_copper = _require_int(
+                offer.get("sell_copper"),
+                f"assortments.{assortment_key}.{item_key}.sell_copper",
+                minimum=0,
+                raise_error=_commerce_error,
+            )
+            if sell_copper > buy_copper:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.{item_key}: sell_copper {sell_copper} "
+                    f"exceeds buy_copper {buy_copper}"
+                )
+            price_entry = PRICE_TABLE.get(ITEM_REGISTRY[item_key].price_table_key)
+            if price_entry is None:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.{item_key} has no price-table entry"
+                )
+            band_floor, band_ceiling = price_entry.min_copper, price_entry.max_copper
+            if not band_floor <= buy_copper <= (band_ceiling if band_ceiling is not None else buy_copper):
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.{item_key} buy_copper {buy_copper} is "
+                    f"outside price-table band {(band_floor, band_ceiling)}"
+                )
+            max_stock = _require_int(
+                offer.get("max_stock"),
+                f"assortments.{assortment_key}.{item_key}.max_stock",
+                minimum=1,
+                raise_error=_commerce_error,
+            )
+            initial_stock = _require_int(
+                offer.get("initial_stock"),
+                f"assortments.{assortment_key}.{item_key}.initial_stock",
+                minimum=0,
+                raise_error=_commerce_error,
+            )
+            if initial_stock > max_stock:
+                raise _commerce_error(
+                    f"assortments.{assortment_key}.{item_key}: initial_stock "
+                    f"{initial_stock} exceeds max_stock {max_stock}"
+                )
+            restock_quantity = _require_int(
+                offer.get("restock_quantity"),
+                f"assortments.{assortment_key}.{item_key}.restock_quantity",
+                minimum=1,
+                raise_error=_commerce_error,
+            )
+            offers[item_key] = ItemOfferRule(
+                item_key=item_key,
+                buy_copper=buy_copper,
+                sell_copper=sell_copper,
+                max_stock=max_stock,
+                initial_stock=initial_stock,
+                restock_quantity=restock_quantity,
+            )
+        missing = item_set - seen_items
+        if missing:
+            raise _commerce_error(
+                f"assortments.{assortment_key} is missing offers for {sorted(missing)}"
+            )
+        validated[assortment_key] = offers
+    missing_assortments = set(ASSORTMENT_REGISTRY) - set(validated)
+    if missing_assortments:
+        raise _commerce_error(
+            f"assortments is missing rules for {sorted(missing_assortments)}"
+        )
+    return validated
+
+
+def validate_shop_configs(
+    raw: Any,
+    assortment_offers: Mapping[str, Mapping[str, ItemOfferRule]],
+) -> dict[str, ShopConfig]:
+    """Resolve the ``shops:`` section of commerce.yaml against assortments.
+
+    A shop's offered goods are the union of its referenced assortments'
+    validated offer rules, handed downstream as the flat ``ShopConfig`` shape
+    (design §3.1). The shops-completeness accounting is keyed on shop
+    identity rather than a component-type field, so a shop whose rule row is
+    absent is named no matter how many shops the registry carries (§1.1).
+    """
+    if not isinstance(raw, list):
+        raise _commerce_error("shops must be a list")
     configs: dict[str, ShopConfig] = {}
     for position, entry in enumerate(raw, start=1):
         if not isinstance(entry, Mapping):
-            raise _error(f"shops[{position}] must be a mapping")
+            raise _commerce_error(f"shops[{position}] must be a mapping")
+        unknown_fields = set(entry) - _SHOPS_ROW_FIELDS
+        if unknown_fields:
+            raise _commerce_error(
+                f"shops[{position}] has unknown field(s) {sorted(unknown_fields)} "
+                f"(offers moved to the assortments section)"
+            )
         shop_key = entry.get("shop_key")
         if shop_key not in SHOP_REGISTRY:
-            raise _error(f"shops[{position}].shop_key {shop_key!r} is unknown")
+            raise _commerce_error(f"shops[{position}].shop_key {shop_key!r} is unknown")
         if shop_key in configs:
-            raise _error(f"duplicate shop_key {shop_key!r} in shops")
+            raise _commerce_error(f"duplicate shop_key {shop_key!r} in shops")
         shop = SHOP_REGISTRY[shop_key]
-        for offered_key in shop.offered_item_keys:
-            if offered_key not in ITEM_REGISTRY:
-                raise _error(
-                    f"shops.{shop_key}.offered_item_keys contains unknown item_key {offered_key!r}"
+        if not shop.assortment_keys:
+            raise _commerce_error(f"shops.{shop_key} references no assortments")
+        if len(set(shop.assortment_keys)) != len(shop.assortment_keys):
+            for assortment_key in shop.assortment_keys:
+                if shop.assortment_keys.count(assortment_key) > 1:
+                    break
+            raise _commerce_error(
+                f"shops.{shop_key} references assortment {assortment_key!r} more than once"
+            )
+        for assortment_key in shop.assortment_keys:
+            if assortment_key not in ASSORTMENT_REGISTRY:
+                raise _commerce_error(
+                    f"shops.{shop_key} references unknown assortment {assortment_key!r}"
                 )
-        offered_keys = set(shop.offered_item_keys)
+        missing_rules = set(shop.assortment_keys) - set(assortment_offers)
+        if missing_rules:
+            raise _commerce_error(
+                f"shops.{shop_key} has no offer rules for assortment(s) "
+                f"{sorted(missing_rules)}"
+            )
+        # Per-shop overlap rejection: two referenced assortments both
+        # containing one key would leave the resolver picking a price by an
+        # unstated precedence rule (design §3.1).
+        owner_by_item: dict[str, str] = {}
+        for assortment_key in shop.assortment_keys:
+            for item_key in ASSORTMENT_REGISTRY[assortment_key].item_keys:
+                previous = owner_by_item.get(item_key)
+                if previous is not None and previous != assortment_key:
+                    raise _commerce_error(
+                        f"shops.{shop_key} offers {item_key!r} through more than one "
+                        f"assortment: {previous!r}, {assortment_key!r}"
+                    )
+                owner_by_item[item_key] = assortment_key
         from world.rules.clock import CLOCK_YAML
 
         hours_per_day = int(CLOCK_YAML["hours_per_day"])
-        open_hour = _require_int(entry.get("open_hour"), f"shops.{shop_key}.open_hour", minimum=0)
-        close_hour = _require_int(entry.get("close_hour"), f"shops.{shop_key}.close_hour", minimum=0)
-        restock_hour = _require_int(entry.get("restock_hour"), f"shops.{shop_key}.restock_hour", minimum=0)
+        open_hour = _require_int(
+            entry.get("open_hour"),
+            f"shops.{shop_key}.open_hour",
+            minimum=0,
+            raise_error=_commerce_error,
+        )
+        close_hour = _require_int(
+            entry.get("close_hour"),
+            f"shops.{shop_key}.close_hour",
+            minimum=0,
+            raise_error=_commerce_error,
+        )
+        restock_hour = _require_int(
+            entry.get("restock_hour"),
+            f"shops.{shop_key}.restock_hour",
+            minimum=0,
+            raise_error=_commerce_error,
+        )
         for label, hour in (
             ("open_hour", open_hour),
             ("close_hour", close_hour),
             ("restock_hour", restock_hour),
         ):
             if hour >= hours_per_day:
-                raise _error(
+                raise _commerce_error(
                     f"shops.{shop_key}.{label}={hour} must be below "
                     f"hours_per_day={hours_per_day}"
                 )
         if open_hour == close_hour:
-            raise _error(f"shops.{shop_key} open and close hours cannot be equal")
-        offers_entry = entry.get("offers")
-        if not isinstance(offers_entry, list):
-            raise _error(f"shops.{shop_key}.offers must be a list")
-        offers: list[ItemOfferRule] = []
-        seen_items: set[str] = set()
-        for offer_position, offer in enumerate(offers_entry, start=1):
-            if not isinstance(offer, Mapping):
-                raise _error(f"shops.{shop_key}.offers[{offer_position}] must be a mapping")
-            item_key = offer.get("item_key")
-            if item_key not in ITEM_REGISTRY:
-                raise _error(f"shops.{shop_key}.offers[{offer_position}].item_key {item_key!r} is unknown")
-            if item_key not in offered_keys:
-                raise _error(
-                    f"shops.{shop_key}.offers includes {item_key!r} which is not offered "
-                    f"by ShopDefinition {shop_key!r}"
-                )
-            if item_key in seen_items:
-                raise _error(f"duplicate offered item {item_key!r} in shop {shop_key!r}")
-            seen_items.add(item_key)
-            buy_copper = _require_int(offer.get("buy_copper"), f"shops.{shop_key}.{item_key}.buy_copper", minimum=0)
-            sell_copper = _require_int(offer.get("sell_copper"), f"shops.{shop_key}.{item_key}.sell_copper", minimum=0)
-            if sell_copper > buy_copper:
-                raise _error(
-                    f"shops.{shop_key}.{item_key}: sell_copper {sell_copper} exceeds "
-                    f"buy_copper {buy_copper}"
-                )
-            price_entry = PRICE_TABLE.get(ITEM_REGISTRY[item_key].price_table_key)
-            if price_entry is None:
-                raise _error(f"shops.{shop_key}.{item_key} has no price-table entry")
-            band_floor, band_ceiling = price_entry.min_copper, price_entry.max_copper
-            if not band_floor <= buy_copper <= (band_ceiling if band_ceiling is not None else buy_copper):
-                raise _error(
-                    f"shops.{shop_key}.{item_key} buy_copper {buy_copper} is outside "
-                    f"price-table band {(band_floor, band_ceiling)}"
-                )
-            max_stock = _require_int(offer.get("max_stock"), f"shops.{shop_key}.{item_key}.max_stock", minimum=1)
-            initial_stock = _require_int(offer.get("initial_stock"), f"shops.{shop_key}.{item_key}.initial_stock", minimum=0)
-            if initial_stock > max_stock:
-                raise _error(
-                    f"shops.{shop_key}.{item_key}: initial_stock {initial_stock} exceeds "
-                    f"max_stock {max_stock}"
-                )
-            restock_quantity = _require_int(
-                offer.get("restock_quantity"), f"shops.{shop_key}.{item_key}.restock_quantity", minimum=1
-            )
-            offers.append(
-                ItemOfferRule(
-                    item_key=item_key,
-                    buy_copper=buy_copper,
-                    sell_copper=sell_copper,
-                    max_stock=max_stock,
-                    initial_stock=initial_stock,
-                    restock_quantity=restock_quantity,
-                )
-            )
-        missing = offered_keys - seen_items
-        if missing:
-            raise _error(
-                f"shops.{shop_key} is missing offers for {sorted(missing)}"
-            )
+            raise _commerce_error(f"shops.{shop_key} open and close hours cannot be equal")
+        offers = [
+            rule
+            for assortment_key in shop.assortment_keys
+            for rule in assortment_offers[assortment_key].values()
+        ]
         configs[shop_key] = ShopConfig(
             shop_key=shop_key,
             open_hour=open_hour,
@@ -326,10 +498,10 @@ def validate_shop_configs(raw: Any) -> dict[str, ShopConfig]:
             restock_hour=restock_hour,
             offers=tuple(offers),
         )
-        known_parents.pop(shop.merchant_component_key, None)
-    if known_parents:
-        raise _error(
-            f"shops is missing rules for {sorted(known_parents.values())}"
+    missing_shops = set(SHOP_REGISTRY) - set(configs)
+    if missing_shops:
+        raise _commerce_error(
+            f"shops is missing rules for {sorted(missing_shops)}"
         )
     return configs
 
@@ -517,18 +689,24 @@ class GuildCatalog:
 
 
 def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
-    """Load and validate the complete guild-economy rulebook.
+    """Load and validate the complete guild-economy and commerce rulebooks.
 
     The quest reward section requires the caller's current definition registry;
     every other section validates against immutable lore registries alone.
     """
     raw = load_config()
+    commerce = load_commerce_config()
     if "service_hosts" not in raw:
         raise _error("service_hosts section is required")
+    if "assortments" not in commerce:
+        raise _commerce_error("assortments section is required")
+    if "shops" not in commerce:
+        raise _commerce_error("shops section is required")
+    assortment_offers = validate_assortment_configs(commerce["assortments"])
     return GuildCatalog(
         merit_thresholds=validate_merit_thresholds(raw["merit_thresholds"]),
         exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
-        shop_configs=validate_shop_configs(raw["shops"]),
+        shop_configs=validate_shop_configs(commerce["shops"], assortment_offers),
         quest_offers=validate_quest_rewards(raw["quest_rewards"], definition_registry),
         service_hosts=validate_service_hosts(raw["service_hosts"]),
     )

@@ -4,7 +4,7 @@ Tests for immutable economy identities and the guild-economy catalog loader (tas
 from tools.spec_traceability import covers_requirement
 
 import unittest
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 from unittest import mock
 
@@ -24,7 +24,8 @@ from world.lore.items import (
     ItemUseMechanics,
     SUMMARY_MAX,
 )
-from world.lore.shops import SHOP_REGISTRY
+from world.lore.settlements.assortments import ASSORTMENT_REGISTRY, AssortmentDefinition
+from world.lore.shops import SHOP_REGISTRY, ShopDefinition
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.catalog import register_catalog
 from world.rules.guild_config import (
@@ -35,6 +36,7 @@ from world.rules.guild_config import (
     ItemOfferRule,
     ShopConfig,
     load_guild_catalog,
+    validate_assortment_configs,
     validate_exam_profiles,
     validate_merit_thresholds,
     validate_quest_rewards,
@@ -51,6 +53,7 @@ from world.skills.equipment import EquipmentSlot
 from world.skills.registry import SKILL_REGISTRY
 
 RULEBOOK = Path(__file__).resolve().parents[2] / "rules" / "rulebook" / "guild_economy.yaml"
+COMMERCE = Path(__file__).resolve().parents[2] / "rules" / "rulebook" / "commerce.yaml"
 
 
 class CatalogRegistryIsolation(unittest.TestCase):
@@ -77,6 +80,28 @@ class CatalogRegistryIsolation(unittest.TestCase):
 
 def raw_rulebook() -> dict:
     return yaml.safe_load(RULEBOOK.read_text(encoding="utf-8"))
+
+
+def raw_commerce() -> dict:
+    return yaml.safe_load(COMMERCE.read_text(encoding="utf-8"))
+
+
+def _assortment_row(
+    assortment_key: str,
+    mutate_offers=None,
+) -> list[dict]:
+    """Deep-copied shipped assortment rows with one row's offers mutated."""
+    rows = raw_commerce()["assortments"]
+    out: list[dict] = []
+    for row in rows:
+        copy = dict(row)
+        if copy["key"] == assortment_key:
+            offers = [dict(offer) for offer in copy["offers"]]
+            if mutate_offers is not None:
+                offers = mutate_offers(offers)
+            copy["offers"] = offers
+        out.append(copy)
+    return out
 
 
 class ItemDefinitionTests(unittest.TestCase):
@@ -116,8 +141,10 @@ class ItemDefinitionTests(unittest.TestCase):
         "item-presentation-metadata::presentation-metadata-does-not-claim-unimplemented-mechanics"
     )
     def test_presentation_swap_leaves_economy_outputs_unchanged(self):
-        raw = raw_rulebook()["shops"]
-        baseline = validate_shop_configs(raw)
+        raw = raw_commerce()
+        baseline = validate_shop_configs(
+            raw["shops"], validate_assortment_configs(raw["assortments"])
+        )
         original = ITEM_REGISTRY["meal"]
         altered = ItemDefinition(
             key="meal",
@@ -133,7 +160,9 @@ class ItemDefinitionTests(unittest.TestCase):
         )
         ITEM_REGISTRY["meal"] = altered
         try:
-            changed = validate_shop_configs(raw)
+            changed = validate_shop_configs(
+                raw["shops"], validate_assortment_configs(raw["assortments"])
+            )
             self.assertEqual(changed, baseline)
         finally:
             ITEM_REGISTRY["meal"] = original
@@ -322,13 +351,215 @@ class ExamProfileTests(unittest.TestCase):
             validate_exam_profiles(bad)
 
 
+class AssortmentRuleTests(unittest.TestCase):
+    """Assortment-level item/offer alignment (commerce-assortments delta).
+
+    The item/offer alignment, money, band and stock rejections the old
+    per-shop join enforced are now evaluated once per assortment.
+    """
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
+    def test_shipped_assortments_validate_and_resolve(self):
+        offers = validate_assortment_configs(raw_commerce()["assortments"])
+        self.assertEqual(set(offers), set(ASSORTMENT_REGISTRY))
+        for assortment_key, item_rules in offers.items():
+            definition = ASSORTMENT_REGISTRY[assortment_key]
+            self.assertEqual(set(item_rules), set(definition.item_keys))
+            for rule in item_rules.values():
+                self.assertIsInstance(rule, ItemOfferRule)
+                self.assertIsInstance(rule.buy_copper, int)
+                self.assertNotIsInstance(rule.buy_copper, bool)
+                self.assertLessEqual(rule.sell_copper, rule.buy_copper)
+                band = PRICE_TABLE[ITEM_REGISTRY[rule.item_key].price_table_key]
+                self.assertGreaterEqual(rule.buy_copper, band.min_copper)
+                if band.max_copper is not None:
+                    self.assertLessEqual(rule.buy_copper, band.max_copper)
+                self.assertLessEqual(rule.initial_stock, rule.max_stock)
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
+    def test_assortment_missing_offer_is_rejected(self):
+        rows = _assortment_row(
+            "staple_meals",
+            lambda offers: offers[:],
+        )
+        rows = [
+            {**row, "offers": [o for o in row["offers"] if o["item_key"] != "meal"]}
+            if row["key"] == "staple_meals" else row
+            for row in rows
+        ]
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_assortment_configs(rows)
+        message = str(caught.exception)
+        self.assertIn("staple_meals", message)
+        self.assertIn("meal", message)
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
+    def test_offer_for_item_outside_assortment_is_rejected(self):
+        rows = _assortment_row(
+            "common_arms",
+            lambda offers: [{**offers[0], "item_key": "meal"}, *offers[1:]],
+        )
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_assortment_configs(rows)
+        message = str(caught.exception)
+        self.assertIn("common_arms", message)
+        self.assertIn("meal", message)
+
+    def test_unknown_offer_item_is_rejected(self):
+        rows = _assortment_row(
+            "common_arms",
+            lambda offers: [*offers, {"item_key": "synthetic_retired_item", "buy_copper": 100, "sell_copper": 50, "max_stock": 5, "initial_stock": 1, "restock_quantity": 1}],
+        )
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_assortment_configs(rows)
+        self.assertIn("synthetic_retired_item", str(caught.exception))
+
+    def test_unknown_item_in_assortment_identity_is_rejected(self):
+        definition = AssortmentDefinition("t_bad_items", "合成壞貨", ("synthetic_unknown_key",))
+        with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_bad_items": definition}, clear=False):
+            rows = [{"key": "t_bad_items", "offers": []}]
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_assortment_configs(rows)
+            self.assertIn("synthetic_unknown_key", str(caught.exception))
+
+    def test_unknown_assortment_key_is_rejected(self):
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs([{"key": "not_an_assortment", "offers": []}])
+
+    def test_duplicate_assortment_key_is_rejected(self):
+        rows = raw_commerce()["assortments"]
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs(rows + [rows[0]])
+
+    def test_assortments_root_must_be_a_list(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_assortment_configs({"common_arms": {}})
+        self.assertTrue(
+            str(caught.exception).startswith("commerce.yaml: "),
+            "assortment rejections must name their rulebook source",
+        )
+
+    def test_non_mapping_assortment_entry_is_rejected(self):
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs(["nope"])
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-is-a-named-reusable-bundle-of-goods"
+    )
+    def test_assortment_declaring_hours_is_rejected(self):
+        row = raw_commerce()["assortments"][0]
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_assortment_configs([{**row, "open_hour": 8}])
+        self.assertIn("open_hour", str(caught.exception))
+
+    def test_float_price_is_rejected(self):
+        rows = _assortment_row(
+            "staple_meals",
+            lambda offers: [
+                {**offer, "buy_copper": 50.0} if offer["item_key"] == "meal" else offer
+                for offer in offers
+            ],
+        )
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs(rows)
+
+    def test_sell_above_buy_is_rejected(self):
+        rows = _assortment_row(
+            "staple_meals",
+            lambda offers: [
+                {**offer, "sell_copper": 500} if offer["item_key"] == "meal" else offer
+                for offer in offers
+            ],
+        )
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs(rows)
+
+    def test_initial_exceeding_max_is_rejected(self):
+        rows = _assortment_row(
+            "staple_meals",
+            lambda offers: [
+                {**offer, "initial_stock": 99} if offer["item_key"] == "meal" else offer
+                for offer in offers
+            ],
+        )
+        with self.assertRaises(GuildConfigError):
+            validate_assortment_configs(rows)
+
+    def test_registry_assortment_without_rules_is_rejected(self):
+        definition = AssortmentDefinition("t_orphan", "合成孤兒", ())
+        with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_orphan": definition}, clear=False):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_assortment_configs(raw_commerce()["assortments"])
+            self.assertIn("t_orphan", str(caught.exception))
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-may-not-contain-a-keepsake-band-item"
+    )
+    def test_keepsake_band_item_is_rejected_at_any_price(self):
+        # A file-local keepsake-band fixture item, never a shipped keepsake:
+        # the assortment validator must reject it before any price check.
+        keepsake = ItemDefinition(
+            key="t_keepsake_probe",
+            display_name_zh="合成信物",
+            price_table_key="relic",
+            sellable=False,
+            presentation=ItemPresentation(
+                kind=ItemKind.MISC,
+                icon_key=ItemIconKey.MISC,
+                rarity=ItemRarity.LEGENDARY,
+                summary_zh="用於測試信物帶拒絕的合成物品。",
+            ),
+        )
+        definition = AssortmentDefinition("t_keepsake_rack", "合成信物架", ("t_keepsake_probe",))
+        row = {
+            "key": "t_keepsake_rack",
+            "offers": [
+                {
+                    "item_key": "t_keepsake_probe",
+                    # Exactly the relic band floor: the rejection fires on
+                    # the band, not on the price, so even a band-legal price
+                    # is refused.
+                    "buy_copper": 999_999,
+                    "sell_copper": 0,
+                    "max_stock": 1,
+                    "initial_stock": 1,
+                    "restock_quantity": 1,
+                }
+            ],
+        }
+        with mock.patch.dict(ITEM_REGISTRY, {"t_keepsake_probe": keepsake}, clear=False), \
+             mock.patch.dict(ASSORTMENT_REGISTRY, {"t_keepsake_rack": definition}, clear=False):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_assortment_configs([row])
+            message = str(caught.exception)
+            self.assertIn("t_keepsake_rack", message)
+            self.assertIn("t_keepsake_probe", message)
+            self.assertIn("keepsake", message)
+
+
 class ShopRuleTests(unittest.TestCase):
+    """Shop resolution against validated assortment offers (design §3.1)."""
+
+    @staticmethod
+    def _shipped_offers() -> dict:
+        return validate_assortment_configs(raw_commerce()["assortments"])
+
     def test_loaded_shops_are_integer_and_band_consistent(self):
-        raw = raw_rulebook()["shops"]
-        configs = validate_shop_configs(raw)
+        offers = self._shipped_offers()
+        configs = validate_shop_configs(raw_commerce()["shops"], offers)
         self.assertEqual(set(configs), {"altoria_general_store"})
         config = configs["altoria_general_store"]
         self.assertIsInstance(config, ShopConfig)
+        self.assertEqual(
+            {offer.item_key for offer in config.offers},
+            set(SHOP_REGISTRY["altoria_general_store"].offered_item_keys),
+        )
         for offer in config.offers:
             self.assertIsInstance(offer, ItemOfferRule)
             self.assertIsInstance(offer.buy_copper, int)
@@ -341,85 +572,148 @@ class ShopRuleTests(unittest.TestCase):
             self.assertLessEqual(offer.initial_stock, offer.max_stock)
 
     def test_float_price_is_rejected(self):
-        raw = raw_rulebook()["shops"]
-        mutated = {
-            **raw[0],
-            "offers": [
-                {**offer, **({"buy_copper": 50.0} if offer["item_key"] == "meal" else {})}
-                for offer in raw[0]["offers"]
+        # The scenario pin for the legacy guild-economy spec: a floating
+        # offer price fails the join end-to-end, not just the assortment
+        # validator in isolation.
+        rows = _assortment_row(
+            "staple_meals",
+            lambda offers: [
+                {**offer, "buy_copper": 50.0} if offer["item_key"] == "meal" else offer
+                for offer in offers
             ],
-        }
+        )
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([mutated])
-
-    def test_sell_above_buy_is_rejected(self):
-        raw = raw_rulebook()["shops"]
-        mutated = {
-            **raw[0],
-            "offers": [
-                {**offer, **({"sell_copper": 500} if offer["item_key"] == "meal" else {})}
-                for offer in raw[0]["offers"]
-            ],
-        }
-        with self.assertRaises(GuildConfigError):
-            validate_shop_configs([mutated])
-
-    def test_initial_exceeding_max_is_rejected(self):
-        raw = raw_rulebook()["shops"]
-        mutated = {
-            **raw[0],
-            "offers": [
-                {**offer, **({"initial_stock": 99} if offer["item_key"] == "meal" else {})}
-                for offer in raw[0]["offers"]
-            ],
-        }
-        with self.assertRaises(GuildConfigError):
-            validate_shop_configs([mutated])
+            validate_shop_configs(
+                raw_commerce()["shops"],
+                validate_assortment_configs(rows),
+            )
 
     def test_unknown_shop_key_is_rejected(self):
-        raw = raw_rulebook()["shops"]
+        row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([{**raw[0], "shop_key": "not_a_shop"}])
+            validate_shop_configs([{**row, "shop_key": "not_a_shop"}], self._shipped_offers())
 
     def test_shops_root_must_be_a_list(self):
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs({"altoria_general_store": {}})
+            validate_shop_configs({"altoria_general_store": {}}, self._shipped_offers())
 
     def test_non_mapping_shop_entry_is_rejected(self):
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs(["nope"])
+            validate_shop_configs(["nope"], self._shipped_offers())
 
     def test_duplicate_shop_key_is_rejected(self):
-        raw = raw_rulebook()["shops"]
+        rows = raw_commerce()["shops"]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs(raw + [raw[0]])
+            validate_shop_configs(rows + [rows[0]], self._shipped_offers())
 
     def test_hour_at_or_above_day_length_is_rejected(self):
-        raw = raw_rulebook()["shops"]
+        row = raw_commerce()["shops"][0]
         with self.assertRaises(GuildConfigError):
-            validate_shop_configs([{**raw[0], "open_hour": 25}])
+            validate_shop_configs([{**row, "open_hour": 25}], self._shipped_offers())
 
-    def test_offer_not_in_shop_identity_is_rejected(self):
-        raw = raw_rulebook()["shops"]
-        mutated = {
-            **raw[0],
-            "offers": [
-                *raw[0]["offers"],
-                {**raw[0]["offers"][0], "item_key": "plain_sword", "buy_copper": 250, "sell_copper": 100, "max_stock": 3, "initial_stock": 1, "restock_quantity": 1},
-            ],
+    def test_equal_open_and_close_hours_are_rejected(self):
+        row = raw_commerce()["shops"][0]
+        with self.assertRaises(GuildConfigError):
+            validate_shop_configs([{**row, "close_hour": row["open_hour"]}], self._shipped_offers())
+
+    def test_shop_row_carrying_offers_is_rejected(self):
+        # Commerce data moved under assortments: a leftover per-shop offers
+        # block must fail closed instead of being silently ignored.
+        row = raw_commerce()["shops"][0]
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_shop_configs([{**row, "offers": []}], self._shipped_offers())
+        self.assertIn("offers", str(caught.exception))
+
+    def test_shop_referencing_unknown_assortment_is_rejected(self):
+        row = raw_commerce()["shops"][0]
+        shop = replace(SHOP_REGISTRY["altoria_general_store"], assortment_keys=("no_such_assortment",))
+        with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], self._shipped_offers())
+            message = str(caught.exception)
+            self.assertIn("altoria_general_store", message)
+            self.assertIn("no_such_assortment", message)
+
+    def test_shop_without_assortments_is_rejected(self):
+        row = raw_commerce()["shops"][0]
+        shop = replace(SHOP_REGISTRY["altoria_general_store"], assortment_keys=())
+        with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], self._shipped_offers())
+            self.assertIn("altoria_general_store", str(caught.exception))
+
+    def test_duplicate_assortment_reference_is_rejected(self):
+        row = raw_commerce()["shops"][0]
+        shop = replace(
+            SHOP_REGISTRY["altoria_general_store"],
+            assortment_keys=("common_arms", "common_arms"),
+        )
+        with mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], self._shipped_offers())
+            self.assertIn("common_arms", str(caught.exception))
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_overlapping_assortments_within_one_shop_are_rejected(self):
+        # ``meal`` ships inside staple_meals; a local assortment sharing it
+        # creates the per-shop collision the resolver must refuse.
+        shared = AssortmentDefinition("t_shared_goods", "合成共用貨", ("meal",))
+        offers = self._shipped_offers()
+        offers = {**offers, "t_shared_goods": offers["staple_meals"]}
+        shop = replace(
+            SHOP_REGISTRY["altoria_general_store"],
+            assortment_keys=("staple_meals", "t_shared_goods"),
+        )
+        with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
+             mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": shop}, clear=True):
+            row = raw_commerce()["shops"][0]
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], offers)
+            message = str(caught.exception)
+            self.assertIn("altoria_general_store", message)
+            self.assertIn("meal", message)
+            self.assertIn("staple_meals", message)
+            self.assertIn("t_shared_goods", message)
+
+    def test_two_shops_may_share_one_item_key_at_their_own_prices(self):
+        # One good sold in two places at two prices is the model working,
+        # not a collision: the rejection is scoped to a single shop.
+        shared = AssortmentDefinition("t_shared_goods", "合成共用貨", ("meal",))
+        offers = self._shipped_offers()
+        offers = {
+            **offers,
+            "t_shared_goods": {
+                "meal": replace(offers["staple_meals"]["meal"], buy_copper=7),
+            },
         }
-        with self.assertRaises(GuildConfigError):
-            validate_shop_configs([mutated])
-
-    def test_missing_offer_is_rejected(self):
-        raw = raw_rulebook()["shops"]
-        mutated = {
-            **raw[0],
-            "offers": [offer for offer in raw[0]["offers"] if offer["item_key"] != "meal"],
-        }
-        with self.assertRaises(GuildConfigError):
-            validate_shop_configs([mutated])
-
+        first = SHOP_REGISTRY["altoria_general_store"]
+        second = ShopDefinition(
+            key="t_second_shop",
+            host_name="合成二號",
+            host_title="合成二號店老闆",
+            assortment_keys=("t_shared_goods",),
+        )
+        rows = [
+            {**raw_commerce()["shops"][0]},
+            {"shop_key": "t_second_shop", "open_hour": 9, "close_hour": 19, "restock_hour": 7},
+        ]
+        with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_shared_goods": shared}, clear=False), \
+             mock.patch.dict(SHOP_REGISTRY, {"altoria_general_store": first, "t_second_shop": second}):
+            configs = validate_shop_configs(rows, offers)
+            self.assertEqual(
+                {offer.item_key for offer in configs["t_second_shop"].offers},
+                {"meal"},
+            )
+            self.assertEqual(
+                configs["t_second_shop"].offers[0].buy_copper,
+                7,
+            )
+            self.assertEqual(
+                {offer.item_key for offer in configs["altoria_general_store"].offers},
+                set(first.offered_item_keys),
+            )
 
 class CatalogLoadingTests(CatalogRegistryIsolation):
     def test_full_catalog_loads_and_joins_registries(self):
@@ -480,19 +774,29 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
     )
     def test_shop_offering_retired_item_fails_catalog_load(self):
-        raw = raw_rulebook()
-        synthetic_shop = dict(raw["shops"][0])
-        synthetic_shop["offers"] = list(synthetic_shop["offers"]) + [
+        raw = raw_commerce()
+        synthetic_rows = [
             {
-                "item_key": "synthetic_retired_item",
-                "buy_copper": 100,
-                "sell_copper": 50,
-                "max_stock": 5,
-                "initial_stock": 1,
-                "restock_quantity": 1,
+                **row,
+                "offers": [
+                    *row["offers"],
+                    {
+                        "item_key": "synthetic_retired_item",
+                        "buy_copper": 100,
+                        "sell_copper": 50,
+                        "max_stock": 5,
+                        "initial_stock": 1,
+                        "restock_quantity": 1,
+                    },
+                ],
             }
+            if row["key"] == "common_arms" else row
+            for row in raw["assortments"]
         ]
-        with mock.patch("world.rules.guild_config.load_config", return_value={**raw, "shops": [synthetic_shop]}):
+        with mock.patch(
+            "world.rules.guild_config.load_commerce_config",
+            return_value={**raw, "assortments": synthetic_rows},
+        ):
             with self.assertRaises(GuildConfigError) as caught:
                 load_guild_catalog(QUEST_DEFINITION_REGISTRY)
             self.assertIn("synthetic_retired_item", str(caught.exception))
@@ -500,25 +804,15 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
     @covers_requirement(
         "lore-item-catalog::retiring-an-item-key-leaves-no-dangling-reference"
     )
-    def test_shop_offered_keys_naming_retired_item_fails_catalog_load(self):
-        from world.lore.shops import ShopDefinition
-        synthetic_shop = ShopDefinition(
-            key="synthetic_shop",
-            merchant_component_key="merchant",
-            host_name="測試老闆",
-            host_title="測試頭銜",
-            offered_item_keys=("synthetic_retired_key",),
+    def test_assortment_item_set_naming_retired_item_fails_catalog_load(self):
+        # The identity side of the alignment: an assortment whose item set
+        # names a retired key fails load naming the assortment and the item.
+        definition = AssortmentDefinition(
+            "t_retired_rack", "合成退役貨架", ("synthetic_retired_key",)
         )
-        with mock.patch.dict(SHOP_REGISTRY, {"synthetic_shop": synthetic_shop}, clear=False):
-            shop_raw = {
-                "shop_key": "synthetic_shop",
-                "open_hour": 8,
-                "close_hour": 20,
-                "restock_hour": 6,
-                "offers": [],
-            }
+        with mock.patch.dict(ASSORTMENT_REGISTRY, {"t_retired_rack": definition}, clear=False):
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([shop_raw])
+                validate_assortment_configs([{"key": "t_retired_rack", "offers": []}])
             self.assertIn("synthetic_retired_key", str(caught.exception))
 
     @covers_requirement(
@@ -543,8 +837,6 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         "lore-registries::currency-is-an-integer-count-of-銅-with-no-floats-in-the-money-path"
     )
     def test_item_naming_absent_price_band_fails_catalog_load(self):
-        from world.lore.shops import ShopDefinition
-
         synthetic_item = ItemDefinition(
             key="synthetic_absent_band_item",
             display_name_zh="合成無頻帶物品",
@@ -557,18 +849,11 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
                 summary_zh="用於測試不存在價格帶的合成物品。",
             ),
         )
-        synthetic_shop = ShopDefinition(
-            key="synthetic_band_shop",
-            merchant_component_key="merchant",
-            host_name="測試老闆",
-            host_title="測試頭銜",
-            offered_item_keys=("synthetic_absent_band_item",),
+        definition = AssortmentDefinition(
+            "t_band_rack", "合成頻帶貨架", ("synthetic_absent_band_item",)
         )
-        shop_raw = {
-            "shop_key": "synthetic_band_shop",
-            "open_hour": 8,
-            "close_hour": 20,
-            "restock_hour": 6,
+        assortment_raw = {
+            "key": "t_band_rack",
             "offers": [
                 {
                     "item_key": "synthetic_absent_band_item",
@@ -581,9 +866,9 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
             ],
         }
         with mock.patch.dict(ITEM_REGISTRY, {"synthetic_absent_band_item": synthetic_item}, clear=False), \
-             mock.patch.dict(SHOP_REGISTRY, {"synthetic_band_shop": synthetic_shop}, clear=False):
+             mock.patch.dict(ASSORTMENT_REGISTRY, {"t_band_rack": definition}, clear=False):
             with self.assertRaises(GuildConfigError) as caught:
-                validate_shop_configs([shop_raw])
+                validate_assortment_configs([assortment_raw])
             self.assertIn("synthetic_absent_band_item", str(caught.exception))
             self.assertIn("has no price-table entry", str(caught.exception))
 

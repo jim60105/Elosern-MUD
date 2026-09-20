@@ -170,6 +170,7 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             "SYNTH_QUESTS": "world.quests.definitions",
             "SYNTH_TITLES": "world.lore.titles",
             "SYNTH_ARCHETYPES": "world.lore.scene_archetypes",
+            "SYNTH_ASSORTMENTS": "world.lore.settlements.assortments",
             "SYNTH_SHOPS": "world.lore.shops",
             "SYNTH_PRICES": "world.lore.economy",
             "SYNTH_BUFFS": "world.rules.buffs",

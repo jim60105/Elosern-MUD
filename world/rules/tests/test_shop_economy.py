@@ -7,6 +7,7 @@ each assertion names its own numbers.
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -19,6 +20,8 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.lore.settlements.assortments import AssortmentDefinition
+from world.lore.shops import ShopDefinition
 from world.rules.clock import WorldClock
 from world.rules.economy import (
     TradeError,
@@ -29,6 +32,7 @@ from world.rules.economy import (
     shop_is_open,
 )
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.rules.guild_config import GuildConfigError, validate_shop_configs
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
@@ -645,6 +649,209 @@ class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTestCase):
                 with self.assertRaises(TradeError) as ctx:
                     parse_merchant_stock(merchant)
                 self.assertEqual(ctx.exception.args[0], TradeReason.MALFORMED_STOCK)
+
+
+def _shop_row(shop_key: str) -> dict:
+    return {
+        "shop_key": shop_key,
+        "open_hour": 8,
+        "close_hour": 20,
+        "restock_hour": 6,
+    }
+
+
+def _mossgate_offers() -> dict:
+    """Offer rules for the kit assortment."""
+    return {
+        "t_mossgate_goods": {
+            item_key: synth_offer_rule(item_key)
+            for item_key in (_T_SPRAY, _T_FANG, _T_APPLE)
+        },
+    }
+
+
+class ShopCompletenessDefectTests(EvenniaTestCase):
+    """The shops-completeness check is keyed on shop identity (design §1.1).
+
+    A synthetic two-shop registry where the second shop has no rule row: the
+    shipped defect keyed the accounting on a constant component type, so the
+    closing check collapsed to one entry and silently accepted the second
+    shop. Every row here is kit or file-local fixture data.
+    """
+
+    SECOND_SHOP = "t_second_stall"
+
+    def setUp(self):
+        second_shop = ShopDefinition(
+            key=self.SECOND_SHOP,
+            host_name="苔徑二號攤",
+            host_title="苔徑市集合成二號攤主",
+            assortment_keys=("t_mossgate_goods",),
+        )
+        open_synthetic_scope(
+            self,
+            "items",
+            "prices",
+            "shops",
+            extra={"shops": {self.SECOND_SHOP: second_shop}},
+        )
+        super().setUp()
+
+    @covers_requirement(
+        "commerce-assortments::every-shop-s-numeric-rules-are-accounted-for-at-load"
+    )
+    def test_second_shop_with_no_rules_is_rejected(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_shop_configs(
+                [_shop_row(T_SHOP)],
+                _mossgate_offers(),
+            )
+        message = str(caught.exception)
+        self.assertIn("missing rules", message)
+        self.assertIn(self.SECOND_SHOP, message)
+
+    @covers_requirement(
+        "commerce-assortments::every-shop-s-numeric-rules-are-accounted-for-at-load"
+    )
+    def test_rules_naming_a_shop_without_identity_are_rejected(self):
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_shop_configs(
+                [_shop_row("t_no_such_shop")],
+                _mossgate_offers(),
+            )
+        self.assertIn("t_no_such_shop", str(caught.exception))
+
+    def test_both_shops_with_rules_resolve_the_same_goods(self):
+        configs = validate_shop_configs(
+            [_shop_row(T_SHOP), _shop_row(self.SECOND_SHOP)],
+            _mossgate_offers(),
+        )
+        expected = {_T_SPRAY, _T_FANG, _T_APPLE}
+        self.assertEqual(
+            {offer.item_key for offer in configs[T_SHOP].offers},
+            expected,
+        )
+        self.assertEqual(
+            {offer.item_key for offer in configs[self.SECOND_SHOP].offers},
+            expected,
+        )
+
+
+class ShopAssortmentResolutionTests(EvenniaTestCase):
+    """Assortment-referencing rejections over file-local fixture registries.
+
+    Each test opens its own scope so the two-or-more shops are exactly the
+    ones the scenario needs; the completeness accounting stays satisfied.
+    """
+
+    OVERLAP_ASSORTMENT = "t_overlap_goods"
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_shop_referencing_unknown_assortment_is_rejected(self):
+        shop = ShopDefinition(
+            key="t_unknown_ref_stall",
+            host_name="苔徑迷路攤",
+            host_title="苔徑市集合成迷路攤主",
+            assortment_keys=("t_no_such_assortment",),
+        )
+        open_synthetic_scope(
+            self,
+            "items",
+            "prices",
+            "shops",
+            extra={"shops": {shop.key: shop}},
+        )
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_shop_configs(
+                [_shop_row(shop.key)],
+                _mossgate_offers(),
+            )
+        message = str(caught.exception)
+        self.assertIn(shop.key, message)
+        self.assertIn("t_no_such_assortment", message)
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_one_shop_overlapping_its_own_assortments_is_rejected(self):
+        overlap = AssortmentDefinition(self.OVERLAP_ASSORTMENT, "苔徑重疊貨", (_T_APPLE,))
+        shop = ShopDefinition(
+            key="t_overlap_stall",
+            host_name="苔徑疊櫃攤",
+            host_title="苔徑市集合成疊櫃攤主",
+            assortment_keys=("t_mossgate_goods", self.OVERLAP_ASSORTMENT),
+        )
+        open_synthetic_scope(
+            self,
+            "items",
+            "prices",
+            "shops",
+            extra={
+                "assortments": {self.OVERLAP_ASSORTMENT: overlap},
+                "shops": {shop.key: shop},
+            },
+        )
+        floor, _ceiling = price_band(_T_APPLE)
+        offers = _mossgate_offers()
+        offers[self.OVERLAP_ASSORTMENT] = {
+            _T_APPLE: replace(
+                synth_offer_rule(_T_APPLE, max_stock=7),
+                buy_copper=floor + 7,
+            ),
+        }
+        with self.assertRaises(GuildConfigError) as caught:
+            validate_shop_configs([_shop_row(shop.key)], offers)
+        message = str(caught.exception)
+        self.assertIn(shop.key, message)
+        self.assertIn(_T_APPLE, message)
+        self.assertIn("t_mossgate_goods", message)
+        self.assertIn(self.OVERLAP_ASSORTMENT, message)
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_two_shops_sharing_a_key_resolve_it_at_their_own_prices(self):
+        # One good sold in two places at two prices is the model working,
+        # not a collision: the overlap rejection is scoped to a single shop.
+        overlap = AssortmentDefinition(self.OVERLAP_ASSORTMENT, "苔徑重疊貨", (_T_APPLE,))
+        shop = ShopDefinition(
+            key="t_shared_apple_stall",
+            host_name="苔徑蘋果攤",
+            host_title="苔徑市集合成蘋果攤主",
+            assortment_keys=(self.OVERLAP_ASSORTMENT,),
+        )
+        open_synthetic_scope(
+            self,
+            "items",
+            "prices",
+            "shops",
+            extra={
+                "assortments": {self.OVERLAP_ASSORTMENT: overlap},
+                "shops": {shop.key: shop},
+            },
+        )
+        floor, _ceiling = price_band(_T_APPLE)
+        offers = _mossgate_offers()
+        offers[self.OVERLAP_ASSORTMENT] = {
+            _T_APPLE: replace(
+                synth_offer_rule(_T_APPLE, max_stock=7),
+                buy_copper=floor + 7,
+            ),
+        }
+        configs = validate_shop_configs(
+            [_shop_row(T_SHOP), _shop_row(shop.key)],
+            offers,
+        )
+        mossgate_apple = next(
+            offer for offer in configs[T_SHOP].offers if offer.item_key == _T_APPLE
+        )
+        shared_apple = next(
+            offer for offer in configs[shop.key].offers if offer.item_key == _T_APPLE
+        )
+        self.assertEqual(mossgate_apple.buy_copper, floor + 2)
+        self.assertEqual(shared_apple.buy_copper, floor + 7)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from world.lore.guild import GuildBranch, GuildRank
 from world.lore.names import FrozenDict, NamePack, NamePart
 from world.lore.nations import Nation
 from world.lore.scene_archetypes import SceneArchetype
+from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.shops import ShopDefinition
 from world.lore.titles import (
     FixedTitleDef,
@@ -180,13 +181,20 @@ SYNTH_NAME_PACKS: dict[str, NamePack] = {
     ),
 }
 
+SYNTH_ASSORTMENTS: dict[str, AssortmentDefinition] = {
+    "t_mossgate_goods": AssortmentDefinition(
+        key="t_mossgate_goods",
+        display_name_zh="苔徑市集合成商品",
+        item_keys=("t_ember_spray", "t_iron_fang", "t_huskapple"),
+    ),
+}
+
 SYNTH_SHOPS: dict[str, ShopDefinition] = {
     "t_mossgate_stall": ShopDefinition(
         key="t_mossgate_stall",
-        merchant_component_key="t_synth_courier",
         host_name="霧鱗・灰秤",
         host_title="苔徑市集合成攤主",
-        offered_item_keys=("t_ember_spray", "t_iron_fang", "t_huskapple"),
+        assortment_keys=("t_mossgate_goods",),
     ),
 }
 
