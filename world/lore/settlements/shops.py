@@ -1,15 +1,20 @@
-"""Immutable shop identity registry for the deterministic economy (guild-economy D-8).
+"""Derived shop identity registry (settlement-shops design §3.2).
 
-Shop definitions carry stable identity and the merchant host's authored NPC
-identity (name + title, npc-title-authored-identities D5); the goods they
-stock are the union of the assortments they reference (settlement-shops
-design §3.1). Exact prices, hours, and stock quantities live in
-``world/rules/rulebook/commerce.yaml``.
+Shop identities are a view over the place registry: a place contributes a
+``ShopDefinition`` iff its authored kwargs carry a ``shop_key``, and the
+derived keys ARE those shop identities — every runtime consumer resolves
+``SHOP_REGISTRY[merchant.shop_key]``. The goods a shop stocks are the union
+of the assortments its place references (settlement-shops design §3.1).
+Exact prices, hours, and stock quantities live in
+``world/rules/rulebook/commerce.yaml``. ``world/lore/shops.py`` is deleted;
+its two authored-identity validators move here unchanged (their guild
+registry imports stay function-local, now absolute for the subpackage move).
 """
 
 from dataclasses import dataclass
 
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -40,20 +45,28 @@ class ShopDefinition:
         return tuple(keys)
 
 
-SHOP_REGISTRY: dict[str, ShopDefinition] = {
-    definition.key: definition
-    for definition in (
-        ShopDefinition(
-            key="altoria_general_store",
-            host_name="瑪爾特·金秤",
-            host_title="阿爾托利亞雜貨商店老闆",
-            assortment_keys=(
-                "common_arms", "common_outfits", "staple_meals",
-                "general_sundries",
-            ),
-        ),
-    )
-}
+def _derive_shop_registry() -> dict[str, ShopDefinition]:
+    """Project one ShopDefinition per place that authors a shop identity."""
+    registry: dict[str, ShopDefinition] = {}
+    for place in PLACE_REGISTRY.values():
+        shop_key = dict(place.authored_kwargs).get("shop_key")
+        if shop_key is None:
+            continue
+        if shop_key in registry:
+            raise ValueError(
+                f"shop_key {shop_key!r} is authored on more than one place: "
+                f"{registry[shop_key].key!r} and {place.key!r}"
+            )
+        registry[shop_key] = ShopDefinition(
+            key=shop_key,
+            host_name=place.host_name,
+            host_title=place.host_title,
+            assortment_keys=place.assortment_keys,
+        )
+    return registry
+
+
+SHOP_REGISTRY: dict[str, ShopDefinition] = _derive_shop_registry()
 
 
 def validate_shop_npc_identities(
@@ -70,11 +83,15 @@ def validate_shop_npc_identities(
         try:
             validate_npc_name(definition.host_name)
         except ValueError as error:
-            raise ValueError(f"shop {definition.key} has an invalid host_name: {error}") from error
+            raise ValueError(
+                f"shop {definition.key} has an invalid host_name: {error}"
+            ) from error
         try:
             validate_npc_title(definition.host_title)
         except ValueError as error:
-            raise ValueError(f"shop {definition.key} has an invalid host_title: {error}") from error
+            raise ValueError(
+                f"shop {definition.key} has an invalid host_title: {error}"
+            ) from error
 
 
 def validate_registry_identity_uniqueness(
@@ -95,7 +112,7 @@ def validate_registry_identity_uniqueness(
     if shop_rows is None:
         shop_rows = SHOP_REGISTRY
     if branch_rows is None or rank_rows is None:
-        from .guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
+        from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 
         if branch_rows is None:
             branch_rows = GUILD_BRANCH_REGISTRY

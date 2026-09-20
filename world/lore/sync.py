@@ -18,6 +18,7 @@ from .names import NAME_PACK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
 from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
+from .settlements import PLACE_REGISTRY, SETTLEMENT_REGISTRY
 from .titles import FIXED_TITLE_REGISTRY
 from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY, validate_wilderness_entries
 from .wilderness_regions import WILDERNESS_REGION_REGISTRY
@@ -42,6 +43,8 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "name_packs": NAME_PACK_REGISTRY,
     "wilderness_regions": WILDERNESS_REGION_REGISTRY,
     "wilderness_entries": WILDERNESS_ENTRY_REGISTRY,
+    "settlements": SETTLEMENT_REGISTRY,
+    "places": PLACE_REGISTRY,
     "prices": PRICE_TABLE,
 }
 
