@@ -67,9 +67,6 @@ Of the twenty-one rooms, exactly one, at coordinate `(3,3)`, SHALL spawn as an `
   instances that are not `AnchorRoom` instances
 
 ### Requirement: The sample city's xyzgrid remains thirteen exterior nodes while permanent service interiors are attached
-<!-- Requirement name retained verbatim; the count it names is stale, the text is current.
-     This block is written against the text `altoria-capital-replan` leaves behind and MUST be
-     archived after it. -->
 Every notable building referenced by the xyzgrid SHALL remain represented by one exterior
 GridRoom in that map. Guild economy SHALL additionally create one ordinary permanent room outside the
 xyzgrid node count for each place the settlement's place registry declares, linked bidirectionally from
