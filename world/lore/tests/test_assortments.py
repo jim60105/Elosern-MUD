@@ -49,6 +49,19 @@ PRE_SPLIT_OFFERED_KEYS = (
     "troll_fang",
 )
 
+# The twelve goods altoria-sanctum ADDS to the capital's offered set — the
+# intimacy_tool devices the item registry always carried and no counter ever
+# sold, now stocked by the sanctum shop. They are deliberately NOT part of
+# the pre-split union above: that literal is the historical migration guard,
+# and these keys are this change's own subject, captured separately so a
+# capital union test still says "exactly the old set plus exactly these".
+SANCTUM_ADDED_KEYS = (
+    "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
+    "warmth_rune_egg", "tremor_crystal", "aphrodisiac_bath_salts",
+    "kiss_of_goddess_mist", "censer_of_desire", "embracing_vine",
+    "spark_candy", "slime_lube_gel", "hot_kiss_potion",
+)
+
 
 class AssortmentRegistryTests(unittest.TestCase):
     """Assortment identity is immutable, keyed, and covers the store exactly."""
@@ -64,6 +77,7 @@ class AssortmentRegistryTests(unittest.TestCase):
             [
                 "common_arms", "common_outfits", "staple_meals",
                 "general_sundries", "capital_adornments", "capital_remedies",
+                "sanctum_wares",
                 "elven_crafted_arms", "elven_attire",
                 "elven_fare", "elven_sundries",
                 "elven_adornments", "elven_remedies",
@@ -87,11 +101,17 @@ class AssortmentRegistryTests(unittest.TestCase):
                 ASSORTMENT_REGISTRY["general_sundries"],
                 ASSORTMENT_REGISTRY["capital_adornments"],
                 ASSORTMENT_REGISTRY["capital_remedies"],
+                ASSORTMENT_REGISTRY["sanctum_wares"],
             )
             for item_key in definition.item_keys
         ]
-        self.assertEqual(set(union), set(PRE_SPLIT_OFFERED_KEYS))
-        self.assertEqual(len(union), len(PRE_SPLIT_OFFERED_KEYS))
+        # The historical 58-key partition plus altoria-sanctum's twelve
+        # additions — nothing else entered or left (受洗聖水 stays inside the
+        # 58; it only changed bundle, which the verbatim-move contract below
+        # owns).
+        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS)
+        self.assertEqual(set(union), expected)
+        self.assertEqual(len(union), len(expected))
 
     def test_no_item_lives_in_two_capital_assortments(self):
         owner: dict[str, str] = {}
@@ -102,6 +122,7 @@ class AssortmentRegistryTests(unittest.TestCase):
             ASSORTMENT_REGISTRY["general_sundries"],
             ASSORTMENT_REGISTRY["capital_adornments"],
             ASSORTMENT_REGISTRY["capital_remedies"],
+            ASSORTMENT_REGISTRY["sanctum_wares"],
         ):
             for item_key in definition.item_keys:
                 self.assertNotIn(item_key, owner, f"{item_key!r} split across assortments")
@@ -146,9 +167,11 @@ class AssortmentRegistryTests(unittest.TestCase):
     def test_capital_shops_redistribute_the_pre_split_set_without_overlap(self):
         # The specialist split (altoria-trading-places §6.1, widened by
         # altoria-adornments-and-remedies until the general store sells only
-        # what a general store sells) narrows each shop's shelf; the union
-        # across every CAPITAL trading place must still equal the 58-key
-        # pre-split offered set, with no key offered by two capital shops.
+        # what a general store sells) narrows each shop's shelf; altoria-
+        # sanctum then grew it with the twelve intimacy goods the registry
+        # always carried. The union across every CAPITAL trading place must
+        # equal the 58-key pre-split offered set plus exactly those twelve,
+        # with no key offered by two capital shops.
         # The village shops are out of scope here: they deliberately share
         # keys with the capital through their own assortments (design §4.1).
         from world.lore.settlements.shops import SHOP_REGISTRY
@@ -167,20 +190,25 @@ class AssortmentRegistryTests(unittest.TestCase):
                 )
                 owner[item_key] = shop.key
                 union.append(item_key)
-        self.assertEqual(set(union), set(PRE_SPLIT_OFFERED_KEYS))
-        self.assertEqual(len(union), len(PRE_SPLIT_OFFERED_KEYS))
+        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS)
+        self.assertEqual(set(union), expected)
+        self.assertEqual(len(union), len(expected))
 
     @covers_requirement(
         "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
     )
     def test_adornments_bundle_is_exactly_the_capital_accessory_slot_goods(self):
-        # The partition RULE, computed from both sides: the adornments
-        # bundle is defined as the capital's accessory-slot goods, so an
-        # accessory the capital sells and the bundle omits is a gap, and a
-        # non-accessory inside it is a leak. Neither side is a literal list:
-        # the offered set comes from the derived shop registry, the slot
-        # from the item registry's own equipment_slot — the data nobody can
-        # drift by accident when the next accessory lands.
+        # The partition RULE, computed from both sides, as amended by
+        # altoria-sanctum: the capital's accessory-slot goods are carved
+        # across EXACTLY two bundles — the adornments bundle holds the
+        # jeweller's accessories, the sanctum bundle holds the wearable
+        # devices — and every offered accessory lands in one of them and
+        # nowhere else. An accessory the capital sells and both bundles omit
+        # is a gap, and a non-accessory inside either is a leak. Neither
+        # side is a literal list: the offered set comes from the derived
+        # shop registry, the slot from the item registry's own
+        # equipment_slot — the data nobody can drift by accident when the
+        # next accessory lands.
         from world.lore.settlements.shops import SHOP_REGISTRY
         from world.skills.equipment import EquipmentSlot
 
@@ -192,19 +220,32 @@ class AssortmentRegistryTests(unittest.TestCase):
             if ITEM_REGISTRY[item_key].equipment_slot is EquipmentSlot.ACCESSORY
         }
         adornments = set(ASSORTMENT_REGISTRY["capital_adornments"].item_keys)
-        self.assertEqual(capital_accessories, adornments)
+        sanctum = set(ASSORTMENT_REGISTRY["sanctum_wares"].item_keys)
+        sanctum_accessories = {
+            key for key in sanctum
+            if ITEM_REGISTRY[key].equipment_slot is EquipmentSlot.ACCESSORY
+        }
+        # The wearable devices are IN the sanctum bundle (else the equality
+        # below silently accepts an empty exemption set).
+        self.assertTrue(sanctum_accessories)
+        self.assertEqual(capital_accessories, adornments | sanctum_accessories)
+        self.assertFalse(adornments & sanctum_accessories)
         # The mirror half of the equality, stated separately so a bundle
         # widened with a non-accessory names itself in the failure: no
-        # accessory-slot key may sit in ANOTHER capital bundle either.
+        # accessory-slot key may sit in a THIRD capital bundle either.
         for definition in ASSORTMENT_REGISTRY.values():
-            if definition.key.startswith("elven_") or definition.key == "capital_adornments":
+            if (
+                definition.key.startswith("elven_")
+                or definition.key in ("capital_adornments", "sanctum_wares")
+            ):
                 continue
             for item_key in definition.item_keys:
                 self.assertIsNot(
                     ITEM_REGISTRY[item_key].equipment_slot,
                     EquipmentSlot.ACCESSORY,
                     f"{item_key!r} equips to the accessory slot but sits in "
-                    f"{definition.key!r}, not the adornments bundle",
+                    f"{definition.key!r}, neither the adornments nor the "
+                    "sanctum bundle",
                 )
 
     def test_display_names_are_traditional_chinese(self):

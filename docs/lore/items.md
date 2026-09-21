@@ -310,7 +310,7 @@ items:
 | 情欲香爐 `censer_of_desire` | 稀有 | 光明教會聖所 | `pleasure +14`（強烈檔） | 否（可重複點燃） | 否 | 12000／6000 | 聖所禮儀用的小巧香爐，爐煙沾上肌膚就化作綿長酥癢，越是動情燒得越是歡 |
 
 > [!NOTE]
-> 本分類已完整落地為登錄資料（配戴型 5 件 + 可用型 7 件，視覺分類 `ItemKind.TOY`、圖示 `ItemIconKey.TOY`），現階段採管理發放（grant）形式流通，待聖所與精靈村商店等上游商店街（storefronts）落成後正式鋪貨上架。快感推升走情慾系統的共享快感寫入器 `apply_pleasure_gain` 唯一入口（複用 `stimulus_applied` 幅度帶，不新造增量），不引入新狀態鍵。
+> 本分類已完整落地為登錄資料（配戴型 5 件 + 可用型 7 件，視覺分類 `ItemKind.TOY`、圖示 `ItemIconKey.TOY`），並已〔已實作〕由聖潔王都聖所附設商店（`sanctum_wares`）正式鋪貨上架，十二件全數可在王都櫃檯 `buy`。快感推升走情慾系統的共享快感寫入器 `apply_pleasure_gain` 唯一入口（複用 `stimulus_applied` 幅度帶，不新造增量），不引入新狀態鍵。
 
 ---
 

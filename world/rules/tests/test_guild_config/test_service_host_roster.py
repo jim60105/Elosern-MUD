@@ -57,15 +57,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # (altoria-place-slices): the lower terrace's eatery host leads, the
     # middle terrace's guild/store/forge/tailor/jeweller/alchemist follow
     # (altoria-adornments-and-remedies closed the specialist family and this
-    # pin had never ridden that growth), the village homes close — nine
-    # places, eight hosts, the 共食棚 contributing nothing (ciaran-village-
-    # commons). This is the order the slices deliberately establish; the
-    # content-neutral field comparisons below locate rows by service_id so
-    # they guard identities, not a sequence.
+    # pin had never ridden that growth), the upper terrace's temple 主祭 and
+    # sanctum 執事 close the capital block (altoria-sanctum), the village
+    # homes close — nine places, eight hosts, the 共食棚 contributing nothing
+    # (ciaran-village-commons). This is the order the slices deliberately
+    # establish; the content-neutral field comparisons below locate rows by
+    # service_id so they guard identities, not a sequence.
     ASSEMBLED_ROSTER_ORDER = [
         "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
         "altoria_alchemist",
+        "altoria_high_priestess", "altoria_sanctum_deacon",
         "ciaran_elenis",
         "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
         "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn", "ciaran_vethiel",
@@ -120,6 +122,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
+                "altoria_high_priestess", "altoria_sanctum_deacon",
                 "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
                 "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn",

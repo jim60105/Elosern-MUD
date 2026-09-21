@@ -22,11 +22,12 @@ The voice rules the guild clerk's row established bind these tables too:
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
 # 瑪爾特·金秤 — the general store. Her shelf is what a general store sells
-# once the specialists have taken theirs: tools and raw materials, with 受洗
-# 聖水 still sitting there until the sanctuary change moves it
-# (altoria-adornments-and-remedies). A merchant who has been weighing copper
-# since the guild economy landed, and who sends accessory hunters to the
-# jeweller and potion buyers to the alchemist without missing a beat.
+# once the specialists have taken theirs: tools and raw materials. 受洗聖水
+# left with altoria-sanctum, on its way to the counter the world document
+# says it belongs to. A merchant who has been weighing copper since the
+# guild economy landed, and who sends accessory hunters to the jeweller,
+# potion buyers to the alchemist and sanctum-shopper pilgrims up the 聖階
+# without missing a beat.
 GENERAL_STORE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "賣什麼",
@@ -49,8 +50,9 @@ GENERAL_STORE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "飾品藥水",
         "「那兩樣我早不做了——飾品往市場街口的首飾坊找艾蓮娜，藥劑往東市的"
-        "鍊金坊找希碧拉，都是老街坊。我櫃上留的只有受洗聖水，"
-        "淨化負面狀態那一回用得到；要就 `shop stock` 看看，`buy` 提貨。」",
+        "鍊金坊找希碧拉，都是老街坊。受洗聖水先前暫放我櫃上，如今歸位了——"
+        "要上大神殿前，聖所自己開櫃了；淨化負面狀態那一回用得到，"
+        "他們的櫃檯比我齊全。」",
     ),
 )
 
@@ -173,8 +175,8 @@ JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
 # 希碧拉·灰沼 — the alchemist. Her surname is a peat-bog still, and her
 # voice is measure-and-label: what each remedy does, in plain use-terms
 # (capital_remedies). The six drinkable and applied remedies came off the
-# general store's shelf with this change; 受洗聖水 stays next door until the
-# sanctuary lands, and she says so.
+# general store's shelf with her change; 受洗聖水 has since gone up the
+# 聖階 to its own counter (altoria-sanctum), and she says so.
 ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "藥劑",
@@ -195,14 +197,83 @@ ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "聖水",
-        "「受洗聖水不在我這兒——那是聖所的東西，如今暫放雜貨店櫃檯，"
-        "等聖所開張就歸位。我這裡賣的是調出來的藥：空瓶破瓶拿來我 `sell` 收，"
+        "「受洗聖水不在我這兒——那是聖所的東西，如今聖所自己開櫃，"
+        "上了大神殿前就買得到。我這裡賣的是調出來的藥：空瓶破瓶拿來我 `sell` 收，"
         "好料換新藥，進出都清爽。」",
     ),
 )
 
+# 艾莉安娜·寒水 — the 主祭 of the 光明神殿. Her counter is the dais: worship,
+# blessing, and straight answers about what this building is. The source
+# document's register binds her table (docs/lore/settlement-locations.md
+# §神殿／聖所): 聖所、神殿、教堂、禮拜堂 are one building, its ministry is
+# 社會常識, and a priest who speaks of it coyly is the misreading the
+# document names. She answers a question about the sanctum the way an
+# innkeeper answers a question about rooms — and she trades nothing, so her
+# table ships no trade verbs: the shop counter belongs to the 執事.
+TEMPLE_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "禮拜",
+        "「日課在晨鐘後與日落前，都在講台前，誰來都有位子——不洗禮、不查身家，"
+        "進門坐著便是參與。想聽講道就留到鐘響，想單獨說說話，聖光聽得見，"
+        "我也聽得見。」",
+    ),
+    KeywordResponse(
+        "祝禱",
+        "「祝禱、祝福、為遠行的人祈風向，都在講台邊進行，不收銅板。"
+        "要淨化負面狀態那一類，用的是受洗聖水——那是聖所櫃上的貨，"
+        "你從講台左手邊走過去就是；我這裡管祝禱，執事櫃上管提貨。」",
+    ),
+    KeywordResponse(
+        "聖所",
+        "「就在這棟建築裡，左手邊，同一片屋頂同一排窗。本會以性愛為修道之途，"
+        "聖所公開經營，這是舉世皆知的規矩，跟酒館賣酒一樣沒什麼瞞人的。"
+        "禮拜、聖所、附設商店是同一信仰生活的三個櫃檯——你想問哪一邊，"
+        "我就答哪一邊，沒有不能問的。」",
+    ),
+    KeywordResponse(
+        "商店",
+        "「聖所附設的櫃檯在裡廳，羅海西亞·芬威克執事坐櫃——聖水、禮器、"
+        "修道用的物件都在她架上。買賣的事我外行，你問她，她報數不清場；"
+        "祝禱的事她外行，你回來問我。」",
+    ),
+)
+
+# 羅海西亞·芬威克 — the 聖所執事. Her remit is the sanctum's administered
+# ministry and the shop that supplies it, and her voice is a shopkeeper's
+# from the first syllable: measure, stock, price. The goods are the twelve
+# intimacy tools plus 受洗聖水 (sanctum_wares); she names them the way the
+# jeweller names settings, because in this world that is exactly what they
+# are — merchandise. Nothing in her table whispers.
+SANCTUM_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "賣什麼",
+        "「禮儀與貼身兩類都有現貨：花蒂銀夾、暖蜜魔導珠、恆溫魔法卵這些配戴的，"
+        "催情浴鹽、女神之吻聖霧、情欲香爐這些用的，外加受洗聖水。"
+        "清單 `shop stock` 報實數，看中 `buy` 加品名；跟外頭櫃檯一個規矩，不另立。」",
+    ),
+    KeywordResponse(
+        "聖水",
+        "「受洗聖水如今在我櫃上——先前寄放雜貨店，是聖所沒開張的時候。"
+        "移除身上負面狀態，效果寫在瓶標；`shop stock` 看剩幾瓶，要就 `buy`。」",
+    ),
+    KeywordResponse(
+        "禮器",
+        "「香爐、聖霧、祝禱掛飾這一路，是禮儀正經用的物件，信眾買來自用、"
+        "送禮都有。料工寫在籤上，价钱 `shop stock` 一報瞞不了人；"
+        "舊禮器洗淨要換錢，擱櫃檯上 `sell` 我估。」",
+    ),
+    KeywordResponse(
+        "聖所事務",
+        "「聖所的事，你進門左轉自然有人接——床位、時辰、願不願意，都當面問清，"
+        "這裡不做猜的地方。要祝禱就回大殿找艾莉安娜主祭；要買東西就現在站著，"
+        "`shop stock`、`buy`、`sell`，我櫃上照規矩走。」",
+    ),
+)
+
 # One entry per capital merchant place, keyed exactly as the place rows author
-# it (the keys travel in the rows; the slice assembles into DIALOGUE_ROWS
+# it, plus the 光明神殿's 主祭 — an attendant place, keyed the same way
+# (the keys travel in the rows; the slice assembles into DIALOGUE_ROWS
 # unchanged).
 ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
     (
@@ -277,6 +348,31 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "問藥效可以，別碰櫃檯上那排紅標的。」"
             ),
             responses=ALCHEMIST_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_temple",
+        DialogueDefinition(
+            greeting=(
+                "講台邊的艾莉安娜·寒水主祭合上經册，晨光從她背後的高窗落進大殿："
+                "「願平安與你同進這門。日課、祝禱、想問的事，都可以在這裡說。"
+                "這棟屋頂下有三個櫃檯——禮拜、聖所、還有助理的商店——"
+                "都是明路，你想問哪邊，我答哪邊。」"
+            ),
+            responses=TEMPLE_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_sanctum",
+        DialogueDefinition(
+            greeting=(
+                "裡廳櫃檯後的羅海西亞·芬威克執事把帳頁翻了個面，算盤撥得比嘴快："
+                "「來對地方了。聖水、禮器、貼身用的，架上都有現貨，"
+                "`shop stock` 報剩餘，看中 `buy`，舊件擱櫃上 `sell`；"
+                "聖所的接送安排也在這櫃上問。要祝禱就回大殿找主祭，"
+                "各走各的櫃檯，都不打聽。」"
+            ),
+            responses=SANCTUM_RESPONSES,
         ),
     ),
 )

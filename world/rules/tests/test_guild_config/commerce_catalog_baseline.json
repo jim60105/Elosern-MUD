@@ -189,14 +189,6 @@
       "close_hour": 20,
       "offers": [
         {
-          "buy_copper": 120,
-          "initial_stock": 4,
-          "item_key": "baptismal_holy_water",
-          "max_stock": 10,
-          "restock_quantity": 2,
-          "sell_copper": 60
-        },
-        {
           "buy_copper": 800,
           "initial_stock": 2,
           "item_key": "beast_crystal",
@@ -426,6 +418,117 @@
           "max_stock": 5,
           "restock_quantity": 1,
           "sell_copper": 400
+        }
+      ],
+      "open_hour": 8,
+      "restock_hour": 6
+    },
+    "altoria_sanctum_shop": {
+      "close_hour": 20,
+      "offers": [
+        {
+          "buy_copper": 50,
+          "initial_stock": 10,
+          "item_key": "aphrodisiac_bath_salts",
+          "max_stock": 20,
+          "restock_quantity": 5,
+          "sell_copper": 25
+        },
+        {
+          "buy_copper": 120,
+          "initial_stock": 4,
+          "item_key": "baptismal_holy_water",
+          "max_stock": 10,
+          "restock_quantity": 2,
+          "sell_copper": 60
+        },
+        {
+          "buy_copper": 12000,
+          "initial_stock": 1,
+          "item_key": "censer_of_desire",
+          "max_stock": 2,
+          "restock_quantity": 1,
+          "sell_copper": 6000
+        },
+        {
+          "buy_copper": 600,
+          "initial_stock": 1,
+          "item_key": "embracing_vine",
+          "max_stock": 3,
+          "restock_quantity": 1,
+          "sell_copper": 300
+        },
+        {
+          "buy_copper": 120,
+          "initial_stock": 4,
+          "item_key": "hot_kiss_potion",
+          "max_stock": 10,
+          "restock_quantity": 2,
+          "sell_copper": 60
+        },
+        {
+          "buy_copper": 4500,
+          "initial_stock": 1,
+          "item_key": "hyperesthesia_charm",
+          "max_stock": 3,
+          "restock_quantity": 1,
+          "sell_copper": 2250
+        },
+        {
+          "buy_copper": 900,
+          "initial_stock": 2,
+          "item_key": "kiss_of_goddess_mist",
+          "max_stock": 5,
+          "restock_quantity": 1,
+          "sell_copper": 450
+        },
+        {
+          "buy_copper": 2000,
+          "initial_stock": 2,
+          "item_key": "nymph_buds_clamp",
+          "max_stock": 5,
+          "restock_quantity": 1,
+          "sell_copper": 1000
+        },
+        {
+          "buy_copper": 60,
+          "initial_stock": 10,
+          "item_key": "slime_lube_gel",
+          "max_stock": 20,
+          "restock_quantity": 5,
+          "sell_copper": 30
+        },
+        {
+          "buy_copper": 380,
+          "initial_stock": 4,
+          "item_key": "spark_candy",
+          "max_stock": 10,
+          "restock_quantity": 2,
+          "sell_copper": 190
+        },
+        {
+          "buy_copper": 15000,
+          "initial_stock": 1,
+          "item_key": "tremor_crystal",
+          "max_stock": 2,
+          "restock_quantity": 1,
+          "sell_copper": 7500
+        },
+        {
+          "buy_copper": 3000,
+          "initial_stock": 2,
+          "item_key": "warm_honey_orb",
+          "max_stock": 5,
+          "restock_quantity": 1,
+          "sell_copper": 1500
+        },
+        {
+          "buy_copper": 3500,
+          "initial_stock": 2,
+          "item_key": "warmth_rune_egg",
+          "max_stock": 5,
+          "restock_quantity": 1,
+          "sell_copper": 1750
         }
       ],
       "open_hour": 8,
