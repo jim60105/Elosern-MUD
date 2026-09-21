@@ -28,6 +28,29 @@ def _commerce_file_error(name: str, message: str) -> GuildConfigError:
     return GuildConfigError(f"commerce/{name}: {message}")
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that refuses duplicate mapping keys at any nesting level.
+
+    PyYAML's default mapping constructor silently keeps the LAST duplicate,
+    so a repeated settlement in one slice's ``price_scales`` would silently
+    reprice that settlement instead of failing load — the same fail-loud
+    contract ``item_effects.py`` / ``equipment_effects.py`` already keep, and
+    the whole reason the rulebook splits per file is that keys are owned.
+    """
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> Any:
+        seen: set[Any] = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                raise yaml.YAMLError(
+                    f"duplicate mapping key {key!r} at line "
+                    f"{key_node.start_mark.line + 1}"
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def _require_text(value: Any, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise _error(f"{field} must be a non-empty string")
@@ -82,8 +105,14 @@ def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
     merged: dict[str, Any] = {}
 
     def _claim(kind: str, key: Any, name: str) -> None:
+        if not isinstance(key, str):
+            raise _commerce_file_error(name, f"{kind} key must be a string, got {key!r}")
         first = owners.get((kind, key))
         if first is not None:
+            if first == name:
+                raise _commerce_file_error(
+                    name, f"duplicate {kind} key {key!r} declared twice in commerce/{name}"
+                )
             raise _commerce_file_error(
                 name,
                 f"duplicate {kind} key {key!r} declared in commerce/{first} "
@@ -94,13 +123,20 @@ def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
     for path in files:
         name = path.name
         try:
-            raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+            raw = yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
         except yaml.YAMLError as exc:
             raise _commerce_file_error(name, f"failed to parse: {exc}") from exc
-        if raw is None:
-            continue
         if not isinstance(raw, Mapping):
-            raise _commerce_file_error(name, "rulebook slice must be a mapping")
+            raise _commerce_file_error(
+                name, "rulebook slice must declare at least one commerce section"
+            )
+        unknown = set(raw) - {"assortments", "shops", "price_scales"}
+        if unknown:
+            raise _commerce_file_error(name, f"unknown sections {sorted(unknown)}")
+        if not raw:
+            raise _commerce_file_error(
+                name, "rulebook slice must declare at least one commerce section"
+            )
         for section in ("assortments", "shops"):
             rows = raw.get(section)
             if rows is None:

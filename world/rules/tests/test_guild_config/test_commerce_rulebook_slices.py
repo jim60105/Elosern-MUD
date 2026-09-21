@@ -3,13 +3,23 @@
 Slice of ``test_guild_config``: CommerceRulebookSliceTests.
 """
 from tools.spec_traceability import covers_requirement
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from world.rules.guild_config import GuildConfigError, load_commerce_config
+import yaml
+
+from world.rules.guild_config import (
+    GuildConfigError,
+    load_commerce_config,
+    validate_assortment_configs,
+    validate_price_scales,
+    validate_shop_configs,
+)
 
 _SHIPPED_DIR = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "commerce"
+_BASELINE = Path(__file__).resolve().parent / "commerce_catalog_baseline.json"
 
 _A_ASSORTMENTS = """
 assortments:
@@ -118,6 +128,80 @@ class CommerceRulebookSliceTests(unittest.TestCase):
                 load_commerce_config(root)
             self.assertIn("commerce/bad.yaml", str(caught.exception))
 
+    def test_duplicate_mapping_key_within_one_slice_fails_load(self):
+        # PyYAML's default loader keeps the LAST duplicate silently, which
+        # would let one settlement's scale be repriced by an invisible second
+        # row. The slice loader must refuse the document instead.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write(
+                root,
+                "scales.yaml",
+                "price_scales:\n  t_settlement_one: 100\n  t_settlement_one: 900\n",
+            )
+            with self.assertRaises(GuildConfigError) as caught:
+                load_commerce_config(root)
+            self.assertIn("commerce/scales.yaml", str(caught.exception))
+            self.assertIn("t_settlement_one", str(caught.exception))
+
+    def test_duplicate_row_key_within_one_slice_fails_load(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            row = {
+                "key": "t_bundle_a",
+                "offers": [
+                    {
+                        "item_key": "synthetic_item_a",
+                        "buy_copper": 10,
+                        "sell_copper": 5,
+                        "max_stock": 2,
+                        "initial_stock": 1,
+                        "restock_quantity": 1,
+                    }
+                ],
+            }
+            self._write(
+                root,
+                "one.yaml",
+                yaml.dump({"assortments": [row, dict(row)]}, sort_keys=False),
+            )
+            with self.assertRaises(GuildConfigError) as caught:
+                load_commerce_config(root)
+            self.assertIn("commerce/one.yaml", str(caught.exception))
+            self.assertIn("t_bundle_a", str(caught.exception))
+
+    def test_unknown_section_is_rejected_naming_the_file(self):
+        # A typo'd section would load as a silent no-op slice.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write(root, "typo.yaml", "shop:\n  - shop_key: t_shop_a\n")
+            with self.assertRaises(GuildConfigError) as caught:
+                load_commerce_config(root)
+            message = str(caught.exception)
+            self.assertIn("commerce/typo.yaml", message)
+            self.assertIn("shop", message)
+
+    def test_empty_slice_is_rejected_naming_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write(root, "one.yaml", _A_ASSORTMENTS)
+            self._write(root, "empty.yaml", "# nothing here\n")
+            with self.assertRaises(GuildConfigError) as caught:
+                load_commerce_config(root)
+            self.assertIn("commerce/empty.yaml", str(caught.exception))
+
+    def test_non_string_row_key_is_a_named_rulebook_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write(
+                root,
+                "bad.yaml",
+                "assortments:\n  - key: [not, a, string]\n    offers: []\n",
+            )
+            with self.assertRaises(GuildConfigError) as caught:
+                load_commerce_config(root)
+            self.assertIn("commerce/bad.yaml", str(caught.exception))
+
     def test_shape_error_names_the_offending_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -138,6 +222,46 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         self.assertEqual(
             catalog["price_scales"], {"capital_altoria": 100, "village_ciaran": 100}
         )
+
+    @covers_requirement(
+        "commerce-assortments::commerce-balance-data-is-a-set-of-files-not-one-file"
+    )
+    def test_resolved_shipped_catalog_equals_the_pre_split_baseline(self):
+        # The split promises the resolved catalog moved verbatim: every
+        # shop's offers, prices, stock and hours. The baseline is the
+        # pre-split resolved catalog (normalized JSON) captured before the
+        # directory existed — the one-time guard made permanent.
+        commerce = load_commerce_config(_SHIPPED_DIR)
+        configs = validate_shop_configs(
+            commerce["shops"],
+            validate_assortment_configs(commerce["assortments"]),
+            validate_price_scales(commerce["price_scales"]),
+        )
+        resolved = {
+            "price_scales": dict(sorted(validate_price_scales(commerce["price_scales"]).items())),
+            "shops": {
+                shop_key: {
+                    "open_hour": cfg.open_hour,
+                    "close_hour": cfg.close_hour,
+                    "restock_hour": cfg.restock_hour,
+                    "offers": [
+                        {
+                            "item_key": offer.item_key,
+                            "buy_copper": offer.buy_copper,
+                            "sell_copper": offer.sell_copper,
+                            "max_stock": offer.max_stock,
+                            "initial_stock": offer.initial_stock,
+                            "restock_quantity": offer.restock_quantity,
+                        }
+                        for offer in sorted(cfg.offers, key=lambda o: o.item_key)
+                    ],
+                }
+                for shop_key, cfg in sorted(configs.items())
+            },
+        }
+        baseline = json.loads(_BASELINE.read_text(encoding="utf-8"))
+        self.assertEqual(resolved["price_scales"], baseline["price_scales"])
+        self.assertEqual(resolved["shops"], baseline["shops"])
 
 
 if __name__ == "__main__":
