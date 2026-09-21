@@ -64,7 +64,12 @@ class ShippedTableTests(ProfessionCacheIsolation):
         )
 
         merchant = table["merchant"]
-        self.assertEqual([(c.type_key, c.default_binding) for c in merchant.components], [("merchant", "place")])
+        # merchant-dialogue: a shopkeeper both trades and answers, so the row
+        # carries the dialogue component the attendant's whole blueprint is.
+        self.assertEqual(
+            [(c.type_key, c.default_binding) for c in merchant.components],
+            [("merchant", "place"), ("scripted_dialogue", "place")],
+        )
 
         staff = table["guild_staff"]
         self.assertEqual(
