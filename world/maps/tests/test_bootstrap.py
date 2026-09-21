@@ -53,9 +53,13 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         return XYZExit.objects.all_family().count()
 
     def _bridging_exits(self):
+        # A bridging exit is one that touches the starting room itself. The
+        # south gate room may legitimately carry other exits once the boot
+        # runs sync_wilderness() (the per-gate 荒野 gate provisioning); the
+        # south gate is only resolved here as the bridge's far end, never as
+        # a counting target in its own right.
         limbo = search_object(LIMBO_KEY, exact=True)
-        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        targets = [obj for obj in (limbo[0] if limbo else None, south_gate) if obj is not None]
+        targets = [limbo[0]] if limbo else []
         return [
             exit_obj
             for exit_obj in Exit.objects.all()
