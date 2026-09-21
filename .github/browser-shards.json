@@ -102,7 +102,7 @@
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_service_submenu_leaves_root_clean",
         "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
-        "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport",
+        "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport",
         "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
         "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker"
       ],
