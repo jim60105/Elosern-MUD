@@ -107,35 +107,35 @@ class PlaceRegistryTests(unittest.TestCase):
     PRE_SPLIT_CONTENT_CAPTURE = {
         "altoria_guild_hall": (
             'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
-            'The guild hall of 阿爾托利亞, with a grand board and a training ring (guild-economy D-9).', (4, 3),
+            '阿爾托利亞的冒險者公會大廳，屋裡的兩樣主角是一面向著門的大任務板，與一半鋪成環場的訓練地。', (4, 3),
             '冒險者公會大廳', ('guild hall', 'hall'), '葛里安·衛登', '阿爾托利亞分會會長', 'human', None, 'other', 'guild_staff',
             'altoria_guild_master', (),
             (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), ()
         ),
         "altoria_general_store": (
             'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
-            'The general store of 阿爾托利亞, its shelves waiting for the next caravan (guild-economy D-9).',
+            '阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。',
             (2, 3), '雜貨店', ('general store', 'store', 'shop'), '瑪爾特·金秤', '阿爾托利亞雜貨商店老闆', 'human', None,
             'other', 'merchant', 'altoria_merchant', ('general_sundries',),
             (('shop_key', 'altoria_general_store'), ('dialogue_key', 'altoria_general_store')), (), ()
         ),
         "altoria_forge": (
             'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
-            "The forge of 聖潔王都, its anvil ringing under the capital's weapons trade (settlement-shops design §6.1).",
+            "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。",
             (1, 3), '鍛造鋪', ('forge', 'smithy'), '維爾登·黑潭', '聖潔王都鍛造鋪鐵匠', 'human', 'human_plains', 'male',
             'merchant', 'altoria_blacksmith', ('common_arms',),
             (('shop_key', 'altoria_forge'), ('dialogue_key', 'altoria_forge')), (), ()
         ),
         "altoria_eatery": (
             'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
-            "The eatery of 聖潔王都, steam rising from its kitchen over 南大道's foot traffic (settlement-shops design §6.1).",
+            "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。",
             (3, 1), '餐館', ('eatery', 'restaurant', 'diner'), '西格瑪·庫柏', '聖潔王都餐館老闆', 'human', 'human_plains',
             'male', 'merchant', 'altoria_eatery_owner', ('staple_meals',),
             (('shop_key', 'altoria_eatery'), ('dialogue_key', 'altoria_eatery')), (), ()
         ),
         "altoria_tailor": (
             'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',
-            "The tailor's workshop of 聖潔王都, bolts of cloth beside the noble commissions of 北大道 (settlement-shops design §6.1).",
+            "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。",
             (1, 3), '裁縫坊', ('tailor', 'tailor shop'), '妮絲塔·狐溪', '聖潔王都裁縫坊坊主', 'human', 'human_plains',
             'female', 'merchant', 'altoria_tailor', ('common_outfits',),
             (('shop_key', 'altoria_tailor'), ('dialogue_key', 'altoria_tailor')), (), ()

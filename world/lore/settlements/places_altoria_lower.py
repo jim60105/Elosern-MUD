@@ -35,8 +35,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.EATERY,
         room_name_zh="聖潔王都餐館",
         room_desc_zh=(
-            "The eatery of 聖潔王都, steam rising from its kitchen over "
-            "南大道's foot traffic (settlement-shops design §6.1)."
+            "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。"
         ),
         exterior_xy=(3, 1),  # 南大道
         doorway_key_zh="餐館",
@@ -64,14 +63,11 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.TAVERN,
         room_name_zh="聖潔王都醉月酒館",
         room_desc_zh=(
-            "The 醉月酒館 of 聖潔王都 sits where the inn lane earns its "
-            "name: low amber light, sawdust and hops, and a counter worn "
-            "bright where a decade of travellers have leaned. Tables "
-            "crowd toward the hearth, each its own conversation, and the "
-            "room's one rule is the tavern keeper's — talk here, about "
-            "anything, and nobody overheard is the worse for it. Word, "
-            "rumour and companions are what this room trades in; the cups "
-            "are scenery. Nothing on the tables does more than sit in them."
+            "聖潔王都的醉月酒館坐落在客棧巷得名的地方：低垂的琥珀燈色、鋸末與"
+            "蛇麻的氣味，還有那條被十年倚案的旅客磨得發亮的吧台。桌子們朝壁爐"
+            "擠成一堆堆各自的談話，而這間屋子唯一的規矩出自酒館老闆——在這裡什麼"
+            "都可以談，被聽見的人也不會因此吃虧。消息、謠言與同伴才是這間屋子"
+            "經營的東西；杯子只是佈景，桌上的東西什麼都不做，只是擱在那裡。"
         ),
         exterior_xy=(4, 1),  # 客棧巷
         doorway_key_zh="醉月酒館",
@@ -96,15 +92,11 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.LODGING,
         room_name_zh="聖潔王都爐火旅店",
         room_desc_zh=(
-            "The 爐火旅店 of 聖潔王都 keeps its common room around a "
-            "firebank built into the party wall it shares with the "
-            "tavern, so the lane's two doors warm one long room between "
-            "them. Up the stair the guest doors stand in a row, each "
-            "room beyond them private: a bed, a basin, a latch that "
-            "holds. This is where the city sleeps off its travel — "
-            "resting, sleeping it through, or spending the quiet hours "
-            "at practice — and the stairs ask nothing of anyone who "
-            "uses them."
+            "聖潔王都的爐火旅店把公共大廳圍在一道嵌牆的火塘邊——那面牆正是它與"
+            "酒館共用的隔牆，巷子裡的兩扇門因此暖著同一間長屋。上了樓梯，客房的門"
+            "一字排開，門後各自私密：一張床、一個臉盆、一道扣得住的門閂。這座城市"
+            "在這裡把旅途睡回去——歇著、一覺到天亮，或趁安靜的幾個時辰練功——"
+            "樓梯對每個使用它的人都不作任何要求。"
         ),
         exterior_xy=(4, 1),  # 客棧巷
         doorway_key_zh="爐火旅店",
@@ -130,18 +122,12 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.BATHHOUSE,
         room_name_zh="聖潔王都公共浴場",
         room_desc_zh=(
-            "The 公共浴場 of 聖潔王都 breathes steam over the curb of "
-            "浴場前 before you even reach its doors. Inside, the floor "
-            "runs in two: a men's side and a women's side, each with its "
-            "own deep river-water pools and its own shouting, splashing "
-            "regulars, divided by a high wall the manager's voice walks "
-            "the length of all day. Here the capital's human and beastfolk "
-            "custom of covered privacy rules — undress is a private act, "
-            "and this building is the one place it is done in the open, "
-            "among strangers, behind a wall. An elf bathing with them "
-            "would see nothing worth a wall; that disagreement is the "
-            "bathhouse's other landmark, and 伊莎貝爾 has opinions about "
-            "it she delivers on request."
+            "聖潔王都的公共浴場，人還沒走到門口，蒸氣就先漫過浴場前的路緣。屋內的"
+            "地面一分為二：男側與女側，各有各深的河水池，各有各大喊大潑水的老主顧，"
+            "中間隔著一道高牆，管理員的聲音整天沿著牆走來走去。在這裡作主的是王都"
+            "人族與獸人遮蓋私密的習俗——寬衣是個人的事，而這棟建築是唯一讓它當眾"
+            "進行的地方：在陌生人之間、隔著一堵牆。一個精靈若和他們共浴，會覺得沒什麼"
+            "值得隔牆；這場分歧是浴場另一處地標，而伊莎貝爾對它很有意見，問起便說給你聽。"
         ),
         exterior_xy=(5, 1),  # 浴場前
         doorway_key_zh="公共浴場",
@@ -167,16 +153,12 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.WATCH_POST,
         room_name_zh="聖潔王都衛兵駐所",
         room_desc_zh=(
-            "The 衛兵駐所 of 聖潔王都 stands inside the 南門's shadow, "
-            "one warm room against the arch's own cold passage: bench and "
-            "rack along one wall, a brazier smoked black at the ceiling, "
-            "and a shuttered window over the gate tunnel so the oncoming "
-            "hour can be watched from the stove's side. Boots come in and "
-            "out of here on the hour, and the wall charts show every road "
-            "out of the city named. It is a working post, and everything a "
-            "post would hang beside the charts — notices, postings, price "
-            "on a head — is simply not here; work in this city walks in "
-            "through the guild's door, not this one."
+            "聖潔王都的衛兵駐所站在南門的陰影裡，一間溫暖的屋子對著拱門下冰冷的"
+            "通道：一面牆上是長凳與兵器架，火盆把天花板燻得黝黑，一扇木窗板半開的窗"
+            "俯瞰門洞，值更的人坐在爐邊就能盯著接下來的時辰。靴子按整點進出這裡，"
+            "牆上的輿圖標出每一條出城的路。這是一個當值的場所，而一個駐所該掛在輿圖"
+            "旁邊的東西——告示、公文、人頭的金價——這裡一概沒有；這座城市的工作是從"
+            "公會那扇門走進來的，不是這扇。"
         ),
         exterior_xy=(3, 0),  # 南門
         doorway_key_zh="衛兵駐所",
