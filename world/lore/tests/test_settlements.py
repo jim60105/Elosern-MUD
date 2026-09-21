@@ -54,14 +54,16 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_place_iteration_order_is_the_load_bearing_slice_order(self):
         # The derived roster and shop registry iterate this dict, and the
-        # roster must keep the pre-change [guild master, merchant] order first,
-        # with the specialist hosts appended after (sync_service_content
-        # processes rows in dict order).
+        # roster processes rows in dict order (sync_service_content). Since
+        # altoria-place-slices the capital arrives as three terrace slices —
+        # lower, middle, upper — so the 南大道 eatery leads the capital rows
+        # and the middle terrace's guild/store/forge/tailor follow; the
+        # village slice stays last.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
-                "altoria_guild_hall", "altoria_general_store", "altoria_forge",
-                "altoria_eatery", "altoria_tailor",
+                "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
+                "altoria_forge", "altoria_tailor",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],
@@ -69,6 +71,87 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_shipped_place_registry_passes_validation(self):
         validate_place_registry(PLACE_REGISTRY)
+
+    # The altoria-place-slices content-parity guard. Every assembled row is
+    # captured as authored-field literals BEFORE the terrace split (a live dump
+    # of PLACE_REGISTRY, transcribed verbatim); the split moves rows between
+    # slice files and must change no field. Keyed by place key rather than
+    # listed in registry order on purpose — the split deliberately reorders the
+    # assembly, and the iteration-order test above owns that change. If a row
+    # disappears, duplicates, or drifts a field during the move, this fails.
+    PRE_SPLIT_CONTENT_CAPTURE = {
+        "altoria_guild_hall": (
+            'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
+            'The guild hall of 阿爾托利亞, with a grand board and a training ring (guild-economy D-9).', (4, 3),
+            '冒險者公會大廳', ('guild hall', 'hall'), '葛里安·衛登', '阿爾托利亞分會會長', 'human', None, 'other', 'guild_staff',
+            'altoria_guild_master', (),
+            (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), ()
+        ),
+        "altoria_general_store": (
+            'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
+            'The general store of 阿爾托利亞, its shelves waiting for the next caravan (guild-economy D-9).',
+            (2, 3), '雜貨店', ('general store', 'store', 'shop'), '瑪爾特·金秤', '阿爾托利亞雜貨商店老闆', 'human', None,
+            'other', 'merchant', 'altoria_merchant', ('general_sundries',),
+            (('shop_key', 'altoria_general_store'), ('dialogue_key', 'altoria_general_store')), (), ()
+        ),
+        "altoria_forge": (
+            'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
+            "The forge of 聖潔王都, its anvil ringing under the capital's weapons trade (settlement-shops design §6.1).",
+            (1, 3), '鍛造鋪', ('forge', 'smithy'), '維爾登·黑潭', '聖潔王都鍛造鋪鐵匠', 'human', 'human_plains', 'male',
+            'merchant', 'altoria_blacksmith', ('common_arms',),
+            (('shop_key', 'altoria_forge'), ('dialogue_key', 'altoria_forge')), (), ()
+        ),
+        "altoria_eatery": (
+            'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
+            "The eatery of 聖潔王都, steam rising from its kitchen over 南大道's foot traffic (settlement-shops design §6.1).",
+            (3, 1), '餐館', ('eatery', 'restaurant', 'diner'), '西格瑪·庫柏', '聖潔王都餐館老闆', 'human', 'human_plains',
+            'male', 'merchant', 'altoria_eatery_owner', ('staple_meals',),
+            (('shop_key', 'altoria_eatery'), ('dialogue_key', 'altoria_eatery')), (), ()
+        ),
+        "altoria_tailor": (
+            'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',
+            "The tailor's workshop of 聖潔王都, bolts of cloth beside the noble commissions of 北大道 (settlement-shops design §6.1).",
+            (1, 3), '裁縫坊', ('tailor', 'tailor shop'), '妮絲塔·狐溪', '聖潔王都裁縫坊坊主', 'human', 'human_plains',
+            'female', 'merchant', 'altoria_tailor', ('common_outfits',),
+            (('shop_key', 'altoria_tailor'), ('dialogue_key', 'altoria_tailor')), (), ()
+        ),
+        "ciaran_hailiel_home": (
+            'ciaran_hailiel_home', 'village_ciaran', PlaceKind.HOME, '海莉爾的家',
+            "A low, warm room under heavy beams. The hearth is banked with embers, and a window seat overlooks the practice ground where the village's young blade-dancers run through their forms from dawn to dusk. The tools of the house are kept tidy along the walls; nothing here is arranged for trade.",
+            (2, 1), '海莉爾的家', ('hailiel', "hailiel's home"), '海莉爾·斯塔爾法爾', '暗影谷村鑄刃者', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_hailiel', ('elven_crafted_arms',),
+            (('shop_key', 'ciaran_hailiel_home'), ('dialogue_key', 'ciaran_hailiel_home')), (), ()
+        ),
+        "ciaran_lareneth_home": (
+            'ciaran_lareneth_home', 'village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
+            "The scent of candied blossoms hangs in the air of this home along the stream path. Woven baskets of dried petals stand beside a small hearth stone, and by the window a low table holds the day's offering of small treats, set out for whoever passes by.",
+            (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"), '拉瑞內斯·妮特布倫', '暗影谷村花饌好手', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_lareneth', ('elven_fare',),
+            (('shop_key', 'ciaran_lareneth_home'), ('dialogue_key', 'ciaran_lareneth_home')), (), ()
+        ),
+        "ciaran_valwyn_home": (
+            'ciaran_valwyn_home', 'village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
+            "Roots cradle this house beneath the old tree at the village's north edge. Along every wall, the collected oddments of a long life sit in woven baskets and hollowed stones — feathers, seeds, lengths of bundled silk — each tenderly kept, each with a story. It is a home filled with kept things, not a business.",
+            (1, 2), '瓦爾溫的家', ('valwyn', "valwyn's home"), '瓦爾溫·斯蒂爾瓦特爾', '暗影谷村蒐羅者', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_valwyn', ('elven_sundries',),
+            (('shop_key', 'ciaran_valwyn_home'), ('dialogue_key', 'ciaran_valwyn_home')), (), ()
+        ),
+        "ciaran_vethiel_home": (
+            'ciaran_vethiel_home', 'village_ciaran', PlaceKind.HOME, '維特希爾的家',
+            'Herbs hang to dry from the rafters, and dyed thread is wound around pegs by the loom. The wear of many hands shows on the wooden frame, yet the room is a dwelling first: cushions on the floor, a kettle by the fire, garments laid out to be admired among the weaving.',
+            (2, 2), '維特希爾的家', ('vethiel', "vethiel's home"), '維特希爾·威爾德布瑞亞爾', '暗影谷村織衣者', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_vethiel', ('elven_attire',),
+            (('shop_key', 'ciaran_vethiel_home'), ('dialogue_key', 'ciaran_vethiel_home')), (), ()
+        ),
+    }
+
+    def test_the_assembled_registry_equals_the_pre_split_capture(self):
+        from dataclasses import astuple
+
+        self.assertEqual(
+            {key: astuple(place) for key, place in PLACE_REGISTRY.items()},
+            self.PRE_SPLIT_CONTENT_CAPTURE,
+        )
 
     # ---- the kind vocabulary (place-kind-vocabulary) -----------------------
 
@@ -401,6 +484,59 @@ class PlaceRegistryTests(unittest.TestCase):
                 self.assertIn("t_plaza_place", message)
                 broken = next(iter(changes))
                 self.assertIn(broken, message)
+
+    # ---- shared exteriors (altoria-place-slices) ----------------------------
+
+    def _alley(self, key, doorway):
+        """One synthetic place on the shared craft-alley exterior (1, 3)."""
+        return replace(
+            self.guild,
+            key=key,
+            service_id=f"{key}_service",
+            room_name_zh=f"合成巷道室 {key}",
+            exterior_xy=(1, 3),
+            doorway_key_zh=doorway,
+        )
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_two_places_may_share_an_exterior_with_different_doorway_names(self):
+        # One street, two doors (the craft-alley shape): a distinct doorway
+        # name per place is the whole condition, and it loads. The sync side
+        # — that such a pair really yields two doorways — is covered over the
+        # live seams in world/maps/tests/test_service_interiors.py.
+        pair = {
+            place.key: place
+            for place in (
+                self._alley("t_alley_place_a", "合成鍛造鋪門"),
+                self._alley("t_alley_place_b", "合成裁縫坊門"),
+            )
+        }
+        try:
+            validate_place_registry(pair)
+        except ValueError as error:  # pragma: no cover - failure path is the fail below
+            self.fail(f"distinct doorways on one exterior rejected: {error}")
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_two_places_sharing_an_exterior_and_doorway_name_are_rejected(self):
+        # Two identical doorway names on one exterior collapse into one exit
+        # and silently lose a location, so the collision fails load naming
+        # both places and the shared name.
+        pair = {
+            place.key: place
+            for place in (
+                self._alley("t_alley_place_a", "合成巷門"),
+                self._alley("t_alley_place_b", "合成巷門"),
+            )
+        }
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry(pair)
+        message = str(caught.exception)
+        for fragment in ("t_alley_place_a", "t_alley_place_b", "合成巷門"):
+            self.assertIn(fragment, message)
 
 
 class DerivedShopRegistryTests(unittest.TestCase):

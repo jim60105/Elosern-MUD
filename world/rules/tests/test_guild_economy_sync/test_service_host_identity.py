@@ -63,24 +63,36 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             if call.args and call.args[0] == "guild_service_host_created"
         ]
         self.assertEqual(len(events), 9)  # guild host + four capital merchants + four village hosts
-        self.assertEqual(events[0].kwargs["context"]["char"], _guild_host_name())
-        self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_ID)
-        self.assertEqual(events[0].kwargs["context"]["shop"], _guild_branch_key())
+        # The guild host's event is located by service id, not position: the
+        # terrace split (altoria-place-slices) made the lower terrace's eatery
+        # the first roster row, so no shipped row keeps a fixed index.
+        guild_events = [
+            event for event in events
+            if event.kwargs["context"]["service"] == GUILD_SERVICE_ID
+        ]
+        self.assertEqual(len(guild_events), 1)
+        guild_event = guild_events[0]
+        self.assertEqual(guild_event.kwargs["context"]["char"], _guild_host_name())
+        self.assertEqual(guild_event.kwargs["context"]["shop"], _guild_branch_key())
         self.assertEqual(
-            events[0].kwargs["context"]["profession"], _guild_row().profession.key
+            guild_event.kwargs["context"]["profession"], _guild_row().profession.key
         )
-        # The specialist hosts follow the roster order (PLACE_REGISTRY slice
-        # order); every merchant reports its authored shop identity.
+        # The merchant hosts follow the roster order (PLACE_REGISTRY terrace-
+        # slice order); every merchant reports its authored shop identity.
         merchant_service_ids = [
             row.service_id
             for row in get_catalog().service_hosts
             if row.service_id != GUILD_SERVICE_ID
         ]
+        merchant_events = [
+            event for event in events
+            if event.kwargs["context"]["service"] != GUILD_SERVICE_ID
+        ]
         self.assertEqual(
-            [event.kwargs["context"]["service"] for event in events[1:]],
+            [event.kwargs["context"]["service"] for event in merchant_events],
             merchant_service_ids,
         )
-        self.assertTrue(all(event.kwargs["context"]["shop"] for event in events[1:]))
+        self.assertTrue(all(event.kwargs["context"]["shop"] for event in merchant_events))
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()  # reuse fires nothing
         late = [

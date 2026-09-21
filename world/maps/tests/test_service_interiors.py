@@ -237,6 +237,44 @@ class ServiceInteriorTests(EvenniaTestCase):
                 continue
             self.assertIsNotNone(self._interior(place), place.key)
 
+    @covers_requirement(
+        "place-driven-service-sync::interiors-are-created-by-iterating-the-place-registry"
+    )
+    def test_two_synthetic_places_on_one_exterior_get_their_own_doorways(self):
+        # altoria-place-slices task 3.2's positive side over synthetic rows:
+        # a newly authored pair sharing one exterior under different doorway
+        # names (the shape every capital content change will write) yields one
+        # doorway exit per place on the street, not one shared exit.
+        places = _places()
+        # Ride one live row's own settlement and exterior — the suite follows
+        # the registry and never names a shipped settlement.
+        base = next(iter(places.values()))
+        pair = [
+            replace(
+                base,
+                key=f"t_alley_{suffix}",
+                room_name_zh=f"測試巷道室{suffix}",
+                room_desc_zh="Synthetic shared-exterior interior.",
+                doorway_key_zh=f"測試巷門{suffix}",
+                doorway_aliases=(f"t alley {suffix}",),
+            )
+            for suffix in ("a", "b")
+        ]
+        with patch.dict(places, {place.key: place for place in pair}, clear=False):
+            sync_service_interiors()
+            exterior = self._exterior(pair[0])
+            interiors = [self._interior(place) for place in pair]
+        self.assertTrue(all(room is not None for room in interiors))
+        forward = [
+            exit_obj for exit_obj in exterior.exits
+            if exit_obj.destination in interiors
+        ]
+        self.assertEqual(len(forward), 2)
+        self.assertEqual(
+            sorted(exit_obj.key for exit_obj in forward),
+            sorted(place.doorway_key_zh for place in pair),
+        )
+
 
 if __name__ == "__main__":
     import unittest

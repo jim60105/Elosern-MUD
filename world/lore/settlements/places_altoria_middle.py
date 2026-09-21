@@ -1,22 +1,26 @@
-"""聖潔王都 (capital_altoria) place rows (settlement-shops design §6.1).
+"""聖潔王都 (capital_altoria) MIDDLE-terrace place rows (settlement-shops design §6.1).
+
+The middle terrace is the city's civic and crafting ground between the old
+lower town and the noble upper heights (docs/lore/settlement-locations.md):
+the adventurer guild, the general store, and the craft alley where 鍛造鋪 and
+裁縫坊 share one exterior under two doorway names (altoria-capital-replan).
 
 The guild hall and general store are transcribed from the constants in
 ``world/maps/bootstrap.py`` and the roster rows removed from
 ``world/rules/rulebook/guild_economy.yaml``, so the derived shops and
 service-host roster reproduce the pre-change shipped identities exactly. The
-three specialist shops (聖潔王都鍛造鋪 / 聖潔王都餐館 / 聖潔王都裁縫坊) are
-authored content: their interiors, hosts and assortments exist only here and
-in ``world/rules/rulebook/commerce/altoria.yaml``.
+two specialist shops (聖潔王都鍛造鋪 / 聖潔王都裁縫坊) are authored content:
+their interiors, hosts and assortments exist only here and in
+``world/rules/rulebook/commerce/altoria.yaml``.
 
-The tuple order is load-bearing: ``PLACE_REGISTRY`` preserves it, and the
-derived roster must keep the pre-change [altoria_guild_master,
-altoria_merchant] order first, with the specialist hosts appended after
-(sync iterates the roster in this order).
+The assembled tuple order is load-bearing (see the assembly comment in
+``places.py``): this slice follows the lower terrace and precedes the upper,
+so its rows reach the derived roster between them.
 
-Every merchant row carries a ``dialogue_key`` beside its ``shop_key``: the
-merchant blueprint answers as well as trades (merchant-dialogue), and a
-merchant place without the kwarg fails load naming the place. The tables
-live in ``world/lore/dialogue/altoria.py`` under the same keys.
+Merchant rows carry a ``dialogue_key`` beside their ``shop_key``: the merchant
+blueprint answers as well as trades (merchant-dialogue), and a merchant place
+without the kwarg fails load naming the place. The tables live in
+``world/lore/dialogue/altoria.py`` under the same keys.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -98,31 +102,6 @@ ROWS: tuple[PlaceDefinition, ...] = (
         authored_kwargs=(
             ("shop_key", "altoria_forge"),
             ("dialogue_key", "altoria_forge"),
-        ),
-    ),
-    PlaceDefinition(
-        key="altoria_eatery",
-        settlement_key="capital_altoria",
-        kind=PlaceKind.EATERY,
-        room_name_zh="聖潔王都餐館",
-        room_desc_zh=(
-            "The eatery of 聖潔王都, steam rising from its kitchen over "
-            "南大道's foot traffic (settlement-shops design §6.1)."
-        ),
-        exterior_xy=(3, 1),  # 南大道
-        doorway_key_zh="餐館",
-        doorway_aliases=("eatery", "restaurant", "diner"),
-        host_name="西格瑪·庫柏",
-        host_title="聖潔王都餐館老闆",
-        host_race="human",
-        host_subrace="human_plains",
-        host_sex="male",
-        profession="merchant",
-        service_id="altoria_eatery_owner",
-        assortment_keys=("staple_meals",),
-        authored_kwargs=(
-            ("shop_key", "altoria_eatery"),
-            ("dialogue_key", "altoria_eatery"),
         ),
     ),
     PlaceDefinition(
