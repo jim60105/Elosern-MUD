@@ -59,12 +59,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # (altoria-adornments-and-remedies closed the specialist family and this
     # pin had never ridden that growth), the upper terrace's temple 主祭 and
     # sanctum 執事 close the capital block (altoria-sanctum), the village
-    # homes close — nine places, eight hosts, the 共食棚 contributing nothing
-    # (ciaran-village-commons). This is the order the slices deliberately
+    # homes close (altoria-hospitality grew the capital block to eleven hosts;
+    # the 共食棚 still contributes nothing, ciaran-village-commons).
+    # This is the order the slices deliberately
     # establish; the content-neutral field comparisons below locate rows by
     # service_id so they guard identities, not a sequence.
     ASSEMBLED_ROSTER_ORDER = [
-        "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
+        "altoria_eatery_owner",
+        # altoria-hospitality: the lower terrace's three attendant hosts ride
+        # directly behind the eatery, in the slice's authored row order.
+        "altoria_tavern_keeper", "altoria_innkeeper", "altoria_bathhouse_keeper",
+        "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
         "altoria_alchemist",
         "altoria_high_priestess", "altoria_sanctum_deacon",
@@ -122,6 +127,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
+                "altoria_tavern_keeper", "altoria_innkeeper",
+                "altoria_bathhouse_keeper",
                 "altoria_high_priestess", "altoria_sanctum_deacon",
                 "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",

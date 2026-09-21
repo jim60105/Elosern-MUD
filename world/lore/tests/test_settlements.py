@@ -64,10 +64,15 @@ class PlaceRegistryTests(unittest.TestCase):
         # places alphabetical
         # by key (ciaran-village-crafts added 格威娜拉 and 妮瑞斯;
         # ciaran-village-commons added 艾莉妮斯的家, the 共食棚, and 泰莉爾的家).
+        # The hospitality change (altoria-hospitality) grew the LOWER slice in
+        # its authored tuple order: the eatery, then the lane's tavern and inn,
+        # then the bathhouse — still leading the capital block.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
-                "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
+                "altoria_eatery", "altoria_tavern", "altoria_lodging",
+                "altoria_bathhouse",
+                "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
                 "altoria_temple", "altoria_sanctum",
@@ -233,6 +238,9 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_alchemist": "alchemist",
             "altoria_temple": "temple",
             "altoria_sanctum": "sanctum_shop",
+            "altoria_tavern": "tavern",
+            "altoria_lodging": "lodging",
+            "altoria_bathhouse": "bathhouse",
             "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",

@@ -17,6 +17,13 @@ The voice rules the guild clerk's row established bind these tables too:
   the goods of its own assortment, in its own voice — and points the player
   at ``shop stock``, ``buy`` and ``sell``. No shared template with the nouns
   swapped: four shopkeepers, four distinct counters.
+- The hospitality tables (altoria-hospitality) belong to ``attendant`` hosts
+  who sell nothing, so they ship no trade verb at all: the innkeeper's
+  greeting names ``rest``/``sleep``/``practice``, the tavern keeper's names
+  ``talk``/``invite``, and the bathhouse keeper's explains the separated
+  sides — the commands each location exists to host, taught by the person
+  standing in it. None of them quotes a price or promises an unimplemented
+  effect (lodging fees, drink effects and bathing mechanics stay 〔提案〕).
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
@@ -271,10 +278,112 @@ SANCTUM_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# One entry per capital merchant place, keyed exactly as the place rows author
-# it, plus the 光明神殿's 主祭 — an attendant place, keyed the same way
-# (the keys travel in the rows; the slice assembles into DIALOGUE_ROWS
-# unchanged).
+# 蘿溫·古橡 — the 醉月酒館. The lane's information room: the document's
+# designated place for 招募同伴 and 打聽情報, so her table names the commands
+# that already work here (`talk` with anyone in the room, `invite` to the
+# party) and sells nothing — the cups are scenery: no drink does anything,
+# no gamble pays out (docs/lore/settlement-locations.md line 285 keeps both
+# 〔提案〕). Her voice is a hostess's: warm, ears open, mouth shut.
+TAVERN_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "傳聞",
+        "「我這店裡最不缺的就是話。你要打聽什麼，坐下慢慢說——"
+        "在店裡誰都能 `talk`，聊得投緣，人家記得上你。傳聞這東西，"
+        "一杯水的功夫可能就自己走到你桌上。」"
+    ),
+    KeywordResponse(
+        "同伴",
+        "「想招人同行，先讓人認得你：看中哪位，`talk` 聊幾句，"
+        "聊得好了當場 `invite` 一句，願不願意人家自己答。"
+        "我這爐邊一半的夥計，當初就是這樣被隔壁桌叫起來的。」",
+    ),
+    KeywordResponse(
+        "委託",
+        "「公會單子在公會的板上，我這兒不掛板。不過角落那些委託人"
+        "自己會挑人——你先 `talk` 說上話，他手頭有活自然找得到你。"
+        "酒館裡談事有個好處：出了這門，誰也不認得誰。」"
+    ),
+    KeywordResponse(
+        "歇腳",
+        "「趕路趕晚了？巷底就是爐火旅店，溫弗蕾德那兒床乾淨；"
+        "不過夜就在我這兒坐著，`rest` 在哪兒都能歇，我這兒爐子暖、"
+        "話又多，歇得比客棧巷外頭體面。要走了記得把話帶上，別把東西落下。」",
+    ),
+)
+
+# 溫弗蕾德·古林 — the 爐火旅店. Her rooms are the narrative home of the
+# rest/sleep/practice commands, and her table's job is exactly that
+# discoverability (altoria-hospitality design: dialogue carries the
+# affordance). She states the commands work here as anywhere — and quotes
+# no rate, no bill, no stay entitlement: the lodging fee the document marks
+# 〔提案〕 at line 308 stays un-invented, and a landlady who promises a free
+# night is inventing a policy the change refuses to ship.
+LODGING_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "房間",
+        "「樓上房間一排，各有門閂，關上門就是你自己的人。"
+        "要歇就在樓下爐邊或樓上房間裡 `rest`，`rest` 這指令本不挑地方，"
+        "只是我這兒牆厚門實，歇得住。要怎麼用，你開口問，我指給你。」",
+    ),
+    KeywordResponse(
+        "過夜",
+        "「要睡就 `sleep`，睡到精神全回那種；樓上靜，樓下爐邊也有人打盹。"
+        "同一句話我講在前頭：`sleep` 本不挑地方，在哪裡都是睡，"
+        "我這裡不過是床比街邊好——要睡個完整覺，我勸你上樓。」"
+    ),
+    KeywordResponse(
+        "修煉",
+        "「坐著乾歇可惜，可以邊歇邊練：`rest` 加時數，再掛一句 `practice` 加技能名，"
+        "練的進帳按整小時結算。你尚未學會的、練到頂的，喊了也白喊，"
+        "我勸你別白坐。要試就挑個空房，門閂一落，沒人打擾。」"
+    ),
+    KeywordResponse(
+        "澡堂",
+        "「出巷往東走，浴場前那間公共浴場就是——男女兩邊、深池河水，"
+        "伊莎貝爾守著。`rest` `sleep` 的事我這兒管，泡澡的事她管，"
+        "兩條腿走路，別錯過了街口。」",
+    ),
+)
+
+# 伊莎貝爾·葦沼 — the 公共浴場管理員. Her whole job is the two sides and the
+# order between them (docs/lore/settlement-locations.md line 354), and the
+# room's content is the contrast the document keeps for story: human and
+# beastfolk cover up, elves have no concept of shame. She runs no mechanism
+# — no soak restores anything (line 352 keeps that 〔提案〕), and she says
+# so in her own terms.
+BATHHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "規矩",
+        "「這地方只有一條規矩：男左女右，一邊一道牆，各進各門。"
+        "泡的是河水燒的深池，洗的是趕路一身的塵。看順了眼要闖錯邊，"
+        "我喊你回來——這一天我要喊幾百回，習慣了就好。」"
+    ),
+    KeywordResponse(
+        "精靈",
+        "「精靈客人？她們不覺得要牆。人跟獸人進這門先脫外袍、"
+        "再彼此避開眼光，覺得遮著才禮貌；精靈從小就是那麼過的，"
+        "你遮反而是你看不自然。到底誰怪，我守了廿年櫃檯也沒守出答案，"
+        "反正牆在，各洗各的，相安無事。」",
+    ),
+    KeywordResponse(
+        "泡湯",
+        "「池子深水熱，泡到臉紅耳熱再上來衝一桶涼的，渾身鬆快——"
+        "舒坦是舒坦，不是藥。有人說泡完連傷都好了一半，那是他昨夜睡得好，"
+        "別記在池子帳上。要真講究，洗乾淨了再走，別帶著一身河風進旅店。」"
+    ),
+    KeywordResponse(
+        "歇息",
+        "「洗完想坐就外間長椅坐著；`rest` 在哪裡都使得，我這兒不過是"
+        "蒸汽熏著容易睡著。睡過頭別怪我——要一覺睡到樓上去，"
+        "旅店在巷子底，問溫弗蕾德。」"
+    ),
+)
+
+# One entry per capital place that authors a dialogue_key, keyed exactly as
+# the place row authors it: the merchants, the 光明神殿's 主祭, and the three
+# hospitality attendants (altoria-hospitality) — attendant places are keyed
+# the same way (the keys travel in the rows; the slice assembles into
+# DIALOGUE_ROWS unchanged).
 ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
     (
         "altoria_general_store",
@@ -373,6 +482,41 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "各走各的櫃檯，都不打聽。」"
             ),
             responses=SANCTUM_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_tavern",
+        DialogueDefinition(
+            greeting=(
+                "醉月酒館的蘿溫·古橡從櫃檯後打量你一眼，把抹布往肩上一搭："
+                "「新面孔，坐。先把規矩聽懂：我這兒做的是話的生意——"
+                "誰都能 `talk`，聊得投緣的，當場 `invite` 一聲就能帶去同行。"
+                "傳聞不用你找，坐一會兒自己會走到你桌上。」"
+            ),
+            responses=TAVERN_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_lodging",
+        DialogueDefinition(
+            greeting=(
+                "爐火旅店的溫弗蕾德·古林從櫃檯後迎上來，指間捏著一串門閂鑰匙："
+                "「趕路來的？樓上房間一排，各有門閂。我這兒能用的就三樣："
+                "歇就 `rest`，睡就 `sleep`，想邊歇邊練就加一句 `practice` 加技能名。"
+                "這三樣本不挑地方，我這裡不過是牆厚門實，歇得住。」"
+            ),
+            responses=LODGING_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_bathhouse",
+        DialogueDefinition(
+            greeting=(
+                "公共浴場管理員伊莎貝爾·葦沼抱著一疊乾淨布巾從水氣裡走出來，"
+                "把你上下一量：「男邊往左，女邊往右，各進各門，這是這兒唯一的規矩。"
+                "池子是河水燒的，深淺兩格。想問什麼儘管問，我手上活多，答得快。」"
+            ),
+            responses=BATHHOUSE_RESPONSES,
         ),
     ),
 )
