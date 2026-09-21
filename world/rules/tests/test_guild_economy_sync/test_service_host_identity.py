@@ -176,6 +176,13 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # feed merchant stock — and only registry rows were added.
         from world.lore.settlements.shops import ShopDefinition
 
+        # merchant-dialogue: the merchant blueprint's scripted_dialogue
+        # component demands a dialogue table from every merchant place, so
+        # the stand-in row authors one beside its shop_key. The key is the
+        # live general store's own (registry-derived at runtime, never a
+        # shipped literal): two places may share a table — the anchor is the
+        # row's service_id, not the dialogue key.
+        store_kwargs = dict(_place_by_kind("general_store").authored_kwargs)
         new_place = dataclasses.replace(
             _place_by_kind("general_store"),
             key="t_trading_post",
@@ -190,7 +197,10 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             host_race="human",
             host_subrace=None,
             host_sex="other",
-            authored_kwargs=(("shop_key", "t_trading_post"),),
+            authored_kwargs=(
+                ("shop_key", "t_trading_post"),
+                ("dialogue_key", store_kwargs["dialogue_key"]),
+            ),
         )
         # The stand-in shop sells exactly what the live merchant's shop sells:
         # the stock-identity assertion below then holds for any authored

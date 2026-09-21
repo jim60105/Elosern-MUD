@@ -12,6 +12,11 @@ The tuple order is load-bearing: ``PLACE_REGISTRY`` preserves it, and the
 derived roster must keep the pre-change [altoria_guild_master,
 altoria_merchant] order first, with the specialist hosts appended after
 (sync iterates the roster in this order).
+
+Every merchant row carries a ``dialogue_key`` beside its ``shop_key``: the
+merchant blueprint answers as well as trades (merchant-dialogue), and a
+merchant place without the kwarg fails load naming the place. The tables
+live in ``world/lore/dialogue/altoria.py`` under the same keys.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -67,6 +72,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("general_sundries",),
         authored_kwargs=(
             ("shop_key", "altoria_general_store"),
+            ("dialogue_key", "altoria_general_store"),
         ),
     ),
     PlaceDefinition(
@@ -91,6 +97,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("common_arms",),
         authored_kwargs=(
             ("shop_key", "altoria_forge"),
+            ("dialogue_key", "altoria_forge"),
         ),
     ),
     PlaceDefinition(
@@ -115,6 +122,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("staple_meals",),
         authored_kwargs=(
             ("shop_key", "altoria_eatery"),
+            ("dialogue_key", "altoria_eatery"),
         ),
     ),
     PlaceDefinition(
@@ -139,6 +147,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("common_outfits",),
         authored_kwargs=(
             ("shop_key", "altoria_tailor"),
+            ("dialogue_key", "altoria_tailor"),
         ),
     ),
 )

@@ -10,6 +10,11 @@ establishments, which this settlement does not have.
 The tuple order is load-bearing: ``PLACE_REGISTRY`` appends this slice after
 the capital's, so the derived roster and shop registry keep the capital's
 rows first and the village's four homes after (sync iterates in this order).
+
+Every merchant row carries a ``dialogue_key`` beside its ``shop_key``: the
+merchant blueprint answers as well as trades (merchant-dialogue). The
+village tables in ``world/lore/dialogue/ciaran.py`` speak as villagers
+sharing what they make — never as shopkeepers.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -40,6 +45,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("elven_crafted_arms",),
         authored_kwargs=(
             ("shop_key", "ciaran_hailiel_home"),
+            ("dialogue_key", "ciaran_hailiel_home"),
         ),
     ),
     PlaceDefinition(
@@ -67,6 +73,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("elven_fare",),
         authored_kwargs=(
             ("shop_key", "ciaran_lareneth_home"),
+            ("dialogue_key", "ciaran_lareneth_home"),
         ),
     ),
     PlaceDefinition(
@@ -94,6 +101,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("elven_sundries",),
         authored_kwargs=(
             ("shop_key", "ciaran_valwyn_home"),
+            ("dialogue_key", "ciaran_valwyn_home"),
         ),
     ),
     PlaceDefinition(
@@ -121,6 +129,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=("elven_attire",),
         authored_kwargs=(
             ("shop_key", "ciaran_vethiel_home"),
+            ("dialogue_key", "ciaran_vethiel_home"),
         ),
     ),
 )
