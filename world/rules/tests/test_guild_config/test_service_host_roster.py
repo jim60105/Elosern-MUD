@@ -776,6 +776,56 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     expected,
                 )
 
+    #: The same three places pinned at the PLACE registry, where the map
+    #: contract lives: the derived ServiceHostRow carries no coordinate or
+    #: doorway field, so without this literal the lane could move to another
+    #: exterior (or the bathhouse off 浴場前) while every derived comparison
+    #: and every sync test stayed green (post-implementation review).
+    #: Shape: place key -> (kind, exterior_xy, doorway name, host name,
+    #: host race, host sex, assortment keys, authored kwargs).
+    HOSPITALITY_PLACE_ROWS = {
+        "altoria_tavern": (
+            "tavern", (4, 1), "醉月酒館",
+            "蘿溫·古橡", "human", "female", (),
+            {"dialogue_key": "altoria_tavern"},
+        ),
+        "altoria_lodging": (
+            "lodging", (4, 1), "爐火旅店",
+            "溫弗蕾德·古林", "human", "female", (),
+            {"dialogue_key": "altoria_lodging"},
+        ),
+        "altoria_bathhouse": (
+            "bathhouse", (5, 1), "公共浴場",
+            "伊莎貝爾·葦沼", "human", "female", (),
+            {"dialogue_key": "altoria_bathhouse"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-hospitality::the-capital-has-a-tavern-an-inn-and-a-bathhouse"
+    )
+    def test_the_hospitality_place_rows_pin_the_lane_and_bathhouse_front(self):
+        # The lane's two doors sit on 客棧巷 (4,1) — one street, two names —
+        # and the bathhouse on 浴場前 (5,1); the hosts are human women with
+        # nothing to sell. Coordinated drift here decouples the rows from the
+        # map's actual streets, which no derived comparison can see.
+        for key, expected in self.HOSPITALITY_PLACE_ROWS.items():
+            place = PLACE_REGISTRY[key]
+            with self.subTest(place=key):
+                self.assertEqual(
+                    (
+                        place.kind.value,
+                        place.exterior_xy,
+                        place.doorway_key_zh,
+                        place.host_name,
+                        place.host_race,
+                        place.host_sex,
+                        place.assortment_keys,
+                        dict(place.authored_kwargs),
+                    ),
+                    expected,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

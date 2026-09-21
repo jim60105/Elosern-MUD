@@ -107,6 +107,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             if row.profession.key == "attendant"
         }
         self.assertTrue(attendants)
+        # ...and the merchant branch it contrasts against is non-empty too,
+        # so neither predicate can pass by quantifying over nothing.
+        self.assertTrue(set(merchant_service_ids) - attendants)
         self.assertTrue(
             all(
                 event.kwargs["context"]["shop"]

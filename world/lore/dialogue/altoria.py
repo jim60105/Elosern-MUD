@@ -284,23 +284,29 @@ SANCTUM_RESPONSES: tuple[KeywordResponse, ...] = (
 # party) and sells nothing — the cups are scenery: no drink does anything,
 # no gamble pays out (docs/lore/settlement-locations.md line 285 keeps both
 # 〔提案〕). Her voice is a hostess's: warm, ears open, mouth shut.
+# Post-implementation review cut the promises this change does not ship:
+# the synchronised tavern holds only plain-NPC hosts (invite is reserved
+# for recruitable travellers met out in the world, never the people behind
+# this counter), and no authored row auto-delivers rumours or commissions —
+# information-gathering here is the player opening their mouth, `talk`.
 TAVERN_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "傳聞",
-        "「我這店裡最不缺的就是話。你要打聽什麼，坐下慢慢說——"
-        "在店裡誰都能 `talk`，聊得投緣，人家記得上你。傳聞這東西，"
-        "一杯水的功夫可能就自己走到你桌上。」"
+        "「我這店裡最不缺的就是話。你要打聽什麼，開口找人問——"
+        "店裡誰都能 `talk`，問得投緣，人家記得上你。傳聞這東西"
+        "我這裡不掛板也不賣，都在人嘴上，你得自己開口。」"
     ),
     KeywordResponse(
         "同伴",
-        "「想招人同行，先讓人認得你：看中哪位，`talk` 聊幾句，"
-        "聊得好了當場 `invite` 一句，願不願意人家自己答。"
-        "我這爐邊一半的夥計，當初就是這樣被隔壁桌叫起來的。」",
+        "「想招人同行，得先遇得上人：路上、店裡，看哪位是能同行的，"
+        "`talk` 聊幾句，聊得好了當場 `invite` 一句，願不願意人家自己答。"
+        "我這兒櫃檯後站的、灶前燒火的，都是安了家的，邀不走。」",
     ),
     KeywordResponse(
         "委託",
-        "「公會單子在公會的板上，我這兒不掛板。不過角落那些委託人"
-        "自己會挑人——你先 `talk` 說上話，他手頭有活自然找得到你。"
+        "「公會單子在公會的板上，我這兒不掛板，也不代人招工。"
+        "你要尋活路，去公會看板；要在外頭結識了能共事的，回我這裡"
+        "`talk` 說上話、`invite` 定下來，都行。"
         "酒館裡談事有個好處：出了這門，誰也不認得誰。」"
     ),
     KeywordResponse(
@@ -490,8 +496,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
             greeting=(
                 "醉月酒館的蘿溫·古橡從櫃檯後打量你一眼，把抹布往肩上一搭："
                 "「新面孔，坐。先把規矩聽懂：我這兒做的是話的生意——"
-                "誰都能 `talk`，聊得投緣的，當場 `invite` 一聲就能帶去同行。"
-                "傳聞不用你找，坐一會兒自己會走到你桌上。」"
+                "在店裡誰都能 `talk`；路上遇著投緣、能同行的，`invite` "
+                "一聲才算正式邀定。傳聞都在人嘴上，你要打聽就開口問，"
+                "坐著等，它是會挑人的。」"
             ),
             responses=TAVERN_RESPONSES,
         ),

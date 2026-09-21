@@ -40,12 +40,16 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
 from world.rules.dialogue import dialogue_key_for, greeting_for, table_response
+from world.rules import guild_config, guild_economy
+from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
+from world.maps.bootstrap import sync_service_interiors
 from world.skills.handler import INNATE_SKILL_ORDER
 
 from ._support import (
     ServiceContentIsolation,
     _live_registry,
+    _places,
     _place_by_kind,
     _settlements,
 )
@@ -260,23 +264,76 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         "altoria-hospitality::a-hospitality-location-adds-no-mechanism-it-does-not-have"
     )
     def test_the_rooms_bring_no_new_command_and_no_new_persisted_state(self):
-        # The commons gate's shape (test_ciaran_village_commerce): full
-        # command-set equality, and full persisted-attribute-vocabulary
-        # equality across a SECOND synchronization — the rooms add no
-        # command and no resync-only state either.
+        # The pre-change baseline is BUILT, not snapshotted from a world
+        # where the three rooms already exist (post-implementation review):
+        # the lane's artifacts come down — interiors and both doorway ends
+        # directly, the hosts through a roster patch so the real convergence
+        # deletes them — the three place rows are lifted out of the live
+        # registry, and only THEN are the command set and the persisted
+        # attribute vocabulary taken. The rooms then arrive through the real
+        # synchronisation, and neither the command set nor any persisted
+        # attribute KEY may have gained anything. A resync afterwards must
+        # stay idempotent (the commons gate's second-sync shape).
+        places = _hospitality_places()
+        saved_rows = {}
+        for place in places:
+            exterior = _exterior(place)
+            for doorway in list(exterior.exits):
+                if doorway.key == place.doorway_key_zh:
+                    doorway.delete()
+            interior = _interior(place)
+            for back_exit in list(interior.exits):
+                back_exit.delete()
+            interior.delete()
+            saved_rows[place.key] = _places()[place.key]
+            del _places()[place.key]
+        self.addCleanup(_places().update, saved_rows)
+        self._patch_roster(
+            tuple(
+                row
+                for row in get_catalog().service_hosts
+                if row.anchor_room not in saved_rows
+            )
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()  # convergence deletes the three hosts
+        self.assertEqual(
+            [(_host(place), list(search_object_by_tag(place.key))) for place in places],
+            [(None, [])] * 3,
+            "the patched sync left a hospitality artifact alive",
+        )
         commands_before = {command.key for command in CharacterCmdSet().commands}
         vocabulary = {
             (row.db_model, row.db_key, row.db_category)
             for row in Attribute.objects.only("db_model", "db_key", "db_category")
         }
+        # The rooms arrive: full registries back, real synchronisation.
+        _places().update(saved_rows)
+        saved_rows.clear()
+        for patcher in self._patchers:
+            patcher.stop()
+        self._patchers.clear()  # the base's addCleanup stops each once only
         with self.captureOnCommitCallbacks(execute=True):
+            sync_service_interiors()
             sync_service_content()
+        for place in places:
+            with self.subTest(arrival=place.kind):
+                self.assertIsNotNone(_host(place))
+                self.assertEqual(len(search_object_by_tag(place.key)), 1)
         self.assertEqual(
             {command.key for command in CharacterCmdSet().commands},
             commands_before,
         )
+        arrived_vocabulary = {
+            (row.db_model, row.db_key, row.db_category)
+            for row in Attribute.objects.only("db_model", "db_key", "db_category")
+        }
+        self.assertEqual(arrived_vocabulary, vocabulary)
+        # A further resync stays idempotent (no second-sync-only state).
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
         self.assertEqual(
-            vocabulary,
+            arrived_vocabulary,
             {
                 (row.db_model, row.db_key, row.db_category)
                 for row in Attribute.objects.only("db_model", "db_key", "db_category")
