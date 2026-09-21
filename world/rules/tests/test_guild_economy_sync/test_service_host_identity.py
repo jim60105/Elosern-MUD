@@ -259,6 +259,75 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         )
         return legacy
 
+    @covers_requirement(
+        "place-driven-service-sync::one-place-record-yields-a-complete-working-location"
+    )
+    def test_a_host_less_place_row_yields_a_room_and_no_npc(self):
+        # hostless-places task 3.3: a place authoring no host still yields its
+        # whole location — tagged, described interior with both doorways — and
+        # NO NPC, while the freshly reloaded roster carries no row for it. The
+        # row rides the production seams exactly like the complete-location
+        # probe above: it clones a live, resolvable capital row so its exterior
+        # exists on a spawned grid map, and the catalog is reloaded INSIDE the
+        # patch scope so the roster derivation itself is exercised.
+        from typeclasses.rooms import Room
+
+        hostless = dataclasses.replace(
+            _place_by_kind("general_store"),
+            key="t_forecourt",
+            room_name_zh="測試宮前庭",
+            room_desc_zh="A host-less landmark: a room that simply exists.",
+            exterior_xy=(4, 1),
+            doorway_key_zh="測試宮前庭入口",
+            doorway_aliases=("test forecourt",),
+            host_name=None,
+            host_title=None,
+            host_race=None,
+            host_subrace=None,
+            host_sex=None,
+            profession=None,
+            service_id=None,
+            assortment_keys=(),
+            authored_kwargs=(),
+        )
+        with patch.dict(_places(), {"t_forecourt": hostless}):
+            load_catalog_into_cache()
+            # The roster derivation skipped the row: no anchor, no service id.
+            self.assertNotIn("t_forecourt", {row.anchor_room for row in get_catalog().service_hosts})
+            sync_service_interiors()
+            sync_service_content()
+
+            interior = search_object_by_tag("t_forecourt")[0]
+            self.assertIsInstance(interior, Room)
+            self.assertEqual(interior.key, hostless.room_name_zh)
+            self.assertEqual(interior.db.desc, hostless.room_desc_zh)
+            zcoord = _settlements()[hostless.settlement_key].zcoord
+            exterior = GridRoom.objects.filter_xyz(
+                xyz=(*hostless.exterior_xy, zcoord)
+            ).first()
+            self.assertIsNotNone(exterior)
+            self.assertIn(
+                interior, {exit_obj.destination for exit_obj in exterior.exits}
+            )
+            self.assertIn(
+                exterior, {exit_obj.destination for exit_obj in interior.exits}
+            )
+            self.assertEqual(NPC.objects.all_family().filter(db_location=interior).count(), 0)
+
+            # A second run creates nothing new: same single tagged room, same
+            # exits, no NPC appears on either run.
+            room_count = Room.objects.all_family().count()
+            npc_count = NPC.objects.all_family().count()
+            interior_pks = [room.pk for room in search_object_by_tag("t_forecourt")]
+            sync_service_interiors()
+            sync_service_content()
+            self.assertEqual(Room.objects.all_family().count(), room_count)
+            self.assertEqual(NPC.objects.all_family().count(), npc_count)
+            self.assertEqual(
+                [room.pk for room in search_object_by_tag("t_forecourt")], interior_pks
+            )
+            self.assertEqual(NPC.objects.all_family().filter(db_location=interior).count(), 0)
+
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_sync_never_backfills_a_title_into_an_anchored_host(self):
         legacy = self._anchored_legacy_host("舊公會管理人")

@@ -244,6 +244,21 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
         assortment_keys=("t_mossgate_goods",),
         authored_kwargs=(("shop_key", "t_mossgate_stall"),),
     ),
+    # A host-less place (hostless-places): every host field keeps its default,
+    # so this row is the kit fixture for "a place that simply exists" — the
+    # validation-side probe downstream changes build on. Its exterior has no
+    # synthetic grid map (the t_ settlement is validation-only space), so a
+    # database-backed sync probe clones a live resolvable row instead.
+    "t_mossgate_plaza": PlaceDefinition(
+        key="t_mossgate_plaza",
+        settlement_key="t_mossgate",
+        kind=PlaceKind.HOME,
+        room_name_zh="合成苔徑村中廣場",
+        room_desc_zh="A synthetic gathering clearing: a place that exists with no host.",
+        exterior_xy=(2, 2),
+        doorway_key_zh="合成廣場入口",
+        doorway_aliases=("synthetic plaza",),
+    ),
 }
 
 SYNTH_SHOPS: dict[str, ShopDefinition] = {
