@@ -66,3 +66,23 @@
   offers, prices, stock and hours against it.
 - 🟢 Adopted: same-file duplicate row keys report `declared twice in commerce/<file>`
   rather than naming one file as if it were two.
+
+## Duck review dispositions (post-implementation critique of the finished diff)
+
+- 🔴 Adopted: a declared-but-empty slice (`assortments: []`, `shops: []`,
+  `price_scales: {}`) passed the empty-slice guard, which only caught the
+  comment-only/None document. The loader now counts each slice's actual
+  contributions and rejects one that carries no row or scale, naming the file —
+  with subTest cases for each of the three empty-section shapes. Commit 79b75a96.
+- 🟡 Adopted: the live `shop-economy` main spec still named the deleted
+  `commerce.yaml` normatively; retargeted to `rulebook/commerce/` slices. The
+  two active change plans that still instructed edits to the deleted monolith
+  (`altoria-adornments-and-remedies` 2.1, `ciaran-village-crafts` risk
+  paragraph) were retargeted to the settlement slice; the village plan's
+  single-file conflict premise is retired since the slices are disjoint files.
+- 🟡 Adopted: the sorted-discovery pin was vacuous (files written in lexical
+  order). The merge test now writes `z_later.yaml` before `a_earlier.yaml` and
+  asserts the sorted merged order, so dropping `sorted()` flips it.
+- 🟢 Noted, kept as-is: the shipped-layout pin's count/scale assertions overlap
+  the baseline comparison; the layout half is the sole guard on the physical
+  slice layout, so the test stays whole.
