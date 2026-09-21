@@ -1,19 +1,8 @@
-# Tunable commerce balance data (settlement-shops design §3.1).
+# 聖潔王都 commerce slice (commerce-rulebook-slices).
 # Assortment offer rules bind exact integer buy/sell copper, max/initial stock and
-# restock quantity to the immutable item sets in world/lore/settlements/assortments.py.
-# A shop's goods are the union of the assortments it references (plus per-place
-# additions, minus per-place removals), joined by the catalog loader in
-# world/rules/guild_config.py. The shops section carries opening/restock hours
-# and, optionally, a per-shop price_scale and absolute item overrides.
-
-# Settlement-wide price scale: an integer percentage where 100 is par. A shop
-# row may declare its own price_scale, which overrides its settlement's entry.
-# Scaling is integer half-up rounding, (base * scale + 50) // 100, applied once
-# per base value; overrides are absolute and never scaled (design §4).
-price_scales:
-  capital_altoria: 100
-  village_ciaran: 100
-
+# restock quantity to the immutable item sets in world/lore/settlements/assortments.py;
+# the shops section carries the capital's opening/restock hours. Joined by the
+# catalog loader in world/rules/guild_config.py with every other rulebook/commerce/*.yaml.
 assortments:
   - key: common_arms
     offers:
@@ -371,68 +360,6 @@ assortments:
         max_stock: 1
         initial_stock: 1
         restock_quantity: 1
-  - key: elven_crafted_arms
-    offers:
-      - item_key: shadow_blade
-        buy_copper: 100
-        sell_copper: 50
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: shadow_blade_echo
-        buy_copper: 100
-        sell_copper: 50
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-  - key: elven_attire
-    offers:
-      - item_key: dark_elf_kimono
-        buy_copper: 100
-        sell_copper: 50
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: dark_elf_ninja_garb
-        buy_copper: 100
-        sell_copper: 50
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: elven_traditional_robe
-        buy_copper: 120
-        sell_copper: 60
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: elven_forest_veil
-        buy_copper: 150
-        sell_copper: 75
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-  - key: elven_fare
-    offers:
-      - item_key: elven_candied_blossom
-        buy_copper: 20
-        sell_copper: 10
-        max_stock: 20
-        initial_stock: 10
-        restock_quantity: 5
-  - key: elven_sundries
-    offers:
-      - item_key: elven_spider_silk
-        buy_copper: 60
-        sell_copper: 30
-        max_stock: 20
-        initial_stock: 10
-        restock_quantity: 5
-      - item_key: crescent_earring
-        buy_copper: 120
-        sell_copper: 60
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
 
 # Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
 # units relative to the world-day boundary.
@@ -452,20 +379,4 @@ shops:
   - shop_key: altoria_tailor
     open_hour: 8
     close_hour: 20
-    restock_hour: 6
-  - shop_key: ciaran_hailiel_home
-    open_hour: 7
-    close_hour: 19
-    restock_hour: 6
-  - shop_key: ciaran_lareneth_home
-    open_hour: 7
-    close_hour: 19
-    restock_hour: 6
-  - shop_key: ciaran_valwyn_home
-    open_hour: 7
-    close_hour: 19
-    restock_hour: 6
-  - shop_key: ciaran_vethiel_home
-    open_hour: 7
-    close_hour: 19
     restock_hour: 6

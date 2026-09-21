@@ -585,12 +585,14 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         self.assertIn(EquipmentModifierKey.WOODEN_CLUB, rules)
         self.assertEqual(rules[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 3)
         from world.rules.guild_config import (
+            load_commerce_config,
             validate_assortment_configs,
             validate_price_scales,
             validate_shop_configs,
         )
-        commerce_path = Path(__file__).parents[1] / "rulebook" / "commerce.yaml"
-        raw_commerce = yaml.safe_load(commerce_path.read_text(encoding="utf-8"))
+        raw_commerce = load_commerce_config(
+            Path(__file__).parents[1] / "rulebook" / "commerce"
+        )
         assortment_offers = validate_assortment_configs(raw_commerce["assortments"])
         configs = validate_shop_configs(
             raw_commerce["shops"],

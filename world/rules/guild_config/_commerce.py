@@ -165,7 +165,7 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
 
 
 def validate_price_scales(raw: Any) -> dict[str, int]:
-    """Validate the ``price_scales:`` section of commerce.yaml (design §4).
+    """Validate the ``price_scales:`` section of the commerce rulebook (design §4).
 
     The section is keyed by settlement, and each value is an integer
     percentage in ``1..1000`` where ``100`` is par. A settlement may be

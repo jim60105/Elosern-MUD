@@ -104,7 +104,7 @@ class PlaceDefinition:
     authored_kwargs: tuple[tuple[str, str], ...] = ()
     # Per-place assortment adjustments (settlement-shops design §4). Additions
     # stock items outside the referenced assortments — each addition MUST
-    # carry a complete override in the shop row (commerce.yaml) because it has
+    # carry a complete override in the shop row (the commerce rulebook slice) because it has
     # no assortment base rule. Removals decline items the referenced
     # assortments contain. Both are shop-only concepts: a place without a
     # shop identity may declare neither.

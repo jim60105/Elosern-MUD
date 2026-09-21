@@ -119,7 +119,7 @@ class AssortmentRuleTests(unittest.TestCase):
         with self.assertRaises(GuildConfigError) as caught:
             validate_assortment_configs({"common_arms": {}})
         self.assertTrue(
-            str(caught.exception).startswith("commerce.yaml: "),
+            str(caught.exception).startswith("commerce rulebook: "),
             "assortment rejections must name their rulebook source",
         )
 

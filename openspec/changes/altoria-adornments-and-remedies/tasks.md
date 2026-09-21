@@ -9,7 +9,8 @@
 
 ## 2. The offers
 
-- [ ] 2.1 Move the seventeen offer rows in `commerce.yaml` into the two new assortment sections.
+- [ ] 2.1 Move the seventeen offer rows in `rulebook/commerce/altoria.yaml` (the capital slice;
+  the monolith was split by `commerce-rulebook-slices`) into the two new assortment sections.
   Copy every field unchanged — buy, sell, max stock, initial stock, restock.
 - [ ] 2.2 Before anything else in this section, write the test that compares each moved item's
   resolved offer before and after. Seventeen hand-moved rows is where a digit goes missing.

@@ -27,7 +27,7 @@ def validate_shop_configs(
     assortment_offers: Mapping[str, Mapping[str, ItemOfferRule]],
     price_scales: Mapping[str, int],
 ) -> dict[str, ShopConfig]:
-    """Resolve the ``shops:`` section of commerce.yaml against assortments.
+    """Resolve the merged ``shops:`` section of the commerce rulebook against assortments.
 
     A shop's offered goods are the union of its referenced assortments'
     validated offer rules, plus the owning place's additions minus its

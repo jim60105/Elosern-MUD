@@ -1,8 +1,10 @@
 """Catalog loader joining the guild-economy and commerce rulebooks to immutable lore identities (D-1/D-8).
 
 ``guild_economy.yaml`` carries merit thresholds, exam opponent profiles and
-quest rewards; ``commerce.yaml`` carries assortment offer rules and per-shop
-hours (settlement-shops design §3.1). The service-host roster is DERIVED from
+quest rewards; the ``rulebook/commerce/`` directory carries assortment offer
+rules and per-shop hours, merged from one slice per settlement plus a shared
+``scales.yaml`` (settlement-shops design §3.1, commerce-rulebook-slices). The
+service-host roster is DERIVED from
 the place registry (``world/lore/settlements/places.py``), so a service host
 is declared exactly once. This module validates every entry against the
 immutable registries and exposes frozen dataclasses, so deterministic APIs

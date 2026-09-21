@@ -18,7 +18,7 @@
 |---|---|---|
 | 身份＋外觀＋機制宣告 | `world/lore/items.py::ITEM_REGISTRY` | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
-| 商店成交值 | `world/rules/rulebook/commerce.yaml` | 各分類 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨；商店時段也在同一檔 |
+| 商店成交值 | `world/rules/rulebook/commerce/`（每個定居點一個分檔，另有 `scales.yaml`） | 各分類 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨；商店時段也在同一分檔 |
 | 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all-allies`／`all-enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
@@ -144,7 +144,7 @@ effects:
 "accessory": PriceEntry("accessory", "魔法飾品", 80, 800, "A minor magical accessory."),
 ```
 
-再把物品放進一個商品分類（assortment）：商店販售的商品是它引用的分類的聯集，分類的身份（`item_keys`）住在不可變 registry `world/lore/settlements/assortments.py::ASSORTMENT_REGISTRY`，成交數字住在 `world/rules/rulebook/commerce.yaml` 的分類 offer。兩邊缺了一邊，`world/rules/guild_config.py` 載入時就拋 `GuildConfigError`：
+再把物品放進一個商品分類（assortment）：商店販售的商品是它引用的分類的聯集，分類的身份（`item_keys`）住在不可變 registry `world/lore/settlements/assortments.py::ASSORTMENT_REGISTRY`，成交數字住在 `world/rules/rulebook/commerce/` 對應定居點分檔的分類 offer。兩邊缺了一邊，`world/rules/guild_config.py` 載入時就拋 `GuildConfigError`：
 
 ```python
 AssortmentDefinition(
@@ -154,7 +154,7 @@ AssortmentDefinition(
 ),
 ```
 
-再把物品加進商店引用的分類，並在 `commerce.yaml` 該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品）。載入器的驗證是不對稱的，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
+再把物品加進商店引用的分類，並在該定居點的 commerce 分檔（`world/rules/rulebook/commerce/<settlement>.yaml`）中該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品；同一個 key 宣告在兩個分檔會直接失敗載入並指名兩檔）。載入器的驗證是不對稱的，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
 
 ```yaml
 assortments:
@@ -219,7 +219,7 @@ uv run --locked python -m tools.spec_traceability check
 | 新裝備只加 registry 沒加 `equipment_effects.yaml` 條目（或反之） | `EquipmentEffectsRulebookError`，啟動即爆；`modifier_key` 三處對齊見 Step 2b |
 | 百分比欄寫成裸數字或平值欄寫成字串 | 數值種類由欄位決定，`agility` 以外不容許另一種形態；`bool` 也不算整數 |
 | 分類 `buy_copper` 超出價格帶 | `guild_config` 載入失敗，啟動即爆；注意 `sell_copper` 不受價格帶約束 |
-| 只改 `commerce.yaml` 沒把物品加進分類的 `item_keys`（或反之） | 兩邊不一致，載入時 `GuildConfigError`，指名分類與物品 |
+| 只改 commerce 分檔沒把物品加進分類的 `item_keys`（或反之） | 兩邊不一致，載入時 `GuildConfigError`，指名分類與物品 |
 | 把信物（`relic` 帶）物品放進分類 | 載入時直接拒絕——信物永不交易，指名分類與物品 |
 | 商店行誤留舊的 `offers` 欄位 | `shops` 區段只接受 `shop_key` 與三個時段欄位，多餘欄位直接拒絕 |
 | 摘要塞了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |

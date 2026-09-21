@@ -5,7 +5,7 @@
 # service-host roster is DERIVED from the place registry
 # (world/lore/settlements/places.py) — a host is declared exactly once, never
 # here. Commerce balance (assortment offers and shop hours) lives in the
-# sibling rulebook commerce.yaml (settlement-shops design §3.1).
+# sibling rulebook directory commerce/ (settlement-shops design §3.1).
 #
 # Cumulative true `guild_merit` required to be eligible for each rank's exam.
 merit_thresholds:

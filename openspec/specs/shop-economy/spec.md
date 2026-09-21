@@ -16,7 +16,7 @@ the shop references; its offered item keys SHALL be derived from those assortmen
 the shop. A shop SHALL NOT carry a component-type field: every shop host bears the same component type,
 so such a field is constant across the registry and cannot identify a row.
 Exact integer buy/sell copper, max/initial stock, restock quantity, and opening/restock hours SHALL come
-from `commerce.yaml`. Loading SHALL join both sources and reject
+from the `world/rules/rulebook/commerce/` slices (one file per settlement plus `scales.yaml`). Loading SHALL join both sources and reject
 unknown, missing, or extra references, floats, negative prices, sell above buy, buy outside the referenced
 `PRICE_TABLE` range, and stock outside `0 <= initial <= max` with positive restock quantity. The
 per-shop accounting that every shop has numeric rules SHALL be keyed on shop identity.

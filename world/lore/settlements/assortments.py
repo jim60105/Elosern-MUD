@@ -3,7 +3,7 @@
 An assortment is a named, reusable bundle of goods: stable key,
 Traditional Chinese display name, and an immutable tuple of item keys as
 its identity. Exact integer buy/sell copper, stock and restock quantities
-for each item live in ``world/rules/rulebook/commerce.yaml`` and are joined
+for each item live in the ``world/rules/rulebook/commerce/`` slices and are joined
 to these identities by the catalog loader in ``world/rules/guild_config.py``.
 """
 

@@ -1,0 +1,8 @@
+# Cross-settlement price scales (commerce-rulebook-slices; settlement-shops design §4).
+# An integer percentage where 100 is par. A shop row may declare its own
+# price_scale, which overrides its settlement's entry here. Scaling is integer
+# half-up rounding, (base * scale + 50) // 100, applied once per base value;
+# overrides are absolute and never scaled.
+price_scales:
+  capital_altoria: 100
+  village_ciaran: 100

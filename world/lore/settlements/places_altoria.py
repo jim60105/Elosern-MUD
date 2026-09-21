@@ -6,7 +6,7 @@ The guild hall and general store are transcribed from the constants in
 service-host roster reproduce the pre-change shipped identities exactly. The
 three specialist shops (聖潔王都鍛造鋪 / 聖潔王都餐館 / 聖潔王都裁縫坊) are
 authored content: their interiors, hosts and assortments exist only here and
-in ``world/rules/rulebook/commerce.yaml``.
+in ``world/rules/rulebook/commerce/altoria.yaml``.
 
 The tuple order is load-bearing: ``PLACE_REGISTRY`` preserves it, and the
 derived roster must keep the pre-change [altoria_guild_master,
