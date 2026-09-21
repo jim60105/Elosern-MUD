@@ -364,26 +364,33 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
         # interrupted run never leaves the shard without the crown's rooms.
         places = _crown_watch_places()
         saved_rows = {}
+        # Rows leave the registry FIRST (addCleanup backstops it even if a
+        # later step throws), and the teardown sits INSIDE the try: an
+        # exception mid-teardown — after one room is gone and before the
+        # next was saved — still rebuilds through the finally, so the
+        # shared keepdb shard never keeps a half-torn-down world
+        # (post-implementation review).
         for place in places:
-            exterior = _exterior(place)
-            for doorway in list(exterior.exits):
-                if doorway.key == place.doorway_key_zh:
-                    doorway.delete()
-            interior = _interior(place)
-            for back_exit in list(interior.exits):
-                back_exit.delete()
-            interior.delete()
             saved_rows[place.key] = _places()[place.key]
             del _places()[place.key]
         self.addCleanup(_places().update, saved_rows)
-        self._patch_roster(
-            tuple(
-                row
-                for row in get_catalog().service_hosts
-                if row.anchor_room not in saved_rows
-            )
-        )
         try:
+            for place in places:
+                exterior = _exterior(place)
+                for doorway in list(exterior.exits):
+                    if doorway.key == place.doorway_key_zh:
+                        doorway.delete()
+                interior = _interior(place)
+                for back_exit in list(interior.exits):
+                    back_exit.delete()
+                interior.delete()
+            self._patch_roster(
+                tuple(
+                    row
+                    for row in get_catalog().service_hosts
+                    if row.anchor_room not in saved_rows
+                )
+            )
             with self.captureOnCommitCallbacks(execute=True):
                 sync_service_content()  # convergence deletes the hosts
             for place in places:
@@ -496,6 +503,11 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                 text = _table_text(place)
                 for verb in ("`buy`", "`sell`", "`shop stock`"):
                     self.assertNotIn(verb, text, place.kind)
+                # The prose-level no-trade rule (post-implementation review:
+                # the backticked-verb check cannot see a Chinese 賣 claim):
+                # attendants sell nothing and send nobody to a seller that
+                # does not exist — the shipped tavern's cups are scenery.
+                self.assertNotIn("賣", text, place.kind)
                 for token in _backticked_tokens(text):
                     self.assertIn(
                         token, surface, f"{place.kind} names a command that is not"
@@ -507,6 +519,12 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
         )
         for verb in ("`rest`", "`practice`", "`guild exam`"):
             self.assertIn(verb, instructor_text, "the yard's table lost a verb")
+        # ...and pins the honesty of its combat line: `engage` fights a
+        # hostile monster wherever one stands (commands/combat.py), the yard
+        # has no opponent — the table must say so, not advertise sparring
+        # the room cannot provide (post-implementation review caught the
+        # shipped draft doing exactly that).
+        self.assertIn("沒有陪練", instructor_text, "the yard advertises sparring again")
 
 
 if __name__ == "__main__":

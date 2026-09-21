@@ -418,7 +418,7 @@ GUARDHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "過夜",
         "「天黑前要床？出駐所沿南大道往北，客棧巷底有爐火旅店，"
-        "巷裡也有賣酒的坐處。`rest` `sleep` 不挑地方，"
+        "巷裡也有酒館可坐，坐得下趕路人。`rest` `sleep` 不挑地方，"
         "我這兒後頭那間小值房也躺得人，不過沒門閂，睡得睡不睡得看你。」"
     ),
 )
@@ -462,7 +462,10 @@ NOBLE_WATCH_RESPONSES: tuple[KeywordResponse, ...] = (
 # that `guild exam` is what grades it. The commands work wherever the player
 # stands — he says so himself; the yard is where the city comes to do them
 # where the standard is visible. He promises no drill bonus the change does
-# not ship.
+# not ship, and no sparring service either: `engage` fights a hostile monster
+# wherever one stands (post-implementation review caught the shipped draft
+# advertising a sparring partner the room does not have), so his table names
+# the commands honestly and calls the yard dirt, not an opponent.
 DRILL_YARD_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "修煉",
@@ -474,15 +477,16 @@ DRILL_YARD_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "考核",
         "「問升階？公會的 `guild exam` 考的是你身上那些練習換來的東西，"
-        "考場掛在哪條街都行，報名去公會大廳。想先在場裡過幾手，"
-        "`engage` 陪練的規矩問公會的人——我不代考，也不保過。」"
+        "考場掛在哪條街都行，報名去公會大廳。我這裡不代考，"
+        "也不保過——先練夠時數再報名，比較不丟人。」"
     ),
     KeywordResponse(
         "切磋",
-        "「場裡切磋是常事：`engage` 開手，打不過就 `combat forfeit` 認輸，"
-        "`combat actions` 看當下使得出什麼。這些指令哪裡都使得，"
-        "在這片土上打，摔的是軟土，不是街石——這是場子唯一的好处，"
-        "別的我沒有。」"
+        "「打打殺殺不歸這場：`engage` 開的是真生死，對的是街面上"
+        "真出沒的魔物，我這場裡沒有陪練的，也不替你拉人。"
+        "`combat forfeit` 認輸、`combat actions` 看手頭使得出什麼，"
+        "這些指令哪裡都使得。這片土的好處只有一樣——摔的是軟土，"
+        "不是街石。」"
     ),
     KeywordResponse(
         "教頭",
