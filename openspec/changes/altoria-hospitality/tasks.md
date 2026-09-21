@@ -13,28 +13,28 @@
 
 ## 2. The three dialogue tables
 
-- [ ] 2.1 Author each in `world/lore/dialogue/altoria.py`, landed in the same commit as its place
+- [x] 2.1 Author each in `world/lore/dialogue/altoria.py`, landed in the same commit as its place
   row — an authored `dialogue_key` with no table fails catalog load.
-- [ ] 2.2 The innkeeper's lines name `rest`, `sleep` and `practice`; the tavern keeper's name
+- [x] 2.2 The innkeeper's lines name `rest`, `sleep` and `practice`; the tavern keeper's name
   `talk` and `invite`; the bathhouse keeper's explain the separated sides. Follow the guild
   staff table's shape: a greeting that orients, then keyword responses.
-- [ ] 2.3 Do not promise anything unimplemented. The innkeeper must not quote a nightly rate,
+- [x] 2.3 Do not promise anything unimplemented. The innkeeper must not quote a nightly rate,
   the tavern keeper must not offer a drink that does something.
 
 ## 3. Coverage
 
-- [ ] 3.1 All three interiors exist once, are reachable both ways, and each holds one
+- [x] 3.1 All three interiors exist once, are reachable both ways, and each holds one
   dialogue-carrying host.
-- [ ] 3.2 The two lane places produce two distinct doorways on the shared exterior.
-- [ ] 3.3 Resting and practising inside the inn and outside it give identical outcomes and
+- [x] 3.2 The two lane places produce two distinct doorways on the shared exterior.
+- [x] 3.3 Resting and practising inside the inn and outside it give identical outcomes and
   identical clock cost, and no charge is taken.
-- [ ] 3.4 Compare the command set and the persisted attribute set before and after this change
+- [x] 3.4 Compare the command set and the persisted attribute set before and after this change
   and assert both are unchanged. This is the anti-scope-creep gate.
-- [ ] 3.5 Talking to the innkeeper and the tavern keeper surfaces their commands.
+- [x] 3.5 Talking to the innkeeper and the tavern keeper surfaces their commands.
 
 ## 4. The lore document
 
-- [ ] 4.1 Line 287: 「布蘭卡·醉月」 → 蘿溫·古橡. Line 310: 「蘿莎琳·爐火」 → 溫弗蕾德·古林.
+- [x] 4.1 Line 287: 「布蘭卡·醉月」 → 蘿溫·古橡. Line 310: 「蘿莎琳·爐火」 → 溫弗蕾德·古林.
   Line 354: 「彭妮·皂花」 → 伊莎貝爾·葦沼.
-- [ ] 4.2 Run the lore, guild-economy-sync and scripted-dialogue suites plus
+- [x] 4.2 Run the lore, guild-economy-sync and scripted-dialogue suites plus
   `uv run --locked python -m tools.spec_traceability check`.

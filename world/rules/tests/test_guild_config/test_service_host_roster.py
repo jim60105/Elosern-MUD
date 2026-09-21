@@ -720,6 +720,62 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             with self.subTest(field=field):
                 self.assertIsNone(getattr(shelter, field), field)
 
+    #: The three altoria-hospitality rows as LITERALS — the historical
+    #: neutrality baseline excludes them too, so the lane's identities need
+    #: their own independent data contract: a coordinated drift between a
+    #: place row and the sync projection would pass every derived comparison.
+    #: These are the capital's first attendants with nothing to sell: each
+    #: row's whole authored payload is its dialogue key.
+    HOSPITALITY_ROWS = {
+        "altoria_tavern_keeper": (
+            "蘿溫·古橡",
+            "聖潔王都酒館老闆",
+            "attendant",
+            "altoria_tavern",
+            "altoria_tavern_keeper",
+            {"dialogue_key": "altoria_tavern"},
+        ),
+        "altoria_innkeeper": (
+            "溫弗蕾德·古林",
+            "聖潔王都旅店老闆娘",
+            "attendant",
+            "altoria_lodging",
+            "altoria_innkeeper",
+            {"dialogue_key": "altoria_lodging"},
+        ),
+        "altoria_bathhouse_keeper": (
+            "伊莎貝爾·葦沼",
+            "聖潔王都公共浴場管理員",
+            "attendant",
+            "altoria_bathhouse",
+            "altoria_bathhouse_keeper",
+            {"dialogue_key": "altoria_bathhouse"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-hospitality::the-capital-has-a-tavern-an-inn-and-a-bathhouse"
+    )
+    def test_the_three_hospitality_rows_are_their_own_literal_data_contract(self):
+        # Name, title, profession, anchor, service_id and authored kwargs are
+        # pinned as literals against the derived roster (the CIARAN_COMMONS_ROWS
+        # pattern), independent of the sync projection.
+        rows = validate_service_hosts()
+        for service_id, expected in self.HOSPITALITY_ROWS.items():
+            row = next(r for r in rows if r.service_id == service_id)
+            with self.subTest(service_id=service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    expected,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
