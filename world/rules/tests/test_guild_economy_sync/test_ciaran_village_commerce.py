@@ -537,7 +537,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 )
 
     @covers_requirement(
-        "ciaran-village-commons::the-villages-shared-spaces-carry-no-institution-and-no-counter"
+        "ciaran-village-commons::the-village-s-shared-spaces-carry-no-institution-and-no-counter"
     )
     def test_the_shared_spaces_carry_no_trade_no_authority_and_no_new_surface(self):
         catalog = get_catalog()
