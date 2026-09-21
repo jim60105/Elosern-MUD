@@ -308,19 +308,30 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         sanctum = _sanctum_place()
         shop_key = _authored(sanctum)["shop_key"]
-        holy_water = "baptismal_" + "holy_water"
         catalog = get_catalog()
-        # Of every capital shop, exactly one still offers it: the sanctum's.
         capital_key = sanctum.settlement_key
-        offering = [
-            config.shop_key
-            for place in _places().values()
-            if place.settlement_key == capital_key
-            and "shop_key" in _authored(place)
-            for config in [catalog.shop_configs[_authored(place)["shop_key"]]]
-            if any(row.item_key == holy_water for row in config.offers)
-        ]
-        self.assertEqual(offering, [shop_key])
+        # No item key is named literally: the exclusive goods ARE, by
+        # definition, the sanctum offers that no other capital shop offers.
+        def _capital_offering(item_key):
+            return [
+                config.shop_key
+                for place in _places().values()
+                if place.settlement_key == capital_key
+                and "shop_key" in _authored(place)
+                for config in [catalog.shop_configs[_authored(place)["shop_key"]]]
+                if any(row.item_key == item_key for row in config.offers)
+            ]
+
+        exclusive = sorted(
+            row.item_key
+            for row in catalog.shop_configs[shop_key].offers
+            if _capital_offering(row.item_key) == [shop_key]
+        )
+        self.assertTrue(
+            exclusive,
+            "the sanctum lost its sanctum-only capital good",
+        )
+        holy_water = exclusive[0]
         # And buying it there settles through the ordinary path: a fresh
         # visitor with no history pays the offer's authored price out of
         # the ordinary wallet into the ordinary stock.

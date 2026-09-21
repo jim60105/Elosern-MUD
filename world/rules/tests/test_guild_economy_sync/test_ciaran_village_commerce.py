@@ -27,6 +27,7 @@ from world.rules.economy import TradeReason
 from world.rules.economy import buy
 from world.rules.economy import parse_merchant_stock
 from world.rules.guild_economy import sync_service_content
+from world.lore.items.vocab import EquipmentModifierKey
 from ._support import (
     ServiceContentIsolation,
     _items,
@@ -34,6 +35,8 @@ from ._support import (
     _places,
     _settlements,
     _village_places,
+    _village_trading_place,
+    _village_trading_places,
     _village_subrace_key,
 )
 
@@ -369,7 +372,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
             offer
             for config in self._village_shops().values()
             for offer in config.offers
-            if offer.item_key == "crescent_earring"
+            if offer.item_key == EquipmentModifierKey.CRESCENT_EARRING.value
         ]
         self.assertEqual(len(village_offers), 1, "village shops disagree on the earring")
         offer = village_offers[0]
@@ -512,14 +515,14 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                     host.components.get(ScriptedDialogue.get_component_slot())
                 )
         # 練刀場 carries one doorway per dwelling and each leads back to it.
-        # The training ground is the clearing the blade-smith's home already
-        # resolves to; the instructor shares it. Resolve it from the merchant
-        # row explicitly, then pin the TWO dwelling doorways: their exact
-        # destinations and the reciprocal link from each interior.
+        # The training ground is the clearing the trading home already
+        # resolves to; the instructor shares it. Resolve it from the trading
+        # rows (shop_key-carrying village places), then pin the TWO dwelling
+        # doorways: their exact destinations and the reciprocal link from
+        # each interior.
         blade_smith = next(
-            q for q in _village_places()
-            if q.profession == "merchant"
-            and any(p.exterior_xy == q.exterior_xy for p in attendants)
+            q for q in _village_trading_places()
+            if any(p.exterior_xy == q.exterior_xy for p in attendants)
         )
         instructor = next(
             p for p in attendants if p.exterior_xy == blade_smith.exterior_xy
@@ -588,7 +591,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
             for attribute in next(
                 obj
                 for obj in self._interior(
-                    next(p for p in _village_places() if p.profession == "merchant")
+                    _village_trading_place()
                 ).contents
                 if isinstance(obj, NPC)
             ).attributes.all()
@@ -634,7 +637,7 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
         trader_interior_keys = {
             attribute.key
             for attribute in self._interior(
-                next(p for p in _village_places() if p.profession == "merchant")
+                _village_trading_place()
             ).attributes.all()
         }
         self.assertLessEqual(

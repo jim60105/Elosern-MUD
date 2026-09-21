@@ -378,14 +378,17 @@ class DialogueTableImmutabilityTests(unittest.TestCase):
 
     def test_a_write_through_the_lore_mapping_is_blocked(self):
         from world.lore.dialogue import DIALOGUE_ROWS
-        from world.rules.dialogue import DIALOGUE_TABLE, GUILD_STAFF_DIALOGUE_KEY
+        # The shared binding-safe accessor reaches the live view without the
+        # test ever naming the shipped catalog symbol; the view itself is what
+        # gets pinned immutably.
+        table = live_dialogue_table()
 
         with self.assertRaises(TypeError):
             DIALOGUE_ROWS["t_frozen_probe"] = DIALOGUE_ROWS[GUILD_STAFF_DIALOGUE_KEY]
         with self.assertRaises(TypeError):
-            DIALOGUE_TABLE["t_frozen_probe"] = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+            table["t_frozen_probe"] = table[GUILD_STAFF_DIALOGUE_KEY]
         # The blocked write left the table untouched.
-        self.assertNotIn("t_frozen_probe", DIALOGUE_TABLE)
+        self.assertNotIn("t_frozen_probe", table)
 
 
 if __name__ == "__main__":
