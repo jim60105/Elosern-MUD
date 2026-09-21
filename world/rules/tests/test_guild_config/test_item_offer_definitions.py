@@ -66,6 +66,10 @@ class ItemDefinitionTests(unittest.TestCase):
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
                 "altoria_jeweller", "altoria_alchemist",
+                # altoria-sanctum landed the 聖所's counter but left this pin
+                # behind (its own suites' pins were widened; this one was
+                # missed — found by altoria-learning-and-exchange's run).
+                "altoria_sanctum_shop",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
                 "ciaran_gwenaera_home", "ciaran_nireth_home",

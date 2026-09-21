@@ -496,12 +496,99 @@ DRILL_YARD_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
+# 奧德溫·薩契 — the 王立魔法學院院長. The capital's one lore-reveal table
+# (docs/lore/settlement-locations.md line 453 names the academy as the
+# natural reveal scene for the 「魔法等級」 and 「元素」 codex categories,
+# triggered by `talk`): he answers the rank ladder and the element roster as
+# subject matter rather than as orientation, because the academy has no
+# command to teach — 「拜師習得新技能」 stays 〔提案〕 at line 454, and his
+# 拜師 keyword is the change's first refusal spoken in his own voice: no
+# skill is granted by mentorship, proficiency accumulates on the lineage
+# tree, and the title is narrative framing.
+ACADEMY_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "魔法等級",
+        "「魔法的等級梯子有五級：初級、中級、高級、超級、究極，量的是造詣的"
+        "深淺。初級使得出火球、水箭、風刃、治癒術、身體強化；中級添了火焰風暴、冰牆、"
+        "飛行術；高級有熔岩術、暴風雪、高級治癒、統御術；超級是龍炎術、"
+        "地震術、神聖光輝這一路，人類踏得到的寥寥無幾；究極則近乎傳說。"
+        "知識圖鑑『魔法等級』一類寫的就是這條梯子，喊 `lore` 就翻得著你已識的。"
+        "至於學徒、術師那些位階稱號——那是法術身價的資料標籤，不是你的等級，"
+        "學院兩樣都教，從不混著教。」",
+    ),
+    KeywordResponse(
+        "元素",
+        "「元素共八個，入門課第一堂就報這八個名字：火，攻勢最強；水，治癒與守；"
+        "風，速與範圍；土，防守與控場；雷，高速打擊；冰，控制兼攻伐；"
+        "光，治癒與淨化；暗，詛咒與削弱。知識圖鑑『元素』一類寫的就是這八個，"
+        "你已識得的，喊 `lore` 就翻得著。課室裡背得再熟，"
+        "也換不了你自己手上練過的那幾層。」",
+    ),
+    KeywordResponse(
+        "親和",
+        "「親和管的是天生那頭：同一名法術，親和的屬性練來快些，無親和的慢些，"
+        "倍率不過一點一與零點九之別。精靈天賦廣，樣樣都快；轉生者天賦深，"
+        "只快在指名的那一條路上。稟賦是學院教不出來的東西——"
+        "學院能教的，是讓你認清自己該走哪條路。」",
+    ),
+    KeywordResponse(
+        "拜師",
+        "「拜師？我這裡沒有『拜師』這道門。技能不從師門領，從系譜樹上練："
+        "`rest` 掛一句 `practice` 加技能名，整小時結算熟練度；要考級，"
+        "往公會 `guild exam` 報名。師徒名分，學院願意給你，"
+        "但那是一段名分，不是捷徑。真開了『拜師即得技能』的門，"
+        "這院子百年的練法才算白教。」",
+    ),
+)
+
+# 尤斯汀·柯德溫 — the 商會會長. The document's 商會與貿易行 is the designated
+# future source of escort commissions, and `guild request` already tells every
+# registered adventurer that escort work is closed. He is the refusal made
+# flesh: a guild master with a whole wall of route charts and not one posting
+# on it. He speaks of caravans, roads and tariffs as substance — the trade of
+# 東市 really is coordinated from his desk — and when asked for work he sends
+# the enquirer honestly to the guild board, naming that the hall posts nothing
+# because the work its name anticipates has no quest type behind it yet.
+MERCHANT_HALL_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "商隊",
+        "「本季出城的隊子都擱我牆上那張程表裡：東市上船的玻璃、糧食、布疋，"
+        "走哪條官道、幾時回門，寫得清楚。你要搭商隊的行腳捎貨，"
+        "認的是車頭本人，我這裡只登帳、不攬事——公所替行會間調利益，"
+        "不替過路人保貨。」",
+    ),
+    KeywordResponse(
+        "商路",
+        "「東門出去是官道南段，東市本就是老城牆邊長起來的貨棧街。"
+        "往來的大宗就那幾樣：糧、玻璃器、布疋、礦材；工匠巷打的鐵器"
+        "走市場街出城，鍊金坊的藥走東市上船。你要問哪條路通哪裡，"
+        "喊 `前往` 加街名，路自會領你過去；"
+        "我這牆上掛的是誰家幾時走哪條。」",
+    ),
+    KeywordResponse(
+        "委託",
+        "「接活？我公所牆上無單、門邊無榜，護衛商隊那一類事如今根本無處接——"
+        "不是端著架子不給你，是那樣的活路目前還立不起來，"
+        "你問 `guild request` 也問得一樣：公會明講護衛未開。"
+        "要尋事做，往公會大廳的板子上找；這裡只有帳，沒有活。」",
+    ),
+    KeywordResponse(
+        "會務",
+        "「公所的會務就三樣：行會間的利益調停、關稅章程的評議、"
+        "季底各家欠帳的清算。你要入行會，帶引薦人上門當面談；"
+        "要問稅則，窗下那張桌自己看，抄一份不攔。"
+        "其餘的——我這裡管的是人跟人簽字的事，別的管不著。」",
+    ),
+)
+
 # One entry per capital place that authors a dialogue_key, keyed exactly as
 # the place row authors it: the merchants, the 光明神殿's 主祭, and the three
 # hospitality attendants (altoria-hospitality) — attendant places are keyed
 # the same way (the keys travel in the rows; the slice assembles into
 # DIALOGUE_ROWS unchanged). altoria-crown-and-watch appends the watch's and
-# the yard's three attendants after them.
+# the yard's three attendants; altoria-learning-and-exchange appends the
+# academy's and the merchant hall's two after them. The 市集棚 has no entry:
+# the host-less place authors no dialogue_key, so it has nothing to key.
 ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
     (
         "altoria_general_store",
@@ -670,6 +757,30 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "只有這片土、那排柱子，還有跟你說清楚怎麼練的幾句話。」"
             ),
             responses=DRILL_YARD_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_academy",
+        DialogueDefinition(
+            greeting=(
+                "王立魔法學院的奧德溫·薩契院長從示範坪那頭踱回來，袍袖還沾著"
+                "粉筆灰：「來聽課的？課此刻沒有，問答隨時。我這學院不傳秘技、"
+                "不授捷徑——你問位階、問元素、問親和，我答得傾囊；"
+                "問近路，那我勸你往校場走。」"
+            ),
+            responses=ACADEMY_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_merchant_hall",
+        DialogueDefinition(
+            greeting=(
+                "商會公所的尤斯汀·柯德溫會長從關稅桌後抬起眼，把你當貨單估了一遍："
+                "「東市往來的都歸這屋調度。問商隊、問商路、問規矩，我答；"
+                "有一樣你開口也是白問，我先替你省了——我牆上沒有單，"
+                "公所不發委託。」"
+            ),
+            responses=MERCHANT_HALL_RESPONSES,
         ),
     ),
 )
