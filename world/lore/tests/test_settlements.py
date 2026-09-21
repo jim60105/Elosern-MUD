@@ -12,6 +12,7 @@ from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.settlements.places import (
     PLACE_REGISTRY,
     validate_place_registry,
+    PlaceKind,
 )
 from world.lore.settlements.settlements import (
     SETTLEMENT_REGISTRY,
@@ -68,6 +69,87 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_shipped_place_registry_passes_validation(self):
         validate_place_registry(PLACE_REGISTRY)
+
+    # ---- the kind vocabulary (place-kind-vocabulary) -----------------------
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_kind_vocabulary_is_closed_and_covers_the_world_document(self):
+        # The vocabulary is closed: pin the exact member set so an
+        # approximate reuse is visible as a missing name, not a shrug. The
+        # fourteen settlement-build members must be present with their
+        # snake_case wire values — sync mirrors the value, and a member
+        # authored without an explicit value would silently write the
+        # uppercase name to the database.
+        self.assertEqual(
+            {kind.value for kind in PlaceKind},
+            {
+                # shipped before the settlement build
+                "guild_hall", "general_store", "weaponsmith", "outfitter",
+                "eatery", "home",
+                # the settlement build's location types
+                "jeweller", "alchemist", "temple", "sanctum_shop", "tavern",
+                "lodging", "bathhouse", "palace", "watch_post",
+                "training_ground", "academy", "merchant_hall", "market",
+                "commons",
+            },
+        )
+        for kind in PlaceKind:
+            self.assertEqual(kind.value, kind.name.lower())
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_every_shipped_kind_describes_its_location(self):
+        # Each shipped row's kind names what its room is in the world
+        # document, not what mechanism its host carries. The four elven
+        # homes trade and are still homes — the worked example for the
+        # kind rule; reclassifying one to its host's capability fails here.
+        expected = {
+            "altoria_guild_hall": "guild_hall",
+            "altoria_general_store": "general_store",
+            "altoria_forge": "weaponsmith",
+            "altoria_eatery": "eatery",
+            "altoria_tailor": "outfitter",
+            "ciaran_hailiel_home": "home",
+            "ciaran_lareneth_home": "home",
+            "ciaran_valwyn_home": "home",
+            "ciaran_vethiel_home": "home",
+        }
+        self.assertEqual(set(PLACE_REGISTRY), set(expected))
+        for key, kind in expected.items():
+            with self.subTest(place=key):
+                self.assertEqual(PLACE_REGISTRY[key].kind.value, kind)
+        # The homes really do trade — otherwise the pin above proves nothing.
+        for key in ("ciaran_hailiel_home", "ciaran_lareneth_home",
+                    "ciaran_valwyn_home", "ciaran_vethiel_home"):
+            place = PLACE_REGISTRY[key]
+            self.assertEqual(place.profession, "merchant")
+            self.assertTrue(place.assortment_keys)
+            self.assertIn("shop_key", dict(place.authored_kwargs))
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_dwelling_that_trades_is_authored_a_home(self):
+        # Regression guard for the kind rule, not a behaviour test: today no
+        # validation reads kind at all, so this row loads because the rule
+        # permits it. It earns its place because the day anyone adds a
+        # capability-based kind check (a HOME that may not carry a shop_key,
+        # say), this authored record — a dwelling whose occupant trades —
+        # must stay a legal record, and this test fails first.
+        dwelling = self._plant(
+            self.store,
+            kind=PlaceKind.HOME,
+            room_name_zh="合成 dwelling",
+        )
+        try:
+            validate_place_registry({"t_offense_place": dwelling})
+        except ValueError as error:  # pragma: no cover - failure path asserts below
+            self.fail(f"home kind rejected for a trading dwelling: {error}")
+        # The kind names the home, never the host's merchant capability.
+        self.assertEqual(dwelling.kind, PlaceKind.HOME)
 
     @covers_requirement(
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
