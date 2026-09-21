@@ -40,7 +40,7 @@ from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
 )
-from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
+from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY, greeting_for
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_PRESETS
@@ -239,7 +239,12 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(len(client.calls), 0)
         texts = _msg_texts(msg)
         self.assertEqual(len(texts), 1)
-        self.assertIn("歡迎來到冒險者公會", texts[0])
+        # The degraded line IS the host's authored greeting: pin it against
+        # the live dialogue table through the shipped accessor instead of a
+        # prose literal that drifts whenever the table is rewritten.
+        greeting = greeting_for(self.npc)
+        self.assertIsNotNone(greeting, "the host lost its authored greeting")
+        self.assertIn(greeting, texts[0])
         self.assertEqual(_inventory(self.player), [])
 
     @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
