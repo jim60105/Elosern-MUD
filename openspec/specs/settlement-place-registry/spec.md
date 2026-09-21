@@ -8,7 +8,7 @@ edit rather than a code edit across four files.
 ## Requirements
 
 ### Requirement: A place is the single authored record of one service location
-<!-- This block is written against the text `hostless-places` leaves behind and MUST be
+<!-- This block is written against the text `place-kind-vocabulary` leaves behind and MUST be
      archived after it. -->
 The system SHALL support place records. One place SHALL carry everything
 that distinguishes one service location: its stable key, the settlement it
@@ -41,6 +41,12 @@ home, not a shop. The vocabulary SHALL be closed and SHALL cover the location
 types the world document defines, so that no authored place is forced to
 pick a value that misdescribes it; a location type the vocabulary cannot
 name is a reason to extend the vocabulary, not to approximate.
+
+Two places MAY share one exterior — a craft alley with a forge and a tailor
+on it is one street with two doors — but they SHALL NOT share a doorway
+name. Two identical doorway names on one exterior produce a single exit
+where two were authored, silently losing a location rather than failing, so
+the collision SHALL be a load error naming both places.
 
 #### Scenario: One record carries a whole location
 - **WHEN** a place record is loaded
@@ -76,6 +82,15 @@ name is a reason to extend the vocabulary, not to approximate.
 #### Scenario: Every shipped place's kind describes its location
 - **WHEN** each shipped place's kind is compared against what its room is
 - **THEN** each names the location type the world document gives it
+
+#### Scenario: Two places may share an exterior
+- **WHEN** two places declare the same exterior with different doorway names
+- **THEN** both load, and synchronization gives that exterior one doorway
+  per place
+
+#### Scenario: Two places sharing a doorway name fail load
+- **WHEN** two places declare the same exterior and the same doorway name
+- **THEN** validation raises naming both places and the shared name
 
 ### Requirement: A settlement declares its archetype and coordinate space
 The system SHALL support settlement records carrying a stable key matching
