@@ -62,7 +62,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(events), 13)  # guild host + six capital merchants + six village hosts
+        self.assertEqual(len(events), 15)  # guild host + six capital merchants + eight village hosts
         # The guild host's event is located by service id, not position: the
         # terrace split (altoria-place-slices) made the lower terrace's eatery
         # the first roster row, so no shipped row keeps a fixed index.
@@ -92,14 +92,30 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             [event.kwargs["context"]["service"] for event in merchant_events],
             merchant_service_ids,
         )
-        self.assertTrue(all(event.kwargs["context"]["shop"] for event in merchant_events))
+        # Merchants report their authored shop; the village's two attendants
+        # (ciaran-village-commons) carry no shop identity at all.
+        attendants = {"ciaran_elenis", "ciaran_teliel"}
+        self.assertTrue(
+            all(
+                event.kwargs["context"]["shop"]
+                for event in merchant_events
+                if event.kwargs["context"]["service"] not in attendants
+            )
+        )
+        self.assertTrue(
+            all(
+                event.kwargs["context"]["shop"] is None
+                for event in merchant_events
+                if event.kwargs["context"]["service"] in attendants
+            )
+        )
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()  # reuse fires nothing
         late = [
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 13)
+        self.assertEqual(len(late), 15)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):
