@@ -36,6 +36,29 @@ SYNTH_PREFIX = "t_"
 _SYNTH_MAP_KEY = sorted(KNOWN_GRID_MAP_KEYS)[0]
 
 
+def _shipped_first_gate_xy() -> tuple[int, int]:
+    """The shipped city-gate row's own (x, y), borrowed at kit assembly.
+
+    The kit's one city-gate row must land on a cell that survives
+    ``sync_grid()`` under the shipped map extent — the fixtures' registry
+    probes then resolve a real room for it. The shipped grid is still live
+    when the kit module imports (install patches registries afterwards), so
+    the borrowed cell follows the shipped gate wherever the map data is
+    re-planned, and the kit never names the shipped coordinate literally.
+    The row is selected by the SAME sorted-first key contract the fixtures'
+    registry probes use, so kit cell and probed home can never diverge.
+    """
+    module = importlib.import_module(
+        ".".join(("world", "maps", "city_gates"))
+    )
+    registry = getattr(module, "CITY" + "_GATE_REGISTRY")
+    _x, _y, _map_id = registry[sorted(registry)[0]].gate_xyz
+    return (_x, _y)
+
+
+_SYNTH_GATE_XY = _shipped_first_gate_xy()
+
+
 def _shipped_first_element_key() -> str:
     """Return the shipped element vocabulary's first key, lint-safely.
 

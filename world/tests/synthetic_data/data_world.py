@@ -29,7 +29,7 @@ from world.maps.city_gates import CityGateDef
 from world.rules.buffs import BuffDefinition
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 
-from world.tests.synthetic_data.vocab import _SYNTH_MAP_KEY
+from world.tests.synthetic_data.vocab import _SYNTH_GATE_XY, _SYNTH_MAP_KEY
 
 SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
     # Rank keys mirror the shipped letter-rank vocabulary shape; the kit's
@@ -274,7 +274,11 @@ SYNTH_CITY_GATES: MappingProxyType = MappingProxyType(
     {
         _SYNTH_MAP_KEY: CityGateDef(
             map_id=_SYNTH_MAP_KEY,
-            gate_xyz=(2, 0, _SYNTH_MAP_KEY),
+            # The borrowed shipped gate cell (vocab resolver): the kit row
+            # must land on a cell the shipped map data actually contains,
+            # or the registry-probing fixtures resolve no room and silently
+            # no-op.
+            gate_xyz=(_SYNTH_GATE_XY[0], _SYNTH_GATE_XY[1], _SYNTH_MAP_KEY),
             exit_key="霧門",
             exit_aliases=("合成門", "苔徑門"),
         ),

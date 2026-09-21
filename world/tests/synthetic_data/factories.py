@@ -68,7 +68,7 @@ from world.skills.registry import (
 )
 from world.skills.sexual_acts._builder import SexualActDef
 
-from world.tests.synthetic_data.vocab import SYNTH_PREFIX, _SYNTH_MAP_KEY
+from world.tests.synthetic_data.vocab import SYNTH_PREFIX, _SYNTH_GATE_XY, _SYNTH_MAP_KEY
 from world.tests.synthetic_data.data_items import SYNTH_ITEMS, SYNTH_PRICES
 from world.tests.synthetic_data.data_skills import SYNTH_ACT, SYNTH_ACT_SKILL, SYNTH_SKILLS
 from world.tests.synthetic_data.data_characters import (
@@ -165,7 +165,8 @@ def make_city_gate(key: str = "t_made_gate", **overrides: object) -> CityGateDef
     if not key.startswith(SYNTH_PREFIX):
         raise ValueError(f"synthetic keys must start with {SYNTH_PREFIX!r}, got {key!r}")
     overrides.setdefault("map_id", key)
-    overrides.setdefault("gate_xyz", (2, 0, key))
+    # Same borrowed shipped cell as the kit row (one valid-cell invariant).
+    overrides.setdefault("gate_xyz", (_SYNTH_GATE_XY[0], _SYNTH_GATE_XY[1], key))
     base = SYNTH_CITY_GATES[_SYNTH_MAP_KEY]
     merged = {field.name: getattr(base, field.name) for field in _dataclass_fields(base)}
     merged.update(overrides)
