@@ -236,11 +236,12 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         )
         catalog = load_commerce_config(_SHIPPED_DIR)
         # ciaran-village-crafts grew the village to six shelves and six
-        # homes: four capital + the two split-off capital specialist bundles
-        # (altoria-adornments-and-remedies) + six elven assortments, twelve
-        # shops.
-        self.assertEqual(len(catalog["assortments"]), 12)
-        self.assertEqual(len(catalog["shops"]), 12)
+        # homes; altoria-adornments-and-remedies split two more capital
+        # bundles out of the sundries, and altoria-sanctum added the
+        # sanctum's own bundle and counter: five capital + six elven
+        # assortments, thirteen shops.
+        self.assertEqual(len(catalog["assortments"]), 13)
+        self.assertEqual(len(catalog["shops"]), 13)
         self.assertEqual(
             catalog["price_scales"], {"capital_altoria": 100, "village_ciaran": 100}
         )
@@ -294,10 +295,12 @@ class CommerceRulebookSliceTests(unittest.TestCase):
     @covers_requirement(
         "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
     )
-    def test_the_seventeen_moved_offers_travel_field_for_field(self):
+    def test_the_moved_offers_travel_field_for_field(self):
         # altoria-adornments-and-remedies moved seventeen offer rows out of
-        # general_sundries into the two new specialist bundles. A hand-moved
-        # row where a digit went missing is exactly what this guards: the
+        # general_sundries into the two new specialist bundles, and
+        # altoria-sanctum moved 受洗聖水 verbatim onto the sanctum's own
+        # counter. A hand-moved row where a digit went missing is exactly
+        # what this guards: the
         # literal BEFORE table below is the pre-move resolved offer of every
         # moved item (captured from the shipped data at the parent commit and
         # equal, field for field, to the re-baselined commerce_catalog_
@@ -325,6 +328,9 @@ class CommerceRulebookSliceTests(unittest.TestCase):
             "miners_bracing_broth": (50, 25, 20, 10, 5),
             "beastfolk_herbal_salve": (60, 30, 20, 10, 5),
             "passion_draught": (300, 150, 5, 2, 1),
+            # 受洗聖水 -> sanctum_wares / altoria_sanctum_shop
+            # (altoria-sanctum)
+            "baptismal_holy_water": (120, 60, 10, 4, 2),
         }
         commerce = load_commerce_config(_SHIPPED_DIR)
         configs = validate_shop_configs(
@@ -357,9 +363,12 @@ class CommerceRulebookSliceTests(unittest.TestCase):
                     fields,
                     f"{item_key} drifted from its pre-move offer",
                 )
-        # The two new shops are where the goods landed, in bundle size.
+        # The new shops are where the goods landed, in bundle size: the
+        # eleven-plus-six of the adornments split, and altoria-sanctum's
+        # thirteen (twelve intimacy goods plus the moved 受洗聖水).
         self.assertEqual(len(configs["altoria_jeweller"].offers), 11)
         self.assertEqual(len(configs["altoria_alchemist"].offers), 6)
+        self.assertEqual(len(configs["altoria_sanctum_shop"].offers), 13)
 
 
 if __name__ == "__main__":

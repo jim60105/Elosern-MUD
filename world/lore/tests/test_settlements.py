@@ -59,7 +59,9 @@ class PlaceRegistryTests(unittest.TestCase):
         # lower, middle, upper — so the 南大道 eatery leads the capital rows
         # and the middle terrace's guild/store/forge/tailor/jeweller/alchemist
         # follow (altoria-adornments-and-remedies closed the specialist
-        # family); the village slice stays last, its nine places alphabetical
+        # family), the upper terrace's temple and sanctum close the capital
+        # block (altoria-sanctum); the village slice stays last, its nine
+        # places alphabetical
         # by key (ciaran-village-crafts added 格威娜拉 and 妮瑞斯;
         # ciaran-village-commons added 艾莉妮斯的家, the 共食棚, and 泰莉爾的家).
         self.assertEqual(
@@ -68,6 +70,7 @@ class PlaceRegistryTests(unittest.TestCase):
                 "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
+                "altoria_temple", "altoria_sanctum",
                 "ciaran_elenis_home", "ciaran_gwenaera_home",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_nireth_home", "ciaran_shelter",
@@ -228,6 +231,8 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_tailor": "outfitter",
             "altoria_jeweller": "jeweller",
             "altoria_alchemist": "alchemist",
+            "altoria_temple": "temple",
+            "altoria_sanctum": "sanctum_shop",
             "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",
@@ -591,6 +596,7 @@ class DerivedShopRegistryTests(unittest.TestCase):
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
                 "altoria_jeweller", "altoria_alchemist",
+                "altoria_sanctum_shop",
                 "ciaran_gwenaera_home", "ciaran_hailiel_home",
                 "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",

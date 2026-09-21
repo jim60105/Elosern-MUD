@@ -198,12 +198,6 @@ assortments:
         max_stock: 1
         initial_stock: 1
         restock_quantity: 1
-      - item_key: baptismal_holy_water
-        buy_copper: 120
-        sell_copper: 60
-        max_stock: 10
-        initial_stock: 4
-        restock_quantity: 2
       - item_key: spirit_dew
         buy_copper: 6000
         sell_copper: 3000
@@ -368,6 +362,92 @@ assortments:
         max_stock: 5
         initial_stock: 2
         restock_quantity: 1
+  # altoria-sanctum: the sanctum shop's thirteen offer rows. The twelve
+  # intimacy_tool goods are priced against their items' PRICE_TABLE band
+  # (50..20000 copper) at the codex's reference prices in
+  # docs/lore/items.md §性玩具 — the figures the goods were authored with.
+  # 受洗聖水 moved verbatim out of general_sundries: same buy, sell, stock
+  # and restock, on the counter the world document says it belongs to.
+  - key: sanctum_wares
+    offers:
+      - item_key: nymph_buds_clamp
+        buy_copper: 2000
+        sell_copper: 1000
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: warm_honey_orb
+        buy_copper: 3000
+        sell_copper: 1500
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: hyperesthesia_charm
+        buy_copper: 4500
+        sell_copper: 2250
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: warmth_rune_egg
+        buy_copper: 3500
+        sell_copper: 1750
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: tremor_crystal
+        buy_copper: 15000
+        sell_copper: 7500
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: aphrodisiac_bath_salts
+        buy_copper: 50
+        sell_copper: 25
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: kiss_of_goddess_mist
+        buy_copper: 900
+        sell_copper: 450
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: censer_of_desire
+        buy_copper: 12000
+        sell_copper: 6000
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: embracing_vine
+        buy_copper: 600
+        sell_copper: 300
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: spark_candy
+        buy_copper: 380
+        sell_copper: 190
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
+      - item_key: slime_lube_gel
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: hot_kiss_potion
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
+      - item_key: baptismal_holy_water
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
 
 # Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
 # units relative to the world-day boundary.
@@ -393,6 +473,10 @@ shops:
     close_hour: 20
     restock_hour: 6
   - shop_key: altoria_alchemist
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+  - shop_key: altoria_sanctum_shop
     open_hour: 8
     close_hour: 20
     restock_hour: 6

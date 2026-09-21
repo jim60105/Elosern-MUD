@@ -230,7 +230,7 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # OWN assortment.
         table = _dialogue_table()
         places = _merchant_places()
-        self.assertEqual(len(places), 12, "roster lost a merchant place")
+        self.assertEqual(len(places), 13, "roster lost a merchant place")
         greetings = set()
         for place in places:
             with self.subTest(place=place.key):

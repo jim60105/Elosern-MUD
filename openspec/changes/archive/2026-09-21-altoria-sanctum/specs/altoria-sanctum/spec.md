@@ -45,13 +45,16 @@ SHALL represent that as one square with two doors rather than as two separate bu
   interior, and each interior leads back out to that same exterior
 
 ### Requirement: The sanctuary's host ministers and does not trade
-The sanctuary's own host SHALL carry a dialogue capability and no trade capability; the shop's
-host SHALL carry trade and no dialogue. Affinity with the sanctuary SHALL therefore accumulate
-through conversation and affinity with its shop through trade, matching how every other
-location's primary channel is already decided by which capability its host carries.
+The sanctuary's own host SHALL carry a dialogue capability and no trade capability: her
+counter blesses, preaches and answers questions about the ministry, and sells nothing. The
+shop's host SHALL carry the trade capability; like every capital merchant she answers from
+her own shopkeeper's table about her own goods, never from the sanctuary's offices.
+Affinity with the sanctuary SHALL therefore accumulate through conversation and affinity
+with its shop through trade, matching how every other location's primary channel is already
+decided by which capability its host carries.
 
-#### Scenario: The two hosts carry disjoint capabilities
+#### Scenario: The two hosts' trade offices are disjoint
 - **WHEN** both hosts' components are inspected after synchronization
 - **THEN** the sanctuary's host carries a scripted-dialogue component and no merchant
-  component, and the shop's host carries a merchant component and no scripted-dialogue
-  component
+  component, and the shop's host carries a merchant component; the priest's own table
+  ships no trade guidance she could not execute

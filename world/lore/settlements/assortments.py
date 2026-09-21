@@ -78,14 +78,14 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         # data-contract suite computes both sides. 儲物袋 and 滑翔斗篷 equip to
         # the accessory slot, so they are the jeweller's. 王都藥劑 is the
         # drinkable and applied remedies — six of the seven potion-band
-        # goods; 受洗聖水 is the seventh and deliberately STAYS below, because
-        # it belongs to the sanctuary and the sanctuary change moves it (a
-        # band is a pricing constraint, not a shop's inventory).
+        # goods; 受洗聖水 is the seventh, and altoria-sanctum moved it to the
+        # sanctuary's own bundle (a band is a pricing constraint, not a shop's
+        # inventory).
         AssortmentDefinition(
             key="general_sundries",
             display_name_zh="王都雜貨",
             item_keys=(
-                "baptismal_holy_water", "magic_lamp", "healing_herb",
+                "magic_lamp", "healing_herb",
                 "rough_iron_ore", "beast_crystal", "evernight_shard",
                 "mana_core", "dragon_scale_fragment", "elven_spider_silk",
                 "spirit_dew", "enchanted_compass", "dungeon_flare_talisman",
@@ -110,6 +110,24 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "healing_potion", "greater_healing_potion", "mana_potion",
                 "miners_bracing_broth", "beastfolk_herbal_salve",
                 "passion_draught",
+            ),
+        ),
+        # altoria-sanctum: the sanctum shop's bundle. The twelve
+        # ``intimacy_tool`` goods sit in the item registry in this order and
+        # are sold here and nowhere else; 受洗聖水 moved over verbatim from
+        # the sundries (the sanctuary's good, on the counter it belongs to).
+        # The five wearable devices equip to the accessory slot — the
+        # partition rule carves the capital's accessories across exactly two
+        # bundles, this one and 首飾坊's (see the sample-city-altoria spec).
+        AssortmentDefinition(
+            key="sanctum_wares",
+            display_name_zh="聖所用品",
+            item_keys=(
+                "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
+                "warmth_rune_egg", "tremor_crystal", "aphrodisiac_bath_salts",
+                "kiss_of_goddess_mist", "censer_of_desire", "embracing_vine",
+                "spark_candy", "slime_lube_gel", "hot_kiss_potion",
+                "baptismal_holy_water",
             ),
         ),
         AssortmentDefinition(
