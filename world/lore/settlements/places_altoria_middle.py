@@ -43,7 +43,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.GUILD_HALL,
         room_name_zh="阿爾托利亞冒險者公會大廳",
         room_desc_zh=(
-            "阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面向著門的大任務板，"
+            "阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，"
             "以及一座環形訓練場。"
         ),
         exterior_xy=(4, 3),  # 公會前
