@@ -62,7 +62,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(events), 11)  # guild host + four capital merchants + six village hosts
+        self.assertEqual(len(events), 13)  # guild host + six capital merchants + six village hosts
         # The guild host's event is located by service id, not position: the
         # terrace split (altoria-place-slices) made the lower terrace's eatery
         # the first roster row, so no shipped row keeps a fixed index.
@@ -99,7 +99,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 11)
+        self.assertEqual(len(late), 13)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):

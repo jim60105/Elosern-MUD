@@ -70,23 +70,46 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "harbor_lobster_bisque", "elven_candied_blossom",
             ),
         ),
+        # altoria-adornments-and-remedies split the sundries shelf's last two
+        # specialist axes out. 王都飾品 is defined by a RULE, not a list: it
+        # holds exactly the capital's accessory-slot goods (the item
+        # registry's own ``equipment_slot``), so the next accessory added to
+        # the capital cannot quietly rot back onto the general store — the
+        # data-contract suite computes both sides. 儲物袋 and 滑翔斗篷 equip to
+        # the accessory slot, so they are the jeweller's. 王都藥劑 is the
+        # drinkable and applied remedies — six of the seven potion-band
+        # goods; 受洗聖水 is the seventh and deliberately STAYS below, because
+        # it belongs to the sanctuary and the sanctuary change moves it (a
+        # band is a pricing constraint, not a shop's inventory).
         AssortmentDefinition(
             key="general_sundries",
             display_name_zh="王都雜貨",
             item_keys=(
-                "healing_potion", "silver_hairpin", "wolf_fang_necklace",
-                "pilgrim_medallion", "protective_ring", "storage_pouch",
-                "gliding_cloak", "magic_lamp", "healing_herb",
+                "baptismal_holy_water", "magic_lamp", "healing_herb",
                 "rough_iron_ore", "beast_crystal", "evernight_shard",
                 "mana_core", "dragon_scale_fragment", "elven_spider_silk",
-                "baptismal_holy_water", "greater_healing_potion",
-                "mana_potion", "purified_pendant", "fearless_brooch",
-                "apothecary_beads", "passion_silk_choker",
-                "radiant_holy_emblem", "enchanted_compass",
-                "dungeon_flare_talisman", "beastfolk_signal_conch",
-                "camp_ward_kit", "goblin_ear", "slime_residue",
-                "earth_drake_scale", "troll_fang", "miners_bracing_broth",
-                "beastfolk_herbal_salve", "passion_draught", "spirit_dew",
+                "spirit_dew", "enchanted_compass", "dungeon_flare_talisman",
+                "beastfolk_signal_conch", "camp_ward_kit", "goblin_ear",
+                "slime_residue", "earth_drake_scale", "troll_fang",
+            ),
+        ),
+        AssortmentDefinition(
+            key="capital_adornments",
+            display_name_zh="王都飾品",
+            item_keys=(
+                "silver_hairpin", "wolf_fang_necklace", "pilgrim_medallion",
+                "protective_ring", "storage_pouch", "gliding_cloak",
+                "purified_pendant", "fearless_brooch", "apothecary_beads",
+                "passion_silk_choker", "radiant_holy_emblem",
+            ),
+        ),
+        AssortmentDefinition(
+            key="capital_remedies",
+            display_name_zh="王都藥劑",
+            item_keys=(
+                "healing_potion", "greater_healing_potion", "mana_potion",
+                "miners_bracing_broth", "beastfolk_herbal_salve",
+                "passion_draught",
             ),
         ),
         AssortmentDefinition(

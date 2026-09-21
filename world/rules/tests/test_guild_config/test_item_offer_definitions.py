@@ -65,6 +65,7 @@ class ItemDefinitionTests(unittest.TestCase):
             {
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "altoria_jeweller", "altoria_alchemist",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
                 "ciaran_gwenaera_home", "ciaran_nireth_home",

@@ -129,4 +129,58 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ("dialogue_key", "altoria_tailor"),
         ),
     ),
+    # altoria-adornments-and-remedies: the last two specialists of the
+    # forge/eatery/tailor family. The jeweller shares 市場街 with the general
+    # store — one exterior, two doors, distinguished by their authored
+    # doorway names (雜貨店 vs 首飾坊).
+    PlaceDefinition(
+        key="altoria_jeweller",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.JEWELLER,
+        room_name_zh="聖潔王都首飾坊",
+        room_desc_zh=(
+            "The jeweller's shop of 聖潔王都, its case lit for the "
+            "accessory trade of 市場街 (settlement-shops design §6.1)."
+        ),
+        exterior_xy=(2, 3),  # 市場街
+        doorway_key_zh="首飾坊",
+        doorway_aliases=("jeweller", "jewelry shop"),
+        host_name="艾蓮娜·鴉丘",
+        host_title="聖潔王都首飾坊主",
+        host_race="human",
+        host_subrace="human_plains",
+        host_sex="female",
+        profession="merchant",
+        service_id="altoria_jeweller",
+        assortment_keys=("capital_adornments",),
+        authored_kwargs=(
+            ("shop_key", "altoria_jeweller"),
+            ("dialogue_key", "altoria_jeweller"),
+        ),
+    ),
+    PlaceDefinition(
+        key="altoria_alchemist",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.ALCHEMIST,
+        room_name_zh="聖潔王都鍊金坊",
+        room_desc_zh=(
+            "The alchemist's shop of 聖潔王都, its shelves stoppered and "
+            "labelled over 東市's goods road (settlement-shops design §6.1)."
+        ),
+        exterior_xy=(5, 3),  # 東市
+        doorway_key_zh="鍊金坊",
+        doorway_aliases=("alchemist", "alchemy shop"),
+        host_name="希碧拉·灰沼",
+        host_title="聖潔王都鍊金坊主",
+        host_race="human",
+        host_subrace="human_plains",
+        host_sex="female",
+        profession="merchant",
+        service_id="altoria_alchemist",
+        assortment_keys=("capital_remedies",),
+        authored_kwargs=(
+            ("shop_key", "altoria_alchemist"),
+            ("dialogue_key", "altoria_alchemist"),
+        ),
+    ),
 )

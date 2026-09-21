@@ -218,13 +218,15 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # drawn from its own place's assortment. A shared template or a
         # swapped pair of tables cannot satisfy this, because the goods sets
         # are disjoint across the assortments. ciaran-village-crafts grew
-        # the roster to ten voices (six village homes); the disjointness it
-        # leans on holds per settlement — the elven bundles deliberately
-        # share keys with the capital's bundles, but each village table
-        # names goods from its OWN assortment.
+        # the roster to ten voices (six village homes) and
+        # altoria-adornments-and-remedies grew it to twelve (the capital's
+        # jeweller and alchemist); the disjointness it leans on holds per
+        # settlement — the elven bundles deliberately share keys with the
+        # capital's bundles, but each village table names goods from its
+        # OWN assortment.
         table = _dialogue_table()
         places = _merchant_places()
-        self.assertEqual(len(places), 10, "roster lost a merchant place")
+        self.assertEqual(len(places), 12, "roster lost a merchant place")
         greetings = set()
         for place in places:
             with self.subTest(place=place.key):

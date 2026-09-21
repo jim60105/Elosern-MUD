@@ -21,33 +21,36 @@ The voice rules the guild clerk's row established bind these tables too:
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 瑪爾特·金秤 — the general store. Her shelf is the sundries axis: potions and
-# accessories up front, materials and curious tools stacked behind. A merchant
-# who has been weighing copper since the guild economy landed.
+# 瑪爾特·金秤 — the general store. Her shelf is what a general store sells
+# once the specialists have taken theirs: tools and raw materials, with 受洗
+# 聖水 still sitting there until the sanctuary change moves it
+# (altoria-adornments-and-remedies). A merchant who has been weighing copper
+# since the guild economy landed, and who sends accessory hunters to the
+# jeweller and potion buyers to the alchemist without missing a beat.
 GENERAL_STORE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "賣什麼",
-        "「藥水、吊墜胸針、粗鐵礦魔獸結晶、儲物袋——雜貨店雜就雜在該有的都有。"
-        "要買，`shop stock` 先看看我架上剩多少，決定了喊 `buy` 加品名；"
-        "手上多了賣相好的貨，也儘管擱上櫃檯，我喊 `sell` 收。」",
+        "「粗鐵礦、魔獸結晶、附魔羅盤、迷宮探照符——出城要的行頭和要賣的"
+        "素材，我這裡都有。要買，`shop stock` 先看看我架上剩多少，決定了喊 "
+        "`buy` 加品名；手上多了哥布林耳朵、史萊姆黏液這類貨，也儘管擱上櫃檯，"
+        "我喊 `sell` 收。」",
     ),
     KeywordResponse(
-        "藥水",
-        "「小傷小痛，治療藥水壓一壓就過去了；真要進地城，"
-        "強效治療藥水和魔力藥水我擱在櫃檯後頭第二層，銅幣夠就來一瓶。"
-        "數量我隨時報得準：`shop stock`，報完你喊 `buy` 就能提貨。」",
-    ),
-    KeywordResponse(
-        "收貨",
-        "「地城裡揀回來的東西？擺上櫃檯我估個價，`sell` 加品名就成交。"
-        "材料類我收得最勤——尖牙啊鱗片啊結晶啊黏液啊，堆在倉裡也是堆，"
-        "折成銅幣總比生鏽好。」",
+        "材料",
+        "「礦石、鱗片、尖牙、結晶——地城裡揀回來的，我收得最勤；要買新的，"
+        "止血藥草、永夜碎片、魔導晶核也都擱架上。兩頭都走同一個規矩："
+        "`shop stock` 報實數，買喊 `buy`，賣喊 `sell`，銅幣當場點清。」",
     ),
     KeywordResponse(
         "行頭",
-        "「儲物袋、魔法燈、附魔羅盤這類零碎，我櫃上從不缺。別小看小東西——"
-        "少了條繩子，地城裡就是條命。想挑就 `shop stock`，"
-        "看中了 `buy`，我這裡不講價，講的是信得過。」",
+        "「魔法燈、附魔羅盤、通訊法螺、露營魔導具——少了這些，地城裡就是條命。"
+        "想挑就 `shop stock`，看中了 `buy`，我這裡不講價，講的是信得過。」",
+    ),
+    KeywordResponse(
+        "飾品藥水",
+        "「那兩樣我早不做了——飾品往市場街口的首飾坊找艾蓮娜，藥劑往東市的"
+        "鍊金坊找希碧拉，都是老街坊。我櫃上留的只有受洗聖水，"
+        "淨化負面狀態那一回用得到；要就 `shop stock` 看看，`buy` 提貨。」",
     ),
 )
 
@@ -136,6 +139,68 @@ TAILOR_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
+# 艾蓮娜·鴉丘 — the jeweller. Crow-quill polish and an eye for settings: she
+# answers about gemwork and settings, and names the pieces off her own case
+# (capital_adornments). altoria-adornments-and-remedies took these eleven
+# accessory-slot goods off the general store's shelf, verbatim in price.
+JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "飾品",
+        "「銀髮簪、狼牙項鍊、朝聖者銅符——櫃檯後這排玻璃櫃，全是能掛在身上的。"
+        "飾品槽有件數上限，挑你要的那幾件。`shop stock` 報的是現貨，"
+        "看中哪件喊 `buy` 加品名。」",
+    ),
+    KeywordResponse(
+        "鑲工",
+        "「鑲工好壞，看爪不看光。淨化吊墜、無懼胸針是我手上最講工的兩件，"
+        "光輝聖徽的徽面則是一整塊料雕出來的。細節你來櫃前我攤開給你瞧，"
+        "價錢 `shop stock` 一報瞞不了人。」",
+    ),
+    KeywordResponse(
+        "奇物",
+        "「要說佩著有用的——儲物袋肚裡另有一層空間，滑翔斗篷能托住墜落的人。"
+        "這兩樣在我櫃上壓箱底：不便宜，關鍵時刻值回銅幣。"
+        "清單 `shop stock`，要了喊 `buy`。」",
+    ),
+    KeywordResponse(
+        "收飾",
+        "「舊飾件洗淨了拿來，`sell` 加品名我估價；缺了爪、斷了鏈的要先說清，"
+        "熔金重鑄是另一筆工錢。藥師珠串、迷情絲頸環這類有來路的，"
+        "認得下家的我不殺你的價。」",
+    ),
+)
+
+# 希碧拉·灰沼 — the alchemist. Her surname is a peat-bog still, and her
+# voice is measure-and-label: what each remedy does, in plain use-terms
+# (capital_remedies). The six drinkable and applied remedies came off the
+# general store's shelf with this change; 受洗聖水 stays next door until the
+# sanctuary lands, and she says so.
+ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "藥劑",
+        "「治療藥水壓小傷，強效治療藥水拉回重傷，魔力藥水補的是施法者的氣。"
+        "`shop stock` 看得見還剩幾瓶，要哪瓶喊 `buy` 加品名。」",
+    ),
+    KeywordResponse(
+        "外敷",
+        "「獸王國藥草膏抹在腫起處，王國礦工提神湯一口下去瞌睡全消——"
+        "這兩樣不算藥水，算備在行囊裡的救急。數量 `shop stock` 報得準，"
+        "`buy` 了就裝進你的袋子。」",
+    ),
+    KeywordResponse(
+        "特殊",
+        "「迷情藥這種東西，我賣之前會先問你一句想清楚了沒有。"
+        "Effects 全寫在瓶標上，不藏。想先看單子就 `shop stock`，"
+        "決定了再喊 `buy`。」",
+    ),
+    KeywordResponse(
+        "聖水",
+        "「受洗聖水不在我這兒——那是聖所的東西，如今暫放雜貨店櫃檯，"
+        "等聖所開張就歸位。我這裡賣的是調出來的藥：空瓶破瓶拿來我 `sell` 收，"
+        "好料換新藥，進出都清爽。」",
+    ),
+)
+
 # One entry per capital merchant place, keyed exactly as the place rows author
 # it (the keys travel in the rows; the slice assembles into DIALOGUE_ROWS
 # unchanged).
@@ -145,9 +210,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         DialogueDefinition(
             greeting=(
                 "櫃檯後的瑪爾特·金秤從帳簿抬起眼，秤桿還捏在手裡："
-                "「要什麼直說。藥水、護身符、材料、行頭，雜貨店雜就雜在"
-                "該有的都有。想先看清楚，`shop stock` 我報實數；"
-                "決定了 `buy`，手上有想脫手的，擱櫃檯上 `sell`。"
+                "「要什麼直說。材料、行頭、雜七雜八，雜貨店雜就雜在"
+                "該有的都有；飾品請走首飾坊，藥劑請走鍊金坊，我這裡不搶"
+                "街坊的生意。想先看清楚，`shop stock` 我報實數；"
+                "決定了 `buy`，地城裡揀回來的想脫手，擱櫃檯上 `sell`。"
                 "說罷，她又低頭撥她的算盤。」"
             ),
             responses=GENERAL_STORE_RESPONSES,
@@ -187,6 +253,30 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "`sell` 我收。來，手伸出來我比一比。」"
             ),
             responses=TAILOR_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_jeweller",
+        DialogueDefinition(
+            greeting=(
+                "首飾坊的艾蓮娜·鴉丘放下拋光布，把玻璃櫃裡那盞小燈撥亮了些："
+                "「眼睛先挑，錢包隨後——髮簪項鍊、吊墜胸針，能佩的都在這櫃裡。"
+                "現貨 `shop stock` 報得清楚，看中喊 `buy`；"
+                "家傳的舊飾件要估要賣，戴進來，`sell` 我收。」"
+            ),
+            responses=JEWELLER_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_alchemist",
+        DialogueDefinition(
+            greeting=(
+                "鍊金坊的希碧拉·灰沼從一整牆瓶罐之間探出半張臉，指尖夾著一張瓶標："
+                "「說症狀還是說藥名，兩邊我都聽得懂。藥水、提神的、外敷的都有現貨，"
+                "`shop stock` 報剩餘，要了 `buy`；空瓶好料想換錢，擱櫃上 `sell`。"
+                "問藥效可以，別碰櫃檯上那排紅標的。」"
+            ),
+            responses=ALCHEMIST_RESPONSES,
         ),
     ),
 )
