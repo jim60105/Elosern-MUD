@@ -57,14 +57,16 @@ class PlaceRegistryTests(unittest.TestCase):
         # roster processes rows in dict order (sync_service_content). Since
         # altoria-place-slices the capital arrives as three terrace slices —
         # lower, middle, upper — so the 南大道 eatery leads the capital rows
-        # and the middle terrace's guild/store/forge/tailor follow; the
-        # village slice stays last, its six homes alphabetical by host given
-        # name (ciaran-village-crafts added 格威娜拉 and 妮瑞斯).
+        # and the middle terrace's guild/store/forge/tailor/jeweller/alchemist
+        # follow (altoria-adornments-and-remedies closed the specialist
+        # family); the village slice stays last, its six homes alphabetical
+        # by host given name (ciaran-village-crafts added 格威娜拉 and 妮瑞斯).
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
                 "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
-                "altoria_forge", "altoria_tailor",
+                "altoria_forge", "altoria_tailor", "altoria_jeweller",
+                "altoria_alchemist",
                 "ciaran_gwenaera_home", "ciaran_hailiel_home",
                 "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
@@ -164,8 +166,18 @@ class PlaceRegistryTests(unittest.TestCase):
     def test_the_assembled_registry_equals_the_pre_split_capture(self):
         from dataclasses import astuple
 
+        # altoria-adornments-and-remedies projects the comparison onto the
+        # CAPTURED keys instead of the whole live registry: the capture is a
+        # historical migration guard (the terrace split moved these rows and
+        # changed no field), not a growing current-state snapshot — a later
+        # change adds a row (the jeweller and the alchemist, say) by editing
+        # THIS module's pins nowhere except the order and kind tests below.
+        self.assertTrue(
+            set(self.PRE_SPLIT_CONTENT_CAPTURE) <= set(PLACE_REGISTRY),
+            "the assembled registry lost a row the split preserved",
+        )
         self.assertEqual(
-            {key: astuple(place) for key, place in PLACE_REGISTRY.items()},
+            {key: astuple(PLACE_REGISTRY[key]) for key in self.PRE_SPLIT_CONTENT_CAPTURE},
             self.PRE_SPLIT_CONTENT_CAPTURE,
         )
 
@@ -211,6 +223,8 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_forge": "weaponsmith",
             "altoria_eatery": "eatery",
             "altoria_tailor": "outfitter",
+            "altoria_jeweller": "jeweller",
+            "altoria_alchemist": "alchemist",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",
             "ciaran_lareneth_home": "home",
@@ -570,6 +584,7 @@ class DerivedShopRegistryTests(unittest.TestCase):
             {
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
+                "altoria_jeweller", "altoria_alchemist",
                 "ciaran_gwenaera_home", "ciaran_hailiel_home",
                 "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",

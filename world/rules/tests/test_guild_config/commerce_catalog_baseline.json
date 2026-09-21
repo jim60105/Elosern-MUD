@@ -4,6 +4,61 @@
     "village_ciaran": 100
   },
   "shops": {
+    "altoria_alchemist": {
+      "close_hour": 20,
+      "offers": [
+        {
+          "buy_copper": 60,
+          "initial_stock": 10,
+          "item_key": "beastfolk_herbal_salve",
+          "max_stock": 20,
+          "restock_quantity": 5,
+          "sell_copper": 30
+        },
+        {
+          "buy_copper": 250,
+          "initial_stock": 3,
+          "item_key": "greater_healing_potion",
+          "max_stock": 5,
+          "restock_quantity": 2,
+          "sell_copper": 125
+        },
+        {
+          "buy_copper": 100,
+          "initial_stock": 3,
+          "item_key": "healing_potion",
+          "max_stock": 5,
+          "restock_quantity": 2,
+          "sell_copper": 50
+        },
+        {
+          "buy_copper": 120,
+          "initial_stock": 4,
+          "item_key": "mana_potion",
+          "max_stock": 10,
+          "restock_quantity": 2,
+          "sell_copper": 60
+        },
+        {
+          "buy_copper": 50,
+          "initial_stock": 10,
+          "item_key": "miners_bracing_broth",
+          "max_stock": 20,
+          "restock_quantity": 5,
+          "sell_copper": 25
+        },
+        {
+          "buy_copper": 300,
+          "initial_stock": 2,
+          "item_key": "passion_draught",
+          "max_stock": 5,
+          "restock_quantity": 1,
+          "sell_copper": 150
+        }
+      ],
+      "open_hour": 8,
+      "restock_hour": 6
+    },
     "altoria_eatery": {
       "close_hour": 20,
       "offers": [
@@ -134,14 +189,6 @@
       "close_hour": 20,
       "offers": [
         {
-          "buy_copper": 2500,
-          "initial_stock": 2,
-          "item_key": "apothecary_beads",
-          "max_stock": 5,
-          "restock_quantity": 2,
-          "sell_copper": 1250
-        },
-        {
           "buy_copper": 120,
           "initial_stock": 4,
           "item_key": "baptismal_holy_water",
@@ -156,14 +203,6 @@
           "max_stock": 5,
           "restock_quantity": 1,
           "sell_copper": 400
-        },
-        {
-          "buy_copper": 60,
-          "initial_stock": 10,
-          "item_key": "beastfolk_herbal_salve",
-          "max_stock": 20,
-          "restock_quantity": 5,
-          "sell_copper": 30
         },
         {
           "buy_copper": 250,
@@ -230,22 +269,6 @@
           "sell_copper": 750
         },
         {
-          "buy_copper": 15000,
-          "initial_stock": 1,
-          "item_key": "fearless_brooch",
-          "max_stock": 3,
-          "restock_quantity": 1,
-          "sell_copper": 7500
-        },
-        {
-          "buy_copper": 80000,
-          "initial_stock": 1,
-          "item_key": "gliding_cloak",
-          "max_stock": 1,
-          "restock_quantity": 1,
-          "sell_copper": 40000
-        },
-        {
           "buy_copper": 20,
           "initial_stock": 10,
           "item_key": "goblin_ear",
@@ -254,28 +277,12 @@
           "sell_copper": 10
         },
         {
-          "buy_copper": 250,
-          "initial_stock": 3,
-          "item_key": "greater_healing_potion",
-          "max_stock": 5,
-          "restock_quantity": 2,
-          "sell_copper": 125
-        },
-        {
           "buy_copper": 40,
           "initial_stock": 10,
           "item_key": "healing_herb",
           "max_stock": 20,
           "restock_quantity": 5,
           "sell_copper": 20
-        },
-        {
-          "buy_copper": 100,
-          "initial_stock": 3,
-          "item_key": "healing_potion",
-          "max_stock": 5,
-          "restock_quantity": 2,
-          "sell_copper": 50
         },
         {
           "buy_copper": 60,
@@ -294,28 +301,67 @@
           "sell_copper": 1250
         },
         {
-          "buy_copper": 120,
-          "initial_stock": 4,
-          "item_key": "mana_potion",
-          "max_stock": 10,
-          "restock_quantity": 2,
-          "sell_copper": 60
-        },
-        {
-          "buy_copper": 50,
+          "buy_copper": 100,
           "initial_stock": 10,
-          "item_key": "miners_bracing_broth",
+          "item_key": "rough_iron_ore",
           "max_stock": 20,
           "restock_quantity": 5,
-          "sell_copper": 25
+          "sell_copper": 50
         },
         {
-          "buy_copper": 300,
-          "initial_stock": 2,
-          "item_key": "passion_draught",
-          "max_stock": 5,
+          "buy_copper": 20,
+          "initial_stock": 10,
+          "item_key": "slime_residue",
+          "max_stock": 20,
+          "restock_quantity": 5,
+          "sell_copper": 10
+        },
+        {
+          "buy_copper": 6000,
+          "initial_stock": 1,
+          "item_key": "spirit_dew",
+          "max_stock": 1,
           "restock_quantity": 1,
-          "sell_copper": 150
+          "sell_copper": 3000
+        },
+        {
+          "buy_copper": 2000,
+          "initial_stock": 1,
+          "item_key": "troll_fang",
+          "max_stock": 1,
+          "restock_quantity": 1,
+          "sell_copper": 1000
+        }
+      ],
+      "open_hour": 8,
+      "restock_hour": 6
+    },
+    "altoria_jeweller": {
+      "close_hour": 20,
+      "offers": [
+        {
+          "buy_copper": 2500,
+          "initial_stock": 2,
+          "item_key": "apothecary_beads",
+          "max_stock": 5,
+          "restock_quantity": 2,
+          "sell_copper": 1250
+        },
+        {
+          "buy_copper": 15000,
+          "initial_stock": 1,
+          "item_key": "fearless_brooch",
+          "max_stock": 3,
+          "restock_quantity": 1,
+          "sell_copper": 7500
+        },
+        {
+          "buy_copper": 80000,
+          "initial_stock": 1,
+          "item_key": "gliding_cloak",
+          "max_stock": 1,
+          "restock_quantity": 1,
+          "sell_copper": 40000
         },
         {
           "buy_copper": 4800,
@@ -358,14 +404,6 @@
           "sell_copper": 10000
         },
         {
-          "buy_copper": 100,
-          "initial_stock": 10,
-          "item_key": "rough_iron_ore",
-          "max_stock": 20,
-          "restock_quantity": 5,
-          "sell_copper": 50
-        },
-        {
           "buy_copper": 200,
           "initial_stock": 5,
           "item_key": "silver_hairpin",
@@ -374,36 +412,12 @@
           "sell_copper": 100
         },
         {
-          "buy_copper": 20,
-          "initial_stock": 10,
-          "item_key": "slime_residue",
-          "max_stock": 20,
-          "restock_quantity": 5,
-          "sell_copper": 10
-        },
-        {
-          "buy_copper": 6000,
-          "initial_stock": 1,
-          "item_key": "spirit_dew",
-          "max_stock": 1,
-          "restock_quantity": 1,
-          "sell_copper": 3000
-        },
-        {
           "buy_copper": 10000,
           "initial_stock": 3,
           "item_key": "storage_pouch",
           "max_stock": 3,
           "restock_quantity": 1,
           "sell_copper": 5000
-        },
-        {
-          "buy_copper": 2000,
-          "initial_stock": 1,
-          "item_key": "troll_fang",
-          "max_stock": 1,
-          "restock_quantity": 1,
-          "sell_copper": 1000
         },
         {
           "buy_copper": 800,

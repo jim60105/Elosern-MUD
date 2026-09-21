@@ -63,3 +63,36 @@ interior attachment.
   bundle to another
 - **THEN** its buy copper, sell copper, stock cap, initial stock and restock quantity are
   unchanged
+
+### Requirement: Altoria service content synchronizes idempotently without resetting live state
+<!-- The shipped text fixed the surface at ONE merchant NPC, TWO interiors and FOUR doorway
+     exits while the place registry already drove two, three and six. altoria-adornments-and-
+     remedies adds two more merchant places, so the quantities are restated as registry-driven
+     — the idempotence, no-reset and single-creation guarantees below are unchanged. -->
+Guild-economy startup SHALL create or update by stable key/tag one guild-service NPC with
+GuildStaff and GuildExaminer components in the guild hall and one Merchant NPC in the interior
+of every merchant place the settlement's place registry declares. It SHALL create one permanent
+interior and its two directed doorway exits for each place-registry row, and exam spawn
+metadata, exactly once. Repeated sync SHALL update authored descriptions/component definitions
+without duplicating objects or resetting merchant stock that has already been initialized.
+
+#### Scenario: Fresh startup creates a playable service path
+- **WHEN** startup runs against an empty database after grid sync
+- **THEN** one interior per place-registry row exists, reached by two directed doorway exits
+  from its exterior, alongside the guild service host, one merchant host per merchant place,
+  and exam spawn metadata — all before player commands are accepted
+
+#### Scenario: Repeated startup creates no duplicates
+- **WHEN** guild-economy sync runs twice
+- **THEN** object, exit, component-host, and component counts remain unchanged
+
+#### Scenario: Live merchant stock survives content resync
+- **WHEN** a player buys an item and startup sync runs again
+- **THEN** the decremented stock remains rather than returning to initial stock
+
+#### Scenario: A new specialist shop trades through the ordinary command path
+- **WHEN** a player stands in a specialist shop's interior during its opening hours and invokes
+  the stock listing and a purchase
+- **THEN** the listing names that shop's own interior and every good its assortment carries,
+  and the purchase moves goods, wallet and stock through the same deterministic trade APIs
+  every other shop uses

@@ -150,48 +150,6 @@ assortments:
         restock_quantity: 1
   - key: general_sundries
     offers:
-      - item_key: healing_potion
-        buy_copper: 100
-        sell_copper: 50
-        max_stock: 5
-        initial_stock: 3
-        restock_quantity: 2
-      - item_key: silver_hairpin
-        buy_copper: 200
-        sell_copper: 100
-        max_stock: 10
-        initial_stock: 5
-        restock_quantity: 2
-      - item_key: wolf_fang_necklace
-        buy_copper: 800
-        sell_copper: 400
-        max_stock: 5
-        initial_stock: 2
-        restock_quantity: 1
-      - item_key: pilgrim_medallion
-        buy_copper: 1500
-        sell_copper: 750
-        max_stock: 5
-        initial_stock: 2
-        restock_quantity: 1
-      - item_key: protective_ring
-        buy_copper: 30000
-        sell_copper: 15000
-        max_stock: 1
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: storage_pouch
-        buy_copper: 10000
-        sell_copper: 5000
-        max_stock: 3
-        initial_stock: 3
-        restock_quantity: 1
-      - item_key: gliding_cloak
-        buy_copper: 80000
-        sell_copper: 40000
-        max_stock: 1
-        initial_stock: 1
-        restock_quantity: 1
       - item_key: magic_lamp
         buy_copper: 60
         sell_copper: 30
@@ -246,66 +204,6 @@ assortments:
         max_stock: 10
         initial_stock: 4
         restock_quantity: 2
-      - item_key: greater_healing_potion
-        buy_copper: 250
-        sell_copper: 125
-        max_stock: 5
-        initial_stock: 3
-        restock_quantity: 2
-      - item_key: mana_potion
-        buy_copper: 120
-        sell_copper: 60
-        max_stock: 10
-        initial_stock: 4
-        restock_quantity: 2
-      - item_key: purified_pendant
-        buy_copper: 15000
-        sell_copper: 7500
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: fearless_brooch
-        buy_copper: 15000
-        sell_copper: 7500
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: apothecary_beads
-        buy_copper: 2500
-        sell_copper: 1250
-        max_stock: 5
-        initial_stock: 2
-        restock_quantity: 2
-      - item_key: passion_silk_choker
-        buy_copper: 4800
-        sell_copper: 2400
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: radiant_holy_emblem
-        buy_copper: 20000
-        sell_copper: 10000
-        max_stock: 2
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: miners_bracing_broth
-        buy_copper: 50
-        sell_copper: 25
-        max_stock: 20
-        initial_stock: 10
-        restock_quantity: 5
-      - item_key: beastfolk_herbal_salve
-        buy_copper: 60
-        sell_copper: 30
-        max_stock: 20
-        initial_stock: 10
-        restock_quantity: 5
-      - item_key: passion_draught
-        buy_copper: 300
-        sell_copper: 150
-        max_stock: 5
-        initial_stock: 2
-        restock_quantity: 1
       - item_key: spirit_dew
         buy_copper: 6000
         sell_copper: 3000
@@ -360,6 +258,116 @@ assortments:
         max_stock: 1
         initial_stock: 1
         restock_quantity: 1
+  # altoria-adornments-and-remedies: the seventeen offer rows below moved
+  # verbatim out of general_sundries (same buy, sell, stock and restock).
+  # An item's price must not depend on which shelf it sits on — the
+  # data-contract suite compares every moved row against its pre-move offer.
+  - key: capital_adornments
+    offers:
+      - item_key: silver_hairpin
+        buy_copper: 200
+        sell_copper: 100
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 2
+      - item_key: wolf_fang_necklace
+        buy_copper: 800
+        sell_copper: 400
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: pilgrim_medallion
+        buy_copper: 1500
+        sell_copper: 750
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: protective_ring
+        buy_copper: 30000
+        sell_copper: 15000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: storage_pouch
+        buy_copper: 10000
+        sell_copper: 5000
+        max_stock: 3
+        initial_stock: 3
+        restock_quantity: 1
+      - item_key: gliding_cloak
+        buy_copper: 80000
+        sell_copper: 40000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: purified_pendant
+        buy_copper: 15000
+        sell_copper: 7500
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: fearless_brooch
+        buy_copper: 15000
+        sell_copper: 7500
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: apothecary_beads
+        buy_copper: 2500
+        sell_copper: 1250
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+      - item_key: passion_silk_choker
+        buy_copper: 4800
+        sell_copper: 2400
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: radiant_holy_emblem
+        buy_copper: 20000
+        sell_copper: 10000
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+  - key: capital_remedies
+    offers:
+      - item_key: healing_potion
+        buy_copper: 100
+        sell_copper: 50
+        max_stock: 5
+        initial_stock: 3
+        restock_quantity: 2
+      - item_key: greater_healing_potion
+        buy_copper: 250
+        sell_copper: 125
+        max_stock: 5
+        initial_stock: 3
+        restock_quantity: 2
+      - item_key: mana_potion
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
+      - item_key: miners_bracing_broth
+        buy_copper: 50
+        sell_copper: 25
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: beastfolk_herbal_salve
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: passion_draught
+        buy_copper: 300
+        sell_copper: 150
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
 
 # Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
 # units relative to the world-day boundary.
@@ -377,6 +385,14 @@ shops:
     close_hour: 20
     restock_hour: 6
   - shop_key: altoria_tailor
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+  - shop_key: altoria_jeweller
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+  - shop_key: altoria_alchemist
     open_hour: 8
     close_hour: 20
     restock_hour: 6

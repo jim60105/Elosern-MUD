@@ -236,9 +236,11 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         )
         catalog = load_commerce_config(_SHIPPED_DIR)
         # ciaran-village-crafts grew the village to six shelves and six
-        # homes: four capital + six elven assortments, ten shops.
-        self.assertEqual(len(catalog["assortments"]), 10)
-        self.assertEqual(len(catalog["shops"]), 10)
+        # homes: four capital + the two split-off capital specialist bundles
+        # (altoria-adornments-and-remedies) + six elven assortments, twelve
+        # shops.
+        self.assertEqual(len(catalog["assortments"]), 12)
+        self.assertEqual(len(catalog["shops"]), 12)
         self.assertEqual(
             catalog["price_scales"], {"capital_altoria": 100, "village_ciaran": 100}
         )
@@ -288,6 +290,76 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         baseline = json.loads(_BASELINE.read_text(encoding="utf-8"))
         self.assertEqual(resolved["price_scales"], baseline["price_scales"])
         self.assertEqual(resolved["shops"], baseline["shops"])
+
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
+    )
+    def test_the_seventeen_moved_offers_travel_field_for_field(self):
+        # altoria-adornments-and-remedies moved seventeen offer rows out of
+        # general_sundries into the two new specialist bundles. A hand-moved
+        # row where a digit went missing is exactly what this guards: the
+        # literal BEFORE table below is the pre-move resolved offer of every
+        # moved item (captured from the shipped data at the parent commit and
+        # equal, field for field, to the re-baselined commerce_catalog_
+        # baseline.json's pre-move general-store rows); after the move, each
+        # key resolves — through the real loader and validators, not a
+        # re-parse of the YAML — in exactly ONE capital shop, with all five
+        # fields identical.
+        before = {
+            # accessory-slot adornments -> capital_adornments / altoria_jeweller
+            "silver_hairpin": (200, 100, 10, 5, 2),
+            "wolf_fang_necklace": (800, 400, 5, 2, 1),
+            "pilgrim_medallion": (1500, 750, 5, 2, 1),
+            "protective_ring": (30000, 15000, 1, 1, 1),
+            "storage_pouch": (10000, 5000, 3, 3, 1),
+            "gliding_cloak": (80000, 40000, 1, 1, 1),
+            "purified_pendant": (15000, 7500, 3, 1, 1),
+            "fearless_brooch": (15000, 7500, 3, 1, 1),
+            "apothecary_beads": (2500, 1250, 5, 2, 2),
+            "passion_silk_choker": (4800, 2400, 3, 1, 1),
+            "radiant_holy_emblem": (20000, 10000, 2, 1, 1),
+            # remedies -> capital_remedies / altoria_alchemist
+            "healing_potion": (100, 50, 5, 3, 2),
+            "greater_healing_potion": (250, 125, 5, 3, 2),
+            "mana_potion": (120, 60, 10, 4, 2),
+            "miners_bracing_broth": (50, 25, 20, 10, 5),
+            "beastfolk_herbal_salve": (60, 30, 20, 10, 5),
+            "passion_draught": (300, 150, 5, 2, 1),
+        }
+        commerce = load_commerce_config(_SHIPPED_DIR)
+        configs = validate_shop_configs(
+            commerce["shops"],
+            validate_assortment_configs(commerce["assortments"]),
+            validate_price_scales(commerce["price_scales"]),
+        )
+        for item_key, fields in before.items():
+            with self.subTest(item=item_key):
+                homes = [
+                    (shop_key, offer)
+                    for shop_key, cfg in configs.items()
+                    # Capital shops only: the village shelves deliberately
+                    # share remedy keys with the capital at village prices
+                    # (settlement-shops design §4.1).
+                    if shop_key.startswith("altoria_")
+                    for offer in cfg.offers
+                    if offer.item_key == item_key
+                ]
+                self.assertEqual(len(homes), 1, f"{item_key} offered by {len(homes)} shops")
+                offer = homes[0][1]
+                self.assertEqual(
+                    (
+                        offer.buy_copper,
+                        offer.sell_copper,
+                        offer.max_stock,
+                        offer.initial_stock,
+                        offer.restock_quantity,
+                    ),
+                    fields,
+                    f"{item_key} drifted from its pre-move offer",
+                )
+        # The two new shops are where the goods landed, in bundle size.
+        self.assertEqual(len(configs["altoria_jeweller"].offers), 11)
+        self.assertEqual(len(configs["altoria_alchemist"].offers), 6)
 
 
 if __name__ == "__main__":
