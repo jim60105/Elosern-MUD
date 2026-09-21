@@ -47,105 +47,78 @@ PROTOTYPES = {
         "prototype_parent": "grid_room",
         "key": "南門",
         "desc": (
-            "The southern gate of 聖潔王都, a wide arch where the pilgrim road "
-            "leaves the wilderness and enters the lower city. Everything the "
-            "capital grew into began here: a crossing on the river, then a "
-            "town, then a capital that climbed the rock behind it."
+            "聖潔王都的南門，一道寬拱，朝聖之路在這裡離開郊野走進下城。這座王都後來長成的一切都是從這裡開始的，一處渡口、然後一座鎮子、然後一座沿"
+            "著身後岩壁向上攀爬的王城。"
         ),
     },
     (1, 1): {
         "prototype_parent": "grid_room",
         "key": "碼頭埠",
         "desc": (
-            "The quayside of 聖潔王都, where barges from upriver tie off "
-            "against stone blackened by centuries of rope. The lower city is "
-            "the oldest part of the capital, and this is the oldest part of "
-            "the lower city: a river town's working waterfront, loud with "
-            "calls, gulls and cargo."
+            "聖潔王都的碼頭，上游來的駁船繫繩在被幾百年纜繩磨黑的石緣上。下城是王城最老的部分，而這裡是下城裡最老的一段，一座仍在營運的河港，叫賣"
+            "、水鳥與貨件吵成一片。"
         ),
     },
     (2, 1): {
         "prototype_parent": "grid_room",
         "key": "河岸道",
         "desc": (
-            "The riverside road of 聖潔王都, running east from the quayside "
-            "along the north bank. Houses lean shoulder to shoulder here — "
-            "the ground closest to the water was claimed first and never "
-            "gave an inch."
+            "聖潔王都的河岸道，從碼頭沿著北岸向東而去。屋舍在這裡肩並著肩擠成一排，離水最近的土地最先被認領，而且從不肯讓出一寸。"
         ),
     },
     (3, 1): {
         "prototype_parent": "grid_room",
         "key": "南大道",
         "desc": (
-            "The south main street of 聖潔王都, the first stretch of the "
-            "pilgrim road. From the 南門 a traveller walks straight up this "
-            "street and finds the whole city unrolling ahead: market, plaza, "
-            "steps, cathedral."
+            "聖潔王都的南大道，朝聖之路的第一段。從南門沿著它直直向上，整座城市就在前方攤開來，市集、廣場、階梯、大教堂。"
         ),
     },
     (4, 1): {
         "prototype_parent": "grid_room",
         "key": "客棧巷",
         "desc": (
-            "The inn lane of 聖潔王都. Travellers who reach the capital after "
-            "the upper terraces have closed have always slept down here, and "
-            "the lane's inns, stables and late taverns serve them on the same "
-            "crowded ground."
+            "聖潔王都的客棧巷。趕在上方台地關閉之後才到王都的旅人，向來都在下面一帶過夜；巷子裡的旅店"
+            "、馬廄與打烊遲的酒館，就在同一片擁擠的地面上招呼他們。"
         ),
     },
     (5, 1): {
         "prototype_parent": "grid_room",
         "key": "浴場前",
         "desc": (
-            "The front of the capital's bathhouse, steam and river-water "
-            "smell mingling at the curb. A river town got its baths before it "
-            "got anything grander, and this one has outlasted every wall the "
-            "city has built and outgrown."
+            "王都公共浴場門前，蒸氣與河水的氣味在路緣攪在一起。河鎮總是先有了浴池，才談得上別的排場；"
+            "而這一間浴場，比這座城市興築又捨棄的每一道牆都活得久。"
         ),
     },
     (2, 2): {
         "prototype_parent": "grid_room",
         "key": "舊城牆遺跡",
         "desc": (
-            "The ruins of the old city wall of 聖潔王都. This stub of "
-            "foundation is all that stands of the wall that once ringed the "
-            "lower city. When the capital outgrew it, the wall came down and "
-            "the cleared strip along its line became the widest open ground "
-            "the capital has — which is why the market street runs exactly "
-            "here. Read the map by this ruin: the belt above it is the grave "
-            "the wall became."
+            "聖潔王都的舊城牆遺跡。這截剩下的基腳，是曾經圈住下城的那道牆僅存的東西。王都長過了它的範圍之後，牆被拆了下來，沿牆線清出的帶狀空地成"
+            "了這座城市最寬敞的空地，市集街正是因此在這裡。對著這處遺跡讀地圖吧，它上方那條市集帶，就是那道牆變成的墳。"
         ),
     },
     (3, 2): {
         "prototype_parent": "grid_room",
         "key": "大道北段",
         "desc": (
-            "The north section of the pilgrim road, where 南大道 keeps "
-            "climbing toward the plaza. It leaves the lower city's crowding "
-            "behind along a stretch deliberately kept wide — carts of "
-            "offerings and feet of pilgrims have worn the paving smooth."
+            "朝聖之路的北段，南大道持續朝廣場攀升的地方。它把下城的擁擠拋在身後，沿著一段刻意留寬的路走，獻禮的車隊與朝聖者的腳，早把鋪石磨得平滑"
+            "。"
         ),
     },
     (1, 3): {
         "prototype_parent": "grid_room",
         "key": "工匠巷",
         "desc": (
-            "The craft alley of 聖潔王都, at the west end of the old wall "
-            "line. The noisy trades were pushed out here when the market took "
-            "the belt: hammer-song from the forge, chalk-dust and cloth from "
-            "the tailor, and a worn path cut diagonally up toward the drill "
-            "yard where apprentices run their wares."
+            "聖潔王都的工匠巷，在舊牆線的最西端。當市集取得了那條帶狀地，吵鬧的手藝就被擠到這裡來，鍛造鋪的錘聲如歌、裁縫坊的粉筆灰與布疋，還有一"
+            "條斜斜切往校場的磨舊小徑，學徒們帶著貨物跑的就是這條。"
         ),
     },
     (2, 3): {
         "prototype_parent": "grid_room",
         "key": "市場街",
         "desc": (
-            "The market street of 聖潔王都, the longest continuous street "
-            "of the capital. It is long because it is the cleared line of "
-            "the fallen wall — the ruin at its west end explains the street, "
-            "and the stalls on it are why the capital's trade flows east."
+            "聖潔王都的市場街，全王都最長的一條連續街道。它之所以長，是因為它正是那道倒下的牆清出來的牆線，街西頭的遺跡解釋了這條街的由來；而街上"
+            "的攤位，就是王都的貿易為什麼向東流的原因。"
         ),
     },
     (3, 3): {
@@ -153,120 +126,88 @@ PROTOTYPES = {
         "anchor_key": "capital_altoria",
         "key": "中央廣場",
         "desc": (
-            "The central plaza of 聖潔王都, the open hinge of the city. The "
-            "pilgrim road passes through it, the old wall's market belt "
-            "crosses beneath it, and the 聖階 steps rise from its far side to "
-            "the upper terraces. Maps of the capital are drawn from this "
-            "square, and so, most days, are arguments."
+            "聖潔王都的中央廣場，這座城市敞開的樞紐。朝聖之路從它中間穿過，舊城牆的市集帶在它下方橫切而過，聖階則從它遠端拔起，通往上方的台地。王"
+            "都的地圖是從這個廣場畫出去的，多數日子，吵架也是。"
         ),
     },
     (4, 3): {
         "prototype_parent": "grid_room",
         "key": "公會前",
         "desc": (
-            "The square before the adventurers' guild of 聖潔王都, one block "
-            "east of the plaza on the market belt. Contracts change hands in "
-            "the shade of its board before a pen ever moves past the doorsill, "
-            "and the guild's carters load hired swords and crates alike here."
+            "聖潔王都冒險者公會門前的廣場，在市集帶上、廣場以東一格。契約在它告示板的蔭下就交接了，筆"
+            "還沒進門檻，條件早已拍定；公會的搬運工也在這裡裝貨，雇來的刀客與木箱一齊上車。"
         ),
     },
     (5, 3): {
         "prototype_parent": "grid_room",
         "key": "東市",
         "desc": (
-            "The east market of 聖潔王都, where the old wall line's trade "
-            "meets the road out of the city's east gate. Grain, glass and "
-            "foreign coin pass through it, and a worn slope beside it cuts "
-            "the corner up to the cathedral for pilgrims who will not walk "
-            "the plaza and the steps."
+            "聖潔王都的東市，舊牆線上的貿易與出東門的道路交會的地方。穀物、玻璃與外國硬幣都經過它；道"
+            "旁一條磨舊的斜坡抄近直通向大教堂，專走給不肯繞廣場和聖階的朝聖者。"
         ),
     },
     (6, 3): {
         "prototype_parent": "grid_room",
         "key": "東門",
         "desc": (
-            "The eastern gate of 聖潔王都, at the far end of the market belt "
-            "where a road from the east would sensibly meet a river town's "
-            "high street. It came late — the wall it stands in is newer than "
-            "the ruin west of the plaza — and it is where the capital's "
-            "eastern trade, and most of its trouble, arrives."
+            "聖潔王都的東門，在市集帶的最遠端，正是東方來的道路會與河鎮主街合理相接的位置。它來得晚，它所立身的那道牆，比廣場西邊那處遺跡還新，王"
+            "都以東的買賣、以及多半的麻煩，都是從這扇門進來的。"
         ),
     },
     (2, 4): {
         "prototype_parent": "grid_room",
         "key": "校場外",
         "desc": (
-            "The drill yard below the upper terraces of 聖潔王都, where the "
-            "capital's levies and the guild's escorts learn to stand in "
-            "formation. The ground is beaten hard, the officers' voices carry "
-            "all the way to the craft alley, and the apprentices' diagonal "
-            "up from 工匠巷 wears a green seam across the slope."
+            "王都上方台地之下的校場外，徵兵與公會護衛在這裡學著站進陣形。地面被踩得堅硬，軍官的嗓子一"
+            "路傳得進工匠巷，從工匠巷斜斜上來的學徒小徑在坡上磨出一道草綠的縫。"
         ),
     },
     (3, 4): {
         "prototype_parent": "grid_room",
         "key": "聖階",
         "desc": (
-            "The sacred steps of 聖潔王都 — the last stretch of the pilgrim "
-            "road and the reason the upper city stays the upper city. Every "
-            "king crowned here has widened them, and every penitent who "
-            "climbs them on their knees measures the capital's ambition in "
-            "stone. Above them the ground that wanted height: church, "
-            "academy, palace."
+            "聖潔王都的聖階，朝聖之路的最後一段，也是上城始終是上城的原因。每一位在此加冕的王都把它們拓寬過，每一位跪著爬上來的懺悔者，都用石階量"
+            "過這座王都的野心。階頂之上是那片想要高度的地，教會、學院、王宮。"
         ),
     },
     (4, 4): {
         "prototype_parent": "grid_room",
         "key": "大神殿前",
         "desc": (
-            "The forecourt before the great cathedral of 聖潔王都, facing the "
-            "top of the 聖階 dead-on. The Church of Light took this terrace "
-            "before the crown took the one above it, and the ordering of the "
-            "two is a statement the whole city is built to repeat: God first, "
-            "and the crown watching from higher still."
+            "聖潔王都大神殿前的前庭，正面對著聖階的頂端。光明教會先取走了這層台地，王冠才取了它上面那一層；兩者的次序是這整座城市被蓋出來反覆宣示"
+            "的一句話，神在前，王冠在更高的地方俯視。"
         ),
     },
     (3, 5): {
         "prototype_parent": "grid_room",
         "key": "貴族區前",
         "desc": (
-            "The approach to the noble quarter of 聖潔王都, behind and above "
-            "the drill yard. The families that held the old lower-city "
-            "crossing bought their way up the rock one terrace at a time, and "
-            "their gates, lamplighters and leashed dogs show how long the "
-            "climb took."
+            "聖潔王都貴族區前的通道，在校場的後上方。當年握著下城渡口的那些家族，是一層台地一層台地買"
+            "上岩壁的；他們的門、點燈人與拴著的狗，都寫著這一段攀爬走了多久。"
         ),
     },
     (4, 5): {
         "prototype_parent": "grid_room",
         "key": "上城門",
         "desc": (
-            "The upper gate of 聖潔王都, set in the wall that encloses the "
-            "terrace of institutions. It still has a gatehouse and a "
-            "watch oath, though these days it exists mainly so the upper "
-            "city can close itself off on feast days — and on the days it "
-            "does not wish to be seen by the market belt."
+            "聖潔王都的上城門，嵌在圍起機構台地的那道牆裡。它還有門樓與守門誓約，不過如今它存在，主要是為了讓上城能在節日裡把自己關起來，以及在它"
+            "不想被市集帶看見的那些日子。"
         ),
     },
     (5, 5): {
         "prototype_parent": "grid_room",
         "key": "學院前",
         "desc": (
-            "The square before the capital's academy, on the eastern shoulder "
-            "of the climb. Students argue on its steps, sellers of ink and "
-            "second-hand theses circle them, and the slope down to the east "
-            "market is the shortest distance between theory and supper."
+            "王立魔法學院門前的廣場，在攀爬東側的肩頭。學生在它的階上爭辯，賣墨水與二手論文的販子圍著"
+            "他們打轉，而下到東市的那條斜坡，是理論到晚餐之間最短的距離。"
         ),
     },
     (4, 6): {
         "prototype_parent": "grid_room",
         "key": "王宮前庭",
         "desc": (
-            "The palace forecourt of 聖潔王都, the last node of the climb and "
-            "the highest ground in the capital. From here the whole teardrop "
-            "of the city lies below: river, quay, fallen wall, market belt, "
-            "steps and church — the river town's rock, held by a crown that "
-            "made a point of building above the church."
+            "聖潔王都的王宮前庭，攀登上的最後一格，也是王都裡最高的地面。從這裡看下去，整座城市像一滴淚攤在腳下，河、碼頭、倒下的牆、市集帶、階與"
+            "教堂，一塊河鎮的岩石，握在一個刻意把宮殿蓋在教堂之上的王冠手裡。"
         ),
     },
 }

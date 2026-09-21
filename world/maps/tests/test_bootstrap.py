@@ -108,7 +108,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         sync_grid()
 
         south_gate = GridRoom.objects.get(db_key="南門")
-        self.assertIn("southern gate", south_gate.db.desc)
+        # zhtw-room-prose: the spawn pin asserts the mechanism (the room's desc
+        # equals its authored prototype), not the sentence — the prototype's
+        # prose is Traditional Chinese like every other shipped room text.
+        from world.maps.altoria_capital import PROTOTYPES
+
+        self.assertEqual(
+            south_gate.db.desc, PROTOTYPES[(3, 0)]["desc"]
+        )
 
         changed = dict(XYMAP_DATA)
         changed["prototypes"] = dict(XYMAP_DATA["prototypes"])
