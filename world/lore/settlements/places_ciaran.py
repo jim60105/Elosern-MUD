@@ -20,11 +20,43 @@ ciaran-village-crafts adds the two homes the document names: 格威娜拉的家 
 銀葉坡, whose host makes the village's ornaments, and 妮瑞斯的家 off 藥草園,
 whose hedge-healer keeps the remedies out of the 調藥坊's absence. Rows stay
 alphabetical by host given name.
+
+ciaran-village-commons adds the three shared spaces the document names and the
+village lacked: 共食棚 off 村中廣場 — a host-less commons, because eating
+together is not a transaction in this culture — and the two homes whose people
+converse instead of trading: 泰莉爾的家 off 練刀場, where the village's sword
+instructor lives beside the blade-smith's doorstep, and 艾莉妮斯的家 off
+長老古樹下, home of the village's elder. Rows stay alphabetical by key.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 
 ROWS: tuple[PlaceDefinition, ...] = (
+    PlaceDefinition(
+        key="ciaran_elenis_home",
+        settlement_key="village_ciaran",
+        kind=PlaceKind.HOME,
+        room_name_zh="艾莉妮斯的家",
+        room_desc_zh=(
+            "The eldest house under the eldest tree, its doorway worn smooth "
+            "by a century of the same footsteps. Within, the room is spare "
+            "and unhurried: low seats, a ledge of kept seed-pods and folded "
+            "cloths, and nothing sorted for anyone's buying. The elder's "
+            "goods are remembered things — the village's own history, "
+            "kept whole, and none of them set out for a stranger's coin."
+        ),
+        exterior_xy=(1, 3),  # 長老古樹下
+        doorway_key_zh="艾莉妮斯的家",
+        doorway_aliases=("elenis", "elenis's home"),
+        host_name="艾莉妮斯·達恩斯特瑞德爾",
+        host_title="暗影谷村長老",
+        host_race="elf",
+        host_subrace="ciaran",
+        host_sex="female",
+        profession="attendant",
+        service_id="ciaran_elenis",
+        authored_kwargs=(("dialogue_key", "ciaran_elenis_home"),),
+    ),
     PlaceDefinition(
         key="ciaran_gwenaera_home",
         settlement_key="village_ciaran",
@@ -140,6 +172,50 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ("shop_key", "ciaran_nireth_home"),
             ("dialogue_key", "ciaran_nireth_home"),
         ),
+    ),
+    PlaceDefinition(
+        key="ciaran_shelter",
+        settlement_key="village_ciaran",
+        kind=PlaceKind.COMMONS,
+        room_name_zh="共食棚",
+        room_desc_zh=(
+            "A wide roof of woven branches over a floor worn level by "
+            "everyone's feet. Long tables stand in the shade; baskets of "
+            "the day's gathering sit open on them, and the kettle place is "
+            "already laid for whoever arrives next. Nobody tends the food "
+            "and nobody asks for it: what the forest gave the village is "
+            "simply set under one shared roof, and every villager eats from "
+            "the same table."
+        ),
+        exterior_xy=(1, 1),  # 村中廣場
+        doorway_key_zh="共食棚",
+        doorway_aliases=("shelter", "communal shelter"),
+    ),
+    PlaceDefinition(
+        key="ciaran_teliel_home",
+        settlement_key="village_ciaran",
+        kind=PlaceKind.HOME,
+        room_name_zh="泰莉爾的家",
+        room_desc_zh=(
+            "A home on the training ground's edge, its one clear space kept "
+            "swept for bare-foot forms. Wooden practice blades hang in a "
+            "row by the door, worn light at the handles by many hands; "
+            "cushions and a kettle sit opposite, for the resting that every "
+            "hour of practice costs. Nothing in the room is for sale — the "
+            "house of the village's sword instructor teaches the way its "
+            "yard always has, by the trainee's own repetition."
+        ),
+        exterior_xy=(2, 1),  # 練刀場
+        doorway_key_zh="泰莉爾的家",
+        doorway_aliases=("teliel", "teliel's home"),
+        host_name="泰莉爾·菲溫德",
+        host_title="暗影谷村刀術導師",
+        host_race="elf",
+        host_subrace="ciaran",
+        host_sex="female",
+        profession="attendant",
+        service_id="ciaran_teliel",
+        authored_kwargs=(("dialogue_key", "ciaran_teliel_home"),),
     ),
     PlaceDefinition(
         key="ciaran_valwyn_home",

@@ -59,17 +59,20 @@ class PlaceRegistryTests(unittest.TestCase):
         # lower, middle, upper — so the 南大道 eatery leads the capital rows
         # and the middle terrace's guild/store/forge/tailor/jeweller/alchemist
         # follow (altoria-adornments-and-remedies closed the specialist
-        # family); the village slice stays last, its six homes alphabetical
-        # by host given name (ciaran-village-crafts added 格威娜拉 and 妮瑞斯).
+        # family); the village slice stays last, its nine places alphabetical
+        # by key (ciaran-village-crafts added 格威娜拉 and 妮瑞斯;
+        # ciaran-village-commons added 艾莉妮斯的家, the 共食棚, and 泰莉爾的家).
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
                 "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
-                "ciaran_gwenaera_home", "ciaran_hailiel_home",
-                "ciaran_lareneth_home", "ciaran_nireth_home",
-                "ciaran_valwyn_home", "ciaran_vethiel_home",
+                "ciaran_elenis_home", "ciaran_gwenaera_home",
+                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_nireth_home", "ciaran_shelter",
+                "ciaran_teliel_home", "ciaran_valwyn_home",
+                "ciaran_vethiel_home",
             ],
         )
 
@@ -225,10 +228,13 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_tailor": "outfitter",
             "altoria_jeweller": "jeweller",
             "altoria_alchemist": "alchemist",
+            "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",
             "ciaran_lareneth_home": "home",
             "ciaran_nireth_home": "home",
+            "ciaran_shelter": "commons",
+            "ciaran_teliel_home": "home",
             "ciaran_valwyn_home": "home",
             "ciaran_vethiel_home": "home",
         }
