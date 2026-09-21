@@ -24,7 +24,7 @@ from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
-from world.rules.economy import buy, parse_merchant_stock, shop_is_open_at
+from world.rules.economy import parse_merchant_stock, shop_is_open_at
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
 from world.skills.equipment import list_items
@@ -126,7 +126,13 @@ class AdornmentsRemediesSyncTests(
                         (row for row in config.offers if stock.get(row.item_key, 0) > 0),
                         key=lambda row: row.buy_copper,
                     )
-                    result = buy(buyer, host, offer.item_key, 1)
+                    # The purchase itself rides the ordinary command, not the
+                    # API underneath it: parser, merchant resolution, schedule
+                    # gate and trade wiring all have to work for a player.
+                    purchase = self.call(
+                        CmdBuy(), f"{offer.item_key} 1", caller=buyer
+                    )
+                self.assertIn("你買了", purchase)
                 # The listing is headed by the shop's OWN room name, so the
                 # two specialists can never echo each other's counter.
                 self.assertIn(place.room_name_zh, listing)
@@ -139,4 +145,3 @@ class AdornmentsRemediesSyncTests(
                     parse_merchant_stock(merchant)[offer.item_key],
                     stock[offer.item_key] - 1,
                 )
-                self.assertGreater(result["total_copper"], 0)

@@ -146,7 +146,7 @@ TAILOR_RESPONSES: tuple[KeywordResponse, ...] = (
 JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "飾品",
-        "「銀髮簪、狼牙項鍊、朝聖者銅符——柜檯後這排玻璃櫃，全是能掛在身上的。"
+        "「銀髮簪、狼牙項鍊、朝聖者銅符——櫃檯後這排玻璃櫃，全是能掛在身上的。"
         "飾品槽有件數上限，挑你要的那幾件。`shop stock` 報的是現貨，"
         "看中哪件喊 `buy` 加品名。」",
     ),

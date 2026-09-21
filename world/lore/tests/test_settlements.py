@@ -163,7 +163,7 @@ class PlaceRegistryTests(unittest.TestCase):
         ),
     }
 
-    def test_the_assembled_registry_equals_the_pre_split_capture(self):
+    def test_pre_split_captured_rows_remain_verbatim_in_assembled_registry(self):
         from dataclasses import astuple
 
         # altoria-adornments-and-remedies projects the comparison onto the
