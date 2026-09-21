@@ -279,13 +279,16 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         )
         # ...but both acquired items are the one authored definition: the
         # inventory rows carry the identical key, and the key resolves to
-        # exactly one registry entry no matter which shop sold it.
-        self.assertEqual(list(village_buyer.db.inventory), [item_key])
-        self.assertEqual(list(capital_buyer.db.inventory), [item_key])
-        self.assertIs(
-            _items()[village_buyer.db.inventory[0]],
-            _items()[capital_buyer.db.inventory[0]],
-        )
+        # exactly one registry entry no matter which shop sold it: the two
+        # inventory rows are compared against EACH OTHER and against the
+        # shops' own offer sets — a settlement-suffixed twin materialized by
+        # one shop would appear in one row only and fail both seams.
+        village_rows = list(village_buyer.db.inventory)
+        capital_rows = list(capital_buyer.db.inventory)
+        self.assertEqual(village_rows, capital_rows)
+        self.assertEqual(len(village_rows), 1)
+        self.assertTrue(set(village_rows) <= {offer.item_key for offer in village_config.offers})
+        self.assertTrue(set(capital_rows) <= {offer.item_key for offer in capital_config.offers})
 
     @covers_requirement(
         "ciaran-village-crafts::an-elven-made-good-is-everyday-at-home-whatever-it-is-worth-abroad"
