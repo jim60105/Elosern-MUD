@@ -7,6 +7,7 @@ shares (``_require_place_kwargs`` / ``_place_for_shop``).
 from typing import Any
 
 from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.places import place_is_hostless
 
 from ._loaders import _commerce_error, _error, _require_text
 from ._types import ServiceHostRow
@@ -15,10 +16,12 @@ from ._types import ServiceHostRow
 def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     """Batch-validate the service-host roster derived from the place registry (design §3.2).
 
-    The roster is no longer authored: each place yields one row declaring
-    ``name``/``title`` (the host identity), ``profession``, the interior room
-    tag the place anchors to (its key), ``service_id``, and the authored
-    component identity kwargs. Every rejection the hand-authored roster
+    The roster is no longer authored: each place that declares a host yields
+    one row declaring ``name``/``title`` (the host identity), ``profession``,
+    the interior room tag the place anchors to (its key), ``service_id``, and
+    the authored component identity kwargs. A place authors no host at all
+    (hostless-places) contributes no row — the projection covers exactly the
+    host-declaring places. Every rejection the hand-authored roster
     carried runs unchanged over the derived rows: a profession naming no
     registry row, a blueprint component whose identity kwargs the place fails
     to supply, surplus kwargs no component consumes, a person-bound profession
@@ -38,6 +41,11 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     rows: list[ServiceHostRow] = []
     seen_service_ids: set[str] = set()
     for place in PLACE_REGISTRY.values():
+        # One row per host-declaring place: a place authors either a complete
+        # host or none of it (validate_place_registry), and the host-less
+        # rows contribute nothing to the roster.
+        if place_is_hostless(place):
+            continue
         what = f"place {place.key!r}"
         name = _require_text(place.host_name, f"{what}.host_name")
         title = _require_text(place.host_title, f"{what}.host_title")
