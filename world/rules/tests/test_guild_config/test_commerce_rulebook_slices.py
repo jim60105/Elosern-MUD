@@ -235,8 +235,10 @@ class CommerceRulebookSliceTests(unittest.TestCase):
             ["altoria.yaml", "ciaran.yaml", "scales.yaml"],
         )
         catalog = load_commerce_config(_SHIPPED_DIR)
-        self.assertEqual(len(catalog["assortments"]), 8)
-        self.assertEqual(len(catalog["shops"]), 8)
+        # ciaran-village-crafts grew the village to six shelves and six
+        # homes: four capital + six elven assortments, ten shops.
+        self.assertEqual(len(catalog["assortments"]), 10)
+        self.assertEqual(len(catalog["shops"]), 10)
         self.assertEqual(
             catalog["price_scales"], {"capital_altoria": 100, "village_ciaran": 100}
         )
@@ -245,10 +247,16 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         "commerce-assortments::commerce-balance-data-is-a-set-of-files-not-one-file"
     )
     def test_resolved_shipped_catalog_equals_the_pre_split_baseline(self):
-        # The split promises the resolved catalog moved verbatim: every
-        # shop's offers, prices, stock and hours. The baseline is the
-        # pre-split resolved catalog (normalized JSON) captured before the
-        # directory existed — the one-time guard made permanent.
+        # The split promised the resolved catalog moved verbatim: every
+        # shop's offers, prices, stock and hours. The baseline started as
+        # the pre-split resolved catalog (normalized JSON) captured before
+        # the directory existed and is the equality guard the slice loader
+        # must keep passing — re-baselined whenever a content change
+        # deliberately moves the catalog (ciaran-village-crafts added the
+        # two village homes' shops, moved the earring offer between
+        # shelves, and added the remedy offers). What it must NEVER absorb
+        # is drift from the SLICE LOADERS: the offers still have to resolve
+        # through the same merge/validation path the split introduced.
         commerce = load_commerce_config(_SHIPPED_DIR)
         configs = validate_shop_configs(
             commerce["shops"],

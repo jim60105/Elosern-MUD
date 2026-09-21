@@ -1,4 +1,6 @@
-"""Slice of ``test_guild_economy_sync``: TradePathNoArchetypeBranchTests, CiaranVillageCommerceTests.
+"""Data-contract test: elven village commerce content contract
+
+Slice of ``test_guild_economy_sync``: TradePathNoArchetypeBranchTests, CiaranVillageCommerceTests.
 """
 from tools.spec_traceability import covers_requirement
 import unittest
@@ -109,6 +111,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
     )
+    @covers_requirement(
+        "ciaran-village-crafts::the-village-supplies-adornments-and-remedies-from-two-more-homes"
+    )
     def test_village_interiors_doorways_and_hosts_appear_after_sync(self):
         sync_service_content()
         places = _village_places()
@@ -155,6 +160,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "ciaran-village-commerce::a-settlement-without-shops-is-fully-playable"
     )
+    @covers_requirement(
+        "ciaran-village-crafts::the-village-supplies-adornments-and-remedies-from-two-more-homes"
+    )
     def test_village_titles_avoid_commercial_words(self):
         sync_service_content()
         for place in _village_places():
@@ -170,6 +178,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "ciaran-village-commerce::one-good-is-sold-at-two-prices-in-two-settlements"
+    )
+    @covers_requirement(
+        "ciaran-village-crafts::an-elven-made-good-is-everyday-at-home-whatever-it-is-worth-abroad"
     )
     def test_elven_goods_resolve_at_two_prices_across_two_settlements(self):
         # The mechanic is the DUAL RESOLUTION: one authored item key priced
@@ -218,6 +229,140 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
             village_offered - capital_offered,
             "the capital imported the village's whole shelf",
         )
+
+    @covers_requirement(
+        "ciaran-village-crafts::an-elven-made-good-is-everyday-at-home-whatever-it-is-worth-abroad"
+    )
+    def test_one_key_bought_at_both_settlements_yields_one_item_definition(self):
+        # The two-price scenario's other half: buying the shared key in the
+        # village and in the capital acquires the SAME item definition. The
+        # village does not stock a village-flavoured copy — both sides sell
+        # the one ITEM_REGISTRY entry, and a buyer who shops both settlements
+        # ends up holding the same key twice, not a settlement-suffixed twin.
+        sync_service_content()
+        village_config, capital_config, item_key = self._shared_settlement_goods()[0]
+        place = next(
+            place
+            for place in _village_places()
+            if self._village_shops()[place.key] is village_config
+        )
+        village_store = self._village_interior(place)
+        village_host = self._village_host(place)
+        capital_place = next(
+            place
+            for place in _places().values()
+            if dict(place.authored_kwargs).get("shop_key")
+            and self._capital_config_for(place) is capital_config
+        )
+        capital_store = self._village_interior(capital_place)
+        capital_host = NPC.objects.filter(db_key=capital_place.host_name).first()
+        self.assertIsNotNone(capital_host)
+        village_buyer = create_object(PlayerCharacter, key="village_two_price_buyer")
+        village_buyer.race = "human"
+        village_buyer.apply_race_baseline()
+        village_buyer.location = village_store
+        village_buyer.db.wallet = 1_000_000
+        capital_buyer = create_object(PlayerCharacter, key="capital_two_price_buyer")
+        capital_buyer.race = "human"
+        capital_buyer.apply_race_baseline()
+        capital_buyer.location = capital_store
+        capital_buyer.db.wallet = 1_000_000
+        with patch(
+            "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
+        ):
+            in_village = buy(village_buyer, village_host, item_key, 1)
+            in_capital = buy(capital_buyer, capital_host, item_key, 1)
+        # Two settlements, two prices (the data half the companion test
+        # pins): what leaves each wallet differs...
+        self.assertNotEqual(
+            1_000_000 - village_buyer.db.wallet, 1_000_000 - capital_buyer.db.wallet
+        )
+        # ...but both acquired items are the one authored definition: the
+        # inventory rows carry the identical key, and the key resolves to
+        # exactly one registry entry no matter which shop sold it: the two
+        # inventory rows are compared against EACH OTHER and against the
+        # shops' own offer sets — a settlement-suffixed twin materialized by
+        # one shop would appear in one row only and fail both seams.
+        village_rows = list(village_buyer.db.inventory)
+        capital_rows = list(capital_buyer.db.inventory)
+        self.assertEqual(village_rows, capital_rows)
+        self.assertEqual(len(village_rows), 1)
+        self.assertTrue(set(village_rows) <= {offer.item_key for offer in village_config.offers})
+        self.assertTrue(set(capital_rows) <= {offer.item_key for offer in capital_config.offers})
+
+    @covers_requirement(
+        "ciaran-village-crafts::an-elven-made-good-is-everyday-at-home-whatever-it-is-worth-abroad"
+    )
+    def test_rarity_is_read_nowhere_in_resolving_village_prices(self):
+        # 「稀有度不抬村價」: rarity is a presentation classification (the
+        # item registry's own contract), and the village price resolves
+        # through the assortment rows alone. This tripwire scans the
+        # commerce data, loader, validator and trade path for the token —
+        # none may read it — and pairs that with the shipped fact that the
+        # village's expensive-rarity goods price at the village's everyday
+        # scale: strictly below every capital offer, where the same key is
+        # offered at all.
+        root = Path(__file__).resolve().parents[4]
+        for relative in (
+            "world/rules/guild_config/_commerce.py",
+            "world/rules/guild_config/_shops.py",
+            "world/rules/economy.py",
+            "world/rules/rulebook/commerce/ciaran.yaml",
+        ):
+            source = (root / relative).read_text(encoding="utf-8")
+            self.assertNotIn("rarity", source, f"{relative} reads rarity")
+        catalog_village = {
+            offer.item_key: offer.buy_copper
+            for config in self._village_shops().values()
+            for offer in config.offers
+        }
+        capital_prices: dict[str, list[int]] = {}
+        for config in self._capital_shops():
+            for offer in config.offers:
+                capital_prices.setdefault(offer.item_key, []).append(offer.buy_copper)
+        shared = set(catalog_village) & set(capital_prices)
+        self.assertTrue(shared, "no village good is offered in the capital")
+        for item_key in sorted(shared):
+            with self.subTest(item=item_key):
+                # The shared goods are all authored ABOVE the common rarity
+                # tier — and the village price is the everyday one anyway:
+                # cheaper than every capital resolution of the key.
+                self.assertNotEqual(
+                    _items()[item_key].presentation.rarity, "common"
+                )
+                self.assertLess(
+                    catalog_village[item_key], min(capital_prices[item_key])
+                )
+
+    @covers_requirement(
+        "ciaran-village-crafts::the-village-supplies-adornments-and-remedies-from-two-more-homes"
+    )
+    def test_crescent_earring_is_offered_by_one_village_shop_at_its_moved_price(self):
+        # The adornment move (design §"crescent_earring changes hands inside
+        # the village"): exactly one village shop offers the key — the
+        # per-shop overlap rule depends on it — and the offer row travelled
+        # verbatim: the price the collector's shelf carried is the price
+        # the adornment-maker's shelf carries.
+        village_offers = [
+            offer
+            for config in self._village_shops().values()
+            for offer in config.offers
+            if offer.item_key == "crescent_earring"
+        ]
+        self.assertEqual(len(village_offers), 1, "village shops disagree on the earring")
+        offer = village_offers[0]
+        self.assertEqual((offer.buy_copper, offer.sell_copper), (120, 60))
+        self.assertEqual(
+            (offer.max_stock, offer.initial_stock, offer.restock_quantity),
+            (3, 1, 1),
+        )
+
+    def _capital_config_for(self, place):
+        catalog = get_catalog()
+        shop_key = dict(place.authored_kwargs).get("shop_key")
+        if shop_key is None or shop_key not in catalog.shop_configs:
+            return None
+        return catalog.shop_configs[shop_key]
 
     @covers_requirement(
         "ciaran-village-commerce::trading-without-commerce-uses-the-identical-mechanism"

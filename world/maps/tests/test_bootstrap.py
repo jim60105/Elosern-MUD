@@ -68,13 +68,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
-        # Two settlements: the capital's twenty-one rooms and the village's six.
-        self.assertEqual(self._count_grid_rooms(), 27)
-        # 52 capital directed links + 10 village directed links.
-        self.assertEqual(self._count_city_exits(), 62)
+        # Two settlements: the capital's twenty-one rooms and the village's
+        # ten (ciaran-village-crafts grew 暗影谷村 from six nodes to ten).
+        self.assertEqual(self._count_grid_rooms(), 31)
+        # 52 capital directed links + 18 village directed links.
+        self.assertEqual(self._count_city_exits(), 70)
         # One forward Limbo bridge per CITY_GATE_REGISTRY row.
         self.assertEqual(len(self._bridging_exits()), 2)
-        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 64)
+        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 72)
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -90,17 +91,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             for room in GridRoom.objects.all_family()
         }
 
-        self.assertEqual(self._count_grid_rooms(), 27)
-        self.assertEqual(self._count_city_exits(), 62)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
         self.assertEqual(len(self._bridging_exits()), 2)
         self.assertEqual(first_ids, second_ids)
 
-    def test_single_call_on_fresh_grid_spawns_all_twenty_seven_rooms(self):
+    def test_single_call_on_fresh_grid_spawns_all_thirty_one_rooms(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
 
         self.assertEqual(XYZGrid.objects.all().count(), 0)
         sync_grid()
-        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_grid_rooms(), 31)
 
     def test_in_place_update_changes_desc_without_new_room(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -121,7 +122,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         grid.reload()
         grid.spawn()
 
-        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_grid_rooms(), 31)
         south_gate = GridRoom.objects.get(db_key="南門")
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
@@ -199,8 +200,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_absent_limbo_degrades_without_raising(self):
         sync_grid()
 
-        self.assertEqual(self._count_grid_rooms(), 27)
-        self.assertEqual(self._count_city_exits(), 62)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
         self.assertEqual(len(self._bridging_exits()), 0)
 
     @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
@@ -456,8 +457,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 27)
-        self.assertEqual(self._count_city_exits(), 62)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
         self.assertEqual(len(self._bridging_exits()), 0)
         from evennia.utils.search import search_script
 
@@ -467,8 +468,8 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         create_object(Room, key=LIMBO_KEY, location=None)
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 27)
-        self.assertEqual(self._count_city_exits(), 62)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
         self.assertEqual(len(self._bridging_exits()), 2)
 
 
@@ -594,7 +595,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     def test_at_server_start_provisions_wilderness_too(self):
         at_server_start()
 
-        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_grid_rooms(), 31)
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         scripts = WildernessScript.objects.filter(db_key=WILDERNESS_NAME)

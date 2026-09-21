@@ -31,7 +31,8 @@ class AssortmentDefinition:
 # alone, and each specialist references exactly one other assortment
 # (altoria-trading-places §6.1).
 #
-# The four elven-craft assortments serve 暗影谷村 (design §6.2, §10 change 7):
+# The six elven-craft assortments serve 暗影谷村 (design §6.2, §10 change 7,
+# grown by ciaran-village-crafts):
 # each villager's home carries one shelf of what its host happens to make or
 # collect. They share keys with the capital where the world document
 # requires it — ``elven_spider_silk`` and ``elven_candied_blossom`` are also
@@ -114,7 +115,27 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             key="elven_sundries",
             display_name_zh="精靈雜貨",
             item_keys=(
-                "elven_spider_silk", "crescent_earring",
+                "elven_spider_silk",
+            ),
+        ),
+        # ciaran-village-crafts: two more villagers' shelves. 精靈綴飾 is the
+        # adornment maker's work — the crescent earring moves here verbatim
+        # from 精靈雜貨, joined by the prism charm; 精靈調藥 is the hedge
+        # healer's remedies. Both remedies are also capital goods, offered in
+        # the village at everyday prices under the same two-price rule as the
+        # silk.
+        AssortmentDefinition(
+            key="elven_adornments",
+            display_name_zh="精靈綴飾",
+            item_keys=(
+                "prism_charm", "crescent_earring",
+            ),
+        ),
+        AssortmentDefinition(
+            key="elven_remedies",
+            display_name_zh="精靈調藥",
+            item_keys=(
+                "greater_healing_potion", "mana_potion",
             ),
         ),
     )

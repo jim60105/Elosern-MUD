@@ -496,6 +496,29 @@
       "open_hour": 8,
       "restock_hour": 6
     },
+    "ciaran_gwenaera_home": {
+      "close_hour": 19,
+      "offers": [
+        {
+          "buy_copper": 120,
+          "initial_stock": 1,
+          "item_key": "crescent_earring",
+          "max_stock": 3,
+          "restock_quantity": 1,
+          "sell_copper": 60
+        },
+        {
+          "buy_copper": 10000,
+          "initial_stock": 1,
+          "item_key": "prism_charm",
+          "max_stock": 3,
+          "restock_quantity": 1,
+          "sell_copper": 5000
+        }
+      ],
+      "open_hour": 7,
+      "restock_hour": 6
+    },
     "ciaran_hailiel_home": {
       "close_hour": 19,
       "offers": [
@@ -534,17 +557,32 @@
       "open_hour": 7,
       "restock_hour": 6
     },
-    "ciaran_valwyn_home": {
+    "ciaran_nireth_home": {
       "close_hour": 19,
       "offers": [
         {
-          "buy_copper": 120,
-          "initial_stock": 1,
-          "item_key": "crescent_earring",
-          "max_stock": 3,
-          "restock_quantity": 1,
-          "sell_copper": 60
+          "buy_copper": 150,
+          "initial_stock": 2,
+          "item_key": "greater_healing_potion",
+          "max_stock": 5,
+          "restock_quantity": 2,
+          "sell_copper": 75
         },
+        {
+          "buy_copper": 80,
+          "initial_stock": 5,
+          "item_key": "mana_potion",
+          "max_stock": 10,
+          "restock_quantity": 5,
+          "sell_copper": 40
+        }
+      ],
+      "open_hour": 7,
+      "restock_hour": 6
+    },
+    "ciaran_valwyn_home": {
+      "close_hour": 19,
+      "offers": [
         {
           "buy_copper": 60,
           "initial_stock": 10,

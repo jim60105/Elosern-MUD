@@ -96,16 +96,18 @@ class ShopNPCIdentityTests(unittest.TestCase):
         self.assertIn("guild_branch:guild_branch_altoria", str(caught.exception))
         self.assertIn("guild_rank:F", str(caught.exception))
 
-    def test_shipped_registry_carries_the_four_capital_and_four_village_shops(self):
+    def test_shipped_registry_carries_the_four_capital_and_six_village_shops(self):
         # The capital shops arrive in terrace-slice order (altoria-place-slices):
         # the lower terrace's eatery precedes the middle terrace's store,
-        # forge and tailor; the village homes close.
+        # forge and tailor; the village homes close, alphabetical by host
+        # given name (ciaran-village-crafts grew the village to six homes).
         self.assertEqual(
             list(SHOP_REGISTRY),
             [
                 "altoria_eatery", "altoria_general_store",
                 "altoria_forge", "altoria_tailor",
-                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_gwenaera_home", "ciaran_hailiel_home",
+                "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],
         )
