@@ -16,6 +16,11 @@
 - [x] 1.2 In `validate_place_registry`, add the all-or-nothing check over those seven fields.
   The error names the place, the fields found and the fields missing; that message is the point
   of the rule, so assert on its content, not just that it raises.
+  Implemented per design.md's resolution of this wording: the counted group is the SIX
+  scalar fields (`host_subrace` is outside the count by design); `authored_kwargs` governs
+  absence through the shared `place_is_hostless` predicate — a stray non-empty kwargs
+  tuple (or subrace) on an otherwise wholly absent group is a partial-host offense naming
+  the field, and a complete host may legitimately author `authored_kwargs=()`.
 - [x] 1.3 Extend the existing goods rule: a place authoring no host SHALL declare no
   `assortment_keys`, no `extra_item_keys` and no `excluded_item_keys`. Fold it into the block
   that already enforces assortments-iff-shop-identity rather than adding a second loop.

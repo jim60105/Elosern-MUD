@@ -77,18 +77,22 @@ class CatalogRegistryIsolation(unittest.TestCase):
 
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
-        self._catalog = CATALOG
+        # Snapshot the REAL module cache (the name imported above is a value
+        # copy; rebinding it restores nothing).
+        import world.rules.guild_config as _guild_config
+
+        self._guild_config_module = _guild_config
+        self._catalog = _guild_config.CATALOG
         register_catalog()
 
     def tearDown(self):
-        global CATALOG
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 
         QUEST_DEFINITION_REGISTRY.clear()
         QUEST_DEFINITION_REGISTRY.update(self._registry_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offer_items)
-        CATALOG = self._catalog
+        self._guild_config_module.CATALOG = self._catalog
         super().tearDown()
 
 def raw_rulebook() -> dict:
