@@ -363,19 +363,17 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
         # failure-safe: the rooms come back in a finally-block, so an
         # interrupted run never leaves the shard without the crown's rooms.
         places = _crown_watch_places()
-        saved_rows = {}
-        # Rows leave the registry FIRST (addCleanup backstops it even if a
-        # later step throws), and the teardown sits INSIDE the try: an
-        # exception mid-teardown — after one room is gone and before the
-        # next was saved — still rebuilds through the finally, so the
-        # shared keepdb shard never keeps a half-torn-down world
-        # (post-implementation review).
-        for place in places:
-            saved_rows[place.key] = _places()[place.key]
-            del _places()[place.key]
+        # Save EVERY row before ANY is removed, register the last-resort
+        # cleanup, and only then enter the try: from the first destructive
+        # operation onward, an exception anywhere — mid-teardown, after one
+        # room is gone and before the next was reached — still rebuilds
+        # through the finally, so the shared keepdb shard never keeps a
+        # half-torn-down world (post-implementation review, twice).
+        saved_rows = {place.key: _places()[place.key] for place in places}
         self.addCleanup(_places().update, saved_rows)
         try:
             for place in places:
+                del _places()[place.key]
                 exterior = _exterior(place)
                 for doorway in list(exterior.exits):
                     if doorway.key == place.doorway_key_zh:
