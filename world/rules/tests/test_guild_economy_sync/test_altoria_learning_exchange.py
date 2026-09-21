@@ -178,11 +178,22 @@ def _table_text(place):
 
 
 def _backticked_tokens(text):
-    """Every ASCII backticked token in authored prose (command mentions)."""
+    """EVERY backticked token in authored prose, of any script (command
+    mentions). No ASCII filter: a CJK command key is exactly as load-bearing
+    as a Latin one, and skipping them would let a table advertise a
+    non-existent or builder-only CJK command unseen."""
+    return {token.strip() for token in re.findall(r"`([^`]+)`", text) if token.strip()}
+
+
+def _player_usable_command_keys():
+    """Key -> command for every mounted project command an ordinary player
+    can execute: the docs-covered mounted surface minus anything gated to
+    the Builders permission (``地圖`` really is mounted and really is
+    builder-only — the shipped docs say so in its own context column)."""
     return {
-        token
-        for token in re.findall(r"`([^`]+)`", text)
-        if re.fullmatch(r"[a-z][a-z ]*", token)
+        command.key: command
+        for command in mounted_command_classes().values()
+        if "Builders" not in (getattr(command, "locks", "") or "")
     }
 
 
@@ -200,7 +211,7 @@ def _mounted_command_surface():
         surface.add(command.key)
         surface.update(command.aliases)
     for entry in EXPECTED_COMMANDS.values():
-        surface.update(re.findall(r"[a-z][a-z ]*", entry["syntax"]))
+        surface.update(re.findall(r"[a-z][a-z ]*[a-z]|[a-z]", entry["syntax"]))
     return {token.strip() for token in surface}
 
 
@@ -217,6 +228,41 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         player.race = "human"
         player.apply_race_baseline()
         return player
+
+    def _restore_world(self, snapshot):
+        """Idempotent world repair for the lift-and-resync gate: rows back
+        from an IMMUTABLE caller-held snapshot (never cleared), patches
+        stopped (double-stop tolerated). The real synchronisation only runs
+        when the world is actually missing one of this gate's three rooms or
+        hosts: after the finally-block's restore succeeded the cleanup
+        re-entry is a pure health check — a late re-sync would cold-load the
+        catalog against the fixture quest registry, which is exactly the
+        state a post-tearDown cleanup must NOT do (the base's tearDown has
+        already reset the catalog cache by then). Registered as a cleanup
+        BEFORE any destructive mutation, so a failure inside the finally
+        block's own restore still leaves the cleanup to retry the rebuild —
+        the shard never keeps a torn-down academy, hall or stalls. Every
+        step is safe to run twice: a dict-copy row update, an
+        already-stopped patcher, an idempotent sync."""
+        _places().update(dict(snapshot))
+        for patcher in self._patchers:
+            try:
+                patcher.stop()
+            except RuntimeError:
+                pass  # the finally block already stopped this one
+        self._patchers.clear()
+        if all(
+            search_object_by_tag(place.key)
+            and (
+                place.kind == "market"
+                or _host(place) is not None
+            )
+            for place in _learning_exchange_places()
+        ):
+            return  # the finally-block's restore already completed the job
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_interiors()
+            sync_service_content()
 
     @covers_requirement(
         "altoria-learning-and-exchange::the-capital-has-an-academy-a-merchant-hall-and-covered-market-stalls"
@@ -368,6 +414,16 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                 ranks_answer,
                 f"the ladder answer lost rung {tier.key}",
             )
+            # Every example spell the registry lists for a rung is recited by
+            # the academy's answer (the 究極 rung lists none, so the loop is
+            # the honest boundary there) — a later rewrite cannot hollow the
+            # ladder into bare rung names.
+            for spell in tier.example_spells_zh:
+                self.assertIn(
+                    spell,
+                    ranks_answer,
+                    f"the ladder answer dropped {tier.key}'s {spell}",
+                )
         for element in _element_roster().values():
             self.assertIn(
                 element.display_name_zh,
@@ -431,6 +487,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # tables resolves to a REAL mounted command — the tables teach what
         # exists and invent nothing.
         surface = _mounted_command_surface()
+        playable = _player_usable_command_keys()
         for place in _staffed_places():
             with self.subTest(place=place.kind):
                 dialogue_key = _authored(place)["dialogue_key"]
@@ -439,7 +496,22 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                     self.assertNotIn(verb, text, place.kind)
                 self.assertNotIn("賣", text, place.kind)
                 for token in _backticked_tokens(text):
-                    self.assertIn(token, surface, f"{place.kind} names a fake command")
+                    if re.fullmatch(r"[a-z][a-z ]*", token):
+                        self.assertIn(
+                            token, surface, f"{place.kind} names a fake command"
+                        )
+                    elif re.fullmatch(r"[\u4e00-\u9fff]+", token):
+                        # CJK command keys are checked against ACCESSIBILITY,
+                        # not mere membership: every CJK command a table
+                        # backticks must be one an ordinary player can
+                        # execute (``地圖`` is mounted but builder-gated —
+                        # a table sending players to it would pass membership
+                        # and still mislead; neither new table does).
+                        self.assertIn(
+                            token,
+                            playable,
+                            f"{place.kind} advertises an unplayable command",
+                        )
         dean_text = _table_text(_academy())
         self.assertIn("沒有『拜師』這道門", dean_text, "the dean offers apprenticeship again")
         # The dean points at the acquisition path that really exists.
@@ -452,6 +524,10 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # `guild request` really is a mounted command, and it really is the
         # closed door the table sends enquirers to.
         self.assertIn("guild request", surface)
+        # And the hall sends route-seekers to a command the player can ACTUALLY
+        # run (`前往`), not to the builder-gated `地圖`.
+        self.assertIn("`前往`", guild_text)
+        self.assertNotIn("`地圖`", guild_text)
 
     @covers_requirement(
         "altoria-learning-and-exchange::neither-location-implements-the-system-it-is-the-future-home-of"
@@ -464,13 +540,15 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # are the command set and the persisted attribute vocabulary taken.
         # The rooms then arrive through the real synchronisation, and neither
         # surface may have gained anything. Restoration is failure-safe: the
-        # rooms come back in a finally-block, so an interrupted run never
-        # leaves the shard without the capital's academy, hall or stalls.
+        # rooms come back through an idempotent cleanup registered BEFORE the
+        # first destructive mutation (holding a snapshot that is never
+        # cleared), so even a raise inside the finally-block's own restore
+        # leaves the cleanup to rebuild the shard's academy, hall and stalls.
         places = _learning_exchange_places()
         # Save EVERY row before ANY is removed, register the last-resort
         # cleanup, and only then enter the try.
         saved_rows = {place.key: _places()[place.key] for place in places}
-        self.addCleanup(_places().update, saved_rows)
+        self.addCleanup(self._restore_world, saved_rows)
         try:
             for place in places:
                 del _places()[place.key]
@@ -507,17 +585,9 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
             }
         finally:
             # Rebuild the world whatever happened above: rows back, patches
-            # stopped, real synchronisation. The base's addCleanup stops each
-            # patcher once only, so clearing _patchers after stopping is the
-            # idempotence contract here.
-            _places().update(saved_rows)
-            saved_rows.clear()
-            for patcher in self._patchers:
-                patcher.stop()
-            self._patchers.clear()
-            with self.captureOnCommitCallbacks(execute=True):
-                sync_service_interiors()
-                sync_service_content()
+            # stopped, real synchronisation — the SAME call the cleanup
+            # would make, and the snapshot survives untouched either way.
+            self._restore_world(saved_rows)
         # The rooms arrived.
         for place in places:
             with self.subTest(arrival=place.kind):
