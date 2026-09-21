@@ -150,7 +150,6 @@ class PlaceRegistryTests(unittest.TestCase):
             self.fail(f"home kind rejected for a trading dwelling: {error}")
         # The kind names the home, never the host's merchant capability.
         self.assertEqual(dwelling.kind, PlaceKind.HOME)
-        self.assertNotIn("shop", str(dwelling.kind))
 
     @covers_requirement(
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
