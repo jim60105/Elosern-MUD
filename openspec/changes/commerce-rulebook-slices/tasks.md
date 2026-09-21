@@ -50,3 +50,19 @@
   idempotently). Note: `tools.test_data_lint check` reports one pre-existing violation in
   `world/rules/tests/test_dialogue.py` (`symbol-ref:DIALOGUE_TABLE`) that is present on the
   master baseline too — untouched by this change and not newly introduced here.
+
+## Duck review dispositions (plan-as-executed critique)
+
+- 🔴 Adopted: PyYAML silently keeps the LAST duplicate mapping key, so a repeated
+  settlement scale (or any duplicated mapping field) inside one slice would reprice
+  without signal. The loader now parses each slice with a duplicate-rejecting
+  SafeLoader (the repo's item_effects/equipment_effects pattern) — commit 1d7fdf78.
+- 🟡 Adopted: unknown top-level sections / empty slices are rejected naming the file
+  (a typo'd section can no longer load as a silent no-op slice).
+- 🟡 Adopted: non-string row keys raise the named GuildConfigError instead of a raw
+  TypeError from the owners map.
+- 🟡 Adopted: the task-1.1 guard is permanent — the pre-split resolved catalog ships
+  as `commerce_catalog_baseline.json` and a covering test compares every shop's
+  offers, prices, stock and hours against it.
+- 🟢 Adopted: same-file duplicate row keys report `declared twice in commerce/<file>`
+  rather than naming one file as if it were two.
