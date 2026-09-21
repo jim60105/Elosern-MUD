@@ -59,12 +59,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # (altoria-adornments-and-remedies closed the specialist family and this
     # pin had never ridden that growth), the upper terrace's temple 主祭 and
     # sanctum 執事 close the capital block (altoria-sanctum), the village
-    # homes close — nine places, eight hosts, the 共食棚 contributing nothing
-    # (ciaran-village-commons). This is the order the slices deliberately
+    # homes close (altoria-hospitality grew the capital block to eleven hosts;
+    # the 共食棚 still contributes nothing, ciaran-village-commons).
+    # This is the order the slices deliberately
     # establish; the content-neutral field comparisons below locate rows by
     # service_id so they guard identities, not a sequence.
     ASSEMBLED_ROSTER_ORDER = [
-        "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
+        "altoria_eatery_owner",
+        # altoria-hospitality: the lower terrace's three attendant hosts ride
+        # directly behind the eatery, in the slice's authored row order.
+        "altoria_tavern_keeper", "altoria_innkeeper", "altoria_bathhouse_keeper",
+        "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
         "altoria_alchemist",
         "altoria_high_priestess", "altoria_sanctum_deacon",
@@ -122,6 +127,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
+                "altoria_tavern_keeper", "altoria_innkeeper",
+                "altoria_bathhouse_keeper",
                 "altoria_high_priestess", "altoria_sanctum_deacon",
                 "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
@@ -712,6 +719,112 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         for field in HOST_IDENTITY_FIELDS:
             with self.subTest(field=field):
                 self.assertIsNone(getattr(shelter, field), field)
+
+    #: The three altoria-hospitality rows as LITERALS — the historical
+    #: neutrality baseline excludes them too, so the lane's identities need
+    #: their own independent data contract: a coordinated drift between a
+    #: place row and the sync projection would pass every derived comparison.
+    #: These are the capital's first attendants with nothing to sell: each
+    #: row's whole authored payload is its dialogue key.
+    HOSPITALITY_ROWS = {
+        "altoria_tavern_keeper": (
+            "蘿溫·古橡",
+            "聖潔王都酒館老闆",
+            "attendant",
+            "altoria_tavern",
+            "altoria_tavern_keeper",
+            {"dialogue_key": "altoria_tavern"},
+        ),
+        "altoria_innkeeper": (
+            "溫弗蕾德·古林",
+            "聖潔王都旅店老闆娘",
+            "attendant",
+            "altoria_lodging",
+            "altoria_innkeeper",
+            {"dialogue_key": "altoria_lodging"},
+        ),
+        "altoria_bathhouse_keeper": (
+            "伊莎貝爾·葦沼",
+            "聖潔王都公共浴場管理員",
+            "attendant",
+            "altoria_bathhouse",
+            "altoria_bathhouse_keeper",
+            {"dialogue_key": "altoria_bathhouse"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-hospitality::the-capital-has-a-tavern-an-inn-and-a-bathhouse"
+    )
+    def test_the_three_hospitality_rows_are_their_own_literal_data_contract(self):
+        # Name, title, profession, anchor, service_id and authored kwargs are
+        # pinned as literals against the derived roster (the CIARAN_COMMONS_ROWS
+        # pattern), independent of the sync projection.
+        rows = validate_service_hosts()
+        for service_id, expected in self.HOSPITALITY_ROWS.items():
+            row = next(r for r in rows if r.service_id == service_id)
+            with self.subTest(service_id=service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    expected,
+                )
+
+    #: The same three places pinned at the PLACE registry, where the map
+    #: contract lives: the derived ServiceHostRow carries no coordinate or
+    #: doorway field, so without this literal the lane could move to another
+    #: exterior (or the bathhouse off 浴場前) while every derived comparison
+    #: and every sync test stayed green (post-implementation review).
+    #: Shape: place key -> (kind, exterior_xy, doorway name, host name,
+    #: host race, host sex, assortment keys, authored kwargs).
+    HOSPITALITY_PLACE_ROWS = {
+        "altoria_tavern": (
+            "tavern", (4, 1), "醉月酒館",
+            "蘿溫·古橡", "human", "female", (),
+            {"dialogue_key": "altoria_tavern"},
+        ),
+        "altoria_lodging": (
+            "lodging", (4, 1), "爐火旅店",
+            "溫弗蕾德·古林", "human", "female", (),
+            {"dialogue_key": "altoria_lodging"},
+        ),
+        "altoria_bathhouse": (
+            "bathhouse", (5, 1), "公共浴場",
+            "伊莎貝爾·葦沼", "human", "female", (),
+            {"dialogue_key": "altoria_bathhouse"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-hospitality::the-capital-has-a-tavern-an-inn-and-a-bathhouse"
+    )
+    def test_the_hospitality_place_rows_pin_the_lane_and_bathhouse_front(self):
+        # The lane's two doors sit on 客棧巷 (4,1) — one street, two names —
+        # and the bathhouse on 浴場前 (5,1); the hosts are human women with
+        # nothing to sell. Coordinated drift here decouples the rows from the
+        # map's actual streets, which no derived comparison can see.
+        for key, expected in self.HOSPITALITY_PLACE_ROWS.items():
+            place = PLACE_REGISTRY[key]
+            with self.subTest(place=key):
+                self.assertEqual(
+                    (
+                        place.kind.value,
+                        place.exterior_xy,
+                        place.doorway_key_zh,
+                        place.host_name,
+                        place.host_race,
+                        place.host_sex,
+                        place.assortment_keys,
+                        dict(place.authored_kwargs),
+                    ),
+                    expected,
+                )
 
 
 if __name__ == "__main__":

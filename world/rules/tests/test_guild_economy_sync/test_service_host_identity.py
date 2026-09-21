@@ -62,7 +62,9 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(events), 15)  # guild host + six capital merchants + eight village hosts
+        # guild host + six capital merchants + eight village hosts + the lane's
+        # three attendants (altoria-hospitality)
+        self.assertEqual(len(events), 20)
         # The guild host's event is located by service id, not position: the
         # terrace split (altoria-place-slices) made the lower terrace's eatery
         # the first roster row, so no shipped row keeps a fixed index.
@@ -92,9 +94,22 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             [event.kwargs["context"]["service"] for event in merchant_events],
             merchant_service_ids,
         )
-        # Merchants report their authored shop; the village's two attendants
-        # (ciaran-village-commons) carry no shop identity at all.
-        attendants = {"ciaran_elenis", "ciaran_teliel"}
+        # Merchants report their authored shop; every attendant-profession
+        # host — the village's two (ciaran-village-commons), the upper
+        # terrace's 主祭 (altoria-sanctum) and the lane's three
+        # (altoria-hospitality) — carries no shop identity at all. The
+        # split is derived from the roster's profession key, not a literal
+        # set: the temple's 主祭 was silently leaning on the merchant branch
+        # (an attendant event passes no truthy-shop assertion).
+        attendants = {
+            row.service_id
+            for row in get_catalog().service_hosts
+            if row.profession.key == "attendant"
+        }
+        self.assertTrue(attendants)
+        # ...and the merchant branch it contrasts against is non-empty too,
+        # so neither predicate can pass by quantifying over nothing.
+        self.assertTrue(set(merchant_service_ids) - attendants)
         self.assertTrue(
             all(
                 event.kwargs["context"]["shop"]
@@ -115,7 +130,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 15)
+        self.assertEqual(len(late), 20)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):
