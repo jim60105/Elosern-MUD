@@ -9,6 +9,7 @@ here pins a particular sentence."""
 
 from tools.spec_traceability import covers_requirement
 
+import re
 import unittest
 
 from world.lore.settlements._prose_lang import english_prose_defects
@@ -71,12 +72,30 @@ class AuthoredRoomProseLanguageTests(unittest.TestCase):
         "grid-room-sync::authored-room-prose-is-traditional-chinese"
     )
     def test_no_shipped_description_carries_an_authoring_note(self):
+        # A kebab-case latin identifier is a spec/change name (or a design
+        # decision id) that leaked into player-facing text; the shipped prose
+        # carries zero of them, so the check is a general rule, not a list.
+        identifier = re.compile(r"[A-Za-z]+(?:-[A-Za-z0-9]+)+")
         for label, _name, desc in _shipped_authored_rooms():
             with self.subTest(room=label):
                 self.assertNotIn("§", desc)
-                # Authoring notes leaked as parenthesized design/change refs.
-                for note in ("D-", "design", "change ", "spec "):
-                    self.assertNotIn(note, desc)
+                self.assertIsNone(
+                    identifier.search(desc),
+                    f"{label}: description carries a spec/change identifier",
+                )
+
+    @covers_requirement(
+        "grid-room-sync::authored-room-prose-is-traditional-chinese"
+    )
+    def test_authoring_note_fails_the_check(self):
+        # A Chinese description whose Han majority is untouched, but which
+        # names the change that wrote it — the authoring-note defect the
+        # scenario forbids, in the exact form the substring list would miss.
+        identifier = re.compile(r"[A-Za-z]+(?:-[A-Za-z0-9]+)+")
+        self.assertIsNotNone(
+            identifier.search("這間屋子是在 altoria-capital-replan 之後重寫的。"),
+            "a spec/change identifier passed the authoring-note check",
+        )
 
     @covers_requirement(
         "grid-room-sync::authored-room-prose-is-traditional-chinese"
