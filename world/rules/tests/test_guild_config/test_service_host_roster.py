@@ -28,7 +28,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
 
     # The rows the hand-authored service_hosts roster shipped before this
     # change removed it. The derived roster must reproduce them field for
-    # field — that is the change's behaviour-neutrality gate.
+    # field — that is the change's behaviour-neutrality gate. The merchant
+    # row carries one extension since merchant-dialogue: a dialogue_key
+    # beside the shop_key (the shopkeeper blueprint now answers too). The
+    # guild row's two kwargs stay pinned exactly as they shipped.
     FORMER_YAML_ROWS = (
         {
             "name": "葛里安·衛登",
@@ -46,6 +49,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "anchor_room": "altoria_general_store",
             "service_id": "altoria_merchant",
             "shop_key": "altoria_general_store",
+            "dialogue_key": "altoria_general_store",
         },
     )
 
@@ -151,7 +155,11 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
 
     # The complete roster as it shipped BEFORE place-attendant-profession,
     # written as literals (never derived from the live registry): the fixed
-    # nine rows the blueprint addition must reproduce untouched.
+    # nine rows the blueprint addition must reproduce untouched. Each
+    # merchant row's authored_kwargs gained its dialogue_key with
+    # merchant-dialogue (a shopkeeper both trades and answers); every other
+    # field remains the pre-change literal, so an identity cannot silently
+    # move under the extension.
     PRE_CHANGE_BASELINE = (
         {
             "name": "葛里安·衛登",
@@ -170,7 +178,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "altoria_general_store",
             "service_id": "altoria_merchant",
-            "authored_kwargs": {"shop_key": "altoria_general_store"},
+            "authored_kwargs": {
+                "shop_key": "altoria_general_store",
+                "dialogue_key": "altoria_general_store",
+            },
         },
         {
             "name": "維爾登·黑潭",
@@ -178,7 +189,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "altoria_forge",
             "service_id": "altoria_blacksmith",
-            "authored_kwargs": {"shop_key": "altoria_forge"},
+            "authored_kwargs": {
+                "shop_key": "altoria_forge",
+                "dialogue_key": "altoria_forge",
+            },
         },
         {
             "name": "西格瑪·庫柏",
@@ -186,7 +200,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "altoria_eatery",
             "service_id": "altoria_eatery_owner",
-            "authored_kwargs": {"shop_key": "altoria_eatery"},
+            "authored_kwargs": {
+                "shop_key": "altoria_eatery",
+                "dialogue_key": "altoria_eatery",
+            },
         },
         {
             "name": "妮絲塔·狐溪",
@@ -194,7 +211,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "altoria_tailor",
             "service_id": "altoria_tailor",
-            "authored_kwargs": {"shop_key": "altoria_tailor"},
+            "authored_kwargs": {
+                "shop_key": "altoria_tailor",
+                "dialogue_key": "altoria_tailor",
+            },
         },
         {
             "name": "海莉爾·斯塔爾法爾",
@@ -202,7 +222,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "ciaran_hailiel_home",
             "service_id": "ciaran_hailiel",
-            "authored_kwargs": {"shop_key": "ciaran_hailiel_home"},
+            "authored_kwargs": {
+                "shop_key": "ciaran_hailiel_home",
+                "dialogue_key": "ciaran_hailiel_home",
+            },
         },
         {
             "name": "拉瑞內斯·妮特布倫",
@@ -210,7 +233,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "ciaran_lareneth_home",
             "service_id": "ciaran_lareneth",
-            "authored_kwargs": {"shop_key": "ciaran_lareneth_home"},
+            "authored_kwargs": {
+                "shop_key": "ciaran_lareneth_home",
+                "dialogue_key": "ciaran_lareneth_home",
+            },
         },
         {
             "name": "瓦爾溫·斯蒂爾瓦特爾",
@@ -218,7 +244,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "ciaran_valwyn_home",
             "service_id": "ciaran_valwyn",
-            "authored_kwargs": {"shop_key": "ciaran_valwyn_home"},
+            "authored_kwargs": {
+                "shop_key": "ciaran_valwyn_home",
+                "dialogue_key": "ciaran_valwyn_home",
+            },
         },
         {
             "name": "維特希爾·威爾德布瑞亞爾",
@@ -226,7 +255,10 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "profession": "merchant",
             "anchor_room": "ciaran_vethiel_home",
             "service_id": "ciaran_vethiel",
-            "authored_kwargs": {"shop_key": "ciaran_vethiel_home"},
+            "authored_kwargs": {
+                "shop_key": "ciaran_vethiel_home",
+                "dialogue_key": "ciaran_vethiel_home",
+            },
         },
     )
 
@@ -274,6 +306,32 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         ):
             with self.assertRaises(GuildConfigError):
                 validate_service_hosts()
+
+    @covers_requirement(
+        "merchant-dialogue::every-merchant-host-answers-when-spoken-to"
+    )
+    def test_a_merchant_place_authoring_no_dialogue_key_fails_load(self):
+        # merchant-dialogue: the blueprint now demands a dialogue table from
+        # every shopkeeper. A merchant place that kept only its shop_key (the
+        # pre-change row shape) is rejected by the generic blueprint-coverage
+        # rule — no loader change — and the error names the place and the
+        # missing identity kwarg, so a silent shopkeeper is an authoring
+        # error, never a default.
+        store = PLACE_REGISTRY["altoria_general_store"]
+        silent = replace(
+            store,
+            key="t_silent_merchant_place",
+            service_id="t_silent_merchant",
+            authored_kwargs=(("shop_key", "t_silent_merchant_shop"),),
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_silent_merchant_place": silent}, clear=True
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        message = str(caught.exception)
+        self.assertIn("t_silent_merchant_place", message)
+        self.assertIn("dialogue_key", message)
 
     def test_person_bound_profession_place_is_rejected_as_an_anchor(self):
         # The roster row IS the anchor registration: anchoring a blueprint

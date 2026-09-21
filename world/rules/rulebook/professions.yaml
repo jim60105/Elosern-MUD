@@ -32,11 +32,20 @@
 #     and the dialogue table, never in a per-role profession: a profession is
 #     an assembly-time component tuple (D1), and twelve same-tuple rows would
 #     be twelve names for one blueprint.
+#
+# The `merchant` row is the shopkeeper blueprint: a merchant BOTH trades and
+# answers (merchant-dialogue). Since that change the row carries the same
+# place-bound ScriptedDialogue component the attendant's whole blueprint is,
+# so every merchant place must author a `dialogue_key` — the blueprint-coverage
+# rejection of the missing kwarg is intended: a greetingless shopkeeper is the
+# defect merchant-dialogue removed, and a silent merchant is an authoring
+# error, never a default.
 schema_version: 1
 professions:
   - key: merchant
     components:
       - { type: merchant, default_binding: place }
+      - { type: scripted_dialogue, default_binding: place }
     schedule_template: null
     default_tier: null
   - key: guild_staff
