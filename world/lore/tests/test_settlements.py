@@ -170,14 +170,14 @@ class PlaceRegistryTests(unittest.TestCase):
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
-            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡——羽毛、種子、一綑綑紮起的絲——樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。",
+            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。",
             (1, 2), '瓦爾溫的家', ('valwyn', "valwyn's home"), '瓦爾溫·斯蒂爾瓦特爾', '暗影谷村蒐羅者', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_valwyn', ('elven_sundries',),
             (('shop_key', 'ciaran_valwyn_home'), ('dialogue_key', 'ciaran_valwyn_home')), (), ()
         ),
         "ciaran_vethiel_home": (
             'ciaran_vethiel_home', 'village_ciaran', PlaceKind.HOME, '維特希爾的家',
-            "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家：地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。",
+            "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。",
             (2, 2), '維特希爾的家', ('vethiel', "vethiel's home"), '維特希爾·威爾德布瑞亞爾', '暗影谷村織衣者', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_vethiel', ('elven_attire',),
             (('shop_key', 'ciaran_vethiel_home'), ('dialogue_key', 'ciaran_vethiel_home')), (), ()
