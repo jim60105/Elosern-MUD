@@ -1,14 +1,14 @@
 ## 1. The three places
 
-- [ ] 1.1 Add 聖潔王都醉月酒館 off 客棧巷 `(4,1)`: host 蘿溫·古橡, title 聖潔王都酒館老闆,
+- [x] 1.1 Add 聖潔王都醉月酒館 off 客棧巷 `(4,1)`: host 蘿溫·古橡, title 聖潔王都酒館老闆,
   human, female, `attendant`, no assortments.
-- [ ] 1.2 Add 聖潔王都爐火旅店 off the same exterior: host 溫弗蕾德·古林, title
+- [x] 1.2 Add 聖潔王都爐火旅店 off the same exterior: host 溫弗蕾德·古林, title
   聖潔王都旅店老闆娘, human, female, `attendant`. Give it a doorway name distinct from the
   tavern's — they share the lane.
-- [ ] 1.3 Add 聖潔王都公共浴場 off 浴場前 `(5,1)`: host 伊莎貝爾·葦沼, title
+- [x] 1.3 Add 聖潔王都公共浴場 off 浴場前 `(5,1)`: host 伊莎貝爾·葦沼, title
   聖潔王都公共浴場管理員, human, female, `attendant`.
-- [ ] 1.3a Author the three as `PlaceKind.TAVERN`, `PlaceKind.LODGING` and `PlaceKind.BATHHOUSE`.
-- [ ] 1.4 Author the three room descriptions. The bathhouse's should carry the nudity-ethics
+- [x] 1.3a Author the three as `PlaceKind.TAVERN`, `PlaceKind.LODGING` and `PlaceKind.BATHHOUSE`.
+- [x] 1.4 Author the three room descriptions. The bathhouse's should carry the nudity-ethics
   contrast the document calls a narrative hook, visibly enough that a later scene can use it.
 
 ## 2. The three dialogue tables
