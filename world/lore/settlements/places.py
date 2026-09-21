@@ -30,12 +30,44 @@ from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 
 
 class PlaceKind(StrEnum):
+    """Closed vocabulary of what a place's location IS in the world.
+
+    A kind names the location itself — the room, the ground, the building —
+    never a capability its host happens to carry. The worked example is the
+    four elven homes: every one of them trades, and every one of them is
+    ``HOME``, because in the village a blade-maker's dwelling is a dwelling
+    and the fact that you can buy a blade there is a property of who lives
+    in it. A location type the vocabulary cannot name is a reason to extend
+    this enum, not to approximate with an existing member.
+
+    Nothing is permitted to branch on ``kind`` at runtime: it is descriptive
+    metadata for the registry and for whoever eventually reads it, and
+    giving a mechanism permission to gate on it would repeat the mistake
+    ``professions.yaml`` warns about for professions.
+    """
+
     GUILD_HALL = "guild_hall"
     GENERAL_STORE = "general_store"
     WEAPONSMITH = "weaponsmith"
     OUTFITTER = "outfitter"
     EATERY = "eatery"
     HOME = "home"
+    # The settlement build's location types (altoria-* / ciaran-* content
+    # changes author rows against these; none of them changes a shipped row).
+    JEWELLER = "jeweller"
+    ALCHEMIST = "alchemist"
+    TEMPLE = "temple"
+    SANCTUM_SHOP = "sanctum_shop"
+    TAVERN = "tavern"
+    LODGING = "lodging"
+    BATHHOUSE = "bathhouse"
+    PALACE = "palace"
+    WATCH_POST = "watch_post"
+    TRAINING_GROUND = "training_ground"
+    ACADEMY = "academy"
+    MERCHANT_HALL = "merchant_hall"
+    MARKET = "market"
+    COMMONS = "commons"
 
 
 @dataclass(frozen=True)
