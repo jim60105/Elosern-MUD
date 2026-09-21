@@ -51,6 +51,7 @@ from ._support import (
     _live_registry,
     _places,
     _place_by_kind,
+    _restore_places_snapshot,
     _settlements,
 )
 
@@ -275,6 +276,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         # attribute KEY may have gained anything. A resync afterwards must
         # stay idempotent (the commons gate's second-sync shape).
         places = _hospitality_places()
+        registry_snapshot = dict(_places())
         saved_rows = {}
         for place in places:
             exterior = _exterior(place)
@@ -287,7 +289,10 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             interior.delete()
             saved_rows[place.key] = _places()[place.key]
             del _places()[place.key]
-        self.addCleanup(_places().update, saved_rows)
+        # Full ordered snapshot restore: a dict.update() of only the removed
+        # rows would re-append them at the END of the live registry, and its
+        # insertion order is load-bearing for the derived service-host roster.
+        self.addCleanup(_restore_places_snapshot, registry_snapshot)
         self._patch_roster(
             tuple(
                 row
@@ -308,7 +313,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             for row in Attribute.objects.only("db_model", "db_key", "db_category")
         }
         # The rooms arrive: full registries back, real synchronisation.
-        _places().update(saved_rows)
+        _restore_places_snapshot(registry_snapshot)
         saved_rows.clear()
         for patcher in self._patchers:
             patcher.stop()

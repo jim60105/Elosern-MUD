@@ -91,6 +91,19 @@ def _place_by_kind(kind: str):
     """The live place row of one service kind (registry-ordered first match)."""
     return next(place for place in _places().values() if place.kind == kind)
 
+def _restore_places_snapshot(snapshot: dict) -> None:
+    """Restore the place registry to a full ordered snapshot, position-safe.
+
+    ``dict.update()`` of only the removed rows re-appends them at the END of
+    the live registry; the insertion order is load-bearing (the derived
+    service-host roster and the SHOP_REGISTRY iterate it, and the roster-order
+    tests re-derive from the live dict). Clearing first and updating with the
+    complete pre-removal snapshot keeps every key in its original position.
+    """
+    places = _places()
+    places.clear()
+    places.update(snapshot)
+
 GUILD_SERVICE_ID = "altoria_guild_master"
 
 MERCHANT_SERVICE_ID = "altoria_merchant"
@@ -121,6 +134,23 @@ def _village_places():
         for place in places.values()
         if place.settlement_key not in hall_settlements
     )
+
+def _village_trading_places():
+    """The village place rows that trade, discovered from the live registry.
+
+    A trading home is a village row whose authored kwargs carry a ``shop_key``
+    — the same shape the commerce validators read — so the suite never names a
+    profession value literally.
+    """
+    return tuple(
+        place
+        for place in _village_places()
+        if "shop_key" in dict(place.authored_kwargs)
+    )
+
+def _village_trading_place():
+    """The registry-first village trading row (the comparison host)."""
+    return next(iter(_village_trading_places()))
 
 def _village_subrace_key() -> str:
     """The subrace every village host is authored to carry, registry-derived.

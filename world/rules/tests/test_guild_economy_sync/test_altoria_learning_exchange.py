@@ -66,6 +66,7 @@ from ._support import (
     ServiceContentIsolation,
     _live_registry,
     _places,
+    _restore_places_snapshot,
 )
 
 
@@ -231,7 +232,10 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
 
     def _restore_world(self, snapshot):
         """Idempotent world repair for the lift-and-resync gate: rows back
-        from an IMMUTABLE caller-held snapshot (never cleared), patches
+        from an IMMUTABLE caller-held snapshot (never cleared) through a
+        position-safe full-registry restore (dict.update of only the removed
+        rows would re-append them at the END of the live registry, whose
+        insertion order is load-bearing for the derived service-host roster), patches
         stopped (double-stop tolerated). The real synchronisation only runs
         when the world is actually missing one of this gate's three rooms or
         hosts: after the finally-block's restore succeeded the cleanup
@@ -244,7 +248,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         the shard never keeps a torn-down academy, hall or stalls. Every
         step is safe to run twice: a dict-copy row update, an
         already-stopped patcher, an idempotent sync."""
-        _places().update(dict(snapshot))
+        _restore_places_snapshot(dict(snapshot))
         for patcher in self._patchers:
             try:
                 patcher.stop()
@@ -548,7 +552,8 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # Save EVERY row before ANY is removed, register the last-resort
         # cleanup, and only then enter the try.
         saved_rows = {place.key: _places()[place.key] for place in places}
-        self.addCleanup(self._restore_world, saved_rows)
+        registry_snapshot = dict(_places())
+        self.addCleanup(self._restore_world, registry_snapshot)
         try:
             for place in places:
                 del _places()[place.key]
@@ -587,7 +592,7 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
             # Rebuild the world whatever happened above: rows back, patches
             # stopped, real synchronisation — the SAME call the cleanup
             # would make, and the snapshot survives untouched either way.
-            self._restore_world(saved_rows)
+            self._restore_world(registry_snapshot)
         # The rooms arrived.
         for place in places:
             with self.subTest(arrival=place.kind):

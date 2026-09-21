@@ -60,6 +60,7 @@ from ._support import (
     ServiceContentIsolation,
     _live_registry,
     _places,
+    _restore_places_snapshot,
 )
 
 
@@ -370,7 +371,13 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
         # through the finally, so the shared keepdb shard never keeps a
         # half-torn-down world (post-implementation review, twice).
         saved_rows = {place.key: _places()[place.key] for place in places}
-        self.addCleanup(_places().update, saved_rows)
+        # Full ordered snapshot: a dict.update() of only the removed rows
+        # re-appends them at the END of the live registry, and the registry's
+        # insertion order is load-bearing (the derived service-host roster and
+        # the SHOP_REGISTRY iterate it). Restoring through clear+update of the
+        # complete pre-removal snapshot keeps every key's position.
+        registry_snapshot = dict(_places())
+        self.addCleanup(_restore_places_snapshot, registry_snapshot)
         try:
             for place in places:
                 del _places()[place.key]
@@ -410,7 +417,7 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
             # stopped, real synchronisation. The base's addCleanup stops
             # each patcher once only, so clearing _patchers after stopping
             # is the idempotence contract here.
-            _places().update(saved_rows)
+            _restore_places_snapshot(registry_snapshot)
             saved_rows.clear()
             for patcher in self._patchers:
                 patcher.stop()
