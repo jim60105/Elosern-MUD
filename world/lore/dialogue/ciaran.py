@@ -21,9 +21,43 @@ DIALOGUE_ROWS unchanged): 海莉爾·斯塔爾法爾 forges the village's shadow
 steel; 拉瑞內斯·妮特布倫 keeps the candied blossom larder; 瓦爾溫·斯蒂爾瓦特爾
 is the collector whose kept things line the old tree's house; 維特希爾·
 威爾德布瑞亞爾 weaves at the loom on the slope.
+
+ciaran-village-crafts adds the two the document names: 格威娜拉·希爾維爾莉夫
+makes the village's ornaments on 銀葉坡, and 妮瑞斯·米斯特瓦勒 tends herbs
+and remedies by the 藥草園.
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
+
+# 格威娜拉·希爾維爾莉夫 — the adornment maker (暗影谷村綴飾者).
+# elven_adornments: 三稜晶符, 月牙耳環. Ornament is a love, not a trade;
+# the village simply asked her to hang things up.
+GWENAERA_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "綴飾",
+        "「銀絲是我自己絞的，貝殼是溪邊撿的，磨一整晚才亮得起來。"
+        "完成的都曬在窗邊繩上，讓人看的，`shop stock` 報此刻掛著的；"
+        "谷裡的人喜歡，我才多做一些。」",
+    ),
+    KeywordResponse(
+        "晶符",
+        "「三稜晶是族裡老辦法磨的，光進去、三條色出來，孩子各分著玩。"
+        "掛在頸上也是這個用法——好看而已，不是什麼神器。"
+        "想帶一枚走，`shop stock` 看看繩上還有沒有。」",
+    ),
+    KeywordResponse(
+        "耳環",
+        "「月牙那對本就是做給自己戴的，戴過一季洗淨了，"
+        "瓦爾溫掛出去也是該的——飾物在谷裡不算稀罕，合眼緣要自己挑。"
+        "在不在，`buy` 加名之前先 `shop stock` 問一聲。」",
+    ),
+    KeywordResponse(
+        "舊飾",
+        "「斷了的耳勾、鬆了的絲結，拿來我修，不計錢——器物壞了可惜。"
+        "真要脫手什麼舊飾，`sell` 一聲，我掂著銀的成色回你；"
+        "谷裡東西總該有第二條命，瓦爾溫也這樣講。」",
+    ),
+)
 
 # 海莉爾·斯塔爾法爾 — the blade-smith (暗影谷村鑄刃者). elven_crafted_arms:
 # 暗影鋼刀, 暗影鋼刀·影. She shares the blade, not trade talk.
@@ -79,6 +113,35 @@ LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
         "「甜口的多，鹹口的少——谷裡口味清淡，旅人擔待。"
         "要濃的，你往王都餐館去，那邊灶氣旺。我這裡連蜜都捨不得多放，"
         "想甜的，`shop stock` 裡挑花蕊就是了。」",
+    ),
+)
+
+# 妮瑞斯·米斯特瓦勒 — the hedge-healer (暗影谷村調藥者). elven_remedies:
+# 強效治療藥劑, 魔力回復藥劑. Her knowledge exists because elves get hurt
+# too; the jars are simply what she keeps enough of to share.
+NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "調藥",
+        "「藥草是園裡長的，方子是族裡傳的，製藥這一爐小火從早熬到晚。"
+        "強效治療與魔力回復是兩爐常備的，`shop stock` 報此刻罐裡的數；"
+        "精靈不害病歸不害病，傷口與空掉的魔力可不認種族。」",
+    ),
+    KeywordResponse(
+        "重傷",
+        "「紅的這罐救急，傷重才舍得開封，輕傷用清水與草灰就夠。"
+        "要帶幾罐備著，`buy` 加名便是；擱藥園邊晒著的那批，"
+        "下個月才熬得新一輪——急不來。」",
+    ),
+    KeywordResponse(
+        "魔力",
+        "「藍的是給施法的人回氣用的，魔法種族一樣喝得，效用不打折。"
+        "外頭賣得金貴，谷裡不過是多熬一爐的事，`shop stock` 有就提走。」",
+    ),
+    KeywordResponse(
+        "藥草",
+        "「園裡採得多、你尋得的料好，我都收：曬乾的根、開花的頂葉都要。"
+        "`sell` 喊一聲我過秤回銅，藥性壞了的請帶回去——"
+        "那類東西我擱不下手。」",
     ),
 )
 
@@ -189,6 +252,30 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "有舊衣要拿來的，洗淨了擱機邊便是。」"
             ),
             responses=VETHIEL_RESPONSES,
+        ),
+    ),
+    (
+        "ciaran_gwenaera_home",
+        DialogueDefinition(
+            greeting=(
+                "銀葉坡頂的屋裡，格威娜拉·希爾維爾莉夫從工作台後抬起眼，"
+                "指間還捻著一縷銀絲：「來得正好，幫我看看這兩朵絞花哪個順眼。"
+                "完成的都曬窗邊繩上，`shop stock` 報此刻掛著的；喜歡哪件同我說"
+                "`buy`——谷裡人愛戴，我才多做。有斷了舊了要修的，擱這兒，不計錢。」"
+            ),
+            responses=GWENAERA_RESPONSES,
+        ),
+    ),
+    (
+        "ciaran_nireth_home",
+        DialogueDefinition(
+            greeting=(
+                "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯·米斯特瓦勒正替藥爐"
+                "壓小火：「來得巧，這輪剛起罐。強效治療與魔力回復都還有些，"
+                "`shop stock` 報罐裡的數；要帶幾罐防身，同我說 `buy`。"
+                "園裡採得多的藥草你要脫手，`sell` 一聲，我過秤。」"
+            ),
+            responses=NIRETH_RESPONSES,
         ),
     ),
 )

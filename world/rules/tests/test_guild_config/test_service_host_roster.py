@@ -62,8 +62,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     ASSEMBLED_ROSTER_ORDER = [
         "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor",
-        "ciaran_hailiel", "ciaran_lareneth",
-        "ciaran_valwyn", "ciaran_vethiel",
+        "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
+        "ciaran_nireth", "ciaran_valwyn", "ciaran_vethiel",
     ]
 
     def _assert_reproduces_former_rows(self, rows):
@@ -114,8 +114,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
                 "altoria_eatery_owner", "altoria_tailor",
-                "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_valwyn", "ciaran_vethiel",
+                "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
+                "ciaran_nireth", "ciaran_valwyn", "ciaran_vethiel",
             },
         )
 
@@ -163,11 +163,13 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
 
     # The complete roster as it shipped BEFORE place-attendant-profession,
     # written as literals (never derived from the live registry): the fixed
-    # nine rows the blueprint addition must reproduce untouched. Each
+    # rows the blueprint addition must reproduce untouched. Each
     # merchant row's authored_kwargs gained its dialogue_key with
     # merchant-dialogue (a shopkeeper both trades and answers); every other
     # field remains the pre-change literal, so an identity cannot silently
-    # move under the extension.
+    # move under the extension. ciaran-village-crafts appended the two new
+    # village homes (格威娜拉, 妮瑞斯) — the gate still fails if any of the
+    # earlier rows drifts while the roster grows.
     PRE_CHANGE_BASELINE = (
         {
             "name": "葛里安·衛登",
@@ -236,6 +238,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
+            "name": "格威娜拉·希爾維爾莉夫",
+            "title": "暗影谷村綴飾者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_gwenaera_home",
+            "service_id": "ciaran_gwenaera",
+            "authored_kwargs": {
+                "shop_key": "ciaran_gwenaera_home",
+                "dialogue_key": "ciaran_gwenaera_home",
+            },
+        },
+        {
             "name": "拉瑞內斯·妮特布倫",
             "title": "暗影谷村花饌好手",
             "profession": "merchant",
@@ -244,6 +257,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "authored_kwargs": {
                 "shop_key": "ciaran_lareneth_home",
                 "dialogue_key": "ciaran_lareneth_home",
+            },
+        },
+        {
+            "name": "妮瑞斯·米斯特瓦勒",
+            "title": "暗影谷村調藥者",
+            "profession": "merchant",
+            "anchor_room": "ciaran_nireth_home",
+            "service_id": "ciaran_nireth",
+            "authored_kwargs": {
+                "shop_key": "ciaran_nireth_home",
+                "dialogue_key": "ciaran_nireth_home",
             },
         },
         {

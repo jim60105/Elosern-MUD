@@ -58,13 +58,15 @@ class PlaceRegistryTests(unittest.TestCase):
         # altoria-place-slices the capital arrives as three terrace slices —
         # lower, middle, upper — so the 南大道 eatery leads the capital rows
         # and the middle terrace's guild/store/forge/tailor follow; the
-        # village slice stays last.
+        # village slice stays last, its six homes alphabetical by host given
+        # name (ciaran-village-crafts added 格威娜拉 and 妮瑞斯).
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
                 "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor",
-                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_gwenaera_home", "ciaran_hailiel_home",
+                "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],
         )
@@ -122,12 +124,26 @@ class PlaceRegistryTests(unittest.TestCase):
             'female', 'merchant', 'ciaran_hailiel', ('elven_crafted_arms',),
             (('shop_key', 'ciaran_hailiel_home'), ('dialogue_key', 'ciaran_hailiel_home')), (), ()
         ),
+        "ciaran_gwenaera_home": (
+            'ciaran_gwenaera_home', 'village_ciaran', PlaceKind.HOME, '格威娜拉的家',
+            "Silver wire and half-finished ornaments lie on a cloth across the work table, sorted by a craftswoman's eye rather than a merchant's. Finished pieces hang from a line by the window beside drying blossom heads from the slope below; the hearth warms a kettle no customer was expected to need. It is the house of someone who loves ornamental work, and trades only because the village asks her to.",
+            (2, 3), '格威娜拉的家', ('gwenaera', "gwenaera's home"), '格威娜拉·希爾維爾莉夫', '暗影谷村綴飾者', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_gwenaera', ('elven_adornments',),
+            (('shop_key', 'ciaran_gwenaera_home'), ('dialogue_key', 'ciaran_gwenaera_home')), (), ()
+        ),
         "ciaran_lareneth_home": (
             'ciaran_lareneth_home', 'village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
             "The scent of candied blossoms hangs in the air of this home along the stream path. Woven baskets of dried petals stand beside a small hearth stone, and by the window a low table holds the day's offering of small treats, set out for whoever passes by.",
             (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"), '拉瑞內斯·妮特布倫', '暗影谷村花饌好手', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_lareneth', ('elven_fare',),
             (('shop_key', 'ciaran_lareneth_home'), ('dialogue_key', 'ciaran_lareneth_home')), (), ()
+        ),
+        "ciaran_nireth_home": (
+            'ciaran_nireth_home', 'village_ciaran', PlaceKind.HOME, '妮瑞斯的家',
+            "Bundles of herb and small stoppered jars of remedy crowd this sunlit house, sorted in the order of when they were picked rather than of what they are worth. A mortar sits by the window overlooking the village's herb plot, and the air turns bitter-sweet at the door. The remedies are kept for whoever needs them; being asked to keep them for coin is an after-thought of the same village that grows the herbs.",
+            (3, 1), '妮瑞斯的家', ('nireth', "nireth's home"), '妮瑞斯·米斯特瓦勒', '暗影谷村調藥者', 'elf', 'ciaran',
+            'female', 'merchant', 'ciaran_nireth', ('elven_remedies',),
+            (('shop_key', 'ciaran_nireth_home'), ('dialogue_key', 'ciaran_nireth_home')), (), ()
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
@@ -195,8 +211,10 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_forge": "weaponsmith",
             "altoria_eatery": "eatery",
             "altoria_tailor": "outfitter",
+            "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",
             "ciaran_lareneth_home": "home",
+            "ciaran_nireth_home": "home",
             "ciaran_valwyn_home": "home",
             "ciaran_vethiel_home": "home",
         }
@@ -205,7 +223,8 @@ class PlaceRegistryTests(unittest.TestCase):
             with self.subTest(place=key):
                 self.assertEqual(PLACE_REGISTRY[key].kind.value, kind)
         # The homes really do trade — otherwise the pin above proves nothing.
-        for key in ("ciaran_hailiel_home", "ciaran_lareneth_home",
+        for key in ("ciaran_gwenaera_home", "ciaran_hailiel_home",
+                    "ciaran_lareneth_home", "ciaran_nireth_home",
                     "ciaran_valwyn_home", "ciaran_vethiel_home"):
             place = PLACE_REGISTRY[key]
             self.assertEqual(place.profession, "merchant")
@@ -551,7 +570,8 @@ class DerivedShopRegistryTests(unittest.TestCase):
             {
                 "altoria_general_store", "altoria_forge",
                 "altoria_eatery", "altoria_tailor",
-                "ciaran_hailiel_home", "ciaran_lareneth_home",
+                "ciaran_gwenaera_home", "ciaran_hailiel_home",
+                "ciaran_lareneth_home", "ciaran_nireth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
             },
         )

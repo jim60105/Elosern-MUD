@@ -93,7 +93,7 @@ class ServiceInteriorTests(EvenniaTestCase):
         sync_service_interiors()
         # Two settlements are spawned (21 capital + 6 village nodes); the
         # interiors are still not xyzgrid nodes.
-        self.assertEqual(self._count_grid_rooms(), 27)
+        self.assertEqual(self._count_grid_rooms(), 31)
 
     def test_interiors_are_not_xyzgrid_nodes(self):
         sync_service_interiors()

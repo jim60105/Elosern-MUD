@@ -60,17 +60,56 @@ assortments:
         max_stock: 20
         initial_stock: 10
         restock_quantity: 5
+  # ciaran-village-crafts: the adornment maker's shelf. 月牙耳環 moves here
+  # verbatim from elven_sundries — same buyer, same numbers, one home is just
+  # tidier than the next. 三稜晶符 is an enchanted accessory: the price band
+  # floor (magic_accessory opens at 100 gold) is the cheapest the rulebook
+  # can say, so the village prices it at the floor; it is still cheaper here
+  # than a capital jeweller would ask for the same work.
+  - key: elven_adornments
+    offers:
+      - item_key: prism_charm
+        buy_copper: 10000
+        sell_copper: 5000
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
       - item_key: crescent_earring
         buy_copper: 120
         sell_copper: 60
         max_stock: 3
         initial_stock: 1
         restock_quantity: 1
+  # The hedge healer's remedies. Both are also capital goods; the village
+  # sells them at everyday scale, cheaper than 王都雜貨 per the two-price
+  # rule (potion band 50..500).
+  - key: elven_remedies
+    offers:
+      - item_key: greater_healing_potion
+        buy_copper: 150
+        sell_copper: 75
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+      - item_key: mana_potion
+        buy_copper: 80
+        sell_copper: 40
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
 
 # Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
 # units relative to the world-day boundary.
 shops:
+  - shop_key: ciaran_gwenaera_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
   - shop_key: ciaran_hailiel_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: ciaran_nireth_home
     open_hour: 7
     close_hour: 19
     restock_hour: 6

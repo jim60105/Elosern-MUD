@@ -2,15 +2,17 @@
 Self-consistency checks for the assortment registry (settlement-shops design
 §3.1): the four capital bundles split the former 58-item general-store
 monolith along the weapons/armour/food/sundries axis, non-overlapping, with
-every item known to the item registry; the four elven bundles serve 暗影谷村's
-homes (design §6.2) and deliberately share two keys with the capital —
-`elven_spider_silk` and `elven_candied_blossom` — because two shops offering
+every item known to the item registry; the six elven bundles serve 暗影谷村's
+homes (design §6.2) and deliberately share four keys with the capital —
+`elven_spider_silk`, `elven_candied_blossom`, `greater_healing_potion` and
+`mana_potion` — because two shops offering
 one key through two different assortments is the model working, not a
 duplicate (design §4.1). Borderline assignments are deliberate and stable:
 `iron_shield` (armor band, off-hand) lives in outfits not arms; the potion
 consumables `miners_bracing_broth`, `beastfolk_herbal_salve`, `passion_draught`
 and `spirit_dew` stay in sundries rather than staple_meals; the elven
-jewellery (`crescent_earring`) rides the collector's sundries."""
+jewellery (`crescent_earring`) rides the adornment maker's shelf
+(elven_adornments, moved there by ciaran-village-crafts)."""
 
 import unittest
 
@@ -54,13 +56,14 @@ class AssortmentRegistryTests(unittest.TestCase):
             list(ASSORTMENT_REGISTRY), [definition.key for definition in ASSORTMENT_REGISTRY.values()]
         )
 
-    def test_registry_carries_the_four_capital_and_four_elven_assortments(self):
+    def test_registry_carries_the_four_capital_and_six_elven_assortments(self):
         self.assertEqual(
             list(ASSORTMENT_REGISTRY),
             [
                 "common_arms", "common_outfits", "staple_meals",
                 "general_sundries", "elven_crafted_arms", "elven_attire",
                 "elven_fare", "elven_sundries",
+                "elven_adornments", "elven_remedies",
             ],
         )
 
@@ -97,11 +100,13 @@ class AssortmentRegistryTests(unittest.TestCase):
                 self.assertNotIn(item_key, owner, f"{item_key!r} split across assortments")
                 owner[item_key] = definition.key
 
-    def test_elven_assortments_share_exactly_the_two_inherited_keys(self):
+    def test_elven_assortments_share_exactly_the_four_inherited_keys(self):
         # The village shelves are independent of the capital's except for the
-        # two goods the world document carries across: the silk (the design's
-        # worked example) and the candied blossom (蜜漬花蕊). Two shops, two
-        # assortments, one key, two prices — the case this model exists for.
+        # goods the world document carries across: the silk (the design's
+        # worked example), the candied blossom (蜜漬花蕊), and the two remedy
+        # potions the hedge-healer keeps (ciaran-village-crafts). Two shops,
+        # two assortments, one key, two prices — the case this model exists
+        # for.
         elven_keys = {
             item_key
             for definition in ASSORTMENT_REGISTRY.values()
@@ -116,7 +121,10 @@ class AssortmentRegistryTests(unittest.TestCase):
         }
         self.assertEqual(
             elven_keys & capital_keys,
-            {"elven_spider_silk", "elven_candied_blossom"},
+            {
+                "elven_spider_silk", "elven_candied_blossom",
+                "greater_healing_potion", "mana_potion",
+            },
         )
 
     def test_every_assortment_item_resolves_in_the_item_registry(self):

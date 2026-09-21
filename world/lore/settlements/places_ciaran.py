@@ -15,11 +15,46 @@ Every merchant row carries a ``dialogue_key`` beside its ``shop_key``: the
 merchant blueprint answers as well as trades (merchant-dialogue). The
 village tables in ``world/lore/dialogue/ciaran.py`` speak as villagers
 sharing what they make — never as shopkeepers.
+
+ciaran-village-crafts adds the two homes the document names: 格威娜拉的家 off
+銀葉坡, whose host makes the village's ornaments, and 妮瑞斯的家 off 藥草園,
+whose hedge-healer keeps the remedies out of the 調藥坊's absence. Rows stay
+alphabetical by host given name.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 
 ROWS: tuple[PlaceDefinition, ...] = (
+    PlaceDefinition(
+        key="ciaran_gwenaera_home",
+        settlement_key="village_ciaran",
+        kind=PlaceKind.HOME,
+        room_name_zh="格威娜拉的家",
+        room_desc_zh=(
+            "Silver wire and half-finished ornaments lie on a cloth across "
+            "the work table, sorted by a craftswoman's eye rather than a "
+            "merchant's. Finished pieces hang from a line by the window "
+            "beside drying blossom heads from the slope below; the hearth "
+            "warms a kettle no customer was expected to need. It is the "
+            "house of someone who loves ornamental work, and trades only "
+            "because the village asks her to."
+        ),
+        exterior_xy=(2, 3),  # 銀葉坡
+        doorway_key_zh="格威娜拉的家",
+        doorway_aliases=("gwenaera", "gwenaera's home"),
+        host_name="格威娜拉·希爾維爾莉夫",
+        host_title="暗影谷村綴飾者",
+        host_race="elf",
+        host_subrace="ciaran",
+        host_sex="female",
+        profession="merchant",
+        service_id="ciaran_gwenaera",
+        assortment_keys=("elven_adornments",),
+        authored_kwargs=(
+            ("shop_key", "ciaran_gwenaera_home"),
+            ("dialogue_key", "ciaran_gwenaera_home"),
+        ),
+    ),
     PlaceDefinition(
         key="ciaran_hailiel_home",
         settlement_key="village_ciaran",
@@ -74,6 +109,36 @@ ROWS: tuple[PlaceDefinition, ...] = (
         authored_kwargs=(
             ("shop_key", "ciaran_lareneth_home"),
             ("dialogue_key", "ciaran_lareneth_home"),
+        ),
+    ),
+    PlaceDefinition(
+        key="ciaran_nireth_home",
+        settlement_key="village_ciaran",
+        kind=PlaceKind.HOME,
+        room_name_zh="妮瑞斯的家",
+        room_desc_zh=(
+            "Bundles of herb and small stoppered jars of remedy crowd this "
+            "sunlit house, sorted in the order of when they were picked "
+            "rather than of what they are worth. A mortar sits by the "
+            "window overlooking the village's herb plot, and the air turns "
+            "bitter-sweet at the door. The remedies are kept for whoever "
+            "needs them; being asked to keep them for coin is an after-"
+            "thought of the same village that grows the herbs."
+        ),
+        exterior_xy=(3, 1),  # 藥草園
+        doorway_key_zh="妮瑞斯的家",
+        doorway_aliases=("nireth", "nireth's home"),
+        host_name="妮瑞斯·米斯特瓦勒",
+        host_title="暗影谷村調藥者",
+        host_race="elf",
+        host_subrace="ciaran",
+        host_sex="female",
+        profession="merchant",
+        service_id="ciaran_nireth",
+        assortment_keys=("elven_remedies",),
+        authored_kwargs=(
+            ("shop_key", "ciaran_nireth_home"),
+            ("dialogue_key", "ciaran_nireth_home"),
         ),
     ),
     PlaceDefinition(
