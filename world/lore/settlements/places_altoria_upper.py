@@ -6,8 +6,7 @@ altoria-sanctum lands this terrace's first rows: 聖潔王都光明神殿 and it
 attached 聖潔王都聖所, two place records sharing the one 大神殿前 exterior
 under two doorway names — worship, the sanctum's open ministry and the shop
 that supplies it are one building's three counters, and the map shows that
-as one square with two doors. Learning-and-exchange appends its row here
-later.
+as one square with two doors.
 
 altoria-crown-and-watch lands the terrace's seat of government and its two
 arms: 聖潔王都王宮 off 王宮前庭 — the first real use of hostless-places, a
@@ -18,6 +17,13 @@ and an empty room is honest about being the edge of what is built; the
 tables teach commands that already work everywhere. None of the three
 carries a lock: the document's 限制進入 is a story device for a questline
 that does not exist yet, and a gate on an empty room is a wall, not a mystery.
+
+altoria-learning-and-exchange appends this terrace's academy here: 聖潔王都
+王立魔法學院 off 學院前, the document's 全大陸唯二真正夠格稱作『學院』的設施
+and the capital's designated lore-reveal room — the dean's table answers on
+the magic-rank ladder and the element vocabulary instead of teaching a
+command, because 「拜師習得新技能」 stays 〔提案〕 and this change ships no
+apprenticeship mechanism.
 
 The assembled tuple order is load-bearing (see the assembly comment in
 ``places.py``): this slice follows the capital's lower and middle terraces,
@@ -195,5 +201,46 @@ ROWS: tuple[PlaceDefinition, ...] = (
         service_id="altoria_drill_instructor",
         assortment_keys=(),
         authored_kwargs=(("dialogue_key", "altoria_drill_yard"),),
+    ),
+    # 聖潔王都王立魔法學院 — the capital's academy, off 學院前 (5,5), the
+    # square the map already carries. The document's 魔法學院與圖書館 is 〔有〕
+    # for 都城 and 〔無〕 for every other archetype, and the Kingdom's is
+    # 薇歐蕾特·阿爾托利亞's old school. The dean is the capital's attendant
+    # whose table carries subject matter instead of a command lesson: the
+    # magic-rank ladder and the element vocabulary, the two closed lore
+    # vocabularies the document names as this room's natural reveal site
+    # (docs/lore/settlement-locations.md line 453). He grants nothing — the
+    # 〔提案〕 「拜師習得新技能」 at line 454 stays the lineage tree's, and
+    # this row ships no apprenticeship surface beside the room.
+    PlaceDefinition(
+        key="altoria_academy",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.ACADEMY,
+        room_name_zh="聖潔王都王立魔法學院",
+        room_desc_zh=(
+            "The academy of 聖潔王都 keeps its lectures under one roof: a "
+            "long hall of tiered benches facing a demonstration floor, "
+            "lamp-bright enough at every hour for reading, and off it a "
+            "stack room where the capital's copies of the rank texts are "
+            "kept in the order students climb them. Students argue on the "
+            "steps outside, and the tutors inside answer questions the way "
+            "a school is supposed to — all the way down. The 院長's desk "
+            "faces the demonstration floor; everything the city knows about "
+            "the ladder of magical ranks and the eight elements was taught "
+            "somewhere that looks like this, and the Kingdom's copy is the "
+            "one 薇歐蕾特·阿爾托利亞 sat in."
+        ),
+        exterior_xy=(5, 5),  # 學院前
+        doorway_key_zh="王立魔法學院",
+        doorway_aliases=("academy", "royal academy", "magic academy"),
+        host_name="奧德溫·薩契",
+        host_title="聖潔王都魔法學院院長",
+        host_race="human",
+        host_subrace=None,
+        host_sex="male",
+        profession="attendant",
+        service_id="altoria_academy_dean",
+        assortment_keys=(),
+        authored_kwargs=(("dialogue_key", "altoria_academy"),),
     ),
 )

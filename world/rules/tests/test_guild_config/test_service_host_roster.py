@@ -644,8 +644,13 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # altoria-crown-and-watch widens the sanctioned group with the
         # host-less 聖潔王都王宮: the palace is the capital's first place to
         # reach the rooms-only outcome hostless-places reserved for this
-        # exact all-or-nothing shape.
-        self.assertEqual(hostless, {"ciaran_shelter", "altoria_palace"})
+        # exact all-or-nothing shape. altoria-learning-and-exchange widens it
+        # again with the host-less 聖潔王都市集棚 — host-less on the document's
+        # authority (a market street's trade hangs on its stallholders, not a
+        # fixed street-chief NPC), the second emptiness meant to stay empty.
+        self.assertEqual(
+            hostless, {"ciaran_shelter", "altoria_palace", "altoria_market_stalls"}
+        )
         for place in PLACE_REGISTRY.values():
             if place_is_hostless(place):
                 continue

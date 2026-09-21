@@ -21,6 +21,17 @@ Merchant rows carry a ``dialogue_key`` beside their ``shop_key``: the merchant
 blueprint answers as well as trades (merchant-dialogue), and a merchant place
 without the kwarg fails load naming the place. The tables live in
 ``world/lore/dialogue/altoria.py`` under the same keys.
+
+altoria-learning-and-exchange appends the capital's last two middle-terrace
+rooms: 聖潔王都商會公所 off 東市 — the document's designated future source
+of escort commissions, landed here as an attendant host who talks caravans
+and trade routes and offers no work, because the escort quest type the
+commissions need does not exist — and 聖潔王都市集棚 off 市場街, the
+capital's second host-less place, host-less on the document's authority
+rather than on an unwritten story: 「市場街本身不需要一位固定的街長型功能性
+NPC，遊戲性功能都掛在各個攤販身上」 (docs/lore/settlement-locations.md
+line 374). 市場街 now carries three doors (雜貨店、首飾坊、市集棚) and 東市
+two (鍊金坊、商會公所); the registry's doorway-name rule keeps them honest.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -182,5 +193,73 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ("shop_key", "altoria_alchemist"),
             ("dialogue_key", "altoria_alchemist"),
         ),
+    ),
+    # 聖潔王都商會公所 — the merchants' guild hall, off 東市 (5,3), sharing
+    # that exterior with the alchemist under a different doorway name
+    # (鍊金坊 vs 商會公所). The document's 商會與貿易行 is 「未來的」護衛委託
+    # 發放處 and 「guild request」 already reports escort work closed: the
+    # guild master talks caravans, routes and tariffs as world-building and
+    # offers nothing — a commission surface without the escort quest type
+    # behind it would post work that cannot be completed, so this row ships
+    # an attendant's dialogue table and no work board (design refusal two).
+    PlaceDefinition(
+        key="altoria_merchant_hall",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.MERCHANT_HALL,
+        room_name_zh="聖潔王都商會公所",
+        room_desc_zh=(
+            "The merchants' hall of 聖潔王都 is a long office above the "
+            "east road's goods traffic: a tariff table under the windows, "
+            "route charts nailed along the wall with the season's caravans "
+            "chalked against them, and benches where factors wait while "
+            "clerks settle their business in writing across the counter. "
+            "The trade of 東市 is coordinated from this room — who runs "
+            "which road, who carries whose glass and grain, who owes the "
+            "guild what at quarter's end. There is no board on the wall and "
+            "no list by the door: whatever work this hall will one day "
+            "post, its arrangements are still made with a person, face to "
+            "face, across a desk."
+        ),
+        exterior_xy=(5, 3),  # 東市
+        doorway_key_zh="商會公所",
+        doorway_aliases=("merchant hall", "guild of merchants", "trading hall"),
+        host_name="尤斯汀·柯德溫",
+        host_title="聖潔王都商會會長",
+        host_race="human",
+        host_subrace=None,
+        host_sex="male",
+        profession="attendant",
+        service_id="altoria_merchant_master",
+        assortment_keys=(),
+        authored_kwargs=(("dialogue_key", "altoria_merchant_hall"),),
+    ),
+    # 聖潔王都市集棚 — the covered market stalls, off 市場街 (2,3), sharing
+    # that exterior with the general store and the jeweller under a third
+    # doorway name (雜貨店 vs 首飾坊 vs 市集棚). Host-less on the document's
+    # authority, not by omission: line 374 says a market street's function
+    # hangs on individual stallholders, not on a fixed street-chief NPC, so
+    # this emptiness is a design statement, not the palace's unwritten
+    # story. When stallholders arrive they will be transient scene NPCs on
+    # the quest path — the same rooms-only shape hostless-places reserves,
+    # with no permanent roster row expected behind it.
+    PlaceDefinition(
+        key="altoria_market_stalls",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.MARKET,
+        room_name_zh="聖潔王都市集棚",
+        room_desc_zh=(
+            "The covered stalls of 聖潔王都 are a roof over other people's "
+            "counters: a long shed of trestled canvas and scarfing boards, "
+            "sun through the seams in pale stripes along the empty stalls. "
+            "Every stall is swept and unclaimed — fruit sellers wheel their "
+            "barrows in at dawn and wheel them out at dusk, buskers take "
+            "the wide bay by the west door, and the ground itself keeps no "
+            "shopkeeper. The street's trade lives on the people who stand "
+            "here only for today, and the shed has been built to wait for "
+            "whoever that is, asking nothing and reserving nothing."
+        ),
+        exterior_xy=(2, 3),  # 市場街
+        doorway_key_zh="市集棚",
+        doorway_aliases=("market stalls", "stalls", "covered market"),
     ),
 )

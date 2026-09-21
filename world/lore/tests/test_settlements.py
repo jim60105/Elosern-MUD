@@ -71,6 +71,9 @@ class PlaceRegistryTests(unittest.TestCase):
         # appended to the LOWER slice behind the bathhouse (its exterior, the
         # 南門, is old-town ground), and the palace, the noble watch and the
         # drill yard appended to the UPPER slice behind the sanctum.
+        # altoria-learning-and-exchange grew both again: the merchant hall and
+        # the market stalls appended to the MIDDLE slice behind the alchemist,
+        # and the academy appended to the UPPER slice behind the drill yard.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
@@ -78,10 +81,11 @@ class PlaceRegistryTests(unittest.TestCase):
                 "altoria_bathhouse", "altoria_guardhouse",
                 "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
-                "altoria_alchemist",
+                "altoria_alchemist", "altoria_merchant_hall",
+                "altoria_market_stalls",
                 "altoria_temple", "altoria_sanctum",
                 "altoria_palace", "altoria_noble_watch",
-                "altoria_drill_yard",
+                "altoria_drill_yard", "altoria_academy",
                 "ciaran_elenis_home", "ciaran_gwenaera_home",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_nireth_home", "ciaran_shelter",
@@ -253,6 +257,11 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_noble_watch": "watch_post",
             "altoria_drill_yard": "training_ground",
             "altoria_guardhouse": "watch_post",
+            # Learning-and-exchange lands the vocabulary's academy /
+            # merchant_hall / market entries on the capital's last three rooms.
+            "altoria_merchant_hall": "merchant_hall",
+            "altoria_market_stalls": "market",
+            "altoria_academy": "academy",
             "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",
