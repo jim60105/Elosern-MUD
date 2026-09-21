@@ -55,15 +55,20 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
 
     # The assembled roster order is the terrace-slice order
     # (altoria-place-slices): the lower terrace's eatery host leads, the
-    # middle terrace's guild/store/forge/tailor follow, the village homes
-    # close. This is the order the split deliberately established; the
+    # middle terrace's guild/store/forge/tailor/jeweller/alchemist follow
+    # (altoria-adornments-and-remedies closed the specialist family and this
+    # pin had never ridden that growth), the village homes close — nine
+    # places, eight hosts, the 共食棚 contributing nothing (ciaran-village-
+    # commons). This is the order the slices deliberately establish; the
     # content-neutral field comparisons below locate rows by service_id so
     # they guard identities, not a sequence.
     ASSEMBLED_ROSTER_ORDER = [
         "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
-        "altoria_blacksmith", "altoria_tailor",
+        "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
+        "altoria_alchemist",
+        "ciaran_elenis",
         "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
-        "ciaran_nireth", "ciaran_valwyn", "ciaran_vethiel",
+        "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn", "ciaran_vethiel",
     ]
 
     def _assert_reproduces_former_rows(self, rows):
@@ -113,9 +118,12 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             set(catalog.host_by_service_id),
             {
                 "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor",
+                "altoria_eatery_owner", "altoria_tailor", "altoria_jeweller",
+                "altoria_alchemist",
+                "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_nireth", "ciaran_valwyn", "ciaran_vethiel",
+                "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn",
+                "ciaran_vethiel",
             },
         )
 
@@ -129,15 +137,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     @covers_requirement(
         "place-attendant-hosts::adding-the-blueprint-changes-no-shipped-host"
     )
-    def test_the_attendant_blueprint_ships_unused(self):
-        # Neutrality gate (place-attendant-profession): every derived row
-        # equals the FULL pre-change baseline field by field — name, title,
-        # profession, anchor, service_id, authored identity — so a shipped
-        # host's identity cannot silently move while the two-row former-YAML
-        # zip above still passes. NOT ONE row names the new attendant
-        # blueprint: it ships available for content changes, used by nothing.
+    def test_the_attendant_blueprint_ships_without_moving_any_baseline_row(self):
+        # Neutrality gate (place-attendant-profession, as modified by
+        # ciaran-village-commons): every derived row equals its pre-change
+        # baseline entry field by field — name, title, profession, anchor,
+        # service_id, authored identity — so a shipped host's identity
+        # cannot silently move while the roster grows. The blueprint shipped
+        # unused until ciaran-village-commons named its first two hosts;
+        # those rows are this change's own subject (covered against the
+        # ciaran-village-commons capability), not part of this neutrality
+        # claim, so no row count or profession-absence pin belongs here.
         rows = validate_service_hosts()
-        self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
         for expected in self.PRE_CHANGE_BASELINE:
             row = next(r for r in rows if r.service_id == expected["service_id"])
             with self.subTest(service_id=row.service_id):
@@ -159,7 +169,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                         expected["authored_kwargs"],
                     ),
                 )
-        self.assertNotIn("attendant", {row.profession.key for row in rows})
 
     # The complete roster as it shipped BEFORE place-attendant-profession,
     # written as literals (never derived from the live registry): the fixed
@@ -224,6 +233,28 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "authored_kwargs": {
                 "shop_key": "altoria_tailor",
                 "dialogue_key": "altoria_tailor",
+            },
+        },
+        {
+            "name": "艾蓮娜·鴉丘",
+            "title": "聖潔王都首飾坊主",
+            "profession": "merchant",
+            "anchor_room": "altoria_jeweller",
+            "service_id": "altoria_jeweller",
+            "authored_kwargs": {
+                "shop_key": "altoria_jeweller",
+                "dialogue_key": "altoria_jeweller",
+            },
+        },
+        {
+            "name": "希碧拉·灰沼",
+            "title": "聖潔王都鍊金坊主",
+            "profession": "merchant",
+            "anchor_room": "altoria_alchemist",
+            "service_id": "altoria_alchemist",
+            "authored_kwargs": {
+                "shop_key": "altoria_alchemist",
+                "dialogue_key": "altoria_alchemist",
             },
         },
         {
@@ -576,20 +607,25 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     @covers_requirement(
         "place-attendant-hosts::adding-the-blueprint-changes-no-shipped-host"
     )
-    def test_every_shipped_place_still_authors_a_complete_host(self):
-        # hostless-places neutrality gate (task 4.1): the capability ships
-        # unused. Every shipped place declares all six scalar host fields,
-        # and the derived roster is the fixed nine rows field for field —
-        # nothing moved into or out of the host-declaring set.
+    def test_every_shipped_place_authors_a_complete_host_except_the_shelter(self):
+        # hostless-places neutrality gate, as widened by
+        # ciaran-village-commons: the one shipped host-less place is the
+        # sanctioned 共食棚 commons, and every other shipped place declares
+        # all six scalar host fields. The derived roster still reproduces
+        # every pre-change baseline row field for field — no identity moved
+        # into or out of the host-declaring set — while the roster itself
+        # has grown with the content changes that own the new rows.
         from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
 
+        hostless = {place.key for place in PLACE_REGISTRY.values() if place_is_hostless(place)}
+        self.assertEqual(hostless, {"ciaran_shelter"})
         for place in PLACE_REGISTRY.values():
+            if place_is_hostless(place):
+                continue
             with self.subTest(place=place.key):
-                self.assertFalse(place_is_hostless(place))
                 for field in HOST_IDENTITY_FIELDS:
                     self.assertIsNotNone(getattr(place, field), field)
         rows = validate_service_hosts()
-        self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
         for expected in self.PRE_CHANGE_BASELINE:
             row = next(r for r in rows if r.service_id == expected["service_id"])
             with self.subTest(service_id=row.service_id):
