@@ -1,4 +1,4 @@
-"""Data-contract test: commerce rulebook slice loading contract (commerce-rulebook-slices).
+"""Data-contract test: commerce rulebook slice loading contract
 
 Slice of ``test_guild_config``: CommerceRulebookSliceTests.
 """
