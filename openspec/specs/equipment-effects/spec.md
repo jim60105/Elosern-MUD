@@ -93,11 +93,19 @@ Rulebook fields whose consumers arrive in later changes (combat/stat merge, immu
 - **THEN** combat, act resolution, and buff application produce byte-for-byte identical results between the two copies, and no production module outside the validated loader and the change-authorized consumers imports the equipment-effect rulebook
 
 ### Requirement: The new equipment roster is registered and tradeable
-The roster SHALL add the ten designed equipment items — 淨化吊墜, 無懼胸針, 騎士全套板甲, 藥師珠串, 大術師補綴長袍, 誘蠱蕾絲內衣, 迷情絲頸環, 修女聖袍, 光輝聖徽, 聖女聖袍 — each with a registry presentation identity, an existing price-table key, an effect binding, and a listing in the existing general store's offered keys.
+The roster SHALL add the ten designed equipment items — 淨化吊墜, 無懼胸針, 騎士全套板甲,
+藥師珠串, 大術師補綴長袍, 誘蠱蕾絲內衣, 迷情絲頸環, 修女聖袍, 光輝聖徽, 聖女聖袍 — each
+with a registry presentation identity, an existing price-table key, an effect binding, and a
+listing in the offered keys of at least one Altoria shop.
+<!-- Was "a listing in the existing general store's offered keys". altoria-adornments-and-
+     remedies moves the roster's five accessory pieces to 聖潔王都首飾坊 (the armor pieces
+     already sat with 聖潔王都裁縫坊), so the tradeable guarantee is per-roster, not
+     per-shelf. The shipped behavioral test already asserts offered-by-some-capital-shop. -->
 
 #### Scenario: New items are purchasable and fully bound
-- **WHEN** the general store is inspected after this change
-- **THEN** each of the ten new item keys appears in the offered keys with a resolvable price entry and a budget-checked rulebook entry
+- **WHEN** the capital's shops are inspected after this change
+- **THEN** each of the ten new item keys appears in at least one capital shop's offered keys
+  with a resolvable price entry and a budget-checked rulebook entry
 
 ### Requirement: Church-of-Light equipment obeys its canon doctrine
 The named 光明教會 equipment set is governed by the Church's canon doctrine (坦露與歡愉為正向、光之治療與淨化) and is split into two sub-sets by liturgical function. The **vestment-and-emblem** sub-set — `sister_vestments`, `radiant_holy_emblem`, `saintess_vestments`, and `pilgrim_medallion` — SHALL carry non-negative `exposure_bias` and non-negative `pleasure_gain`, and SHALL provide at least one of `heal_gain` or an immunity, because a garment or sigil of the faith channels the Light's healing and cleansing. The **sanctuary-device** sub-set — the 聖所 devices the codex catalogues, currently `nymph_buds_clamp`, `warm_honey_orb`, and `hyperesthesia_charm` — SHALL carry non-negative `exposure_bias` and positive `pleasure_gain`, and SHALL NOT be required to provide `heal_gain` or an immunity, because a device serves the rite of pleasure itself rather than dispensing the Light. No member of either sub-set SHALL carry chastity-style suppression (negative `pleasure_gain` or negative `exposure_bias`); ordinary combat trade-offs (negative `defense`, `atk_phys`, agility, etc.) remain permitted as the mechanical cost of holiness. A future registry-owned faith-identity tag is out of scope here; membership is these named sets, and a new Church item enters by amending this requirement in the change that adds it, naming the sub-set it joins.
