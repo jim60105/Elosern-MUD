@@ -311,7 +311,6 @@
     "web/webclient-app/tests/world/map_lattice_support.js",
     "world/ai/tests/test_npc_dialogue_prompts.py",
     "world/imports/tests/test_skill_registry_self_arming.py",
-    "world/rules/tests/test_dialogue.py",
     "world/rules/tests/test_item_effects_rulebook.py",
     "world/rules/tests/test_traits.py"
   ],
