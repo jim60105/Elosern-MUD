@@ -207,6 +207,13 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
     and the fields missing — that message is the point of the rule, because
     the failure mode it replaces is a ``None`` profession key reaching
     ``get_profession`` several layers away.
+
+    The record loop is followed by one cross-record rule (altoria-place-slices,
+    born with the replan's shared exteriors): two places MAY share an exterior
+    — a craft alley with a forge and a tailor on it is one street with two
+    doors — but never a doorway name on it, because two identical doorway
+    keys on one exterior produce a single exit where two were authored,
+    silently losing a location rather than failing.
     """
     for place_key, place in places.items():
         if place_key != place.key:
@@ -283,6 +290,27 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 f"place {place.key!r} declares extra_item_keys/excluded_item_keys "
                 "without a shop identity (shop_key)"
             )
+
+    # Cross-record pass: one doorway name per exterior. Keyed by
+    # (settlement_key, exterior_xy, doorway_key_zh) because the interior's z
+    # derives from the settlement — the same coordinate in two settlements is
+    # two streets, not one. exterior_xy is already validated as an (x, y)
+    # integer pair by the record loop above.
+    first_holder: dict[tuple[str, tuple[int, int], str], str] = {}
+    for place in places.values():
+        doorway = (
+            place.settlement_key,
+            tuple(place.exterior_xy),
+            place.doorway_key_zh,
+        )
+        if doorway in first_holder:
+            raise ValueError(
+                f"places {first_holder[doorway]!r} and {place.key!r} both declare "
+                f"doorway {place.doorway_key_zh!r} on the exterior at "
+                f"{tuple(place.exterior_xy)} of {place.settlement_key!r}; "
+                "two places on one exterior must name their doorways differently"
+            )
+        first_holder[doorway] = place.key
 
 
 # The registry is assembled from the per-settlement slices in fixed order (the

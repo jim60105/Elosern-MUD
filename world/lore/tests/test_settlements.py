@@ -485,6 +485,59 @@ class PlaceRegistryTests(unittest.TestCase):
                 broken = next(iter(changes))
                 self.assertIn(broken, message)
 
+    # ---- shared exteriors (altoria-place-slices) ----------------------------
+
+    def _alley(self, key, doorway):
+        """One synthetic place on the shared craft-alley exterior (1, 3)."""
+        return replace(
+            self.guild,
+            key=key,
+            service_id=f"{key}_service",
+            room_name_zh=f"合成巷道室 {key}",
+            exterior_xy=(1, 3),
+            doorway_key_zh=doorway,
+        )
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_two_places_may_share_an_exterior_with_different_doorway_names(self):
+        # One street, two doors (the craft-alley shape): a distinct doorway
+        # name per place is the whole condition, and it loads. The sync side
+        # — that such a pair really yields two doorways — is covered over the
+        # live seams in world/maps/tests/test_service_interiors.py.
+        pair = {
+            place.key: place
+            for place in (
+                self._alley("t_alley_place_a", "合成鍛造鋪門"),
+                self._alley("t_alley_place_b", "合成裁縫坊門"),
+            )
+        }
+        try:
+            validate_place_registry(pair)
+        except ValueError as error:  # pragma: no cover - failure path is the fail below
+            self.fail(f"distinct doorways on one exterior rejected: {error}")
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_two_places_sharing_an_exterior_and_doorway_name_are_rejected(self):
+        # Two identical doorway names on one exterior collapse into one exit
+        # and silently lose a location, so the collision fails load naming
+        # both places and the shared name.
+        pair = {
+            place.key: place
+            for place in (
+                self._alley("t_alley_place_a", "合成巷門"),
+                self._alley("t_alley_place_b", "合成巷門"),
+            )
+        }
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry(pair)
+        message = str(caught.exception)
+        for fragment in ("t_alley_place_a", "t_alley_place_b", "合成巷門"):
+            self.assertIn(fragment, message)
+
 
 class DerivedShopRegistryTests(unittest.TestCase):
     """Shop identities are a view over the places that author a shop_key."""
