@@ -21,7 +21,11 @@ def _error(message: str) -> GuildConfigError:
 
 
 def _commerce_error(message: str) -> GuildConfigError:
-    return GuildConfigError(f"commerce.yaml: {message}")
+    return GuildConfigError(f"commerce rulebook: {message}")
+
+
+def _commerce_file_error(name: str, message: str) -> GuildConfigError:
+    return GuildConfigError(f"commerce/{name}: {message}")
 
 
 def _require_text(value: Any, field: str) -> str:
@@ -53,13 +57,73 @@ def load_config() -> dict[str, Any]:
     return dict(raw)
 
 
-def load_commerce_config() -> dict[str, Any]:
-    raw = yaml.safe_load(
-        (Path(__file__).parents[1] / "rulebook" / "commerce.yaml").read_text(encoding="utf-8")
-    )
-    if not isinstance(raw, Mapping):
-        raise _commerce_error("rulebook must be a mapping")
-    return dict(raw)
+COMMERCE_DIR = Path(__file__).parents[1] / "rulebook" / "commerce"
+
+
+def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
+    """Load the commerce rulebook directory as one merged catalog.
+
+    Every ``*.yaml`` in the directory is read in sorted filename order so the
+    load is deterministic. ``assortments:`` and ``shops:`` lists concatenate
+    (in that sorted file order); ``price_scales:`` mappings merge. An
+    assortment key, a shop key or a settlement scale declared in two files is
+    a load error naming the key and both files — each file owns what it
+    declares, and a silent last-file-wins merge would destroy that guarantee.
+    A parse or shape error names the offending file.
+    """
+    directory = COMMERCE_DIR if rulebook_dir is None else Path(rulebook_dir)
+    files = sorted(directory.glob("*.yaml"))
+    if not files:
+        raise _commerce_error(f"no *.yaml found in {directory}")
+    assortments: list[Any] = []
+    shops: list[Any] = []
+    price_scales: dict[Any, Any] = {}
+    owners: dict[tuple[str, Any], str] = {}
+    merged: dict[str, Any] = {}
+
+    def _claim(kind: str, key: Any, name: str) -> None:
+        first = owners.get((kind, key))
+        if first is not None:
+            raise _commerce_file_error(
+                name,
+                f"duplicate {kind} key {key!r} declared in commerce/{first} "
+                f"and commerce/{name}",
+            )
+        owners[(kind, key)] = name
+
+    for path in files:
+        name = path.name
+        try:
+            raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise _commerce_file_error(name, f"failed to parse: {exc}") from exc
+        if raw is None:
+            continue
+        if not isinstance(raw, Mapping):
+            raise _commerce_file_error(name, "rulebook slice must be a mapping")
+        for section in ("assortments", "shops"):
+            rows = raw.get(section)
+            if rows is None:
+                continue
+            if not isinstance(rows, list):
+                raise _commerce_file_error(name, f"{section} must be a list")
+            for position, row in enumerate(rows, start=1):
+                if not isinstance(row, Mapping):
+                    raise _commerce_file_error(
+                        name, f"{section} entry {position} must be a mapping"
+                    )
+                row_key = row.get("key" if section == "assortments" else "shop_key")
+                if row_key is not None:
+                    _claim(section, row_key, name)
+            merged.setdefault(section, []).extend(rows)
+        scales = raw.get("price_scales")
+        if scales is not None:
+            if not isinstance(scales, Mapping):
+                raise _commerce_file_error(name, "price_scales must be a mapping")
+            for settlement_key in scales:
+                _claim("price_scales settlement", settlement_key, name)
+            merged.setdefault("price_scales", {}).update(scales)
+    return merged
 
 
 def validate_merit_thresholds(raw: Mapping[str, Any]) -> dict[str, int]:

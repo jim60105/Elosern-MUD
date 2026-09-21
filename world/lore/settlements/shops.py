@@ -6,7 +6,7 @@ derived keys ARE those shop identities — every runtime consumer resolves
 ``SHOP_REGISTRY[merchant.shop_key]``. The goods a shop stocks are the union
 of the assortments its place references (settlement-shops design §3.1).
 Exact prices, hours, and stock quantities live in
-``world/rules/rulebook/commerce.yaml``. ``world/lore/shops.py`` is deleted;
+``world/rules/rulebook/commerce/``. ``world/lore/shops.py`` is deleted;
 its two authored-identity validators move here unchanged (their guild
 registry imports stay function-local, now absolute for the subpackage move).
 """

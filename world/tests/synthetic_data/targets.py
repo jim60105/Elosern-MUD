@@ -39,7 +39,7 @@ from world.tests.synthetic_data.data_world import (
 from world.tests.synthetic_data.data_presets_quests import SYNTH_PRESETS, SYNTH_QUESTS, _build_issuances
 
 # Fragment-assembled logical name: the token is a shipped universe member
-# (the commerce.yaml section), so this file never spells it literally.
+# (the commerce rulebook section), so this file never spells it literally.
 _BUNDLES_LOGICAL = "assort" + "ments"
 
 # ---------------------------------------------------------------------------

@@ -47,6 +47,7 @@ from world.rules.guild_config import (
     GuildConfigError,
     ItemOfferRule,
     ShopConfig,
+    load_commerce_config,
     load_guild_catalog,
     validate_assortment_configs,
     validate_exam_profiles,
@@ -68,7 +69,7 @@ from world.skills.registry import SKILL_REGISTRY
 
 RULEBOOK = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "guild_economy.yaml"
 
-COMMERCE = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "commerce.yaml"
+COMMERCE_DIR = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "commerce"
 
 class CatalogRegistryIsolation(unittest.TestCase):
     def setUp(self):
@@ -99,7 +100,7 @@ def raw_rulebook() -> dict:
     return yaml.safe_load(RULEBOOK.read_text(encoding="utf-8"))
 
 def raw_commerce() -> dict:
-    return yaml.safe_load(COMMERCE.read_text(encoding="utf-8"))
+    return load_commerce_config(COMMERCE_DIR)
 
 def _shipped_scales() -> dict:
     """The shipped price_scales section, validated like catalog load does."""
