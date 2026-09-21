@@ -117,9 +117,10 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         catalog = get_catalog()
         capital_key = _place_by_kind("guild_hall").settlement_key
         return [
-            catalog.shop_configs[place.key]
+            catalog.shop_configs[dict(place.authored_kwargs)["shop_key"]]
             for place in _places().values()
-            if place.settlement_key == capital_key and place.key in catalog.shop_configs
+            if place.settlement_key == capital_key
+            and "shop_key" in dict(place.authored_kwargs)
         ]
 
     @covers_requirement(
@@ -513,18 +514,37 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                     host.components.get(ScriptedDialogue.get_component_slot())
                 )
         # 練刀場 carries one doorway per dwelling and each leads back to it.
-        blade_place = next(p for p in attendants if any(
-            q.exterior_xy == p.exterior_xy and q.profession == "merchant"
-            for q in _village_places()
-        ))
-        exterior = self._exterior(blade_place)
-        keys = {e.key for e in exterior.exits}
-        self.assertIn(blade_place.doorway_key_zh, keys)
-        self.assertIn(
-            next(p.doorway_key_zh for p in _village_places()
-                 if p.exterior_xy == blade_place.exterior_xy and p.profession == "merchant"),
-            keys,
+        # The training ground is the clearing the blade-smith's home already
+        # resolves to; the instructor shares it. Resolve it from the merchant
+        # row explicitly, then pin the TWO dwelling doorways: their exact
+        # destinations and the reciprocal link from each interior.
+        blade_smith = next(
+            q for q in _village_places()
+            if q.profession == "merchant"
+            and any(p.exterior_xy == q.exterior_xy for p in attendants)
         )
+        instructor = next(
+            p for p in attendants if p.exterior_xy == blade_smith.exterior_xy
+        )
+        clearing = self._exterior(blade_smith)
+        dwelling_doors = {
+            e.key: e for e in clearing.exits
+            if e.key in {blade_smith.doorway_key_zh, instructor.doorway_key_zh}
+        }
+        self.assertEqual(
+            set(dwelling_doors),
+            {blade_smith.doorway_key_zh, instructor.doorway_key_zh},
+            "練刀場 does not carry one doorway per dwelling",
+        )
+        self.assertIs(dwelling_doors[blade_smith.doorway_key_zh].destination,
+                      self._interior(blade_smith))
+        self.assertIs(dwelling_doors[instructor.doorway_key_zh].destination,
+                      self._interior(instructor))
+        for place in (blade_smith, instructor):
+            with self.subTest(reciprocal=place.key):
+                back = [e for e in self._interior(place).exits
+                        if e.destination == clearing]
+                self.assertEqual(len(back), 1)
         # A second run duplicates nothing.
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
@@ -534,6 +554,12 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 exterior = self._exterior(place)
                 self.assertEqual(
                     len([e for e in exterior.exits if e.key == place.doorway_key_zh]), 1
+                )
+                residents = [
+                    o for o in self._interior(place).contents if isinstance(o, NPC)
+                ]
+                self.assertEqual(
+                    len(residents), 0 if place is commons else 1, place.key
                 )
 
     @covers_requirement(
@@ -551,8 +577,24 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertNotIn("shop_key", dict(place.authored_kwargs))
                 self.assertNotIn(place.key, catalog.shop_configs)
         self.assertNotIn(commons.key, catalog.shop_configs)
+        # Surface baseline BEFORE any service content synchronizes: the
+        # command keys must be identical after. The persisted-shape half is
+        # compared below against the blade-smith's trading host — a shipped
+        # row that predates this change — so the attendant shape may only
+        # persist a subset of what an ordinary village host already does.
+        commands_before = {command.key for command in CharacterCmdSet().commands}
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
+        trader_host_keys = {
+            attribute.key
+            for attribute in next(
+                obj
+                for obj in self._interior(
+                    next(p for p in _village_places() if p.profession == "merchant")
+                ).contents
+                if isinstance(obj, NPC)
+            ).attributes.all()
+        }
         # Runtime half: no merchant capability exists at any of the three.
         self.assertEqual([o for o in self._interior(commons).contents if isinstance(o, NPC)], [])
         player = create_object(PlayerCharacter, key="commons_probe")
@@ -576,16 +618,39 @@ class CiaranVillageCommonsTests(ServiceContentIsolation, EvenniaTestCase):
                     e for e in exterior.exits if e.key == place.doorway_key_zh
                 )
                 # No lock, no prerequisite: the default traversal access
-                # check is all the doorway consults.
+                # check is all the doorway consults, and the stock exit
+                # traversal API — the path the 前往 command walks — moves
+                # the character through it.
                 self.assertTrue(doorway.access(player, "traverse"))
-                player.move_to(doorway.destination)
+                doorway.at_traverse(player, doorway.destination)
                 self.assertEqual(player.location, self._interior(place))
+                # The dwelling host persists no attribute key that a shipped
+                # trading host does not also carry: the attendant shape adds
+                # nothing to the persisted surface.
+                self.assertLessEqual(
+                    {attribute.key for attribute in host.attributes.all()},
+                    trader_host_keys,
+                )
+        # The shelter interior persists no attribute beyond what an ordinary
+        # village interior (the blade-smith's home) already carries.
+        trader_interior_keys = {
+            attribute.key
+            for attribute in self._interior(
+                next(p for p in _village_places() if p.profession == "merchant")
+            ).attributes.all()
+        }
+        self.assertLessEqual(
+            {attribute.key for attribute in self._interior(commons).attributes.all()},
+            trader_interior_keys,
+        )
         # The command set and the persisted attribute vocabulary are
-        # unchanged by the commons.
-        commands = {c.key for c in CharacterCmdSet().commands}
-        self.assertNotIn("petition", commands)
-        self.assertNotIn("council", commands)
-        self.assertNotIn("share", commands)
+        # unchanged by the commons: full command-set equality against the
+        # pre-sync snapshot, and full vocabulary equality across a second
+        # synchronization (no resync-only state either).
+        self.assertEqual(
+            {command.key for command in CharacterCmdSet().commands},
+            commands_before,
+        )
         vocabulary = {
             (row.db_model, row.db_key, row.db_category)
             for row in Attribute.objects.only("db_model", "db_key", "db_category")

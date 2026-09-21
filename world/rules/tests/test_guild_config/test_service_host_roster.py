@@ -648,6 +648,68 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     ),
                 )
 
+    #: The three ciaran-village-commons rows as LITERALS — the historical
+    #: neutrality baseline deliberately excludes them, so their authored
+    #: identity needs its own independent data contract: a coordinated drift
+    #: between a row and the sync output would pass every derived comparison.
+    CIARAN_COMMONS_ROWS = {
+        "ciaran_elenis": (
+            "艾莉妮斯·達恩斯特瑞德爾",
+            "暗影谷村長老",
+            "attendant",
+            "ciaran_elenis_home",
+            "ciaran_elenis",
+            {"dialogue_key": "ciaran_elenis_home"},
+        ),
+        "ciaran_teliel": (
+            "泰莉爾·菲溫德",
+            "暗影谷村刀術導師",
+            "attendant",
+            "ciaran_teliel_home",
+            "ciaran_teliel",
+            {"dialogue_key": "ciaran_teliel_home"},
+        ),
+    }
+
+    @covers_requirement(
+        "ciaran-village-commons::the-village-has-a-communal-shelter-a-sword-instructor-and-an-elder"
+    )
+    def test_the_three_commons_rows_are_their_own_literal_data_contract(self):
+        # The two attendant identities are pinned as literals (name, title,
+        # profession, anchor, service_id, authored kwargs) against the
+        # derived roster, and the shelter's host-less shape (every host
+        # scalar None, no profession, no service_id, no kwargs, no goods)
+        # against the registry row — independent of the sync projection.
+        from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
+
+        rows = validate_service_hosts()
+        for service_id, expected in self.CIARAN_COMMONS_ROWS.items():
+            row = next(r for r in rows if r.service_id == service_id)
+            with self.subTest(service_id=service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    expected,
+                )
+        shelter = PLACE_REGISTRY["ciaran_shelter"]
+        self.assertTrue(place_is_hostless(shelter))
+        self.assertEqual(shelter.kind, "commons")
+        self.assertEqual(shelter.profession, None)
+        self.assertEqual(shelter.service_id, None)
+        self.assertEqual(shelter.authored_kwargs, ())
+        self.assertEqual(shelter.assortment_keys, ())
+        self.assertEqual(shelter.extra_item_keys, ())
+        self.assertEqual(shelter.excluded_item_keys, ())
+        for field in HOST_IDENTITY_FIELDS:
+            with self.subTest(field=field):
+                self.assertIsNone(getattr(shelter, field), field)
+
 
 if __name__ == "__main__":
     unittest.main()
