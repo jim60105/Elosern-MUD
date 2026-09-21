@@ -61,6 +61,11 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # sanctum 執事 close the capital block (altoria-sanctum), the village
     # homes close (altoria-hospitality grew the capital block to eleven hosts;
     # the 共食棚 still contributes nothing, ciaran-village-commons).
+    # altoria-crown-and-watch grows it to fourteen: the guard captain rides
+    # behind the bathhouse (the guardhouse appended to the LOWER slice), and
+    # the noble-quarter captain and the drill instructor close the capital
+    # block behind the sanctum 執事 (the upper slice); the host-less palace
+    # contributes nothing, exactly as the 共食棚 never has.
     # This is the order the slices deliberately
     # establish; the content-neutral field comparisons below locate rows by
     # service_id so they guard identities, not a sequence.
@@ -69,10 +74,16 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # altoria-hospitality: the lower terrace's three attendant hosts ride
         # directly behind the eatery, in the slice's authored row order.
         "altoria_tavern_keeper", "altoria_innkeeper", "altoria_bathhouse_keeper",
+        # altoria-crown-and-watch: the 衛兵駐所 captain, appended to the
+        # lower slice behind the bathhouse.
+        "altoria_guard_captain",
         "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
         "altoria_alchemist",
         "altoria_high_priestess", "altoria_sanctum_deacon",
+        # altoria-crown-and-watch: the noble-quarter captain and the drill
+        # instructor, appended to the upper slice behind the sanctum.
+        "altoria_noble_watch_captain", "altoria_drill_instructor",
         "ciaran_elenis",
         "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
         "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn", "ciaran_vethiel",
@@ -130,6 +141,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_tavern_keeper", "altoria_innkeeper",
                 "altoria_bathhouse_keeper",
                 "altoria_high_priestess", "altoria_sanctum_deacon",
+                "altoria_guard_captain",
+                "altoria_noble_watch_captain", "altoria_drill_instructor",
                 "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
                 "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn",
@@ -628,7 +641,11 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
 
         hostless = {place.key for place in PLACE_REGISTRY.values() if place_is_hostless(place)}
-        self.assertEqual(hostless, {"ciaran_shelter"})
+        # altoria-crown-and-watch widens the sanctioned group with the
+        # host-less 聖潔王都王宮: the palace is the capital's first place to
+        # reach the rooms-only outcome hostless-places reserved for this
+        # exact all-or-nothing shape.
+        self.assertEqual(hostless, {"ciaran_shelter", "altoria_palace"})
         for place in PLACE_REGISTRY.values():
             if place_is_hostless(place):
                 continue
@@ -825,6 +842,144 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     ),
                     expected,
                 )
+
+    #: The three altoria-crown-and-watch attendant rows as LITERALS — the
+    #: historical neutrality baseline excludes them, so the watch's and the
+    #: yard's identities need their own independent data contract: a
+    #: coordinated drift between a place row and the sync projection would
+    #: pass every derived comparison (the HOSPITALITY_ROWS pattern).
+    CROWN_WATCH_ROWS = {
+        "altoria_guard_captain": (
+            "托瓦德·鄧堡",
+            "聖潔王都衛兵隊隊長",
+            "attendant",
+            "altoria_guardhouse",
+            "altoria_guard_captain",
+            {"dialogue_key": "altoria_guardhouse"},
+        ),
+        "altoria_noble_watch_captain": (
+            "古利安·鷹守",
+            "聖潔王都貴族區衛隊長",
+            "attendant",
+            "altoria_noble_watch",
+            "altoria_noble_watch_captain",
+            {"dialogue_key": "altoria_noble_watch"},
+        ),
+        "altoria_drill_instructor": (
+            "伊沃·高丘",
+            "聖潔王都訓練場教頭",
+            "attendant",
+            "altoria_drill_yard",
+            "altoria_drill_instructor",
+            {"dialogue_key": "altoria_drill_yard"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-crown-and-watch::the-capital-has-a-palace-a-noble-quarter-a-guardhouse-and-a-drill-yard"
+    )
+    def test_the_three_crown_watch_rows_are_their_own_literal_data_contract(self):
+        # Name, title, profession, anchor, service_id and authored kwargs are
+        # pinned as literals against the derived roster, independent of the
+        # sync projection.
+        rows = validate_service_hosts()
+        for service_id, expected in self.CROWN_WATCH_ROWS.items():
+            row = next(r for r in rows if r.service_id == service_id)
+            with self.subTest(service_id=service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    expected,
+                )
+
+    #: The four altoria-crown-and-watch places pinned at the PLACE registry,
+    #: where the map contract lives (the HOSPITALITY_PLACE_ROWS pattern):
+    #: the derived ServiceHostRow carries no coordinate or doorway field, so
+    #: without this literal the palace could move off 王宮前庭 or the
+    #: guardhouse off 南門 while every derived comparison stayed green.
+    #: Shape: place key -> (kind, exterior_xy, doorway name, host name,
+    #: host race, host sex, assortment keys, authored kwargs). The palace's
+    #: host half of the tuple is the literal None triple — the row is the
+    #: capital's first host-less place, and pinning its emptiness here is
+    #: what keeps an attendant from quietly appearing behind the throne.
+    CROWN_WATCH_PLACE_ROWS = {
+        "altoria_palace": (
+            "palace", (4, 6), "王宮",
+            None, None, None, (), {},
+        ),
+        "altoria_noble_watch": (
+            "watch_post", (3, 5), "貴族區衛所",
+            "古利安·鷹守", "human", "male", (),
+            {"dialogue_key": "altoria_noble_watch"},
+        ),
+        "altoria_drill_yard": (
+            "training_ground", (2, 4), "校場",
+            "伊沃·高丘", "human", "male", (),
+            {"dialogue_key": "altoria_drill_yard"},
+        ),
+        "altoria_guardhouse": (
+            "watch_post", (3, 0), "衛兵駐所",
+            "托瓦德·鄧堡", "human", "male", (),
+            {"dialogue_key": "altoria_guardhouse"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-crown-and-watch::the-capital-has-a-palace-a-noble-quarter-a-guardhouse-and-a-drill-yard"
+    )
+    def test_the_crown_watch_place_rows_pin_the_four_exteriors(self):
+        # 王宮 off 王宮前庭 (4,6), the noble watch off 貴族區前 (3,5), the
+        # drill yard off 校場外 (2,4), the guardhouse off 南門 (3,0): the four
+        # squares the capital grid already carries and these doors land on.
+        for key, expected in self.CROWN_WATCH_PLACE_ROWS.items():
+            place = PLACE_REGISTRY[key]
+            with self.subTest(place=key):
+                self.assertEqual(
+                    (
+                        place.kind.value,
+                        place.exterior_xy,
+                        place.doorway_key_zh,
+                        place.host_name,
+                        place.host_race,
+                        place.host_sex,
+                        place.assortment_keys,
+                        dict(place.authored_kwargs),
+                    ),
+                    expected,
+                )
+
+    @covers_requirement(
+        "altoria-crown-and-watch::the-capital-has-a-palace-a-noble-quarter-a-guardhouse-and-a-drill-yard"
+    )
+    def test_the_palace_row_is_host_less_in_the_shape_hostless_places_reserved(self):
+        # The palace's emptiness is its own data contract (the shelter pin's
+        # shape): every host scalar None, no profession, no service id, no
+        # component kwargs, no goods — the all-or-nothing group wholly absent,
+        # not a partially authored host that validation would reject and a
+        # careless reader might mistake for a host-less room.
+        from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
+
+        palace = PLACE_REGISTRY["altoria_palace"]
+        self.assertTrue(place_is_hostless(palace))
+        self.assertEqual(palace.kind, "palace")
+        self.assertEqual(palace.profession, None)
+        self.assertEqual(palace.service_id, None)
+        self.assertEqual(palace.authored_kwargs, ())
+        self.assertEqual(palace.assortment_keys, ())
+        self.assertEqual(palace.extra_item_keys, ())
+        self.assertEqual(palace.excluded_item_keys, ())
+        for field in HOST_IDENTITY_FIELDS:
+            with self.subTest(field=field):
+                self.assertIsNone(getattr(palace, field), field)
+        # And the derived roster really carries no palace row.
+        anchors = {row.anchor_room for row in validate_service_hosts()}
+        self.assertNotIn("altoria_palace", anchors)
 
 
 if __name__ == "__main__":

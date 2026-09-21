@@ -67,15 +67,21 @@ class PlaceRegistryTests(unittest.TestCase):
         # The hospitality change (altoria-hospitality) grew the LOWER slice in
         # its authored tuple order: the eatery, then the lane's tavern and inn,
         # then the bathhouse — still leading the capital block.
+        # altoria-crown-and-watch grew both slices at once: the guardhouse
+        # appended to the LOWER slice behind the bathhouse (its exterior, the
+        # 南門, is old-town ground), and the palace, the noble watch and the
+        # drill yard appended to the UPPER slice behind the sanctum.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
                 "altoria_eatery", "altoria_tavern", "altoria_lodging",
-                "altoria_bathhouse",
+                "altoria_bathhouse", "altoria_guardhouse",
                 "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist",
                 "altoria_temple", "altoria_sanctum",
+                "altoria_palace", "altoria_noble_watch",
+                "altoria_drill_yard",
                 "ciaran_elenis_home", "ciaran_gwenaera_home",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_nireth_home", "ciaran_shelter",
@@ -241,6 +247,12 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_tavern": "tavern",
             "altoria_lodging": "lodging",
             "altoria_bathhouse": "bathhouse",
+            # The crown's rooms (altoria-crown-and-watch): the palace lands
+            # the vocabulary's palace / watch_post / training_ground entries.
+            "altoria_palace": "palace",
+            "altoria_noble_watch": "watch_post",
+            "altoria_drill_yard": "training_ground",
+            "altoria_guardhouse": "watch_post",
             "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",

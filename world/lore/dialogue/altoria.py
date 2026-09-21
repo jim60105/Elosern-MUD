@@ -385,11 +385,119 @@ BATHHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
+# 托瓦德·鄧堡 — the 衛兵駐所 captain behind the 南門. His table's job is
+# orientation: a traveller has just come through the arch and has not yet
+# seen the city. He names the streets `地圖` and `前往` already resolve, sends
+# anyone hunting work up the road to the guild board, and hangs nothing of his
+# own — the document rules a parallel bounty system out in as many words
+# (docs/lore/settlement-locations.md line 410), and the change's second
+# refusal keeps his wall bare. He posts no work; the two roads that exist
+# already carry it.
+GUARDHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "進城",
+        "「剛過南門的吧？聽一句：正對門這條是南大道，一直走到頭是中央廣場，"
+        "廣場再上去三層台——市集、公會、神殿，一路都有門牌。"
+        "要看全城的圖喊 `地圖`，要走去哪條街喊 `前往` 加街名，"
+        "路是死的，圖上都有，不用問我第二次。」"
+    ),
+    KeywordResponse(
+        "找活",
+        "「尋活路上來對了：出門左轉，沿大道走到公會前，大廳裡有看板，"
+        "`guild list` 撿單、`guild accept` 簽字，那是正路。"
+        "我這牆上不掛單，也不代人掛——城裡委託走公會板，私底下相熟的另約，"
+        "沒有一套掛在衛所牆上的懸賞，你別再問。」"
+    ),
+    KeywordResponse(
+        "治安",
+        "「城裡治安歸我們：白天查街、夜裡輪門。你在街上遇著事，"
+        "找穿這身牌的，南門駐所、貴族區衛所兩處都有人。"
+        "不過真話講在前面：我們管的是街，不是你背包裡東西的歸屬——"
+        "錢貨糾紛去公會評，那才有條文。」"
+    ),
+    KeywordResponse(
+        "過夜",
+        "「天黑前要床？出駐所沿南大道往北，客棧巷底有爐火旅店，"
+        "巷裡也有賣酒的坐處。`rest` `sleep` 不挑地方，"
+        "我這兒後頭那間小值房也躺得人，不過沒門閂，睡得睡不睡得看你。」"
+    ),
+)
+
+# 古利安·鷹守 — the 貴族區衛所 captain. The document's 守門衛兵隊長 belongs
+# to a 限制進入 this change deliberately does not ship (design: a lock on an
+# empty room is a wall, not a mystery), so his table's whole office is the
+# open door: the quarter is walkable to anyone, and there is simply nothing
+# to petition for yet. He says so plainly — no gate to impress a player
+# with, no invented audience to tease them toward.
+NOBLE_WATCH_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "貴族區",
+        "「要進貴族區？請便，沒有要請的意思——就是請便。這一區不設關，"
+        "我手底下的人查巡，不查客。各府邸的門關著，那是各家自己的門，"
+        "你沿街上走，沒有人攔你。」"
+    ),
+    KeywordResponse(
+        "謁見",
+        "「要遞狀？沒有狀可遞。這區裡如今沒有當值的門，也沒有開著的案——"
+        "不是我不給你遞，是這府第的戲還沒開鑼。真要說有什麼，"
+        "街走到頭是王宮前庭，你想進去自己走進去，裡頭有座空著的王。」"
+    ),
+    KeywordResponse(
+        "衛所",
+        "「我這衛所管的是這一區的門前清靜：巡邏班次、防火的水、"
+        "各家報上來的雜事。你要問哪條街通哪裡，喊 `地圖`，圖是全城的；"
+        "要問我，我答街面上這些。別的沒有，不是隱瞞，是真沒有。」"
+    ),
+    KeywordResponse(
+        "委託",
+        "「官面上不發委託，衛所牆上不掛單，這話我對每個進門的人都講一遍。"
+        "你要尋事做，公會板在大道那頭；要替哪家府邸跑腿，"
+        "那得是府裡人私下找你——總之都不歸我掛牌。」"
+    ),
+)
+
+# 伊沃·高丘 — the 校場 instructor. His value is the innkeeper's office in
+# yard clothes (altoria-crown-and-watch design): the dialogue is where a
+# player learns that `rest` plus `practice` is how proficiency is trained and
+# that `guild exam` is what grades it. The commands work wherever the player
+# stands — he says so himself; the yard is where the city comes to do them
+# where the standard is visible. He promises no drill bonus the change does
+# not ship.
+DRILL_YARD_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "修煉",
+        "「練熟練度，靠的不是這片土，是你自己：`rest` 加時數、掛一句 "
+        "`practice` 加技能名，整小時結算。這話在哪條街講都一樣，"
+        "我這場裡的好處只有兩樣——柱子由你打，沒人嫌吵；"
+        "看得見別人怎麼練。要練就現在開始，汗是你自己的。」"
+    ),
+    KeywordResponse(
+        "考核",
+        "「問升階？公會的 `guild exam` 考的是你身上那些練習換來的東西，"
+        "考場掛在哪條街都行，報名去公會大廳。想先在場裡過幾手，"
+        "`engage` 陪練的規矩問公會的人——我不代考，也不保過。」"
+    ),
+    KeywordResponse(
+        "切磋",
+        "「場裡切磋是常事：`engage` 開手，打不過就 `combat forfeit` 認輸，"
+        "`combat actions` 看當下使得出什麼。這些指令哪裡都使得，"
+        "在這片土上打，摔的是軟土，不是街石——這是場子唯一的好处，"
+        "別的我沒有。」"
+    ),
+    KeywordResponse(
+        "教頭",
+        "「我這教頭不傳秘技，也不發證書。會什麼、練到哪裡，"
+        "你自己的帳上都有。我能給的是這片場子和一句話：`rest` 掛 `practice`，"
+        "整小時地練，比站在場中羨慕柱子上的痕有用。」"
+    ),
+)
+
 # One entry per capital place that authors a dialogue_key, keyed exactly as
 # the place row authors it: the merchants, the 光明神殿's 主祭, and the three
 # hospitality attendants (altoria-hospitality) — attendant places are keyed
 # the same way (the keys travel in the rows; the slice assembles into
-# DIALOGUE_ROWS unchanged).
+# DIALOGUE_ROWS unchanged). altoria-crown-and-watch appends the watch's and
+# the yard's three attendants after them.
 ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
     (
         "altoria_general_store",
@@ -524,6 +632,40 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "池子是河水燒的，深淺兩格。想問什麼儘管問，我手上活多，答得快。」"
             ),
             responses=BATHHOUSE_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_guardhouse",
+        DialogueDefinition(
+            greeting=(
+                "衛兵駐所的托瓦德·鄧堡從值房窗後轉出來，胸牌在燭火裡磕了一下："
+                "「過門進來的？南門一帶歸我管。你要問路，我指；"
+                "要問規矩，我講。牆上沒有你要找的東西——這話我先說在前頭，"
+                "省得你繞回來再問。」"
+            ),
+            responses=GUARDHOUSE_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_noble_watch",
+        DialogueDefinition(
+            greeting=(
+                "貴族區衛所的古利安·鷹守抬起下巴看了看你，沒有伸手攔："
+                "「這一區不設關，進出請便。我守的是街面清靜，不是門檻。"
+                "想問事就問，問不出什麼也別見怪——這一區如今就是沒有事。」"
+            ),
+            responses=NOBLE_WATCH_RESPONSES,
+        ),
+    ),
+    (
+        "altoria_drill_yard",
+        DialogueDefinition(
+            greeting=(
+                "校場的伊沃·高丘從排柱那頭走回來，小臂上還沾著場裡的土："
+                "「來看熱鬧還是來練？說在前頭：我這裡沒有秘傳，也沒有捷徑——"
+                "只有這片土、那排柱子，還有跟你說清楚怎麼練的幾句話。」"
+            ),
+            responses=DRILL_YARD_RESPONSES,
         ),
     ),
 )
