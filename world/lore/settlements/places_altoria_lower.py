@@ -17,6 +17,13 @@ Merchant rows carry a ``dialogue_key`` beside their ``shop_key``: the merchant
 blueprint answers as well as trades (merchant-dialogue), and a merchant place
 without the kwarg fails load naming the place. The tables live in
 ``world/lore/dialogue/altoria.py`` under the same keys.
+
+altoria-crown-and-watch adds this terrace's 衛兵駐所 off 南門 — the gates
+already existed and the guardhouse behind them did not. Its captain is the
+document's 衛兵隊長: an attendant whose table orients the traveller coming
+through the arch, and who explicitly posts no work of his own (the document
+rules a parallel bounty system out at its line 410; the guild board and
+``npc:`` private commissions already carry that road).
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -148,5 +155,40 @@ ROWS: tuple[PlaceDefinition, ...] = (
         service_id="altoria_bathhouse_keeper",
         assortment_keys=(),
         authored_kwargs=(("dialogue_key", "altoria_bathhouse"),),
+    ),
+    # 聖潔王都衛兵駐所 — the guardhouse behind the south gate. The document
+    # keeps its 懸賞任務板 〔提案〕 pointed at the guild board and private
+    # commissions instead (line 410), so the room ships no board, the host
+    # ships no issuing component, and the change's second refusal is the
+    # rule that keeps it that way.
+    PlaceDefinition(
+        key="altoria_guardhouse",
+        settlement_key="capital_altoria",
+        kind=PlaceKind.WATCH_POST,
+        room_name_zh="聖潔王都衛兵駐所",
+        room_desc_zh=(
+            "The 衛兵駐所 of 聖潔王都 stands inside the 南門's shadow, "
+            "one warm room against the arch's own cold passage: bench and "
+            "rack along one wall, a brazier smoked black at the ceiling, "
+            "and a shuttered window over the gate tunnel so the oncoming "
+            "hour can be watched from the stove's side. Boots come in and "
+            "out of here on the hour, and the wall charts show every road "
+            "out of the city named. It is a working post, and everything a "
+            "post would hang beside the charts — notices, postings, price "
+            "on a head — is simply not here; work in this city walks in "
+            "through the guild's door, not this one."
+        ),
+        exterior_xy=(3, 0),  # 南門
+        doorway_key_zh="衛兵駐所",
+        doorway_aliases=("guardhouse", "guard house"),
+        host_name="托瓦德·鄧堡",
+        host_title="聖潔王都衛兵隊隊長",
+        host_race="human",
+        host_subrace=None,
+        host_sex="male",
+        profession="attendant",
+        service_id="altoria_guard_captain",
+        assortment_keys=(),
+        authored_kwargs=(("dialogue_key", "altoria_guardhouse"),),
     ),
 )
