@@ -307,6 +307,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             with self.assertRaises(GuildConfigError):
                 validate_service_hosts()
 
+    @covers_requirement(
+        "merchant-dialogue::every-merchant-host-answers-when-spoken-to"
+    )
     def test_a_merchant_place_authoring_no_dialogue_key_fails_load(self):
         # merchant-dialogue: the blueprint now demands a dialogue table from
         # every shopkeeper. A merchant place that kept only its shop_key (the

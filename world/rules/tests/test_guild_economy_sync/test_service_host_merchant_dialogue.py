@@ -21,6 +21,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 import re
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -120,6 +121,9 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
             "wallet": actor.db.wallet,
         }
 
+    @covers_requirement(
+        "merchant-dialogue::every-merchant-host-answers-when-spoken-to"
+    )
     def test_merchant_host_answers_from_its_authored_table(self):
         # 3.1 — the shipped general store's host greets and answers with the
         # authored lines, nothing synthetic, nothing empty.
@@ -139,6 +143,9 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
                     response.response,
                 )
 
+    @covers_requirement(
+        "merchant-dialogue::every-merchant-host-answers-when-spoken-to"
+    )
     def test_trade_contract_survives_the_dialogue_component(self):
         # 3.3 — identical outcomes with and without the component on the
         # host: the core stock state plus one full buy+sell round trip
@@ -175,6 +182,9 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
             dialogue_key_for(converged), _dialogue_key_of_service(MERCHANT_SERVICE_ID)
         )
 
+    @covers_requirement(
+        "merchant-dialogue::a-trading-host-speaks-as-its-settlement-not-as-a-shop-template"
+    )
     def test_village_tables_speak_without_proprietor_vocabulary(self):
         # 3.5 — the de-commercialised settlement's four speak as neighbours
         # sharing what they make: the ban list is the capital shopkeeper
@@ -199,6 +209,9 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
                 for word in banned:
                     self.assertNotIn(word, prose)
 
+    @covers_requirement(
+        "merchant-dialogue::a-trading-host-speaks-as-its-settlement-not-as-a-shop-template"
+    )
     def test_every_merchant_table_names_its_own_goods(self):
         # 2.4/3.1's per-host half — each table speaks about what ITS shop
         # actually carries: every one of the eight voices mentions at least
