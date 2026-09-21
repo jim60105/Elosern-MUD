@@ -288,13 +288,24 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
 # The registry is assembled from the per-settlement slices in fixed order (the
 # world/lore/items assembly precedent). Slice order is load-bearing: the
 # derived service-host roster and the derived SHOP_REGISTRY both iterate this
-# dict, and sync_service_content processes roster rows in this order.
-from world.lore.settlements.places_altoria import ROWS as ALTORIA_ROWS  # noqa: E402
+# dict, and sync_service_content processes roster rows in this order. The
+# capital's own slices run in terrace order — lower, middle, upper — because
+# the terraces are how the city is described and a place's terrace is the
+# first thing that locates it; the village slice stays last so every capital
+# row keeps its place ahead of the village homes' in the derived registries.
+from world.lore.settlements.places_altoria_lower import ROWS as ALTORIA_LOWER_ROWS  # noqa: E402
+from world.lore.settlements.places_altoria_middle import ROWS as ALTORIA_MIDDLE_ROWS  # noqa: E402
+from world.lore.settlements.places_altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # noqa: E402
 from world.lore.settlements.places_ciaran import ROWS as CIARAN_ROWS  # noqa: E402
 
 PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     definition.key: definition
-    for definition in (*ALTORIA_ROWS, *CIARAN_ROWS)
+    for definition in (
+        *ALTORIA_LOWER_ROWS,
+        *ALTORIA_MIDDLE_ROWS,
+        *ALTORIA_UPPER_ROWS,
+        *CIARAN_ROWS,
+    )
 }
 
 validate_place_registry(PLACE_REGISTRY)

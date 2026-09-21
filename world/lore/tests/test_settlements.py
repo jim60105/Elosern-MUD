@@ -54,14 +54,16 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_place_iteration_order_is_the_load_bearing_slice_order(self):
         # The derived roster and shop registry iterate this dict, and the
-        # roster must keep the pre-change [guild master, merchant] order first,
-        # with the specialist hosts appended after (sync_service_content
-        # processes rows in dict order).
+        # roster processes rows in dict order (sync_service_content). Since
+        # altoria-place-slices the capital arrives as three terrace slices —
+        # lower, middle, upper — so the 南大道 eatery leads the capital rows
+        # and the middle terrace's guild/store/forge/tailor follow; the
+        # village slice stays last.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
-                "altoria_guild_hall", "altoria_general_store", "altoria_forge",
-                "altoria_eatery", "altoria_tailor",
+                "altoria_eatery", "altoria_guild_hall", "altoria_general_store",
+                "altoria_forge", "altoria_tailor",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
             ],

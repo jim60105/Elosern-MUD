@@ -53,17 +53,27 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         },
     )
 
+    # The assembled roster order is the terrace-slice order
+    # (altoria-place-slices): the lower terrace's eatery host leads, the
+    # middle terrace's guild/store/forge/tailor follow, the village homes
+    # close. This is the order the split deliberately established; the
+    # content-neutral field comparisons below locate rows by service_id so
+    # they guard identities, not a sequence.
+    ASSEMBLED_ROSTER_ORDER = [
+        "altoria_eatery_owner", "altoria_guild_master", "altoria_merchant",
+        "altoria_blacksmith", "altoria_tailor",
+        "ciaran_hailiel", "ciaran_lareneth",
+        "ciaran_valwyn", "ciaran_vethiel",
+    ]
+
     def _assert_reproduces_former_rows(self, rows):
         self.assertEqual(
             [row.service_id for row in rows],
-            [
-                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor",
-                "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_valwyn", "ciaran_vethiel",
-            ],
+            list(self.ASSEMBLED_ROSTER_ORDER),
         )
-        for row, former in zip(rows, self.FORMER_YAML_ROWS):
+        by_service = {row.service_id: row for row in rows}
+        for former in self.FORMER_YAML_ROWS:
+            row = by_service[former["service_id"]]
             self.assertEqual(row.name, former["name"])
             self.assertEqual(row.title, former["title"])
             self.assertEqual(row.profession.key, former["profession"])
@@ -82,7 +92,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     def test_shipped_roster_reproduces_the_removed_yaml_rows_exactly(self):
         rows = validate_service_hosts()
         self._assert_reproduces_former_rows(rows)
-        guild, merchant = rows[0], rows[1]
+        by_service = {row.service_id: row for row in rows}
+        guild = by_service["altoria_guild_master"]
+        merchant = by_service["altoria_merchant"]
         branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
         store = SHOP_REGISTRY["altoria_general_store"]
         # The identity join that used to be hand-synchronized across four
@@ -95,12 +107,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertEqual(
             [row.service_id for row in catalog.service_hosts],
-            [
-                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor",
-                "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_valwyn", "ciaran_vethiel",
-            ],
+            list(self.ASSEMBLED_ROSTER_ORDER),
         )
         self.assertEqual(
             set(catalog.host_by_service_id),
@@ -131,7 +138,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # blueprint: it ships available for content changes, used by nothing.
         rows = validate_service_hosts()
         self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
-        for row, expected in zip(rows, self.PRE_CHANGE_BASELINE):
+        for expected in self.PRE_CHANGE_BASELINE:
+            row = next(r for r in rows if r.service_id == expected["service_id"])
             with self.subTest(service_id=row.service_id):
                 self.assertEqual(
                     (
@@ -558,7 +566,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     self.assertIsNotNone(getattr(place, field), field)
         rows = validate_service_hosts()
         self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
-        for row, expected in zip(rows, self.PRE_CHANGE_BASELINE):
+        for expected in self.PRE_CHANGE_BASELINE:
+            row = next(r for r in rows if r.service_id == expected["service_id"])
             with self.subTest(service_id=row.service_id):
                 self.assertEqual(
                     (
