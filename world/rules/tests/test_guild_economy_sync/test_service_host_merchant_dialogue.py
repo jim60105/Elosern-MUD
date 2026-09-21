@@ -18,6 +18,7 @@ real sync, these cases prove:
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
+import re
 from unittest.mock import patch
 
 from typeclasses.characters import PlayerCharacter
@@ -41,14 +42,42 @@ from ._support import (
     _live_registry,
     _merchant_host_name,
     _merchant_row,
+    _places,
     _roster_row,
     _village_places,
+    _shops,
 )
 
 
 def _dialogue_table():
     """The live dialogue registry, read through the attribute-string seam."""
-    return _live_registry("world.rules.dialogue", "DIALOGUE" + "_TABLE")
+    return _live_registry("world.lore.dialogue", "DIALOGUE" + "_ROWS")
+
+
+def _merchant_places():
+    """Live place rows that author both a shop and a voice (never keyed here)."""
+    return [
+        place
+        for place in _places().values()
+        if "dialogue_key" in dict(place.authored_kwargs)
+        and "shop_key" in dict(place.authored_kwargs)
+    ]
+
+
+def _goods_names(shop_key):
+    """Display names of everything the shop's assortments actually offer."""
+    return sorted(
+        {
+            _items()[item_key].display_name_zh
+            for item_key in _shops()[shop_key].offered_item_keys
+        }
+    )
+
+
+def _table_text(definition):
+    return definition.greeting + "".join(
+        response.keyword + response.response for response in definition.responses
+    )
 
 
 def _dialogue_key_of_service(service_id):
@@ -111,7 +140,10 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
                 )
 
     def test_trade_contract_survives_the_dialogue_component(self):
-        # 3.3 — identical outcomes with and without the component on the host.
+        # 3.3 — identical outcomes with and without the component on the
+        # host: the core stock state plus one full buy+sell round trip
+        # (price, credit, inventory effects, stock after each operation,
+        # wallet) snapshot by snapshot.
         sync_service_content()
         host = _merchant_host()
         self.assertTrue(is_dialogue_host(host))
@@ -149,16 +181,44 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         # register (shop words, quoted hours, goods-as-stock), discovered from
         # the roster's own village rows, never a hand-listed key set.
         sync_service_content()
-        banned = ("老闆", "店主", "本店", "營業時間", "營業", "庫存", "售價", "光臨")
+        # Lexical policy, checked against the prose with the command spans
+        # (`shop stock`, `buy`, `sell`) excised — those are syntax the visitor
+        # needs, not register. Ordinary hours and inventory wordings are in
+        # scope beside the shopkeeper nouns.
+        banned = (
+            "老闆", "店主", "本店", "營業時間", "營業", "庫存", "存貨", "存量",
+            "售價", "光臨", "開店", "開門", "打烊",
+        )
         table = _dialogue_table()
         places = _village_places()
         self.assertTrue(places, "registry lost the de-commercialised settlement")
         for place in places:
             with self.subTest(place=place.key):
                 definition = table[_dialogue_key_of_service(place.service_id)]
-                text = definition.greeting + "".join(
-                    response.keyword + response.response
-                    for response in definition.responses
-                )
+                prose = re.sub(r"`[^`]*`", "", _table_text(definition))
                 for word in banned:
-                    self.assertNotIn(word, text)
+                    self.assertNotIn(word, prose)
+
+    def test_every_merchant_table_names_its_own_goods(self):
+        # 2.4/3.1's per-host half — each table speaks about what ITS shop
+        # actually carries: every one of the eight voices mentions at least
+        # one display name drawn from its own place's assortment. A shared
+        # template or a swapped pair of tables cannot satisfy this, because
+        # the goods sets are disjoint across the eight assortments.
+        table = _dialogue_table()
+        places = _merchant_places()
+        self.assertEqual(len(places), 8, "roster lost a merchant place")
+        greetings = set()
+        for place in places:
+            with self.subTest(place=place.key):
+                authored = dict(place.authored_kwargs)
+                definition = table[authored["dialogue_key"]]
+                text = _table_text(definition)
+                greetings.add(definition.greeting)
+                goods = _goods_names(authored["shop_key"])
+                self.assertTrue(
+                    any(name[-2:] in text for name in goods),
+                    f"{place.key!r}'s table never names its own merchandise",
+                )
+        # No greeting is shared: the voices are authored, not templated.
+        self.assertEqual(len(greetings), len(places))

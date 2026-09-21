@@ -30,7 +30,7 @@ from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "鍛刀",
-        "「谷底的鐵砂性子烈，鍛得溫順了才配叫刀。砧邊擱著的是讓人帶走的，"
+        "「谷底的鐵砂性子烈，鍛得溫順了才配叫鋼刀。砧邊擱著的是讓人帶走的，"
         "`shop stock` 報此刻的數；看中哪柄，同我說一聲便是——"
         "谷裡不興吆喝那一套。」",
     ),
@@ -76,7 +76,7 @@ LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "口味",
-        "「甜口的多，鹹口的少——谷裡口味清淡，客官擔待。"
+        "「甜口的多，鹹口的少——谷裡口味清淡，旅人擔待。"
         "要濃的，你往王都餐館去，那邊灶氣旺。我這裡連蜜都捨不得多放，"
         "想甜的，`shop stock` 裡挑花蕊就是了。」",
     ),
