@@ -80,10 +80,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         "altoria_guild_master", "altoria_merchant",
         "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
         "altoria_alchemist",
+        # altoria-learning-and-exchange: the 商會公所 master, appended to the
+        # middle slice behind the alchemist (the host-less 市集棚 contributes
+        # no row).
+        "altoria_merchant_master",
         "altoria_high_priestess", "altoria_sanctum_deacon",
         # altoria-crown-and-watch: the noble-quarter captain and the drill
         # instructor, appended to the upper slice behind the sanctum.
         "altoria_noble_watch_captain", "altoria_drill_instructor",
+        # altoria-learning-and-exchange: the 王立魔法學院 dean, appended to
+        # the upper slice behind the drill yard.
+        "altoria_academy_dean",
         "ciaran_elenis",
         "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
         "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn", "ciaran_vethiel",
@@ -143,6 +150,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_high_priestess", "altoria_sanctum_deacon",
                 "altoria_guard_captain",
                 "altoria_noble_watch_captain", "altoria_drill_instructor",
+                # altoria-learning-and-exchange: the dean and the guild master.
+                "altoria_academy_dean", "altoria_merchant_master",
                 "ciaran_elenis",
                 "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
                 "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn",
@@ -985,6 +994,131 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # And the derived roster really carries no palace row.
         anchors = {row.anchor_room for row in validate_service_hosts()}
         self.assertNotIn("altoria_palace", anchors)
+
+    #: The two altoria-learning-and-exchange attendant rows as LITERALS —
+    #: the CROWN_WATCH_ROWS pattern: name, title, profession, anchor,
+    #: service id and authored kwargs pinned against the derived roster
+    #: independently of the sync projection, so a coordinated drift between
+    #: a place row and the projection cannot pass every derived comparison.
+    LEARNING_EXCHANGE_ROWS = {
+        "altoria_academy_dean": (
+            "奧德溫·薩契",
+            "聖潔王都魔法學院院長",
+            "attendant",
+            "altoria_academy",
+            "altoria_academy_dean",
+            {"dialogue_key": "altoria_academy"},
+        ),
+        "altoria_merchant_master": (
+            "尤斯汀·柯德溫",
+            "聖潔王都商會會長",
+            "attendant",
+            "altoria_merchant_hall",
+            "altoria_merchant_master",
+            {"dialogue_key": "altoria_merchant_hall"},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-learning-and-exchange::the-capital-has-an-academy-a-merchant-hall-and-covered-market-stalls"
+    )
+    def test_the_two_learning_exchange_rows_are_their_own_literal_data_contract(self):
+        # Both hosts land as plain attendants — the academy grants no skill
+        # and the hall posts no work, and neither authored a branch, shop or
+        # quest kwarg that would say otherwise.
+        rows = validate_service_hosts()
+        for service_id, expected in self.LEARNING_EXCHANGE_ROWS.items():
+            row = next(r for r in rows if r.service_id == service_id)
+            with self.subTest(service_id=service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    expected,
+                )
+
+    #: The three altoria-learning-and-exchange places pinned at the PLACE
+    #: registry, where the map contract lives (the CROWN_WATCH_PLACE_ROWS
+    #: pattern): the academy on the 學院前 square (5,5) the upper terrace's
+    #: own, the merchant hall sharing 東市 (5,3) with the alchemist under a
+    #: second door name, and the stalls the third door on 市場街 (2,3) behind
+    #: the general store and the jeweller. The stalls' host half is the
+    #: literal None triple — the capital's second deliberate emptiness.
+    LEARNING_EXCHANGE_PLACE_ROWS = {
+        "altoria_academy": (
+            "academy", (5, 5), "王立魔法學院",
+            "奧德溫·薩契", "human", "male", (),
+            {"dialogue_key": "altoria_academy"},
+        ),
+        "altoria_merchant_hall": (
+            "merchant_hall", (5, 3), "商會公所",
+            "尤斯汀·柯德溫", "human", "male", (),
+            {"dialogue_key": "altoria_merchant_hall"},
+        ),
+        "altoria_market_stalls": (
+            "market", (2, 3), "市集棚",
+            None, None, None, (), {},
+        ),
+    }
+
+    @covers_requirement(
+        "altoria-learning-and-exchange::the-capital-has-an-academy-a-merchant-hall-and-covered-market-stalls"
+    )
+    def test_the_learning_exchange_place_rows_pin_the_three_exteriors(self):
+        # 學院前 (5,5), 東市 (5,3), 市場街 (2,3): the squares the capital grid
+        # already carries and these doors land on — 東市 and 市場街 shared
+        # with earlier shops, their distinctness owned here as literals and
+        # by the registry's one-doorway-name-per-exterior rule.
+        for key, expected in self.LEARNING_EXCHANGE_PLACE_ROWS.items():
+            place = PLACE_REGISTRY[key]
+            with self.subTest(place=key):
+                self.assertEqual(
+                    (
+                        place.kind.value,
+                        place.exterior_xy,
+                        place.doorway_key_zh,
+                        place.host_name,
+                        place.host_race,
+                        place.host_sex,
+                        place.assortment_keys,
+                        dict(place.authored_kwargs),
+                    ),
+                    expected,
+                )
+
+    @covers_requirement(
+        "altoria-learning-and-exchange::the-capital-has-an-academy-a-merchant-hall-and-covered-market-stalls"
+    )
+    def test_the_stalls_row_is_host_less_in_the_shape_hostless_places_reserved(self):
+        # The stalls' emptiness is its own data contract (the palace pin's
+        # shape): every host scalar None, no profession, no service id, no
+        # component kwargs, no goods — hostless-places' all-or-nothing group
+        # wholly absent. What separates it from the palace is only why it is
+        # empty (the document, not an unwritten story), and that lives in
+        # the prose; the shape pin keeps a host from quietly appearing
+        # behind the awnings.
+        from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
+
+        stalls = PLACE_REGISTRY["altoria_market_stalls"]
+        self.assertTrue(place_is_hostless(stalls))
+        self.assertEqual(stalls.kind, "market")
+        self.assertEqual(stalls.profession, None)
+        self.assertEqual(stalls.service_id, None)
+        self.assertEqual(stalls.authored_kwargs, ())
+        self.assertEqual(stalls.assortment_keys, ())
+        self.assertEqual(stalls.extra_item_keys, ())
+        self.assertEqual(stalls.excluded_item_keys, ())
+        for field in HOST_IDENTITY_FIELDS:
+            with self.subTest(field=field):
+                self.assertIsNone(getattr(stalls, field), field)
+        # And the derived roster carries no stalls row.
+        anchors = {row.anchor_room for row in validate_service_hosts()}
+        self.assertNotIn("altoria_market_stalls", anchors)
 
 
 if __name__ == "__main__":
