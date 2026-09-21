@@ -117,13 +117,13 @@ LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
 )
 
 # 妮瑞斯·米斯特瓦勒 — the hedge-healer (暗影谷村調藥者). elven_remedies:
-# 強效治療藥劑, 魔力回復藥劑. Her knowledge exists because elves get hurt
+# 強效治療藥水, 魔力藥水. Her knowledge exists because elves get hurt
 # too; the jars are simply what she keeps enough of to share.
 NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "調藥",
         "「藥草是園裡長的，方子是族裡傳的，製藥這一爐小火從早熬到晚。"
-        "強效治療與魔力回復是兩爐常備的，`shop stock` 報此刻罐裡的數；"
+        "強效治療藥水與魔力藥水是兩爐常備的，`shop stock` 報此刻罐裡的數；"
         "精靈不害病歸不害病，傷口與空掉的魔力可不認種族。」",
     ),
     KeywordResponse(
@@ -134,7 +134,7 @@ NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "魔力",
-        "「藍的是給施法的人回氣用的，魔法種族一樣喝得，效用不打折。"
+        "「藍的是魔力藥水，給施法的人回氣用的，魔法種族一樣喝得，效用不打折。"
         "外頭賣得金貴，谷裡不過是多熬一爐的事，`shop stock` 有就提走。」",
     ),
     KeywordResponse(
@@ -146,7 +146,8 @@ NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
 )
 
 # 瓦爾溫·斯蒂爾瓦特爾 — the collector (暗影谷村蒐羅者). elven_sundries:
-# 精靈蛛絲, 月牙耳環. Her home is full of kept things, each with a story.
+# 精靈蛛絲 (月牙耳環 rides the adornment maker's shelf since
+# ciaran-village-crafts). Her home is full of kept things, each with a story.
 VALWYN_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "蒐羅",
@@ -271,7 +272,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         DialogueDefinition(
             greeting=(
                 "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯·米斯特瓦勒正替藥爐"
-                "壓小火：「來得巧，這輪剛起罐。強效治療與魔力回復都還有些，"
+                "壓小火：「來得巧，這輪剛起罐。強效治療藥水與魔力藥水都還有些，"
                 "`shop stock` 報罐裡的數；要帶幾罐防身，同我說 `buy`。"
                 "園裡採得多的藥草你要脫手，`sell` 一聲，我過秤。」"
             ),
