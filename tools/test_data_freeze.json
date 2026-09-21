@@ -197,6 +197,10 @@
       "reason": "guild/shop config validation contract"
     },
     {
+      "path": "world/rules/tests/test_guild_economy_sync/test_altoria_sanctum.py",
+      "reason": "altoria-sanctum content contract"
+    },
+    {
       "path": "world/rules/tests/test_guild_economy_sync/test_ciaran_village_commerce.py",
       "reason": "elven village commerce content contract"
     },
