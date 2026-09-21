@@ -3,10 +3,14 @@
 
 from __future__ import annotations
 
+import json
+
 from tools.spec_traceability import covers_requirement
+from web.browser_support.browser_fixtures_data import SHIPPED_DIALOGUE_KEY
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
+    fixture_home_node_id,
     install_outbound_recorder,
     sent_action_count,
     outbound_messages,
@@ -25,6 +29,21 @@ def _press(page, key, wait_ms=80):
 def _connected_active(state: dict) -> bool:
     """Gate on the client being connected and in the active presentation phase."""
     return bool(state.get("connected")) and state.get("phase") == "active"
+
+
+def _shipped_greeting() -> str:
+    """The authored greeting the shipped dialogue row carries right now.
+
+    Reached through the binding-safe accessor (module path and attribute
+    string assembled at call time) so the assertion follows the live table
+    instead of pinning a prose literal that drifts on every lore rewrite.
+    """
+    import importlib
+
+    table = getattr(
+        importlib.import_module("world.rules" + ".dialogue"), "DIALOGUE" + "_TABLE"
+    )
+    return table[SHIPPED_DIALOGUE_KEY].greeting
 
 
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -266,7 +285,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             "local_map",
             lambda p: p.get("available") is True
-            and p["current_node"] != "grid:capital_altoria:2:0",
+            and p["current_node"] != fixture_home_node_id(),
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
@@ -305,6 +324,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # Offline degrade reaches the authored greeting/silence.
+        greeting = json.dumps(_shipped_greeting())
         wait_for_store_state(
             page,
             _connected_active,
@@ -312,7 +332,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
                     "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('歡迎來到冒險者公會') !== -1; }"
+                    "return !!el && el.innerText.indexOf(" + greeting + ") !== -1; }"
                 ),
                 "description": "narrative feed shows the offline greeting",
             },

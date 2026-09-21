@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
+    fixture_home_node_id,
     install_outbound_recorder,
     sent_action_count,
     outbound_messages,
@@ -82,7 +83,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         map_before = store_state(page)["panels"]["local_map"]
-        self.assertEqual(map_before["current_node"], "grid:capital_altoria:2:0")
+        home = fixture_home_node_id()
+        self.assertEqual(map_before["current_node"], home)
         time_before = store_state(page)["serverTime"]
 
         self._open_root(page, 0)  # Move
@@ -105,7 +107,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._wait_panel(
                 page,
                 "local_map",
-                lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
+                lambda p: p.get("available") is True and p["current_node"] != home,
                 timeout=10000,
             )
             moves_sent = 1
@@ -131,12 +133,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._wait_panel(
                 page,
                 "local_map",
-                lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
+                lambda p: p.get("available") is True and p["current_node"] != home,
             )
             moves_sent = 2
         self.assertEqual(sent_action_count(page, "explore.move"), moves_sent)
         after = store_state(page)
-        self.assertNotEqual(after["panels"]["local_map"]["current_node"], "grid:capital_altoria:2:0")
+        self.assertNotEqual(after["panels"]["local_map"]["current_node"], home)
         self.assertNotEqual(
             after["serverTime"],
             time_before,

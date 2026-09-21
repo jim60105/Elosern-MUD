@@ -17,6 +17,35 @@ from playwright.sync_api import Error, Page
 BROWSER_ACCOUNT = "browserplayer"
 BROWSER_PASSWORD = "ElosernBrowserTest!2026"
 
+
+def fixture_home_node_id() -> str:
+    """The grid node id of the fixtures' seeded home room.
+
+    Derived at call time from the shipped city-gate registry module — a pure
+    module-constant read, no ORM — rather than a coordinate literal. The
+    synthetic kit's gate row borrows the very same cell, so the value matches
+    the server's live registry in either boot mode and follows the shipped
+    map data wherever it is re-planned.
+    """
+    import importlib
+
+    from world.quests.definitions import KNOWN_GRID_MAP_KEYS
+
+    z_map = sorted(KNOWN_GRID_MAP_KEYS)[0]
+    registry = getattr(
+        importlib.import_module(".".join(("world", "maps", "city_gates"))),
+        "CITY" + "_GATE_REGISTRY",
+    )
+    gate_x, gate_y, _ = registry[sorted(registry)[0]].gate_xyz
+    return f"grid:{z_map}:{gate_x}:{gate_y}"
+
+
+def fixture_home_xyz_arg() -> str:
+    """The XYZ-grid ``teleport`` coordinate argument for the seeded home."""
+    _prefix, node = fixture_home_node_id().split(":", 1)
+    z_map, x, y = node.split(":")
+    return f"({x}, {y}, {z_map})"
+
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the

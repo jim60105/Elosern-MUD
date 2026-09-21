@@ -6,7 +6,12 @@ from __future__ import annotations
 import re
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import store_state, wait_for_store_state
+from .browser_helpers import (
+    fixture_home_node_id,
+    fixture_home_xyz_arg,
+    store_state,
+    wait_for_store_state,
+)
 
 
 def _srgb_to_linear(c: float) -> float:
@@ -85,27 +90,26 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
     def _repin_at_home(self, page) -> None:
         """Deterministically pin the shared character back at the fixture's
-        home grid room (capital map, slot (2, 0) — the bootstrap anchor the
-        minimap fixture starts its knowledge walk from).
+        home grid room — the city-gate anchor the minimap fixture starts its
+        knowledge walk from, resolved from the live registry module rather
+        than a coordinate literal.
 
         Earlier journeys may have submitted one ``explore.move``, leaving the
         character on another grid node when this journey starts. The seeded
         account is a superuser, so the XYZ-grid ``teleport`` re-pins the
         character without traversing a costed exit; the panel refresh rides
         ``at_post_move``. The coordinate form is used instead of a room name:
-        the map key comes from the boot mode's own grid catalog, and no ORM
-        or registry read happens in the journey process (the server owns
-        the boot-mode catalogs).
+        the coordinate comes from the shared registry-module helper (a pure
+        module-constant read; the kit row borrows the same cell in synthetic
+        mode), and no ORM query happens in the journey process (the server
+        owns the boot-mode catalogs).
         """
-        from world.quests.definitions import KNOWN_GRID_MAP_KEYS
-
-        z_map = sorted(KNOWN_GRID_MAP_KEYS)[0]
-        self._send(page, f"teleport (2, 0, {z_map})")
+        self._send(page, f"teleport {fixture_home_xyz_arg()}")
         wait_for_store_state(
             page,
             lambda s: (
                 ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
-                == f"grid:{z_map}:2:0"
+                == fixture_home_node_id()
             ),
             timeout=15000,
         )

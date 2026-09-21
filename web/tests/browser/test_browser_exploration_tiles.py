@@ -309,12 +309,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the waiting screen renders the three-operation card row",
         )
 
-    def test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport(self):
-        # fix-webclient-hud-dock-exploration-grid-width: at 400x720 the pane
-        # content width is ~384px, so the `auto-fit` grid fits only 2 columns
-        # (floor((384 + 8) / 158) = 2). The exploration fixture's 3-exit move
-        # frame wraps the third exit onto a partial second row; the last tile
-        # must span the remaining column so no horizontal space is left blank.
+    def test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport(self):
+        # fix-webclient-hud-dock-exploration-grid-width: at 400x720 the outlet
+        # pane is two content-sized columns wide. The invariant is that the
+        # last row never leaves blank horizontal space: a partial last row
+        # must span the remaining columns via an inline grid-column style,
+        # and a row the shipped exit count fills exactly must not span. The
+        # rendered column count and tile count drive which half applies, so
+        # the assertion tracks the shipped fixture topology (the south gate
+        # gained the wilderness exit since this test was written: the move
+        # frame is 4 exits, i.e. two full rows here) instead of pinning it.
         page = self.logged_in_page((400, 720))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -337,10 +341,23 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertLessEqual(
             abs((last_box["x"] + last_box["width"]) - (pane_box["x"] + pane_box["width"])),
             2,
-            "the partial second row's tile must end at the pane's right edge",
+            "the last row must end at the pane's right edge",
         )
-        self.assertIn(
-            "grid-column",
-            tiles.last.get_attribute("style") or "",
-            "the partial-row tile must carry the inline span style",
+        last_style = tiles.last.get_attribute("style") or ""
+        columns = page.evaluate(
+            """() => getComputedStyle(
+                document.querySelector('.dock-menu__outlet')
+            ).gridTemplateColumns.split(' ').length"""
         )
+        if tiles.count() % columns:
+            self.assertIn(
+                "grid-column",
+                last_style,
+                "the partial-row tile must carry the inline span style",
+            )
+        else:
+            self.assertNotIn(
+                "grid-column",
+                last_style,
+                "a tile on a fully filled row must not carry the span style",
+            )

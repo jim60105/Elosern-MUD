@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
+    fixture_home_node_id,
     install_outbound_recorder,
     sent_action_count,
     outbound_messages,
@@ -106,7 +107,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_panel(
             page,
             "local_map",
-            lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
+            lambda p: p.get("available") is True and p["current_node"] != fixture_home_node_id(),
         )
         self.assertEqual(
             sent_action_count(page, "explore.move"),
