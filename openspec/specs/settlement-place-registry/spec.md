@@ -8,6 +8,8 @@ edit rather than a code edit across four files.
 ## Requirements
 
 ### Requirement: A place is the single authored record of one service location
+<!-- This block is written against the text `hostless-places` leaves behind and MUST be
+     archived after it. -->
 The system SHALL support place records. One place SHALL carry everything
 that distinguishes one service location: its stable key, the settlement it
 belongs to, its kind, the Traditional Chinese name and description of its
