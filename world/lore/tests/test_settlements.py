@@ -224,6 +224,102 @@ class PlaceRegistryTests(unittest.TestCase):
         self.assertIn("altoria_general_store", message)
         self.assertIn("t_second_shop_place", message)
 
+    # ---- the optional host group (hostless-places) -------------------------
+
+    def _hostless(self, key="t_plaza_place", **changes):
+        """One synthetic place authoring no host at all (every field defaulted)."""
+        base = dict(
+            key=key,
+            host_name=None,
+            host_title=None,
+            host_race=None,
+            host_subrace=None,
+            host_sex=None,
+            profession=None,
+            service_id=None,
+            assortment_keys=(),
+            authored_kwargs=(),
+        )
+        base.update(changes)
+        return replace(self.guild, **base)
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_place_may_author_no_host_at_all(self):
+        # A place that simply exists — plaza, forecourt, quay — loads with no
+        # host fields, and the absent race is never reported as unknown race
+        # ``None`` (the per-field checks belong to the authored host only).
+        try:
+            validate_place_registry({"t_plaza_place": self._hostless()})
+        except ValueError as error:  # pragma: no cover - failure path asserts below
+            self.fail(f"host-less place rejected: {error}")
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_half_authored_host_names_the_fields_that_break_the_set(self):
+        # A name without a profession is an unfinished record, not an empty
+        # room: the error names the place, the fields found and the fields
+        # missing — that message is the point of the rule.
+        name_only = replace(
+            self._hostless(), host_name="測試街長", host_title="測試頭銜"
+        )
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry({"t_plaza_place": name_only})
+        message = str(caught.exception)
+        self.assertIn("t_plaza_place", message)
+        for field in ("host_name", "host_title"):
+            self.assertIn(field, message)
+        for field in ("host_race", "host_sex", "profession", "service_id"):
+            self.assertIn(field, message)
+        # The mirror image: a profession without a host name.
+        profession_only = replace(self._hostless(), profession="merchant")
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry({"t_plaza_place": profession_only})
+        message = str(caught.exception)
+        self.assertIn("t_plaza_place", message)
+        self.assertIn("profession", message)
+        self.assertIn("host_name", message)
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_host_less_place_may_not_sell(self):
+        # Goods require a merchant to sell them: assortments, additions and
+        # exclusions are each rejected on a host-less row, naming the place.
+        for field, value in (
+            ("assortment_keys", ("common_arms",)),
+            ("extra_item_keys", ("t_any_item",)),
+            ("excluded_item_keys", ("t_any_item",)),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError) as caught:
+                    validate_place_registry(
+                        {"t_plaza_place": self._hostless(**{field: value})}
+                    )
+                message = str(caught.exception)
+                self.assertIn("t_plaza_place", message)
+                self.assertIn("goods", message)
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_stray_subrace_or_kwargs_break_the_absent_host(self):
+        # A wholly absent group carries no optional parts either: a stray
+        # subrace or component kwargs is found-but-rest-missing material.
+        for changes in (
+            {"host_subrace": "high_elven"},
+            {"authored_kwargs": (("dialogue_key", "guild_staff"),)},
+        ):
+            with self.subTest(**changes):
+                with self.assertRaises(ValueError) as caught:
+                    validate_place_registry({"t_plaza_place": self._hostless(**changes)})
+                message = str(caught.exception)
+                self.assertIn("t_plaza_place", message)
+                broken = next(iter(changes))
+                self.assertIn(broken, message)
+
 
 class DerivedShopRegistryTests(unittest.TestCase):
     """Shop identities are a view over the places that author a shop_key."""

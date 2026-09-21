@@ -11,6 +11,12 @@ place declares is declared anywhere else.
 identity: ``sync_service_content`` writes them once when it creates the host
 and never rewrites them on a later sync, so an authored edit takes effect
 through roster convergence rather than a backfill.
+
+A place's host is optional as ONE indivisible group: a place either authors
+the complete host (name, title, race, sex, profession, service id — with
+subrace and component kwargs as its optional parts) or authors none of it,
+describing a place that simply exists: a plaza, a forecourt, a quay. A
+partially authored host is a load error, not a half-built NPC.
 """
 
 from dataclasses import dataclass
@@ -44,18 +50,26 @@ class PlaceDefinition:
     exterior_xy: tuple[int, int]  # z derives from the settlement
     doorway_key_zh: str
     doorway_aliases: tuple[str, ...]
-    host_name: str
-    host_title: str
-    host_race: str  # RACE_REGISTRY key
-    host_subrace: str | None  # SUBRACE_REGISTRY key under host_race
-    host_sex: str  # SEX_VALUES member
-    profession: str
-    service_id: str
-    assortment_keys: tuple[str, ...]
+    # The host is one optional group: every scalar below is None exactly when
+    # the place authors no host at all (validate_place_registry enforces the
+    # all-or-nothing set; host_subrace stays outside the count because None is
+    # a legitimate authored value even for a place with a host).
+    host_name: str | None = None
+    host_title: str | None = None
+    host_race: str | None = None  # RACE_REGISTRY key
+    host_subrace: str | None = None  # SUBRACE_REGISTRY key under host_race
+    host_sex: str | None = None  # SEX_VALUES member
+    profession: str | None = None
+    service_id: str | None = None
+    # The dataclass has no kw_only: every field after the first default needs
+    # one. () reads as "declares no goods" / "authors no component kwargs",
+    # and keeps ``dict(place.authored_kwargs)`` working against a host-less
+    # row (the shop-identity scan) without a guard.
+    assortment_keys: tuple[str, ...] = ()
     # The profession blueprint's authored component identity kwargs (shop_key /
     # branch_key / dialogue_key), frozen as a mapping. Projected onto the
     # blueprint exactly as validate_service_hosts projects roster kwargs today.
-    authored_kwargs: tuple[tuple[str, str], ...]
+    authored_kwargs: tuple[tuple[str, str], ...] = ()
     # Per-place assortment adjustments (settlement-shops design §4). Additions
     # stock items outside the referenced assortments — each addition MUST
     # carry a complete override in the shop row (commerce.yaml) because it has
@@ -93,6 +107,58 @@ def _authored_kwargs_map(place: PlaceDefinition) -> dict[str, str]:
     return authored
 
 
+# The scalar host fields counted by the all-or-nothing rule. host_subrace is
+# deliberately outside the count: None is a legitimate authored value for it
+# even on a host-declaring place (every capital host authors None today).
+HOST_IDENTITY_FIELDS: tuple[str, ...] = (
+    "host_name",
+    "host_title",
+    "host_race",
+    "host_sex",
+    "profession",
+    "service_id",
+)
+
+
+def place_is_hostless(place: PlaceDefinition) -> bool:
+    """True when this place authors no host at all.
+
+    The single definition of the group's ABSENCE, shared by the record
+    validator and the roster derivation so the two never drift. A partially
+    authored host is NOT hostless — malformed material must fall through to
+    validation, never to a silently empty room. A stray component-kwargs
+    tuple on an otherwise host-less row is likewise not hostless.
+    """
+    return (
+        all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS)
+        and place.host_subrace is None
+        and place.authored_kwargs == ()
+    )
+
+
+def _validate_host_group(place: PlaceDefinition) -> None:
+    """Reject a partially authored host, naming the fields that break the set.
+
+    Reached only when the row is NOT hostless, so the legal shapes here are
+    exactly: every scalar authored (optionally with a subrace and kwargs), or
+    a row whose only offence is a stray subrace / kwargs on an otherwise
+    wholly absent group — each of which names the offending fields.
+    """
+    found = [field for field in HOST_IDENTITY_FIELDS if getattr(place, field) is not None]
+    missing = [field for field in HOST_IDENTITY_FIELDS if getattr(place, field) is None]
+    if place.host_subrace is not None:
+        found.append("host_subrace")
+    if place.authored_kwargs != ():
+        found.append("authored_kwargs")
+    if not missing:
+        return
+    raise ValueError(
+        f"place {place.key!r} authors a partial host: the host is one "
+        f"all-or-nothing group, found {found} but missing {missing} "
+        "(author the complete host or none of it)"
+    )
+
+
 def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
     """Fail closed on a malformed place record, naming the place and rule.
 
@@ -102,6 +168,13 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
     declares assortments iff it authors a shop identity. Blueprint coverage
     and dead-kwarg rejection are inherited unchanged from
     ``validate_service_hosts`` at catalog load, not duplicated here.
+
+    The host is optional as one indivisible group (hostless-places): either
+    every scalar host field is authored or none is, and a place authoring no
+    host may declare no goods. A half-authored host names the fields found
+    and the fields missing — that message is the point of the rule, because
+    the failure mode it replaces is a ``None`` profession key reaching
+    ``get_profession`` several layers away.
     """
     for place_key, place in places.items():
         if place_key != place.key:
@@ -110,15 +183,20 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
             raise ValueError(
                 f"place {place.key!r} names unknown settlement {place.settlement_key!r}"
             )
-        if place.host_race not in RACE_REGISTRY:
+        hostless = place_is_hostless(place)
+        if not hostless:
+            _validate_host_group(place)
+        # Per-field host validation is reachable only for an authored host:
+        # an absent race must never be reported as unknown race ``None``.
+        if not hostless and place.host_race not in RACE_REGISTRY:
             raise ValueError(
                 f"place {place.key!r} names unknown host_race {place.host_race!r}"
             )
-        if place.host_sex not in SEX_VALUES:
+        if not hostless and place.host_sex not in SEX_VALUES:
             raise ValueError(
                 f"place {place.key!r} names unknown host_sex {place.host_sex!r}"
             )
-        if place.host_subrace is not None:
+        if not hostless and place.host_subrace is not None:
             subrace = SUBRACE_REGISTRY.get(place.host_subrace)
             if subrace is None:
                 raise ValueError(
@@ -139,6 +217,14 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 f"got {place.exterior_xy!r}"
             )
         authored = _authored_kwargs_map(place)
+        if hostless and (
+            place.assortment_keys or place.extra_item_keys or place.excluded_item_keys
+        ):
+            raise ValueError(
+                f"place {place.key!r} authors no host and declares goods "
+                "(assortment_keys/extra_item_keys/excluded_item_keys); "
+                "goods require a merchant to sell them"
+            )
         has_shop_identity = "shop_key" in authored
         if bool(place.assortment_keys) != has_shop_identity:
             if place.assortment_keys:

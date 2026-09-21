@@ -437,6 +437,90 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertIn("altoria_guild_hall", message)
         self.assertIn("t_guild_table_gone", message)
 
+    # ---- host-less places (hostless-places) --------------------------------
+
+    def _hostless(self, key="t_plaza"):
+        """A synthetic place authoring no host at all (every field defaulted)."""
+        return replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            key=key,
+            host_name=None,
+            host_title=None,
+            host_race=None,
+            host_subrace=None,
+            host_sex=None,
+            profession=None,
+            service_id=None,
+            assortment_keys=(),
+            authored_kwargs=(),
+        )
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_host_less_place_contributes_no_roster_row(self):
+        # The roster is the projection of the places that DECLARE a host: a
+        # host-less row adds nothing, and the nine shipped rows keep their
+        # order and identity untouched.
+        baseline = validate_service_hosts()
+        with mock.patch.dict(PLACE_REGISTRY, {"t_plaza": self._hostless()}):
+            rows = validate_service_hosts()
+        self.assertEqual(len(rows), len(baseline))
+        self.assertEqual(
+            [row.service_id for row in rows], [row.service_id for row in baseline]
+        )
+        self.assertNotIn("t_plaza", {row.anchor_room for row in rows})
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
+    )
+    def test_a_partial_host_is_not_hostless_and_still_faces_the_rejections(self):
+        # The skip must never turn malformed material into a silent empty
+        # room: a row with a host name and no profession is NOT skipped —
+        # it falls through to the roster's named rejections.
+        partial = replace(self._hostless(), host_name="測試半人", host_title="測試殘缺")
+        with mock.patch.dict(PLACE_REGISTRY, {"t_plaza": partial}, clear=True):
+            with self.assertRaises(GuildConfigError):
+                validate_service_hosts()
+
+    @covers_requirement(
+        "place-attendant-hosts::adding-the-blueprint-changes-no-shipped-host"
+    )
+    def test_every_shipped_place_still_authors_a_complete_host(self):
+        # hostless-places neutrality gate (task 4.1): the capability ships
+        # unused. Every shipped place declares all six scalar host fields,
+        # and the derived roster is the fixed nine rows field for field —
+        # nothing moved into or out of the host-declaring set.
+        from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
+
+        for place in PLACE_REGISTRY.values():
+            with self.subTest(place=place.key):
+                self.assertFalse(place_is_hostless(place))
+                for field in HOST_IDENTITY_FIELDS:
+                    self.assertIsNotNone(getattr(place, field), field)
+        rows = validate_service_hosts()
+        self.assertEqual(len(rows), len(self.PRE_CHANGE_BASELINE))
+        for row, expected in zip(rows, self.PRE_CHANGE_BASELINE):
+            with self.subTest(service_id=row.service_id):
+                self.assertEqual(
+                    (
+                        row.name,
+                        row.title,
+                        row.profession.key,
+                        row.anchor_room,
+                        row.service_id,
+                        row.authored_kwargs,
+                    ),
+                    (
+                        expected["name"],
+                        expected["title"],
+                        expected["profession"],
+                        expected["anchor_room"],
+                        expected["service_id"],
+                        expected["authored_kwargs"],
+                    ),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

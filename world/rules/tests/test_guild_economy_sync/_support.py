@@ -38,7 +38,6 @@ from world.rules import guild_config
 from world.rules import guild_economy
 from world.rules.clock import WorldClock
 from world.rules.guild_config import (
-    CATALOG,
     ServiceHostRow,
     get_catalog,
     load_catalog_into_cache,
@@ -190,17 +189,20 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()
-        self._previous_catalog = CATALOG
+        # Snapshot the REAL module cache (the name imported above is a value
+        # copy; rebinding it restores nothing). A test that calls
+        # load_catalog_into_cache() inside a temporary registry patch would
+        # otherwise leave the patched-scope catalog globally installed.
+        self._previous_catalog = guild_config.CATALOG
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
         self._patchers: list = []
 
     def tearDown(self):
-        global CATALOG
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
-        CATALOG = self._previous_catalog
+        guild_config.CATALOG = self._previous_catalog
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._previous_offers)
         super().tearDown()
