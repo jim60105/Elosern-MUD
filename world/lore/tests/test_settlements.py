@@ -107,7 +107,7 @@ class PlaceRegistryTests(unittest.TestCase):
     PRE_SPLIT_CONTENT_CAPTURE = {
         "altoria_guild_hall": (
             'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
-            '阿爾托利亞的冒險者公會大廳，屋裡的兩樣主角是一面向著門的大任務板，與一半鋪成環場的訓練地。', (4, 3),
+            '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面向著門的大任務板，以及一座環形訓練場。', (4, 3),
             '冒險者公會大廳', ('guild hall', 'hall'), '葛里安·衛登', '阿爾托利亞分會會長', 'human', None, 'other', 'guild_staff',
             'altoria_guild_master', (),
             (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), ()
