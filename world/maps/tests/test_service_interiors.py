@@ -246,18 +246,15 @@ class ServiceInteriorTests(EvenniaTestCase):
         # names (the shape every capital content change will write) yields one
         # doorway exit per place on the street, not one shared exit.
         places = _places()
-        base = next(
-            place
-            for place in places.values()
-            if place.settlement_key == "capital_altoria"
-        )
+        # Ride one live row's own settlement and exterior — the suite follows
+        # the registry and never names a shipped settlement.
+        base = next(iter(places.values()))
         pair = [
             replace(
                 base,
                 key=f"t_alley_{suffix}",
                 room_name_zh=f"測試巷道室{suffix}",
                 room_desc_zh="Synthetic shared-exterior interior.",
-                exterior_xy=(1, 3),
                 doorway_key_zh=f"測試巷門{suffix}",
                 doorway_aliases=(f"t alley {suffix}",),
             )
