@@ -133,10 +133,7 @@ def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
         unknown = set(raw) - {"assortments", "shops", "price_scales"}
         if unknown:
             raise _commerce_file_error(name, f"unknown sections {sorted(unknown)}")
-        if not raw:
-            raise _commerce_file_error(
-                name, "rulebook slice must declare at least one commerce section"
-            )
+        contributed = 0
         for section in ("assortments", "shops"):
             rows = raw.get(section)
             if rows is None:
@@ -152,6 +149,7 @@ def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
                 if row_key is not None:
                     _claim(section, row_key, name)
             merged.setdefault(section, []).extend(rows)
+            contributed += len(rows)
         scales = raw.get("price_scales")
         if scales is not None:
             if not isinstance(scales, Mapping):
@@ -159,6 +157,16 @@ def load_commerce_config(rulebook_dir: Path | None = None) -> dict[str, Any]:
             for settlement_key in scales:
                 _claim("price_scales settlement", settlement_key, name)
             merged.setdefault("price_scales", {}).update(scales)
+            contributed += len(scales)
+        if not contributed:
+            # An empty or semantically-empty slice is an ownership failure:
+            # it declares it owns a section while carrying no row, so an
+            # accidentally emptied settlement would vanish from the world
+            # without a signal.
+            raise _commerce_file_error(
+                name, "rulebook slice must carry at least one offer row, shop row "
+                "or price scale"
+            )
     return merged
 
 

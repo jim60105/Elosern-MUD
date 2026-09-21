@@ -80,8 +80,11 @@ class CommerceRulebookSliceTests(unittest.TestCase):
     def test_sections_spread_across_files_load_as_one_catalog(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            self._write(root, "one.yaml", _A_ASSORTMENTS + _A_SHOPS + _SCALES_A)
-            self._write(root, "two.yaml", _B_ASSORTMENTS + _B_SHOPS + _SCALES_B)
+            # Written in reverse lexical order: the loader MUST sort by
+            # filename, so the merged order is a-file-rows then z-file-rows
+            # regardless of creation order or platform listing order.
+            self._write(root, "z_later.yaml", _B_ASSORTMENTS + _B_SHOPS + _SCALES_B)
+            self._write(root, "a_earlier.yaml", _A_ASSORTMENTS + _A_SHOPS + _SCALES_A)
             merged = load_commerce_config(root)
         # Identical to what one concatenated file would produce, in sorted
         # file order: every section from every file, concatenated/merged.
@@ -189,6 +192,21 @@ class CommerceRulebookSliceTests(unittest.TestCase):
             with self.assertRaises(GuildConfigError) as caught:
                 load_commerce_config(root)
             self.assertIn("commerce/empty.yaml", str(caught.exception))
+
+    def test_semantically_empty_slice_is_rejected_naming_the_file(self):
+        # A declared-but-empty section is an ownership failure, not a
+        # legitimate partial slice: an accidentally emptied settlement would
+        # silently vanish from the world.
+        empties = ["assortments: []\n", "shops: []\n", "price_scales: {}\n"]
+        for text in empties:
+            with self.subTest(text=text):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self._write(root, "one.yaml", _A_ASSORTMENTS)
+                    self._write(root, "hollow.yaml", text)
+                    with self.assertRaises(GuildConfigError) as caught:
+                        load_commerce_config(root)
+                    self.assertIn("commerce/hollow.yaml", str(caught.exception))
 
     def test_non_string_row_key_is_a_named_rulebook_error(self):
         with tempfile.TemporaryDirectory() as tmp:
