@@ -67,6 +67,7 @@ class ItemDefinitionTests(unittest.TestCase):
                 "altoria_eatery", "altoria_tailor",
                 "ciaran_hailiel_home", "ciaran_lareneth_home",
                 "ciaran_valwyn_home", "ciaran_vethiel_home",
+                "ciaran_gwenaera_home", "ciaran_nireth_home",
             },
         )
         for shop in SHOP_REGISTRY.values():

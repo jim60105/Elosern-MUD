@@ -38,7 +38,10 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_fresh_spawn_every_intra_city_exit_is_costed_xyz_exit(self):
         sync_grid()
         exits = self._intra_city_exits()
-        self.assertEqual(len(exits), 62)
+        # 52 capital directed links + 18 village (ciaran-village-crafts grew
+        # the village tree from five links to nine; every link spawns the
+        # costed exit in both directions).
+        self.assertEqual(len(exits), 70)
         for exit_obj in exits:
             self.assertIsInstance(exit_obj, CostedXYZExit)
 
