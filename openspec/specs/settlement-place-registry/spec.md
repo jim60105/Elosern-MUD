@@ -33,6 +33,13 @@ profession but no name, is an unfinished record rather than a deliberate
 empty room. A place that authors no host SHALL declare no assortments, no
 additions and no exclusions: goods require a merchant to sell them.
 
+A place's kind SHALL describe what the location is in the world, never what
+capability its host carries. A dwelling whose occupant happens to trade is a
+home, not a shop. The vocabulary SHALL be closed and SHALL cover the location
+types the world document defines, so that no authored place is forced to
+pick a value that misdescribes it; a location type the vocabulary cannot
+name is a reason to extend the vocabulary, not to approximate.
+
 #### Scenario: One record carries a whole location
 - **WHEN** a place record is loaded
 - **THEN** it alone supplies the interior's identity and description, the
@@ -58,6 +65,15 @@ additions and no exclusions: goods require a merchant to sell them.
 - **WHEN** a place record authors no host and declares assortments,
   additions or exclusions
 - **THEN** validation raises naming the place
+
+#### Scenario: A dwelling that trades is still a dwelling
+- **WHEN** a place whose room is a home and whose host carries a merchant
+  capability is inspected
+- **THEN** its kind names it a home rather than a shop
+
+#### Scenario: Every shipped place's kind describes its location
+- **WHEN** each shipped place's kind is compared against what its room is
+- **THEN** each names the location type the world document gives it
 
 ### Requirement: A settlement declares its archetype and coordinate space
 The system SHALL support settlement records carrying a stable key matching
