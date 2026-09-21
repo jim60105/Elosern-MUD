@@ -1,6 +1,4 @@
-"""Data-contract test: elven village commerce content contract
-
-Slice of ``test_guild_economy_sync``: TradePathNoArchetypeBranchTests, CiaranVillageCommerceTests.
+"""Slice of ``test_guild_economy_sync``: TradePathNoArchetypeBranchTests, CiaranVillageCommerceTests.
 """
 from tools.spec_traceability import covers_requirement
 import unittest
