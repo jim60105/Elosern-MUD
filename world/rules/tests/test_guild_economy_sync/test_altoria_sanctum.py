@@ -40,7 +40,7 @@ from typeclasses.components import Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
-from world.rules.economy import buy, parse_merchant_stock
+from world.rules.economy import buy, parse_merchant_stock, sell
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
 
@@ -345,6 +345,20 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIn(holy_water, visitor.db.inventory)
         self.assertEqual(
             parse_merchant_stock(merchant_slot)[holy_water], stock_before - 1
+        )
+        # Selling back settles on the same seam — the counter takes its own
+        # authored sell price and the good returns to ordinary stock.
+        with patch(
+            "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
+        ):
+            sale = sell(visitor, deacon, holy_water, 1)
+        self.assertEqual(sale["total_copper"], offer.sell_copper)
+        self.assertEqual(
+            visitor.db.wallet, 100000 - offer.buy_copper + offer.sell_copper
+        )
+        self.assertNotIn(holy_water, visitor.db.inventory)
+        self.assertEqual(
+            parse_merchant_stock(merchant_slot)[holy_water], stock_before
         )
 
 
