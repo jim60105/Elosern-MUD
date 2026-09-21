@@ -204,6 +204,10 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertTrue(places, "registry lost the de-commercialised settlement")
         for place in places:
             with self.subTest(place=place.key):
+                if place.service_id is None:
+                    # 共食棚 (ciaran-village-commons): a host-less commons
+                    # speaks with no voice — nothing here to police.
+                    continue
                 definition = table[_dialogue_key_of_service(place.service_id)]
                 prose = re.sub(r"`[^`]*`", "", _table_text(definition))
                 for word in banned:

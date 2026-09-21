@@ -25,6 +25,14 @@ is the collector whose kept things line the old tree's house; 維特希爾·
 ciaran-village-crafts adds the two the document names: 格威娜拉·希爾維爾莉夫
 makes the village's ornaments on 銀葉坡, and 妮瑞斯·米斯特瓦勒 tends herbs
 and remedies by the 藥草園.
+
+ciaran-village-commons adds the two voices that converse without trading:
+泰莉爾·菲溫德, the village's sword instructor on 練刀場, whose table speaks
+of the branch's blade culture and points training at `rest` and `practice`
+(she grants nothing — proficiency comes only from the trainee's own hours),
+and 艾莉妮斯·達恩斯特瑞德爾, the elder, whose dwelling is memory rather than
+office: the branch, the forest, the village's past. Neither asks, permits,
+or decides anything. The shelter between them is host-less on purpose.
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
@@ -175,6 +183,37 @@ VALWYN_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
+# 泰莉爾·菲溫德 — the sword instructor (暗影谷村刀術導師). She shares the
+# 練刀場 with 海莉爾 the blade-smith: the forge and the teaching, on one
+# clearing. She teaches nothing directly — training is `rest` plus
+# `practice`, and her lines say so without pretending otherwise.
+TELIEL_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "刀術",
+        "「基亞蘭的孩子先認刀柄、後認刀鋒：舞刀是谷裡人說話的另一種聲音，"
+        "不是殺人用的手藝。你看見林緣挂的那些刀痕了嗎？一代人補一片，"
+        "傷口的帳早就算清了。想學的是這個，不是我的名聲。」",
+    ),
+    KeywordResponse(
+        "練習",
+        "「我這邊沒有『拜師』這道門——谷裡不興把功夫鎖在某個人手上。"
+        "要練就 `rest` 養足精神，再 `practice 刀術`，一個時辰一個時辰地熬；"
+        "熟練度是你自己流汗換來的，我站在這裡只是讓你知道場子怎麼用。」",
+    ),
+    KeywordResponse(
+        "練刀場",
+        "「場子日夜都在。清晨是孩子的，日頭偏西是輪值的獵隊，"
+        "入夜後誰想獨自走幾遍式子，誰就自己來。木刀擱場邊，借還不用登記；"
+        "要買真刀才要找對人——鍛的那位住場子另一頭。」",
+    ),
+    KeywordResponse(
+        "比劃",
+        "「想找人過兩手？谷裡人得閒會陪，手上有準頭，點到為止；"
+        "`engage` 開口便是，也可以去公會考場按規矩打。"
+        "我不同你比——導師的手留給還不會收刀的人，不是留給看熱鬧的。」",
+    ),
+)
+
 # 維特希爾·威爾德布瑞亞爾 — the weaver (暗影谷村織衣者). elven_attire:
 # 精靈短袍傳統服飾, 精靈戰鬥服飾, 精靈傳統服飾, 精靈森林輕紗.
 VETHIEL_RESPONSES: tuple[KeywordResponse, ...] = (
@@ -200,6 +239,41 @@ VETHIEL_RESPONSES: tuple[KeywordResponse, ...] = (
         "「穿舊的、小了的不必丟，洗淨拿來我改；改不了的拆成布，"
         "布還有布的去處。要連布帶線一併脫手，`sell` 一聲，"
         "我按紗的成色回你——谷裡東西總該有第二條命。」",
+    ),
+)
+
+# 艾莉妮斯·達恩斯特瑞德爾 — the elder (暗影谷村長老). Her dwelling is a
+# keeper's, not an office: no petition, no permission, no council business.
+# Memory is her content — the branch, the forest, the village's past. Her
+# people's devotions stay where the document leaves them: unshown.
+ELENIS_RESPONSES: tuple[KeywordResponse, ...] = (
+    KeywordResponse(
+        "村子",
+        "「這谷裡的樹比我記得的事還老一截。早年村子不在這裡，"
+        "是樹長穩了、溪改道了，人才跟著搬過來，一棵一棵認臉認熟的。"
+        "你問村子的來歷，我能說的都是這種小事——精靈不寫史，"
+        "史活在記得的人對著的那棵樹下。」",
+    ),
+    KeywordResponse(
+        "基亞蘭",
+        "「基亞蘭這一支是愛舞刀的，外頭傳我們脾氣硬，其實是記性長："
+        "刀上刻的名字一代比一代密，磨損的是柄、不是名字。"
+        "悠花離村之前，也在練刀場待過整個雨季——那孩子走的時候，"
+        "村裡沒有人勸；精靈留人留不住，也不該留。」",
+    ),
+    KeywordResponse(
+        "森林",
+        "「林子認得村裡每一雙腳。獵有獵的道，採有採的時辰，"
+        "哪片坡哪年歇養、哪條溪產什麼魚，族裡老一輩都背得下來。"
+        "你要進林，記一句便夠：帶走多少、還回去多少，森林不計較，"
+        "但會記得。」",
+    ),
+    KeywordResponse(
+        "往事",
+        "「你說要我決定？沒有什麼決定。族裡多年沒有『重要事務』了，"
+        "幾棵樹下坐一坐、把話說齊，事情原本就是那個樣子。"
+        "我不是管事的，也沒有什麼能准你或擋你的——"
+        "要坐就坐，要問往事就問，老人家這裡只有時間。」",
     ),
 )
 
@@ -277,6 +351,30 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
                 "園裡採得多的藥草你要脫手，`sell` 一聲，我過秤。」"
             ),
             responses=NIRETH_RESPONSES,
+        ),
+    ),
+    (
+        "ciaran_elenis_home",
+        DialogueDefinition(
+            greeting=(
+                "古樹下的坐石被太陽曬得微溫，艾莉妮斯·達恩斯特瑞德爾抬眼看你，"
+                "手裡一縷新剝的樹皮擱在膝上沒動：「坐。老人家這裡不賣東西，"
+                "也沒有事情要你辦——你想問什麼，村裡的事、林子的事、"
+                "還是這支刀的名字？記得的我說，不記得的我同你一起想。」"
+            ),
+            responses=ELENIS_RESPONSES,
+        ),
+    ),
+    (
+        "ciaran_teliel_home",
+        DialogueDefinition(
+            greeting=(
+                "場邊的木刀排成一列，泰莉爾·菲溫德剛收最後一組式子，額上的汗"
+                "還沒乾；她抱臂看你：「來看練刀的？場子就是這樣用的。"
+                "先 `rest` 養好精神，再 `practice 刀術`，一個時辰一個時辰來——"
+                "谷裡沒有捷徑，我這裡也沒有要賣你的東西。」"
+            ),
+            responses=TELIEL_RESPONSES,
         ),
     ),
 )
