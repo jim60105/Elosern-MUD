@@ -38,12 +38,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="艾莉妮斯的家",
         room_desc_zh=(
-            "The eldest house under the eldest tree, its doorway worn smooth "
-            "by a century of the same footsteps. Within, the room is spare "
-            "and unhurried: low seats, a ledge of kept seed-pods and folded "
-            "cloths, and nothing sorted for anyone's buying. The elder's "
-            "goods are remembered things — the village's own history, "
-            "kept whole, and none of them set out for a stranger's coin."
+            "最老的樹下是最老的一間屋子，門框被同一族腳步磨了一百年，磨得發亮。屋裡簡樸而從容，低矮的坐處、一格擱著留種的莢果與摺好的布的擱板，沒"
+            "有什麼東西分好了類等誰來買。長老的家當都是被記得的東西，村莊自己的歷史完完整整留著，沒有一樣拿出來等著賺陌生人的錢。"
         ),
         exterior_xy=(1, 3),  # 長老古樹下
         doorway_key_zh="艾莉妮斯的家",
@@ -63,13 +59,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="格威娜拉的家",
         room_desc_zh=(
-            "Silver wire and half-finished ornaments lie on a cloth across "
-            "the work table, sorted by a craftswoman's eye rather than a "
-            "merchant's. Finished pieces hang from a line by the window "
-            "beside drying blossom heads from the slope below; the hearth "
-            "warms a kettle no customer was expected to need. It is the "
-            "house of someone who loves ornamental work, and trades only "
-            "because the village asks her to."
+            "銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛"
+            "在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一"
+            "個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。"
         ),
         exterior_xy=(2, 3),  # 銀葉坡
         doorway_key_zh="格威娜拉的家",
@@ -93,11 +85,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="海莉爾的家",
         room_desc_zh=(
-            "A low, warm room under heavy beams. The hearth is banked with "
-            "embers, and a window seat overlooks the practice ground where "
-            "the village's young blade-dancers run through their forms from "
-            "dawn to dusk. The tools of the house are kept tidy along the "
-            "walls; nothing here is arranged for trade."
+            "一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年"
+            "幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺"
+            "著等誰來買。"
         ),
         exterior_xy=(2, 1),  # 練刀場
         doorway_key_zh="海莉爾的家",
@@ -121,11 +111,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="拉瑞內斯的家",
         room_desc_zh=(
-            "The scent of candied blossoms hangs in the air of this home "
-            "along the stream path. Woven baskets of dried petals stand "
-            "beside a small hearth stone, and by the window a low table "
-            "holds the day's offering of small treats, set out for whoever "
-            "passes by."
+            "溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊"
+            "一張矮凳上擺著今日待客的小點，為每個經過的人留著。"
         ),
         exterior_xy=(1, 0),  # 溪畔小徑
         doorway_key_zh="拉瑞內斯的家",
@@ -149,13 +136,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="妮瑞斯的家",
         room_desc_zh=(
-            "Bundles of herb and small stoppered jars of remedy crowd this "
-            "sunlit house, sorted in the order of when they were picked "
-            "rather than of what they are worth. A mortar sits by the "
-            "window overlooking the village's herb plot, and the air turns "
-            "bitter-sweet at the door. The remedies are kept for whoever "
-            "needs them; being asked to keep them for coin is an after-"
-            "thought of the same village that grows the herbs."
+            "成把的藥草與塞著木塞的小藥罐擠滿這間曬得到太陽的屋子，按摘下的時辰排，不按值多少錢排。窗"
+            "邊一方臼，窗外望得見村子的藥草園，門口一帶的空氣苦裡帶甜。藥是留給需要的人的；被村子請託"
+            "把藥換成錢賣，是同一座種藥的村子順便想到的事。"
         ),
         exterior_xy=(3, 1),  # 藥草園
         doorway_key_zh="妮瑞斯的家",
@@ -179,13 +162,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.COMMONS,
         room_name_zh="共食棚",
         room_desc_zh=(
-            "A wide roof of woven branches over a floor worn level by "
-            "everyone's feet. Long tables stand in the shade; baskets of "
-            "the day's gathering sit open on them, and the kettle place is "
-            "already laid for whoever arrives next. Nobody tends the food "
-            "and nobody asks for it: what the forest gave the village is "
-            "simply set under one shared roof, and every villager eats from "
-            "the same table."
+            "寬寬一片編枝的屋頂，罩著被所有人的腳踩平的地板。長桌擱在蔭裡；當日採集的東西開著簍放在桌上，燒水的位置早已鋪好，等下一個來的人。沒有"
+            "人看管食物，也沒有人索取，森林給村子的就放在這一頂共用的屋簷下，每個村民都從同一張桌上吃。"
         ),
         exterior_xy=(1, 1),  # 村中廣場
         doorway_key_zh="共食棚",
@@ -197,13 +175,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="泰莉爾的家",
         room_desc_zh=(
-            "A home on the training ground's edge, its one clear space kept "
-            "swept for bare-foot forms. Wooden practice blades hang in a "
-            "row by the door, worn light at the handles by many hands; "
-            "cushions and a kettle sit opposite, for the resting that every "
-            "hour of practice costs. Nothing in the room is for sale — the "
-            "house of the village's sword instructor teaches the way its "
-            "yard always has, by the trainee's own repetition."
+            "練刀場邊的一戶人家，屋裡那片騰空的空間掃得乾淨，留給赤腳練刀的人。木刀在門邊排成一排，刀柄被許多手握得發白；對面擱著坐墊與水壺，為"
+            "每一次練習之後的休息也留了位置。屋裡沒有一樣東西在賣，村子刀術導師的家教人的方式，和她的場子一直以來一樣，靠練習者自己的重複。"
         ),
         exterior_xy=(2, 1),  # 練刀場
         doorway_key_zh="泰莉爾的家",
@@ -223,11 +196,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="瓦爾溫的家",
         room_desc_zh=(
-            "Roots cradle this house beneath the old tree at the village's "
-            "north edge. Along every wall, the collected oddments of a long "
-            "life sit in woven baskets and hollowed stones — feathers, seeds, "
-            "lengths of bundled silk — each tenderly kept, each with a story. "
-            "It is a home filled with kept things, not a business."
+            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留"
+            "著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。"
         ),
         exterior_xy=(1, 2),  # 村北古樹下
         doorway_key_zh="瓦爾溫的家",
@@ -251,11 +221,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.HOME,
         room_name_zh="維特希爾的家",
         room_desc_zh=(
-            "Herbs hang to dry from the rafters, and dyed thread is wound "
-            "around pegs by the loom. The wear of many hands shows on the "
-            "wooden frame, yet the room is a dwelling first: cushions on the "
-            "floor, a kettle by the fire, garments laid out to be admired "
-            "among the weaving."
+            "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間"
+            "攤著幾件衣服等人欣賞。"
         ),
         exterior_xy=(2, 2),  # 織房坡
         doorway_key_zh="維特希爾的家",

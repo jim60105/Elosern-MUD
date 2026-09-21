@@ -43,8 +43,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.GUILD_HALL,
         room_name_zh="阿爾托利亞冒險者公會大廳",
         room_desc_zh=(
-            "The guild hall of 阿爾托利亞, with a grand board and a training "
-            "ring (guild-economy D-9)."
+            "阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，"
+            "以及一座環形訓練場。"
         ),
         exterior_xy=(4, 3),  # 公會前
         doorway_key_zh="冒險者公會大廳",
@@ -68,8 +68,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.GENERAL_STORE,
         room_name_zh="阿爾托利亞雜貨店",
         room_desc_zh=(
-            "The general store of 阿爾托利亞, its shelves waiting for the "
-            "next caravan (guild-economy D-9)."
+            "阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前"
+            "先替它們留好位置。"
         ),
         exterior_xy=(2, 3),  # 市場街
         doorway_key_zh="雜貨店",
@@ -96,8 +96,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.WEAPONSMITH,
         room_name_zh="聖潔王都鍛造鋪",
         room_desc_zh=(
-            "The forge of 聖潔王都, its anvil ringing under the capital's "
-            "weapons trade (settlement-shops design §6.1)."
+            "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲"
+            "定了價。"
         ),
         exterior_xy=(1, 3),  # 工匠巷
         doorway_key_zh="鍛造鋪",
@@ -121,8 +121,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.OUTFITTER,
         room_name_zh="聖潔王都裁縫坊",
         room_desc_zh=(
-            "The tailor's workshop of 聖潔王都, bolts of cloth beside the "
-            "noble commissions of 北大道 (settlement-shops design §6.1)."
+            "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。"
         ),
         exterior_xy=(1, 3),  # 工匠巷
         doorway_key_zh="裁縫坊",
@@ -150,8 +149,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.JEWELLER,
         room_name_zh="聖潔王都首飾坊",
         room_desc_zh=(
-            "The jeweller's shop of 聖潔王都, its case lit for the "
-            "accessory trade of 市場街 (settlement-shops design §6.1)."
+            "聖潔王都的首飾坊，展示櫃裡打著光，為市場街的飾品交易而亮。"
         ),
         exterior_xy=(2, 3),  # 市場街
         doorway_key_zh="首飾坊",
@@ -175,8 +173,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.ALCHEMIST,
         room_name_zh="聖潔王都鍊金坊",
         room_desc_zh=(
-            "The alchemist's shop of 聖潔王都, its shelves stoppered and "
-            "labelled over 東市's goods road (settlement-shops design §6.1)."
+            "聖潔王都的鍊金坊，一排排瓶罐塞好、貼好標籤，望著東市那條貨運道路。"
         ),
         exterior_xy=(5, 3),  # 東市
         doorway_key_zh="鍊金坊",
@@ -208,17 +205,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.MERCHANT_HALL,
         room_name_zh="聖潔王都商會公所",
         room_desc_zh=(
-            "The merchants' hall of 聖潔王都 is a long office above the "
-            "east road's goods traffic: a tariff table under the windows, "
-            "route charts nailed along the wall with the season's caravans "
-            "chalked against them, and benches where factors wait while "
-            "clerks settle their business in writing across the counter. "
-            "The trade of 東市 is coordinated from this room — who runs "
-            "which road, who carries whose glass and grain, who owes the "
-            "guild what at quarter's end. There is no board on the wall and "
-            "no list by the door: whatever work this hall will one day "
-            "post, its arrangements are still made with a person, face to "
-            "face, across a desk."
+            "聖潔王都的商會公所是一間縱長的辦公室，俯著東市那條貨運道上的車馬，窗下一張稅率長桌，牆上釘著路線圖，這一季各支商隊的名字用粉筆記在地"
+            "圖旁邊；長凳上坐等的是各號的代辦，櫃檯那頭書記把一筆筆生意用白紙黑字敲定。東市的買賣就在這間屋子裡調度，誰走哪條路、誰替誰載玻璃與"
+            "穀物、季末誰該付公會多少。牆上沒有公告板，門邊也沒有名單，這座公所日後要派什麼活，眼下都得隔著書桌、面對面跟人談。"
         ),
         exterior_xy=(5, 3),  # 東市
         doorway_key_zh="商會公所",
@@ -248,15 +237,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.MARKET,
         room_name_zh="聖潔王都市集棚",
         room_desc_zh=(
-            "The covered stalls of 聖潔王都 are a roof over other people's "
-            "counters: a long shed of trestled canvas and scarfing boards, "
-            "sun through the seams in pale stripes along the empty stalls. "
-            "Every stall is swept and unclaimed — fruit sellers wheel their "
-            "barrows in at dawn and wheel them out at dusk, buskers take "
-            "the wide bay by the west door, and the ground itself keeps no "
-            "shopkeeper. The street's trade lives on the people who stand "
-            "here only for today, and the shed has been built to wait for "
-            "whoever that is, asking nothing and reserving nothing."
+            "聖潔王都的市集棚是蓋在別人攤位上頭的一片屋頂，長長一座棚子，支架撐著帆布與攔板，日光從縫隙漏下來，在空蕩的攤位排之間拖出淡淡的光條。"
+            "每個攤位都掃過了、也都不屬於誰，賣果子的天亮推車進來、黃昏推車出去，賣唱的佔西門那片寬地，這塊地本身不養任何固定的店主。一條街的生意"
+            "靠的是只站今天一天的人，而棚子蓋來就是為了等那樣的人，什麼都不問，什麼都不留。"
         ),
         exterior_xy=(2, 3),  # 市場街
         doorway_key_zh="市集棚",

@@ -45,17 +45,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.TEMPLE,
         room_name_zh="聖潔王都光明神殿",
         room_desc_zh=(
-            "The light of the 光明神殿 arrives before the room does: tall "
-            "windows up the whole height of the nave, and the morning "
-            "through them in bars you could lay hands on. Benches face the "
-            "raised dais where the 主祭 reads, blesses and answers; the "
-            "air holds a little of the day's incense. Along the near "
-            "wall, the nave opens without partition or curtain into the "
-            "聖所's own hall — the sanctum where the church's ministry of "
-            "love is carried out, its shop counter visible from the "
-            "benches. Blessing, ministry and trade are three counters of "
-            "one faith, side by side in the same light; nobody in this "
-            "city would think to lower their voice about any of them."
+            "光明神殿的光比屋子先到，長窗沿中殿一路開到屋頂，晨光從窗格斜斜落下來，亮得幾乎可以用手捧住。長椅對著墊高的臺，主祭在那裡誦讀、祝禱、"
+            "回答提問；空氣裡留著一點今日焚香的氣息。近處的牆邊，中殿沒有任何隔斷或簾幔，直接敞進聖所自己的大廳，那裡是教會行愛之工的地方，從長椅"
+            "上就看得見那裡的商品櫃。祝禱、事工與買賣是同一份信仰的三座櫃檯，並排站在同一片光裡；這座城市裡沒有人會覺得提起它們其中任何一樣時該壓"
+            "低聲音。"
         ),
         exterior_xy=(4, 4),  # 大神殿前
         doorway_key_zh="光明神殿",
@@ -76,18 +69,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.SANCTUM_SHOP,
         room_name_zh="聖潔王都聖所",
         room_desc_zh=(
-            "The 聖所 opens off the nave under the same roof and the same "
-            "windows: warm light, clean linen, warm water ready in basins, "
-            "and along one wall a shop counter fitted out like any other "
-            "in the capital — shelves of ritual and comfort ware, glass "
-            "bottles, folded vestments of soft cloth, priced and stocked "
-            "the way a general store prices and stocks. Attendants move "
-            "between the counter and the guest rooms down the hall with "
-            "ledgers under their arms, calling the deacon's name in the "
-            "same voice they use for blessings. Worship, ministry and "
-            "trade in one building, in the open: this is how the Church "
-            "of Light keeps house, and everyone on the continent knows it "
-            "the way they know a tavern sells wine."
+            "聖所開在中殿旁邊，同一個屋簷、同一排窗，暖的光、洗淨的亞麻布、臉盆裡備好的溫水，一面牆邊是一張和城裡任何店面沒有兩樣的商品櫃，禮儀與"
+            "安養器物的層架、玻璃瓶、軟布祭袍摺得整整齊齊，標價與補貨的方式跟雜貨店一模一樣。執事們手臂下夾著賬簿，在櫃檯與廊底客房之間來回，喊執"
+            "事名字的聲調跟喊祝禱時完全一樣。敬拜、事工、買賣在同一棟屋簷下、毫不避人。光明教會就是這樣過日子，聖所公開營生這件事，整個大陸都"
+            "知道，跟酒館賣酒沒有兩樣。"
         ),
         exterior_xy=(4, 4),  # 大神殿前
         doorway_key_zh="聖所",
@@ -118,18 +103,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.PALACE,
         room_name_zh="聖潔王都王宮",
         room_desc_zh=(
-            "The throne approach of 聖潔王都 rises under its own roof: "
-            "polished stone the colour of the cliff the capital stands on, "
-            "standing columns set wide enough for a procession, and at the "
-            "far end a low dais of three steps behind which the throne "
-            "chair looks out over the whole length of the hall. It is "
-            "grand, it is clean, and it is waiting — no guard in the "
-            "doorway, no petitioner on the floor, no voice carrying down "
-            "the marble. Everything this room would eventually hold, every "
-            "story a palace is supposed to contain, has not been written "
-            "yet, and the hall makes no attempt to pretend otherwise. "
-            "Whoever walks its length will hear only their own footsteps, "
-            "which is the truest account of the crown this city wears."
+            "聖潔王都的王座通道在自己屋簷下升起，磨亮的石材正是這座王都立足的崖壁顏色，立柱之間的寬度夠得過一支儀仗，最遠端是三級臺的矮臺，王椅在"
+            "臺後俯瞰整座大殿的全長。它宏偉、潔淨，而且正在等待，門口沒有衛兵，地上沒有跪求的人，沒有任何聲音在大理石上迴盪。這間屋子遲早要裝進的"
+            "東西、一座王宮該有的每個故事，都還沒有被寫出來，大殿也懶得假裝不是這樣。沿著它走完一趟的人會聽見的唯一聲音是自己的腳步，那才是這座城"
+            "市頭上這頂王冠最忠實的描述。"
         ),
         exterior_xy=(4, 6),  # 王宮前庭
         doorway_key_zh="王宮",
@@ -145,15 +122,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.WATCH_POST,
         room_name_zh="聖潔王都貴族區衛所",
         room_desc_zh=(
-            "The 貴族區衛所 of 聖潔王都 is one long room of stacked "
-            "shields and folded cloaks, a brazier at either end and a "
-            "record desk by the door where arrivals would be written down "
-            "if anyone still arrived needing to be. The quarter's patrol "
-            "rotates through here on the hour. Nothing on the walls is an "
-            "order, and nothing across the room is a barrier: whoever "
-            "built the post left the floor open from door to desk, the way "
-            "a house leaves its parlour door open in a season without "
-            "callers."
+            "聖潔王都的貴族區衛所是一間縱長的屋子，堆著盾牌、疊著斗篷，兩頭各一座火盆，門邊一張登記桌，要是還有什麼人到訪需要登記，就會被寫在這張"
+            "桌上。街區的巡邏按整點輪過這裡。牆上沒有任何一張是命令，屋裡也沒有任何一樣東西會阻擋人，當初蓋這駐所的人把地面從門到桌留空，像一戶"
+            "沒有訪客的人家把客廳的門敞著。"
         ),
         exterior_xy=(3, 5),  # 貴族區前
         doorway_key_zh="貴族區衛所",
@@ -179,15 +150,9 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.TRAINING_GROUND,
         room_name_zh="聖潔王都校場",
         room_desc_zh=(
-            "The 校場 of 聖潔王都 is a raked dirt yard under the upper "
-            "wall: practice posts set in rows, ring rope worn pale at the "
-            "hand-holds, and a long bench of the kind a whole morning of "
-            "forms leaves sweating. The capital's levies drill here before "
-            "the guild takes its own hours in the evening, and the marks on "
-            "the posts came from a hundred different hands. Nothing in the "
-            "yard sharpens a blade or grades a rank by itself — it is where "
-            "the city comes to do the work any ground would take, done "
-            "where everyone can see the standard."
+            "聖潔王都的校場是上城牆下一片耙平的泥地，練習樁一排排立著，圍繩的握處磨得發白，一條長凳，是那種一整個上午的招式練下來會讓人一身汗的長"
+            "凳。王都的徵兵在白天於此操練，公會到傍晚才來用屬於它的時段，樁上的痕跡來自一百雙不同的手。場子裡沒有任何東西會自己磨快一刀或評定一階"
+            "，它是這座城市來做「任何地面都肯承接的那種功課」的地方，只因為在這裡，每個人都看得見標準在哪裡。"
         ),
         exterior_xy=(2, 4),  # 校場外
         doorway_key_zh="校場",
@@ -218,17 +183,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         kind=PlaceKind.ACADEMY,
         room_name_zh="聖潔王都王立魔法學院",
         room_desc_zh=(
-            "The academy of 聖潔王都 keeps its lectures under one roof: a "
-            "long hall of tiered benches facing a demonstration floor, "
-            "lamp-bright enough at every hour for reading, and off it a "
-            "stack room where the capital's copies of the rank texts are "
-            "kept in the order students climb them. Students argue on the "
-            "steps outside, and the tutors inside answer questions the way "
-            "a school is supposed to — all the way down. The 院長's desk "
-            "faces the demonstration floor; everything the city knows about "
-            "the ladder of magical ranks and the eight elements was taught "
-            "somewhere that looks like this, and the Kingdom's copy is the "
-            "one 薇歐蕾特·阿爾托利亞 sat in."
+            "聖潔王都的學院把講課收在同一個屋簷下，一間長廳，階梯式的長椅面對著示範場，無論幾點都燈光明亮到能讀書，廳旁是一間書庫，王都藏的階級課"
+            "本照學生攀登的順序上架。學生在門外的階梯上爭論，裡面的講師回答問題的方式正是一所學校該有的樣子，一路答到底。院長的書桌正對著示範場；"
+            "這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特·阿爾托利亞從前坐過的教"
+            "室。"
         ),
         exterior_xy=(5, 5),  # 學院前
         doorway_key_zh="王立魔法學院",

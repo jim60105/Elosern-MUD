@@ -61,6 +61,10 @@
       "reason": "lore registry content contract"
     },
     {
+      "path": "world/lore/tests/test_room_prose_language.py",
+      "reason": "authored room prose language contract"
+    },
+    {
       "path": "world/lore/tests/test_races.py",
       "reason": "race/subrace data contract"
     },
