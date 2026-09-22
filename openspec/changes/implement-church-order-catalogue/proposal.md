@@ -23,9 +23,10 @@ None.
 
 ## Dependencies
 
-depends-on: implement-church-core
+depends-on: implement-church-foundation
+depends-on: implement-church-redemption
 
-The ledger (`db.church.redeemed`), the `REDEEM_CATALOG` engine + `church redeem` rail, the `church.yaml` loader with its polarity gate, and the §9.2 predicate-extension sanction all land there; this change queues behind it (its archive syncs `church-ordination`'s main spec first).
+The ledger (`db.church.redeemed`) and the `church.yaml` loader with its polarity gate land in `implement-church-foundation`; the `REDEEM_CATALOG` engine + `church redeem` rail land in `implement-church-redemption`, whose archive syncs `church-ordination`'s main spec first; the §9.2 predicate-extension sanction travels with `implement-church-enrollment` (the saintess-vessel delta's replacement requirement). This change queues behind redemption (transitively foundation, enrollment, accrual).
 
 Size: ≤ one engineer-day (design §8 second half: 8 rows + the title ladder + both validator faces).
 
@@ -39,6 +40,7 @@ Size: ≤ one engineer-day (design §8 second half: 8 rows + the title ladder + 
 
 ## Batch:
 
-depends-on: implement-church-core
+depends-on: implement-church-foundation
+depends-on: implement-church-redemption
 
-Code-conflict notes: appends to `REDEEM_CATALOG`, the skill-registry clergy block, and `church.yaml` — all owned by the core change; must not start before core archives. Title-side files (`world/lore/titles.py`, evaluator, `titles.js`) are owned by no other active change at proposal time.
+Code-conflict notes: appends to `REDEEM_CATALOG`, the skill-registry clergy block, and `church.yaml` — all owned by `implement-church-redemption` (shells/validator from `implement-church-foundation`); must not start before redemption archives. `implement-church-combat-ministry` owns the combat files (`monster_behaviour.py`, `defeat_aftermath/violation.py`, the buff declaration) and touches none of this change's files — the two may run in parallel once redemption is archived. Title-side files (`world/lore/titles.py`, evaluator, `titles.js`) are owned by no other active change at proposal time.
