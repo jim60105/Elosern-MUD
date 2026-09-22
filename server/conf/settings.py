@@ -534,6 +534,13 @@ ART_REMBG_MODEL_DIR = os.path.join(GAME_DIR, "server", ".rembg")
 # never costs the record its image.
 ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
 
+# Cap on the CTranslate2 intra-op thread count. 0 (the default) leaves the
+# library's own thread count in place; a non-zero value reaches the
+# translator's intra_op thread count at construction time (design D7 in
+# world/art/translate_ct2.py). Unlike ART_REMBG_THREADS this is a constructor
+# argument, never a process-global environment mutation.
+ART_TRANSLATE_THREADS = _env_int_bounded("ART_TRANSLATE_THREADS", 0, low=0, high=256)
+
 # Dotted path of the prompt-translation backend class. Deliberately NOT
 # environment-overridable: it is the third import-executing dotted-path seam
 # after ART_SD_CLIENT and ART_REMBG_BACKEND, so an inherited environment must
@@ -541,6 +548,15 @@ ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
 # add-ctranslate2-translate-backend; until then an enabled stage degrades
 # safely through art_translate_unavailable.
 ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"
+
+# Model directory (CTranslate2 model + SentencePiece source model, see
+# world/art/translate_ct2.py). Deliberately NOT environment-overridable
+# (same rationale as ART_STORE_ROOT and ART_REMBG_MODEL_DIR): a mistyped value
+# would silently relocate the translation model artifact off its persistent
+# volume and turn every translation into a bounded unavailable. The server
+# never downloads into it — an operator seeds it (scripts/fetch-translate-model.sh)
+# and compose mounts the evennia-translate volume at /app/server/.translate.
+ART_TRANSLATE_MODEL_DIR = os.path.join(GAME_DIR, "server", ".translate")
 
 ######################################################################
 # Prompt library (prompt-library)
