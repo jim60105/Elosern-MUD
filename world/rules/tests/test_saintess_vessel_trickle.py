@@ -1,11 +1,12 @@
-"""Data-contract test: saintess vessel trickle and preset integration smoke contract
+"""Data-contract test: saintess vessel trickle and enrollment integration smoke contract
 
 Behavior suite for 聖光涓流 (saintess-vessel D2): the vessel holder's idle
 arousal never leaves the 微興奮～中等 band on the world clock, moves at most
 ±1 per advance, and re-arms after ordinary decay re-entry; non-holders are
 byte-identical. Shipped preset/skill keys appear here because the task 5.3
-end-to-end smoke activates the shipped Saintess preset and casts the shipped
-ceremonial ward through the real action pipeline.
+end-to-end smoke enrolls a female ``human_royal`` through the church
+enrollment rite and casts the shipped ceremonial ward through the real action
+pipeline.
 
 The direction draw is a stateless crc32(id:tick) hash (design D2b), so every
 advance outcome is deterministic; where an assertion needs a specific draw
@@ -22,6 +23,8 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.components import ChurchHost
+from typeclasses.npcs import NPC
 
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.clock import AdvanceSource, WorldClock
@@ -31,7 +34,6 @@ from world.rules.tests.combat_fixtures import grant_lineage
 
 VESSEL_KEY = "saintess_vessel"
 WARD_KEY = "sanctified_ward"
-PRESET_KEY = "violet_altoria"
 GRANT_EVENT = "saintess_vessel_granted"
 BAND_FLOOR = 15
 BAND_CEILING = 59
@@ -238,35 +240,49 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
             self.assertEqual(holder.sexual.pending_climax_extension, 0)
 
 
-class SaintessVesselPresetSmokeTests(EvenniaTest):
-    """Task 5.3 end-to-end: preset grant, clock trickle, ceremonial ward cast."""
+class SaintessVesselEnrollmentSmokeTests(EvenniaTest):
+    """Task 5.3 end-to-end: enrollment grant, clock trickle, ward cast."""
 
-    def test_preset_activation_trickle_and_ward_cast_smoke(self):
+    def setUp(self):
+        super().setUp()
+        self.celebrant = create_object(
+            NPC, key="smoke celebrant", location=self.room1
+        )
+        self.component = ChurchHost.create(
+            self.celebrant, service_id="smoke_celebrant"
+        )
+        self.celebrant.components.add(self.component)
+
+    def test_enrollment_trickle_and_ward_cast_smoke(self):
         holder = self.char1
         holder.race = "human"
+        holder.subrace = "human_royal"
+        holder.sex = "female"
         holder.apply_race_baseline()
         self.account.at_post_create_character(holder)
 
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-            activate_player_character,
-        )
+        from world.rules.church import enroll
 
         with (
-            patch("world.rules.character_creation.log_info") as info,
+            patch("world.rules.church.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            activate_player_character(
-                self.account,
-                holder,
-                CharacterCreationRequest(mode="preset", preset_key=PRESET_KEY),
-            )
+            with patch(
+                "world.rules.church.get_world_clock",
+                return_value=WorldClock(tick=0),
+            ):
+                enroll(holder, self.celebrant)
         grant_events = [
             call.args[0] for call in info.call_args_list if call.args
         ]
-        self.assertEqual(grant_events, [GRANT_EVENT])
-        (event,), kwargs = info.call_args
-        self.assertEqual(kwargs["context"]["source"], "preset")
+        self.assertIn(GRANT_EVENT, grant_events)
+        # The grant event is the second of the enrollment pair and carries
+        # the church-enrollment source (the preset path is retired).
+        grant_call = next(
+            call for call in info.call_args_list if call.args[0] == GRANT_EVENT
+        )
+        kwargs = grant_call.kwargs
+        self.assertEqual(kwargs["context"]["source"], "church_enrollment")
         self.assertEqual(kwargs["context"]["passive"], VESSEL_KEY)
         self.assertIn(VESSEL_KEY, holder.db.skills["passive"])
 
