@@ -3,10 +3,11 @@
 The authoritative design is
 `docs/superpowers/specs/2026-09-22-church-system-design.md` (approved, five
 owner amendments baked in). The owner additionally capped every change at one
-engineer-day, so the superseded `implement-church-core` re-cut into four: this
-foundation, then enrollment / accrual / redemption, plus the already-proposed
-order-catalogue (design §8 rewritten to the six-row reality). This change ships
-the substrate with zero player-visible surface. See `proposal.md` for
+engineer-day, so the superseded `implement-church-core` re-cut into five: this
+foundation, then enrollment / accrual / redemption / combat-ministry, alongside
+the already-proposed order-catalogue (design §8 rewritten to the six-row
+reality). This change ships the substrate with zero player-visible surface. See
+`proposal.md` for
 motivation and the `church-ordination` delta spec for requirements.
 
 ## Goals / Non-Goals

@@ -1,8 +1,9 @@
 ## Why
 
 The owner capped this sub-project at eight hours (one engineer-day) per
-OpenSpec change; the superseded `implement-church-core` is re-cut into four,
-and this is its **redemption layer**: the ordination ladder itself — the
+OpenSpec change; the superseded `implement-church-core` is re-cut into five
+changes (foundation + four layers), and this is its **redemption layer**: the
+ordination ladder itself — the
 price-band finals for the 16 Series A/B/D keys, their `SKILL_REGISTRY` rows,
 the grown `REDEEM_CATALOG`, and the `church redeem` / `church merit` rail that
 makes the 「聖職敘階授予」 channel real. The ledger, rulebook gates, and

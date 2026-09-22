@@ -1,8 +1,9 @@
 ## Why
 
 The owner capped this sub-project at eight hours (one engineer-day) per
-OpenSpec change; the superseded `implement-church-core` is re-cut into four,
-and this is its **combat-ministry layer**: the two tank-making rails that make
+OpenSpec change; the superseded `implement-church-core` is re-cut into five
+changes (foundation + four layers), and this is its **combat-ministry layer**:
+the two tank-making rails that make
 the clergy loop ("舍棄防禦") actually tankable — the lamb-seal target-preference
 override built on the one new buff primitive, and the martyrdom-vow victim-pool
 filter — plus the cross-change end-to-end proof of the whole loop. The rows

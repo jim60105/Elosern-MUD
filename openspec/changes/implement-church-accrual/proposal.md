@@ -1,8 +1,9 @@
 ## Why
 
 The owner capped this sub-project at eight hours (one engineer-day) per
-OpenSpec change; the superseded `implement-church-core` is re-cut into four,
-and this is its **accrual layer**: the two merit-earning behaviours the church
+OpenSpec change; the superseded `implement-church-core` is re-cut into five
+changes (foundation + four layers), and this is its **accrual layer**: the two
+merit-earning behaviours the church
 sells its grace by — `church pray` (time cost) and `church offer` (explicit
 sexual offering judged by arousal, never affinity) — plus the
 `climax_while_enrolled` side-reaction row that makes the erotic practice itself

@@ -1,8 +1,9 @@
 ## Why
 
 The owner capped this sub-project at eight hours (one engineer-day) per
-OpenSpec change; the superseded `implement-church-core` is re-cut into four,
-and this is its **enrollment layer**: `church join` becomes the player's first
+OpenSpec change; the superseded `implement-church-core` is re-cut into five
+changes (foundation + four layers), and this is its **enrollment layer**:
+`church join` becomes the player's first
 visible contact with the church — the deterministic three-stage rite, the
 subrace/sex-gated Saintess office branch, and the unconditional vestment
 handover — plus the `violet_altoria` preset surgery and the lore/spec
