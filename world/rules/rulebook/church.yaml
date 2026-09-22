@@ -1,0 +1,84 @@
+# Light Church rulebook slice (implement-church-foundation §1/§2; design doc
+# 2026-09-22-church-system-design §4.3).
+#
+# A sectioned rule table: every row carries a unique `id` and a `section`
+# discriminator; the remaining keys are the row's data mapping, interpreted
+# by world/rules/church_rulebook.py (the loader family seam in
+# world/rules/rulebook/schema.py::load_sectioned_rules). One-row-one-test
+# correspondence applies exactly like combat_modifiers.yaml: every row id
+# below has exactly one test_rule_<id> in
+# world/rules/tests/test_church_rulebook.py (audited mechanically by
+# world/rules/tests/test_rule_id_test_correspondence.py).
+#
+# Tuning finals (decide-and-record tasks 1.1/1.2 — every downstream church
+# change prices against these; the 16-key redemption price-band final is
+# owned by implement-church-redemption):
+#   - acceptance curve: owner-pinned ordinal 0 = 50%, strictly monotonic to
+#     100% at the top ordinal (高度/極限, ordinal 4); intermediates are the
+#     proposal's 65 / 80 / 90. The loader monotonicity gate rejects any
+#     retune that breaks the invariant.
+#   - pray: 600 s duration, +40 merit, daily cap 3/day. The +1 daily-cap
+#     from the order-catalogue change's rite_morning_devotion is NOT
+#     shipped here.
+#   - accrual: pray_completed +40 (cap 3/day), offering_accepted per-row
+#     merit (values ride the OFFERING_CATALOG rows), climax_while_enrolled
+#     +10 (small).
+#   - offering copper payout: integer band 20..80, per-row overrides keyed
+#     by offering row key (empty at this stage — the seed offering rows stay
+#     inert until implement-church-accrual wires the offering rail);
+#     enrollment required.
+#   - passive_effects: the rulebook home of PASSIVE redemption-catalogue
+#     effects (Series C, order-catalogue change). Empty now; the loader's
+#     polarity gate and its one-to-one PASSIVE-row association bind rows
+#     added here.
+
+# 5 acceptance rows — NPC arousal ordinal 0..4 -> accept percent.
+- id: accept_ordinal_0
+  section: acceptance
+  ordinal: 0
+  accept_percent: 50
+- id: accept_ordinal_1
+  section: acceptance
+  ordinal: 1
+  accept_percent: 65
+- id: accept_ordinal_2
+  section: acceptance
+  ordinal: 2
+  accept_percent: 80
+- id: accept_ordinal_3
+  section: acceptance
+  ordinal: 3
+  accept_percent: 90
+- id: accept_ordinal_4
+  section: acceptance
+  ordinal: 4
+  accept_percent: 100
+
+# 1 pray row — duration seconds, merit per pray, daily cap.
+- id: pray
+  section: pray
+  duration_seconds: 600
+  merit_per_pray: 40
+  daily_cap: 3
+
+# 3 accrual rows — rulebook merit accrual values.
+- id: accrual_pray_completed
+  section: accrual
+  merit: 40
+  daily_cap: 3
+- id: accrual_offering_accepted
+  section: accrual
+  per_row: true
+- id: accrual_climax_while_enrolled
+  section: accrual
+  merit: 10
+
+# 2 offering rows — copper payout band (int copper) and the enrollment gate.
+- id: offering_payout_band
+  section: offering
+  copper_lo: 20
+  copper_hi: 80
+  overrides: {}
+- id: offering_enrollment_required
+  section: offering
+  enrollment_required: true
