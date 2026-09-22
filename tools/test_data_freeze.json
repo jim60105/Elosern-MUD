@@ -22,7 +22,7 @@
     },
     {
       "path": "world/lore/tests/test_church.py",
-      "reason": "frozen church catalogues and the derived church-place venue set"
+      "reason": "frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract"
     },
     {
       "path": "world/lore/tests/test_economy.py",
@@ -74,7 +74,7 @@
     },
     {
       "path": "world/lore/tests/test_saintess_vessel_grant.py",
-      "reason": "saintess vessel registry and preset grant contract"
+      "reason": "saintess vessel registry and enrollment grant contract"
     },
     {
       "path": "world/lore/tests/test_scene_archetypes.py",
@@ -165,6 +165,10 @@
       "reason": "buff rulebook content contract"
     },
     {
+      "path": "world/rules/tests/test_church_enrollment.py",
+      "reason": "church enrollment office and vestment handover contract"
+    },
+    {
       "path": "world/rules/tests/test_clock.py",
       "reason": "clock rulebook contract"
     },
@@ -226,7 +230,7 @@
     },
     {
       "path": "world/rules/tests/test_saintess_vessel_trickle.py",
-      "reason": "saintess vessel trickle and preset integration smoke contract"
+      "reason": "saintess vessel trickle and enrollment integration smoke contract"
     },
     {
       "path": "world/rules/tests/test_shipped_item_use_regression.py",
