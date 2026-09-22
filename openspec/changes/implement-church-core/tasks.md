@@ -1,6 +1,6 @@
 # Tasks: implement-church-core
 
-Traceability convention (verified against `tools/spec_traceability.py::_normalize_identifier` — the current slug regex is `[^\w]+` with `re.UNICODE`, so CJK SURVIVES; recompute every ID with that function, do not copy the archived CJK-stripping IDs): the exact `covers_requirement` IDs for this change's deltas are:
+Traceability convention (verified against `tools/spec_traceability.py::normalize_requirement_name` — the current slug regex is `[^\w]+` with `re.UNICODE`, so CJK SURVIVES; recompute every ID with that function, do not copy the archived CJK-stripping IDs): the exact `covers_requirement` IDs for this change's deltas are:
 
 church-ordination (new spec):
 
