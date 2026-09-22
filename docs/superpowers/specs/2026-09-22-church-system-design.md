@@ -419,13 +419,33 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 
 ## 8. Change split
 
-- `implement-church-core`: ledger + rulebook + enrollment (incl. the
-  subrace-gated vessel grant and the preset/prose edit) + pray + offering
-  + redemption engine + Series A/B/D rows (16 rows incl. lamb mark, martyr
-  vow, charge-primitive) + tests + docs trio + the §9 saintess-vessel delta.
-- `implement-church-order-catalogue`: Series C/E rows (8 pure-positive
-  passives + utility) + the clergy title group (new predicate family,
-  ladder rows, both validator faces) + their rule rows + tests.
+### 8.1 Proposed OpenSpec changes (created 2026-09-22, os-propose;
+`openspec validate --all --strict` 258/258)
+
+| # | Change key | Scope | Delta specs (requirements) | Tasks | Commits |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `implement-church-core` | `db.church` ledger + `church.yaml` (monotonicity + passive-no-negativity loader gates) + `ChurchHost` guild-style enrollment (female `human_royal` vessel grant, no uniqueness; unconditional vestment handover) + violet_altoria preset/prose deletion + pray/offer/redeem/merit + climax accrual + Series A/B/D 16 rows (charges primitive, martyr-vow pool filter) + lore realignment + docs trio | `church-ordination` (new, 16) + `saintess-vessel` (REMOVED+ADDED replacement of requirements 1+5: enrollment grant path, predicate-family extension with the global 聖女 office-name title ban reaffirmed) | 28 | `db83524a`, duck fix `f062e8b3` |
+| 2 | `implement-church-order-catalogue` | Series C (5 pure-positive passives; poverty_vow downside removed per iron rule) + Series E (3 utility) completing 24 rows + clergy title ladder (虔信者 3／修女 6／神官 10／主教 15／樞機 20, new 聖職 category) | `title-system` (ADDED 2 + MODIFIED 2 with main-spec IDs kept) + `church-ordination` (purely additive, 3) | 13 | `3c4b05b6`, duck fix `9907fd2c` |
+
+### 8.2 Implementation batch order (serial queue)
+
+1. **Batch 1 — `implement-church-core`** (apply → verify → archive+sync).
+   Hard dependency: none (consumes `settlement-place-registry` /
+   `guild-registration` / `shop-economy` verbatim; the church place kwarg
+   rides the existing authored-kwargs contract, deliberately not delta'd).
+2. **Batch 2 — `implement-church-order-catalogue`** (apply → verify →
+   archive+sync). Hard depends-on batch 1: needs `db.church.redeemed`,
+   `REDEEM_CATALOG` + the redeem rail, the `church.yaml` loader gates, and
+   the §9.2 predicate-extension sanction. Its duck-verified additive delta
+   edits none of core's ADDED requirements. Code-conflict note: it appends
+   to core-owned files (`REDEEM_CATALOG`, the clergy skill-registry block,
+   `church.yaml`) — it MUST NOT start before core is archived; the
+   title-side files it touches (`world/lore/titles.py`, the planner
+   evaluator, `web/webclient/presentation/title_codex.py`,
+   `protocol/constants.js` + its test) are owned by no other active change.
+3. Sub-project 2 (temple service economy) and sub-project 3 (confession /
+   observance commands) are separate future designs; both build on the
+   merit ledger and church-place flag that batch 1 lands.
 
 ## 9. Amendments to `openspec/specs/saintess-vessel/spec.md` (carried by
 `implement-church-core` as a delta spec)
