@@ -13,6 +13,15 @@ from ._loaders import _commerce_error, _error, _require_text
 from ._types import ServiceHostRow
 
 
+#: Closed vocabulary of PLACE-level venue flags the lore layer derives from
+#: (design 2026-09-22-church-system-design §5.1). A venue flag marks the
+#: PLACE — the church-place set derives from it in ``world/lore/church/`` —
+#: never the service host, so no profession blueprint consumes it. The
+#: dead-kwarg contract stays intact: anything OUTSIDE this closed class is
+#: still rejected as a kwarg no component consumes.
+VENUE_FLAG_KWARGS = frozenset({"church"})
+
+
 def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
     """Batch-validate the service-host roster derived from the place registry (design §3.2).
 
@@ -95,7 +104,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
                     f"component {component.type_key!r} needs authored kwargs {lacking}"
                 )
             consumed |= needed
-        dead = sorted(set(authored) - consumed)
+        dead = sorted(set(authored) - consumed - VENUE_FLAG_KWARGS)
         if dead:
             raise _error(
                 f"{what} authors kwargs {dead} that no component "

@@ -21,8 +21,21 @@ from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, Profession
 # The identity kwargs a component cannot live without. An authored service host
 # is anchored on these values; the blueprint shares only the component SHAPE, so
 # every one of them must come from authored data (design profession-import-
-# assembly D4: assembly never invents identity values).
-_IDENTITY_KWARGS = frozenset({"service_id", "shop_key", "branch_key", "dialogue_key"})
+# assembly D4: assembly never invents identity values). ``church`` (the venue
+# identity a place's ``church`` kwarg authors) and ``initial_arousal`` (the
+# authored spawn-data seed) are the ChurchHost component's identity fields —
+# blueprint-coverage consumption is how the roster validator's "a kwarg no
+# component consumes SHALL be rejected" gate admits them.
+_IDENTITY_KWARGS = frozenset(
+    {
+        "service_id",
+        "shop_key",
+        "branch_key",
+        "dialogue_key",
+        "church",
+        "initial_arousal",
+    }
+)
 
 # The availability-binding fields are ASSEMBLY-OWNED, not authored kwargs: the
 # single writer copies them from the blueprint binding plus the caller's anchor

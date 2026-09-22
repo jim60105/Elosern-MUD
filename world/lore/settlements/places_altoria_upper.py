@@ -32,8 +32,14 @@ so its rows reach the derived roster after them and before the village's.
 Merchant rows here carry a ``dialogue_key`` beside their ``shop_key``
 like every other capital merchant (merchant-dialogue); the tables live in
 ``world/lore/dialogue/altoria.py`` under the same keys. The 主祭's row is the
-capital's second ``attendant`` host — her service is conversation, so she
-authors a ``dialogue_key`` and no goods.
+capital's first ``clergy`` host (implement-church-foundation): an attendant
+blueprint plus the ChurchHost ministry capability, authored through the
+``church`` venue kwarg and the ``initial_arousal`` spawn-data seed — her
+service is conversation, so she authors a ``dialogue_key`` and no goods. The
+聖所執事's row is a plain ``merchant`` (owner decision: ministry is the
+celebrant's office alone) — she authors the ``church`` venue kwarg so the
+building stays in the derived venue set, but carries no ChurchHost and no
+arousal seed.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -58,10 +64,18 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_race="human",
         host_subrace=None,
         host_sex="female",
-        profession="attendant",
+        profession="clergy",
         service_id="altoria_high_priestess",
         assortment_keys=(),
-        authored_kwargs=(("dialogue_key", "altoria_temple"),),
+        authored_kwargs=(
+            ("dialogue_key", "altoria_temple"),
+            # implement-church-foundation: the venue joins the derived
+            # church-place set, and the host's blueprint (clergy) attaches
+            # the ChurchHost capability; the raised initial arousal is the
+            # clergy spawn-data seed (design §5.3).
+            ("church", "light_church"),
+            ("initial_arousal", "微興奮"),
+        ),
     ),
     PlaceDefinition(
         key="altoria_sanctum",
@@ -88,6 +102,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         authored_kwargs=(
             ("shop_key", "altoria_sanctum_shop"),
             ("dialogue_key", "altoria_sanctum"),
+            ("church", "light_church"),
         ),
     ),
     # 聖潔王都王宮 — the palace, host-less by decision (altoria-crown-and-watch

@@ -98,34 +98,37 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             [event.kwargs["context"]["service"] for event in merchant_events],
             merchant_service_ids,
         )
-        # Merchants report their authored shop; every attendant-profession
-        # host — the village's two (ciaran-village-commons), the upper
-        # terrace's 主祭 (altoria-sanctum) and the lane's three
-        # (altoria-hospitality) — carries no shop identity at all. The
-        # split is derived from the roster's profession key, not a literal
-        # set: the temple's 主祭 was silently leaning on the merchant branch
-        # (an attendant event passes no truthy-shop assertion).
-        attendants = {
+        # Merchants report their authored shop; every non-trading host — the
+        # village's two (ciaran-village-commons), the upper terrace's 主祭
+        # (clergy blueprint since implement-church-foundation: ministry, no
+        # trade) and the lane's three (altoria-hospitality) — carries no shop
+        # identity at all. The split is derived from the roster blueprint's
+        # components (merchant capability), not a literal set or profession
+        # key: the sanctum 執事, a plain merchant since the owner decision,
+        # reports her shop exactly like any merchant.
+        trading = {
             row.service_id
             for row in get_catalog().service_hosts
-            if row.profession.key == "attendant"
+            if any(
+                component.type_key == Merchant.name
+                for component in row.profession.components
+            )
         }
-        self.assertTrue(attendants)
-        # ...and the merchant branch it contrasts against is non-empty too,
-        # so neither predicate can pass by quantifying over nothing.
-        self.assertTrue(set(merchant_service_ids) - attendants)
+        non_trading = set(merchant_service_ids) - trading
+        self.assertTrue(trading)
+        self.assertTrue(non_trading)
         self.assertTrue(
             all(
                 event.kwargs["context"]["shop"]
                 for event in merchant_events
-                if event.kwargs["context"]["service"] not in attendants
+                if event.kwargs["context"]["service"] in trading
             )
         )
         self.assertTrue(
             all(
                 event.kwargs["context"]["shop"] is None
                 for event in merchant_events
-                if event.kwargs["context"]["service"] in attendants
+                if event.kwargs["context"]["service"] in non_trading
             )
         )
         with self.captureOnCommitCallbacks(execute=True):

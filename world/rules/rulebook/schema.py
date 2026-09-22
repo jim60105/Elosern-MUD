@@ -1,5 +1,13 @@
 """Shared declarative rule primitives for every rulebook table.
 
+``load_rules`` is the canonical rule-table loader: a YAML list of uniquely
+identified ``when``/``then`` rules evaluated through ``evaluate_condition``.
+Sections that are not condition rules — tuning tables whose rows carry
+owner-defined fields instead of a ``when``/``then`` pair — ride the same
+family through ``load_sectioned_rules``: the identical ID uniqueness and
+shape-discipline contract, with a ``section`` discriminator and an opaque
+``data`` mapping each table owner interprets. Both loaders share the same
+error vocabulary so a malformed row names itself the same way everywhere.
 The future ``sexual.yaml`` table is expected to import ``Condition``,
 ``evaluate_condition``, and ``load_rules`` rather than reimplement matching.
 Effects remain opaque to this module and are interpreted by each table owner.
@@ -31,6 +39,21 @@ class Rule:
     then: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class SectionedRule:
+    """One identified row of a sectioned rulebook table.
+
+    ``data`` is an opaque mapping (the same contract ``Rule.then`` carries)
+    interpreted exclusively by the table owner named by ``section``. Like a
+    ``Rule``, a row's identity is its unique ``id`` — the one-row-one-test
+    correspondence audit enumerates these rows.
+    """
+
+    id: str
+    section: str
+    data: dict[str, Any]
+
+
 def load_rules(path: Path) -> list[Rule]:
     """Load a YAML list of uniquely identified rules."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -52,6 +75,44 @@ def load_rules(path: Path) -> list[Rule]:
         seen.add(rule_id)
         rules.append(Rule(rule_id, dict(when), dict(then)))
     return rules
+
+
+def load_sectioned_rules(path: Path) -> list[SectionedRule]:
+    """Load a YAML list of uniquely identified sectioned rows.
+
+    Each entry is a mapping carrying a non-empty string ``id`` (unique across
+    the file) and a non-empty string ``section`` discriminator; every other
+    key becomes the row's opaque ``data`` mapping. The shape discipline — a
+    YAML list of mappings, unique non-empty ids, malformed rows naming
+    themselves — mirrors :func:`load_rules`, so a sectioned table (e.g.
+    ``church.yaml``) rides the same loader family without inventing a second
+    error vocabulary. ``data`` is deliberately not deep-frozen: it is the
+    same opaque-dict contract ``Rule.then`` already carries.
+    """
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError(f"{path}: expected a YAML list")
+    rows: list[SectionedRule] = []
+    seen: set[str] = set()
+    for position, entry in enumerate(raw, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{path}: entry {position} must be a mapping")
+        row_id = entry.get("id")
+        if not isinstance(row_id, str) or not row_id.strip():
+            raise MissingRuleIdError(f"{path}: entry {position} is missing id")
+        if row_id in seen:
+            raise DuplicateRuleIdError(f"{path}: duplicate rule id {row_id!r}")
+        section = entry.get("section")
+        if not isinstance(section, str) or not section.strip():
+            raise ValueError(f"{path}: rule {row_id!r} requires a non-empty section")
+        data = {
+            key: value
+            for key, value in entry.items()
+            if key not in ("id", "section")
+        }
+        seen.add(row_id)
+        rows.append(SectionedRule(row_id, section, data))
+    return rows
 
 
 def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
