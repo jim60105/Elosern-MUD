@@ -228,7 +228,10 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     if "church_enrolled" in when:
         if not isinstance(when["church_enrolled"], bool):
             raise ValueError("church_enrolled condition requires a boolean value")
-        # Fail closed: a missing fact (any table that does not publish it)
-        # reads as False, never as True.
-        checks.append(context.get("church_enrolled") is True)
+        # The authored boolean is honored; a missing fact (any table that does
+        # not publish it) reads as False, so ``false`` matches an unenrolled
+        # entity and ``true`` fails closed for one.
+        checks.append(
+            context.get("church_enrolled", False) is when["church_enrolled"]
+        )
     return bool(checks) and all(checks)

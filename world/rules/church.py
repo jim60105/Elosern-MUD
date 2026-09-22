@@ -500,6 +500,11 @@ def pray_step(entity: Any) -> dict[str, Any]:
     from world.rules.church_rulebook import get_church_rules
 
     rules = get_church_rules().pray
+    # The prayer's merit is the accrual row's value (design §5.2 "accrual row
+    # adds merit"); the ``pray`` section owns the duration and the daily cap.
+    accrual = get_church_rules().accrual["accrual_pray_completed"]
+    if "merit" not in accrual:
+        raise PrayerError(PrayerReason.MALFORMED_LEDGER)
     clock = get_world_clock()
     today = clock.tick // _DAY_SECONDS
     daily_block = ledger["daily"]
@@ -529,7 +534,7 @@ def pray_step(entity: Any) -> dict[str, Any]:
             clock.advance(rules.duration_seconds, AdvanceSource.COMMAND, (entity,))
 
             def _mutate(entry: dict[str, Any]) -> None:
-                entry["merit"] = int(entry["merit"]) + rules.merit_per_pray
+                entry["merit"] = int(entry["merit"]) + int(accrual["merit"])
                 daily = entry["daily"]
                 if not isinstance(daily, dict):
                     raise ChurchLedgerError("db.church daily is malformed")
@@ -539,10 +544,12 @@ def pray_step(entity: Any) -> dict[str, Any]:
                 daily["pray"] = int(daily.get("pray", 0)) + 1
 
             written = _write_ledger(entity, _mutate)
+            char_key = str(entity)
+            tick_after = clock.tick
             transaction.on_commit(
                 lambda: log_info(
                     "church_pray",
-                    context={"char": str(entity), "tick": clock.tick},
+                    context={"char": char_key, "tick": tick_after},
                 )
             )
     except Exception:
@@ -599,13 +606,17 @@ def offering_menu(entity: Any) -> tuple[OfferingRow, ...]:
 def _offering_copper(row: OfferingRow) -> int:
     """Resolve one offering row's integer copper payout.
 
-    A per-row override wins; otherwise the payout is a deterministic function
-    of one injected ``roll_d100`` inside the configured band (integer copper,
-    both band edges reachable). The override map and the band both ride the
-    rulebook slice, never a code-side constant.
+    Precedence: the row's own ``copper`` override (``OfferingRow.copper`` —
+    ``None`` defers), then the rulebook's per-row override map, then a
+    deterministic function of one injected ``roll_d100`` inside the
+    configured band (integer copper, both band edges reachable). The tuning
+    numbers ride the catalogue rows and the rulebook slice, never a code-side
+    constant.
     """
     from world.rules.church_rulebook import get_church_rules
 
+    if row.copper is not None:
+        return int(row.copper)
     config = get_church_rules().offering
     override = config.overrides.get(row.key)
     if override is not None:
@@ -641,6 +652,36 @@ def _snapshot_offering_state(
         attributes[("quest_log", None)] = snapshot_quest_log(entity)
         snapshots[id(entity)] = (entity, attributes)
     return snapshots
+
+
+def _stored_arousal_ordinal(entity: Any) -> int:
+    """Read an entity's arousal ordinal without creating any state.
+
+    The offering consent read must stay write-free: ``entity.sexual`` is a
+    lazy property whose first access persists the materialized traits, which
+    would break the decline's zero-write promise and the accepted offer's
+    all-or-nothing rollback. The no-create pattern (combat-modifier condition
+    contexts) derives the ordinal from the stored pleasure counter; a
+    never-materialized entity falls back to its authored ``db.sexual``
+    baseline label, then to the generic floor (ordinal 0).
+    """
+    from world.rules.combat_modifiers import _stored_sexual_level
+
+    stored = _stored_sexual_level(entity, "arousal")
+    if stored is not None:
+        return int(stored.value)
+    db = getattr(entity, "db", None)
+    baseline = getattr(db, "sexual", None) if db is not None else None
+    if isinstance(baseline, dict) and isinstance(baseline.get("arousal"), str):
+        try:
+            from world.rules.sexual_state.pleasure import PLEASURE_CONFIG
+
+            return PLEASURE_CONFIG.ordinal_for(
+                PLEASURE_CONFIG.floor_for_level(baseline["arousal"])
+            )
+        except Exception:  # observability: ignore R2: a malformed authored baseline fails the consent read closed (ordinal 0)
+            return 0
+    return 0
 
 
 def _restore_offering_surfaces(
@@ -690,18 +731,21 @@ def offer_step(entity: Any, npc: Any, row_key: str) -> dict[str, Any]:
 
     from world.rules.church_rulebook import get_church_rules
 
-    ordinal = int(npc.sexual.arousal.value)
+    ordinal = _stored_arousal_ordinal(npc)
     accept_percent = get_church_rules().acceptance[ordinal][1]
     roll = roll_d100()
     if roll > accept_percent:
+        char_key = str(entity)
+        npc_key = str(npc)
+        row_key_value = row.key
         with transaction.atomic():
             transaction.on_commit(
                 lambda: log_info(
                     "church_offering_declined",
                     context={
-                        "char": str(entity),
-                        "npc": str(npc),
-                        "row": row.key,
+                        "char": char_key,
+                        "npc": npc_key,
+                        "row": row_key_value,
                     },
                 )
             )
@@ -752,13 +796,16 @@ def offer_step(entity: Any, npc: Any, row_key: str) -> dict[str, Any]:
                 "wallet",
                 int(getattr(entity.db, "wallet", None) or 0) + copper,
             )
+            char_key = str(entity)
+            npc_key = str(npc)
+            row_key_value = row.key
             transaction.on_commit(
                 lambda: log_info(
                     "church_offering_accepted",
                     context={
-                        "char": str(entity),
-                        "npc": str(npc),
-                        "row": row.key,
+                        "char": char_key,
+                        "npc": npc_key,
+                        "row": row_key_value,
                     },
                 )
             )

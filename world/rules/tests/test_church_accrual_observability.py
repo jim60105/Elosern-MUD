@@ -12,6 +12,8 @@ live menu, never literal shipped content.
 
 from unittest.mock import patch
 
+from django.db import transaction
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
@@ -165,6 +167,39 @@ class ChurchAccrualRollbackSilenceTests(ChurchAccrualObservabilityBase):
             self.assertRaises(RuntimeError),
         ):
             church.offer_step(self.char1, self.recipient, self._row_key())
+        self.assertEqual(self._events(info), [])
+
+    @covers_requirement(
+        "church-ordination::the-accrual-paths-are-offline-deterministic-with-commit-bound-observability"
+    )
+    def test_a_rolled_back_decline_emits_nothing(self):
+        # The decline registers its event inside its own empty atomic; a
+        # caller's outer rollback must discard that registration too.
+        self.recipient.sexual.pleasure.base = 0
+        with (
+            patch("world.rules.church.roll_d100", return_value=99),
+            patch("world.rules.church.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with transaction.atomic():
+                result = church.offer_step(
+                    self.char1, self.recipient, self._row_key()
+                )
+                self.assertEqual(result["outcome"], "declined")
+                transaction.set_rollback(True)
+        self.assertEqual(self._events(info), [])
+
+    @covers_requirement(
+        "church-ordination::the-accrual-paths-are-offline-deterministic-with-commit-bound-observability"
+    )
+    def test_a_rolled_back_prayer_emits_nothing_from_an_ambient_wrapper(self):
+        with (
+            patch("world.rules.church.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with transaction.atomic():
+                church.pray_step(self.char1)
+                transaction.set_rollback(True)
         self.assertEqual(self._events(info), [])
 
 

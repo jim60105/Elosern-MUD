@@ -89,6 +89,70 @@ def _holder(hp=100, max_hp=None, owned=(_T_RENEWAL_KEY,)):
     return entity
 
 
+class ChurchEnrolledConditionTests(unittest.TestCase):
+    """The ``church_enrolled`` boolean fact honors its authored value."""
+
+    def test_evaluate_condition_honors_the_authored_boolean(self):
+        from world.rules.rulebook.schema import evaluate_condition
+
+        self.assertTrue(evaluate_condition({"church_enrolled": False}, {}))
+        self.assertFalse(evaluate_condition({"church_enrolled": True}, {}))
+        self.assertTrue(
+            evaluate_condition(
+                {"church_enrolled": True}, {"church_enrolled": True}
+            )
+        )
+        self.assertTrue(
+            evaluate_condition(
+                {"church_enrolled": False}, {"church_enrolled": False}
+            )
+        )
+        self.assertFalse(
+            evaluate_condition(
+                {"church_enrolled": True}, {"church_enrolled": False}
+            )
+        )
+        self.assertFalse(
+            evaluate_condition(
+                {"church_enrolled": False}, {"church_enrolled": True}
+            )
+        )
+
+    def test_rail_validator_rejects_malformed_church_enrolled_and_merit_gain(self):
+        bad_rows = (
+            Rule(
+                id="t_bad_enrolled_value",
+                when={
+                    "field": "climax_phase",
+                    "equals": "進行中",
+                    "church_enrolled": "yes",
+                },
+                then={"merit_gain": "accrual_climax_while_enrolled"},
+            ),
+            Rule(
+                id="t_unknown_accrual_row",
+                when={
+                    "field": "climax_phase",
+                    "equals": "進行中",
+                    "church_enrolled": True,
+                },
+                then={"merit_gain": "t_no_such_accrual"},
+            ),
+            Rule(
+                id="t_event_conditioned_merit",
+                when={
+                    "event": "physical_hit",
+                    "church_enrolled": True,
+                },
+                then={"merit_gain": "accrual_climax_while_enrolled"},
+            ),
+        )
+        for row in bad_rows:
+            with self.subTest(row=row.id):
+                with self.assertRaises(ValueError):
+                    validate_state_reaction_rules([row])
+
+
 # ---------------------------------------------------------------------------
 # 2.1 Loader: the self-recovery fraction is validated fail-closed
 # ---------------------------------------------------------------------------

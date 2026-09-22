@@ -12,6 +12,7 @@ synthetic catalogue rows carry ``t_`` keys.
 """
 
 from copy import deepcopy
+from dataclasses import replace
 from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
@@ -119,6 +120,7 @@ class ChurchPrayTests(ChurchAccrualBase):
     )
     def test_a_prayer_spends_time_and_earns_merit(self):
         rules = get_church_rules().pray
+        accrual = get_church_rules().accrual["accrual_pray_completed"]
         before = church.merit(self.char1)
         with (
             patch("world.rules.church.log_info") as info,
@@ -127,12 +129,36 @@ class ChurchPrayTests(ChurchAccrualBase):
             result = church.pray_step(self.char1)
         self.assertEqual(result["outcome"], "prayed")
         self.assertEqual(result["tick"], rules.duration_seconds)
-        self.assertEqual(church.merit(self.char1), before + rules.merit_per_pray)
+        self.assertEqual(church.merit(self.char1), before + int(accrual["merit"]))
         self.assertEqual(church.daily(self.char1), {"day": 0, "pray": 1})
         (event,), kwargs = info.call_args
         self.assertEqual(event, "church_pray")
         self.assertEqual(kwargs["context"]["char"], str(self.char1))
         self.assertEqual(kwargs["context"]["tick"], rules.duration_seconds)
+
+    @covers_requirement(
+        "church-ordination::prayer-is-a-time-costed-capped-venue-bound-accrual"
+    )
+    def test_prayer_credits_the_accrual_row_as_the_authority(self):
+        # The delta requires prayer to apply the ``pray_completed`` accrual
+        # row; a divergence between the pray section and the accrual row must
+        # resolve in the accrual row's favour.
+        rules = get_church_rules()
+        divergent = replace(
+            rules,
+            accrual={
+                **rules.accrual,
+                "accrual_pray_completed": {"merit": 7, "daily_cap": 3},
+            },
+        )
+        before = church.merit(self.char1)
+        with patch(
+            "world.rules.church_rulebook.get_church_rules", return_value=divergent
+        ):
+            result = church.pray_step(self.char1)
+        self.assertEqual(result["outcome"], "prayed")
+        self.assertEqual(church.merit(self.char1), before + 7)
+        self.assertEqual(result["tick"], rules.pray.duration_seconds)
 
     @covers_requirement(
         "church-ordination::prayer-is-a-time-costed-capped-venue-bound-accrual"
@@ -430,6 +456,98 @@ class ChurchOfferingSettlementTests(ChurchAccrualBase):
     @covers_requirement(
         "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
     )
+    def test_a_partner_offering_forwards_the_npc_and_runs_both_bodies(self):
+        row = next(
+            candidate
+            for candidate in OFFERING_CATALOG
+            if candidate.act_key == "partner_caress"
+        )
+        self._set_ordinal(self.recipient, 4)
+        duo_before = self.recipient.sexual.duo_act_count
+        with (
+            patch("world.rules.church.roll_d100", return_value=10),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+            patch("world.rules.church.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = church.offer_step(self.char1, self.recipient, row.key)
+        self.assertEqual(result["outcome"], "accepted")
+        self.assertEqual(self._events(info), ["church_offering_accepted"])
+        # The pipeline forwarded the NPC as the act target: her pair counter
+        # ran (a participant rail), and the actor's pleasure rail ran too.
+        self.assertEqual(self.recipient.sexual.duo_act_count, duo_before + 1)
+        self.assertGreater(self.char1.sexual.pleasure.base, 0)
+
+    @covers_requirement(
+        "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
+    )
+    def test_offering_a_partner_act_to_oneself_is_rejected(self):
+        row = next(
+            candidate
+            for candidate in OFFERING_CATALOG
+            if candidate.act_key == "partner_caress"
+        )
+        with (
+            patch("world.rules.church.roll_d100", return_value=10),
+        ):
+            with self.assertRaises(OfferingError) as caught:
+                church.offer_step(self.char1, self.char1, row.key)
+        self.assertEqual(caught.exception.args[0], OfferingReason.ACT_REJECTED)
+
+    @covers_requirement(
+        "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
+    )
+    def test_the_payout_respects_band_edges_overrides_and_row_copper(self):
+        from contextlib import ExitStack
+
+        from world.rules.church_rulebook import OfferingConfig
+
+        def _accept(row_key, roll, rules=None):
+            self._set_ordinal(self.recipient, 4)
+            patchers = [patch("world.rules.church.roll_d100", return_value=roll)]
+            if rules is not None:
+                patchers.append(
+                    patch("world.rules.church_rulebook.get_church_rules", return_value=rules)
+                )
+            with ExitStack() as stack:
+                for patcher in patchers:
+                    stack.enter_context(patcher)
+                with self.captureOnCommitCallbacks(execute=True):
+                    return church.offer_step(self.char1, self.recipient, row_key)
+
+        base = get_church_rules()
+        row_key = self._first_row_key()
+        result = _accept(row_key, 1)
+        self.assertEqual(result["copper"], base.offering.copper_lo)
+        result = _accept(row_key, 100)
+        self.assertEqual(result["copper"], base.offering.copper_hi)
+        overridden = replace(
+            base,
+            offering=OfferingConfig(
+                copper_lo=base.offering.copper_lo,
+                copper_hi=base.offering.copper_hi,
+                overrides={row_key: {"copper": 77}},
+                enrollment_required=True,
+            ),
+        )
+        result = _accept(row_key, 1, rules=overridden)
+        self.assertEqual(result["copper"], 77)
+        # A catalogue row's own copper override wins over everything.
+        capped = OfferingRow(
+            key="offering_t_nine",
+            act_key="solo_self_touch",
+            merit=1,
+            copper=9,
+        )
+        with patch(
+            "world.rules.church.OFFERING_CATALOG", OFFERING_CATALOG + (capped,)
+        ):
+            result = _accept("offering_t_nine", 100)
+        self.assertEqual(result["copper"], 9)
+
+    @covers_requirement(
+        "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
+    )
     def test_a_rolled_back_acceptance_leaves_both_bodies_byte_identical(self):
         real_write = church._write_ledger
 
@@ -448,6 +566,7 @@ class ChurchOfferingSettlementTests(ChurchAccrualBase):
         with (
             patch("world.rules.church._write_ledger", side_effect=write_then_raise),
             patch("world.rules.church.roll_d100", return_value=10),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
             patch("world.rules.church.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
             self.assertRaises(RuntimeError),
@@ -463,6 +582,62 @@ class ChurchOfferingSettlementTests(ChurchAccrualBase):
             "the act's rails rolled back on the NPC body",
         )
         self.assertEqual(self.recipient.sexual.pleasure.base, npc_pleasure_cached)
+        self.assertEqual(self._events(info), [])
+
+    @covers_requirement(
+        "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
+    )
+    def test_a_declined_offer_never_materializes_the_npc(self):
+        # A never-touched NPC carries no state at all; the consent read and
+        # the decline must not create any — the zero-write promise is
+        # byte-level, so even the sexual-handler materialization is a write.
+        pristine = create_object(NPC, key="t_pristine_recipient", location=self.hall)
+        row_key = self._first_row_key()
+        ledger_before = deepcopy(church.read_ledger(self.char1))
+        keys_before = self._persisted_attribute_keys(pristine)
+        with (
+            patch("world.rules.church.roll_d100", return_value=99),
+            patch("world.rules.church.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = church.offer_step(self.char1, pristine, row_key)
+        self.assertEqual(result["outcome"], "declined")
+        self.assertEqual(self._events(info), ["church_offering_declined"])
+        self.assertEqual(church.read_ledger(self.char1), ledger_before)
+        self.assertEqual(self._persisted_attribute_keys(pristine), keys_before)
+        for key in ("sexual_traits", "virgin", "experience_types"):
+            self.assertNotIn(key, keys_before)
+
+    @covers_requirement(
+        "church-ordination::sexual-offering-is-explicit-selection-ministry-gated-on-the-npc-s-arousal-never-affinity"
+    )
+    def test_a_rolled_back_accept_restores_the_npc_s_absence(self):
+        real_write = church._write_ledger
+
+        def write_then_raise(entity, mutate):
+            real_write(entity, mutate)
+            raise RuntimeError("simulated post-settlement offering failure")
+
+        pristine = create_object(NPC, key="t_pristine_accept", location=self.hall)
+        pristine.race = "human"
+        pristine.apply_race_baseline()
+        row = next(
+            candidate
+            for candidate in OFFERING_CATALOG
+            if candidate.act_key == "partner_caress"
+        )
+        keys_before = self._persisted_attribute_keys(pristine)
+        with (
+            patch("world.rules.church._write_ledger", side_effect=write_then_raise),
+            patch("world.rules.church.roll_d100", return_value=10),
+            patch("world.rules.church.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+            self.assertRaises(RuntimeError),
+        ):
+            church.offer_step(self.char1, pristine, row.key)
+        self.assertEqual(self._persisted_attribute_keys(pristine), keys_before)
+        for key in ("sexual_traits", "virgin", "experience_types"):
+            self.assertNotIn(key, keys_before)
         self.assertEqual(self._events(info), [])
 
     @covers_requirement(
