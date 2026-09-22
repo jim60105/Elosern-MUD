@@ -3,6 +3,10 @@
 Date: 2026-09-22
 Status: approved by the project owner in a brainstorming session (sections 1-6,
 final decisions below)
+Amended 2026-09-22 (owner, post-review): subrace-gated saintess grant at
+enrollment (vessel removed from the preset), clergy title group behind a new
+count predicate family, and the saintess-vessel spec amendments they carry
+(sections 5.1/5.9 and 9).
 Change split: see §8 — the 24-row catalogue alone exceeds the one-workday
 convention, so implementation ships as two OpenSpec changes
 (`implement-church-core`: ledger + enrollment + pray + offering + redemption
@@ -133,7 +137,8 @@ correspondence gate applies like `combat_modifiers.yaml`:
 
 ## 5. Mechanics
 
-### 5.1 Enrollment (owner decision: guild-style dialogue, deterministic core)
+### 5.1 Enrollment (owner decision: guild-style dialogue, deterministic core;
+amended: subrace-gated office grant)
 
 Modeled byte-shape-wise on guild registration (`commands/guild.py`):
 
@@ -147,10 +152,51 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
 3. `enroll` creates the ledger, stamps `enrolled_tick`, and emits
    `church_enrolled` via `transaction.on_commit` (facade `log_info`).
    Re-enrollment is a stable rejection ("你已屬光明教會").
+4. **Subrace branch (owner decision, amendment):** an enroller whose subrace
+   is `human_royal` is additionally granted `saintess_vessel` through the
+   canonical granted-passive write path inside the same enrollment
+   transaction, emitting the existing `saintess_vessel_granted` event. Every
+   other enroller becomes a sister (nun) with the plain ledger — no skill is
+   granted at enrollment for anyone else; the clergy passives stay
+   redemption purchases. The vessel is deliberately NOT a redemption
+   catalogue row: it is a blood office the church recognizes at enrollment,
+   never purchasable. Consequences, all recorded: trickle/decay-floor/
+   ceremonial reads arm only from ownership, so the princess becomes
+   functionally saintess exactly at her church visit; custom-created
+   `human_royal` characters also qualify (the engine tracks no global
+   one-per-generation office state — the lore singleton stays narrative,
+   owner-accepted); the oath flag machinery is untouched (it already reads
+   vessel ownership).
+5. **Preset change (same change):** `violet_altoria.passive_skills` drops
+   `saintess_vessel`; the vessel-bearing starter becomes a royal princess
+   awaiting consecration. Persona/life-story prose is realigned in the same
+   change (public identity 「聖女」→「聖女繼承人」; the 8-year-old
+   consecration line becomes succession designation). `saintess_vestments`
+   stays as a carried starter item. All preset data-contract tests follow.
 
 `pray` requires an existing ledger (the unenrolled are told to speak with
 the celebrant). Church venues: places whose authored kwargs carry a `church`
 flag (derived set in the lore package, same pattern as `shop_key`).
+
+### 5.9 Clergy title group (owner decision, amendment)
+
+A fixed-title family in the existing title system (`world/lore/titles.py`
+`FixedTitleDef`: declarative predicate families, auto-unlock + equip only,
+display-only — the owner pins these titles as usable by NO other system as a
+prerequisite, which matches the title system's existing nature). Modeled on
+how guild-rank titles ride the `guild_rank_reached` family:
+
+- New predicate family `church_skills_redeemed` → parameter: an integer
+  threshold. It evaluates `len(db.church.redeemed)` (the redeemed count
+  only; `saintess_vessel` is never in `redeemed` and never counted).
+- Title ladder (displays zh, thresholds tuning): 虔信者 3 ／ 修女 6 ／
+  神官 10 ／ 主教 15 ／ 樞機 20. **No church title may display 聖女** — the
+  office stays prose per the saintess-vessel spec (reaffirmed, see §9).
+- Touch surfaces (all enumerated, none optional): the family enum +
+  `TitlePredicate` parameter face + the `predicate_satisfied` evaluator; the
+  fixed-title registry loader validation; the closed codex `category` set in
+  Python AND its `titles.js` panel-validator mirror (both sides, same
+  change); one-row-one-test registry tests; codex panel tests.
 
 ### 5.2 Prayer (`church pray`)
 
@@ -315,6 +361,13 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
   skills untouched; declined offering writes nothing.
 - Byte-identical baselines: unenrolled climax accrual; no-seal monster
   decisions; no-martyr violation pool.
+- Enrollment office test: a `human_royal` enrollment grants the vessel and
+  emits `saintess_vessel_granted` exactly once inside one transaction; any
+  other subrace does not; re-enrollment re-grants nothing; the preset no
+  longer carries the vessel; the trickle stays disarmed before enrollment.
+- Title tests: threshold boundaries (redeemed count exactly at/under each
+  ladder rung); the vessel is never counted; no church fixed-title row
+  displays 聖女 (registry data-contract gate).
 - Iron-rule gate: loader rejects negative-polarity passive rows; data
   contract test over shipped rows asserts every church PASSIVE's rule rows
   are positive polarity only.
@@ -330,11 +383,31 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 
 ## 8. Change split
 
-- `implement-church-core`: ledger + rulebook + enrollment + pray + offering
+- `implement-church-core`: ledger + rulebook + enrollment (incl. the
+  subrace-gated vessel grant and the preset/prose edit) + pray + offering
   + redemption engine + Series A/B/D rows (16 rows incl. lamb mark, martyr
-  vow, charge-primitive) + tests + docs trio.
+  vow, charge-primitive) + tests + docs trio + the §9 saintess-vessel delta.
 - `implement-church-order-catalogue`: Series C/E rows (8 pure-positive
-  passives + utility) + their rule rows + tests.
+  passives + utility) + the clergy title group (new predicate family,
+  ladder rows, both validator faces) + their rule rows + tests.
+
+## 9. Amendments to `openspec/specs/saintess-vessel/spec.md` (carried by
+`implement-church-core` as a delta spec)
+
+1. **Grant path:** the vessel stops being preset-initial state; the sole
+   acquisition channel becomes church enrollment by a `human_royal`
+   character. The PASSIVE practice/unlock/conferral guards, the
+   granted-only character, and the granted-event observability requirement
+   are unchanged (the enrollment transaction reuses the same write path and
+   the same `saintess_vessel_granted` event; the preset-activation grant
+   scenario is replaced, not duplicated).
+2. **Title invariants:** the no-title-state decision, the byte-identical
+   `title_collection`/`title_equipped` oath-flip scenario, and the ban on
+   any fixed-title row naming the 聖女 office are all reaffirmed. The
+   `TitlePredicateFamily` closed set is extended with the church redemption
+   count family (a count of redeemed catalogue skills, which by
+   construction can never reference the vessel); the extension is what this
+   delta amends, the office-name ban is not.
 
 Sub-project 2 (temple service economy: paid heal/purify services, donation
 economy) and sub-project 3 (confession and the wider observance command set)
