@@ -150,6 +150,32 @@ class ChurchPlaceDerivationTests(TestCase):
         # The canonical identity itself names the church the venue belongs to.
         self.assertEqual(CHURCH_VENUE_KEY, "light_church")
 
+    @covers_requirement(
+        "church-ordination::church-venues-and-clergy-hosts-exist-as-authored-content"
+    )
+    def test_a_duplicate_church_flag_on_one_place_fails_closed(self):
+        # The delta's fail-closed rule covers DUPLICATE authoring too: a place
+        # listing the flag twice must raise regardless of whether the two
+        # values agree — dict() would silently keep the last one.
+        temple = PLACE_REGISTRY["altoria_temple"]
+        for pairs in (
+            (("church", "light_church"), ("church", "light_church")),
+            (("church", "dark_church"), ("church", "light_church")),
+            (("church", "light_church"), ("church", "dark_church")),
+        ):
+            with self.subTest(pairs=pairs):
+                duplicate = replace(
+                    temple,
+                    key="t_duplicate_church_place",
+                    service_id="t_duplicate_church_place",
+                    authored_kwargs=pairs,
+                )
+                with patch.dict(
+                    PLACE_REGISTRY, {"t_duplicate_church_place": duplicate}
+                ):
+                    with self.assertRaisesRegex(ValueError, "more than once"):
+                        resolve_church_place_keys()
+
 
 if __name__ == "__main__":
     import unittest

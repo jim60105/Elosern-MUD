@@ -189,6 +189,8 @@ class ChurchTuningTests(TestCase):
 
     def test_rule_offering_payout_band(self):
         offering = get_church_rules().offering
+        # The decided payout final (task 1.2): the integer band 20..80.
+        self.assertEqual((offering.copper_lo, offering.copper_hi), (20, 80))
         self.assertLessEqual(offering.copper_lo, offering.copper_hi)
         self.assertIsInstance(offering.copper_lo, int)
         self.assertIsInstance(offering.copper_hi, int)
@@ -344,6 +346,16 @@ class PassivePolarityGateTests(TestCase):
             validate_passive_polarity(
                 self._catalogue(self._passive()),
                 [self._effect(effects={"multiplier": 0.5})],
+            )
+        with self.assertRaisesRegex(ChurchRulebookError, "multiplier"):
+            validate_passive_polarity(
+                self._catalogue(self._passive()),
+                [self._effect(effects={"multiplier": float("nan")})],
+            )
+        with self.assertRaisesRegex(ChurchRulebookError, "multiplier"):
+            validate_passive_polarity(
+                self._catalogue(self._passive()),
+                [self._effect(effects={"multiplier": float("inf")})],
             )
         validate_passive_polarity(
             self._catalogue(self._passive()),

@@ -26,6 +26,7 @@ No gameplay mechanic consumes these numbers here: the accrual and redemption
 changes read this snapshot through the same import.
 """
 
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -237,11 +238,11 @@ def _classify_passive_effects(
                     row_id,
                     f"passive row {skill_key!r}: multiplier must be a number",
                 )
-            if value < 1.0:
+            if not math.isfinite(value) or value < 1.0:
                 raise _error(
                     row_id,
-                    f"passive row {skill_key!r}: multiplier {value} is below "
-                    "1.0 and worsens baseline",
+                    f"passive row {skill_key!r}: multiplier {value} must be "
+                    "finite and at least 1.0",
                 )
         elif effect_key == "mitigation":
             _validate_mitigation(row_id, skill_key, value)

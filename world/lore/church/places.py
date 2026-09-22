@@ -19,14 +19,18 @@ def _derive_church_place_keys() -> tuple[str, ...]:
     """Project the church venue set from place-authored kwargs, fail-closed."""
     keys: list[str] = []
     for place in PLACE_REGISTRY.values():
-        authored = dict(place.authored_kwargs)
-        flag = authored.get("church")
+        flag: str | None = None
+        for key, value in place.authored_kwargs:
+            if key != "church":
+                continue
+            if flag is not None:
+                raise ValueError(
+                    f"place {place.key!r} authors the church kwarg more than "
+                    "once; a duplicate flag is conflicting authoring"
+                )
+            flag = value
         if flag is None:
             continue
-        if place.key in keys:
-            raise ValueError(
-                f"place {place.key!r} is flagged church more than once"
-            )
         if flag != CHURCH_VENUE_KEY:
             raise ValueError(
                 f"place {place.key!r} authors church kwarg {flag!r}, "
