@@ -116,6 +116,10 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "公會（需已註冊冒險者）",
     },
     "guild exam": {"syntax": "guild exam [<rank>]", "context": "公會（需當地考核官）"},
+    "church join": {
+        "syntax": "church join",
+        "context": "教會（需當地教會神職人員）",
+    },
     "shop stock": {"syntax": "shop stock", "context": "經濟（需當地商人）"},
     "buy": {"syntax": "buy <item_key> [數量]", "context": "經濟（需當地商人）"},
     "sell": {"syntax": "sell <item_key> [數量]", "context": "經濟（需當地商人）"},
@@ -440,6 +444,25 @@ class CommandDocsContractTests(unittest.TestCase):
         # The overview link set gains exactly the delivery fragment.
         self.assertEqual(overview["交付"], "交付")
 
+    @covers_requirement(
+        "church-ordination::the-church-join-command-is-documented-in-the-docs-trio"
+    )
+    def test_church_join_entry_is_documented(self):
+        entry = self.entries["church join"]
+        self.assertEqual(entry["指令"], "church join")
+        self.assertEqual(parse_aliases(entry["別名"]), {"入教", "洗禮"})
+        self.assertEqual(
+            entry["語法"].replace("`", ""),
+            EXPECTED_COMMANDS["church join"]["syntax"],
+        )
+        self.assertEqual(
+            entry["情境"], EXPECTED_COMMANDS["church join"]["context"]
+        )
+        self.assertIn("教會", entry["說明"])
+        self.assertIn("已入教者會被拒絕", entry["說明"])
+        overview = parse_overview_links(self.overview)
+        self.assertEqual(overview["church join"], "church-join")
+
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_persona_command_family_is_documented(self):
         # The four persona prose commands are canonical entries covering the
@@ -747,6 +770,7 @@ class CommandDocsContractTests(unittest.TestCase):
             "戰鬥",
             "技能施放",
             "公會",
+            "教會",
             "經濟",
             "角色建立",
             "管理員",

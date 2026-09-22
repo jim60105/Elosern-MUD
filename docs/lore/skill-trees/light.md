@@ -180,7 +180,7 @@ pleasure_gain = floor(140 × 該次 HP 損失 ÷ 最大 HP)
 
 ## 與相鄰系統的接縫
 
-- **聖女（容器）**：光明教會的聖女是王室每代獻任的公主，本樹「高潮即峰值」設計的職位化身。修女走施予面，聖女走領受面，她的 `blessed_climax`（天賜高潮）公開行使即「傾湧」祝福奇蹟，`bliss_apotheosis` 的高潮滿值條款在她身上是職務而非祕密。聖女的誓約即引擎的 `virgin` 旗標（`rulebook/sexual.yaml`），由 `first_vaginal_penetration` 單向翻轉、頭銜隨之移交。聖女機制不需要任何新增判定，全部讀既有狀態。〔提案〕被動 `saintess_vessel`（劇情授予，非系譜節點）：聖光涓流讓持有者的興奮常駐微興奮～中等浮動，公開祝福儀式按 `sanctified_ward`（聖光庇護陣）／女神降福的儀典縮寫施展並額外讀取興奮階數；落地前聖女一律按聖職者規則運作。
+- **聖女（容器）**：光明教會的聖女是入教儀式中祝聖的容器職位——任何女性王族後裔獻與教會、於入教時接任，聖女並非每代唯一的職位。修女走施予面，聖女走領受面，她的 `blessed_climax`（天賜高潮）公開行使即「傾湧」祝福奇蹟，`bliss_apotheosis` 的高潮滿值條款在她身上是職務而非祕密。聖女的誓約即引擎的 `virgin` 旗標（`rulebook/sexual.yaml`），由 `first_vaginal_penetration` 單向翻轉、誓約自此斷絕；誓言斷絕不會動用任何頭銜狀態——聖女是以敘事身分閱讀的散文，不是固定頭銜（見聖女容器規格的頭銜禁令）。〔已實作〕被動 `saintess_vessel`（入教授予，非系譜節點）：持有者於入教儀式受授（每位入教的女性王族後裔皆得，無唯一性），聖光涓流讓持有者的興奮常駐微興奮～中等浮動，公開祝福儀式按 `sanctified_ward`（聖光庇護陣）／女神降福的儀典縮寫施展並額外讀取興奮階數。
 
 - **情慾秘術**（見 [情慾秘術分類定位](/lore/skill-trees/sexual-act)）：情慾秘術走 SEXUAL_ACT_REGISTRY 的獨立計數器解鎖，本樹走熟練度系譜，兩軸獨立但共享同一套興奮／高潮期相狀態。教會聖所「邊做愛邊治療」的傳統就是兩條軸線在實務上的疊合。
 - **戰鬥中性行為／性高潮系統**：性行為在戰鬥中可執行（pleasure／sexual_counter／sexual_event 等效果字串走既有 action 管線，性脅迫掃描同時覆蓋戰內戰外）；高潮的延長與結束由世界時鐘的 `climax_settlement_action` 結算。`blessed_climax` 完全複用這條管線：觸發（強制 pleasure 推進，同 `divine_pleasure_max` 路徑）、鎖定（combat modifier）、解除（climax_ends → 餘韻）都是現成機制，無需新增狀態。

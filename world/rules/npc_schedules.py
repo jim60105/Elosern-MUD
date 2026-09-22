@@ -59,7 +59,9 @@ _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 _ENTRY_FIELDS = frozenset({"tick_offset", "kind", "target", "state"})
 _KINDS = ("move", "state")
 _BLOCKING_STATES = frozenset({"busy", "resting"})
-_INTERACTION_KINDS = frozenset({"talk", "engage", "service_shop", "service_guild"})
+_INTERACTION_KINDS = frozenset(
+    {"talk", "engage", "service_shop", "service_guild", "service_church"}
+)
 SCHEDULE_BLOCKED_REASON = "她現在正忙著，沒有理會你。"
 
 
@@ -637,8 +639,9 @@ def interaction_reason(npc: Any, interaction_kind: str) -> str | None:
     state value -- or no schedule at all -- never blocks. The state is read
     defensively (an NPC without the attribute reads as unblocked), and the
     kind vocabulary is the enumerated surface contract (``talk``, ``engage``,
-    ``service_shop``, ``service_guild``); an unknown kind raises so a caller
-    typo fails loudly instead of silently opening a gate bypass.
+    ``service_shop``, ``service_guild``, ``service_church``); an unknown kind
+    raises so a caller typo fails loudly instead of silently opening a gate
+    bypass.
     """
     if interaction_kind not in _INTERACTION_KINDS:
         raise ScheduleError(f"unknown interaction kind {interaction_kind!r}")

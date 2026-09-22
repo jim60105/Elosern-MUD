@@ -60,7 +60,7 @@ class SaintessOathObservabilityTests(EvenniaTest):
         return [call.args[0] for call in info_mock.call_args_list if call.args]
 
     @covers_requirement(
-        "saintess-vessel::the-oath-flip-and-vessel-grant-are-observable-through-the-facade-without-title-state"
+        "saintess-vessel::the-oath-flip-stays-observable-through-the-facade-and-the-office-name-title-ban-holds"
     )
     def test_holder_flip_emits_exactly_one_oath_event_at_commit(self):
         holder = self._holder()
@@ -102,7 +102,7 @@ class SaintessOathObservabilityTests(EvenniaTest):
         self.assertNotIn(OATH_EVENT, self._events(info2))
 
     @covers_requirement(
-        "saintess-vessel::the-oath-flip-and-vessel-grant-are-observable-through-the-facade-without-title-state"
+        "saintess-vessel::the-oath-flip-stays-observable-through-the-facade-and-the-office-name-title-ban-holds"
     )
     def test_rolled_back_flip_emits_no_oath_event(self):
         holder = self._holder()
@@ -131,7 +131,7 @@ class SaintessOathObservabilityTests(EvenniaTest):
         self.assertNotIn(OATH_EVENT, self._events(info))
 
     @covers_requirement(
-        "saintess-vessel::the-oath-flip-and-vessel-grant-are-observable-through-the-facade-without-title-state"
+        "saintess-vessel::the-oath-flip-stays-observable-through-the-facade-and-the-office-name-title-ban-holds"
     )
     def test_title_system_is_untouched_by_the_capability(self):
         families_before = frozenset(TitlePredicateFamily)
@@ -141,6 +141,11 @@ class SaintessOathObservabilityTests(EvenniaTest):
             apply_event(holder, FLIP_EVENT)
         self.assertEqual(frozenset(TitlePredicateFamily), families_before)
         self.assertEqual(frozenset(FixedTitleRegistry), rows_before)
+        # The §9.2 sanction allows at most ONE extension — the church
+        # redeemed-count family — and it lands with the sibling
+        # order-catalogue change: at THIS landing the family set stays
+        # unchanged, so the sanctioned family is asserted ABSENT here.
+        self.assertNotIn("church_skills_redeemed", {f.value for f in TitlePredicateFamily})
         self.assertFalse(
             any(
                 "聖女" in str(getattr(row, "display_name_zh", ""))
