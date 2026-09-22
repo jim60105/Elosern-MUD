@@ -181,9 +181,9 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    placing the vestment in the initiate's hands, offline-deterministic —
    the LLM `give_item` dialogue intent is deliberately NOT the channel).
    Handover is holding-aware: a character already carrying ≥1 of that item
-   key receives no duplicate (the violet_altoria starter already carries
-   `saintess_vestments`; her enrollment therefore grants no second robe,
-   while every other new sister receives hers). The grant ships in the
+   key receives no duplicate (a general guard; no shipped starter carries a
+   vestment any more — see the preset change below — so every enrollment
+   including violet_altoria's receives its robe). The grant ships in the
    same ledger event context (`char`, `host`, `item`).
 6. **Preset change (same change):** `violet_altoria.passive_skills` drops
    `saintess_vessel`; the vessel-bearing starter becomes a royal princess
@@ -193,8 +193,10 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    clause; the personality's temple-blessing passages and the life story's
    consecration/倾湧-duty sentences are deleted (not rewritten into a
    successor framing) while keeping the rest of her story continuous.
-   `saintess_vestments` stays as a carried starter item (an heirloom, not a
-   claim of office). All preset data-contract tests follow.
+   **`saintess_vestments` is removed from her `starting_items` (owner
+   decision)** — the robe is no longer a family heirloom she starts with;
+   she receives it from the celebrant at enrollment like every other
+   initiate. All preset data-contract tests follow.
 
 `pray` requires an existing ledger (the unenrolled are told to speak with
 the celebrant). Church venues: places whose authored kwargs carry a `church`
