@@ -525,6 +525,23 @@ ART_REMBG_BACKEND = "world.art.cutout.RembgCutoutBackend"
 # remains the escape hatch for a nonstandard layout.
 ART_REMBG_MODEL_DIR = os.path.join(GAME_DIR, "server", ".rembg")
 
+###############################################################################
+# Art prompt translation (add-art-prompt-translation-seam)
+###############################################################################
+
+# Master switch for the local prompt-text pre-process. It deliberately defaults
+# to False: a translation failure degrades the prompt to its authored text and
+# never costs the record its image.
+ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
+
+# Dotted path of the prompt-translation backend class. Deliberately NOT
+# environment-overridable: it is the third import-executing dotted-path seam
+# after ART_SD_CLIENT and ART_REMBG_BACKEND, so an inherited environment must
+# not import arbitrary code at engine startup. The named class lands with
+# add-ctranslate2-translate-backend; until then an enabled stage degrades
+# safely through art_translate_unavailable.
+ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"
+
 ######################################################################
 # Prompt library (prompt-library)
 ######################################################################

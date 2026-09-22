@@ -113,8 +113,8 @@ first — this is why they are sequential rather than parallel.
   `world/art/worker.py` (`_settle_one` stage call and two events; the lease
   bound is deliberately untouched), `web/tests/browser/browser_settings.py`,
   `server/conf/tests/test_env_overrides/` inventory literals,
-  `world/art/tests/test_worker.py`, `world/art/tests/test_art_observability.py`,
-  `.github/evennia-shards.json` (one new test module),
+  `world/art/tests/test_worker/test_translate_stage.py`,
+  `world/art/tests/test_art_observability.py`,
   `.env.example`, `docs/development/settings-and-environment.md`,
   `docs/gm/prompts.md`.
 - No new dependency. No network. No container change — this change introduces

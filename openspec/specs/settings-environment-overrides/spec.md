@@ -12,7 +12,7 @@ developer guide as the documentation of record.
 
 ### Requirement: Deployment settings accept typed environment overrides
 `server/conf/settings.py` SHALL derive the initial value of every deployment-tunable setting it
-declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`,
+declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`,
 `ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` groups from an environment
 variable, using typed conversion at settings import. The env-backed set is exactly:
 `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, `ART_SD_CFG_SCALE`, `ART_SD_SAMPLER`,
@@ -22,13 +22,14 @@ variable, using typed conversion at settings import. The env-backed set is exact
 `ART_SD_PREPIN_SAMPLES_FORMAT`, `ART_SD_OUTPUT_FORMAT`, `ART_SD_OUTPUT_QUALITY`,
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`,
 `ART_REMBG_ENABLED`, `ART_REMBG_MODEL`, `ART_REMBG_DOWNLOAD_ENABLED`,
-`ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`,
+`ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`,
 `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` — each from a
 variable of the same name — plus
 `ART_SD_BASE_URL` from
 `SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec. No other setting in these groups
-SHALL read the environment; `ART_SD_CLIENT`, `ART_REMBG_BACKEND`, `ART_REMBG_MODEL_DIR`, the
+SHALL read the environment; `ART_SD_CLIENT`, `ART_REMBG_BACKEND`, `ART_REMBG_MODEL_DIR`,
+`ART_TRANSLATE_BACKEND`, the
 derived `ART_SD_OUTPUT_EXTENSION`, and the auth
 pair `ART_SD_USERNAME`/`ART_SD_PASSWORD` in particular SHALL NOT (see their own requirements).
 (`DEFEAT_ADULT_SCENES` is not an addition of this change: the exact-set statement here repairs
@@ -49,7 +50,8 @@ inclusive 1-to-10 integer for `ELOSERN_MAX_CHARACTERS`
 a positive float for `ART_SD_CFG_SCALE`; case-insensitive boolean words (`1/true/yes/on` true,
 `0/false/no/off` false, nothing else) for `ART_SD_PREPIN_SAMPLES_FORMAT`,
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_REMBG_ENABLED` (default `false`),
-`ART_REMBG_DOWNLOAD_ENABLED` (default `true`), `ART_SCHEDULER_ENABLED`,
+`ART_REMBG_DOWNLOAD_ENABLED` (default `true`), `ART_TRANSLATE_ENABLED` (default `false`),
+`ART_SCHEDULER_ENABLED`,
 `DEFEAT_ADULT_SCENES` (default `true`), and
 `ELOSERN_VUE_CLIENT`;
 case-insensitive membership in the closed set `png|webp|jpeg|avif` for `ART_SD_OUTPUT_FORMAT`;
@@ -73,12 +75,13 @@ effective settings never depend on a developer's or CI runner's inherited shell 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
   environment
-- **THEN** every `ART_SD_*`, `ART_REMBG_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`, and
+- **THEN** every `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`, and
   `MAX_NR_CHARACTERS` setting equals its documented default (including
   `ART_SD_PROBE_TIMEOUT_MS=5000`, `ART_SD_PROBE_CACHE_SECONDS=300`,
   `ART_REMBG_ENABLED=False`, `ART_REMBG_MODEL="bria-rmbg"`,
   `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
-  `ART_REMBG_THREADS=0`, `DEFEAT_ADULT_SCENES=True`, and `MAX_NR_CHARACTERS=5`), and the server starts
+  `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`, `DEFEAT_ADULT_SCENES=True`, and
+  `MAX_NR_CHARACTERS=5`), and the server starts
 
 #### Scenario: Valid overrides coerce to typed values
 - **WHEN** the settings module is imported with `ART_SD_PROBE_TIMEOUT_MS=2000` and
@@ -124,6 +127,13 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `ART_REMBG_ENABLED=true` present in the shell environment
 - **THEN** the effective `ART_SD_PROBE_TIMEOUT_MS` for the test session is the documented
   default `5000` and the effective `ART_REMBG_ENABLED` is the documented default `False`
+
+#### Scenario: The translation switch coerces and rejects like every other boolean knob
+- **WHEN** the settings module is imported with `ART_TRANSLATE_ENABLED=on`, then separately with
+  `=off`, then separately with `=maybe`
+- **THEN** the first two yield `True` and `False`, and the third raises the named settings error
+  identifying `ART_TRANSLATE_ENABLED`, quoting the raw value, and stating the boolean-word rule
+
 ### Requirement: Invalid environment values fail settings load with a named error
 An environment variable that is present but cannot be coerced to its setting's declared type or
 bounds — a non-integer `ART_SD_STEPS`, a non-boolean word for a boolean knob, a negative or
@@ -202,6 +212,8 @@ entry. Secrets (`SECRET_KEY` and equivalents) SHALL NOT be moved to the environm
 and an environment-controlled seam would let any inherited process environment import arbitrary
 code at engine startup. `ART_REMBG_BACKEND` SHALL likewise never read the environment, for the
 identical reason: it is the second import-executing dotted-path seam in the art pipeline.
+`ART_TRANSLATE_BACKEND` SHALL likewise never read the environment: it is the third such seam,
+and the rule is a class rule about import-executing dotted paths, not a list that stops at two.
 `ART_STORE_ROOT` SHALL likewise remain code-only so a mistyped value
 cannot silently relocate generated art off the persistent volume, and `ART_REMBG_MODEL_DIR`
 SHALL remain code-only under the same rule so a mistyped value cannot silently relocate the
@@ -242,6 +254,13 @@ every non-LLM secret retains `secret_settings.py` as its only location.
 - **WHEN** the settings module is imported with `LLM_API_KEY=sk-test`
 - **THEN** the resolved profile default map carries `api_key="sk-test"` for every layer, and
   no other credential variable is consulted from the environment
+
+#### Scenario: A hostile translation-seam variable is ignored
+- **WHEN** the settings module is imported with `ART_TRANSLATE_BACKEND` set to any value in the
+  environment
+- **THEN** the effective `ART_TRANSLATE_BACKEND` remains its code default and no environment read
+  for that name occurs
+
 ### Requirement: Environment inventory and configuration guide are version-controlled and exact
 The repository SHALL track `.env.example` as the exact inventory of environment variables
 this project reads: every active (uncommented) entry SHALL be a variable that
@@ -331,6 +350,7 @@ its own extension-to-mime-type map. (Settings modules cannot import
 - **THEN** the effective extension is the derived value for the effective
   format, no environment read for the extension name occurs, and no
   format/extension contradiction is possible
+
 ### Requirement: LLM profile knobs accept global and per-layer environment overrides
 `server/conf/settings.py` SHALL derive the initial value of every `LLMProfile` field from a
 declarative knob table covering exactly these knobs and their documented bounds:

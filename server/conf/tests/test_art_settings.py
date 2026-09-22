@@ -9,6 +9,8 @@ import unittest
 
 from django.conf import settings
 
+from tools.spec_traceability import covers_requirement
+
 
 class ArtSettingsTests(unittest.TestCase):
     def test_store_root_lives_under_game_dir_and_defaults_are_sane(self):
@@ -79,6 +81,21 @@ class ArtSettingsTests(unittest.TestCase):
         self.assertEqual(
             settings.ART_REMBG_MODEL_DIR,
             __import__("os").path.join(settings.GAME_DIR, "server", ".rembg"),
+        )
+
+    @covers_requirement(
+        "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
+    )
+    def test_prompt_translation_defaults_to_off(self):
+        self.assertIs(settings.ART_TRANSLATE_ENABLED, False)
+
+    @covers_requirement(
+        "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"
+    )
+    def test_prompt_translation_seam_is_code_only(self):
+        self.assertEqual(
+            settings.ART_TRANSLATE_BACKEND,
+            "world.art.translate_ct2.CTranslate2Backend",
         )
 
     def test_external_worker_settings_are_removed(self):

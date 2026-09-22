@@ -70,6 +70,16 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；首次模型下載刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
 | `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.69 的唯一機制），屬刻意的行程全域設定 |
 
+### 美術提示詞翻譯
+
+本機提示詞翻譯階段在 worker 讀取 claimed record 的 `source_description` 後、呼叫 sd-webui 前執行。它只交給 backend 含 Han 字的行，保留原本的行數與順序，且不會回寫 authored text 或 `source_hash`。backend 尚未由本 change 提供時，啟用後會記錄 `art_translate_unavailable`，再以原始提示詞生成圖片。
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `ART_TRANSLATE_ENABLED` | `ART_TRANSLATE_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；`True` 時啟用本機提示詞前處理，翻譯失敗只降級提示詞，不會令圖片工作失敗。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
+
+**翻譯 backend（僅限程式碼）**：`ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"` 是第三個會執行匯入的 dotted-path seam，因此不讀環境變數。測試與瀏覽器 harness 指向 `world.art.fake_translate.FakeTranslator`，避免載入翻譯函式庫或連線。
+
 **模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物悄悄搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
 
 **Alpha 敵對組合啟動即拒絕**：`ART_REMBG_ENABLED=true` 搭配有效 `ART_SD_OUTPUT_FORMAT=jpeg` 在 settings 匯入時直接 `ImproperlyConfigured`（JPEG 的 RGB 正規化會丟掉 alpha，存下帶背景的肖像卻宣稱是去背成品）。檢查位於 `secret_settings` 匯入之後，因此環境與 `secret_settings.py` 兩條覆蓋路徑由同一個檢查把關；`png`／`webp`／`avif` 攜帶 alpha，三者啟用階段皆正常啟動。
@@ -231,6 +241,7 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏進程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
+| `ART_REMBG_BACKEND`／`ART_TRANSLATE_BACKEND` | 這兩個 local art stage seam 也會執行 dotted-path 匯入；它們分別是第二與第三個 import-executing seam，維持 code-only 可阻止繼承環境載入任意程式碼 |
 | `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
 
