@@ -21,6 +21,10 @@
       "reason": "assortment registry content contract"
     },
     {
+      "path": "world/lore/tests/test_church.py",
+      "reason": "frozen church catalogues and the derived church-place venue set"
+    },
+    {
       "path": "world/lore/tests/test_economy.py",
       "reason": "price-table data contract"
     },
@@ -167,6 +171,10 @@
     {
       "path": "world/rules/tests/test_equipment_effect_rulebook.py",
       "reason": "equipment effect rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_economy_sync/test_church_hosts.py",
+      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
     },
     {
       "path": "world/rules/tests/test_guild_config/_support.py",
