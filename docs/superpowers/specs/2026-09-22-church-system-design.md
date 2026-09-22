@@ -172,7 +172,20 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    the lore documents that assert it (`docs/lore/overview.md` 宗教信仰 and
    any sibling wording) are realigned in this same change; the oath flag
    machinery is untouched (it already reads vessel ownership).
-5. **Preset change (same change):** `violet_altoria.passive_skills` drops
+5. **Vestment handover (owner decision):** enrollment hands over one
+   clerical armor through the church host as an NPC item delivery —
+   `sister_vestments` (修女聖袍) for ordinary enrollees, `saintess_vestments`
+   (聖女聖袍) instead for the vessel branch — granted inside the same
+   enrollment transaction via the existing deterministic item-grant path
+   (the `QuestReward` item-quantity rail; presentation reads as the host
+   placing the vestment in the initiate's hands, offline-deterministic —
+   the LLM `give_item` dialogue intent is deliberately NOT the channel).
+   Handover is holding-aware: a character already carrying ≥1 of that item
+   key receives no duplicate (the violet_altoria starter already carries
+   `saintess_vestments`; her enrollment therefore grants no second robe,
+   while every other new sister receives hers). The grant ships in the
+   same ledger event context (`char`, `host`, `item`).
+6. **Preset change (same change):** `violet_altoria.passive_skills` drops
    `saintess_vessel`; the vessel-bearing starter becomes a royal princess
    awaiting nothing in particular — pre-enrollment she is simply a 王女.
    **The persona drops all religious narrative (owner decision):** no 聖女
@@ -379,6 +392,10 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 - Title tests: threshold boundaries (redeemed count exactly at/under each
   ladder rung); the vessel is never counted; no church fixed-title row
   displays 聖女 (registry data-contract gate).
+- Vestment handover tests: ordinary enrollment receives exactly one
+  `sister_vestments`; a vessel-branch enrollment without the robe receives
+  exactly one `saintess_vestments`; an enrollment that already carries the
+  key receives none; the grant is transactional with the ledger write.
 - Iron-rule gate: loader rejects negative-polarity passive rows; data
   contract test over shipped rows asserts every church PASSIVE's rule rows
   are positive polarity only.
