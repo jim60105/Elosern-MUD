@@ -17,6 +17,8 @@ import importlib
 from contextlib import ExitStack
 from unittest.mock import patch
 
+from django.test import override_settings
+
 from evennia.utils.test_resources import EvenniaTestCase
 
 import server.conf.at_server_startstop as startup
@@ -114,6 +116,8 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertEqual(error.call_args.kwargs["context"], {"step": "sync_all"})
         self.assertIsInstance(error.call_args.kwargs["exc"], RuntimeError)
         warn.assert_not_called()
+
+
         # Steps before the failure emitted their events; nothing after ran.
         self.assertEqual(
             self._steps(info),
@@ -189,3 +193,51 @@ class StartupStepEventTests(_StubbedStartup):
         )
         self.assertIsInstance(error.call_args.kwargs["exc"], RuntimeError)
         warn.assert_not_called()
+
+
+class OptionalArtStageReportTests(_StubbedStartup):
+    @staticmethod
+    def _reports(info):
+        return [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "art_optional_stages"
+        ]
+
+    def test_reports_both_disabled_stages_once_before_startup_steps(self):
+        with override_settings(ART_REMBG_ENABLED=False, ART_TRANSLATE_ENABLED=False):
+            info, _warn, _error = self._run()
+        reports = self._reports(info)
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(
+            reports[0].kwargs["context"],
+            {
+                "art_rembg": {"setting": "ART_REMBG_ENABLED", "enabled": False},
+                "art_translate": {
+                    "setting": "ART_TRANSLATE_ENABLED",
+                    "enabled": False,
+                },
+            },
+        )
+        self.assertEqual(info.call_args_list[0], reports[0])
+
+    def test_reports_one_enabled_stage_once(self):
+        with override_settings(ART_REMBG_ENABLED=True, ART_TRANSLATE_ENABLED=False):
+            info, _warn, _error = self._run()
+        reports = self._reports(info)
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(
+            reports[0].kwargs["context"]["art_rembg"],
+            {"setting": "ART_REMBG_ENABLED", "enabled": True},
+        )
+        self.assertEqual(
+            reports[0].kwargs["context"]["art_translate"],
+            {"setting": "ART_TRANSLATE_ENABLED", "enabled": False},
+        )
+
+    def test_reports_stages_even_if_a_later_fail_loud_step_aborts_boot(self):
+        info, _warn, _error = self._run(
+            {"world.lore.sync.sync_all": {"side_effect": RuntimeError("boom")}},
+            assert_raises=RuntimeError,
+        )
+        self.assertEqual(len(self._reports(info)), 1)

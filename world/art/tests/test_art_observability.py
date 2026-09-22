@@ -17,6 +17,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from world.art.fake_cutout import FakeCutoutBackend
 from world.art.fake_sd_client import FakeSDWebUIClient
+from world.art.fake_translate import FakeTranslator
 from world.art.queue import ensure, record_key, requeue
 from evennia.utils.create import create_object
 from typeclasses.characters import PlayerCharacter
@@ -26,6 +27,7 @@ from tools.spec_traceability import covers_requirement
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.translate import TranslateError
 from world.art.worker import drain_synchronous
 
 
@@ -422,6 +424,146 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(_events(info, "art_cutout_done"), [])
         self.assertEqual(_events(warn, "art_cutout_failed"), [])
         self.assertEqual(backend_cls.call_count, 0)
+
+
+class TranslationEventTests(EvenniaTest):
+    """Stage event cardinality is independent of the art subject kind."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(Path(self.tempdir.name)),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+
+    def tearDown(self):
+        self.art_settings.disable()
+        super().tearDown()
+
+    @contextmanager
+    def _client(self, client):
+        with patch("world.art.worker.resolve_sd_client", return_value=client):
+            yield
+
+    @contextmanager
+    def _translator(self, fake):
+        with override_settings(
+            ART_TRANSLATE_ENABLED=True,
+            ART_TRANSLATE_BACKEND="world.art.fake_translate.FakeTranslator",
+        ):
+            with patch(
+                "world.art.fake_translate.FakeTranslator", return_value=fake
+            ):
+                yield
+
+    def test_success_emits_one_done_event_with_the_exact_context_schema(self):
+        subject = _subject("t_synth_translate_done")
+        ensure(subject, "第一行漢字\nLatin")
+        with self._translator(FakeTranslator()):
+            with self._client(FakeSDWebUIClient()):
+                with patch("world.art.worker.log_info") as info:
+                    with patch("world.art.worker.log_warn") as warn:
+                        drain_synchronous(10)
+        done = _events(info, "art_translate_done")
+        self.assertEqual(len(done), 1)
+        self.assertEqual(_events(warn, "art_translate_failed"), [])
+        self.assertEqual(
+            set(done[0].kwargs["context"]),
+            {
+                "job",
+                "subject",
+                "image_id",
+                "lines_total",
+                "lines_offered",
+                "lines_untranslated",
+                "duration_ms",
+            },
+        )
+        context = done[0].kwargs["context"]
+        self.assertEqual(context["job"], record_key(subject))
+        self.assertEqual(context["subject"], subject.full())
+        self.assertEqual(context["image_id"], "")
+        self.assertEqual(
+            (context["lines_total"], context["lines_offered"], context["lines_untranslated"]),
+            (2, 1, 0),
+        )
+        self.assertIsInstance(context["duration_ms"], int)
+        self.assertNotIn("exc", done[0].kwargs)
+
+    def test_forward_default_failure_emits_one_bounded_event_and_still_settles(self):
+        subject = _subject("t_synth_translate_forward_default")
+        description = "引擎尚未安裝"
+        ensure(subject, description)
+        client = FakeSDWebUIClient()
+        with override_settings(ART_TRANSLATE_ENABLED=True):
+            with self._client(client):
+                with patch("world.art.worker.log_info") as info:
+                    with patch("world.art.worker.log_warn") as warn:
+                        drain_synchronous(10)
+        failed = _events(warn, "art_translate_failed")
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(_events(info, "art_translate_done"), [])
+        self.assertEqual(
+            set(failed[0].kwargs["context"]),
+            {"job", "subject", "image_id", "code"},
+        )
+        self.assertEqual(
+            failed[0].kwargs["context"],
+            {
+                "job": record_key(subject),
+                "subject": subject.full(),
+                "image_id": "",
+                "code": "art_translate_unavailable",
+            },
+        )
+        self.assertIsInstance(failed[0].kwargs["exc"], TranslateError)
+        self.assertEqual(failed[0].kwargs["exc"].code, "art_translate_unavailable")
+        self.assertEqual(client.calls, [(subject, description)])
+
+    def test_unknown_translator_code_is_normalized_before_the_failure_event(self):
+        subject = _subject("t_synth_translate_unknown_code")
+        description = "未知錯誤碼"
+        ensure(subject, description)
+        translator = FakeTranslator()
+        translator.fail_every_call(TranslateError("unexpected", "scripted"))
+        client = FakeSDWebUIClient()
+        with self._translator(translator):
+            with self._client(client):
+                with patch("world.art.worker.log_warn") as warn:
+                    drain_synchronous(10)
+        failed = _events(warn, "art_translate_failed")
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(
+            failed[0].kwargs["context"]["code"], "art_translate_error"
+        )
+        self.assertEqual(client.calls, [(subject, description)])
+
+    def test_disabled_and_all_latin_runs_are_silent_and_unresolved(self):
+        disabled = _subject("t_synth_translate_disabled")
+        latin = _subject("t_synth_translate_latin")
+        ensure(disabled, "關閉時不翻譯")
+        with patch(
+            "world.art.translate.resolve_translate_backend",
+            side_effect=AssertionError("skipped stages must not resolve"),
+        ) as resolver:
+            with self._client(FakeSDWebUIClient()):
+                with patch("world.art.worker.log_info") as disabled_info:
+                    with patch("world.art.worker.log_warn") as disabled_warn:
+                        drain_synchronous(10)
+            ensure(latin, "English prompt tags")
+            with override_settings(ART_TRANSLATE_ENABLED=True):
+                with self._client(FakeSDWebUIClient()):
+                    with patch("world.art.worker.log_info") as latin_info:
+                        with patch("world.art.worker.log_warn") as latin_warn:
+                            drain_synchronous(10)
+        self.assertEqual(resolver.call_count, 0)
+        self.assertEqual(_events(disabled_info, "art_translate_done"), [])
+        self.assertEqual(_events(disabled_warn, "art_translate_failed"), [])
+        self.assertEqual(_events(latin_info, "art_translate_done"), [])
+        self.assertEqual(_events(latin_warn, "art_translate_failed"), [])
 
 
 if __name__ == "__main__":

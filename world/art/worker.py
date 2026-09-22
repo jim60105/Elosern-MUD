@@ -46,6 +46,7 @@ from world.art.queue import (
 from world.art.sd_worker import SDError, resolve_sd_client
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
+from world.art.translate import TranslateError, translate_description
 from world.observability import log_error, log_info, log_warn
 from world.observability.sanitize import safe_endpoint
 from world.prompts.loader import PromptLibraryError
@@ -184,13 +185,20 @@ def _settle_one(
     Returns ``None`` when the claim was requeued or reclaimed mid-flight and
     must not be settled by this worker.
     """
-    description = str(record.db.source_description or "")
     # The job key and image id are likewise captured BEFORE the settle: a
     # gallery settle deletes the job record, and the post-settle boundary
     # event must still name the finished job.
     job_key = str(record.db_key)
     image_id = str(record.db.gallery_image_id or "")
     is_gallery = bool(image_id)
+    description = str(record.db.source_description or "")
+    if bool(settings.ART_TRANSLATE_ENABLED):
+        description = _translate_prompt(
+            description,
+            job_key=job_key,
+            subject=subject,
+            image_id=image_id,
+        )
 
     def _gallery_failure(code: str):
         """Terminal gallery failure settle; ``None`` when the claim is stale."""
@@ -346,6 +354,53 @@ def _settle_one(
     if prior_identity:
         _cleanup_prior_output(prior_identity)
     return ArtAssetStatus.DONE, identity, None, True
+
+
+def _translate_prompt(
+    description: str, *, job_key: str, subject: ArtSubject, image_id: str
+) -> str:
+    """Translate a prompt locally, degrading safely to its authored text."""
+    started = time.monotonic()
+    try:
+        translated, counts = translate_description(description)
+    except TranslateError as error:
+        log_warn(
+            "art_translate_failed",
+            context={
+                "job": job_key,
+                "subject": subject.full(),
+                "image_id": image_id,
+                "code": error.code,
+            },
+            exc=error,
+        )
+        return description
+    except Exception as error:  # belt-and-braces for the stage's bounded contract
+        log_warn(
+            "art_translate_failed",
+            context={
+                "job": job_key,
+                "subject": subject.full(),
+                "image_id": image_id,
+                "code": "art_translate_error",
+            },
+            exc=error,
+        )
+        return description
+    if counts.lines_offered:
+        log_info(
+            "art_translate_done",
+            context={
+                "job": job_key,
+                "subject": subject.full(),
+                "image_id": image_id,
+                "lines_total": counts.lines_total,
+                "lines_offered": counts.lines_offered,
+                "lines_untranslated": counts.lines_untranslated,
+                "duration_ms": int((time.monotonic() - started) * 1000),
+            },
+        )
+    return translated
 
 
 def _cleanup_prior_output(identity: str) -> None:

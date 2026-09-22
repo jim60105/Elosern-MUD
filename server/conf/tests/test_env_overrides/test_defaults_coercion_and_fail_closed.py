@@ -80,6 +80,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             "ART_SD_PRESERVE_GENERATION_METADATA": "TRUE",
             "ART_REMBG_ENABLED": "TRUE",
             "ART_REMBG_DOWNLOAD_ENABLED": "Yes",
+            "ART_TRANSLATE_ENABLED": "OFF",
             "ART_SCHEDULER_ENABLED": "OFF",
             "ELOSERN_VUE_CLIENT": "Yes",
         }
@@ -91,6 +92,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
                 "ART_SD_PRESERVE_GENERATION_METADATA": "True",
                 "ART_REMBG_ENABLED": "True",
                 "ART_REMBG_DOWNLOAD_ENABLED": "True",
+                "ART_TRANSLATE_ENABLED": "False",
                 "ART_SCHEDULER_ENABLED": "False",
                 "ELOSERN_VUE_CLIENT": "True",
             },

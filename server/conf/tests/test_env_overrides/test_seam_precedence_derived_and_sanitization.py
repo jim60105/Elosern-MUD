@@ -30,18 +30,26 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             "ART_STORE_ROOT",
             "ART_REMBG_BACKEND",
             "ART_REMBG_MODEL_DIR",
+            "ART_TRANSLATE_BACKEND",
         ]
         env = {
             "ART_SD_CLIENT": "os.system",
             "ART_STORE_ROOT": "/tmp/env-override-art-root",
             "ART_REMBG_BACKEND": "os.system",
             "ART_REMBG_MODEL_DIR": "/tmp/env-override-rembg",
+            "ART_TRANSLATE_BACKEND": "os.system",
         }
         result = self._run(_settings_repr(names), **env)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         printed = _printed_map(
             result.stdout,
-            {"ART_SD_CLIENT", "ART_STORE_ROOT", "ART_REMBG_BACKEND", "ART_REMBG_MODEL_DIR"},
+            {
+                "ART_SD_CLIENT",
+                "ART_STORE_ROOT",
+                "ART_REMBG_BACKEND",
+                "ART_REMBG_MODEL_DIR",
+                "ART_TRANSLATE_BACKEND",
+            },
         )
         self.assertEqual(
             printed["ART_SD_CLIENT"], repr("world.art.sd_worker.SDWebUIClient")
@@ -62,6 +70,10 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             msg=printed["ART_REMBG_MODEL_DIR"],
         )
         self.assertNotIn("env-override-rembg", printed["ART_REMBG_MODEL_DIR"])
+        self.assertEqual(
+            printed["ART_TRANSLATE_BACKEND"],
+            repr("world.art.translate_ct2.CTranslate2Backend"),
+        )
 
     @covers_requirement(
         "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"

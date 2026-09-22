@@ -20,6 +20,8 @@ at_server_cold_stop()
 import importlib
 import time
 
+from django.conf import settings
+
 from world.observability import log_error, log_info, log_warn
 
 # Patchable monotonic clock seam for startup timing tests.
@@ -364,6 +366,20 @@ def at_server_start():
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
     from world.rules.npc_schedules import sync_npc_schedules
+
+    log_info(
+        "art_optional_stages",
+        context={
+            "art_rembg": {
+                "setting": "ART_REMBG_ENABLED",
+                "enabled": bool(settings.ART_REMBG_ENABLED),
+            },
+            "art_translate": {
+                "setting": "ART_TRANSLATE_ENABLED",
+                "enabled": bool(settings.ART_TRANSLATE_ENABLED),
+            },
+        },
+    )
 
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
