@@ -81,7 +81,8 @@
         "world.rules.tests.test_positional_marker",
         "world.rules.tests.test_turn_order_control",
         "world.rules.tests.test_multi_strike_cap_widening",
-        "world.rules.tests.test_lightning_turn_behavior"
+        "world.rules.tests.test_lightning_turn_behavior",
+        "world.rules.tests.test_saintess_vessel_trickle"
       ]
     },
     {
@@ -164,6 +165,7 @@
         "world.rules.tests.test_recovery_profiles",
         "world.rules.tests.test_rule_id_test_correspondence",
         "world.rules.tests.test_rulebook_schema",
+        "world.rules.tests.test_saintess_oath_observability",
         "world.rules.tests.test_service_messages",
         "world.rules.tests.test_service_view",
         "world.rules.tests.test_service_view_side_effects",

@@ -12,10 +12,14 @@ the clock transaction.
 Deliberately the raw stored lists only — no innate keys, no unlocked sexual
 acts, no conferred grants: a qualifier passive like ``saintess_vessel`` is
 non-conferrable and never unlocked, so the stored passive list is exactly its
-ownership surface.
+ownership surface. Evennia deserializes stored list attributes as
+``_SaverList`` (a ``Sequence``, NOT a ``list`` subclass — the same note
+``items/reads.py`` and ``progression/_scaling.py`` record), so the check
+accepts any non-string sequence plus the plain set/tuple forms the original
+callers could hand it; every other stored shape fails closed.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 
@@ -27,6 +31,9 @@ def owns_stored_skill(entity: Any, skill_key: str) -> bool:
         return False
     for field in ("active", "passive"):
         values = stored.get(field)
-        if isinstance(values, (list, tuple, set, frozenset)) and skill_key in values:
+        if (
+            (isinstance(values, Sequence) and not isinstance(values, (str, bytes)))
+            or isinstance(values, (set, frozenset))
+        ) and skill_key in values:
             return True
     return False

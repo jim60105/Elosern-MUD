@@ -69,6 +69,10 @@
       "reason": "race/subrace data contract"
     },
     {
+      "path": "world/lore/tests/test_saintess_vessel_grant.py",
+      "reason": "saintess vessel registry and preset grant contract"
+    },
+    {
       "path": "world/lore/tests/test_scene_archetypes.py",
       "reason": "scene archetype data contract"
     },
@@ -211,6 +215,10 @@
     {
       "path": "world/rules/tests/test_rulebook_schema.py",
       "reason": "rulebook schema contract"
+    },
+    {
+      "path": "world/rules/tests/test_saintess_vessel_trickle.py",
+      "reason": "saintess vessel trickle and preset integration smoke contract"
     },
     {
       "path": "world/rules/tests/test_shipped_item_use_regression.py",

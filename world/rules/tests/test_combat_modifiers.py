@@ -647,6 +647,89 @@ class CombatModifierTests(EvenniaTestCase):
             RULES["priestly_grace_recovery_scale"].then,
         )
 
+    @covers_requirement("saintess-vessel::the-vessel-adds-no-combat-numbers-beyond-the-two-ceremonial-reads")
+    def test_rule_saintess_vessel_blessing_scale(self):
+        # A bare vessel holder (no other modifier-bearing skill, buff, or
+        # equipment, no active blessing) merges EXACTLY the ceremonial scale
+        # key — the vessel adds no numeric combat axis of its own.
+        entity = self._owning("saintess_vessel_blessing_scale")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"blessing_arousal_scale": 0.1},
+        )
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["saintess_vessel_blessing_scale"].then,
+        )
+        self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
+
+    @covers_requirement("saintess-vessel::each-named-public-blessing-ceremony-reads-the-holder-s-excitement-tier-exactly-once")
+    def test_rule_saintess_blessing_grace(self):
+        rule = RULES["saintess_blessing_grace"]
+        entity = self._owning("saintess_blessing_grace")
+        # 微興奮 (pleasure 15–34) sits below the row's gte 中等 threshold, so
+        # the grace row never matches there even with the blessing live.
+        entity.sexual.pleasure.base = 15
+        self.assertEqual(entity.sexual.arousal.level, "微興奮")
+        apply_buff(entity, "light_blessing")
+        self.assertNotIn(
+            "saintess_blessing_grace", dict(matched_combat_modifiers(entity))
+        )
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"blessing_arousal_scale": 0.1, "defense": 18},
+        )
+        # At 中等 it matches — but only while the holder's OWN light_blessing
+        # instance is live; without it the row stays inert.
+        entity.sexual.pleasure.base = 40
+        self.assertEqual(entity.sexual.arousal.level, "中等")
+        self.assertIn(
+            "saintess_blessing_grace", dict(matched_combat_modifiers(entity))
+        )
+        remove_by_selector(entity, "light_blessing")
+        self.assertNotIn(
+            "saintess_blessing_grace", dict(matched_combat_modifiers(entity))
+        )
+
+    @covers_requirement("saintess-vessel::each-named-public-blessing-ceremony-reads-the-holder-s-excitement-tier-exactly-once")
+    def test_saintess_blessing_grace_merges_as_a_separate_status_sourced_condition(self):
+        # The goddess-blessing ceremony reads the tier through its own grace
+        # row: the merged bundle carries the authored +18 AND the vessel's
+        # independent +6 as two separately matched status-sourced conditions.
+        entity = self._owning("saintess_blessing_grace")
+        apply_buff(entity, "light_blessing")
+        entity.sexual.pleasure.base = 40
+        matched = dict(matched_combat_modifiers(entity))
+        self.assertIn("light_blessing_defense_bonus", matched)
+        self.assertIn("saintess_blessing_grace", matched)
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"blessing_arousal_scale": 0.1, "defense": 24},
+        )
+
+        from world.rules.status_display import display_for
+
+        self.assertEqual(
+            display_for("saintess_blessing_grace").label, "女神降福恩典"
+        )
+        self.assertEqual(
+            display_for("light_blessing_defense_bonus").label, "女神降福防禦提升"
+        )
+
+    def test_light_blessing_authored_row_is_byte_identical(self):
+        # The authored +18/60 s goddess-blessing row is fixed lore data; the
+        # vessel's grace must never rewrite it. Pin the row's source block
+        # verbatim so ANY edit to the authored row fails this test.
+        frozen = (
+            "- id: light_blessing_defense_bonus\n"
+            "  when: {buff_active: light_blessing}\n"
+            "  then: {defense: 18}\n"
+        )
+        yaml_text = (
+            Path(__file__).parents[1] / "rulebook" / "combat_modifiers.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn(frozen, yaml_text)
+
     def test_rule_light_blessing_defense_bonus(self):
         entity = self._entity()
         apply_buff(entity, "light_blessing")
