@@ -33,7 +33,7 @@ from world.rules.character_creation import (
 from world.rules.progression import grant_skill_practice_xp, grant_study_practice_xp
 from world.rules.skill_effects import validate_conferrable_skill
 from world.rules.skill_ownership import owns_stored_skill
-from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind, TargetSpec
 
 VESSEL_KEY = "saintess_vessel"
 PRESET_KEY = "violet_altoria"
@@ -49,6 +49,7 @@ class SaintessVesselRegistryContractTests(EvenniaTestCase):
     def test_row_shape_matches_the_clergy_qualifier_contract(self):
         skill = SKILL_REGISTRY[VESSEL_KEY]
         self.assertIs(skill.kind, SkillKind.PASSIVE)
+        self.assertIs(skill.target_spec, TargetSpec.NONE)
         self.assertTrue(skill.usable_out_of_combat)
         self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
         self.assertIs(skill.category, SkillCategory.ENHANCEMENT)
@@ -141,13 +142,22 @@ class SaintessVesselPresetGrantTests(EvenniaTest):
         self.account.at_post_create_character(holder)
         with (
             patch("world.rules.character_creation.log_info") as info,
-            self.captureOnCommitCallbacks(execute=True),
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
         ):
             activate_player_character(
                 self.account,
                 holder,
                 CharacterCreationRequest(mode="preset", preset_key=PRESET_KEY),
             )
+            self.assertEqual(
+                info.call_count,
+                0,
+                "the grant event must wait for the commit seam, "
+                "not log immediately",
+            )
+        self.assertGreaterEqual(
+            len(callbacks), 1, "activation must queue commit-bound callbacks"
+        )
         self.assertIn(VESSEL_KEY, holder.db.skills["passive"])
         self.assertTrue(owns_stored_skill(holder, VESSEL_KEY))
         events = [call.args[0] for call in info.call_args_list if call.args]

@@ -51,6 +51,14 @@ def _first_down_draw_tick(entity, from_tick: int) -> int:
     return tick
 
 
+def _first_up_draw_tick(entity, from_tick: int) -> int:
+    """Return the first tick after ``from_tick`` whose draw is plus."""
+    tick = from_tick
+    while _trickle_draw(entity, tick) != 1:
+        tick += 1
+    return tick
+
+
 def _holder(key: str = "saintess holder"):
     entity = create_object(PlayerCharacter, key=key)
     entity.race = "human"
@@ -81,7 +89,26 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
             self.assertGreaterEqual(readings[index], BAND_FLOOR, readings)
             self.assertLessEqual(readings[index], BAND_CEILING, readings)
             self.assertLessEqual(abs(readings[index] - readings[index - 1]), 1)
-        self.assertNotEqual(sum(readings[1:]), 12 * 30)
+        # The gauge visibly moves: the first advance from the interior 30
+        # always lands on 29 or 31 (no endpoint zero-collapse exists there),
+        # so at least one reading differs from the starting value.
+        self.assertTrue(any(reading != 30 for reading in readings[1:]), readings)
+
+    def test_fluctuation_direction_follows_the_stateless_tick_hash(self):
+        # The design pins the direction to the crc32(id:tick) hash (D2b), so
+        # BOTH signed outcomes must be observable for one entity: select a
+        # plus-draw advance and a minus-draw advance from an interior value
+        # and assert the exact signed move — a constant-direction
+        # implementation cannot satisfy both.
+        holder = _holder()
+        holder.sexual.pleasure.base = 30
+        clock = WorldClock(tick=0)
+        up_tick = _first_up_draw_tick(holder, clock.tick + 1)
+        clock.advance(up_tick - clock.tick, AdvanceSource.SKIP, [holder])
+        self.assertEqual(holder.sexual.pleasure.base, 31)
+        down_tick = _first_down_draw_tick(holder, clock.tick + 1)
+        clock.advance(down_tick - clock.tick, AdvanceSource.SKIP, [holder])
+        self.assertEqual(holder.sexual.pleasure.base, 30)
 
     def test_floor_oscillation_never_reads_calm(self):
         # D2b's binding guarantee at the floor: never below 15 after any
@@ -104,6 +131,12 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         holder = _holder()
         holder.sexual.pleasure.base = 70
         clock = WorldClock(tick=0)
+        # At or above 高度 the step is a no-op: a short advance with no decay
+        # due must not move the gauge at all (no writer call).
+        with patch("world.rules.pleasure.apply_pleasure_gain") as gain_mock:
+            clock.advance(6, AdvanceSource.SKIP, [holder])
+        gain_mock.assert_not_called()
+        self.assertEqual(holder.sexual.pleasure.base, 70)
         # One full decay interval: 高度 60-84 crosses one band to the 中等
         # ceiling region; the holder floor keeps her at 59, then the step
         # clamps the post-decay draw inside [15, 59].
@@ -175,6 +208,19 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         gain_mock.assert_not_called()
         self.assertEqual(sexual_record(plain), before)
         self.assertEqual(plain.sexual.pleasure.base, 20)
+
+    def test_non_holder_decay_still_crosses_to_the_calm_floor(self):
+        # The unchanged 平靜-floor decay path: a non-holder at 20 (微興奮)
+        # crossing one full decay interval lands on 14 (the 微興奮 floor minus
+        # one) exactly as before this change — never the holder's 15 floor.
+        plain = create_object(PlayerCharacter, key="non-holder decay trickle")
+        plain.race = "human"
+        plain.apply_race_baseline()
+        plain.db.skills = {"active": [], "passive": []}
+        plain.sexual.pleasure.base = 20
+        WorldClock(tick=0).advance(1800, AdvanceSource.SKIP, [plain])
+        self.assertEqual(plain.sexual.pleasure.base, 14)
+        self.assertEqual(plain.sexual.arousal.level, "平靜")
 
     @covers_requirement("saintess-vessel::saintess-trickle-pins-the-holder-s-idle-arousal-inside-the-idle-band")
     def test_idle_trickle_never_opens_a_climax_below_the_gate(self):

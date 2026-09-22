@@ -15,8 +15,13 @@ non-conferrable and never unlocked, so the stored passive list is exactly its
 ownership surface. Evennia deserializes stored list attributes as
 ``_SaverList`` (a ``Sequence``, NOT a ``list`` subclass — the same note
 ``items/reads.py`` and ``progression/_scaling.py`` record), so the check
-accepts any non-string sequence plus the plain set/tuple forms the original
-callers could hand it; every other stored shape fails closed.
+accepts sequence/set collections the original callers and Evennia storage
+produce (``_SaverList``, ``list``, ``tuple``, ``set``, ``frozenset``) while
+rejecting every other shape: strings/bytes-like values can never name a
+skill key, mappings are not ownership lists, and any container whose
+membership test raises (e.g. a ``bytearray`` probed with a string) fails
+closed to ``False`` — settlement branches must degrade to the non-holder
+path, never raise inside the clock transaction.
 """
 
 from collections.abc import Mapping, Sequence
@@ -31,9 +36,13 @@ def owns_stored_skill(entity: Any, skill_key: str) -> bool:
         return False
     for field in ("active", "passive"):
         values = stored.get(field)
-        if (
-            (isinstance(values, Sequence) and not isinstance(values, (str, bytes)))
-            or isinstance(values, (set, frozenset))
-        ) and skill_key in values:
-            return True
+        if isinstance(values, (str, bytes, bytearray, memoryview, Mapping)):
+            continue
+        try:
+            if skill_key in values:
+                return True
+        except TypeError:
+            # Not a membership-supporting container at all (int, None, ...):
+            # malformed storage fails closed, never raises.
+            continue
     return False
