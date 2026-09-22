@@ -72,7 +72,7 @@ enrollment requirements onto it.
 depends-on: implement-church-foundation
 
 Needs the `db.church` ledger + single-writer primitives, the `ChurchHost`
-component on the two clergy roster rows, the derived `church` venue set, and
+component on the celebrant roster row, the derived `church` venue set, and
 the `church.yaml` pray/accrual rows the ledger gates against. Consumes
 verbatim: `guild-registration`'s three-stage host pattern, the
 `QuestReward` item-quantity rail, the granted-passive write path

@@ -3,7 +3,7 @@
 The authoritative design is
 `docs/superpowers/specs/2026-09-22-church-system-design.md` (approved, five
 owner amendments baked in) §5.1/§7/§9. The substrate — `db.church`, the
-`church.yaml` gates, `ChurchHost` on the two clergy roster rows, the derived
+`church.yaml` gates, `ChurchHost` on the celebrant roster row, the derived
 `church` venue set, the frozen catalogue shells — landed with
 `implement-church-foundation`. This change makes the church joinable and lands
 the owner's preset/lore amendments. See `proposal.md` for motivation and the

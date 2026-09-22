@@ -34,12 +34,14 @@ player-visible surface.
   validated shell — its 16 Series A/B/D rows and price finals land with
   `implement-church-redemption`.
 - `ChurchHost` typeclass component (sibling of `GuildStaff`, zero-state
-  capability adapter) authored on the two registered clergy NPC roster rows
-  (艾莉安娜·寒水 high celebrant, 羅海西亞·芬威克 sanctuary steward) through
-  their profession blueprint, plus the small raised-initial-arousal authoring
-  kwarg on their spawn data and the `church` place kwarg on the church place
-  records. `place-driven-service-sync` convergence stays idempotent with the
-  new component.
+  capability adapter) authored on the one registered clergy NPC roster row
+  (艾莉安娜·寒水 high celebrant) through her profession blueprint, plus the
+  small raised-initial-arousal authoring kwarg on her spawn data and the
+  `church` place kwarg on the church place records. Per owner decision the
+  聖所執事 (羅海西亞·芬威克) stays a plain merchant who only sells the
+  sanctum's wares — ministry is the celebrant's office alone (nuns join the
+  roster in a later sub-project). `place-driven-service-sync` convergence
+  stays idempotent with the new component.
 
 ## Capabilities
 
@@ -74,9 +76,10 @@ place-driven service sync.
   stage), `world/rules/rulebook/church.yaml`, `world/lore/church/`
   (`OFFERING_CATALOG`, `REDEEM_CATALOG` shell, church-place derivation),
   `ChurchHost` component (sibling of `GuildStaff`).
-- Edited: the two clergy NPC roster rows (+ `ChurchHost` blueprint kwargs, +
-  raised-initial-arousal authoring kwarg), the church place records (+ `church`
-  kwarg), `.github/evennia-shards.json`.
+- Edited: the celebrant NPC roster row (+ `ChurchHost` blueprint kwargs, +
+  raised-initial-arousal authoring kwarg; the sanctum steward's merchant row
+  is authored with no ChurchHost and no arousal seed), the church place
+  records (+ `church` kwarg), `.github/evennia-shards.json`.
 - No player-visible surface, no commands, no docs trio change in this change;
   no quest channel, no LLM participation (offline determinism is a standing
   constraint on everything built on this substrate); no backward-compat shims

@@ -148,8 +148,10 @@ amended: subrace-gated office grant)
 Modeled byte-shape-wise on guild registration (`commands/guild.py`):
 
 1. New `ChurchHost` typeclass component (sibling of `GuildStaff`), authored
-   on the two registered clergy NPCs (艾莉安娜·寒水 high celebrant,
-   羅海西亞·芬威克 sanctuary steward).
+   on the one registered clergy NPC (艾莉安娜·寒水 high celebrant). Owner
+   decision: the sanctum steward (羅海西亞·芬威克) is a plain merchant who
+   only sells the sanctum's wares; ministry — enrollment and service — is the
+   celebrant's office alone (nuns join the roster in a later sub-project).
 2. Command `church join` (aliases 入教／洗禮): resolves a local church host
    (`resolve_local_service_host` pattern) → schedule gate
    (`interaction_reason(host, "service_church")`) → deterministic
@@ -252,7 +254,7 @@ and never auto-counts.
 5. Decline: `church_offering_declined` event, no writes.
 6. Presentation hint only: an NPC at high arousal, when addressed, is
    prompted in flavour text to propose receiving ministry (no mechanical
-   force). Sanctuary NPCs are authored with a raised initial arousal
+   force). The celebrant is authored with a raised initial arousal
    (small new authoring kwarg on NPC spawn data; the runtime sexual state
    already exists).
 
@@ -428,7 +430,7 @@ ceiling ≤ 8 tasks / ≤ one engineer-day per change — the original 28-task
 
 | # | Change key | Scope | Delta specs (requirements) | Tasks | Commits |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `implement-church-foundation` | `db.church` ledger + `church.yaml` (monotonicity + passive-no-negativity loader gates; acceptance/pray/accrual/payout tuning finals) + frozen `OFFERING_CATALOG`/`REDEEM_CATALOG` shells + validators + `church` place-kwarg derivation (duplicate-kwarg fail-closed) + `ChurchHost` authored on the two clergy roster rows (+ raised-initial-arousal kwarg); no player-visible surface | `church-ordination` (new, 4: ledger, rulebook gates, venues/hosts, catalogue shells) | 8 | `bbdecd6a` |
+| 1 | `implement-church-foundation` | `db.church` ledger + `church.yaml` (monotonicity + passive-no-negativity loader gates; acceptance/pray/accrual/payout tuning finals) + frozen `OFFERING_CATALOG`/`REDEEM_CATALOG` shells + validators + `church` place-kwarg derivation (duplicate-kwarg fail-closed) + `ChurchHost` authored on the celebrant roster row only (+ raised-initial-arousal kwarg; the sanctum steward stays a plain merchant); no player-visible surface | `church-ordination` (new, 4: ledger, rulebook gates, venues/hosts, catalogue shells) | 8 | `bbdecd6a` |
 | 2 | `implement-church-enrollment` | `church join` three-stage flow + female `human_royal` vessel branch (no uniqueness) + unconditional vestment handover + violet_altoria preset/prose deletion + lore realignment + join docs trio | `church-ordination` (ADDED 6) + `saintess-vessel` (REMOVED+ADDED replacement of requirements 1+5: enrollment grant path, predicate-family extension with the global 聖女 office-name title ban reaffirmed) | 7 | `3a0022a5` |
 | 3 | `implement-church-accrual` | `church pray` (venue/cap/clock accrual) + `church offer` (arousal-ordinal acceptance curve, never affinity) + `climax_while_enrolled` side-reaction + commit-bound observability + AI-dead smoke over these paths + pray/offer docs trio | `church-ordination` (ADDED 5, incl. the accrual-path determinism/observability requirement split-finer from core's omnibus) | 7 | `e2708a87` |
 | 4 | `implement-church-redemption` | 16-key price-band finals + Series A/B/D `SKILL_REGISTRY` rows + grown `REDEEM_CATALOG` + `church redeem`/`merit` rail + negative-set/guard-green tests + redeem/merit docs trio | `church-ordination` (ADDED 3) | 6 | `d57949cc` |

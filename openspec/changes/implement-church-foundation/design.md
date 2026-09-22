@@ -44,7 +44,9 @@ absence of any writer, tested at the wallet boundary.
 
 **D3 — `ChurchHost` is a sibling `GuildStaff` component, not a `Merchant`
 extension.** Same capability-adapter shape (zero state writes), authored on the
-two clergy NPC roster rows via their profession blueprint kwargs. The
+celebrant NPC roster row via her profession blueprint kwargs (the sanctum steward
+stays a plain merchant per owner decision; ministry is the celebrant's office
+alone). The
 three-stage join flow itself lands with the enrollment change; the component
 and its roster authoring land here because the accrual change's venue check and
 the enrollment change's host resolution both read it.
@@ -82,7 +84,7 @@ to the redemption change, which owns the rows being priced.
   redemption change appends rows behind the same validator.
 - [The polarity data-contract test hardcodes shipped keys and rots when
   Series C lands] → D5 mandates a catalogue-driven enumeration.
-- [Adding `ChurchHost` kwargs to the clergy roster rows touches place
+- [Adding `ChurchHost` kwargs to the celebrant roster row touches place
   authoring] → `place-driven-service-sync` convergence is roster-authoritative;
   the tasks verify sync idempotence with the new component and a non-empty
   derived church-place set.
