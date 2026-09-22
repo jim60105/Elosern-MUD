@@ -59,6 +59,19 @@
       max_hp_coefficient: 140
       flat_max_hp_fraction: 0.05
 
+# 高潮即虔誠（climax-while-enrolled, church design §5.4）：入教者每次進入
+# 「進行中」期相即依 church.yaml 的 accrual 記帳獲得恩寵（the erotic
+# practice IS devotion）。enrollment condition 對未入教者 fail-closed：
+# 未入教實體的高潮結算位元組無異（該行永遠不觸發）。金額唯讀自
+# church.yaml 的 accrual_climax_while_enrolled，此處不重複任何調校數字。
+- id: climax_while_enrolled
+  when:
+    field: climax_phase
+    equals: 進行中
+    church_enrolled: true
+  then:
+    merit_gain: accrual_climax_while_enrolled
+
 # 荊棘反甲（earth-spell-catalog D2）：the first live rule on the shipped
 # physical_hit event — holder-gated through buff_active on the empty-modifier
 # earth_carapace mount; the counter lives and dies with the buff instance.
