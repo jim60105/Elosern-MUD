@@ -144,6 +144,97 @@ class RequestBuildingTests(unittest.TestCase):
         self.assertNotIn("{description}", positive)
         self.assertNotIn("{", negative)
 
+    @covers_requirement(
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key"
+    )
+    def test_shipped_portrait_templates_compose_a_full_body_white_backdrop(self):
+        portrait, negative = render_prompt_pair(_monster("low"), "a monster description")
+        for phrase in (
+            "full-body",
+            "standing",
+            "head to feet",
+            "simple background",
+            "white background",
+            "plain white backdrop",
+            "isolated on white",
+        ):
+            with self.subTest(positive=phrase):
+                self.assertIn(phrase, portrait)
+        for phrase in (
+            "medium half-body",
+            "out-of-focus",
+            "painted",
+            "blurred",
+            "textured",
+            "scenic background",
+        ):
+            with self.subTest(removed_positive=phrase):
+                self.assertNotIn(phrase, portrait)
+        for phrase in (
+            "lowres",
+            "jpeg artifacts",
+            "blurry",
+            "deformed",
+            "disfigured",
+            "bad anatomy",
+            "extra limbs",
+            "missing limbs",
+            "cropped",
+            "out of frame",
+            "watermark",
+            "signature",
+            "text",
+            "letters",
+            "logo",
+            "duplicate",
+            "mutilated",
+            "mutated hands",
+            "fused fingers",
+            "poorly drawn face",
+            "bad proportions",
+            "oversaturated",
+            "cluttered background",
+            "detailed background",
+            "scenery",
+            "landscape",
+            "furniture",
+            "gradient background",
+            "background shadow",
+            "close-up",
+            "portrait crop",
+            "cropped legs",
+            "cropped feet",
+        ):
+            with self.subTest(negative=phrase):
+                self.assertIn(phrase, negative)
+        scene, _ = render_prompt_pair(_scene("t_synth_city"), "a scene description")
+        for phrase in ("foreground", "midground", "background"):
+            with self.subTest(scene=phrase):
+                self.assertIn(phrase, scene)
+        for phrase in (
+            "white backdrop",
+            "white background",
+            "simple background",
+            "isolated on white",
+        ):
+            with self.subTest(scene_exemption=phrase):
+                self.assertNotIn(phrase, scene)
+
+    @covers_requirement(
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key"
+    )
+    def test_portrait_prompt_pair_is_independent_of_the_cutout_setting(self):
+        with override_settings(ART_REMBG_ENABLED=True):
+            with_cutout = build_txt2img_request(_monster("low"), "a monster description")
+        with override_settings(ART_REMBG_ENABLED=False):
+            without_cutout = build_txt2img_request(
+                _monster("low"), "a monster description"
+            )
+        self.assertEqual(
+            (with_cutout["prompt"], with_cutout["negative_prompt"]),
+            (without_cutout["prompt"], without_cutout["negative_prompt"]),
+        )
+
 
 class GenerateValidationTests(unittest.TestCase):
     def _client(self, transport):

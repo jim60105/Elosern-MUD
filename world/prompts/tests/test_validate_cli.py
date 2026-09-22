@@ -45,7 +45,6 @@ class ValidateCliTests(unittest.TestCase):
             "npc_dialogue.system",
             "scenario_director.system",
             "npc.thinking",
-            "art.style",
             "art.character_description",
             "art.monster_description",
             "character_creation.system",

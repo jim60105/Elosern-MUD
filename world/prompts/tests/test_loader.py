@@ -362,7 +362,7 @@ class ValidationFailureTests(PromptFixture):
         self.assertIn("narrator.system", library.errors)
         self.assertIn("npc_dialogue.system", library.texts)
         self.assertIn("scenario_director.system", library.texts)
-        self.assertIn("art.style", library.texts)
+        self.assertIn("art.character_description", library.texts)
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_unreadable_file_marks_its_keys_unavailable(self):
@@ -463,10 +463,24 @@ class RenderContractTests(PromptFixture):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_render_is_byte_identical_for_identical_input(self):
         self.load()
-        first = render_prompt("art.character_description", race="t_ashfolk", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
-        second = render_prompt("art.character_description", race="t_ashfolk", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
+        first = render_prompt(
+            "art.character_description",
+            race="t_ashfolk",
+            age="24",
+            appearance="",
+            equipment="",
+            custom="",
+        )
+        second = render_prompt(
+            "art.character_description",
+            race="t_ashfolk",
+            age="24",
+            appearance="",
+            equipment="",
+            custom="",
+        )
         self.assertEqual(first, second)
-        self.assertEqual(first, "A t_ashfolk character named 艾琳 (24) in the approved visual style.")
+        self.assertEqual(first, "t_ashfolk, 24 years old.")
 
 
 class ArtGenerationPromptTests(PromptFixture):
@@ -494,7 +508,7 @@ class ArtGenerationPromptTests(PromptFixture):
             "art.yaml",
             "schema_version: 1\n"
             "prompts:\n"
-            "  art.style: approved visual style\n"
+            "  art.negative_prompt: lowres\n"
             "  art.scene_prompt: 場景 {nmme}。\n",
         )
         library = self.load()
@@ -510,9 +524,8 @@ class ArtGenerationPromptTests(PromptFixture):
             "art.yaml",
             "schema_version: 1\n"
             "prompts:\n"
-            "  art.style: approved visual style\n"
             "  art.character_description: |-\n"
-            "    A {race} character named {name} ({age}) in the {style}.\n"
+            "    {race}, {age} years old.{appearance}{equipment}{custom}\n"
             "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n"
             "  art.negative_prompt: lowres, text\n"
             "  art.portrait_prompt: |-\n"
@@ -525,7 +538,10 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertNotEqual(before, after)
         self.assertEqual(library.unavailable, frozenset())
 
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    @covers_requirement(
+        "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth",
+        "art-gallery-prompt-fields::the-prompt-library-remains-the-sole-source-of-the-composed-template",
+    )
     def test_character_description_placeholder_set_matches_the_template(self):
         """Every shipped-template slot is allowlisted and every allowlisted
         name is slotted — the registry and prompts/art.yaml cannot drift."""
@@ -535,10 +551,11 @@ class ArtGenerationPromptTests(PromptFixture):
         text = declared["prompts"]["art.character_description"]
         tokens = set(_PLACEHOLDER_RE.findall(text))
         allowed = set(PROMPT_SPECS["art.character_description"].allowed_placeholders)
-        self.assertEqual(tokens, allowed)
-        self.assertIn("appearance", tokens)
-        self.assertIn("equipment", tokens)
-        self.assertIn("custom", tokens)
+        expected = {"race", "age", "appearance", "equipment", "custom"}
+        self.assertEqual(tokens, expected)
+        self.assertEqual(allowed, expected)
+        self.assertNotIn("name", tokens)
+        self.assertNotIn("style", tokens)
 
 
 class LoadLifecycleTests(unittest.TestCase):

@@ -6,10 +6,13 @@ cover the pure eligibility contract â€” canonical attribute presence and type â€
 against real ``PlayerCharacter`` attributes.
 """
 
+from unittest.mock import patch
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from world.art.service import request_gallery_image
 from world.art.subjects import ArtSubjectError, character_ages
 
 from tools.spec_traceability import covers_requirement
@@ -56,6 +59,29 @@ class CharacterAgesTests(EvenniaTestCase):
         with self.assertRaises(ArtSubjectError) as ctx:
             character_ages(self.character)
         self.assertIn("age", str(ctx.exception))
+
+    @covers_requirement(
+        "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
+    )
+    def test_gallery_description_receives_the_apparent_age(self):
+        self.character.age = 240
+        self.character.apparent_age = 31
+        self.character.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": "subject-age-seam",
+        }
+        with (
+            patch(
+                "world.art.service.description_for", return_value="description"
+            ) as compose,
+            patch("world.art.service.enqueue_gallery_job"),
+        ):
+            request_gallery_image(self.character)
+        args, kwargs = compose.call_args
+        self.assertEqual(args[0].full(), "portrait:character:subject-age-seam")
+        self.assertIs(kwargs["entity"], self.character)
+        self.assertEqual(kwargs["apparent_age"], 31)
+        self.assertNotEqual(kwargs["apparent_age"], self.character.age)
 
 
 if __name__ == "__main__":
