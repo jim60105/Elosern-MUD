@@ -75,6 +75,12 @@ open **角色狀態 → 技能書**, then choose **修煉** beside an active ski
 | [`guild request`](/game/command-reference?id=guild-request) | 委託公會規劃任務（護衛尚未開放）。 |
 | [`guild exam`](/game/command-reference?id=guild-exam) | 申請公會考核。 |
 
+## 教會
+
+| 指令 | 說明 |
+| --- | --- |
+| [`church join`](/game/command-reference?id=church-join) | 在主祭面前入教（入教／洗禮）。 |
+
 ## 知識圖鑑
 
 | 指令 | 說明 |

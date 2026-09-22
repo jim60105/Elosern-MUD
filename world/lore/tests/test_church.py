@@ -1,15 +1,19 @@
-"""Data-contract test: frozen church catalogues and the derived church-place venue set
+"""Data-contract test: frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract
 
 The shipped OFFERING_CATALOG seeds resolve against the live sexual-act
 catalogue, REDEEM_CATALOG ships as a validated empty shell with its row
 validator rejecting planted malformed rows by name, `saintess_vessel` never
 enters the redemption catalogue, and the church-place set is derived
-fail-closed from the place registry's authored `church` kwargs.
+fail-closed from the place registry's authored `church` kwargs. The lore
+documents are realigned with the shipped mechanics: the once-per-generation
+Saintess framing is retired in favour of the no-uniqueness enrollment grant,
+and the 神殿／聖所 ministry counter carries the 〔已實作〕 status tag.
 """
 
 from tools.spec_traceability import covers_requirement
 
 from dataclasses import replace
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -28,6 +32,16 @@ from world.lore.church.places import (
     resolve_church_place_keys,
 )
 from world.lore.settlements.places import PLACE_REGISTRY
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# The once-per-generation donated-princess framing, retired by this change:
+# a search across the lore documents must find none of these phrasings.
+_RETIRED_FRAMINGS = (
+    "每代由王國王室獻任的公主",
+    "王室每代獻任的公主",
+    "每代獻一女",
+)
 
 
 class OfferingCatalogueTests(TestCase):
@@ -175,6 +189,55 @@ class ChurchPlaceDerivationTests(TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, "more than once"):
                         resolve_church_place_keys()
+
+
+class ChurchLoreRealignmentTests(TestCase):
+    """The lore documents state the no-uniqueness office and current status."""
+
+    def _read(self, relative: str) -> str:
+        return (REPO_ROOT / relative).read_text(encoding="utf-8")
+
+    @covers_requirement(
+        "church-ordination::lore-documents-state-the-no-uniqueness-office-and-current-status"
+    )
+    def test_the_religion_overview_states_the_no_uniqueness_enrollment_framing(self):
+        section = self._read("docs/lore/overview.md")
+        self.assertIn("任何女性王族後裔皆可獻與教會", section)
+        self.assertIn("於入教儀式中祝聖", section)
+        self.assertNotIn("每代由王國王室獻任的公主", section)
+
+    @covers_requirement(
+        "church-ordination::lore-documents-state-the-no-uniqueness-office-and-current-status"
+    )
+    def test_the_light_tree_footnote_reflects_the_enrollment_grant(self):
+        footnote = self._read("docs/lore/skill-trees/light.md")
+        self.assertIn("入教儀式中祝聖的容器職位", footnote)
+        self.assertIn("無唯一性", footnote)
+        self.assertIn("〔已實作〕被動 `saintess_vessel`", footnote)
+        self.assertNotIn("王室每代獻任的公主", footnote)
+        self.assertNotIn("頭銜隨之移交", footnote)
+
+    @covers_requirement(
+        "church-ordination::lore-documents-state-the-no-uniqueness-office-and-current-status"
+    )
+    def test_the_temple_section_status_tag_tracks_the_landing(self):
+        section = self._read("docs/lore/settlement-locations.md")
+        self.assertIn("〔已實作〕`church join`", section)
+        self.assertIn("入教／洗禮", section)
+
+    @covers_requirement(
+        "church-ordination::lore-documents-state-the-no-uniqueness-office-and-current-status"
+    )
+    def test_the_retired_once_per_generation_framing_appears_nowhere(self):
+        offenders: list[str] = []
+        for path in (REPO_ROOT / "docs" / "lore").rglob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            for claim in _RETIRED_FRAMINGS:
+                if claim in text:
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT).as_posix()}:{claim}"
+                    )
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":
