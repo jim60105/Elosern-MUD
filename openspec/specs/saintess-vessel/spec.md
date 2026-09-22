@@ -1,12 +1,12 @@
 # saintess-vessel Specification
 
 ## Purpose
-Defines the 聖女容器 (`saintess_vessel`) passive: the 劇情/聖職敘階-granted Saintess vessel whose 聖光涓流 keeps her arousal idling in the 微興奮～中等 band on the world clock, whose two named public blessing ceremonies each read her excitement tier exactly once, and whose boundary transitions are recorded through the observability facade.
+Defines the 聖女容器 (`saintess_vessel`) passive: the church-enrollment-granted Saintess vessel whose 聖光涓流 keeps her arousal idling in the 微興奮～中等 band on the world clock, whose two named public blessing ceremonies each read her excitement tier exactly once, and whose boundary transitions are recorded through the observability facade.
 
 ## Requirements
 
-### Requirement: saintess_vessel is a granted-only clergy qualifier passive
-`SKILL_REGISTRY` SHALL contain `saintess_vessel`（聖女容器）declared `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, `usable_out_of_combat=True`, `element="light"`, `category=SkillCategory.ENHANCEMENT`, with an EMPTY effects collection (asserted by emptiness, not container type — the shipped builder defaults the omitted field to its shared frozen empty list) and no lineage prerequisites — the same qualifier-row shape as `pain_to_pleasure`, `rapture_renewal`, and `priestly_grace`. The row SHALL NOT appear in any genealogy tree, and the passive kind itself SHALL keep it unearnable: the practice-award entries and the cross-lineage unlock engine SHALL reject it exactly as they already reject PASSIVE skills. It SHALL NOT be conferrable (`validate_conferrable_skill` accepts only stat-multiply/rule-table shaped rows and the vessel carries neither), joining the same non-conferrable qualifier class as the other three clergy passives. The ONLY production paths that place it on an entity are preset activation (`passive_skills`) and an import record. The shipped Saintess preset's `passive_skills` SHALL include `saintess_vessel`.
+### Requirement: saintess_vessel is a church-enrollment-granted clergy qualifier passive
+`SKILL_REGISTRY` SHALL contain `saintess_vessel`（聖女容器）declared `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, `usable_out_of_combat=True`, `element="light"`, `category=SkillCategory.ENHANCEMENT`, with an EMPTY effects collection (asserted by emptiness, not container type — the shipped builder defaults the omitted field to its shared frozen empty list) and no lineage prerequisites — the same qualifier-row shape as `pain_to_pleasure`, `rapture_renewal`, and `priestly_grace`. The row SHALL NOT appear in any genealogy tree, and the passive kind itself SHALL keep it unearnable: the practice-award entries and the cross-lineage unlock engine SHALL reject it exactly as they already reject PASSIVE skills. It SHALL NOT be conferrable (`validate_conferrable_skill` accepts only stat-multiply/rule-table shaped rows and the vessel carries neither), joining the same non-conferrable qualifier class as the other three clergy passives. The ONLY production path that places it on an entity is the church enrollment transaction of a female `human_royal` character — the enrollment grant replaces the former preset-activation grant (the shipped `violet_altoria` preset's `passive_skills` SHALL NOT include `saintess_vessel`), there is no office uniqueness (every eligible royal who enrolls becomes a saintess; no global office state exists), and the vessel SHALL NEVER be a redemption-catalogue row at any price (negative-set pinned). The PASSIVE guards, the granted-only character, and the granted-event observability are unchanged: the enrollment transaction reuses the same canonical granted-passive write path and the same `saintess_vessel_granted` event.
 
 #### Scenario: The vessel row exists with the clergy qualifier shape
 - **WHEN** `SKILL_REGISTRY["saintess_vessel"]` is read
@@ -20,9 +20,21 @@ Defines the 聖女容器 (`saintess_vessel`) passive: the 劇情/聖職敘階-gr
 - **WHEN** `validate_conferrable_skill` is called with `saintess_vessel`
 - **THEN** it raises, exactly as it does for `pain_to_pleasure`
 
-#### Scenario: The shipped Saintess preset carries the vessel at activation
-- **WHEN** the Saintess preset is activated and its activation transaction commits
-- **THEN** her stored passive skill list contains `saintess_vessel` and exactly one `saintess_vessel_granted` observability event is emitted at commit
+#### Scenario: Church enrollment by a female royal is the sole grant path
+- **WHEN** a female `human_royal` character's church enrollment transaction commits
+- **THEN** her stored passive skill list contains `saintess_vessel` and exactly one `saintess_vessel_granted` observability event is emitted at that commit, and activating the shipped preset grants neither the vessel nor the event
+
+#### Scenario: No other initiate is granted the vessel
+- **WHEN** an initiate of any other subrace, or a male `human_royal`, enrolls
+- **THEN** no `saintess_vessel` grant or granted event occurs
+
+#### Scenario: There is no office uniqueness
+- **WHEN** two distinct female `human_royal` characters each complete enrollment
+- **THEN** both hold the vessel; nothing tracks or caps a global office holder
+
+#### Scenario: The vessel is never purchasable
+- **WHEN** the church redemption catalogue is enumerated
+- **THEN** `saintess_vessel` is absent at every price, permanently
 
 ### Requirement: Saintess trickle pins the holder's idle arousal inside the idle band
 For an entity owning `saintess_vessel`, the world-clock settlement SHALL guarantee that after any settlement step the entity's pleasure is never below the 微興奮 floor (15) while the holder sits below the 中等/高度 boundary behavior defined below. Concretely, all writes through the sanctioned `world/rules/` pleasure writers only (never a typeclass, AI, or presentation module):
@@ -93,8 +105,8 @@ The vessel's rulebook rows SHALL carry exactly the `blessing_arousal_scale` valu
 - **WHEN** `evaluate_combat_modifiers` is evaluated for a vessel holder who owns no other modifier-bearing skill, buff, or equipment and has no active blessing
 - **THEN** the merged bundle contains exactly `blessing_arousal_scale` and no numeric combat axis
 
-### Requirement: The oath flip and vessel grant are observable through the facade without title state
-The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` event, for an entity owning `saintess_vessel`, SHALL emit exactly one `saintess_oath_broken` observability event through the `world.observability` facade, registered through the transaction-commit seam so a rolled-back transaction emits nothing, with a plain-data context carrying at least the entity identifier and the event name. A non-holder's flag flip SHALL emit no `saintess_oath_broken` event. The flip SHALL NOT create, bank, remove, or mutate any title state, and the title-system's predicate families, bank path, removal path, and fixed-title rows SHALL be unchanged by this capability; the 聖女 title remains narrative identity prose read alongside the stored `virgin` flag.
+### Requirement: The oath flip stays observable through the facade and the office-name title ban holds
+The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` event, for an entity owning `saintess_vessel`, SHALL emit exactly one `saintess_oath_broken` observability event through the `world.observability` facade, registered through the transaction-commit seam so a rolled-back transaction emits nothing, with a plain-data context carrying at least the entity identifier and the event name. A non-holder's flag flip SHALL emit no `saintess_oath_broken` event. The flip SHALL NOT create, bank, remove, or mutate any title state, and the title-system's bank path, removal path, and fixed-title rows SHALL be unchanged by this capability; the 聖女 title remains narrative identity prose read alongside the stored `virgin` flag. The `TitlePredicateFamily` closed set SHALL be extended by at most one member — the church redeemed-count family (a count of redeemed church-catalogue skills which by construction can never reference the vessel, since the vessel never enters the redeemed set), landed by the sibling order-catalogue change; the extension is what this amendment sanctions, and until that change lands the family set stays unchanged — and no predicate family beyond it SHALL be added. The office-name ban is reaffirmed unchanged and stays global: no fixed-title row of ANY category SHALL display or otherwise name the 聖女 office.
 
 #### Scenario: A holder's oath flip logs exactly once at commit
 - **WHEN** a vessel holder's `virgin` flag flips via the `first_vaginal_penetration` rulebook event and the enclosing transaction commits
@@ -112,6 +124,6 @@ The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` ev
 - **WHEN** `first_vaginal_penetration` fires again for an entity whose flag is already false
 - **THEN** the rule's irreversibility yields no state change and no further oath event
 
-#### Scenario: No title predicate family is added
-- **WHEN** `TitlePredicateFamily` members and fixed-title registry rows are enumerated after this capability ships
-- **THEN** both sets are unchanged and no fixed-title row names the Saintess office
+#### Scenario: The only sanctioned predicate-family extension is the church redemption count
+- **WHEN** `TitlePredicateFamily` members and fixed-title registry rows are enumerated at this capability's landing and after the sibling order-catalogue change lands
+- **THEN** the family set differs from the pre-church set by at most the church redeemed-count family and nothing else, the title bank and removal paths are unchanged, and no fixed-title row — church or otherwise — names the Saintess office
