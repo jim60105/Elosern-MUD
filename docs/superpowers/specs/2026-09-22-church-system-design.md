@@ -180,11 +180,11 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    (the `QuestReward` item-quantity rail; presentation reads as the host
    placing the vestment in the initiate's hands, offline-deterministic —
    the LLM `give_item` dialogue intent is deliberately NOT the channel).
-   Handover is holding-aware: a character already carrying ≥1 of that item
-   key receives no duplicate (a general guard; no shipped starter carries a
-   vestment any more — see the preset change below — so every enrollment
-   including violet_altoria's receives its robe). The grant ships in the
-   same ledger event context (`char`, `host`, `item`).
+   The handover is unconditional (owner decision): every enrollment receives
+   exactly one vestment even if the initiate already carries that item key
+   — the celebrant's gift is the rite, not the inventory, so there is no
+   holding check. The grant ships in the same ledger event context
+   (`char`, `host`, `item`).
 6. **Preset change (same change):** `violet_altoria.passive_skills` drops
    `saintess_vessel`; the vessel-bearing starter becomes a royal princess
    awaiting nothing in particular — pre-enrollment she is simply a 王女.
@@ -397,7 +397,8 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 - Vestment handover tests: ordinary enrollment receives exactly one
   `sister_vestments`; a vessel-branch enrollment without the robe receives
   exactly one `saintess_vestments`; an enrollment that already carries the
-  key receives none; the grant is transactional with the ledger write.
+  key still receives its one; the grant is transactional with the ledger
+  write.
 - Iron-rule gate: loader rejects negative-polarity passive rows; data
   contract test over shipped rows asserts every church PASSIVE's rule rows
   are positive polarity only.
