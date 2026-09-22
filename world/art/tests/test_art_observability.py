@@ -459,6 +459,9 @@ class TranslationEventTests(EvenniaTest):
             ):
                 yield
 
+    @covers_requirement(
+        "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
+    )
     def test_success_emits_one_done_event_with_the_exact_context_schema(self):
         subject = _subject("t_synth_translate_done")
         ensure(subject, "第一行漢字\nLatin")
@@ -493,6 +496,12 @@ class TranslationEventTests(EvenniaTest):
         self.assertIsInstance(context["duration_ms"], int)
         self.assertNotIn("exc", done[0].kwargs)
 
+    @covers_requirement(
+        "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
+    )
+    @covers_requirement(
+        "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
+    )
     def test_forward_default_failure_emits_one_bounded_event_and_still_settles(self):
         subject = _subject("t_synth_translate_forward_default")
         description = "引擎尚未安裝"
@@ -523,6 +532,9 @@ class TranslationEventTests(EvenniaTest):
         self.assertEqual(failed[0].kwargs["exc"].code, "art_translate_unavailable")
         self.assertEqual(client.calls, [(subject, description)])
 
+    @covers_requirement(
+        "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
+    )
     def test_unknown_translator_code_is_normalized_before_the_failure_event(self):
         subject = _subject("t_synth_translate_unknown_code")
         description = "未知錯誤碼"
@@ -541,6 +553,12 @@ class TranslationEventTests(EvenniaTest):
         )
         self.assertEqual(client.calls, [(subject, description)])
 
+    @covers_requirement(
+        "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
+    )
+    @covers_requirement(
+        "art-prompt-translation::a-per-line-language-gate-skips-text-that-needs-no-translation"
+    )
     def test_disabled_and_all_latin_runs_are_silent_and_unresolved(self):
         disabled = _subject("t_synth_translate_disabled")
         latin = _subject("t_synth_translate_latin")

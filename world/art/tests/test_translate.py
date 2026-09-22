@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
+from tools.spec_traceability import covers_requirement
 from world.art.fake_translate import FakeTranslator
 from world.art.translate import (
     TranslateError,
@@ -60,6 +61,9 @@ class _InfiniteIterationSequence(Sequence[str]):
 
 
 class BackendResolutionTests(unittest.TestCase):
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_resolution_failures_all_raise_art_translate_unavailable(self):
         paths = (
             "not-a-dotted-path",
@@ -74,6 +78,9 @@ class BackendResolutionTests(unittest.TestCase):
                         resolve_translate_backend()
                 self.assertEqual(caught.exception.code, "art_translate_unavailable")
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_non_string_setting_values_raise_art_translate_unavailable(self):
         for value in (None, 7):
             with self.subTest(value=value):
@@ -88,12 +95,18 @@ class TranslationBoundaryTests(unittest.TestCase):
         with patch.object(translate, "resolve_translate_backend", return_value=backend):
             return translate_description(text)
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_an_arbitrary_backend_exception_becomes_art_translate_error(self):
         with self.assertRaises(TranslateError) as caught:
             self._translate_with(_StubBackend(error=RuntimeError("engine exploded")))
         self.assertEqual(caught.exception.code, "art_translate_error")
         self.assertIsInstance(caught.exception.__cause__, RuntimeError)
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_scripted_bounded_backend_error_remains_art_translate_error(self):
         with self.assertRaises(TranslateError) as caught:
             self._translate_with(
@@ -101,11 +114,17 @@ class TranslationBoundaryTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "art_translate_error")
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_unknown_backend_error_code_is_normalized(self):
         with self.assertRaises(TranslateError) as caught:
             self._translate_with(_StubBackend(error=TranslateError("unexpected", "bad")))
         self.assertEqual(caught.exception.code, "art_translate_error")
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_invalid_backend_results_are_bounded(self):
         cases = {
             "non-sequence": "not lines",
@@ -121,6 +140,9 @@ class TranslationBoundaryTests(unittest.TestCase):
                     self._translate_with(_StubBackend(result=result))
                 self.assertEqual(caught.exception.code, "art_translate_error")
 
+    @covers_requirement(
+        "art-prompt-translation::a-per-line-language-gate-skips-text-that-needs-no-translation"
+    )
     def test_all_latin_short_circuits_before_backend_resolution(self):
         text = "prompt tags\nblue hair"
         with patch.object(
@@ -132,6 +154,12 @@ class TranslationBoundaryTests(unittest.TestCase):
         self.assertEqual(actual, text)
         self.assertEqual(counts, TranslationCounts(0, 0, 0))
 
+    @covers_requirement(
+        "art-prompt-translation::a-per-line-language-gate-skips-text-that-needs-no-translation"
+    )
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_mixed_lines_are_batched_reassembled_and_count_untranslated(self):
         backend = _StubBackend(result=("translated", "專名"))
         text = "Latin\n漢字第一行\nuntouched\n漢字第二行"
@@ -140,6 +168,9 @@ class TranslationBoundaryTests(unittest.TestCase):
         self.assertEqual(actual, "Latin\ntranslated\nuntouched\n專名")
         self.assertEqual(counts, TranslationCounts(4, 2, 1))
 
+    @covers_requirement(
+        "art-prompt-translation::a-per-line-language-gate-skips-text-that-needs-no-translation"
+    )
     def test_empty_and_whitespace_only_descriptions_are_noops(self):
         for text in ("", " \t "):
             with self.subTest(text=repr(text)):
@@ -152,12 +183,18 @@ class TranslationBoundaryTests(unittest.TestCase):
                 self.assertEqual(actual, text)
                 self.assertEqual(counts, TranslationCounts(0, 0, 0))
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
+    )
     def test_translate_module_has_no_observability_dependency(self):
         source = Path(translate.__file__).read_text(encoding="utf-8")
         self.assertNotIn("world.observability", source)
 
 
 class FakeTranslatorTests(unittest.TestCase):
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-injectable-and-tests-never-load-a-translation-library"
+    )
     def test_fake_records_calls_changes_each_line_and_replays_failures(self):
         fake = FakeTranslator()
         self.assertEqual(

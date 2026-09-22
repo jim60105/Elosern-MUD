@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
+from tools.spec_traceability import covers_requirement
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.fake_translate import FakeTranslator
 from world.art.queue import (
@@ -40,6 +41,9 @@ class TranslationStageTests(WorkerStoreIsolation):
             ):
                 yield
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
+    )
     def test_enabled_stage_translates_classic_scene_character_and_monster(self):
         description = "含有漢字"
         subjects = (
@@ -73,6 +77,9 @@ class TranslationStageTests(WorkerStoreIsolation):
                 originals[record.db_key],
             )
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
+    )
     def test_enabled_stage_translates_gallery_without_mutating_the_spent_job(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         description = "畫像漢字"
@@ -111,6 +118,12 @@ class TranslationStageTests(WorkerStoreIsolation):
             "gallery settlement deletes only after the boundary observed source text",
         )
 
+    @covers_requirement(
+        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
+    )
+    @covers_requirement(
+        "art-prompt-translation::the-translation-backend-is-injectable-and-tests-never-load-a-translation-library"
+    )
     def test_disabled_stage_leaves_description_and_backend_unresolved(self):
         subject = self._subject("t_synth_disabled_translation")
         description = "原始漢字"
@@ -132,6 +145,9 @@ class TranslationStageTests(WorkerStoreIsolation):
         self.assertEqual(second.calls, [(subject, description)])
         self.assertEqual(target.read_bytes(), baseline)
 
+    @covers_requirement(
+        "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
+    )
     def test_translation_failures_degrade_to_the_original_prompt_without_record_code(self):
         cases = (
             (
