@@ -6,8 +6,10 @@ list with disjoint action ownership:
 
 * ``dispatch_phase_reaction`` runs once after a successful canonical
   ``_apply_climax_phase_set`` edge and executes the ``apply_buff`` /
-  ``remove_buff`` / ``self_heal_max_fraction`` actions of field-conditioned
-  phase rules.
+  ``remove_buff`` / ``self_heal_max_fraction`` / ``merit_gain`` actions of
+  field-conditioned phase rules (``merit_gain`` grants a church.yaml accrual
+  row's merit through the church module's sole accrual primitive — the
+  ``climax_while_enrolled`` rail row, design §5.4).
 * ``dispatch_outcome_reaction`` runs on named outcome events (``hp_loss``,
   ``negative_buff_added``) and executes only the ``pleasure_gain`` action of
   event-conditioned rules; buff actions belong to the phase dispatcher.
@@ -42,6 +44,7 @@ _RECOGNIZED_WHEN_KEYS = frozenset(
         "dual_wielding",
         "equipment_worn",
         "event_source_skill",
+        "church_enrolled",
     }
 )
 
@@ -91,11 +94,13 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
             {"apply_buff_to_source"},
             {"mark_order_op"},
             {"self_heal_max_fraction"},
+            {"merit_gain"},
         ):
             raise ValueError(
                 f"state reaction rule {rule.id!r} then clause must declare exactly one of "
                 f"'apply_buff', 'remove_buff', 'pleasure_gain', 'counter_damage', "
                 f"'apply_buff_to_source', 'mark_order_op', or 'self_heal_max_fraction', "
+                f"or 'merit_gain', "
                 f"got {sorted(then_keys)!r}"
             )
 
@@ -241,6 +246,42 @@ def validate_state_reaction_rules(rules: list[Rule]) -> None:
                 raise ValueError(
                     f"state reaction rule {rule.id!r} self_heal_max_fraction must be a finite "
                     f"number in (0, 1], got {fraction!r}"
+                )
+        elif action_key == "merit_gain":
+            # A church-rules merit grant is a PHASE action: it runs only on
+            # canonical climax phase edges, which only dispatch_phase_reaction
+            # executes — an event-conditioned rule carrying it would be dead
+            # and is rejected fail-closed. The value names a church.yaml
+            # accrual row whose ``merit`` the dispatcher grants through the
+            # church module's single accrual primitive, so the tunable number
+            # never duplicates here.
+            if "event" in rule.when:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} merit_gain is a phase action "
+                    f"and must not be conditioned on an event"
+                )
+            accrual_key = rule.then["merit_gain"]
+            if (
+                isinstance(accrual_key, bool)
+                or not isinstance(accrual_key, str)
+                or not accrual_key.strip()
+            ):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} merit_gain must be the key of a "
+                    f"church.yaml accrual row, got {accrual_key!r}"
+                )
+            from world.rules.church_rulebook import get_church_rules
+
+            accrual = get_church_rules().accrual.get(accrual_key)
+            if accrual is None or "merit" not in accrual:
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} merit_gain names {accrual_key!r}, "
+                    f"which is not a church.yaml accrual row with a merit value"
+                )
+        if "church_enrolled" in rule.when:
+            if not isinstance(rule.when["church_enrolled"], bool):
+                raise ValueError(
+                    f"state reaction rule {rule.id!r} church_enrolled must be a boolean"
                 )
 
 
@@ -439,8 +480,16 @@ def dispatch_phase_reaction(
         return
 
     from world.rules.buffs import active_buff_keys_from_storage
+    from world.rules.church import read_ledger
 
     active_rules = rules if rules is not None else STATE_REACTION_RULES
+    try:
+        enrolled = read_ledger(entity) is not None
+    except Exception:
+        # The enrollment probe never gates the rail's other rows: a malformed
+        # or unreadable ledger fails the church check closed (False) without
+        # breaking an unrelated transition reaction.
+        enrolled = False
     context = {
         "entity": entity,
         "field": "climax_phase",
@@ -448,6 +497,7 @@ def dispatch_phase_reaction(
         "from_phase": from_phase,
         "to_phase": to_phase,
         "active_buffs": active_buff_keys_from_storage(entity),
+        "church_enrolled": enrolled,
     }
 
     for rule in active_rules:
@@ -491,6 +541,20 @@ def dispatch_phase_reaction(
                 amount = min(floored, gap)
                 if amount > 0:
                     _apply_heal(entity, int(amount))
+            elif "merit_gain" in rule.then:
+                # Climax-while-enrolled accrual (design §5.4): the amount
+                # rides the church.yaml accrual row; the write goes through
+                # the church module's sole accrual primitive. The row's
+                # enrollment condition fails closed for the unenrolled, which
+                # keeps their climax settlement byte-identical.
+                from world.rules.church import add_merit
+                from world.rules.church_rulebook import get_church_rules
+
+                accrual_key = rule.then["merit_gain"]
+                accrual = get_church_rules().accrual.get(accrual_key)
+                if accrual is None or "merit" not in accrual:
+                    continue
+                add_merit(entity, int(accrual["merit"]))
 
 
 def _read_max_hp(entity: Any) -> Fraction | None:

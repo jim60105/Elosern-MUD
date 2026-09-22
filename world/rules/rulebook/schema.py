@@ -120,7 +120,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
         "buff_active", "skill_owned", "dual_wielding", "equipment_worn",
-        "skill_qualified", "event_source_skill",
+        "skill_qualified", "event_source_skill", "church_enrolled",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -225,4 +225,10 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
                     and source == expected
                 )
             )
+    if "church_enrolled" in when:
+        if not isinstance(when["church_enrolled"], bool):
+            raise ValueError("church_enrolled condition requires a boolean value")
+        # Fail closed: a missing fact (any table that does not publish it)
+        # reads as False, never as True.
+        checks.append(context.get("church_enrolled") is True)
     return bool(checks) and all(checks)
