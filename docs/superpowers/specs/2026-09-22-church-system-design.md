@@ -11,12 +11,14 @@ uniqueness — any female royal who enrolls becomes the saintess — and the
 preset persona drops all religious narrative (no 聖女繼承人 wording;
 pre-enrollment she is simply 王女).
 Change split: see §8 — the 24-row catalogue alone exceeds the one-workday
-convention, so implementation ships as two OpenSpec changes
-(`implement-church-core`: ledger + enrollment + pray + offering + redemption
-engine + Series A/B/D catalogue; `implement-church-order-catalogue`: Series
-C/E rows). Sub-projects 2 (temple service economy) and 3 (prayer/confession/
-donation observance commands) are deliberately out of scope and get their own
-design documents later.
+convention, and the owner additionally caps every change at one engineer-day
+(eight hours), so implementation ships as six OpenSpec changes: the
+28-task `implement-church-core` proposal was superseded by the re-cut into
+`implement-church-foundation`, `-enrollment`, `-accrual`, `-redemption`, and
+`-combat-ministry`, alongside the existing `implement-church-order-catalogue`
+(Series C/E rows + title ladder). Sub-projects 2 (temple service economy) and
+3 (prayer/confession/donation observance commands) are deliberately out of
+scope and get their own design documents later.
 
 ## 1. Problem and current state
 
@@ -419,36 +421,63 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 
 ## 8. Change split
 
-### 8.1 Proposed OpenSpec changes (created 2026-09-22, os-propose;
-`openspec validate --all --strict` 258/258)
+### 8.1 Proposed OpenSpec changes (re-cut 2026-09-22, os-propose; owner hard
+ceiling ≤ 8 tasks / ≤ one engineer-day per change — the original 28-task
+`implement-church-core` violated it and was superseded;
+`openspec validate --all --strict` 262/262)
 
 | # | Change key | Scope | Delta specs (requirements) | Tasks | Commits |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `implement-church-core` | `db.church` ledger + `church.yaml` (monotonicity + passive-no-negativity loader gates) + `ChurchHost` guild-style enrollment (female `human_royal` vessel grant, no uniqueness; unconditional vestment handover) + violet_altoria preset/prose deletion + pray/offer/redeem/merit + climax accrual + Series A/B/D 16 rows (charges primitive, martyr-vow pool filter) + lore realignment + docs trio | `church-ordination` (new, 16) + `saintess-vessel` (REMOVED+ADDED replacement of requirements 1+5: enrollment grant path, predicate-family extension with the global 聖女 office-name title ban reaffirmed) | 28 | `db83524a`, duck fix `f062e8b3` |
-| 2 | `implement-church-order-catalogue` | Series C (5 pure-positive passives; poverty_vow downside removed per iron rule) + Series E (3 utility) completing 24 rows + clergy title ladder (虔信者 3／修女 6／神官 10／主教 15／樞機 20, new 聖職 category) | `title-system` (ADDED 2 + MODIFIED 2 with main-spec IDs kept) + `church-ordination` (purely additive, 3) | 13 | `3c4b05b6`, duck fix `9907fd2c` |
+| 1 | `implement-church-foundation` | `db.church` ledger + `church.yaml` (monotonicity + passive-no-negativity loader gates; acceptance/pray/accrual/payout tuning finals) + frozen `OFFERING_CATALOG`/`REDEEM_CATALOG` shells + validators + `church` place-kwarg derivation (duplicate-kwarg fail-closed) + `ChurchHost` authored on the two clergy roster rows (+ raised-initial-arousal kwarg); no player-visible surface | `church-ordination` (new, 4: ledger, rulebook gates, venues/hosts, catalogue shells) | 8 | `bbdecd6a` |
+| 2 | `implement-church-enrollment` | `church join` three-stage flow + female `human_royal` vessel branch (no uniqueness) + unconditional vestment handover + violet_altoria preset/prose deletion + lore realignment + join docs trio | `church-ordination` (ADDED 6) + `saintess-vessel` (REMOVED+ADDED replacement of requirements 1+5: enrollment grant path, predicate-family extension with the global 聖女 office-name title ban reaffirmed) | 7 | `3a0022a5` |
+| 3 | `implement-church-accrual` | `church pray` (venue/cap/clock accrual) + `church offer` (arousal-ordinal acceptance curve, never affinity) + `climax_while_enrolled` side-reaction + commit-bound observability + AI-dead smoke over these paths + pray/offer docs trio | `church-ordination` (ADDED 5, incl. the accrual-path determinism/observability requirement split-finer from core's omnibus) | 7 | `e2708a87` |
+| 4 | `implement-church-redemption` | 16-key price-band finals + Series A/B/D `SKILL_REGISTRY` rows + grown `REDEEM_CATALOG` + `church redeem`/`merit` rail + negative-set/guard-green tests + redeem/merit docs trio | `church-ordination` (ADDED 3) | 6 | `d57949cc` |
+| 5 | `implement-church-combat-ministry` | `charges: int` buff primitive + climax-transition consumption + `lamb_seal` narrowing + `rite_martyrdom_vow` `_victim_pool` filter + both byte-identical baselines + the cross-change E2E AI-dead loop proof + observability lint | `church-ordination` (ADDED 3, incl. the E2E loop-observability requirement) | 5 | `32bb25e5` |
+| 6 | `implement-church-order-catalogue` | Series C (5 pure-positive passives; poverty_vow downside removed per iron rule) + Series E (3 utility) completing 24 rows + clergy title ladder (虔信者 3 ／ 修女 6 ／ 神官 10 ／ 主教 15 ／ 樞機 20, new 聖職 category) | `title-system` (ADDED 2 + MODIFIED 2 with main-spec IDs kept) + `church-ordination` (purely additive, 3) | 13 | `3c4b05b6`, duck fix `9907fd2c`, dep repoint `332922e5` |
 
 ### 8.2 Implementation batch order (serial queue)
 
-1. **Batch 1 — `implement-church-core`** (apply → verify → archive+sync).
-   Hard dependency: none (consumes `settlement-place-registry` /
-   `guild-registration` / `shop-economy` verbatim; the church place kwarg
-   rides the existing authored-kwargs contract, deliberately not delta'd).
-2. **Batch 2 — `implement-church-order-catalogue`** (apply → verify →
-   archive+sync). Hard depends-on batch 1: needs `db.church.redeemed`,
-   `REDEEM_CATALOG` + the redeem rail, the `church.yaml` loader gates, and
-   the §9.2 predicate-extension sanction. Its duck-verified additive delta
-   edits none of core's ADDED requirements. Code-conflict note: it appends
-   to core-owned files (`REDEEM_CATALOG`, the clergy skill-registry block,
-   `church.yaml`) — it MUST NOT start before core is archived; the
-   title-side files it touches (`world/lore/titles.py`, the planner
-   evaluator, `web/webclient/presentation/title_codex.py`,
-   `protocol/constants.js` + its test) are owned by no other active change.
-3. Sub-project 2 (temple service economy) and sub-project 3 (confession /
+1. **Batch 1 — `implement-church-foundation`** (apply → verify →
+   archive+sync). Hard dependency: none (consumes
+   `settlement-place-registry` / `guild-registration` / `shop-economy`
+   verbatim; the church place kwarg rides the existing authored-kwargs
+   contract, deliberately not delta'd). Owns `world/rules/church.py`,
+   `world/lore/church/`, `church.yaml` — every later church change appends
+   behind it.
+2. **Batch 2 — `implement-church-enrollment`** (apply → verify →
+   archive+sync). Depends-on batch 1 (ledger, `ChurchHost`, venues). Owns
+   `commands/church.py` (created here) and the saintess-vessel main-spec
+   replacement at archive (§9).
+3. **Batch 3 — `implement-church-accrual`** (apply → verify → archive+sync).
+   Depends-on batches 1–2 (ledger-gated flows, an enrollment to gate on).
+   Appends pray/offer subcommands to enrollment's `commands/church.py`;
+   touches no catalogue/price data.
+4. **Batch 4 — `implement-church-redemption`** (apply → verify →
+   archive+sync). Depends-on batches 1–3 (spendable merit, the docs-trio
+   split point). Owns the price finals, `REDEEM_CATALOG` content, the clergy
+   skill-registry block, and `church.yaml` price/rule additions.
+5. **Batch 5 — `implement-church-combat-ministry`** (apply → verify →
+   archive+sync). Depends-on batch 4 (its rows to redeem) + transitive 1–3
+   (the E2E loop). Owns `monster_behaviour.py`,
+   `defeat_aftermath/violation.py`, and the buff declaration — files no other
+   change touches; parallel-safe with batch 6 once batch 4 archives.
+6. **Batch 6 — `implement-church-order-catalogue`** (apply → verify →
+   archive+sync). Depends-on batches 1 + 4: needs `db.church.redeemed` and
+   the loader gates (1) and `REDEEM_CATALOG` + the redeem rail (4); the §9.2
+   predicate-extension sanction travels with batch 2's saintess-vessel delta.
+   Its duck-verified additive delta edits none of the other changes' ADDED
+   requirements. Code-conflict note: it appends to redemption-owned files
+   (`REDEEM_CATALOG`, the clergy skill-registry block, `church.yaml`) — it
+   MUST NOT start before batch 4 is archived; the title-side files it touches
+   (`world/lore/titles.py`, the planner evaluator,
+   `web/webclient/presentation/title_codex.py`, `protocol/constants.js` +
+   its test) are owned by no other active change.
+7. Sub-project 2 (temple service economy) and sub-project 3 (confession /
    observance commands) are separate future designs; both build on the
    merit ledger and church-place flag that batch 1 lands.
 
 ## 9. Amendments to `openspec/specs/saintess-vessel/spec.md` (carried by
-`implement-church-core` as a delta spec)
+`implement-church-enrollment` as a delta spec)
 
 1. **Grant path:** the vessel stops being preset-initial state; the sole
    acquisition channel becomes church enrollment by a female `human_royal`
