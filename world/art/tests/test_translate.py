@@ -45,6 +45,20 @@ class _BrokenSequence(Sequence[str]):
         raise RuntimeError("iteration exploded")
 
 
+class _InfiniteIterationSequence(Sequence[str]):
+    """Looks sized, but its iterator must never be trusted."""
+
+    def __len__(self) -> int:
+        return 1
+
+    def __getitem__(self, index: int) -> str:
+        raise RuntimeError("indexed extraction exploded")
+
+    def __iter__(self):
+        while True:
+            yield "would-never-stop"
+
+
 class BackendResolutionTests(unittest.TestCase):
     def test_resolution_failures_all_raise_art_translate_unavailable(self):
         paths = (
@@ -56,6 +70,14 @@ class BackendResolutionTests(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path):
                 with override_settings(ART_TRANSLATE_BACKEND=path):
+                    with self.assertRaises(TranslateError) as caught:
+                        resolve_translate_backend()
+                self.assertEqual(caught.exception.code, "art_translate_unavailable")
+
+    def test_non_string_setting_values_raise_art_translate_unavailable(self):
+        for value in (None, 7):
+            with self.subTest(value=value):
+                with override_settings(ART_TRANSLATE_BACKEND=value):
                     with self.assertRaises(TranslateError) as caught:
                         resolve_translate_backend()
                 self.assertEqual(caught.exception.code, "art_translate_unavailable")
@@ -91,6 +113,7 @@ class TranslationBoundaryTests(unittest.TestCase):
             "long": ("one", "two"),
             "non-string": (1,),
             "pathological-sequence": _BrokenSequence(),
+            "infinite-iterator": _InfiniteIterationSequence(),
         }
         for name, result in cases.items():
             with self.subTest(result=name):

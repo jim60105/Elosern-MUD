@@ -43,14 +43,15 @@ def needs_translation(line: str) -> bool:
 
 def resolve_translate_backend():
     """Instantiate the code-only ``ART_TRANSLATE_BACKEND`` seam."""
-    dotted = settings.ART_TRANSLATE_BACKEND
-    module_name, separator, class_name = dotted.rpartition(".")
-    if not separator or not module_name or not class_name:
-        raise TranslateError(
-            "art_translate_unavailable",
-            f"ART_TRANSLATE_BACKEND {dotted!r} is not a dotted module path",
-        )
     try:
+        dotted = settings.ART_TRANSLATE_BACKEND
+        if not isinstance(dotted, str):
+            raise TypeError("ART_TRANSLATE_BACKEND is not a string")
+        module_name, separator, class_name = dotted.rpartition(".")
+        if not separator or not module_name or not class_name:
+            raise ValueError(
+                f"ART_TRANSLATE_BACKEND {dotted!r} is not a dotted module path"
+            )
         module = importlib.import_module(module_name)
         backend_class = getattr(module, class_name)
         return backend_class()
@@ -81,12 +82,12 @@ def translate_description(text: str) -> tuple[str, TranslationCounts]:
         result = backend.translate(offered_lines)
         if isinstance(result, (str, bytes)) or not isinstance(result, Sequence):
             raise TypeError("translation backend returned a non-sequence")
-        translated_lines = tuple(result)
-        if len(translated_lines) != len(offered_lines):
+        if len(result) != len(offered_lines):
             raise ValueError(
                 "translation backend returned "
-                f"{len(translated_lines)} lines for {len(offered_lines)} inputs"
+                f"{len(result)} lines for {len(offered_lines)} inputs"
             )
+        translated_lines = tuple(result[index] for index in range(len(offered_lines)))
         if any(not isinstance(line, str) for line in translated_lines):
             raise TypeError("translation backend returned a non-string line")
         output_lines = list(lines)
