@@ -19,6 +19,8 @@
         "world.rules.tests.test_cast_settlement",
         "world.rules.tests.test_cast_settlement_sexual_coercion",
         "world.rules.tests.test_character_creation",
+        "world.rules.tests.test_church_accrual",
+        "world.rules.tests.test_church_accrual_observability",
         "world.rules.tests.test_church_enrollment",
         "world.rules.tests.test_climax_phase_cycle",
         "world.rules.tests.test_climax_settlement",
