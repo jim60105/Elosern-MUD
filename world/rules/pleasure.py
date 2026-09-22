@@ -17,14 +17,28 @@ are the rulebook engine (``sexual_transitions._apply_then``'s
 neither is an effect-applier entry point.
 """
 
+import zlib
 from typing import Any
 
 from world.rules.sexual_act_effects import _EFFECTS_CONFIG
 from world.rules.sexual_state import _apply_climax_phase_set
+from world.rules.skill_ownership import owns_stored_skill
 
 
-def apply_pleasure_gain(entity: Any, gain: int) -> None:
+def apply_pleasure_gain(
+    entity: Any, gain: int, *, stimulus: bool = True
+) -> None:
     """Apply one participant's pleasure gain and the arousal-coupled cascade.
+
+    ``stimulus=False`` marks a non-stimulus gauge movement (the 聖女容器
+    聖光涓流 idle step, saintess-vessel D2b): the gauge write and the
+    wetness-on-band-up cascade stay, while BOTH climax branches are skipped
+    — the 接近→進行中 / 極限→接近 edges and the extension staging. Without
+    it a holder legitimately parked at 接近 after a 極限 spike (decay never
+    clears that phase) would be promoted into 進行中 by a cosmetic +1 at
+    pleasure 15, i.e. the idle trickle would autonomously open a climax
+    below the 85 gate. Every stimulus caller keeps the default; only the
+    trickle opts out.
 
     Replicates two ``sexual.yaml`` rules directly — ``wetness_follows_arousal``
     and the ``climax_gate``/``climax_phase_critical_point_to_in_progress``
@@ -37,7 +51,8 @@ def apply_pleasure_gain(entity: Any, gain: int) -> None:
     the extension trigger fires only for a participant already in 進行中 when
     the effect applies — a participant this very call pushes from 接近 into
     進行中 has just started climaxing, it has not received a qualifying
-    extension stimulus (pleasure-model design §3.2/§3.4).
+    extension stimulus (pleasure-model design §3.2/§3.4). ``stimulus=False``
+    short-circuits both branches below.
 
     The extension trigger compares against ``gain``, the uncapped computed
     value, not the clamped applied delta: ``pleasure`` self-clamps at 100, so
@@ -64,14 +79,67 @@ def apply_pleasure_gain(entity: Any, gain: int) -> None:
     if gain >= 0:
         if entity.sexual.arousal.value > pre_arousal_ordinal:
             entity.sexual.wetness.value += 1
-        if entity.sexual.arousal.level == "極限":
-            _apply_climax_phase_set(entity, "接近")
-        if was_at_critical_point:
-            _apply_climax_phase_set(entity, "進行中")
-    if was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
+        if stimulus:
+            if entity.sexual.arousal.level == "極限":
+                _apply_climax_phase_set(entity, "接近")
+            if was_at_critical_point:
+                _apply_climax_phase_set(entity, "進行中")
+    if stimulus and was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
         entity.sexual.stage_climax_extension()
 
 
 def zero_pleasure(target: Any) -> None:
     """Set the target's pleasure gauge to zero."""
     target.sexual.pleasure.base = 0
+
+
+# The idle band the 聖女容器 (saintess_vessel) holder's gauge is pinned to:
+# 微興奮 floor (15) through the 中等 ceiling (59). Below the floor the step
+# pins up; inside the band it takes one deterministic ±1 step; at or above
+# the 高度 floor (60) it no-ops — ordinary decay owns the descent and the
+# step re-arms on band re-entry.
+_VESSEL_BAND_FLOOR = 15
+_VESSEL_BAND_CEILING = 59
+
+
+def saintess_trickle_step(entity: Any, resulting_tick: int) -> None:
+    """Apply the 聖光涓流 idle fluctuation once for one world-clock advance.
+
+    Called by ``world.rules.clock.advance`` exactly once per advance (NOT per
+    settlement quantum), non-combat sources only, AFTER the buff/decay
+    settlement loop and outside its pending-work guard — a fully idle holder
+    has no other pending work and must still be pinned. Every write goes
+    through ``apply_pleasure_gain`` with ``stimulus=False``: the gauge write
+    and the arousal-coupled wetness cascade behave as for any stimulus, while
+    the climax-phase edges never fire — the idle trickle must not open a
+    climax below the 85 gate for a holder parked at 接近.
+
+    The plus/minus direction is a stateless crc32 hash of the entity
+    identity AND the full resulting world tick — no RNG, no dice — so an
+    advance that fails and is retried recomputes the identical draw (the
+    advance transaction has no RNG-state snapshot; dice here would not be
+    replay-stable). Raw tick PARITY would be useless here: every shipped
+    non-combat advance duration is even (move 30, cast 6, item 6, skip
+    9000), so ``resulting_tick % 2`` never changes and the draw would be
+    frozen per entity — the hash avalanche over the whole tick is what
+    makes successive advances alternate. A clamped step whose delta
+    collapses to zero (a − draw at the floor, a + draw at the ceiling)
+    issues no writer call at all.
+    """
+    if not owns_stored_skill(entity, "saintess_vessel"):
+        return
+    pleasure = entity.sexual.pleasure.base
+    if pleasure < _VESSEL_BAND_FLOOR:
+        apply_pleasure_gain(
+            entity, _VESSEL_BAND_FLOOR - pleasure, stimulus=False
+        )
+        return
+    if pleasure > _VESSEL_BAND_CEILING:
+        return
+    identity = str(getattr(entity, "id", None) or getattr(entity, "key", entity))
+    draw = zlib.crc32(f"{identity}:{resulting_tick}".encode("utf-8")) % 2
+    step = 1 if draw else -1
+    target = min(_VESSEL_BAND_CEILING, max(_VESSEL_BAND_FLOOR, pleasure + step))
+    if target == pleasure:
+        return
+    apply_pleasure_gain(entity, target - pleasure, stimulus=False)

@@ -9,6 +9,7 @@ from django.db import transaction
 
 from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
+from world.observability import log_info
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.lore.sex import DEFAULT_SEX, SEX_VALUES
@@ -717,6 +718,23 @@ def activate_player_character(
                 character.attributes.add(key, value)
                 if write_observer:
                     write_observer(key)
+            if "saintess_vessel" in skills_value.get("passive", []):
+                # 聖女容器授予 (saintess-vessel D4): the preset activation IS
+                # the 劇情/聖職敘階 grant surface, so seeding the vessel is a
+                # boundary event. Commit-bound via transaction.on_commit (the
+                # clock_advance precedent) — a rolled-back activation emits
+                # nothing — with a plain-data context and zero title reads
+                # or writes (D5).
+                transaction.on_commit(
+                    lambda character=character: log_info(
+                        "saintess_vessel_granted",
+                        context={
+                            "entity": str(character),
+                            "source": "preset",
+                            "passive": "saintess_vessel",
+                        },
+                    )
+                )
             # The persona write is part of the same all-or-nothing transaction:
             # a failure here rolls back the whole activation, so a crash or a
             # rejected write can never leave a persona-less active character

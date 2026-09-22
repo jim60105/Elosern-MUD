@@ -81,6 +81,16 @@ ROWS: tuple[SkillDef, ...] = (
             category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
+            "saintess_vessel",
+            "聖女容器",
+            "光明教會聖女的職位容器：聖光涓流使興奮常駐微興奮～中等浮動，公開祝聖儀典讀取自身興奮階級。",
+            SkillKind.PASSIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            element="light",
+            category=SkillCategory.ENHANCEMENT,
+        ),
+        _skill(
             "blade_art_mastery",
             "劍術精通",
             "被動提昇劍術與刀術相關技能的效果。",

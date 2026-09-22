@@ -223,6 +223,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "pain_to_pleasure",
                 "rapture_renewal",
                 "priestly_grace",
+                "saintess_vessel",
                 "reincarnation_boon_elosia",
                 "reincarnation_boon_yuka",
                 "elf_longevity",
