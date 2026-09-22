@@ -70,9 +70,12 @@ class InteractionReasonTests(unittest.TestCase):
         return SimpleNamespace(db=SimpleNamespace(schedule_state=state), key="npc")
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
-    def test_kind_vocabulary_declares_talk_engage_shop_and_guild(self):
+    def test_kind_vocabulary_declares_talk_engage_shop_guild_and_church(self):
         self.assertEqual(
-            _INTERACTION_KINDS, frozenset({"talk", "engage", "service_shop", "service_guild"})
+            _INTERACTION_KINDS,
+            frozenset(
+                {"talk", "engage", "service_shop", "service_guild", "service_church"}
+            ),
         )
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")

@@ -23,19 +23,29 @@ attribute is read, mutated in a fresh copy, and reassigned inside
 ``transaction.atomic()`` — the same all-or-nothing rule every other
 deterministic-core write follows.
 
-No gameplay mechanic is wired here yet: enrollment, pray/offering accrual,
-and redemption (each a later change) call these primitives; the accrual and
-redemption module names in the docstrings are the sanctioned write paths,
-not imports.
+Enrollment (design §5.1) is wired here: :func:`enroll` is the deterministic
+three-stage rite behind ``church join`` — it materializes the ledger, stamps
+``enrolled_tick``, optionally grants ``saintess_vessel`` to a female
+``human_royal`` through the canonical granted-passive write path, and hands
+over exactly one clerical vestment through the ``QuestReward`` item-quantity
+rail, all inside one transaction with commit-bound observability events.
+pray/offering accrual and redemption (each a later change) call the
+primitives below; the accrual and redemption module names in their docstrings
+are the sanctioned write paths, not imports.
 """
 
 from collections.abc import Callable, MutableMapping, MutableSequence
+from enum import StrEnum
 from typing import Any
 
 from django.db import transaction
 
+from typeclasses.characters import PlayerCharacter
+from typeclasses.components import ChurchHost
+from typeclasses.npcs import NPC
 from world.lore.sexual_vocab import AROUSAL_LEVELS
-from world.rules.clock import CLOCK_YAML, read_world_clock
+from world.observability import log_info
+from world.rules.clock import CLOCK_YAML, get_world_clock, read_world_clock
 
 #: Seconds per world-clock day — the identical formula
 #: ``world/rules/clock.py::_DAY_SECONDS`` derives from ``CLOCK_YAML``.
@@ -44,6 +54,30 @@ _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 
 class ChurchLedgerError(ValueError):
     """A church ledger write violates the single-writer invariants."""
+
+
+class EnrollmentReason(StrEnum):
+    """The named stable rejection reasons of the enrollment rite."""
+
+    NOT_A_PLAYER = "not_a_player"
+    ALREADY_ENROLLED = "already_enrolled"
+    NO_HOST = "no_host"
+    REMOTE_HOST = "remote_host"
+    SERVICE_UNAVAILABLE = "service_unavailable"
+    MALFORMED_LEDGER = "malformed_ledger"
+
+
+class EnrollmentError(ValueError):
+    """A deterministic enrollment rejection with a named reason."""
+
+
+#: The two clerical vestments of the enrollment handover (design §5.1.5).
+#: Module-level names so deterministic code and tests share one spelling.
+SISTER_VESTMENTS_KEY = "sister_vestments"
+SAINTESS_VESTMENTS_KEY = "saintess_vestments"
+
+#: The clergy qualifier passive granted at enrollment (design §5.1.4).
+VESSEL_KEY = "saintess_vessel"
 
 
 def _clock_day() -> int:
@@ -256,3 +290,138 @@ def build_initial_arousal_baseline(level: str) -> dict[str, Any]:
             f"initial_arousal {level!r} is outside {AROUSAL_LEVELS}"
         )
     return {"arousal": level, "virgin": True, "sensitivity": {}}
+
+
+# --------------------------------------------------------------------------- enrollment
+
+
+def _require_enrollable_host(actor: Any, host: Any) -> None:
+    """Validate the host the caller resolved, failing closed with a reason."""
+    if not isinstance(host, NPC):
+        raise EnrollmentError(EnrollmentReason.NO_HOST)
+    if not hasattr(host, "components") or not host.components.has(ChurchHost.name):
+        raise EnrollmentError(EnrollmentReason.NO_HOST)
+    church_host = host.components.get(ChurchHost.get_component_slot())
+    from world.rules.service_gate import (
+        REASON_MALFORMED_BINDING,
+        REASON_OFF_ANCHOR,
+        REASON_REMOTE,
+        service_available,
+    )
+
+    verdict = service_available(actor, host, church_host)
+    if verdict.allowed:
+        return
+    if verdict.reason == REASON_REMOTE:
+        raise EnrollmentError(EnrollmentReason.REMOTE_HOST)
+    if verdict.reason in (REASON_OFF_ANCHOR, REASON_MALFORMED_BINDING):
+        raise EnrollmentError(EnrollmentReason.SERVICE_UNAVAILABLE)
+    raise EnrollmentError(EnrollmentReason.SERVICE_UNAVAILABLE)
+
+
+def enroll(actor: Any, host: Any) -> dict[str, Any]:
+    """Run the deterministic enrollment rite for one initiate (design §5.1).
+
+    ``host`` is the local ``ChurchHost`` the command resolved and schedule-
+    gated; this API re-validates it (an NPC carrying the component, co-located
+    per its service binding) so every entry point gets the same stable
+    rejections. A character who already holds a ledger is refused with
+    ``ALREADY_ENROLLED`` (「你已屬光明教會」 on the command surface) and
+    nothing is written.
+
+    One ``transaction.atomic()`` covers every write: the ledger materializes
+    with ``enrolled_tick`` stamped from the world clock; a female
+    ``human_royal`` initiate is additionally granted ``saintess_vessel``
+    through the canonical granted-passive write path (its Boolean result
+    decides the ``saintess_vessel_granted`` event, so an already-owned vessel
+    never emits a false grant); and exactly one clerical vestment —
+    ``saintess_vestments`` for the vessel branch, ``sister_vestments``
+    otherwise — is granted unconditionally through the ``QuestReward``
+    item-quantity rail (no holding check: the celebrant's gift is the rite,
+    not the inventory). Both observability events ride ``transaction.on_commit``,
+    so a rolled-back transaction emits nothing.
+
+    Returns a plain record ``{"vessel_branch", "vessel_granted", "item"}`` for
+    the command's authored presentation.
+    """
+    if not isinstance(actor, PlayerCharacter):
+        raise EnrollmentError(EnrollmentReason.NOT_A_PLAYER)
+    try:
+        existing = read_ledger(actor)
+    except ChurchLedgerError as error:
+        raise EnrollmentError(EnrollmentReason.MALFORMED_LEDGER) from error
+    if existing is not None:
+        raise EnrollmentError(EnrollmentReason.ALREADY_ENROLLED)
+    _require_enrollable_host(actor, host)
+
+    vessel_branch = (
+        getattr(actor, "subrace", None) == "human_royal"
+        and getattr(actor, "sex", None) == "female"
+    )
+    vestment_key = (
+        SAINTESS_VESTMENTS_KEY if vessel_branch else SISTER_VESTMENTS_KEY
+    )
+    host_id = getattr(host, "key", None) or str(getattr(host, "pk", "") or "")
+    vessel_granted = False
+    from world.rules.surfaces import restore_attributes, snapshot_attributes
+
+    # Evennia's attribute cache is not transaction-aware: a failure after the
+    # inventory/skill writes would otherwise leave stale in-memory values
+    # behind a committed DB rollback. Snapshot every surface this transaction
+    # touches and restore them best-effort on failure — the same discipline
+    # ``turn_in_quest`` and ``apply_inventory_plan`` already follow.
+    snapshots = snapshot_attributes(actor, ("church", "skills", "inventory"))
+    try:
+        with transaction.atomic():
+
+            def _mutate(entry: dict[str, Any]) -> None:
+                entry["enrolled_tick"] = get_world_clock().tick
+
+            _write_ledger(actor, _mutate)
+            if vessel_branch:
+                from world.rules.cross_lineage_unlock import grant_owned_skill
+                from world.skills.registry import SKILL_REGISTRY
+
+                vessel_granted = grant_owned_skill(
+                    actor, VESSEL_KEY, SKILL_REGISTRY
+                )
+            from world.rules.equipment import (
+                apply_inventory_plan,
+                plan_inventory_delta,
+            )
+
+            apply_inventory_plan(
+                plan_inventory_delta(actor, additions=(vestment_key,))
+            )
+            transaction.on_commit(
+                lambda: log_info(
+                    "church_enrolled",
+                    context={
+                        "char": str(actor),
+                        "host": host_id,
+                        "item": vestment_key,
+                    },
+                )
+            )
+            if vessel_granted:
+                transaction.on_commit(
+                    lambda: log_info(
+                        "saintess_vessel_granted",
+                        context={
+                            "entity": str(actor),
+                            "source": "church_enrollment",
+                            "host": host_id,
+                            "passive": VESSEL_KEY,
+                        },
+                    )
+                )
+    except ChurchLedgerError as error:
+        raise EnrollmentError(EnrollmentReason.MALFORMED_LEDGER) from error
+    except Exception:
+        restore_attributes(actor, snapshots)
+        raise
+    return {
+        "vessel_branch": vessel_branch,
+        "vessel_granted": vessel_granted,
+        "item": vestment_key,
+    }
