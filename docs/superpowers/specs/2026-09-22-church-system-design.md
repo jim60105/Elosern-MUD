@@ -3,10 +3,13 @@
 Date: 2026-09-22
 Status: approved by the project owner in a brainstorming session (sections 1-6,
 final decisions below)
-Amended 2026-09-22 (owner, post-review): subrace-gated saintess grant at
-enrollment (vessel removed from the preset), clergy title group behind a new
-count predicate family, and the saintess-vessel spec amendments they carry
-(sections 5.1/5.9 and 9).
+Amended 2026-09-22 twice (owner, post-review): (1) subrace-gated saintess
+grant at enrollment (vessel removed from the preset), clergy title group
+behind a new count predicate family, and the saintess-vessel spec
+amendments they carry (sections 5.1/5.9 and 9); (2) the office has no
+uniqueness — any female royal who enrolls becomes the saintess — and the
+preset persona drops all religious narrative (no 聖女繼承人 wording;
+pre-enrollment she is simply 王女).
 Change split: see §8 — the 24-row catalogue alone exceeds the one-workday
 convention, so implementation ships as two OpenSpec changes
 (`implement-church-core`: ledger + enrollment + pray + offering + redemption
@@ -152,8 +155,8 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
 3. `enroll` creates the ledger, stamps `enrolled_tick`, and emits
    `church_enrolled` via `transaction.on_commit` (facade `log_info`).
    Re-enrollment is a stable rejection ("你已屬光明教會").
-4. **Subrace branch (owner decision, amendment):** an enroller whose subrace
-   is `human_royal` is additionally granted `saintess_vessel` through the
+4. **Subrace/sex branch (owner decision, amendments):** an enroller whose
+   subrace is `human_royal` **and whose sex is female** is additionally granted `saintess_vessel` through the
    canonical granted-passive write path inside the same enrollment
    transaction, emitting the existing `saintess_vessel_granted` event. Every
    other enroller becomes a sister (nun) with the plain ledger — no skill is
@@ -162,17 +165,23 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    catalogue row: it is a blood office the church recognizes at enrollment,
    never purchasable. Consequences, all recorded: trickle/decay-floor/
    ceremonial reads arm only from ownership, so the princess becomes
-   functionally saintess exactly at her church visit; custom-created
-   `human_royal` characters also qualify (the engine tracks no global
-   one-per-generation office state — the lore singleton stays narrative,
-   owner-accepted); the oath flag machinery is untouched (it already reads
-   vessel ownership).
+   functionally saintess exactly at her church visit. **No office
+   uniqueness (owner decision):** every female royal who enrolls becomes a
+   saintess — there is no global office state, and the lore framing of a
+   once-per-generation donated princess is retired, not merely untracked:
+   the lore documents that assert it (`docs/lore/overview.md` 宗教信仰 and
+   any sibling wording) are realigned in this same change; the oath flag
+   machinery is untouched (it already reads vessel ownership).
 5. **Preset change (same change):** `violet_altoria.passive_skills` drops
    `saintess_vessel`; the vessel-bearing starter becomes a royal princess
-   awaiting consecration. Persona/life-story prose is realigned in the same
-   change (public identity 「聖女」→「聖女繼承人」; the 8-year-old
-   consecration line becomes succession designation). `saintess_vestments`
-   stays as a carried starter item. All preset data-contract tests follow.
+   awaiting nothing in particular — pre-enrollment she is simply a 王女.
+   **The persona drops all religious narrative (owner decision):** no 聖女
+   or 聖女繼承人 wording anywhere; the public identity loses the church
+   clause; the personality's temple-blessing passages and the life story's
+   consecration/倾湧-duty sentences are deleted (not rewritten into a
+   successor framing) while keeping the rest of her story continuous.
+   `saintess_vestments` stays as a carried starter item (an heirloom, not a
+   claim of office). All preset data-contract tests follow.
 
 `pray` requires an existing ledger (the unenrolled are told to speak with
 the celebrant). Church venues: places whose authored kwargs carry a `church`
@@ -361,10 +370,12 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
   skills untouched; declined offering writes nothing.
 - Byte-identical baselines: unenrolled climax accrual; no-seal monster
   decisions; no-martyr violation pool.
-- Enrollment office test: a `human_royal` enrollment grants the vessel and
-  emits `saintess_vessel_granted` exactly once inside one transaction; any
-  other subrace does not; re-enrollment re-grants nothing; the preset no
-  longer carries the vessel; the trickle stays disarmed before enrollment.
+- Enrollment office test: a female `human_royal` enrollment grants the
+  vessel and emits `saintess_vessel_granted` exactly once inside one
+  transaction; any other subrace and a male `human_royal` do not; two
+  eligible royals both grant (no uniqueness); re-enrollment re-grants
+  nothing; the preset no longer carries the vessel and its persona carries
+  no 聖女 wording; the trickle stays disarmed before enrollment.
 - Title tests: threshold boundaries (redeemed count exactly at/under each
   ladder rung); the vessel is never counted; no church fixed-title row
   displays 聖女 (registry data-contract gate).
@@ -378,6 +389,11 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 - Player command surface (`church join/pray/offer/redeem/merit`) updates
   `docs/game/commands.md` + `docs/game/command-reference.md` in the same
   change; `tests/test_command_docs.py` green.
+- Lore realignment in the landing change: the once-per-generation 聖女
+  framing in `docs/lore/overview.md` §宗教信仰 (and any sibling wording,
+  e.g. `skill-trees/light.md` 聖女 footnote) becomes "any female royal may
+  be donated to the church and consecrated at enrollment"; church status
+  tags (〔提案〕→〔已實作〕) move with their mechanics.
 - Lore status tags: `docs/lore/settlement-locations.md` §神殿／聖所 〔提案〕
   →〔已實作〕 for the ministry counter in the landing change.
 
@@ -395,8 +411,8 @@ context dicts (`char`, `npc`, `row`, `tick`): `church_enrolled`,
 `implement-church-core` as a delta spec)
 
 1. **Grant path:** the vessel stops being preset-initial state; the sole
-   acquisition channel becomes church enrollment by a `human_royal`
-   character. The PASSIVE practice/unlock/conferral guards, the
+   acquisition channel becomes church enrollment by a female `human_royal`
+   character, with no uniqueness cap. The PASSIVE practice/unlock/conferral guards, the
    granted-only character, and the granted-event observability requirement
    are unchanged (the enrollment transaction reuses the same write path and
    the same `saintess_vessel_granted` event; the preset-activation grant
