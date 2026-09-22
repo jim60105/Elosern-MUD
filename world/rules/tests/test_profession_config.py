@@ -56,11 +56,18 @@ class ShippedTableTests(ProfessionCacheIsolation):
     @covers_requirement(
         "profession-registries::professions-are-one-validated-rulebook-table-with-keyed-frozen-reads",
     )
-    def test_shipped_table_exposes_the_five_blueprint_professions(self):
+    def test_shipped_table_exposes_the_blueprint_professions(self):
         table = load_professions()
         self.assertEqual(
             set(table),
-            {"merchant", "guild_staff", "guild_examiner", "quest_issuer", "attendant"},
+            {
+                "merchant",
+                "guild_staff",
+                "guild_examiner",
+                "quest_issuer",
+                "attendant",
+                "clergy",
+            },
         )
 
         merchant = table["merchant"]
@@ -93,6 +100,18 @@ class ShippedTableTests(ProfessionCacheIsolation):
         self.assertEqual(
             [(c.type_key, c.default_binding) for c in attendant.components],
             [("scripted_dialogue", "place")],
+        )
+
+        # implement-church-foundation: the clergy blueprint attaches the
+        # ChurchHost ministry capability to the high celebrant — the SOLE
+        # ChurchHost per owner decision; the sanctum steward stays a plain
+        # merchant. The anchor component (the first service-bearing class)
+        # is unchanged from the attendant era so roster reuse converges an
+        # existing host instead of duplicating it.
+        clergy = table["clergy"]
+        self.assertEqual(
+            [(c.type_key, c.default_binding) for c in clergy.components],
+            [("scripted_dialogue", "place"), ("church_host", "place")],
         )
 
         for profession in table.values():
@@ -131,10 +150,17 @@ class ShippedTableTests(ProfessionCacheIsolation):
         logged.assert_called_once()
         event, kwargs = logged.call_args[0], logged.call_args[1]
         self.assertEqual(event, ("profession_rulebook_loaded",))
-        self.assertEqual(kwargs["context"]["count"], 5)
+        self.assertEqual(kwargs["context"]["count"], 6)
         self.assertEqual(
             sorted(table),
-            ["attendant", "guild_examiner", "guild_staff", "merchant", "quest_issuer"],
+            [
+                "attendant",
+                "clergy",
+                "guild_examiner",
+                "guild_staff",
+                "merchant",
+                "quest_issuer",
+            ],
         )
 
 

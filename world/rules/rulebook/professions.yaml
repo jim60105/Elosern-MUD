@@ -32,6 +32,17 @@
 #     and the dialogue table, never in a per-role profession: a profession is
 #     an assembly-time component tuple (D1), and twelve same-tuple rows would
 #     be twelve names for one blueprint.
+#   - `clergy` is the ministry blueprint (implement-church-foundation): the
+#     place-bound ScriptedDialogue of an attendant plus the ChurchHost clergy
+#     capability marker. It is the high celebrant 艾莉安娜·寒水's blueprint —
+#     an attendant who also receives the church join/offer ministry surface
+#     (design 2026-09-22-church-system-design §5.1). Per owner decision she
+#     is the SOLE ChurchHost: the sanctum steward 羅海西亞·芬威克 stays a
+#     plain `merchant` selling the sanctum's wares, ministry being the
+#     celebrant's office alone. ScriptedDialogue stays the FIRST component so
+#     the roster reuse anchor (the blueprint's first service-bearing class)
+#     is unchanged from the attendant era and an existing synced host is
+#     converged, never duplicated.
 #
 # The `merchant` row is the shopkeeper blueprint: a merchant BOTH trades and
 # answers (merchant-dialogue). Since that change the row carries the same
@@ -69,5 +80,11 @@ professions:
   - key: attendant
     components:
       - { type: scripted_dialogue, default_binding: place }
+    schedule_template: null
+    default_tier: null
+  - key: clergy
+    components:
+      - { type: scripted_dialogue, default_binding: place }
+      - { type: church_host, default_binding: place }
     schedule_template: null
     default_tier: null

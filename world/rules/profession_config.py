@@ -22,6 +22,7 @@ from typing import Any, Mapping
 import yaml
 
 from typeclasses.components import (
+    ChurchHost,
     GuildExaminer,
     GuildStaff,
     Merchant,
@@ -44,6 +45,7 @@ PROFESSION_COMPONENT_TYPES: dict[str, type] = {
     "merchant": Merchant,
     "scripted_dialogue": ScriptedDialogue,
     "quest_issuer": QuestIssuer,
+    "church_host": ChurchHost,
 }
 
 #: Closed service-binding vocabulary (stored, not consumed; design D6).

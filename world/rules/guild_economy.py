@@ -71,6 +71,29 @@ def _row_anchor_class(row):
     return PROFESSION_COMPONENT_TYPES[first_type_key]
 
 
+def _apply_authored_initial_arousal(host: NPC, authored_map, attached: list[str]) -> None:
+    """Seed a clergy host's spawn-data arousal from its authored kwarg.
+
+    The church design authors a small raised initial arousal on clergy hosts
+    through the ``initial_arousal`` identity kwarg of the ``church_host``
+    component (design §5.3: sanctuary NPCs start already-aroused). The seed
+    applies exactly when this sync newly attached a ``church_host`` — host
+    creation and the converged reuse of a pre-change host alike — and never
+    overwrites an existing raw baseline (an imported or previously authored
+    ``db.sexual`` wins), so a second sync changes nothing.
+    """
+    if "church_host" not in attached:
+        return
+    level = authored_map.get("church_host", {}).get("initial_arousal")
+    if level is None:
+        return
+    if getattr(host, "db", None) is None or getattr(host.db, "sexual", None) is not None:
+        return
+    from world.rules.church import build_initial_arousal_baseline
+
+    host.db.sexual = build_initial_arousal_baseline(level)
+
+
 def _sync_service_host(row, room) -> NPC:
     """Create or reuse one stable NPC service host from a roster row.
 
@@ -123,7 +146,10 @@ def _sync_service_host(row, room) -> NPC:
     # reused hosts included: service_binding/anchor_room_id are authored
     # roster config re-applied idempotently, not runtime identity, so the
     # never-rename/never-retitle contract is untouched (service-anchoring D2).
-    assemble_profession_components(host, row.profession, authored_map, anchor_room=room)
+    attached = assemble_profession_components(
+        host, row.profession, authored_map, anchor_room=room
+    )
+    _apply_authored_initial_arousal(host, authored_map, attached)
     return host
 
 

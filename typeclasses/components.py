@@ -21,6 +21,27 @@ class GuildStaff(Component):
     anchor_room_id = DBField(default=None)
 
 
+class ChurchHost(Component):
+    """Capability marker of one clergy service host (sibling of GuildStaff).
+
+    ``service_id`` is the authored roster anchor; ``church`` records the
+    venue identity the place's ``church`` kwarg authors (the derived
+    church-place set reads the place, this field records the same decision
+    on the host as component identity); ``initial_arousal`` is the authored
+    spawn-data seed the roster sync applies at host creation. The adapter
+    holds no runtime state — enrollment and accrual read only its presence,
+    ``service_id`` and the place-bound anchoring fields the shared assembly
+    converges every sync.
+    """
+
+    name = "church_host"
+    service_id = DBField(default=None)
+    church = DBField(default=None)
+    initial_arousal = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)
+
+
 class GuildExaminer(Component):
     """Capability marker and branch identity of one guild examiner host."""
 
