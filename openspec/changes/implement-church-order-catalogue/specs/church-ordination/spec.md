@@ -35,7 +35,7 @@ The redemption catalogue SHALL gain the three Series E rows: `rite_martial_bless
 - **THEN** the rest bonus applies once with its ledger flag recorded, and no copper or merit moves outside the configured bonus
 
 ### Requirement: Series C/E rule rows load under the correspondence and polarity gates
-Each Series C/E mechanic SHALL be tunable by a `world/rules/rulebook/church.yaml` row (no hardcoded numbers in Python), each row exercising the existing one-row-one-test correspondence gate, and every price/pray/payout tuning value SHALL land inside the bands and finals recorded by the core change. The catalogue SHALL enumerate 24 rows total once these 8 land, with Series C/E prereq-free (catalogue-internal prereqs stay on the Series D high rows only).
+Each Series C/E mechanic SHALL be tunable by a `world/rules/rulebook/church.yaml` row (no hardcoded numbers in Python), each row exercising the existing one-row-one-test correspondence gate. The core change owns the shared price BANDS (entry/mid/high) and the pray/accrual BASE values; this change decides and records its OWN eight price finals inside those bands and its own Series C/E numeric finals (scales, mitigation factor, buff magnitude, cooldown, cap increment) in the `REDEEM_CATALOG`/`church.yaml` authoring, and the correspondence tests assert those recorded finals. The catalogue SHALL enumerate 24 rows total once these 8 land, with Series C/E prereq-free (catalogue-internal prereqs stay on the Series D high rows only).
 
 #### Scenario: One row, one test
 - **WHEN** the correspondence audit runs over the grown `church.yaml`

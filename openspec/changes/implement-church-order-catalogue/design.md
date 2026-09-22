@@ -21,7 +21,7 @@
 
 **D3 — Evaluation is a pure read of `db.church.redeemed` length via a no-create helper.** Modeled on how `guild_rank_reached` reads current rank; the planner's event-log staging is bypassed for correctness (count is durable state), and re-grant dedupe is the registry's existing fixed-key rule. Unenrolled ⇒ 0 ⇒ false, no ledger materialization.
 
-**D4 — 聖女 ban as loader validation on church-category rows only.** A registry-wide 聖女 ban would silently constrain future non-church content; scoping it to the 聖職 category matches the design sentence ("no church title may display 聖女") and stays a data-contract test plus loader rejection.
+**D4 — 聖女 ban stays a GLOBAL loader validation.** The saintess-vessel spec's office-as-prose decision bans any fixed-title row naming the 聖女 office and design §9 reaffirms it unchanged — so the registry loader rejects any row whose display contains 聖女, not only clergy-category rows; scoping it to the ladder would silently weaken a reaffirmed invariant. Stays a data-contract test plus loader rejection.
 
 **D5 — Series C effects are ledger/rulebook multipliers, not code hooks.** `poverty_vow`/`chastity_discipline`/`public_devotion`/`obedience` are accrual-row conditions + scale rows in `church.yaml` gated on `skill_owned` (the established `combat_modifiers.yaml` gating shape) — no new writer paths in `church.py` beyond reading existing status/venue state; `temple_endurance` is a scale row on the existing high-arousal defense-penalty computation.
 

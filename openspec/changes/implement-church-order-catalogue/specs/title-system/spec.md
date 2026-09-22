@@ -16,15 +16,15 @@
 - **THEN** the result is false and no ledger or any other state is created
 
 ### Requirement: The clergy title ladder unlocks by redeemed count and never displays 聖女
-The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 category, each row's predicate a `church_skills_redeemed` threshold: 虔信者 3 ／ 修女 6 ／ 神官 10 ／ 主教 15 ／ 樞機 20 (thresholds are the tuned finals recorded by the change tasks). Grants ride the existing fixed-title machinery verbatim — declarative predicate families, auto-unlock and auto-equip of an empty slot, display-only value, and NO other system may use these titles as a prerequisite. No church fixed-title row SHALL display 聖女 (or any spelling of the Saintess office name): the registry loader/data-contract gate rejects a church-category row whose display contains 聖女, reaffirming the saintess-vessel spec's office-as-prose decision. Ladder rows carry non-empty `hint_zh` and pass the registry's one-row-one-test correspondence tests.
+The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 category, one row per rung (虔信者／修女／神官／主教／樞機), each row's predicate a `church_skills_redeemed` integer threshold. The five thresholds are tuning placeholders: their finals SHALL be decided and recorded by this change's tuning task (design baseline 3／6／10／15／20, strictly ascending) in BOTH the registry rows and this requirement's scenarios before archive — the shipped rows and the recorded finals SHALL agree. Grants ride the existing fixed-title machinery verbatim — declarative predicate families, auto-unlock and auto-equip of an empty slot, display-only value, and NO other system may use these titles as a prerequisite. No fixed-title row of ANY category SHALL display or otherwise name the 聖女 office: the registry loader/data-contract gate rejects any row whose display contains 聖女, reaffirming the saintess-vessel spec's office-as-prose decision globally rather than for the ladder alone. Ladder rows carry non-empty `hint_zh` and pass the registry's one-row-one-test correspondence tests.
 
 #### Scenario: Each rung unlocks exactly at its count
 - **WHEN** a character's redeemed count crosses each ladder threshold (exactly at, and one below)
 - **THEN** the matching title is banked with the fixed slot auto-equipped at the threshold and remains locked one below it
 
-#### Scenario: The 聖女 display ban is a registry gate
-- **WHEN** a planted church-category row displays 聖女
-- **THEN** registry validation rejects it, and every shipped ladder row passes the gate with its non-聖女 display
+#### Scenario: The 聖女 display ban is a global registry gate
+- **WHEN** a planted fixed-title row of any category displays 聖女
+- **THEN** registry validation rejects it, and every shipped fixed-title row — ladder or otherwise — passes the gate with a non-聖女 display
 
 #### Scenario: The ladder is display-only
 - **WHEN** the codebase is searched for title state consumed as a prerequisite

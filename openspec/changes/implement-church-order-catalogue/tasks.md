@@ -2,7 +2,7 @@
 
 Prerequisite: `implement-church-core` is implemented AND archived (its `church-ordination` main spec exists; `REDEEM_CATALOG`, `church.yaml` gates, and the `db.church` ledger are landed). Do not start against an unlanded core — the 24-row test will fail loudly.
 
-Traceability convention (verified against `tools/spec_traceability.py::_normalize_identifier` — the slug regex `[^\w]+` with `re.UNICODE` means CJK SURVIVES; recompute, do not strip): the exact `covers_requirement` IDs for this change:
+Traceability convention (verified against `tools/spec_traceability.py::normalize_requirement_name` — the slug regex `[^\w]+` with `re.UNICODE` means CJK SURVIVES; recompute, do not strip): the exact `covers_requirement` IDs for this change:
 
 church-ordination delta:
 
@@ -38,7 +38,7 @@ Any NEW test module MUST be registered in exactly one `.github/evennia-shards.js
 
 ## 4. Clergy title ladder — registry rows and both validator faces
 
-- [ ] 4.1 Add the 聖職 (`clergy`) member to `TitleCategory` and the 5 ladder rows (displays 虔信者／修女／神官／主教／樞機, thresholds from 1.1, non-empty `flavor_zh`/`hint_zh`) in `world/lore/titles.py`; loader gate: reject any 聖職-category row whose display contains 聖女 (planted-row test + shipped-rows-pass test). One-row-one-test registry tests per ladder row (grant at exact count, locked one below, auto-equip empty slot, redeem-transaction rollback removes it). Annotate ID 5 (and ID 6 for the extended vocabulary validation).
+- [ ] 4.1 Add the 聖職 (`clergy`) member to `TitleCategory` and the 5 ladder rows (displays 虔信者／修女／神官／主教／樞機, thresholds from 1.1, non-empty `flavor_zh`/`hint_zh`) in `world/lore/titles.py`; loader gate: reject ANY fixed-title row of ANY category whose display contains 聖女 — the global office-name ban the saintess-vessel delta reaffirms (planted-row tests in two categories + shipped-rows-pass test). One-row-one-test registry tests per ladder row (grant at exact count, locked one below, auto-equip empty slot, redeem-transaction rollback removes it). Annotate ID 5 (and ID 6 for the extended vocabulary validation).
 - [ ] 4.2 Move the closed category enum across ALL mirrors in the same commit: Python `TitleCategory`, `web/webclient/presentation/title_codex.py` mirror, `web/static/webclient/js/elosern/protocol/constants.js` client validator enum (tab order 戰鬥／法術／探索／公會／聖職／風流韻事), and `web/static/webclient/js/tests/protocol_title_codex.test.js` literal enumeration — plus payload tests: 聖職-category rows render under the new tab; an out-of-enum category is client-rejected. Annotate ID 7.
 - [ ] 4.3 Codex panel tests: ladder rows appear in the fixed-row block locked→unlocked as the redeemed count crosses thresholds; no other system consumes a clergy title as a prerequisite (search-prove). Annotate ID 5.
 
