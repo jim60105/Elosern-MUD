@@ -144,6 +144,9 @@ class RequestBuildingTests(unittest.TestCase):
         self.assertNotIn("{description}", positive)
         self.assertNotIn("{", negative)
 
+    @covers_requirement(
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key"
+    )
     def test_shipped_portrait_templates_compose_a_full_body_white_backdrop(self):
         portrait, negative = render_prompt_pair(_monster("low"), "a monster description")
         for phrase in (
@@ -217,6 +220,9 @@ class RequestBuildingTests(unittest.TestCase):
             with self.subTest(scene_exemption=phrase):
                 self.assertNotIn(phrase, scene)
 
+    @covers_requirement(
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key"
+    )
     def test_portrait_prompt_pair_is_independent_of_the_cutout_setting(self):
         with override_settings(ART_REMBG_ENABLED=True):
             with_cutout = build_txt2img_request(_monster("low"), "a monster description")
