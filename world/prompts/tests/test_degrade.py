@@ -134,9 +134,9 @@ class BoundedFailureDegradeTests(PromptFixture):
     def _break_art(self):
         self.write_file(
             "art.yaml",
-            "schema_version: 1\nprompts:\n  art.style: approved visual style\n"
-            "  art.character_description: A {race} character named {name} ({age}) in the {style}.\n"
-            "  art.character_description: A {race} character named {name} ({age}) in the {style}.\n"
+            "schema_version: 1\nprompts:\n"
+            "  art.character_description: {race}, {age} years old.\n"
+            "  art.character_description: {race}, {age} years old.\n"
             "  art.monster_description: \"{description} ({display_name}；例如：{examples})\"\n",
         )
 
@@ -238,7 +238,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         self._break_art()
         library = self.load()
         self.assertIn("art.character_description", library.errors)
-        self.assertIn("art.style", library.errors)
+        self.assertIn("art.negative_prompt", library.errors)
 
         # The fallback producers resolve their subjects against the scene
         # archetype / monster tier / subrace catalogs, so the kit rows stand
@@ -260,7 +260,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         character.db.subrace = synth_subrace
         character.key = "艾琳"
         text = character_description(character, 24, fields=("appearance",))
-        self.assertIn("艾琳", text)
+        self.assertNotIn("艾琳", text)
         self.assertIn(SYNTH_SUBRACES[synth_subrace].display_name_zh, text)
         self.assertIn("24", text)
 
@@ -345,11 +345,11 @@ class LoaderExceptionChainTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.style: approved visual style\n"
-            "  art.style: approved visual style\n",
+            "  art.negative_prompt: lowres\n"
+            "  art.negative_prompt: lowres\n",
         )
         library = self.load()
-        error = library.errors["art.style"]
+        error = library.errors["art.negative_prompt"]
         self.assertIsNotNone(error.__cause__)
         self.assertIsInstance(error.__cause__, Exception)
 

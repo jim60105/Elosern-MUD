@@ -280,7 +280,7 @@ class DescriptionTests(EvenniaTestCase):
         character.db.disguised_stats = {"atk_phys": 99}
         character.key = "艾琳"
         text = character_description(character, 24, fields=("appearance",))
-        self.assertIn("艾琳", text)
+        self.assertNotIn("艾琳", text)
         self.assertIn(_SYNTH_RACE_LABEL, text)
         self.assertIn("24", text)
         self.assertNotIn("secret tragic past", text)
@@ -363,7 +363,7 @@ class AppearanceDescriptionTests(PromptFixture):
     def test_full_persona_contributes_every_appearance_subkey_and_nothing_else(self):
         self.load()
         text = character_description(_persona_entity(self._full_persona()), 31, fields=self._APPEARANCE_ONLY)
-        self.assertIn("艾琳", text)
+        self.assertNotIn("艾琳", text)
         self.assertIn(_SYNTH_RACE_LABEL, text)
         self.assertIn("31", text)
         for value in _APPEARANCE.values():
@@ -402,7 +402,7 @@ class AppearanceDescriptionTests(PromptFixture):
         # insertion order).
         self.assertEqual(
             first,
-            f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style.\n"
+            f"{_SYNTH_RACE_LABEL}, 31 years old.\n"
             "外觀：\n"
             "height：tall\n"
             "weight：slender\n"
@@ -421,7 +421,7 @@ class AppearanceDescriptionTests(PromptFixture):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_empty_appearance_renders_the_pre_change_description(self):
         self.load()
-        expected = f"A {_SYNTH_RACE_LABEL} character named 艾琳 (24) in the approved visual style."
+        expected = f"{_SYNTH_RACE_LABEL}, 24 years old."
         for persona in (
             {},
             {"appearance": {}, "personality": "guarded"},
@@ -459,7 +459,7 @@ class AppearanceDescriptionTests(PromptFixture):
         persona = {"appearance": {"overview": "長" * 900}}
         text = character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY)
         section = text.removeprefix(
-            f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style.\n"
+            f"{_SYNTH_RACE_LABEL}, 31 years old.\n"
         )
         self.assertEqual(len(section), 600)
         self.assertTrue(section.endswith("…"))
@@ -471,8 +471,7 @@ class AppearanceDescriptionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.style: approved visual style\n"
-            "  art.character_description: A {race} character named {name} ({age}) in the {style} {oops}.\n"
+            "  art.character_description: {race}, {age} years old. {oops}\n"
             '  art.monster_description: "{description} ({display_name}；例如：{examples})"\n',
         )
         self.load()
@@ -493,7 +492,7 @@ class AppearanceDescriptionTests(PromptFixture):
         entity.key = "艾琳"
         self.assertEqual(
             character_description(entity, 24, fields=self._APPEARANCE_ONLY),
-            f"艾琳（{_SYNTH_RACE_LABEL}，24 歲）",
+            f"{_SYNTH_RACE_LABEL}（24 歲）",
         )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
@@ -517,8 +516,23 @@ class AppearanceDescriptionTests(PromptFixture):
             text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         self.assertEqual(calls, ["", "\n外觀：\nfeature：a silver ear piercing"])
         self.assertEqual(
-            text, f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style."
+            text, f"{_SYNTH_RACE_LABEL}, 31 years old."
         )
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_apparent_age_is_rendered_without_the_canonical_age(self):
+        self.load()
+        entity = _persona_entity({"appearance": {"feature": "a silver ear piercing"}})
+        entity.db.age = 240
+        entity.db.apparent_age = 31
+        text = description_for(
+            ArtSubject(ArtSubjectKind.CHARACTER, "42"),
+            entity=entity,
+            apparent_age=entity.db.apparent_age,
+            fields=self._APPEARANCE_ONLY,
+        )
+        self.assertIn("31", text)
+        self.assertNotIn("240", text)
 
 
 if __name__ == "__main__":

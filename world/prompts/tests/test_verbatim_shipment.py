@@ -77,7 +77,7 @@ _NPC_THINKING = "（{name} 沉思片刻……）"
 # {equipment} and {custom} section slots (the pre-composition sentence is
 # byte-identical whenever every section slot is empty).
 _ART_CHARACTER_TEMPLATE = (
-    "A {race} character named {name} ({age}) in the {style}."
+    "{race}, {age} years old."
     "{appearance}{equipment}{custom}"
 )
 _SCENE_BUILDER_SYSTEM = (
@@ -167,23 +167,18 @@ class VerbatimShipmentTests(unittest.TestCase):
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_character_description_is_shipped_verbatim(self):
-        style = render_prompt("art.style")
         self.assertEqual(
             render_prompt(
                 "art.character_description",
                 race="t_ashfolk",
-                name="艾琳",
                 age="24",
-                style=style,
                 appearance="",
                 equipment="",
                 custom="",
             ),
             _ART_CHARACTER_TEMPLATE.format(
                 race="t_ashfolk",
-                name="艾琳",
                 age="24",
-                style=style,
                 appearance="",
                 equipment="",
                 custom="",
@@ -193,14 +188,12 @@ class VerbatimShipmentTests(unittest.TestCase):
             render_prompt(
                 "art.character_description",
                 race="t_ashfolk",
-                name="艾琳",
                 age="24",
-                style=style,
                 appearance="",
                 equipment="",
                 custom="",
             ),
-            "A t_ashfolk character named 艾琳 (24) in the approved visual style.",
+            "t_ashfolk, 24 years old.",
         )
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
@@ -416,7 +409,7 @@ class LibrarySourceTests(unittest.TestCase):
         label = SYNTH_SUBRACES[synth_subrace].display_name_zh
         self.assertEqual(
             character_description(character, 24, fields=("appearance",)),
-            f"A {label} character named 艾琳 (24) in the approved visual style.",
+            f"{label}, 24 years old.",
         )
 
         monster = monster_subject_for(synth_tier)

@@ -286,7 +286,7 @@ class CompositionTests(PromptFixture):
     """Selection-aware character_description over the shipped template,
     wearing patched kit gear."""
 
-    _BASE = f"A {_SYNTH_RACE_LABEL} character named 艾琳 ({{age}}) in the approved visual style."
+    _BASE = f"{_SYNTH_RACE_LABEL}, {{age}} years old."
 
     @covers_requirement(
         "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
@@ -397,8 +397,7 @@ class CompositionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.style: approved visual style\n"
-            "  art.character_description: 'A {name} ({age}) [{style}]|{appearance}|{equipment}|{custom}'\n"
+            "  art.character_description: '{race}, {age} years old.|{appearance}|{equipment}|{custom}'\n"
             "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n",
         )
         self.load()
@@ -408,7 +407,7 @@ class CompositionTests(PromptFixture):
         )
         text = character_description(entity, 24, fields=("appearance", "armor"), custom_prompt="雨")
         armor_line = SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh
-        self.assertTrue(text.startswith("A 艾琳 (24) [approved visual style]"))
+        self.assertTrue(text.startswith(f"{_SYNTH_RACE_LABEL}, 24 years old."))
         self.assertIn(f"|\n外觀：\nfeature：quiet eyes|\n{armor_line}|\n雨", text)
 
     @covers_requirement(
@@ -418,8 +417,7 @@ class CompositionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.style: approved visual style\n"
-            "  art.character_description: A {race} character named {name} ({age}) in the {style} {oops}.\n"
+            "  art.character_description: {race}, {age} years old. {oops}\n"
             "  art.monster_description: \"{description} ({display_name}；例如：{examples})\"\n",
         )
         self.load()
@@ -446,7 +444,7 @@ class CompositionTests(PromptFixture):
             character_description(
                 entity, 24, fields=GALLERY_PROMPT_FIELDS, custom_prompt="任何自由文字"
             ),
-            f"艾琳（{_SYNTH_RACE_LABEL}，24 歲）",
+            f"{_SYNTH_RACE_LABEL}（24 歲）",
         )
 
     @covers_requirement(
@@ -516,7 +514,7 @@ class CompositionTests(PromptFixture):
                     description_for(
                         subjects.ArtSubject(subjects.ArtSubjectKind.CHARACTER, "42"),
                         entity=entity,
-                        age=24,
+                        apparent_age=24,
                         fields=bad_fields,
                         custom_prompt=bad_custom,
                     )
@@ -533,7 +531,21 @@ class DescriptionDispatcherTests(PromptFixture):
         self.load()
         subject = subjects.ArtSubject(subjects.ArtSubjectKind.CHARACTER, "42")
         with self.assertRaises(ArtSubjectError):
-            description_for(subject, entity=object(), age=30)
+            description_for(subject, entity=object(), apparent_age=30)
+
+    @covers_requirement(
+        "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
+    )
+    def test_character_description_seam_requires_the_apparent_age_keyword(self):
+        self.load()
+        subject = subjects.ArtSubject(subjects.ArtSubjectKind.CHARACTER, "42")
+        entity = _entity()
+        self.assertEqual(
+            description_for(subject, entity=entity, apparent_age=24, fields=()),
+            CompositionTests._BASE.format(age=24),
+        )
+        with self.assertRaises(TypeError):
+            description_for(subject, entity=entity, age=24, fields=())
 
     @covers_requirement(
         "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"

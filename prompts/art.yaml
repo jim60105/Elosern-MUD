@@ -1,13 +1,12 @@
 schema_version: 1
 prompts:
-  art.style: approved visual style
   # The {appearance}, {equipment}, and {custom} slots carry whole
   # newline-prefixed fragment sections (the value brings its own leading
   # newline, mirroring the appearance-slot convention), so an empty slot
   # contributes nothing and the sentence stays byte-identical. The template
   # owns which sections exist and in which order they are composed.
   art.character_description: |-
-    A {race} character named {name} ({age}) in the {style}.{appearance}{equipment}{custom}
+    {race}, {age} years old.{appearance}{equipment}{custom}
   art.monster_description: "{description} ({display_name}；例如：{examples})"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the
@@ -26,18 +25,20 @@ prompts:
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
   art.portrait_prompt: |-
-    A medium half-body portrait of a fantasy figure — {description} — facing the
-    viewer at a three-quarter angle, rendered as a detailed digital illustration with
-    confident brushwork, soft shading, and clean linework. Soft warm key light from the
-    upper left with a gentle rim light on the far side; a rich harmonious palette with
-    deep shadow tones. Vertical 3:4 composition with the figure occupying the central
-    two-thirds against a simple out-of-focus background at eye level, anchored by one
-    small narrative detail such as a stray lock of hair or a worn accessory. No readable
-    text, no letters, no watermark.
+    A full-body illustration of a fantasy figure — {description} — standing at a
+    three-quarter angle with the whole figure from head to feet inside the frame,
+    rendered as a detailed digital illustration with confident brushwork, soft shading,
+    and clean linework. Soft warm key light from the upper left with a gentle rim light
+    on the far side; a rich harmonious palette with deep shadow tones. Vertical 3:4
+    composition against a flat white backdrop at eye level, anchored by one small
+    narrative detail such as a stray lock of hair or a worn accessory. No readable text,
+    no letters, no watermark. simple background, white background, plain white backdrop,
+    isolated on white
   # Shared negative prompt for every art generation request. Plain text with no
   # placeholders.
   art.negative_prompt: |-
     lowres, jpeg artifacts, blurry, deformed, disfigured, bad anatomy, extra limbs,
     missing limbs, cropped, out of frame, watermark, signature, text, letters, logo,
-    duplicate, mutilated, mutated hands, fused fingers, poorly drawn face, bad
-    proportions, oversaturated, cluttered background
+    duplicate, mutilated, mutated hands, fused fingers, poorly drawn face, bad proportions,
+    oversaturated, cluttered background, detailed background, scenery, landscape, furniture,
+    gradient background, background shadow, close-up, portrait crop, cropped legs, cropped feet

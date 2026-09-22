@@ -573,20 +573,20 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
         face_rect = gallery_api.validate_face_rect(face_rect)
     # 3. The declared age precondition, read immediately before the request.
     # A kind without the declaration never reads the age attribute at all.
-    age = None
+    apparent_age = None
     if capability.requires_age_precondition:
         if entity is None:
             raise ArtSubjectError(
                 f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
             )
-        age, _apparent_age = character_ages(entity)
+        _age, apparent_age = character_ages(entity)
     # 4. Description: the selection and free text exist only where declared;
     # a kind without them gets its registry-driven description (monster kind)
     # or base identity text — never an empty character description.
     description = description_for(
         subject,
         entity=entity,
-        age=age,
+        apparent_age=apparent_age,
         fields=selected if capability.supports_field_selection else None,
         custom_prompt=custom if capability.supports_free_text else "",
     )

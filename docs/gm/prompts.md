@@ -17,7 +17,7 @@ prompts/
 ├── npc_dialogue.yaml       NPC 對話系統提示詞範本
 ├── scenario_director.yaml  任務企劃（ScenarioDirector）系統提示詞
 ├── npc.yaml                NPC 思考回饋範本
-├── art.yaml                美術描述範本、風格片段與生成提示詞（scene／portrait／negative）
+├── art.yaml                美術描述範本與生成提示詞（scene／portrait／negative）
 ├── character_creation.yaml 創角提示詞（前瞻註冊，尚未有消費者）
 └── action_options.yaml     行動建議提示詞（前瞻註冊，消費者於 action-options-layer 落地）
 ```
@@ -43,8 +43,7 @@ prompts:
 | `npc_dialogue.system` | `npc_dialogue.yaml` | `{name}`、`{desc}`、`{location}` |
 | `scenario_director.system` | `scenario_director.yaml` | 無 |
 | `npc.thinking` | `npc.yaml` | `{name}` |
-| `art.style` | `art.yaml` | 無 |
-| `art.character_description` | `art.yaml` | `{race}`、`{name}`、`{age}`、`{style}`、`{appearance}` |
+| `art.character_description` | `art.yaml` | `{race}`、`{age}`、`{appearance}`、`{equipment}`、`{custom}` |
 | `art.monster_description` | `art.yaml` | `{description}`、`{display_name}`、`{examples}` |
 | `art.scene_prompt` | `art.yaml` | `{description}` |
 | `art.portrait_prompt` | `art.yaml` | `{description}` |
@@ -60,7 +59,7 @@ prompts:
 - 提示詞內的 JSON 範例（如 `{"speech": "你要說的話", "intent": {"kind": "..."}}`）原樣保留，不會被當成預留位置。
 - 不在允許清單內的 `{token}`（例如把 `{name}` 打成 `{nmme}`）會在載入時回報錯誤，不會靜默忽略。
 
-`art.character_description` 的 `{appearance}` 槽位是外觀資訊進入肖像提示詞的唯一路徑：把該槽位從（部署的）`art.yaml` 範本移除，外觀區塊就會從提示詞消失但不會報錯——範本仍是唯一來源，移除槽位是合法編輯。
+`art.character_description` 的 `{appearance}` 槽位是外觀資訊進入肖像提示詞的唯一路徑。把該槽位從部署的 `art.yaml` 範本移除，外觀區塊會從提示詞消失而不會報錯。範本仍是唯一來源，移除槽位屬於合法編輯。
 
 ## 編輯流程
 
@@ -91,11 +90,11 @@ prompts:
 
 引擎內的 sd-webui 客戶端（`world/art/sd_worker.py`）是美術圖像生成的唯一消費者，提示詞文字只存在於 `prompts/art.yaml`：
 
-- `art.scene_prompt` — 場景主體的正向提示詞範本，含一個 `{description}` 預留位置；代入值是該場景在登錄表中的確定性一句話描述。
-- `art.portrait_prompt` — 角色／怪物肖像的正向提示詞範本，同樣含 `{description}` 預留位置；代入值是確定性角色／怪物描述。
+- `art.scene_prompt` — 場景主體的正向提示詞範本，含一個 `{description}` 預留位置；代入值是該場景在登錄表中的確定性一句話描述。場景不在去背階段的主體允許清單內，因此保留前景、中景與背景的繪製構圖。
+- `art.portrait_prompt` — 角色／怪物肖像的正向提示詞範本，同樣含 `{description}` 預留位置；代入值是確定性角色／怪物描述。已出貨範本要求完整身形與白色平坦背景，讓去背階段取得適合的輸入。管理員可修改掛載範本中的背景措辭，變更會透過已渲染提示詞摘要顯示。
 - `art.negative_prompt` — 每個請求共用的負向提示詞，純文字、無預留位置。
 
-範本文字以自然語言英文撰寫（風格、構圖、光線、鏡頭等），與其他層一樣在載入時驗證；未知的 `{token}` 是載入時錯誤。改動三個鍵中任何一個，都會改變記錄的「已渲染提示詞摘要」（rendered-prompt digest）：`done` 記錄會被標記 `hash_changed` 供管理員審核，已完成的圖片不會被悄悄取代，也不會在一般遊玩中重新生成。
+範本文字以自然語言英文撰寫，涵蓋風格、構圖、光線與鏡頭，並與其他層一樣在載入時驗證。未知的 `{token}` 是載入時錯誤。改動三個鍵中任何一個，都會改變記錄的「已渲染提示詞摘要」（rendered-prompt digest）。既有的 `done` 記錄會標記為 `hash_changed` 供管理員審核，已完成的圖片不會被悄悄取代，也不會在一般遊玩中重新生成。本次範本異動後，管理員可對標記的主體執行 `@art requeue`，以新提示詞重新產生圖片。
 
 ### 生成設定（`ART_SD_*`）
 

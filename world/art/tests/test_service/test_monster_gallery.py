@@ -96,10 +96,23 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
     def test_a_monster_subject_queues_one_job_with_no_age_read_and_registry_text(self):
-        with patch("world.art.service.character_ages") as ages:
+        description = "a monster description"
+        with (
+            patch("world.art.service.character_ages") as ages,
+            patch(
+                "world.art.service.description_for", return_value=description
+            ) as compose,
+        ):
             image_id = request_gallery_image(self.subject)
         # The age precondition is NOT declared for this kind: never read.
         ages.assert_not_called()
+        compose.assert_called_once_with(
+            self.subject,
+            entity=None,
+            apparent_age=None,
+            fields=None,
+            custom_prompt="",
+        )
         jobs = self._gallery_jobs()
         self.assertEqual(len(jobs), 1)
         job = jobs[0]
@@ -108,9 +121,11 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         )
         self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
         self.assertIsNone(job.db.gallery_binding or None)
-        # The description is the registry-driven monster description.
-        self.assertEqual(job.db.source_description, monster_description(self.subject))
+        self.assertEqual(job.db.source_description, description)
         self.assertEqual(list(job.db.gallery_requested_fields), [])
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        self.assertEqual([card["image_id"] for card in cards], [image_id])
 
     @covers_requirement(
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"

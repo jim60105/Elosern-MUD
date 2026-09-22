@@ -38,11 +38,10 @@ def _build() -> dict[str, PromptSpec]:
         PromptSpec("npc_dialogue.system", "npc_dialogue.yaml", ("name", "desc", "location", "persona")),
         PromptSpec("scenario_director.system", "scenario_director.yaml", ("name_inspiration",)),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
-        PromptSpec("art.style", "art.yaml"),
         PromptSpec(
             "art.character_description",
             "art.yaml",
-            ("race", "name", "age", "style", "appearance", "equipment", "custom"),
+            ("race", "age", "appearance", "equipment", "custom"),
         ),
         PromptSpec(
             "art.monster_description",
