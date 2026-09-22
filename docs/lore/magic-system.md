@@ -2,7 +2,7 @@
 
 本篇是 [世界觀總覽](/lore/overview) 的延伸專篇，將原始設定〈魔法體系〉一節（元素魔法、神之秘法、位階、魔法道具）展開為完整的技能體系樹，並補上原始設定沒有明文交代、但角色與規則已經隱含的空白：身體強化的倍率位階、天賦異能的定位、雜學秘術為何是一個沒有節點的分類，以及各分支之間如何構成一個自洽的整體。
 
-**本篇與 [技能系譜設計](/lore/skill-trees/index) 是同一份魔法設計的兩個部分，共同構成權威來源。** 本篇負責世界觀框架、種族親和、屬性哲學與跨系統的整體規則；每個屬性、每個分支底下逐一技能的前置條件、熟練度門檻、資源消耗與威力數值，由 `skill-trees/` 底下的專頁詳列。`world/skills/registry.py` 現行只實作了火屬性一條系譜作為機械驗證用的雛型，其餘內容尚未落地。下一階段的程式實作要以本篇與 `skill-trees/` 為準寫入程式碼，順序不可顛倒。新增或調整魔法的程式流程請依循 [新增魔法指南](/development/adding-spells)。
+**本篇與 [技能系譜設計](/lore/skill-trees/index) 是同一份魔法設計的兩個部分，共同構成權威來源。** 本篇負責世界觀框架、種族親和、屬性哲學與跨系統的整體規則；每個屬性、每個分支底下逐一技能的前置條件、熟練度門檻、資源消耗與威力數值，由 `skill-trees/` 底下的專頁詳列。`skill-trees/` 詳列的各棵系譜樹現已全數登錄於 `world/skills/registry/` 套件（八棵屬性樹、武藝兩條路線、身心強化與神之秘法，以及情慾秘術的目錄節點另由 `world/skills/sexual_acts/` 登錄）。新增或調整魔法的程式流程請依循 [新增魔法指南](/development/adding-spells)。
 
 ---
 
@@ -227,6 +227,6 @@
 - [技能系譜設計](/lore/skill-trees/index) — 每個屬性的完整系譜樹、節點數值與威力係數規格
 - [新增魔法指南](/development/adding-spells) — 技能登錄表的實作流程
 - [新增角色模板指南](/development/adding-player-presets) — 角色卡中魔法相關欄位的驗證規則
-- `world/skills/registry.py` — 現行已落地內容的來源（僅火屬性系譜，其餘待本文件與 `skill-trees/` 落地）
+- `world/skills/registry/` — 現行已落地系譜節點的登錄來源（各棵樹的資料模組與 `skill-trees/` 專頁逐頁對應）
 - `world/lore/elements.py` — 八屬性的程式碼定義
 - `docs/superpowers/specs/2026-08-30-use-driven-progression-design.md` — 熟練度、系譜前置與樹冠上限的機械規格

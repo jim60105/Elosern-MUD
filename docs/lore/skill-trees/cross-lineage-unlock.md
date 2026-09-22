@@ -29,19 +29,17 @@
 
 | 欄位 | 說明 |
 | --- | --- |
-| `scope` | 從哪些節點取樣。以 `category` 界定分支，可再以 `group`（元素 key）或 `line`（路線名）收窄 |
-| `group_by` | 以什麼維度分群計數。元素魔法以 `group`（＝元素）分群，武藝以 `line`（＝路線）分群 |
+| `scope` | 從哪些節點取樣。宣告式 `{category, group?}` 只取樣 ACTIVE 節點，並以節點自己的 `group` 欄位分群（一組＝一個 `group`）；或改為顯式 `{keys: [...]}`，即恰好一個群 |
 | `distinct_groups` | 需要**幾個不同的群**各自達標。`1` 是「任一條」，`2` 是「任兩條不同的」 |
 | `min_level` | 每個達標的群裡，至少要有一個節點的熟練度達到這個等級 |
 
-示意（實際 YAML 欄位名由實作階段拍板，本頁只定義語意）：
+已落地規則的實際形狀（`world/rules/rulebook/cross_lineage_unlock.yaml`）：
 
 ```yaml
 - id: precise_mana_control
   grants: [precise_mana_control]
   requires:
     - scope: { category: elemental_magic }
-      group_by: group
       distinct_groups: 2
       min_level: 5
 ```
@@ -93,9 +91,9 @@
 
 ## 6. 實作掛載點
 
-`world/rules/progression.py` 的每次練習授予路徑上，已經存在一個現成的鉤子：該函式在 `award_practice_xp()` 前後對「可能因此解鎖的候選技能」做一次 before／after 快照，把新變得可用的技能收集到 `unlocks_out`，由呼叫端轉成「新技能可用」的通知。
+規則表由 `world/rules/cross_lineage_unlock.py` 載入（啟動即對照正式 registry 驗證），評估掛在 `world/rules/progression/` 的每次練習授予路徑上：該函式在 `award_practice_xp()` 前後對「可能因此解鎖的候選技能」做一次 before／after 快照，把新變得可用的技能收集到 `unlocks_out`，由呼叫端轉成「新技能可用」的通知；跨系譜評估與直接授予的新增持有走同一個 `unlocks_out` 交付管道。
 
-跨系譜規則表的評估應該掛在同一個位置，理由有三：
+評估掛在這裡的理由有三：
 
 1. **熟練度只在這條路徑上變動。** 熟練度的唯一寫入者是 `award_practice_xp()`，所以規則表的條件只可能在這裡從不成立變成成立，不需要輪詢，也不需要在讀取路徑上重算。
 2. **通知管道已經存在。** 「你悟出了劍術精通」「霧魔法系譜已開啟」與現行的「新技能可用」是同一種事件，可以共用同一條交付管道與同一套交易邊界（先提交再送出）。

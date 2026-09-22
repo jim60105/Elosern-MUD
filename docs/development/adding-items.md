@@ -12,11 +12,11 @@
 
 ## 1. 背景：一件物品的資料住在五個地方
 
-物品是 `world/lore/items.py` 中 `ITEM_REGISTRY` 字典裡的 `ItemDefinition`。架構上最重要的設計決定是**身份與數值分離**：registry 只管「這是什麼、長怎樣、有沒有機制」，所有可調的數值都住在確定性 rulebook，調平衡不用動 lore。
+物品是 `world/lore/items/` 套件 assembly 出的 `ITEM_REGISTRY` 字典裡的 `ItemDefinition`（`assembly.py` 依全域凍結順序串接各 `data_*.py` 域切片）。架構上最重要的設計決定是**身份與數值分離**：registry 只管「這是什麼、長怎樣、有沒有機制」，所有可調的數值都住在確定性 rulebook，調平衡不用動 lore。
 
 | 資料域 | 位置 | 內容 |
 |---|---|---|
-| 身份＋外觀＋機制宣告 | `world/lore/items.py::ITEM_REGISTRY` | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
+| 身份＋外觀＋機制宣告 | `world/lore/items/`（`ITEM_REGISTRY`） | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
 | 商店成交值 | `world/rules/rulebook/commerce/`（每個定居點一個分檔，另有 `scales.yaml`） | 各分類 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨；商店時段也在同一分檔 |
 | 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all-allies`／`all-enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
@@ -54,7 +54,7 @@
 
 ### Step 1 — 寫入 `ITEM_REGISTRY`
 
-在 `world/lore/items.py` 的 `ITEM_REGISTRY` 直譯中加入一筆。以一枚飾品為例：
+在對應域的切片模組（如 `world/lore/items/data_regional_equipment.py`）的 `ROWS` 中加入一筆（新物品追加於切片尾端；`assembly.py` 的串接順序是可觀測契約，既有列不重排）。以一枚飾品為例：
 
 ```python
 ItemDefinition(
@@ -183,7 +183,7 @@ shops:
 - 指令端：`使用`（`use`）、`裝備`（`equip`）在 `commands/items.py`；`丟`（`drop`）、`給`（`give`）在 `commands/localized/general.py`；商店為 `shop stock`（別名 `商店庫存`）、`buy`（`購買`）、`sell`（`販賣`），見 `commands/economy.py`
 - WebClient：服務面板背包列與確認框（`web/webclient/actions/service_actions.py` 走同一份 preflight，前端不自行推斷行為）
 
-零程式碼的前提是數值沿用現有詞彙。`kind`、`icon_key`、`rarity` 都是封閉列舉，需要一個新的視覺分類或圖示就不是加資料能了事：得擴充 `world/lore/items.py` 的列舉、`web/webclient-app` 的圖示對應與對應測試／展示，前端遇到未知 icon key 一律退回 unknown Treatment。
+零程式碼的前提是數值沿用現有詞彙。`kind`、`icon_key`、`rarity` 都是封閉列舉，需要一個新的視覺分類或圖示就不是加資料能了事：得擴充 `world/lore/items/vocab.py` 的列舉、`web/webclient-app` 的圖示對應與對應測試／展示，前端遇到未知 icon key 一律退回 unknown Treatment。
 
 若你只是加了資料，上面這些檔案不需要修改；需要修改的那個檔案，就是你發現設計違反的地方，先回頭檢查。
 

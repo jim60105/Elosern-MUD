@@ -1,6 +1,6 @@
 # 新增魔法指南
 
-本指南說明如何為 Elosern 加入一個新的魔法。以目前八屬性×五位階、共 80 個魔法的目錄為基準，說明新增或調整魔法時的完整流程：從設計文件出發、寫入 `SKILL_REGISTRY`、處理 buff、補測試，再到 OpenSpec 工件同步與驗證。
+本指南說明如何為 Elosern 加入一個新的魔法。以目前 `docs/lore/skill-trees/` 全數落地於 registry 的系譜目錄為基準，說明新增或調整魔法時的完整流程：從設計文件出發、寫入 `SKILL_REGISTRY`、處理 buff、補測試，再到 OpenSpec 工件同步與驗證。
 
 本文假設你已讀過：
 
@@ -12,10 +12,10 @@
 
 ## 1. 背景：一個魔法如何運作
 
-魔法是 `world/skills/registry.py` 中 `SKILL_REGISTRY` 字典裡的 `SkillDef`。結構上的重點：
+魔法是 `world/skills/registry/` 套件 assembly 出的 `SKILL_REGISTRY` 字典裡的 `SkillDef`：`assembly.py` 依全域凍結順序串接各 `data_*.py` 切片模組的 `ROWS`（一元素一檔，另有武藝、身心強化、utility 被動與神之秘法切片；情慾秘術目錄另由 `world/skills/sexual_acts/` 的 `SEXUAL_ACT_REGISTRY` 登錄）。結構上的重點：
 
 - **純資料、不可變**：`SkillDef` 是 frozen dataclass，`cost`／`effects` 都是不可變集合；`SkillDef.__post_init__` 會在建構時解析每個 `effects` 字串（無法辨識的前綴直接拋錯，registry 載入即失敗）。
-- **沒有 tier 欄位**：位階由 registry 位置與 MP 成本帶推導（`world/skills/cost_tiers.py::spell_tier_for`）。數值施放門檻已隨 magic-XP 引擎除役（`magic-xp-engine-retirement`）；位階目前是純資料標籤，未來的解鎖階梯（`use-driven-skill-lineage`）讀的是階梯樹，不是 MP 成本帶。
+- **沒有 tier 欄位**：位階由 registry 位置與 MP 成本帶推導（`world/skills/cost_tiers.py::spell_tier_for`）。數值施放門檻已隨 magic-XP 引擎除役（`magic-xp-engine-retirement`）；位階是純資料標籤，實際解鎖由系譜前置（`SkillPrerequisite`，use-driven-skill-lineage 已落地）決定，不看 MP 成本帶。
 - **效果字串是型別化契約**：所有效果前綴在 `world/skills/effects.py` 有對應的 typed dataclass。魔法會用到的前綴：
 
 | 前綴 | 語法 | 說明 |
@@ -38,9 +38,9 @@
 
 | 問題 | 答案 | 寫法 |
 |---|---|---|
-| 屬於某元素的 ACTIVE 魔法，`FactionConstraint` 為 `ANY`？ | 是（絕大多數） | 放進該元素的 `*_elemental_spells(...)` builder 區塊 |
-| 效果本質上只作用於自己（`self_buff_apply` 等）？ | 是 | 以個別 `_skill(...)` 宣告並設 `faction_constraint=FactionConstraint.SELF_ONLY`（builder 固定 `ANY`，不能用） |
-| 是 PASSIVE 技能（如 `movement:flight`）？ | 是 | 以個別 `_skill(...)` 宣告，`kind=SkillKind.PASSIVE`，不進 builder |
+| 屬於某元素的 ACTIVE 魔法，`FactionConstraint` 為 `ANY`？ | 是（絕大多數） | 放進該元素的切片模組 `world/skills/registry/data_<element>.py` 的 `ROWS`，以 `_spell(...)` 宣告 |
+| 效果本質上只作用於自己（`self_buff_apply` 等）？ | 是 | 仍用 `_spell(...)` 宣告，加 `faction_constraint=FactionConstraint.SELF_ONLY`（現行目錄的 SELF_ONLY 法術如 `fire_scorching_armor`、`water_film`、雷系三招都這麼寫） |
+| 是 PASSIVE 技能（如 `movement:flight`）？ | 是 | 以個別 `_skill(...)` 宣告，`kind=SkillKind.PASSIVE`，放進對應切片（身心強化類在 `data_enhancement_masteries.py`／`data_utility_passives.py`） |
 
 > [!NOTE]
 > 主規格 `skill-registry` 規定：效果本質上自我限定的技能 SHALL 宣告 `SELF_ONLY`。既有的 `hardened_skin`（土）、`gale_step`（風）、`static_ward`／`thunder_gods_haste`（雷）都是個別宣告的前例。
@@ -79,22 +79,19 @@ MP 必須落在 §4.3 的對應位階成本帶內：
 
 ### Step 2 — 寫入 registry
 
-在 `world/skills/registry.py` 的 `SKILL_REGISTRY` 字典 literal 中，找到該元素的 `*_elemental_spells(...)` 區塊（若沒有就先建一個），以五行成對註解（`# 火 — 學徒`）分組。builder 的 row 格式是 `(key, label, description, target_spec, mp, effects)`：
+在該元素的切片模組 `world/skills/registry/data_<element>.py` 的 `ROWS` 中追加節點，以段位成對註解（`# 火 — 學徒（根與基礎）`）分組。現行目錄全部採具名 `_spell(...)` 宣告，顯式指派 `category`、`group`、系譜前置（`SkillPrerequisite`）與 `effect_policies`，並設 `usable_out_of_combat=True`：
 
 ```python
-*_elemental_spells(
-    "fire",
-    # 火 — 學徒
-    ("fire_ball", "火球術", "凝聚火焰魔力，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:fire:magic",)),
-    # 火 — 術師
-    ("scorching_wave", "灼熱波動", "釋放灼熱的波動，對單一目標造成魔法傷害並使其灼燒。", TargetSpec.SINGLE, 24, ("damage:fire:magic", "buff_apply:fire_scorch")),
-    ...
-),
+_spell(
+    "fire_ball", "火球術", "凝聚火焰魔力，對單一目標造成魔法傷害。",
+    TargetSpec.SINGLE, usable_out_of_combat=True, mp=14, element="fire", effects=("damage:fire:magic",),
+    category=SkillCategory.ELEMENTAL_MAGIC, group="fire",
+    prerequisites=(SkillPrerequisite("fire_arrow", 3),),
+    effect_policies=(EffectPolicy(coefficient=1.0),),
+)
 ```
 
-`_elemental_spells(element, *rows)` 會固定 `SkillKind.ACTIVE`、`FactionConstraint.ANY`、`cost={"mp": <mp>}`，元素只寫一次。
-
-若法術宣告了具名型別政策（如 `effect_policies`、`cast_conditions`、`interaction`、前置系譜等複合機制，如光系 16 節點），則改採個別具名 `_spell(...)` 宣告，顯式指派參數與 `usable_out_of_combat=True`，不強行套入六欄或七欄位置 tuple：
+宣告更複雜的節點（`cast_conditions`、`interaction` 等機制，如光系聖禮節點）時，同樣走具名參數：
 
 ```python
 _spell(
@@ -107,29 +104,31 @@ _spell(
 
 ### Step 3 — 特殊案例
 
-**自我限定（SELF_ONLY）**：寫成個別 `_skill(...)`，放在該元素 builder 區塊之後、同一階層註解之下：
+**自我限定（SELF_ONLY）**：新節點直接在 `_spell(...)` 帶 `faction_constraint=FactionConstraint.SELF_ONLY`。唯一保留 `_skill(...)` 形態的是歷史前例 `hardened_skin`（土）：
 
 ```python
 # 土 — 學徒
 # hardened_skin is inherently self-only (`self_buff_apply`), so it declares
-# SELF_ONLY — the `_elemental_spells` builder fixes ANY, so this single entry
-# is written out individually per the skill-registry spec's self-only constraint.
+# SELF_ONLY per the skill-registry spec's self-only constraint.
 _skill(
     "hardened_skin",
     "硬化肌膚",
     "使自身肌膚硬化如岩，提升防禦。",
     SkillKind.ACTIVE,
     TargetSpec.SELF,
+    usable_out_of_combat=True,
     cost={"mp": 10},
     element="earth",
     faction_constraint=FactionConstraint.SELF_ONLY,
     effects=["self_buff_apply:earth_hardened_skin"],
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group="earth",
 ),
 ```
 
 **PASSIVE 技能**：`flight` 是唯一前例——保持既有 `_skill(...)` entry、`kind=SkillKind.PASSIVE`，cost 只是顯示用途（PASSIVE 不會走資源扣減），且**不列入**可施放位階的測試配對。
 
-**重新調整既有魔法（recost）**：直接改該 entry 的 cost，**不要複製一份**。若它原本是獨立 `_skill(...)`，可像 `fire_ball`、`wind_blade` 那樣遷入 builder 區塊並刪除舊 entry（key 仍只出現一次）。改完記得搜尋是否有測試或程式碼鎖死了舊 MP。
+**重新調整既有魔法（recost）**：直接改該 entry 的 `mp=`，**不要複製一份**，也不要變動 `ROWS` 順序（assembly 順序是可觀測契約）。改完記得搜尋是否有測試或程式碼鎖死了舊 MP。
 
 ### Step 4 — 處理 buff
 
@@ -213,8 +212,8 @@ openspec validate --all --strict
 - [ ] MP 落在 §4.3 對應位階成本帶（含 opposite-column 前例）
 - [ ] 效果字串全部能通過 `parse_effect`（載入即失敗的契約）
 - [ ] `heal:single` 只配 `SINGLE`／`SELF`；`heal:area` 只配 `AREA`
-- [ ] 自我限定效果（`self_buff_apply` 等）宣告 `SELF_ONLY` 且寫成個別 `_skill(...)`
-- [ ] PASSIVE 技能不進 builder、不列入可施放 tier 配對
+- [ ] 自我限定效果（`self_buff_apply` 等）宣告 `faction_constraint=FactionConstraint.SELF_ONLY`
+- [ ] PASSIVE 技能以 `_skill(...)` 宣告、不列入可施放 tier 配對
 - [ ] 既有技能 recost 是 in-place，key 只出現一次，且無測試鎖死舊 MP
 - [ ] 每個新 buff key：`buffs.yaml` 一列 ＋ `status_display.yaml` 一列 ＋ `test_buff_<key>` 恰好一個
 - [ ] `rate` 只用在 `hp`／`mp`／`sp`；其餘用 `bounds`
@@ -226,7 +225,7 @@ openspec validate --all --strict
 
 ## 5. 常見陷阱
 
-- **把 SELF_ONLY 技能塞進 builder**：builder 固定 `ANY`，違反主規格的自限契約（`hardened_skin` 曾因此在 rubber-duck 審查被擋下）。
+- **自我限定技能漏宣告 SELF_ONLY**：違反主規格的自限契約（`hardened_skin` 曾因此在 rubber-duck 審查被擋下）；預設值是 `ANY`，不會 fail-closed，只能靠宣告自律與審查。
 - **`rate` 用在非 gauge trait**：tick 時拋 `NotImplementedError`，會炸掉世界時鐘的 buff 結算。
 - **新 buff key 漏掉 `status_display.yaml`**：模組 import 直接失敗（fail-closed），不是執行期警告。
 - **效果字串帶數值**（如 `damage:fire:magic:50`）：`damage` 語法就是三段，量級由公式推導；帶數值會在建構時被拒。
