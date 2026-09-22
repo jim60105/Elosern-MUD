@@ -48,7 +48,7 @@ kind.** PASSIVE rows write `db.skills.passive`, ACTIVE rows
 requirement's acceptance, not a courtesy.
 
 **D4 — The two combat rite rows register here, rails land next door.** This
-change's tasks register all 16 rows and their data tests; combat-ministry owns
+change's tasks register all 16 rows (proven through the redeem rail's behaviour, no data-contract test module — owner stance); combat-ministry owns
 `monster_behaviour.py`, `defeat_aftermath/violation.py`, and the buff
 declaration, so no seam crosses mid-file. The rows are redeemable inert actives
 in between (their cast effects beyond declaration are the combat change's

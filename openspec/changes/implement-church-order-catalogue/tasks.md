@@ -17,7 +17,7 @@ title-system delta:
 6. `the-fixed-title-lore-registry-validates-and-syncs-idempotently` (MODIFIED — main-spec ID kept)
 7. `the-codex-oob-payload-and-webclient-window-are-server-authored` (MODIFIED — main-spec ID kept)
 
-Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard; data-contract-tagged modules go in the test-data ledger files.
+Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard; data-contract-tagged modules go in the test-data ledger files. Verification runs the focused test labels that cover this change per the repo AGENTS.md testing rules (smallest label that covers the change; `--parallel 16 --noinput` full suite and CI shard commands are NEVER run locally by this change).
 
 ## 1. Tuning decisions (decide and record first)
 

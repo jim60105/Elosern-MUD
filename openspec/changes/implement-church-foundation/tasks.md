@@ -7,7 +7,7 @@ Traceability convention (verified against `tools.spec_traceability.py::normalize
 3. `church-venues-and-clergy-hosts-exist-as-authored-content`
 4. `the-frozen-church-catalogues-ship-as-validated-shells-awaiting-their-pipeline-rows`
 
-Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at. The price-band tuning task (superseded core's 1.2) belongs to `implement-church-redemption`, which owns the rows being priced.
+Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at. Verification runs the focused test labels that cover this change per the repo AGENTS.md testing rules (smallest label that covers the change; `--parallel 16 --noinput` full suite and CI shard commands are NEVER run locally by this change). The price-band tuning task (superseded core's 1.2) belongs to `implement-church-redemption`, which owns the rows being priced.
 
 ## 1. Tuning decisions (decide and record first — every other church change prices against these)
 

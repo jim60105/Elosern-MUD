@@ -6,7 +6,7 @@ Prerequisites: `implement-church-redemption` is implemented AND archived (the `r
 2. `martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr`
 3. `the-combat-rails-are-offline-deterministic-and-the-full-church-loop-runs-end-to-end-with-ai-dead`
 
-Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at.
+Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at. Verification runs the focused test labels that cover this change per the repo AGENTS.md testing rules (smallest label that covers the change; `--parallel 16 --noinput` full suite and CI shard commands are NEVER run locally by this change).
 
 ## 1. The charges primitive
 

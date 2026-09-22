@@ -8,7 +8,7 @@ Prerequisites: `implement-church-foundation` and `implement-church-enrollment` a
 4. `the-accrual-paths-are-offline-deterministic-with-commit-bound-observability`
 5. `the-church-pray-and-offer-commands-are-documented-in-the-docs-trio`
 
-Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at.
+Any NEW test module MUST be registered in exactly one `.github/evennia-shards.json` shard (unregistered modules silently never run); data-contract-tagged modules go in the test-data ledger files the shard config points at. Verification runs the focused test labels that cover this change per the repo AGENTS.md testing rules (smallest label that covers the change; `--parallel 16 --noinput` full suite and CI shard commands are NEVER run locally by this change).
 
 ## 1. Pray
 
