@@ -17,6 +17,7 @@ from world.observability import log_info, log_warn
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
+from world.rules.pleasure import saintess_trickle_step
 from world.rules.sexual_state import (
     DECAY_CONFIG,
     PLEASURE_CONFIG,
@@ -334,6 +335,21 @@ def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entiti
     if source is not AdvanceSource.COMBAT:
         _settle_buffs_and_decay(entities, seconds)
         _practice_settlement(entities, seconds, source)
+        # 聖光涓流 (saintess-vessel D2b): the holder's idle-band pin/oscillation
+        # runs exactly once per advance — NOT inside the per-quantum settlement
+        # loop, which the pending-work guard would early-exit before (a fully
+        # idle holder has no other pending work) and which would draw up to
+        # 180 steps in one sleep-length advance. Non-combat sources only,
+        # matching the loop's own combat posture, and only when time actually
+        # passed (a zero-second advance mutates no world state and must not
+        # fluctuate the gauge either). The resulting tick is the post-advance
+        # value the caller assigns after this function returns; the direction
+        # draw is a stateless hash of it, so a rolled-back and retried
+        # advance recomputes the identical draw.
+        if seconds > 0:
+            resulting_tick = clock.tick + seconds
+            for entity in entities:
+                saintess_trickle_step(entity, resulting_tick)
     return _settle_boundary_stages(clock.tick, clock.tick + seconds, entities)
 
 

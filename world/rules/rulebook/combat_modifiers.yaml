@@ -118,6 +118,19 @@
 - id: priestly_grace_recovery_scale
   when: {skill_owned: priestly_grace}
   then: {recovery_arousal_scale: 0.1}
+- id: saintess_vessel_blessing_scale
+  # 聖女容器 (saintess_vessel) 的儀典讀取鍵 — 刻意與 priestly_grace 的
+  # recovery_arousal_scale 分鍵：同鍵數值在 merge 時 ADD，共鍵會把興奮
+  # 倍率偷偷加倍。消費端 (recovery_snapshot_kwargs) 以 max 折疊兩鍵，
+  # 同時持有兩者時階級仍只讀一次。
+  when: {skill_owned: saintess_vessel}
+  then: {blessing_arousal_scale: 0.1}
+- id: saintess_blessing_grace
+  # 女神降福恩典 — 聖女容器持有者自身降福 (light_blessing) 存續且興奮
+  # 達中等時，防禦 +6（saintess_vestment_grace 的量級/形状）。獨立於
+  # light_blessing_defense_bonus 的 authored +18，兩條各自成列、merge 相加。
+  when: {skill_owned: saintess_vessel, buff_active: light_blessing, field: arousal, gte: 中等}
+  then: {defense: 6}
 - id: light_blessing_defense_bonus
   when: {buff_active: light_blessing}
   then: {defense: 18}

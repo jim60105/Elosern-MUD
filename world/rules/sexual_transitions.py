@@ -10,7 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from django.db import transaction
+
+from world.observability import log_info
 from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
+from world.rules.skill_ownership import owns_stored_skill
 from world.rules.sexual_state import PLEASURE_CONFIG, _apply_climax_phase_set
 
 
@@ -207,6 +211,26 @@ def _apply_then(
         before = entity.sexual.virgin
         entity.sexual.virgin = then["set"]
         direction = "down" if before and not entity.sexual.virgin else None
+        if direction == "down" and owns_stored_skill(entity, "saintess_vessel"):
+            # 聖女的誓約即引擎的 `virgin` 旗標 (saintess-vessel D4): the
+            # irreversible first flip by a 聖女容器 holder is her oath
+            # breaking. Commit-bound via transaction.on_commit (the
+            # clock_advance precedent) so a rolled-back transaction emits
+            # nothing, and gated on vessel ownership so a generic
+            # character's first penetration never claims a Saintess oath
+            # event. Plain-data context, facade-only, zero title reads or
+            # writes (D5: this change owns no title state). Repeats can
+            # never re-emit: the flag is already down, so `direction` is
+            # None on every later pass.
+            transaction.on_commit(
+                lambda entity=entity, event=context.get("event"): log_info(
+                    "saintess_oath_broken",
+                    context={
+                        "entity": str(entity),
+                        "event": event or "first_vaginal_penetration",
+                    },
+                )
+            )
     elif kind == "append_only_set":
         before = entity.sexual.experience_types
         entity.sexual.add_experience_type(then["add"])

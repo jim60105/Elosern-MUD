@@ -1,8 +1,9 @@
-## Purpose
+# saintess-vessel Specification
 
+## Purpose
 Defines the 聖女容器 (`saintess_vessel`) passive: the 劇情/聖職敘階-granted Saintess vessel whose 聖光涓流 keeps her arousal idling in the 微興奮～中等 band on the world clock, whose two named public blessing ceremonies each read her excitement tier exactly once, and whose boundary transitions are recorded through the observability facade.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: saintess_vessel is a granted-only clergy qualifier passive
 `SKILL_REGISTRY` SHALL contain `saintess_vessel`（聖女容器）declared `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, `usable_out_of_combat=True`, `element="light"`, `category=SkillCategory.ENHANCEMENT`, with an EMPTY effects collection (asserted by emptiness, not container type — the shipped builder defaults the omitted field to its shared frozen empty list) and no lineage prerequisites — the same qualifier-row shape as `pain_to_pleasure`, `rapture_renewal`, and `priestly_grace`. The row SHALL NOT appear in any genealogy tree, and the passive kind itself SHALL keep it unearnable: the practice-award entries and the cross-lineage unlock engine SHALL reject it exactly as they already reject PASSIVE skills. It SHALL NOT be conferrable (`validate_conferrable_skill` accepts only stat-multiply/rule-table shaped rows and the vessel carries neither), joining the same non-conferrable qualifier class as the other three clergy passives. The ONLY production paths that place it on an entity are preset activation (`passive_skills`) and an import record. The shipped Saintess preset's `passive_skills` SHALL include `saintess_vessel`.
@@ -27,11 +28,11 @@ Defines the 聖女容器 (`saintess_vessel`) passive: the 劇情/聖職敘階-gr
 For an entity owning `saintess_vessel`, the world-clock settlement SHALL guarantee that after any settlement step the entity's pleasure is never below the 微興奮 floor (15) while the holder sits below the 中等/高度 boundary behavior defined below. Concretely, all writes through the sanctioned `world/rules/` pleasure writers only (never a typeclass, AI, or presentation module):
 
 1. The pleasure decay step's floor for a holder is the 微興奮 floor: `decay_tick` targets `max(15, band_floor − 1)` and a holder at or below 15 with decay due is a no-op.
-2. Once per world-clock `advance()` (NOT per settlement quantum), for every settled non-combat-sourced scope, an entity below 15 is raised to exactly 15 via `apply_pleasure_gain`.
-3. An entity inside [15, 59] receives exactly one deterministic ±1 step per advance whose direction is a stateless parity of the resulting world tick and the entity identity (a rolled-back, retried advance recomputes the identical direction; no RNG is consumed), with the result clamped so the gauge never leaves [15, 59].
+2. Once per world-clock `advance()` with `seconds > 0` (NOT per settlement quantum), for every settled non-combat-sourced scope, an entity below 15 is raised to exactly 15 via `apply_pleasure_gain(..., stimulus=False)`.
+3. An entity inside [15, 59] receives exactly one deterministic ±1 step per advance whose direction is a stateless hash of the FULL resulting world tick and the entity identity (a rolled-back, retried advance recomputes the identical direction; no RNG is consumed; raw tick parity is refuted — every shipped non-combat advance duration is even, so the draw would freeze per entity), with the result clamped so the gauge never leaves [15, 59] and a clamped-to-zero delta issuing no writer call.
 4. An entity at or above 60 is left untouched; ordinary decay owns the descent and steps 2–3 re-arm when the gauge re-enters the band.
 
-A holder resting at the floor therefore oscillates between 15 and 16 — its arousal level never leaves 微興奮. An entity that does not own `saintess_vessel` SHALL decay and settle byte-for-byte exactly as before this change.
+All trickle writes carry the sanctioned writer's explicit non-stimulus policy: the gauge write and the wetness-on-band-up cascade apply, while the climax-phase edges (接近→進行中, 極限→接近) and extension staging NEVER fire — the idle fluctuation must not autonomously open a climax below the 85 gate for a holder parked at 接近. A holder resting at the floor therefore stays never-below-15 with at most ±1 movement per advance — its arousal level never leaves 微興奮～中等. An entity that does not own `saintess_vessel` SHALL decay and settle byte-for-byte exactly as before this change.
 
 #### Scenario: A completely idle holder at zero is pinned up in one advance
 - **WHEN** a vessel holder with pleasure 0 and no buffs or other pending settlement work is settled by one world-clock advance
@@ -52,6 +53,10 @@ A holder resting at the floor therefore oscillates between 15 and 16 — its aro
 #### Scenario: A retried failed advance recomputes the identical step
 - **WHEN** a world-clock advance for a mid-band holder is forced to fail after the trickle step and is retried with the same inputs
 - **THEN** both attempts compute the same fluctuation direction and the restored holder's pleasure equals the single-apply value
+
+#### Scenario: The idle trickle never opens a climax
+- **WHEN** a holder whose climax phase rests at 接近 (left there by an earlier 極限 spike) is settled by repeated advances inside [15, 59]
+- **THEN** the phase never reads 進行中 and no extension is staged
 
 #### Scenario: Non-holders are byte-identical
 - **WHEN** a non-holder with pleasure 20 is settled over the same advances

@@ -252,6 +252,7 @@ ROWS: dict[str, PlayerPreset] = {
         active_skills=("fire_ball", "wind_blade"),
         passive_skills=(
             "magic_circle_comprehension", "precise_mana_control", "flight",
+            "saintess_vessel",
         ),
         affinity_elements=("fire", "wind"),
         starting_items=(("elven_traditional_robe", 1), ("royal_signet_ring", 1),

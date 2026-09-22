@@ -103,10 +103,18 @@ def recovery_snapshot_kwargs(
     heal_gain = caster_mods.get("heal_gain")
     if heal_gain is not None:
         snapshot["snapshot_heal_gain"] = heal_gain
-    arousal_scale = float(
-        caster_mods.get("recovery_arousal_scale", 0.0)
-        or caster_mods.get("recovery_scale", 0.0)
-        or 0.0
+    # The grace tier is read EXACTLY once: saintess_vessel's ceremonial
+    # blessing_arousal_scale and priestly_grace's recovery_arousal_scale are
+    # both 0.1/ordinal by design and arrive on deliberately distinct keys —
+    # same-key numerics ADD at merge, so a shared key would silently double
+    # the multiplier for a holder of both. max() folds them into one read.
+    arousal_scale = max(
+        float(
+            caster_mods.get("recovery_arousal_scale", 0.0)
+            or caster_mods.get("recovery_scale", 0.0)
+            or 0.0
+        ),
+        float(caster_mods.get("blessing_arousal_scale", 0.0) or 0.0),
     )
     arousal_ordinal = 0
     if actor is not None:

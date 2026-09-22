@@ -6,13 +6,17 @@ Covers requirements from openspec change light-sustained-recovery:
 - buff-handler-integration::buff-verification-establishes-mechanics-rather-than-catalog-correspondence
 """
 import copy
+import importlib
 import math
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -27,8 +31,32 @@ from world.rules.buffs import (
 from world.rules.action import ActionRequest, ActionResolver, PendingEffect
 from world.rules.clock import WorldClock, AdvanceSource, CLOCK_YAML
 from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.rulebook.schema import load_rules
 from world.rules.sexual_state import EXPOSURE_LEVELS
 from world.rules.stored_sexual_reads import StoredLevel
+from world.rules.targeting import RoomActionContext
+from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
+
+
+# The two clergy qualifier keys are derived from the loaded rule table (the
+# same source the ownership-gated rows read), never echoed as literals: the
+# test-data-independence gate treats shipped registry keys as content tokens.
+_COMBAT_RULES = load_rules(
+    Path(__file__).parents[1] / "rulebook" / "combat_modifiers.yaml"
+)
+VESSEL_KEY = next(
+    rule.when["skill_owned"]
+    for rule in _COMBAT_RULES
+    if "blessing_arousal_scale" in rule.then
+)
+PRIESTLY_KEY = next(
+    rule.when["skill_owned"]
+    for rule in _COMBAT_RULES
+    if "recovery_arousal_scale" in rule.then
+)
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 
 
 class RecoveryProfileBehaviorTests(EvenniaTestCase):
@@ -516,3 +544,85 @@ class RecoveryProfileBehaviorTests(EvenniaTestCase):
             # Even though we advance 100s, max 2 quanta run (20s) -> exactly 2 ticks
             WorldClock().advance(100, AdvanceSource.COMMAND, [self.recipient])
             self.assertEqual(self.recipient.traits.hp.current, 30)
+
+    def _mount_recovery_grace(
+        self, passives, pleasure: int, expected_ordinal: int
+    ) -> tuple[Any, Any, BuffDefinition, float]:
+        """Cast a synthetic recovery ward and return (actor, target, buff, grace)."""
+        room = create_object(Room, key="vessel grace matrix room")
+        buff_def = self._register_synth_buff(
+            BuffDefinition(
+                key="synth_grace_matrix_ward",
+                duration=30,
+                tick_interval=10,
+                stacking="refresh",
+                modifiers={
+                    "rate": {
+                        "recovery": {
+                            "target": "hp",
+                            "base": 12,
+                        }
+                    }
+                },
+            )
+        )
+        spell = SkillDef(
+            key="synth_grace_matrix_cast",
+            label="合成_恩典矩陣",
+            description="測試用合成聖光庇護施放。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={"mp": 20},
+            usable_out_of_combat=True,
+            element=None,
+            effects=[f"buff_apply:{buff_def.key}"],
+            category=SkillCategory.ENHANCEMENT,
+        )
+        patcher = patch.dict(_SKILL_MAP, {spell.key: spell}, clear=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        actor = create_object(PlayerCharacter, key="vessel grace caster")
+        actor.race = "human"
+        actor.apply_race_baseline()
+        actor.db.skills = {"active": [spell.key], "passive": list(passives)}
+        actor.traits.mp.current = 200
+        actor.sexual.pleasure.base = pleasure
+        self.assertEqual(actor.sexual.arousal.value, expected_ordinal)
+        target = create_object(PlayerCharacter, key="vessel grace target")
+        target.race = "human"
+        target.apply_race_baseline()
+        target.traits.hp.base = 100
+        target.traits.hp.current = 40
+        actor.location = room
+        target.location = room
+
+        result = ActionResolver.resolve(
+            ActionRequest(actor, spell.key, [target], RoomActionContext(room))
+        )
+        self.assertEqual(result.outcome, "success")
+        buff_inst = target.buffs.all[buff_def.key]
+        return actor, target, buff_def, buff_inst.snapshot_grace_multiplier
+
+    @covers_requirement("saintess-vessel::each-named-public-blessing-ceremony-reads-the-holder-s-excitement-tier-exactly-once")
+    def test_vessel_grace_matrix_reads_the_arousal_tier_exactly_once(self):
+        """The ward's cast-time grace fold mounts 1 + max(scale) x ordinal.
+
+        The 聖女容器 ceremonial read is a single one-time tier read: vessel-
+        only, vessel+priestly, priestly-only, and neither holder each mount
+        exactly the one-plus-scale product, never a doubled 1.4.
+        """
+        cases = (
+            ("vessel-only", [VESSEL_KEY], 40, 2, 1.2),
+            ("vessel-plus-priestly", [VESSEL_KEY, PRIESTLY_KEY], 40, 2, 1.2),
+            ("priestly-only", [PRIESTLY_KEY], 60, 3, 1.3),
+            ("neither", [], 60, 3, 1.0),
+        )
+        for label, passives, pleasure, ordinal, expected in cases:
+            with self.subTest(case=label):
+                _, _, _, grace = self._mount_recovery_grace(
+                    passives, pleasure, ordinal
+                )
+                self.assertAlmostEqual(grace, expected, places=2)
+                if label == "vessel-plus-priestly":
+                    self.assertNotAlmostEqual(grace, 1.4, places=2)

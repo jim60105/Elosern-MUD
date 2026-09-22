@@ -275,6 +275,12 @@
 - code: priestly_grace_recovery_scale
   label: 女神近接回復強化
   severity: beneficial
+- code: saintess_vessel_blessing_scale
+  label: 聖女容器祝聖強化
+  severity: beneficial
+- code: saintess_blessing_grace
+  label: 女神降福恩典
+  severity: beneficial
 - code: light_blessing_defense_bonus
   label: 女神降福防禦提升
   severity: beneficial
