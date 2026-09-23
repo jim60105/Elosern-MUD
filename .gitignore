@@ -24,6 +24,11 @@ server/.media/
 server/.cache/
 server/.art/
 
+# Operator-seeded translation model (art-prompt-translation): the server never
+# downloads it (design D2); a locally seeded bare-metal directory must stay out
+# of git, and the container image declares the path as a volume instead.
+server/.translate/
+
 # Operator-supplied bulk seed-art folder (default ART_SEED_ROOT under GAME_DIR,
 # gallery-seed-sync): never committed; bind-mounted read-only by compose.
 art-seed/

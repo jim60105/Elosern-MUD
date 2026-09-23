@@ -104,6 +104,7 @@ RUN find /app -type d -exec chmod 0755 {} + && \
     install -d -m 775 -o root -g 0 /app/server/.media && \
     install -d -m 775 -o root -g 0 /app/server/.art && \
     install -d -m 775 -o root -g 0 /app/server/.rembg && \
+    install -d -m 775 -o root -g 0 /app/server/.translate && \
     chmod 1775 /app/server
 
 ########################################
@@ -127,7 +128,7 @@ ENV PATH="/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/server/.art", "/app/server/.rembg"]
+VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/server/.art", "/app/server/.rembg", "/app/server/.translate"]
 EXPOSE 4000 4001 4002
 USER $UID
 STOPSIGNAL SIGINT
