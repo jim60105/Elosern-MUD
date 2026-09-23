@@ -21,12 +21,12 @@
 
 ## 2. Handlers + registry
 
-- [ ] 2.1 Implement `_handle_rite_blessing` and `_handle_rite_shelter` in
+- [x] 2.1 Implement `_handle_rite_blessing` and `_handle_rite_shelter` in
       `world/rules/action/effects/church.py` (gates raise `RejectedAction` before staging;
       blessing stages ledger stamp + buff mount, shelter stages traits gain + day marker).
-- [ ] 2.2 Add the shared day-block normalise helper in `world/rules/church.py` and route
+- [x] 2.2 Add the shared day-block normalise helper in `world/rules/church.py` and route
       `pray_step` through it (no third copy of the normalise logic).
-- [ ] 2.3 Declare `effects=("rite_blessing:martial_blessing",)` / `effects=("rite_shelter",)` on the
+- [x] 2.3 Declare `effects=("rite_blessing:martial_blessing",)` / `effects=("rite_shelter",)` on the
       two rows and swap `rite_morning_devotion` to `SkillKind.PASSIVE` in
       `world/skills/registry/data_church.py`; confirm the `REDEEM_CATALOG` row's kind drives
       `grant_owned_skill` into `db.skills.passive`.

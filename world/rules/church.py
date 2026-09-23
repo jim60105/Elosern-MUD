@@ -102,6 +102,7 @@ def _new_ledger() -> dict[str, Any]:
         "merit": 0,
         "enrolled_tick": 0,
         "redeemed": [],
+        "blessing_last_tick": None,
         "daily": {"day": _clock_day(), "pray": 0},
     }
 
@@ -259,6 +260,16 @@ def record_redemption(entity: Any, key: str) -> tuple[str, ...]:
     return tuple(ledger["redeemed"])
 
 
+def _normalize_daily_block(daily_block: dict[str, Any], today: int) -> dict[str, Any]:
+    """Ensure the daily block belongs to ``today``, resetting counters on day change."""
+    if not isinstance(daily_block, dict):
+        raise ChurchLedgerError("db.church daily is malformed")
+    if int(daily_block.get("day", -1)) != today:
+        daily_block.clear()
+        daily_block.update({"day": today, "pray": 0})
+    return daily_block
+
+
 def ensure_daily_reset(entity: Any) -> None:
     """Reset the daily counters when the world-clock day has changed.
 
@@ -274,14 +285,51 @@ def ensure_daily_reset(entity: Any) -> None:
 
     def _mutate(entry: dict[str, Any]) -> None:
         daily_block = entry["daily"]
-        if not isinstance(daily_block, dict):
-            raise ChurchLedgerError("db.church daily is malformed")
-        if int(daily_block.get("day", -1)) == today:
-            return
-        daily_block.clear()
-        daily_block.update({"day": today, "pray": 0})
+        _normalize_daily_block(daily_block, today)
 
     _write_ledger(entity, _mutate)
+
+
+def record_rite_blessing(entity: Any, tick: int) -> dict[str, Any]:
+    """Record rite_martial_blessing cooldown tick on the church ledger."""
+    def _mutate(entry: dict[str, Any]) -> None:
+        entry["blessing_last_tick"] = int(tick)
+
+    written = _write_ledger(entity, _mutate)
+    char_key = str(entity)
+    transaction.on_commit(
+        lambda: log_info(
+            "rite_cast",
+            context={
+                "char": char_key,
+                "rite": "rite_martial_blessing",
+                "tick": int(tick),
+            },
+        )
+    )
+    return written
+
+
+def record_rite_shelter(entity: Any, today: int, tick: int) -> dict[str, Any]:
+    """Record rite_shelter day-block marker on the church ledger."""
+    def _mutate(entry: dict[str, Any]) -> None:
+        daily = entry.get("daily")
+        _normalize_daily_block(daily, today)
+        daily["shelter"] = 1
+
+    written = _write_ledger(entity, _mutate)
+    char_key = str(entity)
+    transaction.on_commit(
+        lambda: log_info(
+            "rite_cast",
+            context={
+                "char": char_key,
+                "rite": "rite_shelter",
+                "tick": int(tick),
+            },
+        )
+    )
+    return written
 
 
 def build_initial_arousal_baseline(level: str) -> dict[str, Any]:
@@ -603,11 +651,7 @@ def pray_step(entity: Any) -> dict[str, Any]:
                     entity, int(accrual["merit"])
                 )
                 daily = entry["daily"]
-                if not isinstance(daily, dict):
-                    raise ChurchLedgerError("db.church daily is malformed")
-                if int(daily.get("day", -1)) != today:
-                    daily.clear()
-                    daily.update({"day": today, "pray": 0})
+                _normalize_daily_block(daily, today)
                 daily["pray"] = int(daily.get("pray", 0)) + 1
 
             written = _write_ledger(entity, _mutate)
