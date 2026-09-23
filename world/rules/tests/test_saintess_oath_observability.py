@@ -142,10 +142,23 @@ class SaintessOathObservabilityTests(EvenniaTest):
         self.assertEqual(frozenset(TitlePredicateFamily), families_before)
         self.assertEqual(frozenset(FixedTitleRegistry), rows_before)
         # The §9.2 sanction allows at most ONE extension — the church
-        # redeemed-count family — and it lands with the sibling
-        # order-catalogue change: at THIS landing the family set stays
-        # unchanged, so the sanctioned family is asserted ABSENT here.
-        self.assertNotIn("church_skills_redeemed", {f.value for f in TitlePredicateFamily})
+        # redeemed-count family — which lands with the sibling
+        # order-catalogue change: the family set gains exactly
+        # church_skills_redeemed and nothing else.
+        baseline_families = {
+            "lineage_complete",
+            "mastery_owned",
+            "first_kill_tier",
+            "quest_completed",
+            "guild_rank_reached",
+            "sexual_experience",
+            "counter_threshold",
+        }
+        self.assertEqual(
+            {f.value for f in TitlePredicateFamily},
+            baseline_families | {"church_skills_redeemed"},
+        )
+        self.assertIn("church_skills_redeemed", {f.value for f in TitlePredicateFamily})
         self.assertFalse(
             any(
                 "聖女" in str(getattr(row, "display_name_zh", ""))
