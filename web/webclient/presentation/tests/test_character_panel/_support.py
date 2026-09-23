@@ -87,10 +87,33 @@ def _scope_extra():
     skills = dict(overlay["skills"])
     mastery = _mastery_row()
     skills[mastery.key] = mastery
-    from world.skills.registry.data_church import ROWS as CHURCH_ROWS
-    for row in CHURCH_ROWS:
+    for row in _rite_rows():
         skills[row.key] = row
     return {**overlay, "skills": skills}
+
+
+# File-local holy-rite twins for the seventh-category grouping contract:
+# only the category/group fields are under test, so the kit cast row is
+# borrowed and re-filed instead of naming shipped rite keys.
+_T_PANEL_RITE_A = "t_panel_rite_a"
+
+
+_T_PANEL_RITE_B = "t_panel_rite_b"
+
+
+def _rite_rows():
+    """One null-group and one 聖禮-group HOLY_RITE active row."""
+    from dataclasses import replace
+
+    from world.skills.registry import SkillCategory
+
+    base = SYNTH_SKILLS["t_ember_burst"]
+    return (
+        replace(base, key=_T_PANEL_RITE_A, label="合成聖禮甲",
+                category=SkillCategory.HOLY_RITE, group=None),
+        replace(base, key=_T_PANEL_RITE_B, label="合成聖禮乙",
+                category=SkillCategory.HOLY_RITE, group="聖禮"),
+    )
 
 
 def _element_mastery_key():

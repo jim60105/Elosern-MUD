@@ -1,5 +1,3 @@
-"""Data-contract test: combat-panel holy_rite grouping renders shipped church skill rows
-"""
 import unittest
 from tools.spec_traceability import covers_requirement
 import importlib
@@ -29,6 +27,8 @@ from ._support import (
     T_EMBER,
     _T_DIALOGUE_ROW,
     _T_MARTIAL_PROBE,
+    _T_COMBAT_RITE_A,
+    _T_COMBAT_RITE_B,
     _monster,
     _player,
     _presenter_scope_extra,
@@ -158,8 +158,10 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_owned_holy_rite_skills_list_as_seventh_category_and_validate(self):
+        # Kit holy-rite twin in the null group: only the seventh-category
+        # placement and the validator's acceptance are under test.
         self.player.db.skills = {
-            "active": ["rite_lamb_mark", "rite_martyrdom_vow"],
+            "active": [_T_COMBAT_RITE_A],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -179,7 +181,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(holy_rite["groups"][0]["label"])
         self.assertEqual(
             [s["key"] for s in holy_rite["groups"][0]["skills"]],
-            ["rite_lamb_mark", "rite_martyrdom_vow"],
+            [_T_COMBAT_RITE_A],
         )
         normalized = validate_context_actions(payload)
         self.assertEqual(normalized["skills"], payload["skills"])
@@ -187,7 +189,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_holy_rite_sub_groups_follow_fixed_null_then_rite_order(self):
         self.player.db.skills = {
-            "active": ["rite_anointing_touch", "rite_lamb_mark"],
+            "active": [_T_COMBAT_RITE_B, _T_COMBAT_RITE_A],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -206,11 +208,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(
             [s["key"] for s in holy_rite["groups"][0]["skills"]],
-            ["rite_lamb_mark"],
+            [_T_COMBAT_RITE_A],
         )
         self.assertEqual(
             [s["key"] for s in holy_rite["groups"][1]["skills"]],
-            ["rite_anointing_touch"],
+            [_T_COMBAT_RITE_B],
         )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")

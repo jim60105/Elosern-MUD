@@ -1,7 +1,4 @@
-"""Data-contract test: character-panel holy_rite grouping renders shipped church skill rows
-
-Character panel presenter tests: canonical envelope, roster, and disguise rendering.
-"""
+"""Character panel presenter tests: canonical envelope, roster, and disguise rendering."""
 from tools.spec_traceability import covers_requirement
 import math
 from unittest.mock import patch
@@ -15,7 +12,22 @@ from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.status_query import StatusQueryError
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
-from ._support import BRANCH, T_EMBER, T_STEADY, _T_ITEM_DISPLAY, _T_THORN, _context, _element_mastery_key, _flattened_keys, _innate_key, _live_skill_registry, _scope_extra, _unlock_free_act_keys
+from ._support import (
+    BRANCH,
+    T_EMBER,
+    T_STEADY,
+    _T_ITEM_DISPLAY,
+    _T_PANEL_RITE_A,
+    _T_PANEL_RITE_B,
+    _T_THORN,
+    _context,
+    _element_mastery_key,
+    _flattened_keys,
+    _innate_key,
+    _live_skill_registry,
+    _scope_extra,
+    _unlock_free_act_keys,
+)
 import unittest
 
 
@@ -388,10 +400,12 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
-    def test_owned_holy_rite_rows_list_in_seventh_group_under_client_bound(self):
+    def test_holy_rite_rows_list_in_seventh_group_under_client_bound(self):
+        # Kit holy-rite twins (null and 聖禮 groups) plus the kit enhancement
+        # passive: only the seventh-category grouping rule is under test.
         self.player.db.skills = {
-            "active": ["rite_anointing_touch", "rite_lamb_mark"],
-            "passive": ["poverty_vow"],
+            "active": [_T_PANEL_RITE_A, _T_PANEL_RITE_B],
+            "passive": [T_STEADY],
         }
         payload = self._render()
         holy_rite = payload["actives"][-1]
@@ -407,18 +421,18 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             [r["key"] for r in holy_rite["groups"][0]["skills"]],
-            ["rite_lamb_mark"],
+            [_T_PANEL_RITE_A],
         )
         self.assertEqual(
             [r["key"] for r in holy_rite["groups"][1]["skills"]],
-            ["rite_anointing_touch"],
+            [_T_PANEL_RITE_B],
         )
         self.assertNotIn(
             "holy_rite",
             [c["category"] for c in payload["passives"]],
         )
         enh = next(c for c in payload["passives"] if c["category"] == "enhancement")
-        self.assertIn("poverty_vow", [r["key"] for g in enh["groups"] for r in g["skills"]])
+        self.assertIn(T_STEADY, [r["key"] for g in enh["groups"] for r in g["skills"]])
         from web.webclient.presentation.character import validate_character
         normalized = validate_character(payload)
         self.assertEqual(normalized["actives"], payload["actives"])

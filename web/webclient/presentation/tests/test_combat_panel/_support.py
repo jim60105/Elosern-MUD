@@ -53,8 +53,7 @@ def _t_context_skill(base_key: str, key: str, label: str, effects):
 def _presenter_scope_extra():
     """One skills overlay: innates plus this file's probe rows."""
     skills = dict(synth_innate_overlay()["skills"])
-    from world.skills.registry.data_church import ROWS as CHURCH_ROWS
-    for row in CHURCH_ROWS:
+    for row in _rite_rows():
         skills[row.key] = row
     disguise = _t_context_skill(
         "t_moss_veil", "t_combat_disguise_probe", "偽裝試探", ["set_disguise"]
@@ -69,6 +68,27 @@ def _presenter_scope_extra():
         {disguise.key: disguise, confer.key: confer, martial.key: martial}
     )
     return {"skills": skills}
+
+
+# File-local holy-rite twins for the holy_rite grouping contract: the kit
+# cast row re-filed under the HOLY_RITE category, never a shipped rite key.
+_T_COMBAT_RITE_A = "t_combat_rite_a"
+
+
+_T_COMBAT_RITE_B = "t_combat_rite_b"
+
+
+def _rite_rows():
+    """One null-group and one 聖禮-group HOLY_RITE active row."""
+    from world.skills.registry import SkillCategory
+
+    base = SYNTH_SKILLS["t_ember_burst"]
+    return (
+        replace(base, key=_T_COMBAT_RITE_A, label="合成聖禮甲",
+                category=SkillCategory.HOLY_RITE, group=None),
+        replace(base, key=_T_COMBAT_RITE_B, label="合成聖禮乙",
+                category=SkillCategory.HOLY_RITE, group="聖禮"),
+    )
 
 
 def _valid_skill(**overrides):
