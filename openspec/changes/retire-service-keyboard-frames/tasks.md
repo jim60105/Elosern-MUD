@@ -13,8 +13,8 @@
 
 ## 3. Node gate and data-lint lists
 
-- [ ] 3.1 Delete `web/static/webclient/js/tests/service_menu.test.js` and the `ServiceMenu` block of `hud_dock_menus.test.js`. Remove the file from `tools/test_data_lint_seed.json`, `tools/test_data_freeze.json`, and `tests/test_data_independence_js_webclient.py`. Run `node --test web/static/webclient/js/tests/*.test.js` and `uv run --locked python -m tools.test_data_lint check`; both green.
-- [ ] 3.2 Re-point `web/webclient/tests/test_node_suite_evidence.py::test_service_menu_node_suite_passes` (rename to describe the panel) at `protocol_services_a.test.js` and `protocol_services_b.test.js`, keeping its `webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel` annotation. Run the Evennia shard that contains it green.
+- [x] 3.1 Delete `web/static/webclient/js/tests/service_menu.test.js` and the `ServiceMenu` block of `hud_dock_menus.test.js`. Remove the file from `tools/test_data_lint_seed.json`, `tools/test_data_freeze.json`, and `tests/test_data_independence_js_webclient.py`. Run `node --test web/static/webclient/js/tests/*.test.js` and `uv run --locked python -m tools.test_data_lint check`; both green.
+- [x] 3.2 Re-point `web/webclient/tests/test_node_suite_evidence.py::test_service_menu_node_suite_passes` (rename to describe the panel) at `protocol_services_a.test.js` and `protocol_services_b.test.js`, keeping its `webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel` annotation. Run the Evennia shard that contains it green.
 
 ## 4. Vitest
 

@@ -101,12 +101,16 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
     )
-    def test_service_menu_node_suite_passes(self):
+    def test_services_panel_node_suite_passes(self):
+        suite = [
+            str(REPO_ROOT / "web/static/webclient/js/tests/protocol_services_a.test.js"),
+            str(REPO_ROOT / "web/static/webclient/js/tests/protocol_services_b.test.js"),
+        ]
         result = subprocess.run(
             [
                 "node",
                 "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/service_menu.test.js"),
+                *suite,
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -116,7 +120,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "service-menu Node suite failed:\n" + result.stdout + result.stderr,
+            "services-panel Node suite failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
