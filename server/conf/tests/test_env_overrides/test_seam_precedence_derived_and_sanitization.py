@@ -309,6 +309,12 @@ class TestSettingsSanitizationTests(_SubprocessSettingsTests):
         }
         result = self._run(code, **env)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertEqual(
-            _printed_map(result.stdout, set(DEFAULT_REPR)), DEFAULT_REPR
-        )
+        expected = dict(DEFAULT_REPR)
+        # Deliberate deviation: server/conf/test_settings.py pins
+        # ART_TRANSLATE_DOWNLOAD_ENABLED = False after the star import, so a
+        # test run sits on the translation air-gapped track — the inherited
+        # shell value (a hostile "true", popped before the import) can never
+        # make a test download-capable, even against the shipped backend's
+        # unseeded directory.
+        expected["ART_TRANSLATE_DOWNLOAD_ENABLED"] = "False"
+        self.assertEqual(_printed_map(result.stdout, set(DEFAULT_REPR)), expected)

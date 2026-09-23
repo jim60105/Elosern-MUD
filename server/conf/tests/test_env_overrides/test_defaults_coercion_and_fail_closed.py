@@ -81,6 +81,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             "ART_REMBG_ENABLED": "TRUE",
             "ART_REMBG_DOWNLOAD_ENABLED": "Yes",
             "ART_TRANSLATE_ENABLED": "OFF",
+            "ART_TRANSLATE_DOWNLOAD_ENABLED": "Yes",
             "ART_SCHEDULER_ENABLED": "OFF",
             "ELOSERN_VUE_CLIENT": "Yes",
         }
@@ -93,6 +94,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
                 "ART_REMBG_ENABLED": "True",
                 "ART_REMBG_DOWNLOAD_ENABLED": "True",
                 "ART_TRANSLATE_ENABLED": "False",
+                "ART_TRANSLATE_DOWNLOAD_ENABLED": "True",
                 "ART_SCHEDULER_ENABLED": "False",
                 "ELOSERN_VUE_CLIENT": "True",
             },

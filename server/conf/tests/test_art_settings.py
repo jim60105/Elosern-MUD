@@ -98,6 +98,16 @@ class ArtSettingsTests(unittest.TestCase):
             "world.art.translate_ct2.CTranslate2Backend",
         )
 
+    @covers_requirement(
+        "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
+    )
+    def test_prompt_translation_download_is_air_gapped_under_test_settings(self):
+        # The documented code default is True, but server/conf/test_settings.py
+        # pins the knob False after the star import: every test run — even one
+        # resolving the shipped backend against an unseeded directory — sits on
+        # the air-gapped track and can never trigger a model download.
+        self.assertIs(settings.ART_TRANSLATE_DOWNLOAD_ENABLED, False)
+
     def test_external_worker_settings_are_removed(self):
         self.assertFalse(hasattr(settings, "ART_WORKER_CMD"))
         self.assertFalse(hasattr(settings, "ART_WORKER_TIMEOUT_SECONDS"))
