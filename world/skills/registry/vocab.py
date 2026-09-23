@@ -134,6 +134,7 @@ class SkillCategory(StrEnum):
     DIVINE_MYSTERY = "divine_mystery"
     UTILITY = "utility"
     SEXUAL_ACT = "sexual_act"
+    HOLY_RITE = "holy_rite"
 
 
 # Presentation metadata bounds shared by every immutable skill definition.

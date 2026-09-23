@@ -1,12 +1,12 @@
 ## 1. Taxonomy move
 
-- [ ] 1.1 Append `HOLY_RITE = "holy_rite"` as the last member of `SkillCategory` in
+- [x] 1.1 Append `HOLY_RITE = "holy_rite"` as the last member of `SkillCategory` in
       `world/skills/registry/vocab.py` (no existing member moves).
-- [ ] 1.2 Swap `category=SkillCategory.ENHANCEMENT` → `CHURCH_RITE` on the 11 church rows and
+- [x] 1.2 Swap `category=SkillCategory.ENHANCEMENT` → `CHURCH_RITE` on the 11 church rows and
       `category=SkillCategory.SEXUAL_ACT` → `CHURCH_RITE` on the 4 Series D rows in
       `world/skills/registry/data_church.py` — nothing else in any row; Series C passives and
       every non-church row untouched.
-- [ ] 1.3 Update `CATEGORY_LABELS` in `world/rules/combat_view.py` and `_CATEGORY_LABELS`
+- [x] 1.3 Update `CATEGORY_LABELS` in `world/rules/combat_view.py` and `_CATEGORY_LABELS`
       (`world/rules/status_query/models.py`) with `SkillCategory.HOLY_RITE: "神聖聖儀"`, and ADD
       the HOLY_RITE grouping branch in both presenters — `combat_view.group_skill_views` and
       `status_query/character.py::group_skill_keys` currently collapse every non-pinned category
