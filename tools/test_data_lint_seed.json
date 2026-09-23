@@ -9,14 +9,6 @@
       "reason": "authoring docs contract"
     },
     {
-      "path": "web/webclient/presentation/tests/test_character_panel/test_presenter.py",
-      "reason": "character-panel holy_rite grouping renders shipped church skill rows"
-    },
-    {
-      "path": "web/webclient/presentation/tests/test_combat_panel/test_presenter.py",
-      "reason": "combat-panel holy_rite grouping renders shipped church skill rows"
-    },
-    {
       "path": "world/lore/tests/test_anchor_placement.py",
       "reason": "anchor placement data contract"
     },
@@ -249,10 +241,6 @@
       "reason": "shipped usable-item regression contract"
     },
     {
-      "path": "world/rules/tests/test_status_query/test_group_skill_keys.py",
-      "reason": "holy_rite grouping order is asserted over shipped SKILL_REGISTRY rows"
-    },
-    {
       "path": "world/skills/sexual_acts/tests/test_acceptance.py",
       "reason": "sexual act acceptance catalog contract"
     },
@@ -303,10 +291,6 @@
     {
       "path": "world/skills/tests/test_cost_tiers.py",
       "reason": "MP cost-tier assignment contract"
-    },
-    {
-      "path": "world/skills/tests/test_effects.py",
-      "reason": "the parser's closed effect grammar is pinned by shipped rite effect strings"
     },
     {
       "path": "world/skills/tests/test_skill_registry/_support.py",

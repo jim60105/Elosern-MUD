@@ -12,6 +12,8 @@ from world.skills.effects import (
     DamageEffect,
     HealEffect,
     MovementEffect,
+    RiteBlessingEffect,
+    RiteShelterEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
     parse_effect,
@@ -63,6 +65,42 @@ class ClosedVocabularyParseTests(unittest.TestCase):
     )
     def test_self_heal_bare_prefix_parses_into_its_dataclass(self):
         self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_rite_blessing_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("rite_blessing:martial_blessing"),
+            RiteBlessingEffect(buff_key="martial_blessing"),
+        )
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_rite_blessing_malformed_payloads_raise(self):
+        for effect in ("rite_blessing", "rite_blessing:", "rite_blessing:a:b"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_rite_shelter_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("rite_shelter"),
+            RiteShelterEffect(),
+        )
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_rite_shelter_rejects_payload(self):
+        for effect in ("rite_shelter:", "rite_shelter:today", "rite_shelter:sanctuary"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
 
 class LightningLineageTreeCatalogTests(unittest.TestCase):
