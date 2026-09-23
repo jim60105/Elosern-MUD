@@ -42,7 +42,13 @@ from commands.combat import (
     CmdEngage,
     CmdGuildExam,
 )
-from commands.church import CmdChurchJoin, CmdChurchOffer, CmdChurchPray
+from commands.church import (
+    CmdChurchJoin,
+    CmdChurchMerit,
+    CmdChurchOffer,
+    CmdChurchPray,
+    CmdChurchRedeem,
+)
 from commands.economy import CmdBuy, CmdInventory, CmdSell, CmdShopStock
 from commands.items import CmdToggleEquip, CmdUseItem
 from commands.guild import (
@@ -202,6 +208,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdChurchJoin)
         self.add(CmdChurchPray)
         self.add(CmdChurchOffer)
+        self.add(CmdChurchRedeem)
+        self.add(CmdChurchMerit)
         self.add(CmdGuildList)
         self.add(CmdGuildAccept)
         self.add(CmdGuildLog)
@@ -246,6 +254,8 @@ POSSESSED_DENYLIST = (
     CmdChurchJoin,
     CmdChurchPray,
     CmdChurchOffer,
+    CmdChurchRedeem,
+    CmdChurchMerit,
     CmdGuildList,
     CmdGuildAccept,
     CmdGuildLog,

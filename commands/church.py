@@ -1,4 +1,5 @@
-"""Player-facing Light Church commands (``join``, ``pray``, ``offer``).
+"""Player-facing Light Church commands (``join``, ``pray``, ``offer``,
+``redeem``, ``merit``).
 
 The command surface is deliberately thin: the deterministic enrollment rite,
 the office branch, and the vestment handover all live in
@@ -10,6 +11,9 @@ model, no LLM intent participates. ``church pray`` and ``church offer`` are
 equally thin: ``world/rules/church.py::pray_step`` and
 ``offering_menu``/``offer_step`` own every mechanic; this module renders the
 menu and maps the stable rejection reasons to fixed player-facing lines.
+``church redeem`` and ``church merit`` are just as thin: the ordination
+ladder (``redeem_step``) and the read-only ledger print own every mechanic,
+and the rejection map below stays the only presentation surface.
 """
 
 from commands.command import Command
@@ -23,10 +27,19 @@ from world.rules.church import (
     OfferingReason,
     PrayerError,
     PrayerReason,
+    RedemptionError,
+    RedemptionReason,
     enroll,
+    enrolled_tick,
+    daily,
+    merit,
     offer_step,
     offering_menu,
     pray_step,
+    redeem_step,
+    redemption_catalogue,
+    redeemed_keys,
+    read_ledger,
 )
 from world.rules.guild import GuildServiceError, resolve_local_service_host
 from world.rules.npc_schedules import interaction_reason
@@ -63,6 +76,18 @@ _OFFERING_REJECTION_LINES = {
 
 _NPC_DECLINED_LINE = "她婉拒了你的服務。"
 _OFFER_USAGE = "用法：church offer <npc> [row_key]"
+
+_REDEMPTION_REJECTION_LINES = {
+    RedemptionReason.NOT_A_PLAYER: "只有冒險者能兌換敘階。",
+    RedemptionReason.NOT_ENROLLED: "你尚未入教。請先與主祭交談。",
+    RedemptionReason.UNKNOWN_KEY: "沒有這個敘階項目。",
+    RedemptionReason.ALREADY_REDEEMED: "你已經獲得這項敘階。",
+    RedemptionReason.INSUFFICIENT_MERIT: "你的恩寵不足，無法兌換這項敘階。",
+    RedemptionReason.UNMET_PREREQ: "你尚未滿足這項敘階的前置條件。",
+    RedemptionReason.MALFORMED_LEDGER: "教會記錄異常，暫時無法兌換敘階。",
+}
+_REDEEM_USAGE = "用法：church redeem [list|<key>]"
+_MERIT_USAGE = "用法：church merit"
 
 
 class CmdChurchJoin(Command):
@@ -179,3 +204,80 @@ class CmdChurchOffer(Command):
             f"你為{npc.key}獻上服務，獲得 {result['merit']} 點恩寵與 "
             f"{result['copper']} 銅。"
         )
+
+
+class CmdChurchRedeem(Command):
+    """以恩寵兌換教會敘階（聖職敘階授予）。"""
+
+    key = "church redeem"
+    aliases = ("敘階",)
+    locks = "cmd:all()"
+    help_category = "church"
+
+    def _show_list(self) -> None:
+        try:
+            rows = redemption_catalogue(self.caller)
+        except RedemptionError as error:
+            reason = error.args[0] if error.args else None
+            self.caller.msg(
+                _REDEMPTION_REJECTION_LINES.get(reason, "兌換無法進行。")
+            )
+            return
+        lines = [f"你目前擁有 {merit(self.caller)} 點恩寵。"]
+        for row, redeemed in rows:
+            skill = SKILL_REGISTRY.get(row.skill_key)
+            label = skill.label if skill is not None else row.skill_key
+            mark = "（已兌換）" if redeemed else ""
+            lines.append(f"{row.skill_key} — {label}（恩寵 {row.merit_price}）{mark}")
+        lines.append(_REDEEM_USAGE)
+        self.caller.msg("\n".join(lines))
+
+    def func(self) -> None:
+        args = self.args.strip()
+        if not args or args == "list":
+            self._show_list()
+            return
+        key = args.split(maxsplit=1)[0]
+        try:
+            result = redeem_step(self.caller, key)
+        except RedemptionError as error:
+            reason = error.args[0] if error.args else None
+            self.caller.msg(
+                _REDEMPTION_REJECTION_LINES.get(reason, "兌換失敗。")
+            )
+            return
+        skill = SKILL_REGISTRY.get(result["row"])
+        label = skill.label if skill is not None else result["row"]
+        self.caller.msg(
+            f"聖光降臨，你以 {result['price']} 點恩寵兌換了「{label}」。"
+        )
+
+
+class CmdChurchMerit(Command):
+    """查閱自己的教會恩寵記錄（唯讀）。"""
+
+    key = "church merit"
+    aliases = ()
+    locks = "cmd:all()"
+    help_category = "church"
+
+    def func(self) -> None:
+        if self.args.strip():
+            self.caller.msg(_MERIT_USAGE)
+            return
+        if read_ledger(self.caller) is None:
+            self.caller.msg("你尚未入教。請先與主祭交談。")
+            return
+        redeemed = redeemed_keys(self.caller)
+        daily_block = daily(self.caller)
+        pray_usage = daily_block["pray"] if daily_block else 0
+        lines = [
+            f"恩寵：{merit(self.caller)} 點",
+            f"入教時的世界時鐘刻度：{enrolled_tick(self.caller)}",
+            f"今日祈禱次數：{pray_usage}",
+        ]
+        if redeemed:
+            lines.append("已兌換敘階：" + "、".join(redeemed))
+        else:
+            lines.append("已兌換敘階：（無）")
+        self.caller.msg("\n".join(lines))
