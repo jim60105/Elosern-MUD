@@ -121,21 +121,22 @@ in shape to `context_actions`'s `skills` field: each category group SHALL contai
 stable key, a bounded display label, and an ordered array of one or more sub-groups; each sub-group
 SHALL contain a nullable group key, a label that is non-null exactly when the group key is non-null,
 and an ordered array of `{key, label}` skill rows, each bounded the same as the prior version's
-passive-row bounds. Category ordering SHALL follow `SkillCategory`'s declaration order (six members
-after the Phase B taxonomy consolidation; `movement` and `innate_gift` are no longer categories);
-sub-group ordering within `elemental_magic` SHALL follow `ELEMENT_REGISTRY`'s declaration order;
-sub-group ordering within `enhancement` SHALL follow the fixed order `null` group, then `"天賦"`, then
-`"身法"`, independent of ownership order. A category with zero owned skills of that kind (active or
-passive) SHALL be omitted from the corresponding array entirely; a category whose skills carry no
-`group` SHALL emit exactly one sub-group with a `null` group key and label. Within each sub-group,
-skill rows SHALL be ordered as `SkillHandler.owned_keys()` returns them, without alphabetical
-reordering. The total count of skill rows across every category and sub-group, flattened, SHALL NOT
-exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`, tracked as independent bounds; these
-bounds apply to the flattened totals, not to the count of top-level category-group entries in either
-array, which is separately bounded by the number of `SkillCategory` members plus exactly one — the
-extra slot carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys
-absent from `SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered
-key still renders.
+passive-row bounds. Category ordering SHALL follow `SkillCategory`'s declaration order (seven members
+after the `holy_rite` addition; `movement` and `innate_gift` are no longer categories); sub-group
+ordering within `elemental_magic` SHALL follow `ELEMENT_REGISTRY`'s declaration order; sub-group
+ordering within `enhancement` SHALL follow the fixed order `null` group, then `"天賦"`, then
+`"身法"`, independent of ownership order; sub-group ordering within `holy_rite` SHALL follow the
+fixed order `null` group, then `"聖禮"`, independent of ownership order. A category with zero owned
+skills of that kind (active or passive) SHALL be omitted from the corresponding array entirely; a
+category whose skills carry no `group` SHALL emit exactly one sub-group with a `null` group key and
+label. Within each sub-group, skill rows SHALL be ordered as `SkillHandler.owned_keys()` returns
+them, without alphabetical reordering. The total count of skill rows across every category and
+sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`,
+tracked as independent bounds; these bounds apply to the flattened totals, not to the count of
+top-level category-group entries in either array, which is separately bounded by the number of
+`SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic
+fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning
+skills in every real category plus one unregistered key still renders.
 
 #### Scenario: Innate active skills are visible for the first time
 - **WHEN** the character panel is built for a freshly created character with no imported skill data
@@ -175,6 +176,15 @@ key still renders.
 - **THEN** the panel does not raise, and that key appears as a `{key, label}` row (with `label`
   equal to `key`) inside one synthetic category group appended after every real `SkillCategory`
   group, in whichever of `actives`/`passives` its original stored bucket indicates
+
+#### Scenario: Owned holy-rite rows list in the seventh group under the client bound
+- **WHEN** the character panel is built for an entity owning the ACTIVE rites `rite_lamb_mark` and
+  `rite_anointing_touch` and the PASSIVE `poverty_vow`
+- **THEN** `actives` ends with a `holy_rite` group (label 神聖聖儀) whose `null` sub-group lists
+  `rite_lamb_mark` and whose `"聖禮"` sub-group lists `rite_anointing_touch` in that fixed order;
+  `passives` carries no `holy_rite` group because `poverty_vow` stays `enhancement`; and an entity
+  owning skills in all seven real categories plus one unregistered key still renders inside the
+  group bound of eight (`len(SkillCategory) + 1`, mirrored by the client constant)
 
 ### Requirement: explore.move traverses a re-resolved Exit through the shared movement path
 The production action registry SHALL register `explore.move`. Its payload SHALL accept exactly `exit_ref` (1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL obtain the actor from the authenticated session, verify the actor's current node ID equals `current_node` (the stale guard), re-resolve the Exit from the actor's location by the opaque `exit_ref`, re-check that the Exit's location is the actor's location and that its destination exists, re-check the `traverse` lock against the actor, and then invoke the Exit's own traversal method so `MovementCostMixin.at_post_traverse` charges the shared `CLOCK_YAML["command_defaults"]["move"]` cost and records the destination node through `record_arrival`. The adapter SHALL NOT relocate the actor directly, SHALL NOT accept a destination room ID, SHALL NOT charge time itself, and SHALL NOT assign location, knowledge, or clock state directly. A missing exit, a wrong node guard, a denied lock, or an active combat session (the `at_pre_move` veto) SHALL reject with a stable code and Traditional Chinese message and SHALL NOT advance the clock or record discovery. On success the adapter SHALL publish a full snapshot at one newer revision so the location change, clock charge, map, header, and shop/quest state refresh together.
