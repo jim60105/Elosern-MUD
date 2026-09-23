@@ -1,4 +1,6 @@
-"""Behaviour suite for the church rulebook slice and its two load gates.
+"""Data-contract test: church rulebook cast-rail contract names its shipped rite rows
+
+Behaviour suite for the church rulebook slice and its two load gates.
 
 Every shipped row of ``church.yaml`` has exactly one ``test_rule_<id>``
 (mirroring the ``combat_modifiers.yaml`` correspondence contract, audited

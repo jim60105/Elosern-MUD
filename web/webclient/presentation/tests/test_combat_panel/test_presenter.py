@@ -1,3 +1,5 @@
+"""Data-contract test: combat-panel holy_rite grouping renders shipped church skill rows
+"""
 import unittest
 from tools.spec_traceability import covers_requirement
 import importlib

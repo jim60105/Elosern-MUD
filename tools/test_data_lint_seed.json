@@ -9,6 +9,14 @@
       "reason": "authoring docs contract"
     },
     {
+      "path": "web/webclient/presentation/tests/test_character_panel/test_presenter.py",
+      "reason": "character-panel holy_rite grouping renders shipped church skill rows"
+    },
+    {
+      "path": "web/webclient/presentation/tests/test_combat_panel/test_presenter.py",
+      "reason": "combat-panel holy_rite grouping renders shipped church skill rows"
+    },
+    {
       "path": "world/lore/tests/test_anchor_placement.py",
       "reason": "anchor placement data contract"
     },
@@ -65,12 +73,12 @@
       "reason": "lore registry content contract"
     },
     {
-      "path": "world/lore/tests/test_room_prose_language.py",
-      "reason": "authored room prose language contract"
-    },
-    {
       "path": "world/lore/tests/test_races.py",
       "reason": "race/subrace data contract"
+    },
+    {
+      "path": "world/lore/tests/test_room_prose_language.py",
+      "reason": "authored room prose language contract"
     },
     {
       "path": "world/lore/tests/test_saintess_vessel_grant.py",
@@ -161,12 +169,16 @@
       "reason": "affinity config validation contract"
     },
     {
+      "path": "world/rules/tests/test_church_accrual.py",
+      "reason": "church accrual tune finals and the offering baseline"
+    },
+    {
       "path": "world/rules/tests/test_church_enrollment.py",
       "reason": "church enrollment office and vestment handover contract"
     },
     {
-      "path": "world/rules/tests/test_church_accrual.py",
-      "reason": "church accrual tune finals and the offering baseline"
+      "path": "world/rules/tests/test_church_rulebook.py",
+      "reason": "church rulebook cast-rail contract names its shipped rite rows"
     },
     {
       "path": "world/rules/tests/test_clock.py",
@@ -175,10 +187,6 @@
     {
       "path": "world/rules/tests/test_equipment_effect_rulebook.py",
       "reason": "equipment effect rulebook contract"
-    },
-    {
-      "path": "world/rules/tests/test_guild_economy_sync/test_church_hosts.py",
-      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
     },
     {
       "path": "world/rules/tests/test_guild_config/_support.py",
@@ -213,6 +221,10 @@
       "reason": "guild/shop config validation contract"
     },
     {
+      "path": "world/rules/tests/test_guild_economy_sync/test_church_hosts.py",
+      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
+    },
+    {
       "path": "world/rules/tests/test_monster_behaviour_profile.py",
       "reason": "monster behaviour rulebook contract"
     },
@@ -235,6 +247,10 @@
     {
       "path": "world/rules/tests/test_shipped_item_use_regression.py",
       "reason": "shipped usable-item regression contract"
+    },
+    {
+      "path": "world/rules/tests/test_status_query/test_group_skill_keys.py",
+      "reason": "holy_rite grouping order is asserted over shipped SKILL_REGISTRY rows"
     },
     {
       "path": "world/skills/sexual_acts/tests/test_acceptance.py",
@@ -287,6 +303,10 @@
     {
       "path": "world/skills/tests/test_cost_tiers.py",
       "reason": "MP cost-tier assignment contract"
+    },
+    {
+      "path": "world/skills/tests/test_effects.py",
+      "reason": "the parser's closed effect grammar is pinned by shipped rite effect strings"
     },
     {
       "path": "world/skills/tests/test_skill_registry/_support.py",

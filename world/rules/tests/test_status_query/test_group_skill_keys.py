@@ -1,4 +1,6 @@
-"""Slice of ``test_status_query``: the skill-key grouping rules and the
+"""Data-contract test: holy_rite grouping order is asserted over shipped SKILL_REGISTRY rows
+
+Slice of ``test_status_query``: the skill-key grouping rules and the
 level-reference comparison.
 """
 from collections.abc import Mapping, Sequence

@@ -1,4 +1,7 @@
-"""Character panel presenter tests: canonical envelope, roster, and disguise rendering."""
+"""Data-contract test: character-panel holy_rite grouping renders shipped church skill rows
+
+Character panel presenter tests: canonical envelope, roster, and disguise rendering.
+"""
 from tools.spec_traceability import covers_requirement
 import math
 from unittest.mock import patch

@@ -1,4 +1,7 @@
-"""Unit tests for the typed skill effect parser."""
+"""Data-contract test: the parser's closed effect grammar is pinned by shipped rite effect strings
+
+Unit tests for the typed skill effect parser.
+"""
 
 from tools.spec_traceability import covers_requirement
 
