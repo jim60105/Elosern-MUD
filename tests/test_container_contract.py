@@ -84,6 +84,7 @@ class ContainerContractTests(unittest.TestCase):
             "/app/server/.media",
             "/app/server/.art",
             "/app/server/.rembg",
+            "/app/server/.translate",
         }
 
         self.assertRegex(
@@ -123,6 +124,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-db:/app/server/db",
                 "evennia-art:/app/server/.art",
                 "evennia-rembg:/app/server/.rembg",
+                "evennia-translate:/app/server/.translate",
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",
@@ -136,6 +138,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-db",
                 "evennia-art",
                 "evennia-rembg",
+                "evennia-translate",
                 "evennia-logs",
                 "evennia-static",
                 "evennia-media",
@@ -170,6 +173,39 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn("install -d -m 775 -o root -g 0 /app/server/.rembg", layout)
         self.assertIn('"/app/server/.rembg"', final)
         self.assertNotIn("ART_REMBG_", final)
+
+    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    def test_the_translation_model_cache_is_an_operator_seeded_volume_never_an_image_layer(self):
+        # art-prompt-translation: the translation model is operator-seeded into
+        # a persistent named volume (code-only ART_TRANSLATE_MODEL_DIR) and the
+        # server performs NO fetch for it (design D2) — unlike the rembg cache,
+        # an empty volume is a bounded unavailable, not a download. This is a
+        # STATIC source-level contract test: compose declares the volume and no
+        # fetch service, the Containerfile prepares the path root:0
+        # group-writable and VOLUME-declares it, and server/.translate/ is
+        # excluded from the build context so no locally seeded artifact can
+        # enter an image layer. The layer-level artifact absence itself is
+        # verified at build time (task 7.2: podman save inspection), not here.
+        compose = yaml.safe_load(_read("compose.yaml"))
+        evennia = compose["services"]["evennia"]
+        self.assertIn("evennia-translate:/app/server/.translate", evennia["volumes"])
+        self.assertIn("evennia-translate", compose["volumes"])
+        self.assertNotIn(
+            "ART_TRANSLATE_", evennia.get("environment", {})
+        )
+        self.assertEqual(
+            set(compose["services"]), {"evennia", "bootstrap"},
+            "no service definition performs a model fetch",
+        )
+        containerfile = _read("Containerfile")
+        layout = _stage(containerfile, "app-layout")
+        final = _stage(containerfile, "final")
+        self.assertIn(
+            "install -d -m 775 -o root -g 0 /app/server/.translate", layout
+        )
+        self.assertIn('"/app/server/.translate"', final)
+        self.assertNotIn("ART_TRANSLATE_", final)
+        self.assertIn("server/.translate/", _read(".containerignore").splitlines())
 
     @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
     def test_prompt_files_are_baked_and_mounted_read_only(self):

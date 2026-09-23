@@ -62,6 +62,7 @@ services:
       - evennia-db:/app/server/db
       - evennia-art:/app/server/.art
       - evennia-rembg:/app/server/.rembg
+      - evennia-translate:/app/server/.translate
       - evennia-logs:/app/server/logs
       - evennia-static:/app/server/.static
       - evennia-media:/app/server/.media
@@ -99,6 +100,7 @@ volumes:
   evennia-db:
   evennia-art:
   evennia-rembg:
+  evennia-translate:
   evennia-logs:
   evennia-static:
   evennia-media:

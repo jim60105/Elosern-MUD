@@ -77,8 +77,13 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ART_TRANSLATE_ENABLED` | `ART_TRANSLATE_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；`True` 時啟用本機提示詞前處理，翻譯失敗只降級提示詞，不會令圖片工作失敗。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
+| `ART_TRANSLATE_THREADS` | `ART_TRANSLATE_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝CTranslate2 自行決定；非零值在 translator 建構時送達 intra-op 執行緒數（建構參數，非行程全域環境變數；鎖定的 ctranslate2 4.8.2 機制） |
 
 **翻譯 backend（僅限程式碼）**：`ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"` 是第三個會執行匯入的 dotted-path seam，因此不讀環境變數。測試與瀏覽器 harness 指向 `world.art.fake_translate.FakeTranslator`，避免載入翻譯函式庫或連線。
+
+**翻譯模型目錄（code-only）**：`ART_TRANSLATE_MODEL_DIR = <GAME_DIR>/server/.translate`，不讀任何環境變數（理由同 `ART_STORE_ROOT` 與 `ART_REMBG_MODEL_DIR`：打錯字會把翻譯模型悄悄搬離持久 volume，把每一次翻譯變成有界的 `art_translate_unavailable`）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-translate` 掛載於 `/app/server/.translate`。
+
+**模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`——正是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。伺服器**永不**下載或填入這個目錄：未種子的目錄是「有界不可用」而非下載，啟用階段時每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
 
 **模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物悄悄搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
 
@@ -242,6 +247,7 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_REMBG_BACKEND`／`ART_TRANSLATE_BACKEND` | 這兩個 local art stage seam 也會執行 dotted-path 匯入；它們分別是第二與第三個 import-executing seam，維持 code-only 可阻止繼承環境載入任意程式碼 |
+| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境打字錯誤會把約 1 GB 去背模型／翻譯模型悄悄搬離其 volume（`ART_STORE_ROOT` 同規則）；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
 

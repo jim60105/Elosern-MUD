@@ -123,9 +123,62 @@ prompts:
 | `ART_REMBG_ALLOWANCE_SECONDS` | 同名 | `120` | 啟用時每項租約寬限秒數，10–1800 包含兩端；是租約預算而非強制逾時 |
 | `ART_REMBG_THREADS` | 同名 | `0` | ONNX session 執行緒上限，0–256；`0`＝ONNX Runtime 自行決定；非零經 `OMP_NUM_THREADS` 送達（行程全域） |
 | `ART_TRANSLATE_ENABLED` | 同名 | `False` | 提示詞本機前處理總開關。只翻譯含 Han 字的行，保留 authored `source_description` 與 `source_hash`；翻譯失敗會用原始提示詞生成圖片。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
+| `ART_TRANSLATE_THREADS` | 同名 | `0` | CTranslate2 intra-op 執行緒上限，0–256；`0`＝CTranslate2 自行決定；非零在建構時送達 translator |
 | `ART_TRANSLATE_BACKEND` | —（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
+
+### 翻譯模型種子（zh→en）
+
+提示詞翻譯引擎（`world.art.translate_ct2.CTranslate2Backend`，add-ctranslate2-translate-backend）是本機 CPU 神經機器翻譯：它**不會拒絕**任何描述（這正是選它而非 chat 模型的原因），但也**從不自己下載模型**。對話伺服器沒有任何下載翻譯模型的執行期網路行為；模型由操作者在主機上種子到持久目錄，缺目錄＝有界的 `art_translate_unavailable`。
+
+**佈局契約**：`ART_TRANSLATE_MODEL_DIR`（裸機 `server/.translate`、容器 `/app/server/.translate`）必須包含
+
+- `model/` — CTranslate2 模型目錄（`config.json` + `model.bin`）
+- `sentencepiece.model` — SentencePiece 來源模型
+
+兩條種子路線產生完全相同的佈局，引擎對「模型從哪來」一無所知（D3：換模型是操作者動作，不是程式碼變更）。
+
+#### 路線一：Argos Open Tech `.argosmodel` 封包（建議，一條指令）
+
+Argos 發行 CTranslate2 模型；只有它的 Python wrapper（本專案刻意不引入的重量級依賴）很肥。封包本身解壓就是上述佈局。使用隨附腳本（在主機執行，只依賴 `curl` 與 `unzip`）：
+
+```sh
+scripts/fetch-translate-model.sh                # 裸機預設種到 server/.translate
+scripts/fetch-translate-model.sh --force        # 已種過時需 --force 覆蓋
+scripts/fetch-translate-model.sh /some/path     # 指定目錄
+```
+
+腳本下載 `translate-zh_en-1_9.argosmodel`（官方封包索引指向 `https://argos-net.com/v1/`），驗證 zip 與所需項目（`model/config.json`、`model/model.bin`、`sentencepiece.model`），解出 `model/`＋`sentencepiece.model`，任何一環失敗都大聲退出。封包內含的 `stanza/`（wrapper 的斷句資料）不需要，刻意不解出——seam 已經按行切分。
+
+⚠️ **授權**：封包 README 記載其模型衍生自 OPUS-MT zh→en（Tiedemann & Thottingal, EAMT 2020），**CC-BY 4.0**。腳本會把 `README.md` 一併種下作為來源與授權紀錄。
+
+#### 路線二：自 `Helsinki-NLP/opus-mt-zh-en` 離線轉換
+
+在有網路的作業站（不必是遊戲主機）用 CTranslate2 轉換器：
+
+```sh
+ct2-transformers-converter --model Helsinki-NLP/opus-mt-zh-en \
+  --output_dir ct2-zh-en &&
+mkdir -p /path/to/server/.translate/model &&
+mv   ct2-zh-en/model.bin ct2-zh-en/config.json ct2-zh-en/shared_vocabulary.json /path/to/server/.translate/model/ &&
+cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
+```
+
+（Helsinki 的 OPUS 倉庫用 `source.spm`／`target.spm` 命名 Marian 的 SentencePiece 檔；轉換輸出直接構成 `model/`，再把 `source.spm` 複製為套件根目錄的 `sentencepiece.model`，即為引擎要求的佈局。轉換前先 `ls ct2-zh-en` 確認產生的是 `source.spm` 這個名字——不同筆轉換指令輸出略有出入，以實際檔名為準。若已存在種子，先確認兩個檔案都在再覆寫。）
+
+⚠️ **授權**：`Helsinki-NLP/opus-mt-zh-en` 的 model card 標示 **CC-BY 4.0**（與路線一同一模型譜系與授權）。
+
+#### 操作者食譜（端到端）
+
+1. **種子**：跑路線一的腳本（或路線二轉換）到 `server/.translate`（裸機）或一個暫存目錄（容器）。
+2. **掛載**：
+   - 裸機：什麼都不用做——`server/.translate` 就是程式碼內預設的 `ART_TRANSLATE_MODEL_DIR`。
+   - 容器：先 `podman compose up -d` 建立 `evennia-translate` 具名 volume，再一次性把暫存種子拷進 volume（腳本會印出完整指令）；之後 volume 在容器重建間保留。
+3. **開啟**：`.env` 加 `ART_TRANSLATE_ENABLED=true`，重啟。
+4. **確認**：啟動時會記錄 `art_optional_stages`（context 含 `art_translate: {setting: "ART_TRANSLATE_ENABLED", enabled: …}`）——它只反映開關狀態，不載入模型；翻譯階段真正就緒以一張含漢字的圖片生成成功、並記錄 `art_translate_done`（含 lines_total／lines_offered／lines_untranslated）為準，此時存放的中繼資料引用英文提示詞。
+
+**未種子 volume 的降級路徑是設計內行為**：每次生成記錄一條 `art_translate_failed`（`art_translate_unavailable`）警告、以 authored 提示詞出圖、圖片照常產生——翻譯是「提示詞比較差」，不是失敗的工作。`@art status` 與 `@art retry`/`requeue` 的行為不變。
 
 **肖像去背的誠實成本**：啟用後，首次生成肖像前 rembg 會下載約 1 GB 的模型檔（快取在持久的 `server/.rembg` volume，跨容器重建保留）；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB（`isnet-anime` 少一個數量級）——小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`）：保留前一份有效輸出、不阻斷批次、`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
 

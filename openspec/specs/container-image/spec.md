@@ -79,6 +79,14 @@ alongside the other persistent paths, exactly like `/app/server/.art`, so an arb
 write it. The ~1 GB model artifact SHALL NOT be baked into the image: it is fetched on first use
 into the volume and reused across container recreations, and an operator MAY pre-seed the volume
 and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment. The model cache SHALL NOT
+
+The translation model cache SHALL be a writable named volume mounted at
+`/app/server/.translate`, matching the code-only `ART_TRANSLATE_MODEL_DIR` setting. The image
+SHALL declare that path as a persistent volume with a `root:0` group-writable directory and
+SHALL NOT bake any model artifact into a layer. Unlike the background-removal cache, this
+volume SHALL NOT be populated at run time: the server performs no download for it, so an
+operator-seeded volume is the ONLY way it is filled and an empty volume is a bounded
+unavailable rather than a fetch.
 live under `/app/server/.art`, whose contents are governed by the art store's confinement, media
 route, and orphan-prune rules, and SHALL NOT use the library default under `$HOME`, which the image
 maps to the `tmpfs`-mounted `/tmp` and would therefore re-download on every container start.
@@ -135,6 +143,13 @@ without storing the initial administrator's password in the long-lived service c
 #### Scenario: A deployment with no seed folder still starts
 - **WHEN** the service is started with no host seed folder present
 - **THEN** the server starts normally, synchronizes no seed art, and reports the skip once
+
+#### Scenario: The translation model cache is an operator-seeded volume, never an image layer
+- **WHEN** the built image and the compose configuration are inspected
+- **THEN** the `evennia` service mounts a named volume at `/app/server/.translate`, the image
+  declares that path as a persistent volume with a `root:0` group-writable directory, the image
+  itself contains no translation model artifact, and no service definition performs a model fetch
+
 ### Requirement: Container ignore file excludes non-build-context files
 The project SHALL provide a `.containerignore` that excludes version control metadata, local virtual
 environments, caches, and any gitignored development-only paths (such as `tmp/`) from the build
