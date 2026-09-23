@@ -169,6 +169,27 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.router.currentDescriptor()).toEqual(initialDescriptor);
   });
 
+  it("closeHudDrawer on shop drawer is frameless and leaves router depth and activeSubDock untouched", () => {
+   openSession();
+   store.setActiveSubDock("services");
+   const initialDepth = store.router.depth();
+   const initialDescriptor = store.router.currentDescriptor();
+
+   // Open shop drawer
+   expect(store.openHudDrawer("shop")).toBe(true);
+   expect(store.view.hudDrawer).toBe("shop");
+
+   // Close with popFrame: true
+   const ok = store.closeHudDrawer({ popFrame: true });
+   expect(ok).toBe(true);
+   expect(store.view.hudDrawer).toBe(null);
+
+    // Frameless guarantee: activeSubDock and router stack are not mutated
+    expect(store.view.activeSubDock).toBe("services");
+    expect(store.router.depth()).toBe(initialDepth);
+    expect(store.router.currentDescriptor()).toEqual(initialDescriptor);
+  });
+
   it("a mode change to combat closes the services drawers and leaves the status drawer openable (task 4.4)", () => {
     openSession();
     store.openHudDrawer("quest");

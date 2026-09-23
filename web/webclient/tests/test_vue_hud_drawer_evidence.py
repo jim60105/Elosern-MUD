@@ -163,11 +163,12 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     def test_drawer_mutations_dispatch_and_confirmation(self):
         # Drawer affordances emit the server-authored action id + payload through
         # the single dispatch entry, locked with in-flight / epoch / revision
-        # gates; the destructive abandon sits behind an explicit confirmation; the
-        # quantity form keeps the server-advertised min/max.
+         # gates; the destructive abandon sits behind an explicit confirmation;
+         # the quantity entry clamps on change to the server-advertised bounds.
         _assert_vitest_passes(
             _run_vitest(
-                TESTS_DIR / "world" / "quest_board.test.js",
+                 TESTS_DIR / "world" / "guild_counter.test.js",
+                 TESTS_DIR / "world" / "quest_log.test.js",
                 TESTS_DIR / "world" / "shop_panel.test.js",
                 TESTS_DIR / "store" / "store_dispatch_focus.test.js",
             ),

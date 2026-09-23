@@ -8,6 +8,8 @@ import ServiceMenu from "../../lib/service_menu.js";
 import { classifyPane } from "../../components/dock-panes.js";
 import { dialogueViewModel } from "../dialogue-view.js";
 
+const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "shop"]);
+
 export function applyInteraction(ctx) {
   // The caption digit activation (webclient-align-11-dialogue-ux, design D3):
   // while the committed `dialogue` panel is available, digits 1–4 address the
@@ -68,11 +70,11 @@ export function applyInteraction(ctx) {
     if (!ctx.dockOnExplorationForm(rs)) {
       return false;
     }
-    // A client-local drawer-open row (the frameless 背包 row, the
+    // A client-local drawer-open row (the frameless 背包 / 商店 rows, the
     // `openCharacter` precedent): open the drawer without pushing a frame,
     // switching the sub-dock, or recording a service surface.
-    if (item.openDrawer === "inventory") {
-      ctx.openHudDrawer("inventory");
+    if (item.openDrawer && FRAMELESS_DRAWER_NAMES.has(item.openDrawer)) {
+      ctx.openHudDrawer(item.openDrawer);
       return true;
     }
     if (item.openSubmenu && ctx.EXPLORATION_SUBMENU_PUSHES[item.openSubmenu]) {
@@ -184,11 +186,11 @@ export function applyInteraction(ctx) {
     if (!ctx.dockOnExplorationForm(rs) || ctx.activeSubDock.value !== "services") {
       return false;
     }
-    // A client-local drawer-open row (the services root's frameless 背包
-    // row): open the drawer without pushing a frame or recording a service
-    // surface (the exploration-root branch above is the same interception).
-    if (item.openDrawer === "inventory") {
-      ctx.openHudDrawer("inventory");
+    // A client-local drawer-open row (the services root's frameless 背包 /
+    // 商店 rows): open the drawer without pushing a frame or recording a
+    // service surface (the exploration-root branch above is the same interception).
+    if (item.openDrawer && FRAMELESS_DRAWER_NAMES.has(item.openDrawer)) {
+      ctx.openHudDrawer(item.openDrawer);
       return true;
     }
     // A bounded services submenu (board / quests / stock / sell / quest-N):

@@ -266,10 +266,11 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
   const drawerHostsServiceFrame = computed(() => {
     const d = store.view.hudDrawer;
     // The frameless drawers never host a frame: skill / lore / status by
-    // design, and inventory by construction (make-inventory-drawer-frameless
-    // removed the 背包 menu, so no inventory frame can be current — the
-    // exclusion makes the frameless guarantee explicit and fails safe).
-    if (!d || d === "skill" || d === "lore" || d === "status" || d === "inventory") {
+   // design, and inventory/shop by construction (make-inventory-drawer-frameless
+   // removed the 背包 menu, make-shop-drawer-frameless makes the 商店 drawer
+   // client-local, so no shop frame is hosted — the exclusion makes the
+   // frameless guarantee explicit and fails safe).
+   if (!d || d === "skill" || d === "lore" || d === "status" || d === "inventory" || d === "shop") {
       return false;
     }
    return (
