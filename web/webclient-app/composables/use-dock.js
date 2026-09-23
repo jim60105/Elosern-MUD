@@ -258,28 +258,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
      };
    });
 
-  // H4 (R3, webclient-hud-04-reference-drawers): whether the open reference
-  // drawer is hosting the keyboard router's current service frame. When true,
-  // the drawer body renders that frame's rows through the shared row renderer
-  // (DockMenu) beside the surface's own presentation, and the dock suppresses
-  // the duplicate copy of those rows.
-  const drawerHostsServiceFrame = computed(() => {
-    const d = store.view.hudDrawer;
-    // The frameless drawers never host a frame: skill / lore / status by
-   // design, and inventory/shop by construction (make-inventory-drawer-frameless
-   // removed the 背包 menu, make-shop-drawer-frameless makes the 商店 drawer
-   // client-local, so no shop frame is hosted — the exclusion makes the
-   // frameless guarantee explicit and fails safe).
-   if (!d || d === "skill" || d === "lore" || d === "status" || d === "inventory" || d === "shop") {
-      return false;
-    }
-   return (
-     store.view.activeSubDock === "services" &&
-     typeof store.currentFrameIsServiceFrame === "function" &&
-     store.currentFrameIsServiceFrame()
-   );
- });
-
   function onAction(intent) {
     // One dispatch intent per activation; the store is the single writer.
     dispatchIntent(intent.action_id, intent.payload);
@@ -306,7 +284,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
     contextActionsPanel,
     dockItems,
     dockPaneKind,
-    drawerHostsServiceFrame,
     focusedRowDisabled,
     detailTestId,
     interactionOpen,

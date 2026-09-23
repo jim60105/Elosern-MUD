@@ -67,7 +67,7 @@ export function applyHud(ctx) {
   };
 
   const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party"]);
-  const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "shop"]);
+  const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "quest", "shop"]);
   const hudDrawer = ref(null);
   ctx.hudDrawer = hudDrawer;
 
@@ -89,9 +89,9 @@ export function applyHud(ctx) {
       return false;
     }
     // make-inventory-drawer-frameless + make-shop-drawer-frameless +
-    // webclient-align-05-party-hud: the 背包, 商店, and 同伴 drawers never
-    // host a router frame, so closing them leaves the router alone — no
-    // menu level is popped and the action dock is never re-homed, whatever
+    // make-quest-drawer-frameless + webclient-align-05-party-hud: the 背包,
+    // 商店, 任務, and 同伴 drawers never host a router frame, so closing them
+    // leaves the router alone — no menu level is popped and the action dock
     // frame is current at close time.
     // Every other drawer keeps the teardown below byte-for-byte.
     if (FRAMELESS_DRAWER_NAMES.has(hudDrawer.value)) {

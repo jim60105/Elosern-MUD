@@ -71,7 +71,7 @@ const {
   rootItems, navigationItems, dockItems, dockPaneKind, interactionOpen,
   interactionTarget, interactionChoices, onInteractionTarget, onTabClick,
   onNavigateHome, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
-  showDetail, focusedRowDisabled, servicesConfirm, drawerHostsServiceFrame,
+  showDetail, focusedRowDisabled, servicesConfirm,
   onAction, onDockActivate, onDockFocusChange,
   onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
@@ -274,7 +274,7 @@ const {
               <p>先選擇左側的對象，即可查看可用的互動。</p>
             </section>
              <DockMenu
-               v-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
+               v-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot)"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
@@ -321,7 +321,6 @@ const {
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
       :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : (store.view.hudDrawer === 'party' ? 'party' : null))"
       :drawer-key="store.view.hudDrawer"
-      :body-class="drawerHostsServiceFrame ? 'hud-drawer__body--dock' : ''"
       @close="onHudDrawerClose"
     >
       <template #art>
@@ -405,21 +404,6 @@ const {
         :affordances="contextAffordances"
         @action="onAction"
         @close="onHudDrawerClose"
-      />
-      <!-- H4 (R3): when the drawer hosts the keyboard router's current service
-           frame, render that frame's rows through the shared row renderer
-           (DockMenu), beside the surface's own presentation; the dock no
-           longer renders the duplicate copy of those rows. -->
-      <DockMenu
-        v-if="drawerHostsServiceFrame"
-        :items="dockItems"
-        :focused-key="store.view.focus.key"
-        :id-prefix="rowPrefix"
-        :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
-        :show-detail="showDetail"
-        :depth="store.view.dockDepth"
-        @focus-change="onDockFocusChange"
-        @activate="onDockActivate"
       />
       <!-- The cast-syntax footer hint is skill-drawer-only: a conditional
            named slot means the other five drawers provide no `foot` slot, so
@@ -558,28 +542,9 @@ const {
   align-items: flex-start;
 }
 
-/* H4 (remove-redundant-dock-menu-layout): when the drawer body hosts a dock
-   service frame, it becomes the host that owns the split, so the row region
-   (`.dock-menu`) and its detail pane (`.dock-detail`) render as direct flex
-   children side by side — the job the removed `.dock-menu-layout` wrapper used
-   to do. The hosted service surface keeps its own full-width row (it wraps to
-   the next line rather than being squished beside the rows), preserving the
-   pre-change stacked reading. */
-.hud-drawer__body--dock {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--sp-3);
-}
-.hud-drawer__body--dock > :not(.dock-menu):not(.dock-detail) {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
 /* quest-drawer-split: the drawer body's wrapper for the two quest surfaces.
    It stacks the quest book above the guild counter (or the counter's honest
-   absence marker) and, when the drawer hosts a service frame, takes the
-   full-width flex row the `--dock` body grants its non-dock children. */
+   absence marker). */
 .quest-drawer {
   display: flex;
   flex-direction: column;

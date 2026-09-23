@@ -8,7 +8,7 @@ import ServiceMenu from "../../lib/service_menu.js";
 import { classifyPane } from "../../components/dock-panes.js";
 import { dialogueViewModel } from "../dialogue-view.js";
 
-const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "shop"]);
+const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
 
 export function applyInteraction(ctx) {
   // The caption digit activation (webclient-align-11-dialogue-ux, design D3):
