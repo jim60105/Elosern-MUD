@@ -126,26 +126,23 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.view.hudDrawer).toBe("party");
   });
 
-  it("hosts a current service frame in its drawer (task 4.3): pushing the 任務記錄 frame opens the quest drawer", () => {
+  it("opens the quest drawer frameless from top navigation (task 4.3): 任務 opens the quest drawer with no frame pushed", () => {
     openSession();
-    // The top navigation opens the quest-log service frame and its drawer.
+    const depthBefore = store.router.depth();
     store.tabToRootAndConfirm("quests", "pointer");
     expect(store.view.hudDrawer).toBe("quest");
+    expect(store.router.depth()).toBe(depthBefore);
   });
 
-  it("closeHudDrawer with popFrame pops exactly one menu level (task 4.2)", () => {
+  it("closeHudDrawer on quest drawer is frameless: closing with popFrame pops nothing (task 4.2)", () => {
     openSession();
-    // The top navigation pushes the hosted 任務記錄 service frame.
     store.tabToRootAndConfirm("quests", "pointer");
-    const depthAtServiceFrame = store.router.depth();
-    // The frame-hosting sync opened the quest drawer.
+    const depthAtQuest = store.router.depth();
     expect(store.view.hudDrawer).toBe("quest");
-    // Closing with popFrame pops exactly one router level (the 任務記錄 frame
-    // returns to the services root).
     const ok = store.closeHudDrawer({ popFrame: true });
     expect(ok).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
-    expect(store.router.depth()).toBe(depthAtServiceFrame - 1);
+    expect(store.router.depth()).toBe(depthAtQuest);
   });
 
   it("closeHudDrawer on party drawer is frameless and leaves router depth and activeSubDock untouched", () => {

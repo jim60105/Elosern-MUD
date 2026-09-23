@@ -133,28 +133,58 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe("quest");
   });
 
-  it("公會 activation still pushes and hosts the 任務 drawer (regression)", () => {
-    openSession();
-    // 公會: the top navigation's 任務 entry pushes the guild quest-log
-    // frame and the frame-hosting watcher opens the 任務 drawer.
+  it("activating the service-guild navigate row in an open target frame opens the quest drawer with router unchanged", () => {
+    const snap = snapshotWithServices();
+    snap.panels.exploration.interact[0].affordances.push({
+      kind: "navigate",
+      surface: "guild",
+      label: "公會服務",
+      enabled: true,
+      disabled_reason: null,
+    });
+    store.beginTransport(1);
+    store.setConnected(true);
+    expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
+
+    // Navigate to 店長 affordance frame
+    expect(store.focusItemByKey("interact")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+    expect(store.focusItemByKey("target-7")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+
     const depthBefore = store.router.depth();
-    store.tabToRootAndConfirm("quests", "pointer");
-    expect(store.router.depth()).toBe(depthBefore + 1);
-    expect(store.view.hudDrawer).toBe("quest");
-   // The services root's guild row pushes the guild frame and hosts the 任務 drawer.
-    setActivePinia(createPinia());
-    store = useElosernStore();
-    store.setSender(fx.createFakeSender());
-    openSession();
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.root", params: {} });
-   expect(store.focusItemByKey("guild")).toBe(true);
+    const descriptorBefore = store.router.currentDescriptor();
+    const trailBefore = trailTitles(store.router);
+
+    // Activate service-guild navigate row
+    expect(store.focusItemByKey("service-guild")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
-   expect(store.router.currentMenu().title).toBe("公會");
-   expect(store.focusItemByKey("board")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-   expect(store.router.currentMenu().title).toBe("任務板");
+
+    // The quest drawer opens frameless: no frame pushed, no dock switch, no service surface
     expect(store.view.hudDrawer).toBe("quest");
+    expect(store.router.depth()).toBe(depthBefore);
+    expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+    expect(trailTitles(store.router)).toEqual(trailBefore);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.serviceSurface).toBe(null);
+
+    // A services-panel commit while the quest drawer is open never records a hosted surface or pushes a frame
+    const nextSnap = snapshotWithServices(2, 5000);
+    nextSnap.panels.exploration = snap.panels.exploration;
+    expect(store.receive(1, "ui_snapshot", [nextSnap], {}).accepted).toBe(true);
+
+    expect(store.view.hudDrawer).toBe("quest");
+    expect(store.router.depth()).toBe(depthBefore);
+    expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+    expect(trailTitles(store.router)).toEqual(trailBefore);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.serviceSurface).toBe(null);
+
+    // Closing the quest drawer by the store close entry pops nothing
+    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.router.depth()).toBe(depthBefore);
+    expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
   });
 
   it("activating the service-shop navigate row in an open target frame opens the shop drawer with router unchanged", () => {
@@ -243,13 +273,21 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("the scoped exemption does not regress the other drawers' close teardown", () => {
     openSession();
-    // 任務 (hosted): closing with popFrame pops one level AND clears the
-    // services sub-dock + re-homes the exploration root, as today.
+    // 任務 (frameless): tabToRootAndConfirm from depth > 1 pops to root and opens
+    // the quest drawer with depth 1 and nothing pushed; closing it pops nothing.
+    expect(store.focusItemByKey("look")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+    expect(store.router.depth()).toBe(2);
+
     store.tabToRootAndConfirm("quests", "pointer");
     expect(store.view.hudDrawer).toBe("quest");
-    const depthAtServiceFrame = store.router.depth();
+    expect(store.router.depth()).toBe(1);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.router.currentMenu().title).toBe("探索");
+
     expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
-    expect(store.router.depth()).toBe(depthAtServiceFrame - 1);
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.router.depth()).toBe(1);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.currentMenu().title).toBe("探索");
   });

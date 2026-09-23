@@ -139,6 +139,13 @@ describe("HudDrawer (H4 D1)", () => {
     expect(subtitle).toContain("font-size: 11px");
   });
 
+  it("renders without bodyClass prop and never applies a --dock modifier (task 4.2)", () => {
+    const w = mountDrawer({ open: true });
+    expect(w.props().bodyClass).toBeUndefined();
+    const body = w.get(".hud-drawer__body");
+    expect(body.classes()).not.toContain("hud-drawer__body--dock");
+  });
+
   it("reduced motion keeps the open state and drops the transition", () => {
     // The transition is expressed through `--motion-base`; the reduced-motion
     // block sets the token to 1ms, so the open state still applies while the
