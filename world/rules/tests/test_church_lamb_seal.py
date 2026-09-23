@@ -61,7 +61,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         super().setUp()
         open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_seal_redirects_over_lowest_hp_strategy(self):
         """A lowest_hp monster picks the seal-bearer over a cheaper target."""
         monster = FakeMonster(
@@ -73,7 +73,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         request = monster_behaviour_policy(monster, _field(monster, [sealed, cheap]))
         self.assertEqual([target.key for target in request.targets], [sealed.key])
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_seal_redirects_over_highest_effective_power_strategy(self):
         """A highest_effective_power monster still picks the seal-bearer."""
         monster = FakeMonster(
@@ -85,7 +85,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         request = monster_behaviour_policy(monster, _field(monster, [sealed, strong]))
         self.assertEqual([target.key for target in request.targets], [sealed.key])
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_multi_seal_canonical_order_player_first_then_ascending_pk(self):
         """Two seal-bearers resolve player-first, then ascending pk."""
         monster = FakeMonster(
@@ -107,7 +107,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         expected = sorted((npc_low, npc_high), key=lambda entity: int(entity.pk))[0]
         self.assertEqual([target.key for target in request.targets], [expected.key])
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_no_seal_decisions_are_byte_identical(self):
         """Zero seals: the metric path runs exactly as before, dice included."""
         monster = FakeMonster(
@@ -132,7 +132,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
             )
         roller.assert_called_once()
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_area_path_is_untouched_by_seals(self):
         """An AREA decision neither narrows nor substitutes with seals present."""
         monster = FakeMonster(
@@ -148,7 +148,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         self.assertEqual(request.skill_key, _T_AREA.key)
         self.assertEqual(request.targets, "all-enemies")
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_positional_exclusion_is_never_substituted_by_the_seal(self):
         """A strike-only kit still refuses a displaced seal-bearer."""
         monster = FakeMonster(
@@ -171,7 +171,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         )
         self.assertEqual(request.skill_key, _T_SPELL.key)
 
-    @covers_requirement("lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
     def test_two_climaxes_lift_the_seal_and_subsequent_fights_show_none(self):
         """Two 進行中 transitions consume the charges; the seal then vanishes
         without a fresh cast, so the policy returns to its metric path."""

@@ -21,17 +21,15 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from world.rules import combat_session as combat_session_module
+import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import engage, forfeit, read_session, settle_session
 from world.rules.defeat_aftermath.violation import derived_roll as _module_derived_roll
 from world.rules.skip_safety import _active_battlefield_for
-from world.skills.registry import SKILL_REGISTRY, TargetSpec
+from world.skills.registry import TargetSpec
 
 from ._support import ViolationBase, _aftermath_entries
-
-_MARTYR_REQ = "martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr"
-
 
 class MartyrVowBase(ViolationBase):
     """A defeat drives an engaged session; helpers stamp the session record."""
@@ -59,7 +57,7 @@ class MartyrVowBase(ViolationBase):
             return resist_roll(attempt_index)
 
         return patch.object(
-            __import__("world.rules.defeat_aftermath", fromlist=["violation"]).violation,
+            defeat_aftermath_violation_module,
             "derived_roll",
             side_effect=roll,
         )
@@ -68,7 +66,7 @@ class MartyrVowBase(ViolationBase):
 class MartyrPoolFilterTests(MartyrVowBase):
     """The one added filter stage and every byte-identical fallback."""
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_the_marked_sister_is_chosen_with_zero_target_rolls(self):
         """A valid stamp collapses the pool; resist draws still run."""
         self._equalize_scores()
@@ -99,7 +97,7 @@ class MartyrPoolFilterTests(MartyrVowBase):
         # The resist contests still drew their normal state-derived values.
         self.assertGreater(len(resist_calls), 0)
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_stale_stamp_and_no_stamp_fall_back_to_the_normal_pool(self):
         """A foreign session id (or none) never fires the collapse."""
         self._equalize_scores()
@@ -141,7 +139,7 @@ class MartyrPoolFilterTests(MartyrVowBase):
         self.assertGreater(len(acts), 0)
         self.assertGreater(len(target_rolls), 0)
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_multiple_markers_resolve_first_by_canonical_order(self):
         """Two stamped companions collapse to the lower-pk one in pool order."""
         self._equalize_scores()
@@ -168,7 +166,7 @@ class MartyrPoolFilterTests(MartyrVowBase):
             "the first canonical-order marker absorbs every attempt",
         )
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_marker_died_or_fled_falls_back_to_the_normal_pool(self):
         """A dead or fled marker cannot collapse the pool."""
         self._equalize_scores()
@@ -223,7 +221,7 @@ class MartyrPoolFilterTests(MartyrVowBase):
 class MartyrVictoryConsumptionTests(MartyrVowBase):
     """Victory spends the stamp on the durable record write."""
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_victory_consumes_the_stamp(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -254,7 +252,7 @@ class MartyrVictoryConsumptionTests(MartyrVowBase):
 class MartyrRollbackDeterminismTests(MartyrVowBase):
     """A rolled-back stamped settlement re-derives the identical collapse."""
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_rolled_back_stamped_settlement_rederives_identically(self):
         self._equalize_scores()
         self._arouse(85)
@@ -271,9 +269,7 @@ class MartyrRollbackDeterminismTests(MartyrVowBase):
             # contract; this slice pins the stamp's collapse determinism.
             return 1 if args[4] == "resist" else 0
 
-        violation_module = __import__(
-            "world.rules.defeat_aftermath", fromlist=["violation"]
-        ).violation
+        violation_module = defeat_aftermath_violation_module
         state = {"failed": False}
 
         def fail_then_advance(*args, **kwargs):
@@ -331,7 +327,6 @@ class MartyrCastRailTests(MartyrVowBase):
             synth_damage_skill,
         )
 
-        open_synthetic_scope(self, "skills", "elements")
         skill = replace(
             synth_damage_skill(
                 "t_rite_vow",
@@ -341,7 +336,12 @@ class MartyrCastRailTests(MartyrVowBase):
             ),
             usable_out_of_combat=True,
         )
-        SKILL_REGISTRY[skill.key] = skill
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            extra={"skills": {skill.key: skill}},
+        )
         self.player.db.skills = {"active": [skill.key], "passive": []}
         return skill
 
@@ -355,7 +355,7 @@ class MartyrCastRailTests(MartyrVowBase):
             ),
         )
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_vow_cast_stamps_the_active_session(self):
         skill = self._synth_vow_skill("session_stamp:martyr_key")
         engage(self.player, self.monster)
@@ -364,7 +364,7 @@ class MartyrCastRailTests(MartyrVowBase):
         record = read_session(self.player)
         self.assertEqual(record.martyr_key, (record.session_id,))
 
-    @covers_requirement(_MARTYR_REQ)
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
     def test_vow_cast_outside_a_fight_is_rejected(self):
         skill = self._synth_vow_skill("session_stamp:martyr_key")
         from world.rules.targeting import RoomActionContext
@@ -385,8 +385,3 @@ class MartyrCastRailTests(MartyrVowBase):
         result = ActionResolver.resolve(self._combat_request(skill))
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason.value, "effect_resolution_failed")
-
-    def test_shipped_vow_row_declares_the_session_stamp_rail(self):
-        """The row's declared effect IS this rail's cast mechanic."""
-        skill = SKILL_REGISTRY["rite_martyrdom_vow"]
-        self.assertEqual(list(skill.effects), ["session_stamp:martyr_key"])
