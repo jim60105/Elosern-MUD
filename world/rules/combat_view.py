@@ -33,10 +33,10 @@ from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 # Presentation bounds owned by the combat view (equal or below protocol limits).
 MAX_PARTICIPANTS = 16
 # Flattened active-skill descriptor bound. Raised from 32 to clear the current
-# theoretical maximum of 157 obtainable active skills (91 base active skills
-# including innate, plus the 66 registered sexual acts of the catalogue) with
-# headroom for catalog growth; a multiple of 16 like the other presentation
-# bounds.
+# theoretical maximum of 157 obtainable active skills (95 base active skills
+# including innate and holy rites, plus the 62 registered sexual acts of the
+# catalogue) with headroom for catalog growth; a multiple of 16 like the other
+# presentation bounds.
 MAX_SKILLS = 192
 MAX_SESSION_ID_CODE_POINTS = 128
 MAX_DISPLAY_NAME_CODE_POINTS = 64

@@ -17,7 +17,7 @@
 
 ## 2. Mirror constants
 
-- [ ] 2.1 Add `"holy_rite"` to `SKILL_CATEGORY_KEYS` in
+- [x] 2.1 Add `"holy_rite"` to `SKILL_CATEGORY_KEYS` in
       `web/static/webclient/js/elosern/protocol/constants.js` and bump
       `CHARACTER_MAX_CATEGORY_GROUPS` 7 → 8 in `panels/character.js` — JS-only edits: the Python
       bound (`web/webclient/presentation/character.py`) is `len(SkillCategory) + 1` dynamically and
