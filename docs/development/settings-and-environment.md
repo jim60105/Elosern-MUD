@@ -77,13 +77,14 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ART_TRANSLATE_ENABLED` | `ART_TRANSLATE_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；`True` 時啟用本機提示詞前處理，翻譯失敗只降級提示詞，不會令圖片工作失敗。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
+| `ART_TRANSLATE_DOWNLOAD_ENABLED` | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；True（預設）＝佈局檢查失敗時 backend 首次使用可把 Argos Open Tech `translate-zh_en-1_9` 封包（約 74 MB）抓進持久的 `server/.translate` volume，與 `ART_REMBG_DOWNLOAD_ENABLED` 完全同型；False＝支援的離線配置——backend 先檢查種子佈局，缺席時立即以 `art_translate_unavailable` 有界失敗（不 import 翻譯函式庫、不觸網、不等待） |
 | `ART_TRANSLATE_THREADS` | `ART_TRANSLATE_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝CTranslate2 自行決定；非零值在 translator 建構時送達 intra-op 執行緒數（建構參數，非行程全域環境變數；鎖定的 ctranslate2 4.8.2 機制） |
 
 **翻譯 backend（僅限程式碼）**：`ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"` 是第三個會執行匯入的 dotted-path seam，因此不讀環境變數。測試與瀏覽器 harness 指向 `world.art.fake_translate.FakeTranslator`，避免載入翻譯函式庫或連線。
 
 **翻譯模型目錄（code-only）**：`ART_TRANSLATE_MODEL_DIR = <GAME_DIR>/server/.translate`，不讀任何環境變數（理由同 `ART_STORE_ROOT` 與 `ART_REMBG_MODEL_DIR`：打錯字會把翻譯模型悄悄搬離持久 volume，把每一次翻譯變成有界的 `art_translate_unavailable`）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-translate` 掛載於 `/app/server/.translate`。
 
-**模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`——正是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。伺服器**永不**下載或填入這個目錄：未種子的目錄是「有界不可用」而非下載，啟用階段時每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
+**模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`——正是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。取得方式為雙軌（`add-translate-model-download-policy`）：`ART_TRANSLATE_DOWNLOAD_ENABLED=true`（預設）時，backend 在首次使用、建構引擎的鎖內抓取同一個封包進這個目錄（有界、單次、原子落地、驗證 zip 與佈局並保留 CC-BY 4.0 README）；`false` 時未種子的目錄是「有界不可用」而非下載——每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。操作者預先以 `scripts/fetch-translate-model.sh` 種子＋設 `false` 即為離線配置。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
 
 **模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物悄悄搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
 

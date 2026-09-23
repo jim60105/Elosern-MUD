@@ -23,7 +23,7 @@ variable, using typed conversion at settings import. The env-backed set is exact
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`,
 `ART_REMBG_ENABLED`, `ART_REMBG_MODEL`, `ART_REMBG_DOWNLOAD_ENABLED`,
 `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`,
-`ART_TRANSLATE_THREADS`,
+`ART_TRANSLATE_DOWNLOAD_ENABLED`, `ART_TRANSLATE_THREADS`,
 `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` — each from a
 variable of the same name — plus
@@ -54,7 +54,7 @@ a positive float for `ART_SD_CFG_SCALE`; case-insensitive boolean words (`1/true
 `0/false/no/off` false, nothing else) for `ART_SD_PREPIN_SAMPLES_FORMAT`,
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_REMBG_ENABLED` (default `false`),
 `ART_REMBG_DOWNLOAD_ENABLED` (default `true`), `ART_TRANSLATE_ENABLED` (default `false`),
-`ART_SCHEDULER_ENABLED`,
+`ART_TRANSLATE_DOWNLOAD_ENABLED` (default `true`), `ART_SCHEDULER_ENABLED`,
 `DEFEAT_ADULT_SCENES` (default `true`), and
 `ELOSERN_VUE_CLIENT`;
 case-insensitive membership in the closed set `png|webp|jpeg|avif` for `ART_SD_OUTPUT_FORMAT`;
@@ -74,6 +74,10 @@ free-text knob SHALL yield the empty "server default" value. For the same-named 
 The test settings bootstrap `server/conf/test_settings.py` SHALL remove every env-backed
 variable name from `os.environ` before importing the production settings, so a test run's
 effective settings never depend on a developer's or CI runner's inherited shell environment.
+After the settings import, the test settings SHALL additionally pin
+`ART_TRANSLATE_DOWNLOAD_ENABLED = False`, so every test run sits on the translation
+air-gapped track regardless of the knob's code default — a test can never trigger a
+model download even when the shipped backend resolves against an unseeded directory.
 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
@@ -83,7 +87,8 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `ART_SD_PROBE_TIMEOUT_MS=5000`, `ART_SD_PROBE_CACHE_SECONDS=300`,
   `ART_REMBG_ENABLED=False`, `ART_REMBG_MODEL="bria-rmbg"`,
   `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
-  `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`, `ART_TRANSLATE_THREADS=0`,
+  `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`,
+  `ART_TRANSLATE_DOWNLOAD_ENABLED=True`, `ART_TRANSLATE_THREADS=0`,
   `DEFEAT_ADULT_SCENES=True`, and `MAX_NR_CHARACTERS=5`), and the server starts
 
 #### Scenario: Valid overrides coerce to typed values
@@ -131,11 +136,19 @@ effective settings never depend on a developer's or CI runner's inherited shell 
 - **THEN** the effective `ART_SD_PROBE_TIMEOUT_MS` for the test session is the documented
   default `5000` and the effective `ART_REMBG_ENABLED` is the documented default `False`
 
+#### Scenario: Test settings force the translation air-gapped track
+- **WHEN** the test settings module is imported, with `ART_TRANSLATE_DOWNLOAD_ENABLED=true`
+  present in the shell environment in one run and absent in another
+- **THEN** the effective `ART_TRANSLATE_DOWNLOAD_ENABLED` for the test session is `False`
+  in both runs, overriding the documented code default `True`
+
 #### Scenario: The translation switch coerces and rejects like every other boolean knob
-- **WHEN** the settings module is imported with `ART_TRANSLATE_ENABLED=on`, then separately with
-  `=off`, then separately with `=maybe`
-- **THEN** the first two yield `True` and `False`, and the third raises the named settings error
-  identifying `ART_TRANSLATE_ENABLED`, quoting the raw value, and stating the boolean-word rule
+- **WHEN** the settings module is imported with `ART_TRANSLATE_ENABLED=on` and
+  `ART_TRANSLATE_DOWNLOAD_ENABLED=off`, then separately with `ART_TRANSLATE_ENABLED=off` and
+  `ART_TRANSLATE_DOWNLOAD_ENABLED=on`, then separately with `ART_TRANSLATE_DOWNLOAD_ENABLED=maybe`
+- **THEN** the first two yield `(True, False)` and `(False, True)` respectively, and the third
+  raises the named settings error identifying `ART_TRANSLATE_DOWNLOAD_ENABLED`, quoting the raw
+  value, and stating the boolean-word rule
 
 #### Scenario: The translation thread cap is bounded at both ends
 - **WHEN** the settings module is imported with `ART_TRANSLATE_THREADS=0`, then separately with

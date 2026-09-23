@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # fetch-translate-model.sh — seed the prompt-translation model (host-only).
 #
-# The game server NEVER downloads the translation model (design D2 of
-# add-ctranslate2-translate-backend): an operator seeds the model directory
-# with this script, on the HOST, and mounts it. An unseeded directory is a
-# bounded `art_translate_unavailable`, never a fetch.
+# Host-side seeding is the air-gapped / pre-seed route of the dual-track
+# acquisition policy (add-translate-model-download-policy): an operator seeds
+# the model directory with this script, on the HOST, and mounts it, optionally
+# setting ART_TRANSLATE_DOWNLOAD_ENABLED=false so the server can never fetch.
+# When the flag is true (the default), the server itself may first-use-fetch
+# the same package into an empty volume; this script remains the way to fill
+# the volume before that first run and the only way to do so offline.
 #
 # It downloads the Argos Open Tech zh->en translation package
 # (translate-zh_en-1_9.argosmodel, a zip archive), verifies the archive and
@@ -33,7 +36,8 @@
 #               fails if one is present)
 #
 # The script prints where to mount the result, including a one-shot command
-# for seeding the compose `evennia-translate` named volume.
+# for seeding the compose volume `podman compose` actually created
+# (project-prefixed, e.g. `mud_evennia-translate`).
 
 set -euo pipefail
 
@@ -49,6 +53,42 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." &> /dev/null && pwd)"
 DEFAULT_TARGET="${REPO_ROOT}/server/.translate"
 
+# The real compose volume name (design D7): podman compose project-prefixes
+# named volumes, so the volume the server actually reads is
+# `${COMPOSE_PROJECT_NAME:-mud}_evennia-translate`, and a command naming only
+# `evennia-translate` silently seeds an orphan volume. Resolution happens at
+# print time: exact name, then project-prefixed name, then a `podman volume
+# ls` suffix scan for `(^|_)evennia-translate$`. A failing `podman volume ls`
+# yields no candidates and is never an error (the name stays unresolved and
+# the printed command carries an explicit note).
+TRANSLATE_VOLUME=""
+TRANSLATE_VOLUME_RESOLVED=0
+resolve_translate_volume() {
+  TRANSLATE_VOLUME_RESOLVED=0
+  TRANSLATE_VOLUME=""
+  local name=""
+  if command -v podman >/dev/null 2>&1; then
+    local names project
+    # pipefail-safe: a failing `podman volume ls` yields no candidates and is
+    # never an error; grep no-match exit 1 is masked by `|| true`.
+    names="$(podman volume ls --format '{{.Name}}' 2>/dev/null || true)"
+    project="${COMPOSE_PROJECT_NAME:-mud}"
+    if printf '%s\n' "${names}" | grep -qx 'evennia-translate'; then
+      name="evennia-translate"
+    elif printf '%s\n' "${names}" | grep -qx "${project}_evennia-translate"; then
+      name="${project}_evennia-translate"
+    else
+      name="$(printf '%s\n' "${names}" | grep -E '(^|_)evennia-translate$' | head -n 1 || true)"
+    fi
+  fi
+  if [[ -n "${name}" ]]; then
+    TRANSLATE_VOLUME_RESOLVED=1
+    TRANSLATE_VOLUME="${name}"
+  else
+    TRANSLATE_VOLUME="${COMPOSE_PROJECT_NAME:-mud}_evennia-translate"
+  fi
+}
+
 target="${DEFAULT_TARGET}"
 force=0
 while [[ $# -gt 0 ]]; do
@@ -58,7 +98,9 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -h|--help)
-      sed -n '2,32p' "${BASH_SOURCE[0]}"
+      # The whole header comment block (line 2 through the last `#` line),
+      # drift-proof against header edits.
+      awk 'NR == 1 { next } /^#/ { print; next } { exit }' "${BASH_SOURCE[0]}"
       exit 0
       ;;
     *)
@@ -164,13 +206,21 @@ echo ""
 echo "Bare-metal: ART_TRANSLATE_MODEL_DIR=${target} is the default; set"
 echo "ART_TRANSLATE_ENABLED=true in .env and restart the server."
 echo ""
-echo "Compose (seed the named volume once, then restart):"
-echo "  podman compose up -d      # creates the evennia-translate volume"
+resolve_translate_volume
+echo "Compose (seed the volume once, then restart):"
+echo "  podman compose up -d      # creates the ${COMPOSE_PROJECT_NAME:-mud}_evennia-translate volume"
 echo "  podman run --rm \\"
-echo "    -v evennia-translate:/app/server/.translate \\"
+echo "    -v ${TRANSLATE_VOLUME}:/app/server/.translate \\"
 echo "    -v '${target}':/seed:ro,z \\"
 echo "    --entrypoint /bin/sh docker.io/library/busybox \\"
 echo "    -c 'cp -a /seed/. /app/server/.translate/'"
+if [[ "${TRANSLATE_VOLUME_RESOLVED}" -ne 1 ]]; then
+  echo ""
+  echo "NOTE: could not resolve the real compose volume name (no podman on"
+  echo "PATH or no matching volume); the command above uses the project-prefixed"
+  echo "default ${TRANSLATE_VOLUME}. Verify with 'podman volume ls' and adjust the"
+  echo "-v name if your deployment's volume differs."
+fi
 echo ""
 echo "An unseeded volume degrades safely: one art_translate_failed warn per"
 echo "generation and the authored prompt is used — the image is still made."

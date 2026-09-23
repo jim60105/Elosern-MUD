@@ -534,6 +534,16 @@ ART_REMBG_MODEL_DIR = os.path.join(GAME_DIR, "server", ".rembg")
 # never costs the record its image.
 ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
 
+# When False, the backend verifies the seeded layout already exists under
+# ART_TRANSLATE_MODEL_DIR before importing any translation library and raises
+# the bounded `art_translate_unavailable` immediately when absent: the
+# supported air-gapped configuration (pre-seed the volume from a trusted
+# machine with scripts/fetch-translate-model.sh, disable runtime downloads —
+# the fetch then becomes structurally impossible). True (the default) lets the
+# backend fetch the Argos Open Tech package on first use into the pinned
+# volume, exactly mirroring ART_REMBG_DOWNLOAD_ENABLED.
+ART_TRANSLATE_DOWNLOAD_ENABLED = _env_bool("ART_TRANSLATE_DOWNLOAD_ENABLED", True)
+
 # Cap on the CTranslate2 intra-op thread count. 0 (the default) leaves the
 # library's own thread count in place; a non-zero value reaches the
 # translator's intra_op thread count at construction time (design D7 in
@@ -553,9 +563,12 @@ ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"
 # world/art/translate_ct2.py). Deliberately NOT environment-overridable
 # (same rationale as ART_STORE_ROOT and ART_REMBG_MODEL_DIR): a mistyped value
 # would silently relocate the translation model artifact off its persistent
-# volume and turn every translation into a bounded unavailable. The server
-# never downloads into it — an operator seeds it (scripts/fetch-translate-model.sh)
-# and compose mounts the evennia-translate volume at /app/server/.translate.
+# volume and turn every translation into a bounded unavailable. Acquisition
+# follows the dual track of ART_TRANSLATE_DOWNLOAD_ENABLED: when enabled (the
+# default) the backend may fetch the model package into this directory on
+# first use; an operator seeding it with scripts/fetch-translate-model.sh and
+# setting the flag false is the air-gapped configuration. Compose mounts the
+# evennia-translate volume at /app/server/.translate.
 ART_TRANSLATE_MODEL_DIR = os.path.join(GAME_DIR, "server", ".translate")
 
 ######################################################################

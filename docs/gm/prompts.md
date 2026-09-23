@@ -123,6 +123,7 @@ prompts:
 | `ART_REMBG_ALLOWANCE_SECONDS` | 同名 | `120` | 啟用時每項租約寬限秒數，10–1800 包含兩端；是租約預算而非強制逾時 |
 | `ART_REMBG_THREADS` | 同名 | `0` | ONNX session 執行緒上限，0–256；`0`＝ONNX Runtime 自行決定；非零經 `OMP_NUM_THREADS` 送達（行程全域） |
 | `ART_TRANSLATE_ENABLED` | 同名 | `False` | 提示詞本機前處理總開關。只翻譯含 Han 字的行，保留 authored `source_description` 與 `source_hash`；翻譯失敗會用原始提示詞生成圖片。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
+| `ART_TRANSLATE_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 backend 下載翻譯模型到持久 volume（與 `ART_REMBG_DOWNLOAD_ENABLED` 同型，約 74 MB 的 `translate-zh_en-1_9` 封包）。`false` 加上預置的 `server/.translate` volume＝無執行期網路配置；模型缺席時立即以有界的 `art_translate_unavailable` 失敗 |
 | `ART_TRANSLATE_THREADS` | 同名 | `0` | CTranslate2 intra-op 執行緒上限，0–256；`0`＝CTranslate2 自行決定；非零在建構時送達 translator |
 | `ART_TRANSLATE_BACKEND` | —（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
 
@@ -130,7 +131,7 @@ prompts:
 
 ### 翻譯模型種子（zh→en）
 
-提示詞翻譯引擎（`world.art.translate_ct2.CTranslate2Backend`，add-ctranslate2-translate-backend）是本機 CPU 神經機器翻譯：它**不會拒絕**任何描述（這正是選它而非 chat 模型的原因），但也**從不自己下載模型**。對話伺服器沒有任何下載翻譯模型的執行期網路行為；模型由操作者在主機上種子到持久目錄，缺目錄＝有界的 `art_translate_unavailable`。
+提示詞翻譯引擎（`world.art.translate_ct2.CTranslate2Backend`，add-ctranslate2-translate-backend）是本機 CPU 神經機器翻譯：它**不會拒絕**任何描述（這正是選它而非 chat 模型的原因）。模型取得走雙軌政策（add-translate-model-download-policy）：預設（`ART_TRANSLATE_DOWNLOAD_ENABLED=true`）下，若佈局檢查失敗，backend 會在首次使用的引擎建構鎖內、以有界的方式（逾時＋串流大小上限、零重試、失敗即鎖住本行程）把同一個 `translate-zh_en-1_9` 封包抓進持久目錄；設 `false` 則對話伺服器沒有任何下載翻譯模型的執行期網路行為——模型由操作者在主機上種子到持久目錄（下方路線一／二），缺目錄＝有界的 `art_translate_unavailable`。
 
 **佈局契約**：`ART_TRANSLATE_MODEL_DIR`（裸機 `server/.translate`、容器 `/app/server/.translate`）必須包含
 

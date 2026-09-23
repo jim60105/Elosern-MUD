@@ -48,6 +48,7 @@ _ENV_OVERRIDES = (
     "ART_REMBG_ALLOWANCE_SECONDS",
     "ART_REMBG_THREADS",
     "ART_TRANSLATE_ENABLED",
+    "ART_TRANSLATE_DOWNLOAD_ENABLED",
     "ART_TRANSLATE_THREADS",
     "ART_SCHEDULER_ENABLED",
     "ART_SCHEDULER_INTERVAL_SECONDS",
@@ -71,6 +72,13 @@ for _llm_name in llm_env_names():
 
 from server.conf.settings import *  # noqa: E402,F401,F403
 
+
+# Every test run through the Evennia test runner (the MUD_TEST_SETTINGS=1
+# gate above) sits on the translation air-gapped track: the pin below
+# overrides the documented code default (True), so an inherited shell value
+# can never make a test run download-capable even when the shipped backend
+# resolves against an unseeded directory.
+ART_TRANSLATE_DOWNLOAD_ENABLED = False
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 DATABASES["default"].setdefault("TEST", {})["NAME"] = os.path.join(

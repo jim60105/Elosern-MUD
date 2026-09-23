@@ -7,6 +7,7 @@ import builtins
 from collections.abc import Sequence
 from contextlib import contextmanager
 import importlib.util
+import io
 import os
 from pathlib import Path
 import shutil
@@ -19,6 +20,7 @@ import types
 import unittest
 from unittest import mock
 from unittest.mock import patch
+import zipfile
 
 from django.test import override_settings
 
@@ -264,6 +266,11 @@ class _CT2BackendCase(unittest.TestCase):
         # never reuse an engine built for a previous configuration.
         self._cache_snapshot = dict(translate_ct2._ENGINES)
         translate_ct2._ENGINES.clear()
+        # The per-process download latch is module-global by design; snapshot
+        # and clear it so download-track tests never leak a latched module
+        # into later tests, and restore it afterwards.
+        self._latch_snapshot = translate_ct2._DOWNLOAD_LATCHED
+        translate_ct2._DOWNLOAD_LATCHED = False
         # Pop any cached real translation libraries so every test starts
         # library-free and the fakes below can never shadow a real import.
         self._modules_snapshot = {
@@ -281,6 +288,7 @@ class _CT2BackendCase(unittest.TestCase):
     def _restore(self):
         translate_ct2._ENGINES.clear()
         translate_ct2._ENGINES.update(self._cache_snapshot)
+        translate_ct2._DOWNLOAD_LATCHED = self._latch_snapshot
         for name in list(sys.modules):
             if (
                 name == "ctranslate2"
@@ -380,6 +388,69 @@ class _CT2BackendCase(unittest.TestCase):
             "socket.socket", side_effect=AssertionError("no network access")
         ):
             yield
+
+
+_PKG = "translate-zh_en-1_9"
+
+
+def _package_members() -> dict[str, bytes]:
+    """The five-entry Argos package layout the download verifies and lands."""
+    return {
+        f"{_PKG}/model/config.json": b"{}",
+        f"{_PKG}/model/model.bin": b"weights",
+        f"{_PKG}/model/shared_vocabulary.json": b"{}",
+        f"{_PKG}/sentencepiece.model": b"sp-model",
+        f"{_PKG}/README.md": b"CC-BY 4.0 provenance",
+    }
+
+
+def _zip_bytes(members: dict[str, bytes]) -> bytes:
+    """Build a zip archive from member name -> content bytes."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def _package_bytes() -> bytes:
+    """The default (valid) package body used by download-test stubs."""
+    return _zip_bytes(_package_members())
+
+
+class _FakeResponse:
+    """Minimal ``urlopen`` response double: headers.get + streaming read."""
+
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        content_length: int | None = None,
+        read_error: Exception | None = None,
+    ):
+        self._body = body
+        self._offset = 0
+        self._read_error = read_error
+        headers: dict[str, str] = {}
+        if content_length is not None:
+            headers["Content-Length"] = str(content_length)
+        self.headers = headers
+
+    def read(self, size: int = -1):
+        if self._read_error is not None:
+            raise self._read_error
+        if size is None or size < 0:
+            chunk = self._body[self._offset :]
+        else:
+            chunk = self._body[self._offset : self._offset + size]
+        self._offset += len(chunk)
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
 
 
 class CTranslate2BackendLayoutTests(_CT2BackendCase):
@@ -736,25 +807,247 @@ class CTranslate2BackendLazinessTests(_CT2BackendCase):
         self.assertIsInstance(caught.exception.__cause__, ImportError)
 
 
+class CTranslate2BackendDownloadTests(_CT2BackendCase):
+    """The dual-track first-use fetch (add-translate-model-download-policy).
+
+    The fetch stub stands in for ``world.art.translate_ct2.urlopen`` (the
+    module's single network entry point); every test stays socket-free.
+    """
+
+    def _fetch_patch(self, body=None, *, content_length=None, error=None):
+        if error is not None:
+            return patch("world.art.translate_ct2.urlopen", side_effect=error)
+        response = _FakeResponse(
+            body if body is not None else _package_bytes(),
+            content_length=content_length,
+        )
+        return patch("world.art.translate_ct2.urlopen", return_value=response)
+
+    def test_a_complete_layout_never_fetches_on_the_download_track(self):
+        # Scenario: a complete layout never triggers a fetch — even with the
+        # flag explicitly on, the check passes and zero network is attempted.
+        self._seed()
+        self._install_stack(_ScriptedStack())
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch() as fetch:
+            with self._no_network():
+                result = backend.translate(("漢字",))
+        self.assertEqual(result, ("out0 out1",))
+        fetch.assert_not_called()
+
+    def test_missing_layout_with_downloads_enabled_fetches_unpacks_and_translates(self):
+        # Scenario: an unseeded volume with downloads enabled fetches once —
+        # the same call populates, verifies, unpacks, emits exactly one
+        # download-done info event, and translates with the built engine.
+        stack = self._install_stack(_ScriptedStack())
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch() as fetch:
+            with patch("world.art.translate_ct2.log_info") as info:
+                result = backend.translate(("漢字",))
+        self.assertEqual(result, ("out0 out1",))
+        fetch.assert_called_once()
+        for relative in (
+            "model/config.json",
+            "model/model.bin",
+            "model/shared_vocabulary.json",
+            "sentencepiece.model",
+            "README.md",
+        ):
+            self.assertTrue(
+                (self.model_dir / relative).is_file(), msg=relative
+            )
+        # The same call then built the engine from the landed layout.
+        self.assertEqual(
+            stack.translator_calls,
+            [(f"{self.model_dir}/model", {"device": "cpu"})],
+        )
+        self.assertEqual(
+            stack.processor_calls,
+            [{"model_file": f"{self.model_dir}/sentencepiece.model"}],
+        )
+        info.assert_called_once()
+        args, kwargs = info.call_args
+        self.assertEqual(args, ("art_translate_model_download_done",))
+        self.assertEqual(kwargs["context"]["url"], translate_ct2._MODEL_URL)
+        self.assertEqual(kwargs["context"]["bytes"], len(_package_bytes()))
+        self.assertIsInstance(kwargs["context"]["duration_ms"], int)
+
+    def test_fetch_failure_is_bounded_emits_one_warn_and_latches(self):
+        # Scenario: a fetch failure degrades and latches — bounded
+        # art_translate_unavailable, no library import, exactly one
+        # download-failed warn, and every later call fails immediately without
+        # a second network attempt.
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        error = OSError("connection refused")
+        with self._fetch_patch(error=error) as fetch:
+            with patch("world.art.translate_ct2.log_warn") as warn:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        self.assertNotIn("ctranslate2", sys.modules)
+        self.assertNotIn("sentencepiece", sys.modules)
+        warn.assert_called_once()
+        args, kwargs = warn.call_args
+        self.assertEqual(args, ("art_translate_model_download_failed",))
+        self.assertEqual(kwargs["context"]["url"], translate_ct2._MODEL_URL)
+        self.assertIn("reason", kwargs["context"])
+        self.assertIs(kwargs["exc"], error)
+        fetch.assert_called_once()
+        # Second attempt in the same process: latched, zero new network.
+        with self._fetch_patch(error=error) as later:
+            with patch("world.art.translate_ct2.log_warn") as later_warn:
+                with self.assertRaises(TranslateError) as second:
+                    backend.translate(("漢字",))
+        self.assertEqual(second.exception.code, "art_translate_unavailable")
+        later.assert_not_called()
+        later_warn.assert_not_called()
+
+    def test_mkdir_failure_is_bounded_emits_one_warn_and_latches(self):
+        # A write failure at directory creation (EROFS/EACCES/ENOSPC on a
+        # read-only or full volume) must follow the same bounded path as any
+        # other download failure: art_translate_unavailable, exactly one
+        # download-failed warn, and the per-process latch so later calls skip
+        # the attempt (delta spec: "including OSError/ENOSPC on a full
+        # volume").
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with mock.patch.object(
+            Path, "mkdir", side_effect=OSError("read-only volume")
+        ):
+            with patch("world.art.translate_ct2.log_warn") as warn:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        warn.assert_called_once()
+        args, kwargs = warn.call_args
+        self.assertEqual(args, ("art_translate_model_download_failed",))
+        self.assertIsInstance(kwargs["exc"], OSError)
+        with patch("world.art.translate_ct2.log_warn") as later_warn:
+            with self.assertRaises(TranslateError) as second:
+                backend.translate(("漢字",))
+        self.assertEqual(second.exception.code, "art_translate_unavailable")
+        later_warn.assert_not_called()
+
+    def test_an_oversize_content_length_is_rejected_before_reading(self):
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with mock.patch.object(translate_ct2, "_MAX_MODEL_BYTES", 1024):
+            response = _FakeResponse(
+                b"x" * 2048,
+                content_length=2048,
+                read_error=AssertionError("body must never be read"),
+            )
+            with patch(
+                "world.art.translate_ct2.urlopen", return_value=response
+            ) as fetch:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        fetch.assert_called_once()
+
+    def test_a_body_over_the_cap_aborts_while_streaming(self):
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with mock.patch.object(translate_ct2, "_MAX_MODEL_BYTES", 1024):
+            with self._fetch_patch(body=b"x" * 2048) as fetch:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        fetch.assert_called_once()
+
+    def test_a_bad_zip_fails_bounded_and_lands_nothing(self):
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch(body=b"definitely not a zip archive"):
+            with patch("world.art.translate_ct2.log_warn") as warn:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        warn.assert_called_once()
+        self.assertEqual(list(self.model_dir.iterdir()), [])
+
+    def test_a_package_missing_a_required_entry_fails_bounded(self):
+        members = _package_members()
+        del members[f"{_PKG}/README.md"]
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch(body=_zip_bytes(members)):
+            with self.assertRaises(TranslateError) as caught:
+                backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        self.assertFalse((self.model_dir / "README.md").exists())
+
+    def test_an_unsafe_or_out_of_package_member_fails_bounded(self):
+        for name in (f"{_PKG}/../../evil", "evil.txt", "/etc/passwd"):
+            with self.subTest(member=name):
+                # The latch is per-process, not per-model-dir; each member
+                # shape must be checked by the real verification code, so
+                # reset it before every iteration (the rmtree below would
+                # otherwise let a later member hide behind an earlier latch).
+                translate_ct2._DOWNLOAD_LATCHED = False
+                shutil.rmtree(self.model_dir, ignore_errors=True)
+                members = _package_members()
+                members[name] = b"x"
+                backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+                with self._fetch_patch(body=_zip_bytes(members)):
+                    with self.assertRaises(TranslateError) as caught:
+                        backend.translate(("漢字",))
+                self.assertEqual(
+                    caught.exception.code, "art_translate_unavailable"
+                )
+
+    def test_a_landed_layout_is_never_refetched_after_a_restart(self):
+        # Task 6.2 phase pair in one process: land the layout with a fetch,
+        # then simulate a restart (latch AND engine cache reset) and observe
+        # zero further fetches — proving "complete layout => no fetch", not a
+        # latched module.
+        self._install_stack(_ScriptedStack())
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch() as fetch:
+            backend.translate(("第一階段",))
+        self.assertEqual(fetch.call_count, 1)
+        translate_ct2._DOWNLOAD_LATCHED = False
+        translate_ct2._ENGINES.clear()
+        with self._fetch_patch(error=AssertionError("must not fetch")) as later:
+            result = backend.translate(("第二階段",))
+        self.assertEqual(result, ("out0 out1",))
+        later.assert_not_called()
+
+
+class CTranslate2BackendAirGappedTests(_CT2BackendCase):
+    """The flag-false track reproduces today's seed-only behavior (3.2)."""
+
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+    )
+    def test_download_disabled_against_absent_dir_is_todays_exact_behavior(self):
+        # Scenario: an unseeded model directory degrades without a fetch —
+        # immediate art_translate_unavailable, no library import, zero network
+        # attempts (the fetch call site does not exist in this branch).
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=False)
+        with self._raising_import_for_optional_stack():
+            with self._no_network():
+                with patch("world.art.translate_ct2.urlopen") as fetch:
+                    with self.assertRaises(TranslateError) as caught:
+                        backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        self.assertNotIn("ctranslate2", sys.modules)
+        self.assertNotIn("sentencepiece", sys.modules)
+        fetch.assert_not_called()
+
+
 class CTranslate2BackendReachabilityTests(_CT2BackendCase):
-    """No generative layer and no outbound transport are reachable (6.5)."""
+    """No generative layer or general-purpose transport is reachable (6.5).
+
+    Re-scoped by add-translate-model-download-policy: the ban covers
+    ``world.ai``/``requests``/``http`` imports and ``LLM_*`` reads; the pinned
+    ``urllib.request`` fetch and the ``world.observability`` lifecycle events
+    are permitted for the acquisition path.
+    """
 
     _BANNED_IMPORT_PREFIXES = (
         "world.ai",
-        "urllib",
         "http",
         "requests",
-        "socket",
-        "importlib",
-        "world.observability",
     )
     _BANNED_SUBSTRINGS = (
-        "world.observability",
         "LLM_",
-        "socket",
-        "urllib",
         "requests",
-        "http",
     )
 
     @covers_requirement(
@@ -796,6 +1089,25 @@ class CTranslate2BackendReachabilityTests(_CT2BackendCase):
                 self.assertFalse(
                     node.attr.startswith("LLM_"), msg=node.attr
                 )
+
+    @covers_requirement(
+        "art-prompt-translation::the-shipped-backend-is-a-neural-machine-translator-never-a-chat-model"
+    )
+    def test_the_only_url_literal_is_the_pinned_model_url(self):
+        # Scenario: the acquisition transport is the pinned model URL only —
+        # exactly one https:// literal exists in the module and it is the
+        # pinned argos-net.com model URL (the outbound-request ban's scope).
+        tree = ast.parse(
+            Path(translate_ct2.__file__).read_text(encoding="utf-8")
+        )
+        urls = [
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith("https://")
+        ]
+        self.assertEqual(urls, [translate_ct2._MODEL_URL])
 
     @covers_requirement(
         "art-prompt-translation::the-shipped-backend-is-a-neural-machine-translator-never-a-chat-model"

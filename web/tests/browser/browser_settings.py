@@ -162,6 +162,11 @@ ART_REMBG_ENABLED = False
 ART_REMBG_BACKEND = "world.art.fake_cutout.FakeCutoutBackend"
 ART_TRANSLATE_ENABLED = False
 ART_TRANSLATE_BACKEND = "world.art.fake_translate.FakeTranslator"
+# Translation air-gap pin, mirroring server/conf/test_settings.py: this module
+# does not import the developer settings, so the knob is declared explicitly —
+# the harness can never attempt a model download even if a suite resolves the
+# shipped backend against an unseeded model directory.
+ART_TRANSLATE_DOWNLOAD_ENABLED = False
 ART_SCHEDULER_ENABLED = False
 ART_SCHEDULER_INTERVAL_SECONDS = 30
 ART_SCHEDULER_LIMIT = 4
