@@ -46,6 +46,16 @@ _IMPORT_BEFORE_INSTALL = (
     # keys, so under the install t_-keyed awards never match a rule and the
     # evaluator is an inert no-op.
     "world.rules.cross_lineage_unlock",
+    # The Church rulebook validates its shipped YAML accrual rows against
+    # the skill registry at import (every church.yaml skill_key must name a
+    # registered skill) and is only reached lazily through the combat
+    # package import chain. Without this pre-import, the first seed graft
+    # that drags in world.rules.combat imports it against the t_-only
+    # install and fails closed on rite_morning_devotion. The frozen _RULES
+    # snapshot is built from shipped keys, so under the install t_-keyed
+    # accrual/redemption lookups never match a row and the ministry tuning
+    # is an inert no-op — the same documented seam class.
+    "world.rules.church_rulebook",
 )
 # Module-level bootstrap content validated against catalog registries at
 # RUNTIME (sync_quest_runtime registers the hand-written intro quest, whose

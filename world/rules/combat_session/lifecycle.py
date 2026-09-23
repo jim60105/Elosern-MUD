@@ -59,7 +59,7 @@ def clear_session(
 
     from django.db import transaction
     from world.rules.buffs import (
-        remove_by_selector,
+        clear_lamb_seals,
         remove_ground_markers,
         remove_positional_markers,
     )
@@ -75,7 +75,7 @@ def clear_session(
     participants.add(actor)
     for entity in participants:
         removed = remove_ground_markers(entity) + remove_positional_markers(entity)
-        seals = remove_by_selector(entity, "lamb_seal")
+        seals = clear_lamb_seals(entity)
         if removed or seals:
             boundary = {
                 "char": str(entity.pk),

@@ -44,13 +44,27 @@ from world.skills.sexual_acts._builder import (
 
 _SEXUAL_YAML_PATH = Path(__file__).parents[4] / "rules" / "rulebook" / "sexual.yaml"
 
-# The two pre-existing mastery/mystery skills categorised SEXUAL_ACT that
-# carry no SexualActDef by design (acquisition-path skills, not acts).
-# divine_sexual_arts joined the catalogue as the eighth hand-built divine row
+# The mastery/mystery skills categorised SEXUAL_ACT that carry no SexualActDef
+# by design (acquisition-path skills, not acts). divine_sexual_arts joined the
+# catalogue as the eighth hand-built divine row
 # (integrate-divine-sexual-arts-catalog), so it participates in the agreement
-# comparison on both sides and must never return to this set.
+# comparison on both sides and must never return to this set. The four church
+# Series D ministry rows join the same exclusion class
+# (implement-church-redemption design §5.5): declaration-only SKILL_REGISTRY
+# rows acquired ONLY through church redemption, doubling as advanced
+# OFFERING_CATALOG rows by shared key (world/lore/tests/test_church.py pins
+# the else branch — they must never enter the act catalogue, whose
+# empty-unlock seed gates would hand a fresh character an act the ordination
+# ladder is the sole gate for).
 _MASTERY_EXCLUSIONS = frozenset(
-    {"divine_sexual_mastery", "reincarnation_boon_yuna"}
+    {
+        "divine_sexual_mastery",
+        "reincarnation_boon_yuna",
+        "rite_anointing_touch",
+        "rite_milk_blessing",
+        "rite_holy_kiss",
+        "rite_confession_bed",
+    }
 )
 
 _KNOWN_EVENTS = frozenset(

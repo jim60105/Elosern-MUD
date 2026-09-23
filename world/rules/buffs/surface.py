@@ -431,6 +431,28 @@ def remove_positional_markers(entity) -> int:
     return len(keys)
 
 
+def clear_lamb_seals(entity) -> int:
+    """Remove every live ``lamb_seal`` buff instance on an entity; return the count.
+
+    ``clear_session``'s unconditional combat-exit seal sweep. Selection
+    resolves against live buff **instances** by definition key, like the
+    conferred-growth-rate and marker sweeps: the removal must stay inert
+    under a test scope whose synthetic catalog excludes the shipped seal
+    definition, where the ``remove_by_selector`` vocabulary gate would fail
+    closed on the named key even though the sweep's contract is "remove
+    what is live, write nothing when nothing is."
+    """
+    keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if buff.definition_key == "lamb_seal"
+    )
+    if not keys:
+        return 0
+    _remove_buff_keys(entity, keys)
+    return len(keys)
+
+
 def _handle_cleanse(
     actor: Any,
     targets: list[Any],

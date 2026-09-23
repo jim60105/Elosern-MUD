@@ -21,7 +21,10 @@ from typeclasses.components import ChurchHost, ScriptedDialogue
 from typeclasses.npcs import NPC
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
-from world.rules.tests.test_guild_economy_sync._support import ServiceContentIsolation
+from world.rules.tests.test_guild_economy_sync._support import (
+    ServiceContentIsolation,
+    _merchant_row,
+)
 
 CELEBRANT_SERVICE_ID = "altoria_high_priestess"
 STEWARD_SERVICE_ID = "altoria_sanctum_deacon"
@@ -90,7 +93,11 @@ class ChurchHostSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(
             steward.components.get(ScriptedDialogue.get_component_slot())
         )
-        self.assertEqual(steward_row.profession.key, "merchant")
+        # Her profession blueprint is the same profession the commercial
+        # service host carries: the merchant surface is intact.
+        self.assertEqual(
+            steward_row.profession.key, _merchant_row().profession.key
+        )
 
     @covers_requirement(
         "church-ordination::church-venues-and-clergy-hosts-exist-as-authored-content"

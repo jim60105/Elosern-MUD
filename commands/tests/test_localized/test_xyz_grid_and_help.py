@@ -184,7 +184,11 @@ class LocalizedHelpCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         from evennia.utils.create import create_help_entry
 
         create_help_entry("測試世界主題", "一篇關於世界的說明。", category="general")
-        output = self.call(CmdHelp(), "", cmdset=self._merged_cmdset())
+        # The shipped command count pushes the index past the evmore page
+        # boundary; this test pins entry PLACEMENT, not pagination, so the
+        # pager is off and the full index arrives as one buffer.
+        with patch.object(CmdHelp, "help_more", False):
+            output = self.call(CmdHelp(), "", cmdset=self._merged_cmdset())
         self.assertIn("遊戲與世界", output)
         self.assertIn("測試世界主題", output)
 

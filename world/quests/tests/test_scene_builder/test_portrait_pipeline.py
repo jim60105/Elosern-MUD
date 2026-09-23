@@ -155,7 +155,9 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         subject, description = client.calls[0]
         self.assertEqual(subject.kind, ArtSubjectKind.CHARACTER)
         self.assertEqual(subject.key, "forest_bandit_chief")
-        self.assertIn("黑鬍", description)
+        # recut-art-portrait-prompt: the display name is deliberately absent
+        # from the character description; the age fingerprint carries it.
+        self.assertNotIn("黑鬍", description)
         self.assertIn("35", description)
 
         # The retrofit settles to a gallery card, not a classic record.
@@ -191,9 +193,13 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         )
         self.assertEqual(first_dispatched, 1)
         # The first materialization's description is the one that generated
-        # the card.
-        self.assertIn("黑鬍", first_client.calls[0][1])
-        self.assertNotIn("獨眼", first_client.calls[0][1])
+        # the card. A stable-key portrait is name-independent by contract
+        # (recut-art-portrait-prompt): the name is never in the prompt, and
+        # the first description's age fingerprint distinguishes it from the
+        # later variant's.
+        self.assertIn("35 years old", first_client.calls[0][1])
+        self.assertNotIn("40 years old", first_client.calls[0][1])
+        self.assertNotIn("黑鬍", first_client.calls[0][1])
         _, second_client, second_dispatched = self._materialize_and_drain(
             self._characterized_payload(
                 display_name="獨眼",

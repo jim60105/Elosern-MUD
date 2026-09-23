@@ -119,7 +119,7 @@ def _church_skills_redeemed_count(entity: Any) -> int:
     try:
         return len(redeemed_keys(entity))
     except (ChurchLedgerError, AttributeError, TypeError, ValueError):
-        raise TitleDataError("db.church state is malformed") from None
+        raise TitleDataError("church ledger state is malformed") from None
 
 
 def predicate_satisfied(

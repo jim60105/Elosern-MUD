@@ -60,6 +60,7 @@ from world.rules.buffs.surface import (  # noqa: F401
     blocks_action,
     cleanse_debuffs,
     clear_conferred_growth_rates,
+    clear_lamb_seals,
     consume_climax_charges,
     entity_active_buffs,
     grant_conferred_growth_rate,
