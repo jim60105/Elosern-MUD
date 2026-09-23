@@ -25,7 +25,7 @@ from world.art.service import request_gallery_image
 
 from tools.spec_traceability import covers_requirement
 from world.art.sd_worker import SDError
-from world.art.store import ArtAssetStatus
+from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.translate import TranslateError
 import world.art.translate_ct2 as translate_ct2
@@ -599,6 +599,17 @@ class TranslationEventTests(EvenniaTest):
         self.assertEqual(
             download_failed[0].kwargs["context"]["url"],
             translate_ct2._MODEL_URL,
+        )
+        # The record settles DONE with the untranslated description (task
+        # 2.4's "the job still settles done on the untranslated description").
+        record = ArtAssetRecord.objects.filter(
+            db_key=record_key(subject)
+        ).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        settles = _events(info, "sd_job_settled")
+        self.assertEqual(len(settles), 1)
+        self.assertEqual(
+            settles[0].kwargs["context"]["status"], ArtAssetStatus.DONE
         )
 
     @covers_requirement(

@@ -296,9 +296,13 @@ class CTranslate2Backend:
                 "process; restart the server or seed the model directory "
                 "with scripts/fetch-translate-model.sh",
             )
-        model_dir.mkdir(parents=True, exist_ok=True)
         start = time.monotonic()
         try:
+            # Directory creation is part of the landing step and can fail like
+            # any write (EROFS/EACCES on a read-only or root-owned volume,
+            # ENOSPC) — it must follow the same bounded path: latch, one warn,
+            # art_translate_unavailable.
+            model_dir.mkdir(parents=True, exist_ok=True)
             body = CTranslate2Backend._download_model()
             CTranslate2Backend._verify_and_unpack(body, model_dir)
         except Exception as error:  # noqa: BLE001 - bounded mapping (D4)

@@ -902,6 +902,31 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
         later.assert_not_called()
         later_warn.assert_not_called()
 
+    def test_mkdir_failure_is_bounded_emits_one_warn_and_latches(self):
+        # A write failure at directory creation (EROFS/EACCES/ENOSPC on a
+        # read-only or full volume) must follow the same bounded path as any
+        # other download failure: art_translate_unavailable, exactly one
+        # download-failed warn, and the per-process latch so later calls skip
+        # the attempt (delta spec: "including OSError/ENOSPC on a full
+        # volume").
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with mock.patch.object(
+            Path, "mkdir", side_effect=OSError("read-only volume")
+        ):
+            with patch("world.art.translate_ct2.log_warn") as warn:
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        warn.assert_called_once()
+        args, kwargs = warn.call_args
+        self.assertEqual(args, ("art_translate_model_download_failed",))
+        self.assertIsInstance(kwargs["exc"], OSError)
+        with patch("world.art.translate_ct2.log_warn") as later_warn:
+            with self.assertRaises(TranslateError) as second:
+                backend.translate(("漢字",))
+        self.assertEqual(second.exception.code, "art_translate_unavailable")
+        later_warn.assert_not_called()
+
     def test_an_oversize_content_length_is_rejected_before_reading(self):
         backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
         with mock.patch.object(translate_ct2, "_MAX_MODEL_BYTES", 1024):
@@ -950,6 +975,11 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
     def test_an_unsafe_or_out_of_package_member_fails_bounded(self):
         for name in (f"{_PKG}/../../evil", "evil.txt", "/etc/passwd"):
             with self.subTest(member=name):
+                # The latch is per-process, not per-model-dir; each member
+                # shape must be checked by the real verification code, so
+                # reset it before every iteration (the rmtree below would
+                # otherwise let a later member hide behind an earlier latch).
+                translate_ct2._DOWNLOAD_LATCHED = False
                 shutil.rmtree(self.model_dir, ignore_errors=True)
                 members = _package_members()
                 members[name] = b"x"
