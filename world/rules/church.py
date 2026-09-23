@@ -48,7 +48,7 @@ from django.db import transaction
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ChurchHost
 from typeclasses.npcs import NPC
-from world.lore.church import OFFERING_CATALOG, OfferingRow
+from world.lore.church import OFFERING_CATALOG, REDEEM_CATALOG, OfferingRow, RedeemRow
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 from world.observability import log_info
 from world.rules.clock import CLOCK_YAML, get_world_clock, read_world_clock
@@ -563,6 +563,54 @@ def pray_step(entity: Any) -> dict[str, Any]:
 # --------------------------------------------------------------------------- offering
 
 
+def _passive_percent_bonus(entity: Any, effect_key: str) -> int:
+    """Sum the additive percent bonus a redeemed PASSIVE grants on one
+    ledger channel (design §5.5: ``vow_of_service`` — offering copper +25%
+    and offering/climax merit +10%, ledger multipliers only, pure-positive;
+    prayer is deliberately untouched). The values ride the ``church.yaml``
+    ``passive_effects`` rows keyed by PASSIVE redemption-catalogue skills;
+    a skill the entity does not own contributes nothing.
+    """
+    from world.rules.church_rulebook import get_church_rules
+
+    skills = getattr(entity, "skills", None)
+    if skills is None:
+        return 0
+    owned = set(skills.base_owned_keys())
+    total = 0
+    for row in get_church_rules().passive_effects:
+        if row.skill_key not in owned:
+            continue
+        value = row.effects.get(effect_key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            total += value
+        elif isinstance(value, str) and value.endswith("%"):
+            parsed = value.rstrip("%").lstrip("+")
+            if parsed.isdigit():
+                total += int(parsed)
+    return total
+
+
+def scaled_merit_gain(entity: Any, base_merit: int) -> int:
+    """The offering/climax merit an owned church PASSIVE grants on top of
+    the accrual base: deterministic round-half-up integer scaling (a small
+    merit still rounds with 0.5 going up, so the bonus never vanishes into
+    integer truncation)."""
+    return base_merit + (
+        base_merit * _passive_percent_bonus(entity, "merit_percent") + 50
+    ) // 100
+
+
+def _scaled_copper_gain(entity: Any, base_copper: int) -> int:
+    """The offering copper an owned church PASSIVE grants on top of the
+    payout base (round-half-up integer scaling, same contract as merit)."""
+    return base_copper + (
+        base_copper * _passive_percent_bonus(entity, "copper_percent") + 50
+    ) // 100
+
+
 class OfferingReason(StrEnum):
     """The named stable rejection reasons of the sexual offering."""
 
@@ -603,7 +651,7 @@ def offering_menu(entity: Any) -> tuple[OfferingRow, ...]:
     )
 
 
-def _offering_copper(row: OfferingRow) -> int:
+def _offering_copper(row: OfferingRow, entity: Any) -> int:
     """Resolve one offering row's integer copper payout.
 
     Precedence: the row's own ``copper`` override (``OfferingRow.copper`` —
@@ -611,21 +659,24 @@ def _offering_copper(row: OfferingRow) -> int:
     deterministic function of one injected ``roll_d100`` inside the
     configured band (integer copper, both band edges reachable). The tuning
     numbers ride the catalogue rows and the rulebook slice, never a code-side
-    constant.
+    constant. An owned church PASSIVE's ``copper_percent`` multiplier (e.g.
+    ``vow_of_service`` +25%) then scales the base with round-half-up integer
+    arithmetic.
     """
     from world.rules.church_rulebook import get_church_rules
 
     if row.copper is not None:
-        return int(row.copper)
+        return _scaled_copper_gain(entity, int(row.copper))
     config = get_church_rules().offering
     override = config.overrides.get(row.key)
     if override is not None:
-        return int(override["copper"])
+        return _scaled_copper_gain(entity, int(override["copper"]))
     lo, hi = config.copper_lo, config.copper_hi
     if hi <= lo:
-        return lo
+        return _scaled_copper_gain(entity, lo)
     roll = roll_d100()
-    return lo + ((roll - 1) * (hi - lo)) // 99
+    base = lo + ((roll - 1) * (hi - lo)) // 99
+    return _scaled_copper_gain(entity, base)
 
 
 def _snapshot_offering_state(
@@ -785,10 +836,11 @@ def offer_step(entity: Any, npc: Any, row_key: str) -> dict[str, Any]:
                 raise OfferingError(
                     OfferingReason.ACT_REJECTED, str(result.reason)
                 )
-            copper = _offering_copper(row)
+            copper = _offering_copper(row, entity)
+            merit_gain = scaled_merit_gain(entity, row.merit)
 
             def _mutate(entry: dict[str, Any]) -> None:
-                entry["merit"] = int(entry["merit"]) + row.merit
+                entry["merit"] = int(entry["merit"]) + merit_gain
 
             _write_ledger(entity, _mutate)
             setattr(
@@ -818,6 +870,147 @@ def offer_step(entity: Any, npc: Any, row_key: str) -> dict[str, Any]:
         "row": row.key,
         "roll": roll,
         "accept_percent": accept_percent,
-        "merit": row.merit,
+        "merit": merit_gain,
         "copper": copper,
+    }
+
+
+# --------------------------------------------------------------------------- redemption
+
+
+class RedemptionReason(StrEnum):
+    """The named stable rejection reasons of the ordination redemption."""
+
+    NOT_A_PLAYER = "not_a_player"
+    NOT_ENROLLED = "not_enrolled"
+    UNKNOWN_KEY = "unknown_key"
+    ALREADY_REDEEMED = "already_redeemed"
+    INSUFFICIENT_MERIT = "insufficient_merit"
+    UNMET_PREREQ = "unmet_prereq"
+    MALFORMED_LEDGER = "malformed_ledger"
+
+
+class RedemptionError(ValueError):
+    """A deterministic redemption rejection with a named reason."""
+
+
+def _require_redemption_ledger(entity: Any) -> dict[str, Any]:
+    """Read and STRICTLY validate the ledger for the redemption checks.
+
+    ``read_ledger`` confirms only the mapping shape; redemption then indexes
+    ``merit`` and ``redeemed``, so a malformed value must fail closed here as
+    the stable ``MALFORMED_LEDGER`` rejection — never a raw ``KeyError`` or
+    coercion escaping to the command surface.
+    """
+    try:
+        ledger = read_ledger(entity)
+    except ChurchLedgerError as error:
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER) from error
+    if ledger is None:
+        raise RedemptionError(RedemptionReason.NOT_ENROLLED)
+    merit = ledger.get("merit")
+    if isinstance(merit, bool) or not isinstance(merit, int):
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER)
+    redeemed = ledger.get("redeemed")
+    if not isinstance(redeemed, list) or not all(
+        isinstance(key, str) for key in redeemed
+    ):
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER)
+    return ledger
+
+
+def redemption_catalogue(entity: Any) -> tuple[tuple[RedeemRow, bool], ...]:
+    """Read-only catalogue listing with the caller's redeemed marks
+    (design §5.6 ``redeem list``: catalogue + merit + redeemed marks). A
+    character who never enrolled has no marks; the command owns the
+    unenrolled presentation."""
+    redeemed = set(redeemed_keys(entity))
+    return tuple((row, row.skill_key in redeemed) for row in REDEEM_CATALOG)
+
+
+def redeem_step(entity: Any, key: str) -> dict[str, Any]:
+    """Redeem one ordination row (design §5.6) — a one-shot, all-or-nothing
+    grace purchase.
+
+    Validation (row exists ∧ not already redeemed ∧ merit sufficient ∧
+    catalogue-internal prereqs met — a plain list of other catalogue keys,
+    never lineage machinery) runs in that order, every failure a stable
+    named rejection. One ``transaction.atomic()`` then performs the
+    authored write sequence: subtract the price from merit, write the skill
+    through the sanctioned granted-skill channel (``grant_owned_skill`` —
+    PASSIVE rows land in ``db.skills.passive``, ACTIVE rows in
+    ``db.skills.active``, per kind), append the key to ``redeemed``, and
+    register ``church_skill_redeemed`` commit-bound. Evennia's attribute
+    cache is not transaction-aware, so the ``church`` and ``skills``
+    surfaces are snapshotted before the transaction and restored on any
+    failure — a rolled-back redemption is byte-identical and emits nothing.
+    """
+    if not isinstance(entity, PlayerCharacter):
+        raise RedemptionError(RedemptionReason.NOT_A_PLAYER)
+    if not isinstance(key, str) or not key:
+        raise RedemptionError(RedemptionReason.UNKNOWN_KEY)
+    ledger = _require_redemption_ledger(entity)
+    row = next(
+        (candidate for candidate in REDEEM_CATALOG if candidate.skill_key == key),
+        None,
+    )
+    if row is None:
+        raise RedemptionError(RedemptionReason.UNKNOWN_KEY)
+    redeemed_set = set(ledger["redeemed"])
+    if key in redeemed_set:
+        raise RedemptionError(RedemptionReason.ALREADY_REDEEMED)
+    if int(ledger["merit"]) < row.merit_price:
+        raise RedemptionError(RedemptionReason.INSUFFICIENT_MERIT)
+    missing = [prereq for prereq in row.prereq_keys if prereq not in redeemed_set]
+    if missing:
+        raise RedemptionError(RedemptionReason.UNMET_PREREQ)
+
+    from world.rules.cross_lineage_unlock import grant_owned_skill
+    from world.rules.surfaces import restore_attributes, snapshot_attributes
+    from world.skills.registry import SKILL_REGISTRY
+
+    snapshots = snapshot_attributes(entity, ("church", "skills"))
+    char_key = str(entity)
+    skill_key = row.skill_key
+    try:
+        with transaction.atomic():
+
+            def _charge(entry: dict[str, Any]) -> None:
+                remaining = int(entry["merit"]) - row.merit_price
+                if remaining < 0:
+                    raise ChurchLedgerError("insufficient merit for redemption")
+                entry["merit"] = remaining
+
+            _write_ledger(entity, _charge)
+            grant_owned_skill(entity, row.skill_key, SKILL_REGISTRY)
+
+            def _mark(entry: dict[str, Any]) -> None:
+                redeemed = entry["redeemed"]
+                if not isinstance(redeemed, list) or not all(
+                    isinstance(existing, str) for existing in redeemed
+                ):
+                    raise ChurchLedgerError("db.church redeemed is malformed")
+                if row.skill_key in redeemed:
+                    raise ChurchLedgerError(f"key {row.skill_key!r} is already redeemed")
+                redeemed.append(row.skill_key)
+
+            written = _write_ledger(entity, _mark)
+            merit_after = int(written["merit"])
+            transaction.on_commit(
+                lambda: log_info(
+                    "church_skill_redeemed",
+                    context={"char": char_key, "skill": skill_key},
+                )
+            )
+    except ChurchLedgerError as error:
+        restore_attributes(entity, snapshots)
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER) from error
+    except Exception:
+        restore_attributes(entity, snapshots)
+        raise
+    return {
+        "outcome": "redeemed",
+        "row": row.skill_key,
+        "price": row.merit_price,
+        "merit": merit_after,
     }

@@ -547,14 +547,18 @@ def dispatch_phase_reaction(
                 # the church module's sole accrual primitive. The row's
                 # enrollment condition fails closed for the unenrolled, which
                 # keeps their climax settlement byte-identical.
-                from world.rules.church import add_merit
+                from world.rules.church import add_merit, scaled_merit_gain
                 from world.rules.church_rulebook import get_church_rules
 
                 accrual_key = rule.then["merit_gain"]
                 accrual = get_church_rules().accrual.get(accrual_key)
                 if accrual is None or "merit" not in accrual:
                     continue
-                add_merit(entity, int(accrual["merit"]))
+                # An owned church PASSIVE's merit_percent multiplier (e.g.
+                # vow_of_service +10%, design §5.5) scales the accrual
+                # through the church module's shared consumer; without the
+                # passive the bonus is zero and the credit is unchanged.
+                add_merit(entity, scaled_merit_gain(entity, int(accrual["merit"])))
 
 
 def _read_max_hp(entity: Any) -> Fraction | None:

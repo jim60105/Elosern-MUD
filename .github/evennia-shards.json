@@ -27,6 +27,7 @@
         "world.rules.tests.test_clock",
         "world.rules.tests.test_cmd_cast",
         "world.rules.tests.test_church_rulebook",
+        "world.rules.tests.test_church_redemption",
         "world.rules.tests.test_combat_modifiers",
         "world.rules.tests.test_combat_modifiers_matched",
         "world.rules.tests.test_combat_modifiers_self_arming",
