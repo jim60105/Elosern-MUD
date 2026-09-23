@@ -244,7 +244,7 @@ test("exploration target menu: shop navigate row carries openDrawer and no openS
    panel.interact = [
      {
        identity: 8,
-       display_name: "商人",
+       display_name: "測試店主",
        affordances: [
          { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
          { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },

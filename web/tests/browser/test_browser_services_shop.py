@@ -31,7 +31,10 @@ def _press(page, key, wait_ms=80):
 class ShopJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_open"
 
-    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement(
+        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
+        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        )
     def test_buy_quantity_validation_exact_copper(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -45,36 +48,58 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertGreater(unit_buy, 0)
         expected_wallet = panel["player"]["wallet"] - 2 * unit_buy
 
+        frame_before = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
         self._open_surface(page, "shop")
-        _press(page, "Enter")  # 貨架
-        _press(page, "Enter")  # first shelf buy row
-        # Quantity form: an oversized value is rejected before sending.
-        _press(page, "3", wait_ms=40)
-        _press(page, "0", wait_ms=40)
-        _press(page, "Enter", wait_ms=40)
-        page.wait_for_timeout(300)
+
+        # Zero dock-menu / dock-detail inside the shop drawer
+        hosted = page.evaluate(
+            """() => {
+              const drawer = document.querySelector('[data-testid="hud-drawer"]');
+              return {
+                menu: drawer.querySelectorAll('[data-testid="dock-menu"]').length,
+                detail: drawer.querySelectorAll('[data-testid="dock-detail"]').length,
+              };
+            }"""
+        )
+        self.assertEqual(hosted, {"menu": 0, "detail": 0})
+
+        # Router depth and trail unchanged across open
+        frame_open = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_open["depth"], frame_before["depth"])
+        self.assertEqual(frame_open["trail"], frame_before["trail"])
+
+        # Tab to the first stock row's quantity input
+        first_stock_input_sel = f'[data-testid="shop-panel__stock--{first_key}"] input.shop-row__qty'
+        self._tab_until_focused(page, first_stock_input_sel)
+
+        # Type an out-of-bounds value, Tab away
+        self._replace_focused_number(page, "30")
+        _press(page, "Tab")  # Tab away to the buy button
+
+        # Assert clamped display and zero shop.buy
+        clamped_val = page.evaluate(
+            f"() => document.querySelector('{first_stock_input_sel}').value"
+        )
+        self.assertEqual(clamped_val, str(shelf["buy"]["quantity"]["max"]))
         self.assertEqual(sent_action_count(page, "shop.buy"), 0)
-        # Cancel the form and re-enter a valid bounded quantity.
-        _press(page, "Escape", wait_ms=40)
-        _press(page, "Enter", wait_ms=40)  # first shelf buy row again
-        _press(page, "2", wait_ms=40)
-        _press(page, "Enter", wait_ms=40)
-        page.wait_for_timeout(500)
-        debug = page.evaluate(
-            """() => ({
-              sent: window.__elosernSent || [],
-              quantityOpen: document.querySelector('[data-testid=\"services-quantity\"]') !== null,
-              quantityValue: document.querySelector('[data-testid=\"services-quantity-value\"]')
-                ? document.querySelector('[data-testid=\"services-quantity-value\"]').textContent
-                : null,
-              depth: window.__elosernBridge.router.depth(),
-              current: window.__elosernBridge.router.currentItem() &&
-                       window.__elosernBridge.router.currentItem().label,
-            })"""
+
+        # Focus input again, replace with 2, Tab to buy button, Enter
+        page.locator(first_stock_input_sel).focus()
+        self._replace_focused_number(page, "2")
+        _press(page, "Tab")
+        first_buy_btn_sel = f'[data-testid="shop-panel__stock--{first_key}"] button.shop-row__buy'
+        active_is_buy = page.evaluate(
+            f"(sel) => document.activeElement && document.activeElement.matches(sel)",
+            first_buy_btn_sel,
         )
-        self.assertEqual(
-            debug["quantityOpen"], False, "quantity form must close on submit: %r" % (debug,)
-        )
+        if not active_is_buy:
+            self._tab_until_focused(page, first_buy_btn_sel)
+        _press(page, "Enter")
+
         self._wait_panel(page, lambda p: p["player"]["wallet"] == expected_wallet)
         self.assertEqual(sent_action_count(page, "shop.buy"), 1)
         sent = page.evaluate("window.__elosernSent || []")
@@ -86,9 +111,19 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(payload, {"item_key": first_key, "quantity": 2})
         self.assertEqual(self._services_panel(page)["player"]["wallet"], expected_wallet)
 
+        # Close drawer and verify router state unchanged
+        _press(page, "Escape")
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        frame_after = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_after["depth"], frame_before["depth"])
+        self.assertEqual(frame_after["trail"], frame_before["trail"])
+
     @covers_requirement(
         "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
         "webclient-contextual-hud::the-bag-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
     )
     def test_sell_and_repeated_inventory_without_use_control(self):
         page = self.logged_in_page()
@@ -115,14 +150,43 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(potion_row["held"], 1)
         wallet_before = panel["player"]["wallet"]
         expected_wallet = wallet_before + potion_row["sell_copper"]
+
+        frame_before = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
         self._open_surface(page, "shop")
-        _press(page, "ArrowRight")  # 販賣 (second grid column)
+
+        # Zero dock-menu / dock-detail inside the shop drawer
+        hosted = page.evaluate(
+            """() => {
+              const drawer = document.querySelector('[data-testid="hud-drawer"]');
+              return {
+                menu: drawer.querySelectorAll('[data-testid="dock-menu"]').length,
+                detail: drawer.querySelectorAll('[data-testid="dock-detail"]').length,
+              };
+            }"""
+        )
+        self.assertEqual(hosted, {"menu": 0, "detail": 0})
+        frame_open = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_open["depth"], frame_before["depth"])
+        self.assertEqual(frame_open["trail"], frame_before["trail"])
+
+        # Tab to potion's sellable row quantity input, set 1, activate 賣出
+        potion_input_sel = f'[data-testid="shop-panel__sellable--{potion}"] input.shop-row__qty'
+        self._tab_until_focused(page, potion_input_sel)
+        self._replace_focused_number(page, "1")
+        _press(page, "Tab")  # Tab to the sell button
+        potion_sell_btn_sel = f'[data-testid="shop-panel__sellable--{potion}"] button.shop-row__sell'
+        active_is_sell = page.evaluate(
+            f"(sel) => document.activeElement && document.activeElement.matches(sel)",
+            potion_sell_btn_sel,
+        )
+        if not active_is_sell:
+            self._tab_until_focused(page, potion_sell_btn_sel)
         _press(page, "Enter")
-        for _ in range(potion_index):
-            _press(page, "ArrowDown", wait_ms=40)
-        _press(page, "Enter")  # the potion sell row
-        _press(page, "1", wait_ms=40)
-        _press(page, "Enter", wait_ms=40)
+
         self._wait_panel(page, lambda p: p["player"]["wallet"] == expected_wallet)
         self.assertEqual(sent_action_count(page, "shop.sell"), 1)
         sent = page.evaluate("window.__elosernSent || []")
@@ -136,22 +200,17 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertNotIn(potion, rows)
         self.assertEqual(rows[staple]["held"], 2)
 
-        # make-inventory-drawer-frameless: the 背包 entry opens the bag
-        # drawer frameless. The drawer body is only its own three-section
-        # stack — the committed rows render as tiles, never as a hosted
-        # keyboard row region — and the router's frame stack is exactly the
-        # same around open+close. The close control closes the hosted 商店
-        # drawer first (its pop + re-home is unchanged behavior; the click is
-        # focus-independent), then the exploration root's 背包 entry (sixth
-        # grid cell) opens the bag.
+        # Close the shop drawer (frameless close)
         page.locator('[data-testid="hud-drawer-close"]').click()
         page.wait_for_timeout(120)
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
-        # Declarative pop (webclient-frame-resolution): closing the drawer
-        # pops exactly the hosted shop frame; the exploration frames opened
-        # on the way in (Interact -> target) remain and the pop restores
-        # focus to the navigate row. Keyboard back to the exploration root
-        # (Escape pops without dispatching) before using the 背包 entry.
+        frame_closed = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_closed["depth"], frame_before["depth"])
+        self.assertEqual(frame_closed["trail"], frame_before["trail"])
+
+        # Keyboard back to the exploration root (Escape pops without dispatching) before using the 背包 entry.
         sent_before_rehome = sent_action_count(page)
         deadline_depth = time.monotonic() + 10
         while (
@@ -224,8 +283,9 @@ class ShopJourneys(ServicesBrowserTest):
         # control is a bounded submenu/action row, never a dbref or a host
         # identity, and no submitted payload carries a host/branch/actor field.
         control_keys = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.dock-menu-item'))
-              .map((el) => el.getAttribute('data-item-key'))"""
+             """() => Array.from(
+                 document.querySelectorAll('[data-testid="hud-drawer"] button, [data-testid="hud-drawer"] input')
+               ).map((el) => el.getAttribute('data-item-key') || el.getAttribute('data-testid') || '')"""
         )
         host_like = [k for k in control_keys if k and "#" in k or (k and k.isdigit())]
         self.assertEqual(
@@ -251,25 +311,61 @@ class ShopJourneys(ServicesBrowserTest):
 class ShopClosedJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_closed"
 
-    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement(
+        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
+        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        )
     def test_closed_shop_disables_all_trades(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         self.assertFalse(panel["shop"]["open"])
 
-        self._open_surface(page, "shop")
-        _press(page, "Enter")  # 貨架
-        for _ in range(3):
-            _press(page, "Enter")
-        page.wait_for_timeout(400)
-        self.assertEqual(sent_action_count(page), 0)
-        stock = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.dock-menu-item'))
-              .map((el) => ({ key: el.getAttribute('data-item-key'),
-                              disabled: el.getAttribute('aria-disabled') === 'true' }))"""
+        frame_before = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
         )
-        disabled = [entry for entry in stock if entry["key"].startswith("stock-")]
-        self.assertTrue(disabled, "stock rows must render")
-        for entry in disabled:
-            self.assertTrue(entry["disabled"], "closed shop rows must be disabled")
+        self._open_surface(page, "shop")
+
+        # Zero dock-menu / dock-detail inside the shop drawer
+        hosted = page.evaluate(
+            """() => {
+              const drawer = document.querySelector('[data-testid="hud-drawer"]');
+              return {
+                menu: drawer.querySelectorAll('[data-testid="dock-menu"]').length,
+                detail: drawer.querySelectorAll('[data-testid="dock-detail"]').length,
+              };
+            }"""
+        )
+        self.assertEqual(hosted, {"menu": 0, "detail": 0})
+        frame_open = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_open["depth"], frame_before["depth"])
+        self.assertEqual(frame_open["trail"], frame_before["trail"])
+
+        # Assert every buy/sell button in the drawer is disabled with its reason and nothing is sent
+        buttons_state = page.evaluate(
+            """() => Array.from(
+                document.querySelectorAll('[data-testid="shop-panel"] button')
+              ).map((btn) => ({
+                text: btn.textContent.trim(),
+                disabled: btn.disabled,
+                reason: btn.closest('.shop-row')?.querySelector('.shop-row__reason')?.textContent.trim() || null,
+              }))"""
+        )
+        self.assertTrue(len(buttons_state) > 0, "shop must render buy/sell buttons")
+        for btn in buttons_state:
+            self.assertTrue(btn["disabled"], f"button {btn['text']} must be disabled when shop is closed")
+            self.assertTrue(bool(btn["reason"]), f"button {btn['text']} must render a disabled reason")
+
+        _press(page, "Enter")
+        page.wait_for_timeout(300)
+        self.assertEqual(sent_action_count(page), 0)
+
+        _press(page, "Escape")
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        frame_after = page.evaluate(
+            "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
+        )
+        self.assertEqual(frame_after["depth"], frame_before["depth"])
+        self.assertEqual(frame_after["trail"], frame_before["trail"])
