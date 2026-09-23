@@ -503,8 +503,14 @@ class TranslationEventTests(EvenniaTest):
         "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
     )
     def test_forward_default_failure_emits_one_bounded_event_and_still_settles(self):
+        # Forward default with no override: the shipped CTranslate2Backend
+        # resolves, but the model directory is unseeded, so the layout check
+        # raises art_translate_unavailable. The stage boundary maps every
+        # failure inside a backend call to art_translate_error (the seam's
+        # own contract), the worker emits one bounded event, and the record
+        # still settles with the authored prompt.
         subject = _subject("t_synth_translate_forward_default")
-        description = "引擎尚未安裝"
+        description = "模型尚未種子"
         ensure(subject, description)
         client = FakeSDWebUIClient()
         with override_settings(ART_TRANSLATE_ENABLED=True):
@@ -525,11 +531,14 @@ class TranslationEventTests(EvenniaTest):
                 "job": record_key(subject),
                 "subject": subject.full(),
                 "image_id": "",
-                "code": "art_translate_unavailable",
+                "code": "art_translate_error",
             },
         )
         self.assertIsInstance(failed[0].kwargs["exc"], TranslateError)
-        self.assertEqual(failed[0].kwargs["exc"].code, "art_translate_unavailable")
+        self.assertEqual(failed[0].kwargs["exc"].code, "art_translate_error")
+        cause = failed[0].kwargs["exc"].__cause__
+        self.assertIsInstance(cause, TranslateError)
+        self.assertEqual(cause.code, "art_translate_unavailable")
         self.assertEqual(client.calls, [(subject, description)])
 
     @covers_requirement(
