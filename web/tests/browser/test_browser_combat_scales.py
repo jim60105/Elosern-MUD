@@ -232,7 +232,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
-    @covers_requirement("webclient-desktop-shell::the-dock-s-row-region-and-detail-panes-are-direct-children-of-their-host")
+    @covers_requirement("webclient-desktop-shell::the-action-dock-s-row-region-and-detail-panes-are-direct-children-of-its-pane-host")
     def test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)

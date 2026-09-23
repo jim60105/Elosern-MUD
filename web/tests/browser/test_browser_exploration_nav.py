@@ -314,54 +314,47 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
 
     @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
-    def test_escape_from_quests_service_submenu_leaves_root_clean(self):
+    def test_escape_from_quests_drawer_leaves_root_clean(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Quests opens a re-homed services submenu; Escape must return to the
-        # exploration root without corrupting or re-rendering exploration
-        # cells (the shared-router regression).
-        # The desktop redesign re-homed Quests into the top navigation
-        # (webclient-desktop-shell, acd3790): the nav 任務 click submits the
-        # same committed navigation row (openServiceSubmenu: "quests") the
-        # old dock row carried, opening the quest drawer with the services
-        # sub-dock flag.
-        page.locator('.desktop-navigation button', has_text="任務").click()
-        self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
-            "services",
-            "the services dock must own the surface inside Quests",
+        focused_before = page.evaluate(
+            "window.__elosernBridge.router.currentItem() && "
+            "window.__elosernBridge.router.currentItem().key"
         )
-        _press(page, "Escape")
-        page.wait_for_timeout(120)
+
+        # Top-navigation 任務 click opens the quest drawer frameless
+        page.locator('.desktop-navigation button', has_text="任務").click()
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") == "quest")
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
             None,
-            "Escape must leave the services sub-dock",
+            "activeSubDock must stay null",
         )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "router depth must remain 1",
+        )
+        _press(page, "Escape")
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        self.assertEqual(sent_action_count(page), 0)
+
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
-        # H3 (design D5): the exploration root now includes the 建議 (suggestions)
-        # tab; the desktop redesign (webclient-exploration-menu, synced
-        # projection scenario) omits the character, quests, and inventory
-        # entries the top navigation owns, so the dock root is the
-        # capability-driven five-tab set.
         self.assertEqual(
             keys,
             ["move", "look", "interact", "wait", "suggestions"],
             "the exploration root cells must render after Escape from Quests",
         )
-        # The nav-opened surface has no dock opener row: the Escape re-home
-        # replaces the exploration root with its first row focused
-        # (stores/elosern.js replaceFrame(EXPLORATION_ROOT_DESCRIPTOR,
-        # {openerKey: null})).
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "move",
+            focused_before,
+            "router's focused item must be unchanged from before the open",
         )

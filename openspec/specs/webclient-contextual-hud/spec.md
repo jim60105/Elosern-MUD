@@ -983,32 +983,34 @@ sub-screen replaced.
 - **WHEN** the skill-book drawer opens with the `character` panel available
 - **THEN** its head carries a leading skill glyph and a `主動 {n} · 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
 
-### Requirement: A drawer hosting a dock frame renders that frame rather than a second navigation model
-When the keyboard router's current frame belongs to a surface that a drawer presents, that drawer
-SHALL be open and SHALL render that frame's rows through the same shared row renderer the dock uses,
-beside the surface's own presentation. The client SHALL NOT maintain a second frame stack, a second
-focus model, or a second set of menu keys for a drawer.
+### Requirement: Reference drawers present no router frame and never host a dock row region
+No reference drawer SHALL present a keyboard router frame. Opening any reference drawer — including the 背包 · 裝備 drawer from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, and the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row — SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer. No reference drawer body SHALL render the dock's row renderer (`dock-menu`) or detail pane (`dock-detail`) in any state. Closing a reference drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the control that opened it. Committed rows inside a reference drawer SHALL remain reachable by keyboard without a hosted router frame.
 
-Closing the drawer SHALL pop exactly one menu level, and leaving that surface by any path SHALL close
-the drawer, so no state exists in which such a frame is current while its drawer is closed. A drawer
-that presents no router frame SHALL open and close without touching the frame stack at all.
+A drawer SHALL be openable only while its backing payload is present. When the committed mode changes so that a drawer's payload is no longer available, when the presentation epoch resets, or when the transport is lost, every open drawer SHALL close and every local selection, quantity and confirmation state inside it SHALL be discarded.
 
-A drawer SHALL be openable only while its backing payload is present. When the committed mode changes
-so that a drawer's payload is no longer available, when the presentation epoch resets, or when the
-transport is lost, every open drawer SHALL close and every local selection, quantity and confirmation
-state inside it SHALL be discarded.
+#### Scenario: Opening the quest drawer from the guild clerk pushes no frame
+- **WHEN** the player activates the guild clerk's `navigate` affordance row inside an open target frame
+- **THEN** the 任務 drawer opens with the quest book and the guild counter, the router's current frame is still that target frame, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
 
-#### Scenario: A hosted frame renders inside its drawer
-- **WHEN** the player opens a service surface whose frame the router pushes
-- **THEN** the matching drawer opens, that frame's rows render inside it through the shared row renderer with the focused row marked and disabled rows focusable, and the dock renders no duplicate copy of those rows
+#### Scenario: Opening the bag or the shop pushes no frame
+- **WHEN** the player activates the top navigation's 背包 entry at the exploration root, or a merchant's shop `navigate` affordance row inside an open target frame
+- **THEN** the matching drawer opens, the router's current frame is the frame that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
 
-#### Scenario: Escape from a hosted frame pops exactly one level
-- **WHEN** a drawer is hosting a router frame and the player presses Escape
-- **THEN** exactly one menu level closes, the drawer closes with it, focus returns to the opener, and no action is dispatched
+#### Scenario: Keyboard reachability does not depend on a hosted list
+- **WHEN** a keyboard-only player moves through the open bag drawer, or moves into a shop stock row, types a quantity within its advertised bounds, and activates its buy control
+- **THEN** every committed inventory row is reachable through the focusable item tiles with the shared inspector, the shop row becomes the selected row carrying the quantity hooks and exactly one `shop.buy` is emitted with that row's `item_key` and quantity, and no parallel navigation list of those rows exists to traverse
 
-#### Scenario: A drawer with no frame leaves the router alone
-- **WHEN** the player opens the character-status drawer, which pushes no menu frame
-- **THEN** the router's frame stack is unchanged, and closing the drawer pops nothing
+#### Scenario: Opening the quest drawer from the top navigation pushes no frame
+- **WHEN** the player activates the top navigation's 任務 entry at any dock depth
+- **THEN** the dock returns to its root frame as for every top-navigation entry, the 任務 drawer opens, and the router's depth is 1 with no frame pushed by the open
+
+#### Scenario: No drawer renders the dock's row renderer
+- **WHEN** any reference drawer is open, including the quest drawer while a guild counter control or a quest-book row holds focus
+- **THEN** no `dock-menu` row region and no `dock-detail` pane exists inside the drawer, and the dock itself renders exactly the router's current frame
+
+#### Scenario: Closing a drawer pops nothing and returns focus
+- **WHEN** the open 任務 drawer closes by Escape, by its close control, or by the scrim
+- **THEN** the router's frame stack is exactly what it was right after the open, no action is dispatched, and focus returns to the control that opened it
 
 #### Scenario: A mode change closes the drawers it invalidates
 - **WHEN** the committed mode changes from exploration to combat while a services-backed drawer is open
@@ -1075,44 +1077,6 @@ The drawer SHALL remain available from its combat affordance when services v3 in
 #### Scenario: Reduced motion preserves action information
 - **WHEN** reduced motion is active and focus, inspector, confirmation, or warning state changes
 - **THEN** transitions are effectively instant while labels, reasons, focus, and committed item information remain available
-
-### Requirement: The bag drawer opens without a router frame and hosts no row region
-The 背包 · 裝備 drawer SHALL present no router frame. Activating a 背包 entry — the exploration root's row or the services sub-dock's row — SHALL open the drawer as a client-local open: the router's frame stack, current frame, breadcrumb, and menu keys SHALL be unchanged by the open, no sub-dock switch SHALL occur, and no drawer-hosted service surface SHALL be recorded. The drawer's available body SHALL present only its own committed-panel stack, and no hosted row container, listbox, or detail pane SHALL render inside it in any state. Closing the bag drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the 背包 entry that opened it. Committed inventory rows SHALL remain reachable by keyboard through the focusable item tiles and their shared inspector, and those tiles SHALL be the drawer's only row surface: the drawer SHALL NOT additionally render a navigation list of the same rows.
-
-#### Scenario: Opening the bag leaves the router unchanged
-- **WHEN** the player activates the 背包 entry from the exploration root or from the services sub-dock root
-- **THEN** the 背包 · 裝備 drawer opens, the router's current frame remains the root that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
-
-#### Scenario: The bag body carries no hosted row region
-- **WHEN** the bag drawer is open with the committed services and character panels available
-- **THEN** the drawer body contains the equipment, items, and money sections only, and no row listbox or detail pane renders inside it
-
-#### Scenario: Closing the bag pops nothing and returns focus
-- **WHEN** the open bag drawer closes by Escape, by its close control, or by the scrim
-- **THEN** focus returns to the 背包 entry that opened it and the router's frame stack is exactly what it was before the open
-
-#### Scenario: Keyboard reachability does not depend on the removed list
-- **WHEN** a keyboard-only player moves through the open bag drawer
-- **THEN** every committed inventory row is reachable through the focusable item tiles with the shared inspector, and no parallel navigation list of those rows exists to traverse
-
-### Requirement: The shop drawer opens without a router frame and hosts no row region
-The 商店 drawer SHALL present no router frame. Activating the 商店 entry — the exploration target frame's shop `navigate` affordance row — SHALL open the drawer as a client-local open: the router's frame stack, current frame, breadcrumb, and menu keys SHALL be unchanged by the open, no sub-dock switch SHALL occur, and no drawer-hosted service surface SHALL be recorded. The drawer's body SHALL present only the shop surface rendered from the committed `services` panel, and no hosted row container, listbox, or detail pane SHALL render inside it in any state. Closing the shop drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the 商店 entry that opened it. Every committed stock and sellable row SHALL render within the drawer body and SHALL support keyboard interaction through native focusable controls (Tab, typing, Enter) without touching the router.
-
-#### Scenario: Opening the shop leaves the router unchanged
-- **WHEN** the player activates the shop `navigate` affordance row inside an open merchant target frame
-- **THEN** the 商店 drawer opens, the router's current frame remains the frame that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
-
-#### Scenario: The shop body carries no hosted row region
-- **WHEN** the shop drawer is open with the committed services panel available, including while a stock or sellable row's controls hold focus
-- **THEN** the drawer body contains the shop surface only, and no `dock-menu` row region and no `dock-detail` pane renders inside it
-
-#### Scenario: Closing the shop pops nothing and returns focus
-- **WHEN** the open shop drawer closes by Escape, by its close control, or by the scrim
-- **THEN** focus returns to the 商店 entry that opened it, the router's frame stack is exactly what it was before the open, and no action is dispatched
-
-#### Scenario: A keyboard-only trade needs no router row
-- **WHEN** a keyboard-only player moves into a stock row of the open shop drawer, types a quantity within the row's advertised bounds into that row's quantity entry, and activates its buy control
-- **THEN** the row becomes the selected row carrying the quantity hooks, and exactly one `shop.buy` action is emitted with that row's `item_key` and the typed quantity through the client's single dispatch entry
 
 ### Requirement: The equipment doll renders only server-authored slots and drops nothing
 The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 · 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title. The doll SHALL lay out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels. The doll SHALL render the server's three singleton slots and one accessory summary as four named positions in the square grid. The main-hand, armor, and accessory-summary positions SHALL each render a fixed local SVG selected by its server-authored slot role; the off-hand position SHALL be the iconless position. The doll SHALL NOT select an item icon from an item key or display name. A singleton slot with no row SHALL render a visible named empty state with a dashed outline. An occupied singleton slot SHALL render its visible slot label in the grid and its committed display name in the 裝備描述 column; when the committed rows carry more than one row for a recognised singleton slot, the square position consumes only the first row and every further row for that slot SHALL render as a labelled overflow row, so no committed row is lost. The accessory summary SHALL render its visible label and committed item count, while every repeatable accessory row SHALL render in the 裝備描述 column's accessory group. Any slot key outside the recognised set SHALL render as a labelled fallback row rather than being discarded, so no row the payload sends is lost. When the committed rows carry no equipment at all the doll SHALL render only its visible empty statement.

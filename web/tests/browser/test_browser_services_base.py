@@ -69,9 +69,9 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             lambda s: ((s.get("panels") or {}).get("services") or {}).get("available") is True,
             timeout=timeout,
         )
-        # First step of the journey: open the reference drawer that hosts the
-        # service frame (H4 task 4.3). The body's own testid is then the
-        # drawer-body readiness gate.
+        # First step of the journey: verify the reference drawer is openable
+        # and renders its body (the quest drawer opens frameless and no longer
+        # hosts a router frame). The body's own testid is the readiness gate.
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
@@ -123,18 +123,15 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         KeyboardRouter.confirm façade member, so no pointer path and no OOB
         emission beyond the journey's own later steps).
         """
+        # Close any open drawer first so its scrim does not cover the stage or
+        # block the dock arrow walk.
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s && s.view && s.view.hudDrawer) s.closeHudDrawer({ popFrame: true }); }"
+        )
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         focus_action_dock(page)
         if surface_key == "inventory":
-            # The base class's `_wait_services_available` opened the quest
-            # drawer (H4 task 4.3); the scrim covers the stage while open, so
-            # the nav click must follow a close through the store's single
-            # close entry (the focus-trap makes raw key dispatch
-            # focus-dependent).
-            page.evaluate(
-                "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
-                "if (s) s.closeHudDrawer({ popFrame: true }); }"
-            )
-            wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
             # The desktop redesign re-homed the 背包 entry into the top
             # navigation (webclient-desktop-shell, acd3790): the dock root is
             # the capability-driven [move, look, interact, wait,
@@ -187,6 +184,18 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "description": "frameless shop drawer rendered",
                 },
             )
+        elif surface_key == "guild":
+            wait_for_store_state(
+                page,
+                lambda s: s.get("hudDrawer") == "quest",
+                dom_readiness={
+                    "selector": '[data-testid="quest-drawer"]',
+                    "predicate": (
+                        "() => !!document.querySelector('[data-testid=\"quest-drawer\"]')"
+                    ),
+                    "description": "frameless quest drawer rendered",
+                },
+            )
         return self._services_panel(page)
 
     def _tab_until_focused(self, page, selector, max_presses=30):
@@ -199,8 +208,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
             if matched:
                 return True
+        active_tag = page.evaluate(
+            "() => document.activeElement ? "
+            "(document.activeElement.getAttribute('data-testid') || document.activeElement.tagName) : 'none'"
+        )
         self.fail(
-            f"Tab did not reach element matching {selector} after {max_presses} presses"
+            f"Tab did not reach element matching {selector} after {max_presses} presses (landed on: {active_tag})"
         )
 
     def _replace_focused_number(self, page, value):

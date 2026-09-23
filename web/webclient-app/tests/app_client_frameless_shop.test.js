@@ -38,6 +38,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
           panels: {
             status: fx.statusPanel(),
             services: SERVICES_PANEL_SAMPLE,
+            context_actions: fx.explorationActions(),
             exploration: fx.explorationPanel({
               interact: [
                 {
@@ -99,23 +100,36 @@ describe("frameless 商店 drawer (composition contract)", () => {
     expect(store.serviceSurface).not.toBe("shop");
   });
 
-  it("the quest drawer still hosts its guild frame rows (regression)", async () => {
+  it("no drawer ever renders dock-menu or dock-detail inside hud-drawer, even with service descriptor forced current (task 4.3)", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    // Hosted-style navigation into guild frame
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.root", params: {} });
-    expect(store.focusItemByKey("guild")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.focusItemByKey("board")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    await wrapper.vm.$nextTick();
+    const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
+    const serviceDescriptors = [
+      { source: "services.guild", params: {} },
+      { source: "services.stock", params: {} },
+    ];
 
-    const drawer = wrapper.get('[data-testid="hud-drawer"]');
-    expect(drawer.find('[data-testid="quest-drawer"]').exists()).toBe(true);
-    expect(drawer.find('[data-testid="dock-menu"]').exists()).toBe(true);
+    for (const drawerName of drawers) {
+      for (const descriptor of serviceDescriptors) {
+        store.setActiveSubDock("services");
+        store.router.pushFrame(descriptor);
+        store.openHudDrawer(drawerName);
+        await wrapper.vm.$nextTick();
+
+        const drawer = wrapper.get('[data-testid="hud-drawer"]');
+        expect(drawer.findAll('[data-testid="dock-menu"]').length, `${drawerName} with ${descriptor.source}`).toBe(0);
+        expect(drawer.findAll('[data-testid="dock-detail"]').length, `${drawerName} with ${descriptor.source}`).toBe(0);
+
+        // The dock itself still renders exactly the router's current frame
+        const dock = wrapper.get('#action-dock');
+        expect(dock.find('[data-testid="dock-menu"]').exists(), `dock with ${descriptor.source}`).toBe(true);
+
+        store.closeHudDrawer();
+        await wrapper.vm.$nextTick();
+      }
+    }
   });
 });

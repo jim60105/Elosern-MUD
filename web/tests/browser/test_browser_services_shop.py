@@ -33,7 +33,7 @@ class ShopJourneys(ServicesBrowserTest):
 
     @covers_requirement(
         "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
         )
     def test_buy_quantity_validation_exact_copper(self):
         page = self.logged_in_page()
@@ -122,8 +122,7 @@ class ShopJourneys(ServicesBrowserTest):
 
     @covers_requirement(
         "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::the-bag-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
-        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
     )
     def test_sell_and_repeated_inventory_without_use_control(self):
         page = self.logged_in_page()
@@ -313,7 +312,7 @@ class ShopClosedJourneys(ServicesBrowserTest):
 
     @covers_requirement(
         "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::the-shop-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
         )
     def test_closed_shop_disables_all_trades(self):
         page = self.logged_in_page()

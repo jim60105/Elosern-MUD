@@ -377,16 +377,16 @@ In exploration mode the exploration dock SHALL own the action-dock surface and S
 - **THEN** exactly one menu level closes, the parent menu's cells render immediately, and the prior focused item is restored
 
 #### Scenario: Escape from a re-homed service or character sub-view leaves the exploration root clean
-- **WHEN** the player opens Character or a Quests/Inventory service submenu from the exploration root and presses Escape
-- **THEN** the sub-view closes without sending an action, the exploration root remains the dock's current frame, and no exploration submenu bookkeeping is corrupted or re-rendered
+- **WHEN** the player opens the Character, Quests, or Inventory drawer from the top navigation while the dock is at the exploration root and presses Escape
+- **THEN** the drawer closes without sending an action, the exploration root remains the dock's current frame with no sub-dock active, and no exploration submenu bookkeeping is corrupted or re-rendered
 
 #### Scenario: Disabled affordance explains without submitting
 - **WHEN** focus moves to a disabled `explore.engage` affordance and the player presses Enter
 - **THEN** its disabled reason remains readable and no `ui_action` message is emitted
 
 #### Scenario: Quests and Inventory reach the services submenus
-- **WHEN** the player opens Quests from the exploration root and the `services` panel is available
-- **THEN** the quest-log submenu renders from the unchanged `services` panel payload and its `guild.quest_*` actions
+- **WHEN** the player opens Quests from the top navigation and the `services` panel is available
+- **THEN** the 任務 drawer opens with the quest book rendered from the unchanged `services` panel payload and its `guild.quest_*` controls, no router frame is pushed by the open, and no `dock-menu` row region renders inside the drawer
 
 #### Scenario: The move frame navigates as a single-column list
 - **WHEN** the player presses the horizontal arrow keys while the move frame is open
@@ -427,7 +427,7 @@ Every exploration action SHALL pass the existing dispatcher's epoch, base revisi
 - **THEN** the new-epoch snapshot rebuilds the dock from canonical location, knowledge, and NPC state, the uncertain-result notice is shown, and no dialogue or mutation is automatically replayed
 
 ### Requirement: Exploration browser acceptance is keyboard-only and desktop-bounded
-The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; service submenus reachable through Quests/Inventory; and reconnect retention. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, SHALL assert that no take/drop control and no remote or ambiguous host control is rendered, and SHALL assert that `portrait_ref: null` produces no portrait card and no focus packet.
+The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; the 任務 and 背包 · 裝備 drawers reachable through Quests/Inventory without a service submenu frame; and reconnect retention. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, SHALL assert that no take/drop control and no remote or ambiguous host control is rendered, and SHALL assert that `portrait_ref: null` produces no portrait card and no focus packet.
 
 #### Scenario: A full exploration journey completes in Chromium
 - **WHEN** a seeded actor uses arrows and Enter to move through an exit, look at the room, talk to a scripted host, open Quests, and wait until dawn

@@ -81,7 +81,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
     @covers_requirement(
         "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully",
-        "webclient-contextual-hud::the-bag-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
     )
     def test_grid_renders_only_committed_rows_without_invented_total_or_rarity(self):
         page = self.logged_in_page()

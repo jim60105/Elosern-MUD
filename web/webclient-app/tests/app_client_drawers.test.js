@@ -422,8 +422,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
 
   // quest-drawer-split: the quest drawer away from any clerk. The real
   // player route — the 任務 top-navigation entry opens the
-  // services.quests frame and the
-  // drawer — must show the quest book (host-free) and the explicit
+  // quest drawer without a frame push — must show the quest book (host-free) and the explicit
   // clerk-needed marker in place of the counter, and tracking must dispatch
   // with no guild host present.
   it("opens the quest book away from any clerk and tracks from a row", async () => {
@@ -757,8 +756,10 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    }
 });
 
- it("closing guild-hosted quest drawer pops exactly one level (regression)", async () => {
+ it("closing quest drawer by Escape, close button, and scrim pops nothing, dispatches nothing, and restores focus", async () => {
    mountAppClient();
+   const sender = fx.createFakeSender();
+   store.setSender(sender);
    store.beginTransport(1);
    store.setConnected(true);
    store.receive(
@@ -769,25 +770,71 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
          mode: "exploration",
          panels: {
            status: fx.statusPanel(),
-           exploration: fx.explorationPanel(),
-           context_actions: fx.explorationActions(),
            services: SERVICES_PANEL_SAMPLE,
+           exploration: fx.explorationPanel({
+             interact: [
+               {
+                 identity: 7,
+                 display_name: "店長",
+                 portrait_ref: null,
+                 affordances: [
+                   { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+                   { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
+                 ],
+               },
+             ],
+           }),
          },
        }),
      ],
    );
    await wrapper.vm.$nextTick();
 
-   // Open guild quest log via top navigation
-   store.tabToRootAndConfirm("quests", "pointer");
-   await wrapper.vm.$nextTick();
-   expect(store.view.hudDrawer).toBe("quest");
-   const depthAtQuest = store.router.depth();
-
-   await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+   // Navigate to 店長 affordances
+   expect(store.focusItemByKey("interact")).toBe(true);
+   expect(store.focusConfirm()).toBe(true);
+   expect(store.focusItemByKey("target-7")).toBe(true);
+   expect(store.focusConfirm()).toBe(true);
    await wrapper.vm.$nextTick();
 
-    expect(store.view.hudDrawer).toBe(null);
-   expect(store.router.depth()).toBe(depthAtQuest - 1);
+   const depthBefore = store.router.depth();
+   const trailBefore = store.router.trail();
+
+   const closeRoutes = {
+     "close button": async () => {
+       await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+     },
+     "Escape": async () => {
+       await wrapper.get('[data-testid="hud-drawer"]').trigger("keydown", { key: "Escape" });
+     },
+     "scrim": async () => {
+       await wrapper.get('[data-testid="hud-drawer-scrim"]').trigger("click");
+     },
+   };
+
+   for (const [name, closeAction] of Object.entries(closeRoutes)) {
+     const actionsCountBefore = sender.sent.actions.length;
+
+     // Focus and activate service-guild
+     expect(store.focusItemByKey("service-guild")).toBe(true);
+     expect(store.focusConfirm()).toBe(true);
+     await wrapper.vm.$nextTick();
+
+     expect(store.view.hudDrawer, name).toBe("quest");
+     expect(wrapper.find('[data-testid="quest-drawer"]').exists(), name).toBe(true);
+     expect(store.router.depth(), name).toBe(depthBefore);
+     expect(store.view.activeSubDock, name).toBe(null);
+
+     await closeAction();
+     await wrapper.vm.$nextTick();
+
+     expect(store.view.hudDrawer, name).toBe(null);
+     expect(wrapper.find('[data-testid="hud-drawer"]').exists(), name).toBe(false);
+     expect(store.router.depth(), name).toBe(depthBefore);
+     expect(store.router.trail(), name).toEqual(trailBefore);
+     expect(store.view.activeSubDock, name).toBe(null);
+     expect(sender.sent.actions.length, name).toBe(actionsCountBefore);
+     expect(store.router.currentItem().key, name).toBe("service-guild");
+   }
  });
 });

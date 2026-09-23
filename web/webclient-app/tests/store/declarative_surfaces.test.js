@@ -98,14 +98,14 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(result.accepted).toBe(true);
   }
 
-  // Open the guild quest log through the top navigation.
+  // Open the quest drawer through the top navigation.
   function enterQuests() {
     store.tabToRootAndConfirm("quests", "pointer");
-    expect(store.router.currentDescriptor().source).toBe("services.quests");
+    expect(store.router.currentDescriptor().source).toBe("exploration.root");
     expect(store.view.hudDrawer).toBe("quest");
   }
 
-  // Walk into the guild surface via the 店長's navigate affordance.
+  // Open the quest drawer via the 店長's navigate affordance.
   function enterGuildSurface() {
     expect(store.focusItemByKey("interact")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
@@ -113,7 +113,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("service-guild")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
-    expect(store.router.currentDescriptor().source).toBe("services.guild");
+    expect(store.router.currentDescriptor().source).toBe("exploration.target");
     expect(store.view.hudDrawer).toBe("quest");
   }
 
@@ -124,100 +124,80 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     store.setSender(sender);
   });
 
-  describe("hosted-drawer coupling", () => {
-   it("closing a hosted drawer pops exactly one level", () => {
+  describe("frameless quest drawer", () => {
+    it("activating service-guild opens quest drawer leaving frame stack and depth unchanged", () => {
       openSession();
-     enterGuildSurface();
-     // Descend into the board frame
-     expect(store.focusItemByKey("board")).toBe(true);
+      expect(store.focusItemByKey("interact")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
-     expect(store.router.currentDescriptor().source).toBe("services.board");
+      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusConfirm()).toBe(true);
+
+      const depthBefore = store.router.depth();
+      const descriptorBefore = store.router.currentDescriptor();
+      const trailBefore = store.router.trail();
+
+      expect(store.focusItemByKey("service-guild")).toBe(true);
+      expect(store.focusConfirm()).toBe(true);
+
+      // Quest drawer opens without pushing a frame or recording a service surface
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.router.depth()).toBe(depthBefore);
+      expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+      expect(store.router.trail()).toEqual(trailBefore);
+      expect(store.view.activeSubDock).toBe(null);
+      expect(store.serviceSurface).toBe(null);
+
+      // A services-panel commit while the quest drawer is open never records a hosted surface or pushes a frame
+      const updateSnap = snapshot({ revision: 2 });
+      expect(store.receive(1, "ui_snapshot", [updateSnap], {}).accepted).toBe(true);
+
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.router.depth()).toBe(depthBefore);
+      expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+      expect(store.view.activeSubDock).toBe(null);
+      expect(store.serviceSurface).toBe(null);
+    });
+
+    it("tabToRootAndConfirm('quests') from depth > 1 pops to root and opens quest drawer with depth 1", () => {
+      openSession();
+      expect(store.focusItemByKey("interact")).toBe(true);
+      expect(store.focusConfirm()).toBe(true);
+      expect(store.router.depth()).toBe(2);
+
+      store.tabToRootAndConfirm("quests", "pointer");
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor().source).toBe("exploration.root");
+      expect(store.view.activeSubDock).toBe(null);
+    });
+
+    it("closing the quest drawer pops nothing and leaves the router unchanged", () => {
+      openSession();
+      enterGuildSurface();
       const depth = store.router.depth();
-     // Explicit close: the hosted board frame pops exactly one level, the
-     // drawer closes once.
+      const descriptor = store.router.currentDescriptor();
+
       expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
       expect(store.view.hudDrawer).toBe(null);
-      expect(store.router.depth()).toBe(depth - 1);
-     expect(store.router.currentDescriptor().source).toBe("services.guild");
+      expect(store.router.depth()).toBe(depth);
+      expect(store.router.currentDescriptor()).toEqual(descriptor);
       expect(sender.sent.actions.length).toBe(0);
     });
 
-    it("a committed panel removing the hosted surface closes the drawer through the settle", () => {
+    it("forced service frame settle-time hosting backward compatibility", () => {
       openSession();
-     enterGuildSurface();
-     expect(store.focusItemByKey("board")).toBe(true);
+      store.setActiveSubDock("services");
+      store.router.pushFrame({ source: "services.root", params: {} });
+      expect(store.focusItemByKey("guild")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
-     expect(store.router.currentDescriptor().source).toBe("services.board");
-      // The services panel goes away in the committed state: the settle pops
-     // the whole guild family back to the last resolvable exploration frame
-      // (the 店長 affordance menu still resolves), closes the drawer that
-     // lost its hosted frame.
-      const withoutServices = snapshot();
-      delete withoutServices.panels.services;
-      withoutServices.revision = 2;
-      expect(
-        store.receive(1, "ui_snapshot", [withoutServices], {}).accepted,
-      ).toBe(true);
-      expect(store.router.depth()).toBe(3);
-      expect(store.router.currentDescriptor().source).toBe("exploration.target");
-      expect(store.view.hudDrawer).toBe(null);
-    });
-
-    it("quest-detail loss pops to the hosted parent surface and keeps the drawer", () => {
-      openSession();
-      enterQuests();
-      // Enter the quest detail and its abandon confirmation.
-      expect(store.focusItemByKey("quest-0")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("services.quest-detail");
-      expect(store.focusItemByKey("quest-abandon-q_1042")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("services.confirm");
-      const depth = store.router.depth();
-      // The abandon row goes disabled in the committed panel: the confirm
-      // frame is unresolvable and pops back to the hosted quest-detail
-      // frame — the quest drawer stays open (same hosted surface).
-      store.receive(
-        1,
-        "ui_update",
-        [
-          fx.update({
-            revision: 2,
-            panels: {
-              services: servicesPanel({
-                guild: {
-                  quests: [
-                    {
-                      ...structuredClone(SERVICES_PANEL_SAMPLE.guild.quests[0]),
-                      abandon: {
-                        ...SERVICES_PANEL_SAMPLE.guild.quests[0].abandon,
-                        enabled: false,
-                        disabled_reason: { code: "quest_abandon_locked", message: "目前無法放棄任務" },
-                      },
-                    },
-                  ],
-                },
-              }),
-            },
-          }),
-        ],
-        {},
-      );
-      expect(store.router.depth()).toBe(depth - 1);
-      expect(store.router.currentDescriptor().source).toBe("services.quest-detail");
+      expect(store.router.currentDescriptor().source).toBe("services.guild");
       expect(store.view.hudDrawer).toBe("quest");
-    });
-
-    it("losing the whole hosted surface closes the drawer with its frame gone", () => {
-      openSession();
-      enterQuests();
       const withoutServices = snapshot();
       delete withoutServices.panels.services;
       withoutServices.revision = 2;
       expect(
         store.receive(1, "ui_snapshot", [withoutServices], {}).accepted,
       ).toBe(true);
-      expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
       expect(store.view.hudDrawer).toBe(null);
     });

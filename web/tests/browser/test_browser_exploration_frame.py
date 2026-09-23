@@ -77,7 +77,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         _press(page, "Enter")
 
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
-    @covers_requirement("webclient-desktop-shell::the-dock-s-row-region-and-detail-panes-are-direct-children-of-their-host")
+    @covers_requirement("webclient-desktop-shell::the-action-dock-s-row-region-and-detail-panes-are-direct-children-of-its-pane-host")
     def test_keyboard_move_charges_time_and_refreshes_map(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

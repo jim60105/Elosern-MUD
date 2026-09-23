@@ -128,7 +128,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     }
   });
 
-  it("keeps 公會 hosting intact and renders no row region in the bag after hosted-style navigation", async () => {
+  it("renders no row region in the quest drawer or bag drawer after hosted-style navigation", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
@@ -145,19 +145,19 @@ describe("frameless 背包 drawer (composition contract)", () => {
     await wrapper.vm.$nextTick();
     let drawer = wrapper.get('[data-testid="hud-drawer"]');
     expect(drawer.find('[data-testid="quest-drawer"]').exists()).toBe(true);
-    expect(drawer.find('[data-testid="dock-menu"]').exists()).toBe(true);
-    // The hosted drawer's close follows the declarative contract
-    // (webclient-services-combat-creation-frames): exactly one pop of the
-    // hosted 任務板 frame, the drawer closes once, and the hosted parent
-    // 公會 frame stays current with its sub-dock — no root re-home.
+    expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
+    expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
+    // Closing the quest drawer is frameless: no frame pop occurs, the drawer
+    // closes once, and the current frame stays current.
     const hostedDepth = store.router.depth();
     await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(store.router.depth()).toBe(hostedDepth - 1);
+    expect(store.router.depth()).toBe(hostedDepth);
     expect(store.view.activeSubDock).toBe("services");
-    expect(store.router.currentDescriptor().source).toBe("services.guild");
+    expect(store.router.currentDescriptor().source).toBe("services.board");
     // The player then escapes the remaining guild levels back to the root
     // before opening the bag from the top navigation.
+    store.router.popMenu();
     store.router.popMenu();
     store.router.popMenu();
     await wrapper.vm.$nextTick();

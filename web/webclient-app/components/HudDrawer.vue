@@ -29,11 +29,6 @@ const props = defineProps({
   // Optional leading head icon: a `dock-icons.js` glyph key. Unset (the
   // default) renders no icon — the other five drawers keep today's head.
   icon: { type: String, default: null },
-  // Optional body modifier class (e.g. `hud-drawer__body--dock` when the
-  // drawer hosts a dock service frame). The drawer root is a fragment while
-  // open (scrim + panel), so the modifier is threaded explicitly rather than
-  // left to attribute fallthrough (remove-redundant-dock-menu-layout).
-  bodyClass: { type: String, default: "" },
 });
 
 const emit = defineEmits(["close"]);
@@ -164,7 +159,7 @@ function onScrimClick() {
       <aside v-if="$slots.art" class="hud-drawer__art">
         <slot name="art" />
       </aside>
-      <div class="hud-drawer__body" :class="bodyClass">
+      <div class="hud-drawer__body">
         <slot />
       </div>
     </div>
