@@ -45,7 +45,7 @@ Conversion rules: integers for `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, the fou
 1000-to-60000 integer for `ART_SD_PROBE_TIMEOUT_MS`, an inclusive 5-to-3600 integer for
 `ART_SD_PROBE_CACHE_SECONDS`, an inclusive 10-to-1800 integer for
 `ART_REMBG_ALLOWANCE_SECONDS` (default `120`), an inclusive 0-to-256 integer for
-`ART_REMBG_THREADS` (default `0`, meaning the ONNX Runtime default thread count), and an
+`ART_REMBG_THREADS` (default `0`, meaning the ONNX Runtime default thread count), an
 inclusive 0-to-256 integer for `ART_TRANSLATE_THREADS` (default `0`, meaning the CTranslate2
 default thread count), and an
 inclusive 1-to-10 integer for `ELOSERN_MAX_CHARACTERS`
@@ -84,8 +84,7 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `ART_REMBG_ENABLED=False`, `ART_REMBG_MODEL="bria-rmbg"`,
   `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
   `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`, `ART_TRANSLATE_THREADS=0`,
-  `DEFEAT_ADULT_SCENES=True`, and
-  `MAX_NR_CHARACTERS=5`), and the server starts
+  `DEFEAT_ADULT_SCENES=True`, and `MAX_NR_CHARACTERS=5`), and the server starts
 
 #### Scenario: Valid overrides coerce to typed values
 - **WHEN** the settings module is imported with `ART_SD_PROBE_TIMEOUT_MS=2000` and
