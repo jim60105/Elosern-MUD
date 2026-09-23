@@ -47,16 +47,20 @@ def requirement_for(skill: SkillDef) -> TargetRequirement:
     """The targeting rule one skill definition states.
 
     ``forbid_self`` states the definition's own prohibition on targeting the
-    actor — every ``SEXUAL_ACT`` skill declares it (their SINGLE-target acts
-    are two-participant by construction), and the resolver merely enforces
-    the flag it is given. The derivation lives on the rules side so the
-    definition module never depends on this one; the resolver still consumes
-    the plain value, never the definition.
+    actor — every ``SEXUAL_ACT`` skill and sexual-ministry ``HOLY_RITE``
+    (``group="聖禮"``) declares it (their SINGLE-target acts are two-participant
+    by construction), and the resolver merely enforces the flag it is given.
+    The derivation lives on the rules side so the definition module never
+    depends on this one; the resolver still consumes the plain value, never
+    the definition.
     """
     return TargetRequirement(
         skill.target_spec,
         skill.faction_constraint,
-        forbid_self=skill.category is SkillCategory.SEXUAL_ACT,
+        forbid_self=(
+            skill.category is SkillCategory.SEXUAL_ACT
+            or (skill.category is SkillCategory.HOLY_RITE and skill.group == "聖禮")
+        ),
     )
 
 
