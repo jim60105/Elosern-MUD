@@ -14,7 +14,7 @@ Any NEW test module MUST be registered in exactly one `.github/evennia-shards.js
 
 ## 2. Lamb seal
 
-- [ ] 2.1 Implement `rite_lamb_mark` + `lamb_seal` narrowing in `monster_behaviour_policy` BEFORE target-strategy evaluation (single-target candidates narrow to seal-bearers; player-first-then-ascending-pk; AREA and positional markers untouched; ends with the fight). Tests: redirect over `lowest_hp` (and `highest_effective_power`), multi-seal canonical order, two-climaxes-lift, no-seal decision trace byte-identical. Annotate ID 1.
+- [x] 2.1 Implement `rite_lamb_mark` + `lamb_seal` narrowing in `monster_behaviour_policy` BEFORE target-strategy evaluation (single-target candidates narrow to seal-bearers; player-first-then-ascending-pk; AREA and positional markers untouched; ends with the fight). Tests: redirect over `lowest_hp` (and `highest_effective_power`), multi-seal canonical order, two-climaxes-lift, no-seal decision trace byte-identical. Annotate ID 1.
 
 ## 3. Martyrdom vow
 

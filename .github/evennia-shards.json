@@ -119,6 +119,7 @@
         "world.rules.tests.test_lore_knowledge",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",
+        "world.rules.tests.test_church_lamb_seal",
         "world.rules.tests.test_monster_behaviour_determinism",
         "world.rules.tests.test_monster_behaviour_golden",
         "world.rules.tests.test_monster_behaviour_integration",
