@@ -24,8 +24,8 @@
 
 ## 5. Specs and traceability
 
-- [ ] 5.1 Sync this change's deltas into the main specs, then edit the Purpose paragraphs of `openspec/specs/webclient-service-menus/spec.md` (drop "the keyboard service dock with bounded quantity forms and an abandon confirmation"; say the service surfaces render in frameless reference drawers with bounded quantity entries and an abandon confirmation) and `openspec/specs/webclient-frame-resolution/spec.md` (drop the services table and "drawer-follows-stack behavior").
-- [ ] 5.2 Re-anchor `webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families` in `web/tests/browser/test_browser_combat_menu.py` and `test_browser_creation_reset_draft.py` to the new "…combat and creation families" ID (from `uv run --locked python -m tools.spec_traceability list`), and update the `services.board` comment in `test_browser_exploration_frame.py`. Run `uv run --locked python -m tools.spec_traceability check` green.
+- [x] 5.1 Sync this change's deltas into the main specs, then edit the Purpose paragraphs of `openspec/specs/webclient-service-menus/spec.md` (drop "the keyboard service dock with bounded quantity forms and an abandon confirmation"; say the service surfaces render in frameless reference drawers with bounded quantity entries and an abandon confirmation) and `openspec/specs/webclient-frame-resolution/spec.md` (drop the services table and "drawer-follows-stack behavior").
+- [x] 5.2 Re-anchor `webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families` in `web/tests/browser/test_browser_combat_menu.py` and `test_browser_creation_reset_draft.py` to the new "…combat and creation families" ID (from `uv run --locked python -m tools.spec_traceability list`), and update the `services.board` comment in `test_browser_exploration_frame.py`. Run `uv run --locked python -m tools.spec_traceability check` green.
 
 ## 6. Validation
 

@@ -421,9 +421,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         # Degradation is data: an unregistered source and a lost identity
         # return the shared marker (null reason; no authored message here).
-        # (services.board is a REGISTERED source since the services/combat/
-        # creation family completed the table — it resolves to the
-        # board-empty frame here; the unregistered-source leg names a
+        # (services.* are UNREGISTERED sources since the keyboard service frames
+        # were retired — any services.* descriptor resolves to the shared marker;
+        # the unregistered-source leg names a
         # descriptor the table genuinely does not carry.)
         self.assertEqual(
             {"unresolvable": True, "reason": None},

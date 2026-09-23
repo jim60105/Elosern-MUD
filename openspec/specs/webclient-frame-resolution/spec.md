@@ -1,7 +1,7 @@
 # webclient-frame-resolution Specification
 
 ## Purpose
-Defines the store-owned frame resolver registry mapping frame descriptors to menus derived from committed presentation state at access time, with resolvers forbidden from reading cached or component state. Covers the finite exploration/services/combat/creation descriptor tables, verbatim dynamic rows against client-owned navigation rows, the shared degradation marker for unresolvable descriptors, router frames storing descriptors with focus tracked across re-resolution, stack pop and root-reason rules, status-driven suggestions frames, single-decision-point teardown, committed-state activation payloads, and drawer-follows-stack behavior.
+Defines the store-owned frame resolver registry mapping frame descriptors to menus derived from committed presentation state at access time, with resolvers forbidden from reading cached or component state. Covers the finite exploration/combat/creation descriptor tables, verbatim dynamic rows against client-owned navigation rows, the shared degradation marker for unresolvable descriptors, router frames storing descriptors with focus tracked across re-resolution, stack pop and root-reason rules, status-driven suggestions frames, single-decision-point teardown, and committed-state activation payloads.
 ## Requirements
 
 ### Requirement: Frame descriptors resolve to committed-state menus at access time
@@ -190,19 +190,19 @@ A row activation SHALL dispatch the server-authored action identifier and payloa
 - **WHEN** a player moves and then activates a move row in the refreshed frame
 - **THEN** the submitted `explore.move` carries the new room's `current_node` and the server accepts it, leaving the stale rejection unreachable by normal dock play
 
-### Requirement: The resolver table completes with the services, combat, and creation families
+### Requirement: The resolver table completes with the combat and creation families
 
-The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: services family (panel `services`) — `services.root` `{}`, `services.guild` `{}`, `services.board` `{}`, `services.quests` `{}`, `services.quest-detail` `{questIndex}`, `services.shop` `{}`, `services.stock` `{}`, `services.sell` `{}`, `services.confirm` `{questIndex}` (the abandon-confirmation frame derived from that quest row's server-authored confirm fields); combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. The table SHALL NOT implement a dialogue family: the committed dialogue panel has no dock frame; the caption's dialogue variant derives its rows directly from the committed panel through the shared view model without any descriptor. An out-of-range index or absent key SHALL resolve to the shared unresolvable marker like a lost identity.
+The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. The table SHALL NOT implement a services family: the committed `services` panel has no dock frame; every service surface renders in a frameless reference drawer or overlay. Any `services.*` descriptor is an unregistered source and resolves to the unresolvable marker. The table SHALL NOT implement a dialogue family: dialogue mode keeps the exploration root frame in the dock and presents its scripted picks in the narrative caption. Any `dialogue.*` descriptor is an unregistered source and resolves to the unresolvable marker.
 
 #### Scenario: Every completed-table source resolves from a live snapshot
 
-- **WHEN** each newly added source is resolved against a committed snapshot of its owning mode with valid params
+- **WHEN** each combat and creation source is resolved against a committed snapshot of its owning mode with valid params
 - **THEN** each returns the menu its migrated push site produced, with the same row keys, server-authored payloads, and titles
 
-#### Scenario: A vanished quest degrades like a lost identity
+#### Scenario: No services descriptor is registered
 
-- **WHEN** `services.quest-detail` resolves with a `questIndex` the committed services panel no longer lists
-- **THEN** resolve returns the unresolvable marker, carrying the panel's server-authored reason when present
+- **WHEN** any `services.*` descriptor (for example `services.guild` or `services.stock`) resolves against any committed state
+- **THEN** resolve returns the shared unresolvable marker (an unregistered source), and no router frame in any live mode ever holds a `services.*` descriptor
 
 #### Scenario: No dialogue descriptor is registered
 
