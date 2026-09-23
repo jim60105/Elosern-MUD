@@ -31,6 +31,7 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             "ART_REMBG_BACKEND",
             "ART_REMBG_MODEL_DIR",
             "ART_TRANSLATE_BACKEND",
+            "ART_TRANSLATE_MODEL_DIR",
         ]
         env = {
             "ART_SD_CLIENT": "os.system",
@@ -38,6 +39,7 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             "ART_REMBG_BACKEND": "os.system",
             "ART_REMBG_MODEL_DIR": "/tmp/env-override-rembg",
             "ART_TRANSLATE_BACKEND": "os.system",
+            "ART_TRANSLATE_MODEL_DIR": "/tmp/env-override-translate",
         }
         result = self._run(_settings_repr(names), **env)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
@@ -49,6 +51,7 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
                 "ART_REMBG_BACKEND",
                 "ART_REMBG_MODEL_DIR",
                 "ART_TRANSLATE_BACKEND",
+                "ART_TRANSLATE_MODEL_DIR",
             },
         )
         self.assertEqual(
@@ -74,6 +77,12 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             printed["ART_TRANSLATE_BACKEND"],
             repr("world.art.translate_ct2.CTranslate2Backend"),
         )
+        self.assertEqual(
+            printed["ART_TRANSLATE_MODEL_DIR"],
+            repr(os.path.join(REPO_ROOT, "server", ".translate")),
+            msg=printed["ART_TRANSLATE_MODEL_DIR"],
+        )
+        self.assertNotIn("env-override-translate", printed["ART_TRANSLATE_MODEL_DIR"])
 
     @covers_requirement(
         "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"

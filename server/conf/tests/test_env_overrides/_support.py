@@ -54,8 +54,10 @@ SIDEBAR_PATH = os.path.join(REPO_ROOT, "docs", "_sidebar.md")
 PROMPTS_DOC_PATH = os.path.join(REPO_ROOT, "docs", "gm", "prompts.md")
 
 
-# The env-backed inventory: 27 same-named variables plus the URL knob whose
-# variable name is fixed by the internal-art-worker spec.
+# The env-backed inventory: every entry maps a setting to the environment
+# variable it is derived from. All are same-named except the URL knob
+# (SD_WEBUI_BASE_URL, fixed by the internal-art-worker spec) and the character
+# cap (ELOSERN_MAX_CHARACTERS, the variable behind MAX_NR_CHARACTERS).
 ENV_BACKED: dict[str, str] = {
     "ART_SD_BASE_URL": "SD_WEBUI_BASE_URL",
     "ART_SD_TIMEOUT_SECONDS": "ART_SD_TIMEOUT_SECONDS",
@@ -85,6 +87,7 @@ ENV_BACKED: dict[str, str] = {
     "ART_REMBG_ALLOWANCE_SECONDS": "ART_REMBG_ALLOWANCE_SECONDS",
     "ART_REMBG_THREADS": "ART_REMBG_THREADS",
     "ART_TRANSLATE_ENABLED": "ART_TRANSLATE_ENABLED",
+    "ART_TRANSLATE_THREADS": "ART_TRANSLATE_THREADS",
     "ART_SCHEDULER_ENABLED": "ART_SCHEDULER_ENABLED",
     "ART_SCHEDULER_INTERVAL_SECONDS": "ART_SCHEDULER_INTERVAL_SECONDS",
     "ART_SCHEDULER_LIMIT": "ART_SCHEDULER_LIMIT",
@@ -124,6 +127,7 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_REMBG_ALLOWANCE_SECONDS": "120",
     "ART_REMBG_THREADS": "0",
     "ART_TRANSLATE_ENABLED": "False",
+    "ART_TRANSLATE_THREADS": "0",
     "ART_SCHEDULER_ENABLED": "True",
     "ART_SCHEDULER_INTERVAL_SECONDS": "30",
     "ART_SCHEDULER_LIMIT": "4",
@@ -187,6 +191,9 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("ART_REMBG_ALLOWANCE_SECONDS", "ART_REMBG_ALLOWANCE_SECONDS", "300", "300"),
     ("ART_REMBG_THREADS", "ART_REMBG_THREADS", "8", "8"),
     ("ART_TRANSLATE_ENABLED", "ART_TRANSLATE_ENABLED", "on", "True"),
+    ("ART_TRANSLATE_THREADS", "ART_TRANSLATE_THREADS", "0", "0"),
+    ("ART_TRANSLATE_THREADS", "ART_TRANSLATE_THREADS", "4", "4"),
+    ("ART_TRANSLATE_THREADS", "ART_TRANSLATE_THREADS", "256", "256"),
     ("ART_SCHEDULER_ENABLED", "ART_SCHEDULER_ENABLED", "0", "False"),
     ("ART_SCHEDULER_INTERVAL_SECONDS", "ART_SCHEDULER_INTERVAL_SECONDS", "15", "15"),
     ("ART_SCHEDULER_LIMIT", "ART_SCHEDULER_LIMIT", "8", "8"),
@@ -243,6 +250,9 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ART_REMBG_MODEL", "segment-anything", "expected one of bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp (case-insensitive)"),
     ("ART_REMBG_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
     ("ART_TRANSLATE_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
+    ("ART_TRANSLATE_THREADS", "-1", "expected an integer between 0 and 256"),
+    ("ART_TRANSLATE_THREADS", "257", "expected an integer between 0 and 256"),
+    ("ART_TRANSLATE_THREADS", "twelve", "expected an integer between 0 and 256"),
 ]
 
 

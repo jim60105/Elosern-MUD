@@ -61,6 +61,7 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn("ART_REMBG_BACKEND", call_string_args)
         self.assertNotIn("ART_REMBG_MODEL_DIR", call_string_args)
         self.assertNotIn("ART_TRANSLATE_BACKEND", call_string_args)
+        self.assertNotIn("ART_TRANSLATE_MODEL_DIR", call_string_args)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
