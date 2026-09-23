@@ -39,6 +39,10 @@ class RejectReason(StrEnum):
     TIME_COST_LOOKUP_FAILED = "time_cost_lookup_failed"
     UNSNAPSHOTTED_EFFECT_SURFACE = "unsnapshotted_effect_surface"
     COMMIT_FAILED = "commit_failed"
+    RITE_NOT_ENROLLED = "rite_not_enrolled"
+    RITE_COOLDOWN_ACTIVE = "rite_cooldown_active"
+    RITE_OUTSIDE_VENUE = "rite_outside_venue"
+    RITE_ALREADY_SHELTERED = "rite_already_sheltered"
 
 
 
@@ -146,6 +150,7 @@ SNAPSHOTTED_SURFACES = frozenset(
         "inventory",
         "reward_claims",
         "action_evidence",
+        "church",
     }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}

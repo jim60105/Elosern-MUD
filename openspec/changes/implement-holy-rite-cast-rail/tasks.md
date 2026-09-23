@@ -3,20 +3,20 @@
 
 ## 1. Grammar + surfaces
 
-- [ ] 1.1 Add `RiteBlessingEffect(buff_key)` (single-argument parse helper) and the bare
+- [x] 1.1 Add `RiteBlessingEffect(buff_key)` (single-argument parse helper) and the bare
       `RiteShelterEffect` marker to the parser package `world/skills/effects/` (`parser.py`'s
       dispatch chain, dataclasses where its siblings live), admit both prefixes in
       `parse_effect`'s closed set, and cover the grammar scenarios (payload on the bare prefix and
       bare/empty/multi-segment on the buff prefix fail closed).
-- [ ] 1.2 Add `"church"` to `SNAPSHOTTED_SURFACES` in `world/rules/action/contracts.py`, declare the
+- [x] 1.2 Add `"church"` to `SNAPSHOTTED_SURFACES` in `world/rules/action/contracts.py`, declare the
       four `RITE_*` `RejectReason` values, and add their fixed zh-TW lines to
       `world/rules/player_messages.py`.
-- [ ] 1.2b Add the `"church"` branch to `_snapshot_touched`/`_restore_touched` in
+- [x] 1.2b Add the `"church"` branch to `_snapshot_touched`/`_restore_touched` in
       `world/rules/action/transaction.py` in the wallet/inventory shape
       (`_attribute_snapshot(obj, "church")` / `_restore_attribute`) — membership in the surface set
       alone does NOT snapshot or restore anything (duck B1). Do NOT touch `transaction.py`'s
       `_ENTITY_SURFACES` frozenset (a different, same-named seam: the entity-aggregate gate).
-- [ ] 1.3 Add `("church", None)` to `_ENTITY_SURFACES` in `world/rules/cast_settlement.py`; verify
+- [x] 1.3 Add `("church", None)` to `_ENTITY_SURFACES` in `world/rules/cast_settlement.py`; verify
       the offering rail's explicit `church` snapshot stays idempotent under key-merge.
 
 ## 2. Handlers + registry
