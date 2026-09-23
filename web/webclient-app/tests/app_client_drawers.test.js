@@ -422,8 +422,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
 
   // quest-drawer-split: the quest drawer away from any clerk. The real
   // player route — the 任務 top-navigation entry opens the
-  // services.quests frame and the
-  // drawer — must show the quest book (host-free) and the explicit
+  // quest drawer without a frame push — must show the quest book (host-free) and the explicit
   // clerk-needed marker in place of the counter, and tracking must dispatch
   // with no guild host present.
   it("opens the quest book away from any clerk and tracks from a row", async () => {
