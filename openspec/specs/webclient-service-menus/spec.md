@@ -239,11 +239,11 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost browser suite SHALL exercise, using keyboard controls at 1440x900 and 1280x720, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. Exploration guild service submenus SHALL retain their existing roots and drawer-hosted shared row renderer in this change; the shop surface SHALL be exercised through its frameless drawer's native controls driven by keyboard. The journeys SHALL assert the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and bounded drawer dimensions.
+The managed localhost browser suite SHALL exercise, using keyboard controls at 1440x900 and 1280x720, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. The guild services SHALL be reached through the frameless quest drawer and the shop through the frameless shop drawer; neither drawer SHALL render a `dock-menu` or `dock-detail` element in any journey. The journeys SHALL assert the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and bounded drawer dimensions.
 
 #### Scenario: Guild board journey completes in Chromium
-- **WHEN** a seeded registered member uses arrows and Enter to reach and accept an eligible board offer
-- **THEN** exactly one expected quest action is submitted and refreshed quest state appears without typed input
+- **WHEN** a seeded registered member opens the quest drawer from the guild clerk's navigate row and uses Tab and Enter to reach and activate an eligible board offer's accept control
+- **THEN** exactly one expected quest action is submitted, refreshed quest state appears in the quest book without typed input, and no `dock-menu` or `dock-detail` element renders inside the drawer at any step
 
 #### Scenario: Shop buy journey completes by keyboard in the frameless drawer
 - **WHEN** a player opens the shop drawer from the merchant's navigate row, Tabs to the first stock row's quantity entry, types a quantity above the row's advertised maximum and Tabs away, then replaces it with a quantity within bounds, Tabs to the row's buy control, and presses Enter
@@ -262,7 +262,7 @@ The managed localhost browser suite SHALL exercise, using keyboard controls at 1
 - **THEN** singleton replacement dispatches once, five accessories can be equipped, a sixth refuses with the committed warning without dispatch, and the showcase renders the capped state
 
 #### Scenario: Minimum viewport retains service essentials
-- **WHEN** shop or bag is open at 1280x720 with a disabled action focused
+- **WHEN** shop, quest, or bag is open at 1280x720 with a disabled action focused
 - **THEN** committed values, disabled reason, controls, and close path remain readable and operable without overlap
 
 #### Scenario: No service surface is mounted while its drawer is closed

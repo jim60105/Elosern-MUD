@@ -74,16 +74,18 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::a-drawer-hosting-a-dock-frame-renders-that-frame-rather-than-a-second-navigation-model"
+        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region"
     )
-    def test_drawer_hosts_router_frame_no_second_nav_model(self):
-        # The store-level invariant: no state where a service frame is current
-        # while its drawer is closed; closing the drawer pops exactly one menu
-        # level. The drawer renders the frame's rows through the dock's shared
-        # row renderer (AppClient wires DockMenu into the drawer body).
+    def test_reference_drawers_frameless_no_dock_region(self):
+        # Reference drawers present no router frame: opening any reference
+        # drawer pushes no frame and switches no sub-dock, closing pops nothing,
+        # and no drawer body renders dock-menu or dock-detail.
         _assert_vitest_passes(
-            _run_vitest(TESTS_DIR / "store" / "hud_drawer.test.js"),
-            "drawer hosts the router frame",
+            _run_vitest(
+                TESTS_DIR / "store" / "hud_drawer.test.js",
+                TESTS_DIR / "app_client_frameless_shop.test.js",
+            ),
+            "reference drawers present no router frame and never host a dock row region",
         )
 
     @covers_requirement(

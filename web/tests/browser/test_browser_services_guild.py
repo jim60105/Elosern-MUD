@@ -36,6 +36,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
     SERVICES_MODE = "guild_hall"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_register_and_idempotent_reregister(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -43,10 +44,15 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self.assertFalse(panel["player"]["guild_registered"])
 
         self._open_guild_menu(page)
-        _press(page, "Enter")  # register row
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="guild-counter__register"]')
+        _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
         self.assertEqual(sent_action_count(page, "guild.register"), 1)
         self.assertEqual(self._services_panel(page)["player"]["guild_rank"], "F")
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
         # A stale/replayed client re-submits the empty payload; the server is
         # idempotent and returns the original record without replacing it.
@@ -57,14 +63,16 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self.assertEqual(self._services_panel(page)["player"]["wallet"], 1000)
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_viewport_1280x720_keeps_controls_visible(self):
         page = self.logged_in_page((1280, 720))
         panel = self._wait_services_available(page)
         self._open_guild_menu(page)
-        controls = page.locator(".dock-menu-item")
-        self.assertGreaterEqual(controls.count(), 1)
-        for index in range(controls.count()):
-            self.assertTrue(controls.nth(index).is_visible())
+        self.assertTrue(page.locator('[data-testid="quest-drawer"]').is_visible())
+        self.assertTrue(page.locator('[data-testid="guild-counter"]').is_visible())
+        self.assertTrue(page.locator('[data-testid="guild-counter__register"]').is_visible())
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
         # H4 (task 9.2): the heading is now the open reference drawer's own
         # title (the `#panel-right` reference panels were emptied into drawers).
         heading = page.locator(".hud-drawer__title")
@@ -75,6 +83,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
     SERVICES_MODE = "guild_registered_board"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_board_list_to_accept(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -82,8 +91,9 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["board_total"], 1)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "Enter")
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="guild-counter__accept"]')
         _press(page, "Enter")  # accept the eligible offer row
         self._wait_panel(page, lambda p: p["pagination"]["quest_total"] == 1)
         self.assertEqual(sent_action_count(page, "guild.quest_accept"), 1)
@@ -94,26 +104,22 @@ class GuildBoardJourneys(ServicesBrowserTest):
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_accept"
         )
         self.assertEqual(payload, {"definition_key": guild_offer_quest_key()})
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
-    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     def test_board_frame_refreshes_on_committed_update(self):
-        """Declarative-frame freshness: an open board frame re-resolves its
-        rows from the NEXT committed panel — no re-push, no copy.
-
-        A partial ``ui_update`` replaces only the ``services`` panel with a
-        renamed offer row. The committed panel is not the frame's data: the
-        board frame's next read enumerates the updated label with the row's
-        payload untouched, and no action is dispatched by the injection.
-        """
+        """The guild counter's board re-renders on a committed update."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         self.assertEqual(panel["pagination"]["board_total"], 1)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "Enter")  # open the board frame (hosted by the drawer)
         old_name = panel["guild"]["board"][0]["display_name"]
+        board_row = page.locator(f'[data-testid="guild-counter__board-row--{guild_offer_quest_key()}"]')
+        self.assertTrue(board_row.is_visible())
+        self.assertIn(old_name, board_row.inner_text())
         before = page.evaluate("() => window.__elosernBridge.router.depth()")
         sent_before = len([m for m in outbound_messages(page) if m[0] == "ui_action"])
 
@@ -121,28 +127,22 @@ class GuildBoardJourneys(ServicesBrowserTest):
         new_name = "新增任務委託"
         updated["guild"]["board"][0]["display_name"] = new_name
         inject_update(page, {"services": updated})
-
-        rows = page.evaluate(
-            "() => window.__elosernBridge.router.currentMenu().items.map("
-            "(i) => ({ key: i.key, label: i.label, payload: i.payload }))"
-        )
-        offer = [row for row in rows if row["key"] == "board-0"]
-        self.assertEqual(len(offer), 1, rows)
-        self.assertEqual(offer[0]["label"], new_name)
-        self.assertNotEqual(offer[0]["label"], old_name)
-        self.assertEqual(offer[0]["payload"], {"definition_key": guild_offer_quest_key()})
-        # The frame stayed exactly where it was, and the injection dispatched
-        # nothing.
+        page.wait_for_timeout(200)
+        self.assertIn(new_name, board_row.inner_text())
+        self.assertNotIn(old_name, board_row.inner_text())
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), before)
         self.assertEqual(
             len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
         )
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
 
 class GuildQuestJourneys(ServicesBrowserTest):
     SERVICES_MODE = "guild_active_quest"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_abandon_requires_confirmation(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -150,106 +150,52 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["quest_total"], 1)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "ArrowDown")  # exam_start (second grid row)
-        _press(page, "ArrowLeft")  # quests (second grid row, first column)
-        _press(page, "Enter")
-        _press(page, "Enter")  # the quest row
-        _press(page, "ArrowRight")  # 放棄 (second grid column)
-        _press(page, "Enter")  # open confirmation screen
-        page.wait_for_timeout(400)
-        # No mutation may be sent before the explicit confirmation.
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="quest-log__abandon"]')
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 0)
-        confirm = page.locator(".services-confirm")
-        self.assertEqual(confirm.count(), 1, "abandon confirmation screen must render")
+
+        # Reveal confirmation
+        _press(page, "Enter")
+        page.wait_for_selector('[data-testid="quest-log__abandon-confirm"]', timeout=5000)
+        self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 0)
+
+        # Confirm abandon
+        self._tab_until_focused(page, '[data-testid="quest-log__abandon-confirm-yes"]')
         _press(page, "Enter")  # 確認放棄
         self._wait_panel(page, lambda p: p["guild"]["quests"][0]["state"] == "failed")
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 1)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
-    @covers_requirement("webclient-frame-resolution::a-drawer-follows-the-stack-when-its-hosted-frame-pops")
-    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
-    def test_quest_drawer_closes_with_the_hosted_frame(self):
-        """Drawer coupling: quest loss pops the detail frame to the hosted
-        parent (drawer KEPT); losing the whole hosted surface closes the
-        drawer with its frame gone and its component-local state discarded.
-
-        Injection 1 removes the quest: the quest-detail descriptor becomes
-        unresolvable and pops exactly one level to the hosted `services.quests`
-        frame — the quest drawer stays open. Injection 2 withdraws the whole
-        services panel: the cascade pops every services frame back to the
-        exploration root, and the settle-driven hosting watcher closes the
-        drawer whose hosted frame is gone (the drawer body unmounts, which is
-        where the selection and confirmation state live).
-        """
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    def test_quest_vanishes_book_drops_row_drawer_stays_open(self):
+        """Frameless drawer retention: when a committed update removes a quest,
+        the quest book drops the row and the drawer stays open without a frame pop."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         self.assertEqual(panel["pagination"]["quest_total"], 1)
 
-        # root -> interact -> target -> keywords -> services.guild -> quests
-        # -> quest-detail, mirroring the abandon journey's navigation up to
-        # the detail frame (the confirmation step is NOT opened).
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "ArrowDown")  # exam_start (second grid row)
-        _press(page, "ArrowLeft")  # quests (second grid row, first column)
-        _press(page, "Enter")  # quests frame
-        _press(page, "Enter")  # the quest row -> hosted quest-detail frame
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
-            "services.quest-detail",
-        )
+        self.assertEqual(page.locator('[data-testid^="quest-log__row--"]').count(), 1)
         self.assertEqual(store_state(page)["hudDrawer"], "quest")
         depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
-        sent_before = len([m for m in outbound_messages(page) if m[0] == "ui_action"])
 
-        # Injection 1: the quest disappears from the committed panel.
+        # Injection: the quest disappears from the committed panel.
         updated = self._services_panel(page)
         updated["guild"]["quests"] = []
         updated["pagination"]["quest_total"] = 0
         inject_update(page, {"services": updated})
 
-        # One level down: the hosted parent surface stands, drawer kept.
-        current = page.evaluate(
-            "() => window.__elosernBridge.router.currentDescriptor()"
-        )
-        self.assertEqual(current["source"], "services.quests")
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.depth()"),
-            depth_before - 1,
-        )
+        # The quest row drops from the book, and the drawer stays open at unchanged depth.
+        page.wait_for_selector('[data-testid="quest-log__empty"]', timeout=5000)
+        self.assertEqual(page.locator('[data-testid^="quest-log__row--"]').count(), 0)
         self.assertEqual(store_state(page)["hudDrawer"], "quest")
-
-        # Injection 2: the whole hosted surface is withdrawn.
-        inject_update(
-            page,
-            {
-                "services": {
-                    "schema_version": 4,
-                    "available": False,
-                    "reason": {
-                        "code": "registry_unavailable",
-                        "message": "服務暫不可用。",
-                    },
-                }
-            },
-        )
-        wait_for_store_state(
-            page,
-            lambda s: s.get("hudDrawer") is None
-            and (s.get("panels") or {}).get("services", {}).get("available") is False,
-        )
-        current = page.evaluate(
-            "() => window.__elosernBridge.router.currentDescriptor()"
-        )
-        self.assertTrue(current["source"].startswith("exploration"), current)
-        # The drawer's frame is gone, so no open drawer renders a service
-        # surface: the body unmounts (discarding its local state with it).
-        self.assertEqual(page.locator('[data-testid="quest-drawer"]').count(), 0)
-        # Neither pop dispatched anything.
-        self.assertEqual(
-            len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
-        )
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
     @covers_requirement(
         "webclient-service-menus::the-quest-drawer-separates-the-player-s-quest-book-from-the-guild-counter",
@@ -279,6 +225,7 @@ class GuildTurninJourneys(ServicesBrowserTest):
     SERVICES_MODE = "guild_completed_quest"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_completed_quest_turnin(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -290,12 +237,9 @@ class GuildTurninJourneys(ServicesBrowserTest):
         wallet_after = 1000 + guild_offer_reward_copper()
 
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "ArrowDown")  # exam_start (second grid row)
-        _press(page, "ArrowLeft")  # quests (second grid row, first column)
-        _press(page, "Enter")
-        _press(page, "Enter")  # the quest row
-        _press(page, "ArrowDown")  # 回報 (first column, second row)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="quest-log__turnin"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["wallet"] == wallet_after)
         self.assertEqual(sent_action_count(page, "guild.quest_turnin"), 1)
@@ -306,12 +250,15 @@ class GuildTurninJourneys(ServicesBrowserTest):
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_turnin"
         )
         self.assertEqual(payload, {"quest_id": f"{guild_offer_quest_key()}:1"})
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
 
 class GuildExamJourney(ServicesBrowserTest):
     SERVICES_MODE = "guild_exam"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
     def test_exam_eligibility_transitions_into_combat(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -325,8 +272,9 @@ class GuildExamJourney(ServicesBrowserTest):
         self.assertTrue(panel["guild"]["rank"]["eligible"])
 
         self._open_guild_menu(page)
-        _press(page, "ArrowRight")  # board (second grid column)
-        _press(page, "ArrowDown")  # exam_start (second grid row, second column)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="guild-counter__exam"]')
         _press(page, "Enter")
         # The exam transitions the shell into the ordinary combat menu and the
         # services dock must tear down.

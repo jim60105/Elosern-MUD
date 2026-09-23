@@ -72,24 +72,35 @@ class QuestBookAwayFromClerkJourneys(ServicesBrowserTest):
 
 class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
     """H4 (task 9.4): the keyboard service journeys complete with arrows +
-    Enter, the service frame renders inside the reference drawer, and the
+    Enter, the frameless quest drawer renders the counter, and the
     emitted payloads are unchanged."""
 
     SERVICES_MODE = "guild_hall"
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
-    def test_keyboard_service_journey_frames_render_inside_drawer(self):
+    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    def test_keyboard_service_journey_frameless_drawer(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         self.assertFalse(panel["player"]["guild_registered"])
 
-        # The gate already opened the reference (quest) drawer. Drive the
-        # registration journey with arrow keys + Enter only.
+        depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        trail_before = page.evaluate("() => window.__elosernBridge.router.trail()")
+
         self._open_guild_menu(page)
-        _press(page, "Enter")  # register row
-        self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
-        self.assertEqual(sent_action_count(page, "guild.register"), 1)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before
+        )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.trail()"), trail_before
+        )
+        self.assertEqual(
+            page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0
+        )
+        self.assertEqual(
+            page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0
+        )
 
         # The service frame (quest-drawer) renders inside the reference drawer
         # (H4: the right-column panels were emptied into drawers).
@@ -102,24 +113,19 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
         )
         self.assertTrue(inside_drawer, "the guild service frame renders inside the open reference drawer")
 
-        # remove-redundant-dock-menu-layout: the drawer body that hosts the
-        # service frame is itself the split owner — the row region (`.dock-menu`)
-        # and the surface are direct children of `.hud-drawer__body--dock`, with
-        # no component-level layout wrapper between the body and either child.
-        drawer_split = page.evaluate(
-            """() => {
-              const body = document.querySelector('.hud-drawer__body');
-              const list = document.querySelector('.dock-menu');
-              const surface = document.querySelector('[data-testid="quest-drawer"]');
-              if (!body || !list || !surface) return false;
-              return body.classList.contains('hud-drawer__body--dock')
-                && list.parentElement === body
-                && surface.parentElement === body;
-            }"""
+        self._tab_until_focused(page, '[data-testid="guild-counter__register"]')
+        _press(page, "Enter")
+        self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
+        self.assertEqual(sent_action_count(page, "guild.register"), 1)
+
+        # Close drawer and verify depth and trail are still unchanged
+        _press(page, "Escape")
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before
         )
-        self.assertTrue(
-            drawer_split,
-            "the drawer-hosted row region and surface are direct children of the drawer body",
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.trail()"), trail_before
         )
 
         # The emitted payload is unchanged: the exact server-authored
