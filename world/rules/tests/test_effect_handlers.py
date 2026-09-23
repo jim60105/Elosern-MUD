@@ -127,6 +127,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "inventory",
                     "reward_claims",
                     "action_evidence",
+                    "church",
                 }
             ),
         )
