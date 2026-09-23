@@ -176,16 +176,20 @@ class ContainerContractTests(unittest.TestCase):
 
     @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
     def test_the_translation_model_cache_is_an_operator_seeded_volume_never_an_image_layer(self):
-        # art-prompt-translation: the translation model is operator-seeded into
-        # a persistent named volume (code-only ART_TRANSLATE_MODEL_DIR) and the
-        # server performs NO fetch for it (design D2) — unlike the rembg cache,
-        # an empty volume is a bounded unavailable, not a download. This is a
+        # art-prompt-translation: the translation model lives in a persistent
+        # named volume (code-only ART_TRANSLATE_MODEL_DIR). Following the
+        # dual-track download policy (add-translate-model-download-policy), the
+        # volume is filled at run time only by the backend's lazy first-use
+        # fetch when ART_TRANSLATE_DOWNLOAD_ENABLED=true, or pre-seeded by the
+        # operator with scripts/fetch-translate-model.sh when air-gapped; an
+        # empty volume is a bounded unavailable on either track. This is a
         # STATIC source-level contract test: compose declares the volume and no
         # fetch service, the Containerfile prepares the path root:0
         # group-writable and VOLUME-declares it, and server/.translate/ is
         # excluded from the build context so no locally seeded artifact can
-        # enter an image layer. The layer-level artifact absence itself is
-        # verified at build time (task 7.2: podman save inspection), not here.
+        # enter an image layer — the image itself carries no model on either
+        # track. The layer-level artifact absence itself is verified at build
+        # time (podman save inspection), not here.
         compose = yaml.safe_load(_read("compose.yaml"))
         evennia = compose["services"]["evennia"]
         self.assertIn("evennia-translate:/app/server/.translate", evennia["volumes"])
