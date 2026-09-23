@@ -31,7 +31,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.church import OFFERING_CATALOG, REDEEM_CATALOG, OfferingRow, RedeemRow
+from world.lore.church import OFFERING_CATALOG, OfferingRow, RedeemRow
 from world.rules import church
 from world.rules.church import (
     RedemptionError,
@@ -326,11 +326,9 @@ class ChurchRedemptionActTests(ChurchRedemptionBase):
     def test_the_vessel_is_never_redeemable(self):
         # The permanent negative-set pin, proven through the rail: the
         # vessel key resolves against the shipped catalogue as the unknown-
-        # key rejection, and the shipped catalogue never lists it.
+        # key rejection (the catalogue-level absence fact is pinned by the
+        # data-contract lore suite).
         church.add_merit(self.char1, 100000)
-        self.assertNotIn(
-            VESSEL_KEY, {row.skill_key for row in REDEEM_CATALOG}
-        )
         with self.assertRaises(RedemptionError) as caught:
             church.redeem_step(self.char1, VESSEL_KEY)
         self.assertEqual(caught.exception.args[0], RedemptionReason.UNKNOWN_KEY)
@@ -350,6 +348,68 @@ class ChurchRedemptionActTests(ChurchRedemptionBase):
                 "t_redeem_active": True,
                 "t_redeem_expensive": False,
                 "t_redeem_gated": False,
+            },
+        )
+
+    @covers_requirement(
+        "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
+    )
+    def test_the_read_only_surfaces_fail_closed_on_bad_ledgers(self):
+        # ``redeem list`` and ``merit`` read through the same strict
+        # boundary as the purchase: unenrolled and malformed ledgers are
+        # stable named rejections, never raw exceptions.
+        fresh = create_object(PlayerCharacter, key="t_list_newcomer")
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        with self.assertRaises(RedemptionError) as caught:
+            church.redemption_catalogue(fresh)
+        self.assertEqual(caught.exception.args[0], RedemptionReason.NOT_ENROLLED)
+        with self.assertRaises(RedemptionError) as caught:
+            church.merit_ledger_view(fresh)
+        self.assertEqual(caught.exception.args[0], RedemptionReason.NOT_ENROLLED)
+        both_readers = (
+            "not_a_mapping",
+            {"merit": "oops", "enrolled_tick": 0, "redeemed": [], "daily": {"day": 0, "pray": 0}},
+            {"merit": 10, "enrolled_tick": 0, "redeemed": [7], "daily": {"day": 0, "pray": 0}},
+        )
+        for malformed in both_readers:
+            with self.subTest(ledger=malformed):
+                self.char1.db.church = malformed
+                for reader in (church.redemption_catalogue, church.merit_ledger_view):
+                    with self.assertRaises(RedemptionError) as caught:
+                        reader(self.char1)
+                    self.assertEqual(
+                        caught.exception.args[0], RedemptionReason.MALFORMED_LEDGER
+                    )
+        # A malformed daily block only the merit view reads.
+        self.char1.db.church = {
+            "merit": 10,
+            "enrolled_tick": 0,
+            "redeemed": [],
+            "daily": "broken",
+        }
+        with self.assertRaises(RedemptionError) as caught:
+            church.merit_ledger_view(self.char1)
+        self.assertEqual(
+            caught.exception.args[0], RedemptionReason.MALFORMED_LEDGER
+        )
+
+    @covers_requirement(
+        "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
+    )
+    def test_merit_ledger_view_renders_the_four_fields(self):
+        church.add_merit(self.char1, 1000)
+        self.char1.db.church["enrolled_tick"] = 7
+        self.char1.db.church["daily"] = {"day": 0, "pray": 2}
+        with self.captureOnCommitCallbacks(execute=True):
+            church.redeem_step(self.char1, "t_redeem_active")
+        self.assertEqual(
+            church.merit_ledger_view(self.char1),
+            {
+                "merit": 1000 - 300,
+                "enrolled_tick": 7,
+                "redeemed": ("t_redeem_active",),
+                "pray_today": 2,
             },
         )
 

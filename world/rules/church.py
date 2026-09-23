@@ -921,11 +921,37 @@ def _require_redemption_ledger(entity: Any) -> dict[str, Any]:
 
 def redemption_catalogue(entity: Any) -> tuple[tuple[RedeemRow, bool], ...]:
     """Read-only catalogue listing with the caller's redeemed marks
-    (design §5.6 ``redeem list``: catalogue + merit + redeemed marks). A
-    character who never enrolled has no marks; the command owns the
-    unenrolled presentation."""
-    redeemed = set(redeemed_keys(entity))
+    (design §5.6 ``redeem list``: catalogue + merit + redeemed marks).
+    Reads through the strict redemption ledger boundary: an unenrolled
+    character is the NOT_ENROLLED rejection and a malformed ledger the
+    MALFORMED_LEDGER rejection — never a raw exception escaping the
+    command surface."""
+    ledger = _require_redemption_ledger(entity)
+    redeemed = set(ledger["redeemed"])
     return tuple((row, row.skill_key in redeemed) for row in REDEEM_CATALOG)
+
+
+def merit_ledger_view(entity: Any) -> dict[str, Any]:
+    """Read-only ``church merit`` print record (design §5.6): merit,
+    enrollment day (``enrolled_tick``), redeemed marks, and the daily
+    prayer usage — validated through the strict redemption boundary so a
+    malformed ledger yields the stable MALFORMED_LEDGER rejection."""
+    ledger = _require_redemption_ledger(entity)
+    daily_block = ledger.get("daily")
+    if not isinstance(daily_block, dict):
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER)
+    pray = daily_block.get("pray")
+    if isinstance(pray, bool) or not isinstance(pray, int):
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER)
+    enrolled = ledger.get("enrolled_tick")
+    if isinstance(enrolled, bool) or not isinstance(enrolled, int):
+        raise RedemptionError(RedemptionReason.MALFORMED_LEDGER)
+    return {
+        "merit": int(ledger["merit"]),
+        "enrolled_tick": int(enrolled),
+        "redeemed": tuple(ledger["redeemed"]),
+        "pray_today": int(pray),
+    }
 
 
 def redeem_step(entity: Any, key: str) -> dict[str, Any]:

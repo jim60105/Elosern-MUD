@@ -30,16 +30,13 @@ from world.rules.church import (
     RedemptionError,
     RedemptionReason,
     enroll,
-    enrolled_tick,
-    daily,
     merit,
+    merit_ledger_view,
     offer_step,
     offering_menu,
     pray_step,
     redeem_step,
     redemption_catalogue,
-    redeemed_keys,
-    read_ledger,
 )
 from world.rules.guild import GuildServiceError, resolve_local_service_host
 from world.rules.npc_schedules import interaction_reason
@@ -265,19 +262,21 @@ class CmdChurchMerit(Command):
         if self.args.strip():
             self.caller.msg(_MERIT_USAGE)
             return
-        if read_ledger(self.caller) is None:
-            self.caller.msg("你尚未入教。請先與主祭交談。")
+        try:
+            view = merit_ledger_view(self.caller)
+        except RedemptionError as error:
+            reason = error.args[0] if error.args else None
+            self.caller.msg(
+                _REDEMPTION_REJECTION_LINES.get(reason, "查詢失敗。")
+            )
             return
-        redeemed = redeemed_keys(self.caller)
-        daily_block = daily(self.caller)
-        pray_usage = daily_block["pray"] if daily_block else 0
         lines = [
-            f"恩寵：{merit(self.caller)} 點",
-            f"入教時的世界時鐘刻度：{enrolled_tick(self.caller)}",
-            f"今日祈禱次數：{pray_usage}",
+            f"恩寵：{view['merit']} 點",
+            f"入教時的世界時鐘刻度：{view['enrolled_tick']}",
+            f"今日祈禱次數：{view['pray_today']}",
         ]
-        if redeemed:
-            lines.append("已兌換敘階：" + "、".join(redeemed))
+        if view["redeemed"]:
+            lines.append("已兌換敘階：" + "、".join(view["redeemed"]))
         else:
             lines.append("已兌換敘階：（無）")
         self.caller.msg("\n".join(lines))

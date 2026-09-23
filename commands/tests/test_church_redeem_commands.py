@@ -155,6 +155,30 @@ class ChurchRedeemCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
 
     @covers_requirement(
+        "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
+    )
+    def test_redeem_list_unenrolled_is_a_stable_rejection(self):
+        from typeclasses.characters import PlayerCharacter
+        from evennia.utils.create import create_object
+
+        fresh = create_object(PlayerCharacter, key="t_cmd_list_newcomer")
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        self.call(
+            CmdChurchRedeem(),
+            "",
+            "你尚未入教。請先與主祭交談",
+            caller=fresh,
+        )
+
+    @covers_requirement(
+        "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
+    )
+    def test_redeem_list_malformed_ledger_is_a_stable_line(self):
+        self.char1.db.church = "not_a_mapping"
+        self.call(CmdChurchRedeem(), "", "教會記錄異常")
+
+    @covers_requirement(
         "church-ordination::the-church-redeem-and-merit-commands-are-documented-in-the-docs-trio"
     )
     def test_the_alias_runs_the_same_surface(self):
@@ -204,6 +228,13 @@ class ChurchMeritCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.call(
             CmdChurchMerit(), "", "你尚未入教。請先與主祭交談", caller=fresh
         )
+
+    @covers_requirement(
+        "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
+    )
+    def test_church_merit_malformed_ledger_is_a_stable_line(self):
+        self.char1.db.church = {"merit": "oops", "redeemed": []}
+        self.call(CmdChurchMerit(), "", "教會記錄異常")
 
     @covers_requirement(
         "church-ordination::redemption-is-a-one-shot-all-or-nothing-grace-purchase"
