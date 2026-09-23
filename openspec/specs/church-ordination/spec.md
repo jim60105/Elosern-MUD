@@ -262,11 +262,11 @@ The player commands `church redeem [list|<key>]` and `church merit` SHALL be doc
 - **THEN** the seal neither narrows nor substitutes those paths
 
 ### Requirement: Martyrdom vow collapses the defeat-aftermath victim pool to the marked martyr
-`rite_martyrdom_vow` cast during a fight SHALL stamp `martyr_key` (with the durable session id) on the combat session record. At defeat settlement, `_victim_pool` SHALL apply one additional filter: if the session stamp matches a non-fled pool member, the pool collapses to `[her]` and the existing single-member short-circuit returns her with zero target rolls (resist contests keep their normal draws). Victory consumes the stamp. Edge rules: the marker died before the wipe → normal pool; the marker fled → filter finds no eligible martyr → normal pool; multiple markers → first by canonical order; a session-id mismatch (stale stamp) can never fire. Rollback-retry determinism SHALL hold (the stamp is durable record state; the draws stay state-derived).
+`rite_martyrdom_vow` cast during a fight SHALL stamp `martyr_key` (with the durable session id) on the combat session record. At defeat settlement, `_violation_pool` SHALL apply one additional filter: if the session stamp matches a non-fled pool member, the pool collapses to `[her]` and the existing single-member short-circuit returns her with zero target rolls (resist contests keep their normal draws). Victory consumes the stamp. Edge rules: the marker died before the wipe → normal pool; the marker fled → filter finds no eligible martyr → normal pool; multiple markers → first by canonical order; a session-id mismatch (stale stamp) can never fire. Rollback-retry determinism SHALL hold (the stamp is durable record state; the draws stay state-derived).
 
 #### Scenario: The marked sister is chosen with zero target rolls
 - **WHEN** a defeated fight's session carries a valid martyr stamp for a non-fled survivor in the pool
-- **THEN** `_victim_pool` collapses to her and returns with zero target-selection rolls
+- **THEN** `_violation_pool` collapses to her and returns with zero target-selection rolls
 
 #### Scenario: Every edge falls back to the normal pool
 - **WHEN** the marker died, fled, the stamp is stale, or no stamp exists

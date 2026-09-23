@@ -23,8 +23,15 @@ from tools.spec_traceability import covers_requirement
 from world.rules import combat_session as combat_session_module
 import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
 from world.rules.action import ActionRequest, ActionResolver
+from world.rules.buffs import apply_buff, entity_active_buffs
 from world.rules.combat import BattlefieldActionContext
-from world.rules.combat_session import engage, forfeit, read_session, settle_session
+from world.rules.combat_session import (
+    engage,
+    forfeit,
+    read_session,
+    settle_session,
+    submit_player_action,
+)
 from world.rules.defeat_aftermath.violation import derived_roll as _module_derived_roll
 from world.rules.skip_safety import _active_battlefield_for
 from world.skills.registry import TargetSpec
@@ -379,9 +386,53 @@ class MartyrCastRailTests(MartyrVowBase):
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason.value, "action_forbidden")
 
+    @covers_requirement("church-ordination::martyrdom-vow-collapses-the-defeat-aftermath-victim-pool-to-the-marked-martyr")
+    def test_round_end_persist_preserves_the_stamp_from_an_in_combat_cast(self):
+        """A mid-round cast survives the round's durability merge."""
+        skill = self._synth_vow_skill("session_stamp:martyr_key")
+        engage(self.player, self.monster)
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch(
+            "world.rules.combat.damage.roll_d100", return_value=1
+        ), patch("world.rules.combat.rounds.roll_d100", return_value=1):
+            # The combat facade accepts no SELF target field: the SELF spec
+            # binds the actor inside the resolver.
+            result = submit_player_action(self.player, skill.key, [])
+        self.assertEqual(result["outcome"], "round")
+        record = read_session(self.player)
+        self.assertIsNotNone(record)
+        self.assertEqual(
+            record.martyr_key,
+            (record.session_id,),
+            "the round-end persist must compose from the live durable record",
+        )
+
     def test_session_stamp_unknown_field_is_rejected(self):
         skill = self._synth_vow_skill("session_stamp:not_a_field")
         engage(self.player, self.monster)
         result = ActionResolver.resolve(self._combat_request(skill))
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason.value, "effect_resolution_failed")
+
+
+class LambSealSessionEndTests(MartyrVowBase):
+    """The seal lifts with the fight (design §5.7: ends with the fight)."""
+
+    @covers_requirement("church-ordination::lamb-mark-narrows-monster-target-preference-with-a-charging-buff")
+    def test_session_clear_sweeps_the_bearer_lamb_seal(self):
+        apply_buff(self.player, "lamb_seal")
+        engage(self.player, self.monster)
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch(
+            "world.rules.combat.damage.roll_d100", return_value=1
+        ), patch("world.rules.combat.rounds.roll_d100", return_value=1):
+            with self.captureOnCommitCallbacks(execute=True):
+                settle_session(
+                    self.player,
+                    read_session(self.player),
+                    None,
+                    "victory",
+                )
+        self.assertNotIn(
+            "lamb_seal",
+            entity_active_buffs(self.player),
+            "the seal ends with the fight",
+        )

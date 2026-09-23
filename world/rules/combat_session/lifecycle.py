@@ -58,7 +58,11 @@ def clear_session(
         unregister_participants((*record.player_ids, *record.enemy_ids))
 
     from django.db import transaction
-    from world.rules.buffs import remove_ground_markers, remove_positional_markers
+    from world.rules.buffs import (
+        remove_by_selector,
+        remove_ground_markers,
+        remove_positional_markers,
+    )
 
     participants: set[Any] = set()
     if battlefield is not None:
@@ -71,10 +75,12 @@ def clear_session(
     participants.add(actor)
     for entity in participants:
         removed = remove_ground_markers(entity) + remove_positional_markers(entity)
-        if removed:
+        seals = remove_by_selector(entity, "lamb_seal")
+        if removed or seals:
             boundary = {
                 "char": str(entity.pk),
-                "count": removed,
+                "count": removed + seals,
+                "seals": seals,
                 "reason": "session_end",
             }
             transaction.on_commit(

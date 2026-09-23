@@ -63,15 +63,34 @@ def _handle_session_stamp(
     if record.session_id in stamps:
         # A re-cast inside the same session is an idempotent no-op refresh.
         return []
-    stamped = replace(record, martyr_key=(*stamps, record.session_id))
+
+    def _apply_stamp(actor=actor, session_id=record.session_id) -> None:
+        # Read-modify-write at commit time: compose from the LIVE durable
+        # record so even a mid-cast writer (a round-end persist reshaping
+        # active_combat from the durable state) is never overwritten with
+        # stale fields; the stamp append itself stays idempotent by
+        # session-id membership.
+        current = read_session(actor)
+        if current is None:
+            # The session ended between staging and commit: nothing to stamp.
+            return
+        stamps = current.martyr_key or ()
+        if session_id in stamps:
+            return
+        setattr(
+            actor.db,
+            "active_combat",
+            to_storage(
+                replace(current, martyr_key=(*stamps, session_id))
+            ),
+        )
+
     return [
         PendingEffect(
             actor,
             f"session_stamp|{_entity_key(actor)}|{field}",
             frozenset({"active_combat"}),
-            lambda actor=actor, stamped=stamped: setattr(
-                actor.db, "active_combat", to_storage(stamped)
-            ),
+            _apply_stamp,
         )
     ]
 

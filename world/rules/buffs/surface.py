@@ -172,9 +172,10 @@ def consume_climax_charges(entity) -> int:
         if definition is None or definition.charges is None:
             continue
         remaining = get_charges(buff, default=definition.charges)
-        if remaining <= 0:
-            continue
-        if remaining == 1:
+        if remaining <= 1:
+            # Consuming the final charge — or an already-exhausted pool
+            # (invariant totality: a charge-carrying buff with no charges
+            # left has no right to stay mounted) — dispels and counts it.
             key = getattr(buff, "buffkey", None) or buff.definition_key
             entity.buffs.remove(key, dispel=True)
             dispelled += 1

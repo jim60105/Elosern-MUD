@@ -18,7 +18,7 @@ Any NEW test module MUST be registered in exactly one `.github/evennia-shards.js
 
 ## 3. Martyrdom vow
 
-- [x] 3.1 Implement `rite_martyrdom_vow`: session-record `martyr_key` stamp with the durable session id; one added filter in `defeat_aftermath/violation.py::_victim_pool` (valid stamp ∧ non-fled member → collapse to `[her]`, zero target rolls via the existing short-circuit, resist contests unchanged); victory consumes. Tests: collapse, died/fled/stale/no-stamp fallbacks byte-identical, victory consumption, rollback-retry determinism. Annotate ID 2.
+- [x] 3.1 Implement `rite_martyrdom_vow`: session-record `martyr_key` stamp with the durable session id; one added filter in `defeat_aftermath/violation.py::_violation_pool` (valid stamp ∧ non-fled member → collapse to `[her]`, zero target rolls via the existing short-circuit, resist contests unchanged); victory consumes. Tests: collapse, died/fled/stale/no-stamp fallbacks byte-identical, victory consumption, rollback-retry determinism. Annotate ID 2.
 
 ## 4. The loop proof and gates
 

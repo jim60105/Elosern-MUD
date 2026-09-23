@@ -113,6 +113,7 @@ class EffectRegistryTests(unittest.TestCase):
             SNAPSHOTTED_SURFACES,
             frozenset(
                 {
+                    "active_combat",
                     "traits",
                     "sexual",
                     "buffs",

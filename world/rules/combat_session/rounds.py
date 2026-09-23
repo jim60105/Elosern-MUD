@@ -451,11 +451,20 @@ def _submit_request(
                 )
             )
             new_knocked_out_ids = tuple(sorted(set(record.knocked_out_ids) | set(knocked)))
+            # Compose the round-end record from the LIVE durable record, not
+            # the pre-round snapshot: mid-round writers (the martyrdom-vow
+            # session_stamp effect, church design §5.8) commit their own
+            # active_combat rewrite inside this same atomic unit, and a
+            # replace() over the stale pre-round record would silently wipe
+            # those fields. The live read is the single writer's current
+            # state; the round deltas (fled/knocked-out/elapsed) land on it.
+            current = read_session(actor)
+            base = current if current is not None else record
             new_record = replace(
-                record,
+                base,
                 fled_ids=new_fled_ids,
                 knocked_out_ids=new_knocked_out_ids,
-                rounds_elapsed=record.rounds_elapsed + gained,
+                rounds_elapsed=base.rounds_elapsed + gained,
             )
             _persist(actor, new_record)
 
