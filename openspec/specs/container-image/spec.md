@@ -83,6 +83,14 @@ live under `/app/server/.art`, whose contents are governed by the art store's co
 route, and orphan-prune rules, and SHALL NOT use the library default under `$HOME`, which the image
 maps to the `tmpfs`-mounted `/tmp` and would therefore re-download on every container start.
 
+The translation model cache SHALL be a writable named volume mounted at
+`/app/server/.translate`, matching the code-only `ART_TRANSLATE_MODEL_DIR` setting. The image
+SHALL declare that path as a persistent volume with a `root:0` group-writable directory and
+SHALL NOT bake any model artifact into a layer. Unlike the background-removal cache, this
+volume SHALL NOT be populated at run time: the server performs no download for it, so an
+operator-seeded volume is the ONLY way it is filled and an empty volume is a bounded
+unavailable rather than a fetch.
+
 It SHALL also
 provide a profile-gated, interactive one-shot bootstrap service for initializing a fresh database
 without storing the initial administrator's password in the long-lived service configuration.
@@ -115,6 +123,12 @@ without storing the initial administrator's password in the long-lived service c
 - **THEN** the `evennia` service mounts a named volume at `/app/server/.rembg`, the image declares
   that path as a persistent volume with a `root:0` group-writable directory, and the image itself
   contains no `.onnx` model artifact
+
+#### Scenario: The translation model cache is an operator-seeded volume, never an image layer
+- **WHEN** the built image and the compose configuration are inspected
+- **THEN** the `evennia` service mounts a named volume at `/app/server/.translate`, the image
+  declares that path as a persistent volume with a `root:0` group-writable directory, the image
+  itself contains no translation model artifact, and no service definition performs a model fetch
 
 #### Scenario: Prompt files are mounted read-only from the host
 - **WHEN** `compose.yaml` is inspected and the container is started

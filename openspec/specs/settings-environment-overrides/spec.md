@@ -23,13 +23,14 @@ variable, using typed conversion at settings import. The env-backed set is exact
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`,
 `ART_REMBG_ENABLED`, `ART_REMBG_MODEL`, `ART_REMBG_DOWNLOAD_ENABLED`,
 `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`,
+`ART_TRANSLATE_THREADS`,
 `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` — each from a
 variable of the same name — plus
 `ART_SD_BASE_URL` from
 `SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec. No other setting in these groups
 SHALL read the environment; `ART_SD_CLIENT`, `ART_REMBG_BACKEND`, `ART_REMBG_MODEL_DIR`,
-`ART_TRANSLATE_BACKEND`, the
+`ART_TRANSLATE_BACKEND`, `ART_TRANSLATE_MODEL_DIR`, the
 derived `ART_SD_OUTPUT_EXTENSION`, and the auth
 pair `ART_SD_USERNAME`/`ART_SD_PASSWORD` in particular SHALL NOT (see their own requirements).
 (`DEFEAT_ADULT_SCENES` is not an addition of this change: the exact-set statement here repairs
@@ -45,6 +46,8 @@ Conversion rules: integers for `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, the fou
 `ART_SD_PROBE_CACHE_SECONDS`, an inclusive 10-to-1800 integer for
 `ART_REMBG_ALLOWANCE_SECONDS` (default `120`), an inclusive 0-to-256 integer for
 `ART_REMBG_THREADS` (default `0`, meaning the ONNX Runtime default thread count), and an
+inclusive 0-to-256 integer for `ART_TRANSLATE_THREADS` (default `0`, meaning the CTranslate2
+default thread count), and an
 inclusive 1-to-10 integer for `ELOSERN_MAX_CHARACTERS`
 (values below the lower bound or above the upper bound rejected);
 a positive float for `ART_SD_CFG_SCALE`; case-insensitive boolean words (`1/true/yes/on` true,
@@ -80,7 +83,8 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `ART_SD_PROBE_TIMEOUT_MS=5000`, `ART_SD_PROBE_CACHE_SECONDS=300`,
   `ART_REMBG_ENABLED=False`, `ART_REMBG_MODEL="bria-rmbg"`,
   `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
-  `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`, `DEFEAT_ADULT_SCENES=True`, and
+  `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`, `ART_TRANSLATE_THREADS=0`,
+  `DEFEAT_ADULT_SCENES=True`, and
   `MAX_NR_CHARACTERS=5`), and the server starts
 
 #### Scenario: Valid overrides coerce to typed values
@@ -133,6 +137,12 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `=off`, then separately with `=maybe`
 - **THEN** the first two yield `True` and `False`, and the third raises the named settings error
   identifying `ART_TRANSLATE_ENABLED`, quoting the raw value, and stating the boolean-word rule
+
+#### Scenario: The translation thread cap is bounded at both ends
+- **WHEN** the settings module is imported with `ART_TRANSLATE_THREADS=0`, then separately with
+  `=256`, then separately with `=-1`, then separately with `=257`
+- **THEN** the first two succeed producing `0` and `256`, and the last two each raise the named
+  settings error identifying `ART_TRANSLATE_THREADS` and its 0-to-256 rule
 
 ### Requirement: Invalid environment values fail settings load with a named error
 An environment variable that is present but cannot be coerced to its setting's declared type or
@@ -214,6 +224,9 @@ code at engine startup. `ART_REMBG_BACKEND` SHALL likewise never read the enviro
 identical reason: it is the second import-executing dotted-path seam in the art pipeline.
 `ART_TRANSLATE_BACKEND` SHALL likewise never read the environment: it is the third such seam,
 and the rule is a class rule about import-executing dotted paths, not a list that stops at two.
+`ART_TRANSLATE_MODEL_DIR` SHALL remain code-only under the persistent-volume rule, so a
+mistyped value cannot silently relocate the translation model artifact off its volume and
+turn every translation into a bounded unavailable.
 `ART_STORE_ROOT` SHALL likewise remain code-only so a mistyped value
 cannot silently relocate generated art off the persistent volume, and `ART_REMBG_MODEL_DIR`
 SHALL remain code-only under the same rule so a mistyped value cannot silently relocate the
@@ -260,6 +273,11 @@ every non-LLM secret retains `secret_settings.py` as its only location.
   environment
 - **THEN** the effective `ART_TRANSLATE_BACKEND` remains its code default and no environment read
   for that name occurs
+
+#### Scenario: A translation-model-directory variable is ignored
+- **WHEN** the settings module is imported with `ART_TRANSLATE_MODEL_DIR` set in the environment
+- **THEN** the effective `ART_TRANSLATE_MODEL_DIR` remains the `server/.translate` path under
+  `GAME_DIR`
 
 ### Requirement: Environment inventory and configuration guide are version-controlled and exact
 The repository SHALL track `.env.example` as the exact inventory of environment variables
