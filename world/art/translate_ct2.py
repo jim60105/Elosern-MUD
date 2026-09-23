@@ -128,21 +128,28 @@ class CTranslate2Backend:
                     "with scripts/fetch-translate-model.sh and mount it "
                     "at /app/server/.translate in the container",
                 )
-            if (
-                not (ct2_dir / "config.json").is_file()
-                or not (ct2_dir / "model.bin").is_file()
-            ):
-                raise TranslateError(
-                    "art_translate_unavailable",
-                    f"model directory {model_dir} lacks a CTranslate2 model "
-                    f"({_MODEL_DIR}/config.json + {_MODEL_DIR}/model.bin)",
-                )
-            if not (model_dir / _SP_MODEL).is_file():
-                raise TranslateError(
-                    "art_translate_unavailable",
-                    f"model directory {model_dir} lacks the SentencePiece "
-                    f"source model ({_SP_MODEL})",
-                )
+            required = (
+                (ct2_dir / "config.json", f"the CTranslate2 model file "
+                 f"{_MODEL_DIR}/config.json"),
+                (ct2_dir / "model.bin", f"the CTranslate2 model file "
+                 f"{_MODEL_DIR}/model.bin"),
+                (model_dir / _SP_MODEL, f"the SentencePiece source model "
+                 f"{_SP_MODEL}"),
+            )
+            for path, description in required:
+                if not path.is_file():
+                    raise TranslateError(
+                        "art_translate_unavailable",
+                        f"model directory {model_dir} lacks a CTranslate2 "
+                        f"model plus a SentencePiece source model "
+                        f"(missing {description})",
+                    )
+                # A regular file without read permission still satisfies
+                # is_file(); probe readability so an unreadable component is
+                # detected HERE, before any translation library import
+                # (delta spec: "missing or unreadable model component").
+                with path.open("rb"):
+                    pass
         except TranslateError:
             raise
         except Exception as error:  # noqa: BLE001 - bounded mapping (see above)

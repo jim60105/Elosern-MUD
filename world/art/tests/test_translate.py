@@ -7,6 +7,7 @@ import builtins
 from collections.abc import Sequence
 from contextlib import contextmanager
 import importlib.util
+import os
 from pathlib import Path
 import shutil
 import socket
@@ -429,6 +430,23 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
         self.assertEqual(caught.exception.code, "art_translate_unavailable")
         self.assertNotIn("ctranslate2", sys.modules)
         self.assertNotIn("sentencepiece", sys.modules)
+
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+    )
+    @unittest.skipIf(os.geteuid() == 0, "permission bits do not bind root")
+    def test_an_unreadable_component_raises_unavailable_without_import(self):
+        self._seed()
+        (self.model_dir / "model" / "model.bin").chmod(0)
+        backend = self._backend()
+        with self._raising_import_for_optional_stack():
+            with self._no_network():
+                with self.assertRaises(TranslateError) as caught:
+                    backend.translate(("漢字",))
+        self.assertEqual(caught.exception.code, "art_translate_unavailable")
+        self.assertNotIn("ctranslate2", sys.modules)
+        self.assertNotIn("sentencepiece", sys.modules)
+        (self.model_dir / "model" / "model.bin").chmod(0o644)
 
     @covers_requirement(
         "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"

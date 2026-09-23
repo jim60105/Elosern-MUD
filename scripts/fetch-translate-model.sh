@@ -81,12 +81,13 @@ if [[ -e "${target}/model" || -e "${target}/sentencepiece.model" ]]; then
     echo "       Pass --force to replace it." >&2
     exit 1
   fi
-  rm -rf "${target}/model" "${target}/sentencepiece.model" "${target}/README.md"
 fi
 
 staging="$(mktemp -d "${TMPDIR:-/tmp}/translate-seed.XXXXXX")"
 trap 'rm -rf "${staging}"' EXIT INT TERM
 archive="${staging}/${PKG}.argosmodel"
+replacement="${staging}/replacement"
+mkdir -p "${replacement}"
 
 echo "== Downloading ${PKG} =="
 if ! curl --fail --location --output "${archive}" "${URL}"; then
@@ -101,6 +102,25 @@ if ! unzip -t "${archive}" >/dev/null 2>&1; then
 fi
 
 listed="$(unzip -l "${archive}")"
+members="$(unzip -Z1 "${archive}")"
+while IFS= read -r member; do
+  case "${member}" in
+    "${PKG}/"*) ;;
+    "")
+      continue
+      ;;
+    *)
+      echo "ERROR: archive member outside the package directory: ${member}" >&2
+      exit 1
+      ;;
+  esac
+  case "${member}" in
+    /*|*".."*)
+      echo "ERROR: unsafe archive member path: ${member}" >&2
+      exit 1
+      ;;
+  esac
+done <<<"${members}"
 for entry in "${REQUIRED_ENTRIES[@]}"; do
   if ! grep -q "${entry}" <<<"${listed}"; then
     echo "ERROR: unexpected archive layout — missing ${entry}" >&2
@@ -108,7 +128,7 @@ for entry in "${REQUIRED_ENTRIES[@]}"; do
   fi
 done
 
-echo "== Unpacking into ${target} =="
+echo "== Unpacking =="
 unzip -q "${archive}" "${PKG}/model/*" "${PKG}/sentencepiece.model" "${PKG}/README.md" -d "${staging}/unpacked"
 
 model_dir="${staging}/unpacked/${PKG}/model"
@@ -120,10 +140,20 @@ for check in "${model_dir}/config.json" "${model_dir}/model.bin" "${sp_model}"; 
   fi
 done
 
-mkdir -p "${target}"
-cp -a "${model_dir}" "${target}/model"
-cp -a "${sp_model}" "${target}/sentencepiece.model"
-cp -a "${staging}/unpacked/${PKG}/README.md" "${target}/README.md"
+# Land the validated seed into the replacement directory first, then swap it
+# in atomically — the live model directory is never destroyed before its
+# replacement is complete, so an interrupted run cannot leave the deployment
+# unseeded or half-seeded.
+cp -a "${model_dir}" "${replacement}/model"
+cp -a "${sp_model}" "${replacement}/sentencepiece.model"
+cp -a "${staging}/unpacked/${PKG}/README.md" "${replacement}/README.md"
+mkdir -p "$(dirname -- "${target}")"
+if [[ -e "${target}" ]]; then
+  rm -rf "${target}.old-seed"
+  mv "${target}" "${target}.old-seed"
+fi
+mv "${replacement}" "${target}"
+rm -rf "${target}.old-seed"
 
 echo ""
 echo "✅ Seeded ${target}:"
@@ -138,7 +168,7 @@ echo "Compose (seed the named volume once, then restart):"
 echo "  podman compose up -d      # creates the evennia-translate volume"
 echo "  podman run --rm \\"
 echo "    -v evennia-translate:/app/server/.translate \\"
-echo "    -v ${target}:/seed:ro \\"
+echo "    -v '${target}':/seed:ro,z \\"
 echo "    --entrypoint /bin/sh docker.io/library/busybox \\"
 echo "    -c 'cp -a /seed/. /app/server/.translate/'"
 echo ""

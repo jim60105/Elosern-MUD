@@ -159,13 +159,13 @@ scripts/fetch-translate-model.sh /some/path     # 指定目錄
 
 ```sh
 ct2-transformers-converter --model Helsinki-NLP/opus-mt-zh-en \
-  --output_dir ct2-zh-en --copy_files sentencepiece.model &&
-mkdir -p /path/to/server/.translate &&
+  --output_dir ct2-zh-en &&
+mkdir -p /path/to/server/.translate/model &&
 mv   ct2-zh-en/model.bin ct2-zh-en/config.json ct2-zh-en/shared_vocabulary.json /path/to/server/.translate/model/ &&
-mv   ct2-zh-en/sentencepiece.model /path/to/server/.translate/sentencepiece.model
+cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 ```
 
-（`--copy_files sentencepiece.model` 讓轉換器把 Marian 的 SentencePiece 檔一併放入輸出目錄；轉換輸出直接構成 `model/`，再把 `sentencepiece.model` 放到 `model` 旁的套件根目錄，即為引擎要求的佈局。若已存在種子，先確認兩個檔案都在再覆寫。）
+（Helsinki 的 OPUS 倉庫用 `source.spm`／`target.spm` 命名 Marian 的 SentencePiece 檔；轉換輸出直接構成 `model/`，再把 `source.spm` 複製為套件根目錄的 `sentencepiece.model`，即為引擎要求的佈局。轉換前先 `ls ct2-zh-en` 確認產生的是 `source.spm` 這個名字——不同筆轉換指令輸出略有出入，以實際檔名為準。若已存在種子，先確認兩個檔案都在再覆寫。）
 
 ⚠️ **授權**：`Helsinki-NLP/opus-mt-zh-en` 的 model card 標示 **CC-BY 4.0**（與路線一同一模型譜系與授權）。
 
@@ -176,7 +176,7 @@ mv   ct2-zh-en/sentencepiece.model /path/to/server/.translate/sentencepiece.mode
    - 裸機：什麼都不用做——`server/.translate` 就是程式碼內預設的 `ART_TRANSLATE_MODEL_DIR`。
    - 容器：先 `podman compose up -d` 建立 `evennia-translate` 具名 volume，再一次性把暫存種子拷進 volume（腳本會印出完整指令）；之後 volume 在容器重建間保留。
 3. **開啟**：`.env` 加 `ART_TRANSLATE_ENABLED=true`，重啟。
-4. **確認**：啟動報告會一行列出每個選用 art 階段的狀態（`art_startup_report`）——翻譯階段應顯示 `active`。生成一張含漢字的圖片，成功時記錄 `art_translate_done`（含 lines_total／lines_offered／lines_untranslated），存放的中繼資料引用英文提示詞。
+4. **確認**：啟動時會記錄 `art_optional_stages`（context 含 `art_translate: {setting: "ART_TRANSLATE_ENABLED", enabled: …}`）——它只反映開關狀態，不載入模型；翻譯階段真正就緒以一張含漢字的圖片生成成功、並記錄 `art_translate_done`（含 lines_total／lines_offered／lines_untranslated）為準，此時存放的中繼資料引用英文提示詞。
 
 **未種子 volume 的降級路徑是設計內行為**：每次生成記錄一條 `art_translate_failed`（`art_translate_unavailable`）警告、以 authored 提示詞出圖、圖片照常產生——翻譯是「提示詞比較差」，不是失敗的工作。`@art status` 與 `@art retry`/`requeue` 的行為不變。
 

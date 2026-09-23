@@ -179,11 +179,13 @@ class ContainerContractTests(unittest.TestCase):
         # art-prompt-translation: the translation model is operator-seeded into
         # a persistent named volume (code-only ART_TRANSLATE_MODEL_DIR) and the
         # server performs NO fetch for it (design D2) — unlike the rembg cache,
-        # an empty volume is a bounded unavailable, not a download. The knobs
-        # arrive through env_file: .env like the rest of the ART_* family, so
-        # compose.yaml carries no ART_TRANSLATE_* interpolation line, and a
-        # locally seeded server/.translate/ is excluded from the build context
-        # so no model artifact can ever be baked into an image layer.
+        # an empty volume is a bounded unavailable, not a download. This is a
+        # STATIC source-level contract test: compose declares the volume and no
+        # fetch service, the Containerfile prepares the path root:0
+        # group-writable and VOLUME-declares it, and server/.translate/ is
+        # excluded from the build context so no locally seeded artifact can
+        # enter an image layer. The layer-level artifact absence itself is
+        # verified at build time (task 7.2: podman save inspection), not here.
         compose = yaml.safe_load(_read("compose.yaml"))
         evennia = compose["services"]["evennia"]
         self.assertIn("evennia-translate:/app/server/.translate", evennia["volumes"])
