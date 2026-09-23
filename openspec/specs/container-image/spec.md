@@ -66,7 +66,7 @@ apply them by restarting or reloading the server without rebuilding the image. T
 relabels the bind mount with the SELinux container context so the read-only mount stays readable
 under enforcing SELinux (for example on Fedora or RHEL hosts) without weakening its read-only
 semantics. It SHALL additionally mount the host bulk seed-art folder read-only into the container at
-`/app/art-seed` via `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z`, following the same
+`/app/art-seed` via `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z}`, following the same
 read-only, SELinux-relabelled pattern as the prompt mount, so an operator supplies large prebuilt
 character art without adding it to the image or to version control. Unlike `prompts/`, the seed
 folder SHALL NOT be baked into the image: an absent mount is a supported configuration in which the
@@ -78,18 +78,23 @@ prepare that directory `root:0` and group-writable in the application-layout sta
 alongside the other persistent paths, exactly like `/app/server/.art`, so an arbitrary-UID run can
 write it. The ~1 GB model artifact SHALL NOT be baked into the image: it is fetched on first use
 into the volume and reused across container recreations, and an operator MAY pre-seed the volume
-and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment. The model cache SHALL NOT
+and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment. The model cache
+SHALL NOT live under `/app/server/.art`, whose contents are governed by the art store's
+confinement, media route, and orphan-prune rules, and SHALL NOT use the library default
+under `$HOME`, which the image maps to the `tmpfs`-mounted `/tmp` and would therefore
+re-download on every container start.
 
 The translation model cache SHALL be a writable named volume mounted at
 `/app/server/.translate`, matching the code-only `ART_TRANSLATE_MODEL_DIR` setting. The image
 SHALL declare that path as a persistent volume with a `root:0` group-writable directory and
-SHALL NOT bake any model artifact into a layer. Unlike the background-removal cache, this
-volume SHALL NOT be populated at run time: the server performs no download for it, so an
-operator-seeded volume is the ONLY way it is filled and an empty volume is a bounded
-unavailable rather than a fetch.
-live under `/app/server/.art`, whose contents are governed by the art store's confinement, media
-route, and orphan-prune rules, and SHALL NOT use the library default under `$HOME`, which the image
-maps to the `tmpfs`-mounted `/tmp` and would therefore re-download on every container start.
+SHALL NOT bake any model artifact into a layer. Like the background-removal cache, this volume
+is filled at run time only by the backend's own first-use fetch when
+`ART_TRANSLATE_DOWNLOAD_ENABLED=true` (the default), and reused across container recreations;
+an operator MAY pre-seed the volume with `scripts/fetch-translate-model.sh` and set
+`ART_TRANSLATE_DOWNLOAD_ENABLED=false` for an air-gapped deployment, in which case the fetch is
+structurally impossible. An empty volume on either track is a bounded
+`art_translate_unavailable`, never a crash, and the image itself carries no model on either
+track.
 
 It SHALL also
 provide a profile-gated, interactive one-shot bootstrap service for initializing a fresh database
@@ -138,7 +143,7 @@ without storing the initial administrator's password in the long-lived service c
 
 #### Scenario: Seed art is mounted read-only and never baked into the image
 - **WHEN** `compose.yaml` and the built image are inspected
-- **THEN** the `evennia` service mounts `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z`, and the image itself contains no seed-art directory
+- **THEN** the `evennia` service mounts `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z}`, and the image itself contains no seed-art directory
 
 #### Scenario: A deployment with no seed folder still starts
 - **WHEN** the service is started with no host seed folder present
@@ -148,7 +153,9 @@ without storing the initial administrator's password in the long-lived service c
 - **WHEN** the built image and the compose configuration are inspected
 - **THEN** the `evennia` service mounts a named volume at `/app/server/.translate`, the image
   declares that path as a persistent volume with a `root:0` group-writable directory, the image
-  itself contains no translation model artifact, and no service definition performs a model fetch
+  itself contains no translation model artifact, and no service definition performs a model
+  fetch at start (the only fetch is the backend's lazy first-use download inside the running
+  server when `ART_TRANSLATE_DOWNLOAD_ENABLED=true`)
 
 ### Requirement: Container ignore file excludes non-build-context files
 The project SHALL provide a `.containerignore` that excludes version control metadata, local virtual
