@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
-import ServiceMenu from "../../lib/service_menu.js";
 import COVERAGE_MANIFEST from "../../../static/webclient/js/tests/command_echo_coverage_manifest.json";
 import {
   SERVICES_PANEL_SAMPLE,
@@ -278,35 +277,13 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "sell 月光草 1",
     },
     {
-      id: "services guild row (payload-only accept)",
+      id: "guild accept row (payload-only accept)",
       ids: ["guild.quest_accept"],
       prepare() {
         openExploration();
-        store.setActiveSubDock("services");
-        const model = ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE);
-        store.router.pushFrame({ source: "services.board", params: {} });
-        const row = model.menus.board.items.find((i) => i.actionId === "guild.quest_accept");
-        expect(store.focusItemByKey(row.key)).toBe(true);
-        store.focusConfirm("pointer");
+        store.dispatchAction("guild.quest_accept", { definition_key: "quest_mill_grain" });
       },
       expected: "guild accept quest_mill_grain",
-    },
-    {
-      id: "services quantity form Enter submit (captured itemLabel replayed)",
-      ids: ["shop.buy"],
-      prepare() {
-        openExploration();
-        store.setActiveSubDock("services");
-        const model = ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE);
-        store.router.pushFrame({ source: "services.stock", params: {} });
-        const row = model.menus.stock.items.find((i) => i.itemKey === "item_iron_sword");
-        expect(store.focusItemByKey(row.key)).toBe(true);
-        store.focusConfirm("pointer"); // opens the bounded quantity form
-        expect(store.quantityForm?.open).toBe(true);
-        store.focusPress("2");
-        store.focusPress("Enter");
-      },
-      expected: "buy 鐵劍 2",
     },
     {
       id: "combat: keyboard SINGLE-target cast (forwarded row descriptor)",

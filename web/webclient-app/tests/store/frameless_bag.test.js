@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
-import ServiceMenu from "../../lib/service_menu.js";
 import { SERVICES_PANEL_SAMPLE } from "../../stories/fixtures.js";
 import * as fx from "./protocol_fixtures.js";
 
@@ -87,50 +86,6 @@ describe("frameless 背包 drawer (store contract)", () => {
     // identity — the drawer-open row must not mutate the frame.
     expect(store.router.currentMenu()).toEqual(currentBefore);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.currentFrameIsServiceFrame()).toBe(false);
-  });
-
-  it("the services-root 背包 row opens the bag drawer without switching the dock, survives a services commit, and guild navigation still hosts afterwards", () => {
-    openSession();
-    // The store-constructed case (the standalone services root is not
-    // mounted in production): the services sub-dock is active with its root
-    // frame current, and its 背包 row is the raw model row.
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.root", params: {} });
-    const depthBefore = store.router.depth();
-    const trailBefore = trailTitles(store.router);
-    expect(store.focusItemByKey("inventory")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.view.hudDrawer).toBe("inventory");
-    expect(store.router.depth()).toBe(depthBefore);
-    expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.router.currentMenu().title).toBe("服務");
-    expect(store.view.activeSubDock).toBe("services");
-    // A services commit while the bag drawer is open records no hosted
-    // surface and never switches (or re-hosts) the drawer.
-    const result = store.receive(1, "ui_snapshot", [snapshotWithServices(2, 3300)], {});
-    expect(result.accepted).toBe(true);
-    expect(store.view.hudDrawer).toBe("inventory");
-    expect(store.router.depth()).toBe(depthBefore);
-    expect(trailTitles(store.router)).toEqual(trailBefore);
-    // Closing leaves the dock where it is (the close must not silently
-    // switch back to the exploration root).
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
-    expect(store.view.hudDrawer).toBe(null);
-    expect(store.router.depth()).toBe(depthBefore);
-    expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.view.activeSubDock).toBe("services");
-    // Normal 公會 navigation afterwards still pushes and hosts as before
-    // (surface recorded at push time: the 任務板 row maps to the guild
-    // surface, so its frame opens the 任務 drawer).
-    expect(store.focusItemByKey("guild")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.router.depth()).toBe(depthBefore + 1);
-    expect(store.focusItemByKey("board")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.router.depth()).toBe(depthBefore + 2);
-    expect(store.router.currentMenu().title).toBe("任務板");
-    expect(store.view.hudDrawer).toBe("quest");
   });
 
   it("activating the service-guild navigate row in an open target frame opens the quest drawer with router unchanged", () => {
@@ -166,7 +121,6 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.serviceSurface).toBe(null);
 
     // A services-panel commit while the quest drawer is open never records a hosted surface or pushes a frame
     const nextSnap = snapshotWithServices(2, 5000);
@@ -178,10 +132,9 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.serviceSurface).toBe(null);
 
     // Closing the quest drawer by the store close entry pops nothing
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(depthBefore);
     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
@@ -220,7 +173,6 @@ describe("frameless 背包 drawer (store contract)", () => {
    expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
    expect(trailTitles(store.router)).toEqual(trailBefore);
    expect(store.view.activeSubDock).toBe(null);
-   expect(store.serviceSurface).toBe(null);
 
    // A services-panel commit while the shop drawer is open never records a hosted surface or pushes a frame
    const nextSnap = snapshotWithServices(2, 5000);
@@ -232,7 +184,6 @@ describe("frameless 背包 drawer (store contract)", () => {
    expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
    expect(trailTitles(store.router)).toEqual(trailBefore);
    expect(store.view.activeSubDock).toBe(null);
-   expect(store.serviceSurface).toBe(null);
   });
 
   it("closing the bag pops nothing and leaves the router exactly as the open found it", () => {
@@ -243,34 +194,13 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe("inventory");
     // The single close entry (every HudDrawer route funnels here with
     // popFrame: true) pops nothing and restores nothing to change.
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(depthBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
     expect(store.router.currentMenu().title).toBe("探索");
     expect(store.view.activeSubDock).toBe(null);
   });
-
-  it("closing the bag over a current service frame leaves the router and the dock alone", () => {
-    openSession();
-    // The defensive state the frameless exclusion in AppClient also guards:
-    // a service-titled frame is current while the bag drawer is open (no
-    // production handler records a service surface for this state).
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.shop", params: {} });
-    expect(store.currentFrameIsServiceFrame()).toBe(true);
-    expect(store.openHudDrawer("inventory")).toBe(true);
-    const depthBefore = store.router.depth();
-    const trailBefore = trailTitles(store.router);
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
-    expect(store.view.hudDrawer).toBe(null);
-    // No pop, no clear + re-home: the close left both alone.
-    expect(store.router.depth()).toBe(depthBefore);
-    expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.router.currentMenu().title).toBe("商店");
-    expect(store.view.activeSubDock).toBe("services");
-  });
-
   it("the scoped exemption does not regress the other drawers' close teardown", () => {
     openSession();
     // 任務 (frameless): tabToRootAndConfirm from depth > 1 pops to root and opens
@@ -285,7 +215,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.currentMenu().title).toBe("探索");
 
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(1);
     expect(store.view.activeSubDock).toBe(null);
@@ -315,7 +245,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     store.tabToRootAndConfirm("character", "pointer");
     expect(store.view.hudDrawer).toBe("status");
     expect(store.view.activeSubDock).toBe("character");
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.depth()).toBe(1);

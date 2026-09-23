@@ -112,30 +112,6 @@ describe("dock digit row picks (1–4)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the bounded quantity form captures digits before the row pick", () => {
-    openSession();
-    // The quantity form is a local UI exception whose open state the store
-    // publishes (services rows open it through the row-activation path);
-    // while open, a digit edits the quantity and is consumed before the
-    // dock row pick ever sees it.
-    store.quantityForm = {
-      itemKey: "item-1",
-      actionId: "shop.buy",
-      itemLabel: "麵包",
-      state: { min: 1, max: 9, raw: "", value: null },
-      open: true,
-    };
-    expect(store.focusPress("1")).toBe(true);
-    expect(sender.sent.actions).toHaveLength(0);
-    // The digit edited the quantity, not the dock.
-    store.focusPress("Enter");
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "shop.buy",
-      payload: { item_key: "item-1", quantity: 1 },
-    });
-  });
-
   it("held digit repeats are suppressed like held Enter, even after the lock releases", () => {
     openSession();
     openMoveFrame();

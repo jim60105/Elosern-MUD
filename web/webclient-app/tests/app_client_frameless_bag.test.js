@@ -10,7 +10,6 @@ import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
 import { CHARACTER_PANEL_SAMPLE, SERVICES_PANEL_SAMPLE } from "../stories/fixtures.js";
-import ServiceMenu from "../lib/service_menu.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 
@@ -128,45 +127,24 @@ describe("frameless 背包 drawer (composition contract)", () => {
     }
   });
 
-  it("renders no row region in the quest drawer or bag drawer after hosted-style navigation", async () => {
+  it("renders no row region in the quest drawer or bag drawer", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    // Hosted-style navigation into the guild surface: the 任務板 frame stays
-    // hosted in the 任務 drawer (regression — the frozen hosting surface).
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.root", params: {} });
-    expect(store.focusItemByKey("guild")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.focusItemByKey("board")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // Open quest drawer from top navigation
+    store.tabToRootAndConfirm("quests", "pointer");
     await wrapper.vm.$nextTick();
     let drawer = wrapper.get('[data-testid="hud-drawer"]');
     expect(drawer.find('[data-testid="quest-drawer"]').exists()).toBe(true);
     expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
     expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
-    // Closing the quest drawer is frameless: no frame pop occurs, the drawer
-    // closes once, and the current frame stays current.
-    const hostedDepth = store.router.depth();
+
+    const depthBefore = store.router.depth();
     await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(store.router.depth()).toBe(hostedDepth);
-    expect(store.view.activeSubDock).toBe("services");
-    expect(store.router.currentDescriptor().source).toBe("services.board");
-    // The player then escapes the remaining guild levels back to the root
-    // before opening the bag from the top navigation.
-    store.router.popMenu();
-    store.router.popMenu();
-    store.router.popMenu();
-    await wrapper.vm.$nextTick();
-    expect(store.router.currentDescriptor().source).toBe("exploration.root");
-
-    // The bag opened after that hosted navigation still renders no row
-    // region, and its close leaves the router alone (the re-homed root
-    // frame may still sit above the popped stack from the store-constructed
-    // services root: the contract is that open+close change nothing).
+    expect(store.router.depth()).toBe(depthBefore);
     const depthBeforeBag = store.router.depth();
     await openBagFromNavigation();
     await wrapper.vm.$nextTick();

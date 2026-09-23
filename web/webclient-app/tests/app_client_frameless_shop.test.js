@@ -66,7 +66,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
-  it("renders only shop-panel and zero dock-menu/dock-detail inside drawer, even with shop frame forced current", async () => {
+  it("renders only shop-panel and zero dock-menu/dock-detail inside drawer", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
@@ -85,36 +85,22 @@ describe("frameless 商店 drawer (composition contract)", () => {
     expect(drawer.find('[data-testid="shop-panel"]').exists()).toBe(true);
     expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
     expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
-
-    // Defensive check: force a shop-family descriptor current while shop drawer is open
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "services.stock", params: {} });
-    await wrapper.vm.$nextTick();
-
-    drawer = wrapper.get('[data-testid="hud-drawer"]');
-    expect(drawer.find('[data-testid="shop-panel"]').exists()).toBe(true);
-    expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
-    expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
-
-    // Assert no production handler activation ever sets serviceSurface to "shop"
-    expect(store.serviceSurface).not.toBe("shop");
   });
 
-  it("no drawer ever renders dock-menu or dock-detail inside hud-drawer, even with service descriptor forced current (task 4.3)", async () => {
+  it("no drawer ever renders dock-menu or dock-detail inside hud-drawer (task 4.3)", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
     const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
-    const serviceDescriptors = [
-      { source: "services.guild", params: {} },
-      { source: "services.stock", params: {} },
+    const descriptors = [
+      { source: "exploration.move", params: {} },
+      { source: "exploration.interact", params: {} },
     ];
 
     for (const drawerName of drawers) {
-      for (const descriptor of serviceDescriptors) {
-        store.setActiveSubDock("services");
+      for (const descriptor of descriptors) {
         store.router.pushFrame(descriptor);
         store.openHudDrawer(drawerName);
         await wrapper.vm.$nextTick();
