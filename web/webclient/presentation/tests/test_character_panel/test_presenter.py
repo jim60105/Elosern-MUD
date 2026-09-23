@@ -384,6 +384,42 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             {"key": "no_such_skill", "label": "no_such_skill"},
         )
 
+    @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
+    def test_owned_holy_rite_rows_list_in_seventh_group_under_client_bound(self):
+        self.player.db.skills = {
+            "active": ["rite_anointing_touch", "rite_lamb_mark"],
+            "passive": ["poverty_vow"],
+        }
+        payload = self._render()
+        holy_rite = payload["actives"][-1]
+        self.assertEqual(holy_rite["category"], "holy_rite")
+        self.assertEqual(holy_rite["label"], "神聖聖儀")
+        self.assertEqual(
+            [sub_group["group"] for sub_group in holy_rite["groups"]],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [sub_group["label"] for sub_group in holy_rite["groups"]],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [r["key"] for r in holy_rite["groups"][0]["skills"]],
+            ["rite_lamb_mark"],
+        )
+        self.assertEqual(
+            [r["key"] for r in holy_rite["groups"][1]["skills"]],
+            ["rite_anointing_touch"],
+        )
+        self.assertNotIn(
+            "holy_rite",
+            [c["category"] for c in payload["passives"]],
+        )
+        enh = next(c for c in payload["passives"] if c["category"] == "enhancement")
+        self.assertIn("poverty_vow", [r["key"] for g in enh["groups"] for r in g["skills"]])
+        from web.webclient.presentation.character import validate_character
+        normalized = validate_character(payload)
+        self.assertEqual(normalized["actives"], payload["actives"])
+
 
 if __name__ == "__main__":
     unittest.main()

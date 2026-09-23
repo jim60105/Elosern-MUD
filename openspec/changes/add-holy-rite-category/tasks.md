@@ -29,25 +29,25 @@
 
 ## 3. Contract tests follow
 
-- [ ] 3.1 Update `world/skills/tests/test_skill_registry/` classification anchors: the exact
+- [x] 3.1 Update `world/skills/tests/test_skill_registry/` classification anchors: the exact
       member-set scenario (seven, order), the partition pin, the group-vocabulary pin
       (`HOLY_RITE ⊆ {None, "聖禮"}` with the four Series D keys named), and the no-other-field pin
       (the 15 rows keep kind/cost/effects/element/target_spec).
-- [ ] 3.2 Shrink the registry-agreement exclusion list in the `_support.py` sibling by the four
+- [x] 3.2 Shrink the registry-agreement exclusion list in the `_support.py` sibling by the four
       Series D keys at `world/skills/sexual_acts/tests/test_registry_structure/_support.py` (they
       leave the `SEXUAL_ACT` comparison set by category).
-- [ ] 3.2b Record the traceability slug table: the renamed requirements move
+- [x] 3.2b Record the traceability slug table: the renamed requirements move
       `skill-category-registry::skillcategory-enumerates-exactly-six-presentation-categories` →
       `…seven-…` (and the partition slug likewise) only when this change archives+syncs the main
       spec; during execution the test anchors keep their literal six-slug IDs and
       `tools.spec_traceability check` stays green against the main spec, with the slug-literal
       flip landing in the archive-sync step (precedent: skill-taxonomy-consolidation design's
       old→new slug table).
-- [ ] 3.3 Add the combat-panel scenario (owned `rite_lamb_mark` + `rite_martyrdom_vow` →
+- [x] 3.3 Add the combat-panel scenario (owned `rite_lamb_mark` + `rite_martyrdom_vow` →
       `holy_rite`/神聖聖儀 group, last, single null sub-group) and the character-panel scenario
       (null-then-聖禮 ordering, `poverty_vow` stays under `enhancement` passives) to the panel
       tests; keep `pnpm test`'s touched fixtures honest (no UI feature work).
-- [ ] 3.4 Run `uv run --locked python -m tools.spec_traceability check` and the focused Evennia
+- [x] 3.4 Run `uv run --locked python -m tools.spec_traceability check` and the focused Evennia
       labels for `world.skills`, `world.rules` combat-view/status tests, `--keepdb` (expect green
       with the six-slug anchors untouched mid-flight per 3.2b).
 

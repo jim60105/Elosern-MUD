@@ -154,6 +154,63 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             [_T_MARTIAL_PROBE, innate_keys[1], innate_keys[0]],
         )
 
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_owned_holy_rite_skills_list_as_seventh_category_and_validate(self):
+        self.player.db.skills = {
+            "active": ["rite_lamb_mark", "rite_martyrdom_vow"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertEqual(
+            [category["category"] for category in payload["skills"]],
+            ["martial_arts", "sexual_act", "holy_rite"],
+        )
+        holy_rite = payload["skills"][-1]
+        self.assertEqual(holy_rite["category"], "holy_rite")
+        self.assertEqual(holy_rite["label"], "神聖聖儀")
+        self.assertEqual(len(holy_rite["groups"]), 1)
+        self.assertIsNone(holy_rite["groups"][0]["group"])
+        self.assertIsNone(holy_rite["groups"][0]["label"])
+        self.assertEqual(
+            [s["key"] for s in holy_rite["groups"][0]["skills"]],
+            ["rite_lamb_mark", "rite_martyrdom_vow"],
+        )
+        normalized = validate_context_actions(payload)
+        self.assertEqual(normalized["skills"], payload["skills"])
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_holy_rite_sub_groups_follow_fixed_null_then_rite_order(self):
+        self.player.db.skills = {
+            "active": ["rite_anointing_touch", "rite_lamb_mark"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        holy_rite = next(c for c in payload["skills"] if c["category"] == "holy_rite")
+        self.assertEqual(
+            [sub_group["group"] for sub_group in holy_rite["groups"]],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [sub_group["label"] for sub_group in holy_rite["groups"]],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [s["key"] for s in holy_rite["groups"][0]["skills"]],
+            ["rite_lamb_mark"],
+        )
+        self.assertEqual(
+            [s["key"] for s in holy_rite["groups"][1]["skills"]],
+            ["rite_anointing_touch"],
+        )
+
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
     def test_exploration_uses_the_available_exploration_form_without_fabrication(self):
         payload = self.registry.render(

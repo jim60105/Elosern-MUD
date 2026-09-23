@@ -49,21 +49,12 @@ _SEXUAL_YAML_PATH = Path(__file__).parents[4] / "rules" / "rulebook" / "sexual.y
 # catalogue as the eighth hand-built divine row
 # (integrate-divine-sexual-arts-catalog), so it participates in the agreement
 # comparison on both sides and must never return to this set. The four church
-# Series D ministry rows join the same exclusion class
-# (implement-church-redemption design §5.5): declaration-only SKILL_REGISTRY
-# rows acquired ONLY through church redemption, doubling as advanced
-# OFFERING_CATALOG rows by shared key (world/lore/tests/test_church.py pins
-# the else branch — they must never enter the act catalogue, whose
-# empty-unlock seed gates would hand a fresh character an act the ordination
-# ladder is the sole gate for).
+# Series D ministry rows previously in this set moved to HOLY_RITE
+# (add-holy-rite-category) and therefore leave the SEXUAL_ACT comparison set.
 _MASTERY_EXCLUSIONS = frozenset(
     {
         "divine_sexual_mastery",
         "reincarnation_boon_yuna",
-        "rite_anointing_touch",
-        "rite_milk_blessing",
-        "rite_holy_kiss",
-        "rite_confession_bed",
     }
 )
 

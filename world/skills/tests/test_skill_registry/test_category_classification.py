@@ -56,10 +56,13 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "divine_mystery",
                 "utility",
                 "sexual_act",
+                "holy_rite",
             },
         )
         self.assertNotIn("movement", {member.value for member in SkillCategory})
         self.assertNotIn("innate_gift", {member.value for member in SkillCategory})
+        self.assertNotIn("church", {member.value for member in SkillCategory})
+        self.assertNotIn("ritual", {member.value for member in SkillCategory})
 
     @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
     def test_constructing_without_category_raises_type_error(self):
@@ -225,17 +228,6 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "priestly_grace",
                 "saintess_vessel",
                 "vow_of_service",
-                "rite_heal_light",
-                "rite_cleanse",
-                "rite_calm",
-                "rite_bless_water",
-                "rite_sanctify_ground",
-                "rite_absolution",
-                "rite_lamb_mark",
-                "rite_martyrdom_vow",
-                "rite_morning_devotion",
-                "rite_shelter",
-                "rite_martial_blessing",
                 "poverty_vow",
                 "chastity_discipline",
                 "temple_endurance",
@@ -330,10 +322,23 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "divine_shame_deprivation",
                 "divine_absolute_submission",
                 "divine_purity_restoration",
+            },
+            SkillCategory.HOLY_RITE: {
+                "rite_heal_light",
+                "rite_cleanse",
+                "rite_calm",
+                "rite_bless_water",
+                "rite_sanctify_ground",
+                "rite_absolution",
+                "rite_lamb_mark",
+                "rite_martyrdom_vow",
                 "rite_anointing_touch",
                 "rite_milk_blessing",
                 "rite_holy_kiss",
                 "rite_confession_bed",
+                "rite_martial_blessing",
+                "rite_shelter",
+                "rite_morning_devotion",
             },
         }
         pinned = set().union(*expected.values())
@@ -398,6 +403,27 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIsNone(skill.group, key)
 
+    @covers_requirement("skill-category-registry::category-group-vocabulary-is-closed-per-category")
+    def test_holy_rite_group_vocabulary_is_exactly_the_moved_series_d_rows(self):
+        self.assertNotIn(SkillCategory.HOLY_RITE, _UNGROUPED_CATEGORIES)
+        series_d = {
+            "rite_anointing_touch",
+            "rite_milk_blessing",
+            "rite_holy_kiss",
+            "rite_confession_bed",
+        }
+        holy_rites = [
+            skill for skill in SKILL_REGISTRY.values()
+            if skill.category is SkillCategory.HOLY_RITE
+        ]
+        self.assertEqual(len(holy_rites), 15)
+        for skill in holy_rites:
+            with self.subTest(key=skill.key):
+                if skill.key in series_d:
+                    self.assertEqual(skill.group, "聖禮")
+                else:
+                    self.assertIsNone(skill.group)
+
     @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
     def test_rehomed_acquired_passives_keep_their_mechanics(self):
         flight = SKILL_REGISTRY["flight"]
@@ -446,6 +472,43 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                         _CATALOG_EFFECTS[key],
                         f"skill {key!r} effects drifted from its catalog row",
                     )
+
+    @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
+    def test_moved_church_rites_keep_every_other_field(self):
+        lamb = SKILL_REGISTRY["rite_lamb_mark"]
+        self.assertEqual(lamb.effects, ["self_buff_apply:lamb_seal"])
+        self.assertIs(lamb.category, SkillCategory.HOLY_RITE)
+        self.assertIsNone(lamb.group)
+        self.assertIs(lamb.kind, SkillKind.ACTIVE)
+        self.assertEqual(lamb.cost, {})
+        self.assertEqual(lamb.element.key, "light")
+        self.assertIs(lamb.target_spec, TargetSpec.SELF)
+
+        martyr = SKILL_REGISTRY["rite_martyrdom_vow"]
+        self.assertEqual(martyr.effects, ["session_stamp:martyr_key"])
+        self.assertIs(martyr.category, SkillCategory.HOLY_RITE)
+        self.assertIsNone(martyr.group)
+        self.assertIs(martyr.kind, SkillKind.ACTIVE)
+        self.assertEqual(martyr.cost, {})
+        self.assertEqual(martyr.element.key, "light")
+        self.assertIs(martyr.target_spec, TargetSpec.SELF)
+
+        morning = SKILL_REGISTRY["rite_morning_devotion"]
+        self.assertEqual(morning.effects, [])
+        self.assertIs(morning.category, SkillCategory.HOLY_RITE)
+        self.assertIsNone(morning.group)
+        self.assertIs(morning.kind, SkillKind.ACTIVE)
+        self.assertEqual(morning.cost, {})
+        self.assertEqual(morning.element.key, "light")
+        self.assertIs(morning.target_spec, TargetSpec.SELF)
+
+        bed = SKILL_REGISTRY["rite_confession_bed"]
+        self.assertEqual(bed.effects, [])
+        self.assertIs(bed.category, SkillCategory.HOLY_RITE)
+        self.assertEqual(bed.group, "聖禮")
+        self.assertIs(bed.kind, SkillKind.ACTIVE)
+        self.assertEqual(bed.cost, {})
+        self.assertIs(bed.target_spec, TargetSpec.SINGLE)
 
 class FleeCategoryDeclarationTests(unittest.TestCase):
     """The ``flee`` classification is declared at its own construction site."""

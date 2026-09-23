@@ -87,6 +87,9 @@ def _scope_extra():
     skills = dict(overlay["skills"])
     mastery = _mastery_row()
     skills[mastery.key] = mastery
+    from world.skills.registry.data_church import ROWS as CHURCH_ROWS
+    for row in CHURCH_ROWS:
+        skills[row.key] = row
     return {**overlay, "skills": skills}
 
 
