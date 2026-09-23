@@ -62,7 +62,7 @@ category and no category naming a key absent from `SKILL_REGISTRY`.
   `rite_confession_bed`, `rite_martial_blessing`, `rite_shelter`, and `rite_morning_devotion` are
   inspected
 - **THEN** every one of them is classified `HOLY_RITE`, and the five Series C church passives
-  (`poverty_vow`, `obedience`, `chastity_discipline`, `temple_endurance`, `sanctuary_devotion`) remain
+  (`poverty_vow`, `obedience`, `chastity_discipline`, `temple_endurance`, `public_devotion`) remain
   classified `ENHANCEMENT`
 
 ### Requirement: Category group vocabulary is closed per category

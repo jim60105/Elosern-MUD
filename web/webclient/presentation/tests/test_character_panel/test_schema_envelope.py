@@ -295,8 +295,8 @@ class CharacterSchemaTests(unittest.TestCase):
 
     def test_every_real_category_plus_the_unknown_fallback_fits_the_bound(self):
         # The category-group bound must leave room for the synthetic fallback:
-        # an entity owning skills in all six SkillCategory members plus one
-        # unregistered key serializes seven category groups and must stay valid.
+        # an entity owning skills in all seven SkillCategory members plus one
+        # unregistered key serializes eight category groups and must stay valid.
         categories = [
             "elemental_magic",
             "martial_arts",
@@ -304,6 +304,7 @@ class CharacterSchemaTests(unittest.TestCase):
             "divine_mystery",
             "utility",
             "sexual_act",
+            "holy_rite",
         ]
         groups = []
         for category in categories:

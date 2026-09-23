@@ -167,16 +167,32 @@ class SkillRegistryTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIs(requirement.spec, skill.target_spec)
                 self.assertIs(requirement.faction, skill.faction_constraint)
+                expected_forbid_self = (
+                    skill.category is SkillCategory.SEXUAL_ACT
+                    or (skill.category is SkillCategory.HOLY_RITE and skill.group == "聖禮")
+                )
                 self.assertIs(
                     requirement.forbid_self,
-                    skill.category is SkillCategory.SEXUAL_ACT,
+                    expected_forbid_self,
                 )
                 if (
-                    skill.category is SkillCategory.SEXUAL_ACT
+                    expected_forbid_self
                     and skill.target_spec is TargetSpec.SINGLE
                 ):
                     single_sexual_count += 1
                     self.assertTrue(requirement.forbid_self)
+        # Assert the Series D rows specifically stay forbid_self=True
+        for rite_key in ("rite_anointing_touch", "rite_milk_blessing", "rite_holy_kiss", "rite_confession_bed"):
+            self.assertTrue(
+                requirement_for(SKILL_REGISTRY[rite_key]).forbid_self,
+                f"{rite_key} must retain forbid_self=True after move to HOLY_RITE",
+            )
+        # And non-聖禮 holy rites declare forbid_self=False
+        for non_ministry_key in ("rite_lamb_mark", "rite_martyrdom_vow", "rite_morning_devotion"):
+            self.assertFalse(
+                requirement_for(SKILL_REGISTRY[non_ministry_key]).forbid_self,
+                f"{non_ministry_key} must have forbid_self=False",
+            )
         # Non-vacuity: the three seed acts alone guarantee three SINGLE-target
         # sexual acts; an empty loop here would pass every assertion above.
         self.assertGreaterEqual(single_sexual_count, 3)

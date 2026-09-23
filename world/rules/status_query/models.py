@@ -99,6 +99,7 @@ _CATEGORY_LABELS = {
     SkillCategory.DIVINE_MYSTERY: "神之秘法",
     SkillCategory.UTILITY: "特殊",
     SkillCategory.SEXUAL_ACT: "性愛行為",
+    SkillCategory.HOLY_RITE: "神聖聖儀",
 }
 # Presentation-only fallback bucket for keys absent from ``SKILL_REGISTRY``.
 # ``"unknown"`` is a plain string sentinel, never a ``SkillCategory`` member:

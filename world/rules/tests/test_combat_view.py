@@ -550,6 +550,35 @@ class GroupSkillViewsTests(unittest.TestCase):
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_holy_rite_sub_groups_follow_tag_order(self):
+        # Holy rite sub-groups follow fixed order: None -> "聖禮",
+        # independent of ownership order.
+        tagged = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_rite_tagged",
+            label="聖禮測試",
+            category=SkillCategory.HOLY_RITE,
+            group="聖禮",
+        )
+        untagged = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_rite_untagged",
+            label="聖儀測試",
+            category=SkillCategory.HOLY_RITE,
+            group=None,
+        )
+        groups = self._categories(tagged, untagged)
+        holy_rite = next(c for c in groups if c.category == "holy_rite")
+        self.assertEqual(
+            [g.group for g in holy_rite.groups],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [g.label for g in holy_rite.groups],
+            [None, "聖禮"],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_category_with_zero_owned_skills_is_omitted(self):
         groups = self._categories(_T_CAST)
         self.assertNotIn(

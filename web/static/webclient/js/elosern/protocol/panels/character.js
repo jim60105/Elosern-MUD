@@ -36,7 +36,7 @@ var CHARACTER_MAX_DISPLAYED_ROWS = 32;
 // The category-group count bound equals len(SkillCategory) plus one on the
 // server: the extra slot is the synthetic "unknown" fallback group that
 // holds keys absent from SKILL_REGISTRY.
-var CHARACTER_MAX_CATEGORY_GROUPS = 7;
+var CHARACTER_MAX_CATEGORY_GROUPS = 8;
 // CHARACTER_MAX_KEY is shared with the context_actions skill-group rows.
 var CHARACTER_MAX_LABEL = 128;
 var CHARACTER_MAX_DESCRIPTION = 256;

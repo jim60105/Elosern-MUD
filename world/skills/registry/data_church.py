@@ -51,7 +51,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_cleanse",
@@ -61,7 +61,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_calm",
@@ -71,7 +71,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_bless_water",
@@ -81,7 +81,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_sanctify_ground",
@@ -91,7 +91,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.AREA,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_absolution",
@@ -101,7 +101,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_lamb_mark",
@@ -112,7 +112,7 @@ ROWS: tuple[SkillDef, ...] = (
             usable_out_of_combat=True,
             element="light",
             effects=("self_buff_apply:lamb_seal",),
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_martyrdom_vow",
@@ -123,7 +123,7 @@ ROWS: tuple[SkillDef, ...] = (
             usable_out_of_combat=True,
             element="light",
             effects=("session_stamp:martyr_key",),
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         # ---- Series D — sexual-ministry actives (4; doubling as advanced
         # OFFERING_CATALOG rows through the shared act key) ----
@@ -134,7 +134,7 @@ ROWS: tuple[SkillDef, ...] = (
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
-            category=SkillCategory.SEXUAL_ACT,
+            category=SkillCategory.HOLY_RITE,
             group="聖禮",
         ),
         _skill(
@@ -144,7 +144,7 @@ ROWS: tuple[SkillDef, ...] = (
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
-            category=SkillCategory.SEXUAL_ACT,
+            category=SkillCategory.HOLY_RITE,
             group="聖禮",
         ),
         _skill(
@@ -154,7 +154,7 @@ ROWS: tuple[SkillDef, ...] = (
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
-            category=SkillCategory.SEXUAL_ACT,
+            category=SkillCategory.HOLY_RITE,
             group="聖禮",
         ),
         _skill(
@@ -164,7 +164,7 @@ ROWS: tuple[SkillDef, ...] = (
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
-            category=SkillCategory.SEXUAL_ACT,
+            category=SkillCategory.HOLY_RITE,
             group="聖禮",
         ),
         # ---- Series C — discipline passives (5; pure-positive only per iron rule) ----
@@ -227,7 +227,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_shelter",
@@ -237,7 +237,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
         _skill(
             "rite_morning_devotion",
@@ -247,6 +247,6 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",
-            category=SkillCategory.ENHANCEMENT,
+            category=SkillCategory.HOLY_RITE,
         ),
 )

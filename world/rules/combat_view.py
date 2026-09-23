@@ -33,10 +33,10 @@ from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 # Presentation bounds owned by the combat view (equal or below protocol limits).
 MAX_PARTICIPANTS = 16
 # Flattened active-skill descriptor bound. Raised from 32 to clear the current
-# theoretical maximum of 157 obtainable active skills (91 base active skills
-# including innate, plus the 66 registered sexual acts of the catalogue) with
-# headroom for catalog growth; a multiple of 16 like the other presentation
-# bounds.
+# theoretical maximum of 157 obtainable active skills (95 base active skills
+# including innate and holy rites, plus the 62 registered sexual acts of the
+# catalogue) with headroom for catalog growth; a multiple of 16 like the other
+# presentation bounds.
 MAX_SKILLS = 192
 MAX_SESSION_ID_CODE_POINTS = 128
 MAX_DISPLAY_NAME_CODE_POINTS = 64
@@ -58,6 +58,7 @@ CATEGORY_LABELS: dict[SkillCategory, str] = {
     SkillCategory.DIVINE_MYSTERY: "神之秘法",
     SkillCategory.UTILITY: "特殊",
     SkillCategory.SEXUAL_ACT: "性愛行為",
+    SkillCategory.HOLY_RITE: "神聖聖儀",
 }
 
 
@@ -413,7 +414,8 @@ def group_skill_views(
     depends on what the entity happens to own. Within ``elemental_magic``
     sub-groups follow ``ELEMENT_REGISTRY`` declaration order; within
     ``enhancement`` sub-groups follow the fixed ``None`` -> ``"天賦"`` ->
-    ``"身法"`` order; within
+    ``"身法"`` order; within ``holy_rite`` sub-groups follow the fixed
+    ``None`` -> ``"聖禮"`` order; within
     ``sexual_act`` sub-groups follow first-seen ``group`` order among the
     entity's owned skills; every other category emits exactly one
     ``group=None`` sub-group. A category or sub-group with zero owned skills
@@ -473,6 +475,21 @@ def group_skill_views(
                 )
                 sub_groups.append(
                     SkillGroupView(group=group, label=group, skills=members)
+                )
+        elif category is SkillCategory.HOLY_RITE:
+            sub_groups = []
+            for group_key in (None, "聖禮"):
+                members = tuple(
+                    skill for skill in owned if skill.group == group_key
+                )
+                if not members:
+                    continue
+                sub_groups.append(
+                    SkillGroupView(
+                        group=group_key,
+                        label=group_key,
+                        skills=members,
+                    )
                 )
         else:
             sub_groups = [SkillGroupView(group=None, label=None, skills=owned)]

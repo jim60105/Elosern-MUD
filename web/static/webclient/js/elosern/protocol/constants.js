@@ -138,6 +138,7 @@ var SKILL_CATEGORY_KEYS = [
   "divine_mystery",
   "utility",
   "sexual_act",
+  "holy_rite",
 ];
 
 // local_map panel bounds (mirror of web.webclient.presentation.local_map,

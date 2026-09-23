@@ -44,7 +44,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
     Category order follows ``SkillCategory``'s declaration order; sub-group
     order within ``elemental_magic`` follows ``ELEMENT_REGISTRY``'s declaration
     order; within ``enhancement`` sub-groups follow fixed ``None`` -> ``"天賦"`` ->
-    ``"身法"`` order; and ``sexual_act`` follows first-seen ``group`` order among the given
+    ``"身法"`` order; within ``holy_rite`` sub-groups follow fixed ``None`` ->
+    ``"聖禮"`` order; and ``sexual_act`` follows first-seen ``group`` order among the given
     keys. Every other category emits exactly one ``group=None`` sub-group, and
     each row's ``label`` is the registry label. Categories and sub-groups with
     zero matching keys are omitted. Keys absent from ``SKILL_REGISTRY`` land in
@@ -72,6 +73,8 @@ def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, .
             ordered_groups = [group for group in (None, "天賦", "身法") if group in category_buckets]
         elif category is SkillCategory.SEXUAL_ACT:
             ordered_groups = list(category_buckets)
+        elif category is SkillCategory.HOLY_RITE:
+            ordered_groups = [group for group in (None, "聖禮") if group in category_buckets]
         else:
             ordered_groups = [None]
         views.append(

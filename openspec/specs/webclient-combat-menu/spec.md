@@ -34,20 +34,21 @@ The combat panel's `skills` field SHALL be an ordered array of category groups. 
 SHALL contain the category's stable key, a bounded display label, and an ordered array of one or more
 sub-groups; each sub-group SHALL contain a nullable group key, a label that is non-null exactly when
 the group key is non-null, and an ordered array of skill descriptors. Category ordering SHALL follow
-`SkillCategory`'s declaration order (six members after the Phase B taxonomy consolidation;
-`movement` and `innate_gift` are no longer categories); sub-group ordering within `elemental_magic`
-SHALL follow `ELEMENT_REGISTRY`'s declaration order; sub-group ordering within `enhancement` SHALL
-follow the fixed order `null` group, then `"天賦"`, then `"身法"`, independent of ownership order. A
-category with zero owned skills SHALL be omitted from the array entirely, not emitted with an empty
-`groups` array; a category whose skills carry no `group` SHALL emit exactly one sub-group with a
-`null` group key and label. The total count of skill descriptors across every category and
-sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound of `192` — raised from the previous
-`32` so the bound clears the current theoretical maximum of 157 owned active skills (91 base active
-skills including innate plus 65 registered sexual acts and the pre-existing `divine_sexual_arts`)
-with headroom for catalog growth, while remaining a multiple of 16 consistent with the
-presentation-bounds family; this bound applies to the flattened total, not to the count of top-level
-category-group entries, which is separately bounded by the number of `SkillCategory` members. Within
-each sub-group, skill descriptors SHALL list each unique owned active `SkillDef` in
+`SkillCategory`'s declaration order (seven members after the `holy_rite` addition; `movement` and
+`innate_gift` are no longer categories); sub-group ordering within `elemental_magic` SHALL follow
+`ELEMENT_REGISTRY`'s declaration order; sub-group ordering within `enhancement` SHALL follow the
+fixed order `null` group, then `"天賦"`, then `"身法"`, independent of ownership order; sub-group
+ordering within `holy_rite` SHALL follow the fixed order `null` group, then `"聖禮"`, independent of
+ownership order. A category with zero owned skills SHALL be omitted from the array entirely, not
+emitted with an empty `groups` array; a category whose skills carry no `group` SHALL emit exactly one
+sub-group with a `null` group key and label. The total count of skill descriptors across every
+category and sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound of `192` — raised from the
+previous `32` so the bound clears the current theoretical maximum of 157 owned active skills (91 base
+active skills including innate plus 65 registered sexual acts and the pre-existing
+`divine_sexual_arts`) with headroom for catalog growth, while remaining a multiple of 16 consistent
+with the presentation-bounds family; this bound applies to the flattened total, not to the count of
+top-level category-group entries, which is separately bounded by the number of `SkillCategory`
+members. Within each sub-group, skill descriptors SHALL list each unique owned active `SkillDef` in
 `SkillHandler.owned_keys()` order after passive filtering, including innate skills, without
 alphabetical reordering. Each skill descriptor SHALL contain its stable key, registry label and
 description, exact resource cost, target specification, nullable element key, enabled state,
@@ -123,6 +124,20 @@ SHALL remain within the OOB protocol limit.
   when the participant is present in the art catalog — including an entry that resolves to a
   placeholder — and is `null` only when the participant is absent from the catalog, and the browser
   never derives a subject key or URL from the participant
+
+#### Scenario: Owned holy-rite skills list as the seventh category and validate on both validators
+- **WHEN** an entity owning `rite_lamb_mark` and `rite_martyrdom_vow` receives the `context_actions`
+  panel
+- **THEN** the panel carries a `holy_rite` category group labelled 神聖聖儀, last among the emitted
+  categories, with both skills in its single `null` sub-group, and the mirrored client validator
+  accepts the payload instead of rejecting the category key as unregistered
+
+#### Scenario: Holy-rite sub-groups follow the fixed null-then-聖禮 order
+- **WHEN** an entity owns both a null-group holy rite (`rite_lamb_mark`) and a `聖禮`-group one
+  (`rite_anointing_touch`)
+- **THEN** the `holy_rite` category group emits the `null` sub-group listing `rite_lamb_mark` before
+  the `"聖禮"` sub-group listing `rite_anointing_touch`, independent of the order the two grants were
+  stored
 
 ### Requirement: Availability uses shared side-effect-free rules preview
 The combat presenter, Telnet action listing, and combat adapters SHALL consume the same deterministic preview boundary. Availability SHALL include ownership and active kind, resources, exact target shape, presence/alive/range/faction candidate checks, action capability including `actions_per_turn == 0`, effect-handler availability, and time metadata. Preview state is advisory; every submitted action SHALL repeat authoritative validation against current canonical state before initiative.

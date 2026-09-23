@@ -26,7 +26,7 @@ from world.rules.status_query import (
     group_skill_keys,
 )
 from world.skills.handler import INNATE_SKILL_ORDER
-from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind, TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 from .._combat_session_helpers import (
     _live_registry,
@@ -52,6 +52,8 @@ from ._support import (
     _T_REST,
     _T_SEX_A,
     _T_SEX_B,
+    _T_RITE_A,
+    _T_RITE_B,
     _element_rows,
 )
 
@@ -68,7 +70,16 @@ class GroupSkillKeysTests(unittest.TestCase):
     def setUp(self):
         self.element_keys, self.element_labels, element_rows = _element_rows()
         patcher = synthetic_registries(
-            "skills", extra={"skills": {**_LOCAL_SKILLS, **element_rows}}
+            "skills",
+            extra={
+                "skills": {
+                    **_LOCAL_SKILLS,
+                    **element_rows,
+                    "rite_lamb_mark": SKILL_REGISTRY["rite_lamb_mark"],
+                    "rite_anointing_touch": SKILL_REGISTRY["rite_anointing_touch"],
+                    "poverty_vow": SKILL_REGISTRY["poverty_vow"],
+                }
+            },
         )
         patcher.__enter__()
         self.addCleanup(patcher.__exit__, None, None, None)
@@ -143,6 +154,48 @@ class GroupSkillKeysTests(unittest.TestCase):
     @covers_requirement(
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
+    def test_holy_rite_sub_groups_follow_tag_order(self):
+        # Holy rite sub-groups follow fixed order: None -> 聖禮
+        # Pass in reverse order: _T_RITE_B ("聖禮"), _T_RITE_A (None).
+        views = group_skill_keys([_T_RITE_B, _T_RITE_A])
+        self.assertEqual([view.category for view in views], ["holy_rite"])
+        self.assertEqual(
+            [group.group for group in views[0].groups],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [group.label for group in views[0].groups],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [row.key for group in views[0].groups for row in group.skills],
+            [_T_RITE_A, _T_RITE_B],
+        )
+
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
+    def test_owned_holy_rite_rows_list_in_seventh_group_and_passives_stay_enhancement(self):
+        # Scenario: Owned holy-rite rows list in the seventh group under the client bound
+        # Actives end with holy_rite group (null then 聖禮), poverty_vow stays enhancement
+        actives = group_skill_keys(["rite_anointing_touch", "rite_lamb_mark"])
+        self.assertEqual(actives[-1].category, "holy_rite")
+        self.assertEqual(actives[-1].label, "神聖聖儀")
+        self.assertEqual(
+            [group.group for group in actives[-1].groups],
+            [None, "聖禮"],
+        )
+        self.assertEqual(
+            [row.key for group in actives[-1].groups for row in group.skills],
+            ["rite_lamb_mark", "rite_anointing_touch"],
+        )
+        passives = group_skill_keys(["poverty_vow"])
+        self.assertEqual([view.category for view in passives], ["enhancement"])
+        self.assertNotIn("holy_rite", [view.category for view in passives])
+
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
     def test_ungrouped_category_emits_exactly_one_null_keyed_sub_group(self):
         views = group_skill_keys([_T_MART_A, _T_MART_B])
         self.assertEqual([view.category for view in views], ["martial_arts"])
@@ -189,11 +242,11 @@ class GroupSkillKeysTests(unittest.TestCase):
 
     def test_category_labels_are_the_canonical_traditional_chinese_forms(self):
         views = group_skill_keys(
-            [_T_EL_A, _T_MART_A, _T_REST[0], _T_REST[3], _T_REST[4], _T_SEX_A]
+            [_T_EL_A, _T_MART_A, _T_REST[0], _T_REST[3], _T_REST[4], _T_SEX_A, _T_RITE_A]
         )
         self.assertEqual(
             [view.label for view in views],
-            ["元素魔法", "武技", "強化", "神之秘法", "特殊", "性愛行為"],
+            ["元素魔法", "武技", "強化", "神之秘法", "特殊", "性愛行為", "神聖聖儀"],
         )
 
     def test_group_skill_keys_is_empty_for_no_keys(self):

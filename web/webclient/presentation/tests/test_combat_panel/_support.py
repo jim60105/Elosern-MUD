@@ -53,6 +53,9 @@ def _t_context_skill(base_key: str, key: str, label: str, effects):
 def _presenter_scope_extra():
     """One skills overlay: innates plus this file's probe rows."""
     skills = dict(synth_innate_overlay()["skills"])
+    from world.skills.registry.data_church import ROWS as CHURCH_ROWS
+    for row in CHURCH_ROWS:
+        skills[row.key] = row
     disguise = _t_context_skill(
         "t_moss_veil", "t_combat_disguise_probe", "偽裝試探", ["set_disguise"]
     )

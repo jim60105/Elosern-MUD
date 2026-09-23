@@ -39,6 +39,7 @@ _CATEGORY_ORDER = [
     SkillCategory.DIVINE_MYSTERY,
     SkillCategory.UTILITY,
     SkillCategory.SEXUAL_ACT,
+    SkillCategory.HOLY_RITE,
 ]
 
 _UNGROUPED_CATEGORIES = (

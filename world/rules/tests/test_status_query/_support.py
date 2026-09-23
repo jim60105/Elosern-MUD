@@ -192,6 +192,19 @@ _ROW_SEX_B = _file_skill(
 )
 
 
+_T_RITE_A, _T_RITE_B = "t_status_rite_a", "t_status_rite_b"
+
+
+_ROW_RITE_A = _file_skill(
+    _T_RITE_A, _MARTIAL_TEMPLATE, category=SkillCategory.HOLY_RITE
+)
+
+
+_ROW_RITE_B = _file_skill(
+    _T_RITE_B, _MARTIAL_TEMPLATE, category=SkillCategory.HOLY_RITE, group="聖禮"
+)
+
+
 _LOCAL_SKILLS = {
     row.key: row
     for row in (
@@ -202,5 +215,7 @@ _LOCAL_SKILLS = {
         *_ROW_REST,
         _ROW_SEX_A,
         _ROW_SEX_B,
+        _ROW_RITE_A,
+        _ROW_RITE_B,
     )
 }
