@@ -227,7 +227,15 @@ archive flow:
 - Delta spec `church-ordination`: amends the Series E requirement wording
   (morning devotion PASSIVE, the rite cast rail as the acquisition-use pair),
   adds requirements for the cooldown/day-block rails and the stable rejections.
-- Delta spec (skills registry capability): the `holy_rite` category fact.
+- Delta specs on the three current-contract capabilities this change amends:
+  - `skill-category-registry` — its main spec pins "exactly six members" and
+    the SKILL_REGISTRY partition: the delta grows the enum to seven (appended
+    `HOLY_RITE`) and re-pins the church-block rows' category and the morning-
+    devotion kind.
+  - `battlefield-commit-surface` — the snapshotted-surface list gains
+    `"church"`.
+  - `action-resolution-pipeline` — the four new stable `RITE_*` reject reasons
+    on the rejection vocabulary.
 - Tasks: surfaces + RejectReason + handlers → registry re-classification →
   engine-API deletion + test re-anchors → JS mirror + panel tests → docs/
   traceability sweep.
