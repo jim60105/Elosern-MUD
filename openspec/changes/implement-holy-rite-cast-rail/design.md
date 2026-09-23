@@ -31,10 +31,18 @@ clock — and `shelter_rest_flag` has no reset path.
 
 **D1 — Reuse the safety system wholesale (requester's option B).** `"church"` joins
 `SNAPSHOTTED_SURFACES` in `world/rules/action/contracts.py` and `("church", None)` joins
-`_ENTITY_SURFACES` in `world/rules/cast_settlement.py`. Both are list additions on established
-seams (`battlefield` joined the former by combat-disengage D-5); the commit/restore mechanism is
-untouched. Alternative (a bespoke pray-style settlement inside the handlers) rejected: it duplicates
-machinery the requester explicitly asked to reuse.
+`_ENTITY_SURFACES` in `world/rules/cast_settlement.py`. The `contracts.py` set is only the
+registration gateway: the actual snapshot/restore engine is the per-surface dispatcher
+`_snapshot_touched`/`_restore_touched` in `world/rules/action/transaction.py`, where every
+non-entity surface (`quest_log`, `wallet`, `inventory`, …) earned its own explicit
+`_attribute_snapshot` branch — `"church"` gets the same branch, in the wallet/inventory shape
+(an attribute-keyed snapshot restored via `_restore_attribute`), not an entity-aggregate key.
+Membership alone is not the rollback guarantee; the branch is. Alternative (a bespoke pray-style
+settlement inside the handlers) rejected: it duplicates machinery the requester explicitly asked
+to reuse. Naming hazard: `_ENTITY_SURFACES` exists twice with different shapes — the
+`frozenset` of surface names in `transaction.py` (the entity-aggregate gate; do NOT extend it)
+versus the `(attribute-key, category)` tuple in `cast_settlement.py` (the settlement snapshot
+list; this change's addition target).
 
 **D2 — Grammar on the closed set.** `rite_blessing:<buff-key>` (typed payload, `self_buff_apply`
 grammar twin) and bare `rite_shelter` join `parse_effect` in `world/skills/effects.py`; the registry
@@ -66,7 +74,15 @@ untouched.
 **D7 — Clean cutover deletions.** `cast_martial_blessing`, `apply_shelter_rest`,
 `MartialBlessingReason`/`Error`, `ShelterReason`/`Error` deleted with their tests' old anchors;
 `Series E utility rows feed the core loop`'s `covers_requirement` anchor moves to the new
-resolver-face test (literal IDs per `docs/development/spec-test-traceability.md`).
+resolver-face test (literal IDs per `docs/development/spec-test-traceability.md`). No requirement
+headers rename in this change, so existing slugs stay parseable mid-flight.
+
+**D8 — Hard sequencing on change 1's ARCHIVE, not its proposal.** Task 2.3 (and the panel/kind
+test re-pins) may only run once `add-holy-rite-category` is applied AND archived with its specs
+synced into `openspec/specs/`: `tools.spec_traceability` parses main specs only, and the
+classification tests re-pin against the seven-category main spec. While change 1 is still an
+active delta, change 2's registry/test edits would contradict the still-current six-category
+contract and neither change's gates can both be green.
 
 ## Risks / Trade-offs
 

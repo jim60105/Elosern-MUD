@@ -8,14 +8,14 @@ frozen dataclasses, one per recognized prefix. The recognized set is the complet
 already dispatched by `world/skills/effects.py` plus `stimulus` (introduced by
 `light-sacrament-casting`, which syncs before this change) plus `pleasure_peak` plus `gauge_transfer` plus
 `revoke_grants` (introduced by `conferral-revocation`, which syncs before this change) plus this change's
-`reveal_disguise`,
+shipped `reveal_disguise` and `session_stamp`,
 namely: (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
 `passive_trait`, `movement`, `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`,
 `self_buff_apply`, `confer_growth_rate`, `sexual_event`, `sexual_event_actor`, `sexual_event_target`,
 `pleasure`, `sexual_counter`, `act_pair_event`, `damage`, `heal`, `self_heal`, `cleanse`, `disengage`,
 `divine_mystery`, `divine_pleasure_max`, `divine_climax_extension_stage`, `divine_drain`,
 `divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`,
-`stimulus`, `pleasure_peak`, `gauge_transfer`, `revoke_grants`, `reveal_disguise`, plus `rite_blessing` and `rite_shelter` (introduced by `implement-holy-rite-cast-rail`). `rite_blessing` SHALL parse exactly `rite_blessing:<buff-key>` into a frozen typed dataclass carrying the `buffs.yaml` buff key (any other payload — bare, empty, or multi-segment — raises `ValueError` at parse and therefore at registry load). `rite_shelter` SHALL be a BARE prefix parsing into a payload-free frozen marker dataclass; any payload (`rite_shelter:<anything>`) SHALL raise `ValueError` at parse and therefore at registry load. `parse_effect` SHALL raise `ValueError` for any prefix
+`stimulus`, `pleasure_peak`, `gauge_transfer`, `revoke_grants`, `reveal_disguise`, `session_stamp`, plus `rite_blessing` and `rite_shelter` (introduced by `implement-holy-rite-cast-rail`). `rite_blessing` SHALL parse exactly `rite_blessing:<buff-key>` into a frozen typed dataclass carrying the `buffs.yaml` buff key (any other payload — bare, empty, or multi-segment — raises `ValueError` at parse and therefore at registry load). `rite_shelter` SHALL be a BARE prefix parsing into a payload-free frozen marker dataclass; any payload (`rite_shelter:<anything>`) SHALL raise `ValueError` at parse and therefore at registry load. `parse_effect` SHALL raise `ValueError` for any prefix
 not in this set and SHALL retain every prefix previously recognized, so no shipped skill fails to
 parse. `growth_rate` SHALL parse exactly the four-segment form
 `growth_rate:<stat>:<multiplier>:<scope>`, where `<stat>` is `practice` (the retired `magic` stat
