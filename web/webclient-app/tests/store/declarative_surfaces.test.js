@@ -29,7 +29,7 @@ import CombatMenu from "../../lib/combat_menu.js";
 const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 // The 店長 carries a navigate-kind shop affordance so the keyboard path can
-// reach the shop surface (the affordance row pushes the services.shop frame).
+// reach the shop surface (the affordance row opens the frameless shop drawer).
 function explorationPanelWithShop(overrides = {}) {
   return fx.explorationPanel(
     deepMergeLocal(
@@ -145,7 +145,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
       expect(store.router.trail()).toEqual(trailBefore);
       expect(store.view.activeSubDock).toBe(null);
-      expect(store.serviceSurface).toBe(null);
 
       // A services-panel commit while the quest drawer is open never records a hosted surface or pushes a frame
       const updateSnap = snapshot({ revision: 2 });
@@ -155,7 +154,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.router.depth()).toBe(depthBefore);
       expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
       expect(store.view.activeSubDock).toBe(null);
-      expect(store.serviceSurface).toBe(null);
     });
 
     it("tabToRootAndConfirm('quests') from depth > 1 pops to root and opens quest drawer with depth 1", () => {
@@ -177,29 +175,11 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       const depth = store.router.depth();
       const descriptor = store.router.currentDescriptor();
 
-      expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+      expect(store.closeHudDrawer()).toBe(true);
       expect(store.view.hudDrawer).toBe(null);
       expect(store.router.depth()).toBe(depth);
       expect(store.router.currentDescriptor()).toEqual(descriptor);
       expect(sender.sent.actions.length).toBe(0);
-    });
-
-    it("forced service frame settle-time hosting backward compatibility", () => {
-      openSession();
-      store.setActiveSubDock("services");
-      store.router.pushFrame({ source: "services.root", params: {} });
-      expect(store.focusItemByKey("guild")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("services.guild");
-      expect(store.view.hudDrawer).toBe("quest");
-      const withoutServices = snapshot();
-      delete withoutServices.panels.services;
-      withoutServices.revision = 2;
-      expect(
-        store.receive(1, "ui_snapshot", [withoutServices], {}).accepted,
-      ).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("exploration.root");
-      expect(store.view.hudDrawer).toBe(null);
     });
   });
 
@@ -378,7 +358,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
      expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
      expect(store.router.trail()).toEqual(trailBefore);
      expect(store.view.activeSubDock).toBe(null);
-     expect(store.serviceSurface).toBe(null);
 
      // A services-panel commit while the shop drawer is open never records a hosted surface or pushes a frame
      const updateSnap = snapshot({ revision: 2 });
@@ -388,7 +367,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
      expect(store.router.depth()).toBe(depthBefore);
      expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
      expect(store.view.activeSubDock).toBe(null);
-     expect(store.serviceSurface).toBe(null);
 });
  });
 });

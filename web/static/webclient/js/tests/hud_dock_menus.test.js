@@ -16,7 +16,6 @@ const assert = require("node:assert/strict");
 const KeyboardRouter = require("../elosern/keyboard_router.js");
 const ExplorationMenu = require("../elosern/exploration_menu.js");
 const CombatMenu = require("../elosern/combat_menu.js");
-const ServiceMenu = require("../elosern/service_menu.js");
 const CreationMenu = require("../elosern/creation_menu.js");
 const CharacterMenu = require("../elosern/character_menu.js");
 const { SYNTH_SKILL } = require("./support/synthetic-data.js");
@@ -219,24 +218,6 @@ test("combat menus carry fixed breadcrumb titles", () => {
   assert.equal(scale.title, "威力");
   const target = CombatMenu.openSkillTargets(combat, T_A);
   assert.equal(target.title, "目標");
-});
-
-test("service menus carry fixed breadcrumb titles", () => {
-  const model = ServiceMenu.buildMenus({
-    schema_version: 2,
-    available: true,
-    guild: { registration: { registered: false }, board: [] },
-    shop: { stock: [] },
-  });
-  const menus = model.menus;
-  assert.equal(menus.root.title, "服務");
-  assert.equal(menus.guild.title, "公會");
-  assert.equal(menus.shop.title, "商店");
-  assert.equal(menus.board.title, "任務板");
-  assert.equal(menus.quests.title, "任務記錄");
-  // The 背包 keyboard menu no longer exists: the bag drawer opens frameless
-  // (make-inventory-drawer-frameless), so no 背包 frame can name a breadcrumb.
-  assert.equal(menus.inventory, undefined);
 });
 
 test("exploration target menu: shop and guild navigate rows carry openDrawer and no openServiceSubmenu", () => {

@@ -71,7 +71,7 @@ const {
   rootItems, navigationItems, dockItems, dockPaneKind, interactionOpen,
   interactionTarget, interactionChoices, onInteractionTarget, onTabClick,
   onNavigateHome, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
-  showDetail, focusedRowDisabled, servicesConfirm,
+  showDetail, focusedRowDisabled,
   onAction, onDockActivate, onDockFocusChange,
   onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
@@ -301,11 +301,6 @@ const {
             />
           </div>
           <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
-          <div v-if="servicesConfirm" class="services-confirm">
-            <div class="services-confirm-title" data-testid="services-confirm-title">
-              {{ servicesConfirm.label }}
-            </div>
-          </div>
         </ActionDock>
       </template>
     </AppShell>
@@ -340,7 +335,6 @@ const {
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"
         :services="panel('services') || {}"
-        :quantity-form="store.quantityForm"
         @buy="onShopBuy"
         @sell="onShopSell"
       />

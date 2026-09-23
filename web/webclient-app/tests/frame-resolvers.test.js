@@ -447,158 +447,32 @@ describe("frame resolver — (legacy) the degradation marker", () => {
 
 // --- webclient-services-combat-creation-frames: the completed table ---------
 
-import ServiceMenu from "../lib/service_menu.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 
-function guildSurface() {
-  return {
-    registration: {
-      enabled: true,
-      action_id: "guild.register",
-      label: "登記公會",
-      disabled_reason: null,
-    },
-    board: [
-      {
-        definition_key: "q-wolves",
-        display_name: "狼患",
-        objective_summary: "清除商路狼群",
-        reward_summary: "報酬 500 銅",
-        accept: { enabled: true, action_id: "guild.quest_accept", label: "接取", disabled_reason: null },
-      },
-    ],
-    quests: [
-      {
-        quest_id: "q-1",
-        display_name: "商路巡視",
-        state: "active",
-        detail: "沿商路巡視一輪。",
-        abandon: { enabled: true, action_id: "guild.quest_abandon", label: "放棄", disabled_reason: null },
-        turnin: { enabled: false, action_id: "guild.quest_turnin", label: "回報", disabled_reason: { code: "incomplete", message: "目標尚未完成。" } },
-      },
-      {
-        quest_id: "q-2",
-        display_name: "失落的貨箱",
-        state: "active",
-        detail: "找回遺失的貨箱。",
-        abandon: { enabled: false, action_id: "guild.quest_abandon", label: "放棄", disabled_reason: { code: "locked", message: "此任務無法放棄。" } },
-        turnin: { enabled: true, action_id: "guild.quest_turnin", label: "回報", disabled_reason: null },
-      },
-    ],
-    rank: null,
-  };
-}
+describe("frame resolver — retired services family (unresolvable)", () => {
+  const FORMER_SERVICES_SOURCES = [
+    "services.root",
+    "services.guild",
+    "services.board",
+    "services.quests",
+    "services.shop",
+    "services.stock",
+    "services.sell",
+    "services.quest-detail",
+    "services.confirm",
+  ];
 
-function shopSurface() {
-  return {
-    open: true,
-    stock: [
-      {
-        item_key: "potion",
-        display_name: SYNTH_ITEM.display,
-        buy_copper: 50,
-        stock: 4,
-        buy: { enabled: true, action_id: "shop.buy", quantity: { min: 1, max: 9 }, disabled_reason: null },
-      },
-    ],
-    sellable: [
-      {
-        item_key: "pelt",
-        display_name: "獸皮",
-        sell_copper: 12,
-        held: 3,
-        sell: { enabled: true, action_id: "shop.sell", quantity: { min: 1, max: 3 }, disabled_reason: null },
-      },
-    ],
-  };
-}
-
-function servicesPanel(overrides = {}) {
-  return {
-    schema_version: 1,
-    available: true,
-    guild: guildSurface(),
-    shop: shopSurface(),
-    ...overrides,
-  };
-}
-
-function servicesState(panel = servicesPanel()) {
-  return committedState({ mode: "exploration", panels: { services: panel } });
-}
-
-describe("frame resolver — the services family", () => {
-  it("every services source resolves to the builder menu verbatim", () => {
-    const resolver = resolverFor(servicesState());
-    const model = ServiceMenu.buildMenus(servicesPanel());
-    for (const key of ["root", "guild", "board", "quests", "shop", "stock", "sell"]) {
-      expect(resolver.resolve({ source: `services.${key}` })).toEqual(model.menus[key]);
+  it.each(FORMER_SERVICES_SOURCES)(
+    "every former services source (%s) resolves to the unresolvable marker",
+    (source) => {
+      const resolver = resolverFor(committedState());
+      expect(resolver.resolve({ source, params: { questIndex: 0 } })).toEqual({
+        unresolvable: true,
+        reason: null,
+      });
     }
-  });
-
-  it("quest-detail resolves by the row index the quest rows carry", () => {
-    const resolver = resolverFor(servicesState());
-    const model = ServiceMenu.buildMenus(servicesPanel());
-    const menu = resolver.resolve({ source: "services.quest-detail", params: { questIndex: 1 } });
-    expect(menu).toEqual(ServiceMenu.questMenuFor(model, servicesPanel().guild.quests[1]));
-    expect(menu.items.map((i) => i.key)).toEqual([
-      "quest-detail",
-      "quest-abandon-q-2",
-      "quest-turnin-q-2",
-    ]);
-  });
-
-  it("an out-of-range questIndex is the identity-loss marker", () => {
-    const resolver = resolverFor(servicesState());
-    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 9 } })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
-    expect(resolver.resolve({ source: "services.quest-detail", params: {} })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
-  });
-
-  it("the confirm frame derives from the composed quest row's server fields", () => {
-    const resolver = resolverFor(servicesState());
-    // q-1: the enabled abandon row carries the confirm fields.
-    expect(resolver.resolve({ source: "services.confirm", params: { questIndex: 0 } })).toEqual(
-      ServiceMenu.confirmMenu("確認放棄", "guild.quest_abandon", { quest_id: "q-1" }, null)
-    );
-    // q-2: the disabled abandon row has no confirmation → degrade, no fabrication.
-    expect(resolver.resolve({ source: "services.confirm", params: { questIndex: 1 } })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
-  });
-
-  it("a vanished quest degrades like a lost identity, keeping any server reason", () => {
-    const panel = servicesPanel();
-    const resolver = resolverFor(servicesState(panel));
-    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } }).items).toBeTruthy();
-    // A committed update removes the quest: the open frame degrades.
-    panel.guild.quests = [];
-    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
-  });
-
-  it("an unavailable services panel reports its server message verbatim", () => {
-    const resolver = resolverFor(
-      servicesState({ available: false, reason: { code: "offline", message: "服務目前不可用。" } })
-    );
-    expect(resolver.resolve({ source: "services.guild" })).toEqual({
-      unresolvable: true,
-      reason: "服務目前不可用。",
-    });
-    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } })).toEqual({
-      unresolvable: true,
-      reason: "服務目前不可用。",
-    });
-  });
+  );
 });
 
 function combatFixturePanel(overrides = {}) {

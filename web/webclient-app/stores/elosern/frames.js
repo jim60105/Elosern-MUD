@@ -217,9 +217,6 @@ export function applyFrames(ctx) {
     // hierarchical root + submenus): root entries open Move/Look/Interact/Wait
     // submenus and the Character/Quests/Inventory sub-docks, submenu rows
     // dispatch their `explore.*` actions.
-    if (ctx.handleServiceItem(item)) {
-      return;
-    }
     if (ctx.handleExplorationItem(item)) {
       return;
     }
@@ -400,10 +397,7 @@ export function applyFrames(ctx) {
   // D-A): the ONE commit hook for the exploration dock. A committed push
   // never re-pushes anything — the next access re-resolves. This window only
   // (a) settles the stack so a degradation pops synchronously at the commit,
-  // (b) discards the sub-dock / hosted service drawer the frame stack no
-  // longer hosts, and (c) discards the hosted surface's local state (the
-  // quantity form rides the shop drawer's removal, webclient-service-menus'
-  // discard-on-replacement contract generalized to hosted-frame pops).
+  // and (b) discards the sub-dock the frame stack no longer hosts.
   // The combat/creation settle follows the same descriptor-driven rules;
   // no family has a copy-based refresh path any more.
   ctx.settleFrameStack = function settleFrameStack(rs) {
@@ -458,24 +452,6 @@ export function applyFrames(ctx) {
       (!descriptor || descriptor.source === "exploration.root")
     ) {
       ctx.setActiveSubDock(null);
-    }
-    // Hosted-drawer rule (webclient-services-combat-creation-frames): when a
-    // settle POP happened (depth decreased) and the frame now current is NOT
-    // a hosted service frame, the hosted drawer closes with the frame and the
-    // surface's local state is discarded through the existing cleanup (the
-    // quantity form; the quest drawer's selection/confirmation state is
-    // component-local and dies on unmount). A descendant pop that returns to
-    // another hosted frame of the SAME surface leaves the drawer open; a
-    // manually-opened drawer with no pop is never event-closed.
-    if (popped && !ctx.descriptorIsServiceFrame(descriptor)) {
-      const drawerName = ctx.hudDrawer.value;
-      if (drawerName === "quest" || drawerName === "shop") {
-        ctx.hudDrawer.value = null;
-        ctx.setServiceSurface(null);
-        if (drawerName === "shop") {
-          ctx.quantityForm.value = null;
-        }
-      }
     }
   };
 

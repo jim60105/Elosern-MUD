@@ -7,9 +7,9 @@
 // beyond what those builders already produce (root entries and `back` rows
 // included, so reproducing them is not fabrication).
 //
-// The table is complete (webclient-services-combat-creation-frames): the
-// exploration, services, combat, and creation families. The dock push sites
-// mount descriptors; menu content exists only at resolution time.
+// The table is complete (retire-service-keyboard-frames): the exploration,
+// combat, and creation families. The dock push sites mount descriptors; menu
+// content exists only at resolution time.
 //
 // Purity contract: resolving twice against one committed state returns deep-
 // equal menus and mutates nothing — the builders are pure over their inputs,
@@ -30,7 +30,6 @@
 // to this registry.
 
 import ExplorationMenu from "../lib/exploration_menu.js";
-import ServiceMenu from "../lib/service_menu.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 import stableStringify from "../lib/stable_stringify.js";
@@ -134,44 +133,6 @@ export function createFrameResolver(deps) {
     const { model } = explorationModel();
     return isolate(model.menus[menuKey]);
   };
-
-  // --- services family helpers ----------------------------------------------
-
-  function servicesModel() {
-    const state = committed();
-    const panel = (state.panels && state.panels.services) || {};
-    return ServiceMenu.buildMenus(panel);
-  }
-
-  function requireServicesPanel() {
-    const state = committed();
-    const panel = (state.panels && state.panels.services) || null;
-    if (!panel || panel.available === false) {
-      return { ok: false, reason: marker(panelReasonMessage(panel)) };
-    }
-    return { ok: true, panel };
-  }
-
-  const servicesMenuSource = (menuKey) => () => {
-    const gate = requireServicesPanel();
-    if (!gate.ok) return gate.reason;
-    return isolate(servicesModel().menus[menuKey]);
-  };
-
-  // A quest-detail/confirm descriptor names its quest by the row INDEX the
-  // quest-log rows carry (`quest-<i>`); an index the committed panel no
-  // longer lists is the same identity-loss degradation.
-  function questRowAt(params) {
-    const gate = requireServicesPanel();
-    if (!gate.ok) return { ok: false, reason: gate.reason };
-    const index = indexParam(params, "questIndex");
-    const guild = (gate.panel.guild || {});
-    const row = (guild.quests || [])[index];
-    if (!row) {
-      return { ok: false, reason: marker(panelReasonMessage(gate.panel)) };
-    }
-    return { ok: true, model: servicesModel(), row };
-  }
 
   // --- combat family helpers -------------------------------------------------
 
@@ -298,47 +259,6 @@ export function createFrameResolver(deps) {
         return marker(null);
       }
       return isolate(ExplorationMenu.suggestionsMenu(suggestions));
-    },
-
-    // --- services family (webclient-services-combat-creation-frames) -------
-    // Every source reads the committed `services` panel through the same
-    // ServiceMenu model the migrated push sites used; an absent or
-    // unavailable panel degrades with the server-authored reason.
-    "services.root": servicesMenuSource("root"),
-    "services.guild": servicesMenuSource("guild"),
-    "services.board": servicesMenuSource("board"),
-    "services.quests": servicesMenuSource("quests"),
-    "services.shop": servicesMenuSource("shop"),
-    "services.stock": servicesMenuSource("stock"),
-    "services.sell": servicesMenuSource("sell"),
-    "services.quest-detail": (params) => {
-      const found = questRowAt(params);
-      if (!found.ok) return found.reason;
-      return isolate(ServiceMenu.questMenuFor(found.model, found.row));
-    },
-    // The abandon-confirmation frame, derived from that quest row's
-    // server-authored confirm fields, read from the SAME composed
-    // quest-detail row (`quest-abandon-<id>`) the old push site activated —
-    // the migrated resolver derives by index instead of carrying the row's
-    // fields through a frame copy. A vanished index degrades like a lost
-    // identity; a disabled abandon row (its `confirmActionId` is null) has
-    // no confirmation to present and degrades the same way.
-    "services.confirm": (params) => {
-      const found = questRowAt(params);
-      if (!found.ok) return found.reason;
-      const detail = ServiceMenu.questDetailMenu(found.model.panel, found.row);
-      const row = detail.find((item) => item.key === "quest-abandon-" + found.row.quest_id);
-      if (!row.confirmActionId) {
-        return marker(null);
-      }
-      return isolate(
-        ServiceMenu.confirmMenu(
-          row.confirmLabel,
-          row.confirmActionId,
-          row.confirmPayload,
-          row.commandDisplay ? row.commandDisplay.itemLabel : null
-        )
-      );
     },
 
     // --- combat family ------------------------------------------------------

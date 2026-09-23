@@ -654,7 +654,7 @@ open a surface and now only moves focus into an always-present one), the legend'
 updated in the same change that alters the behaviour.
 
 The digits the legend names SHALL be bound: while the dock owns keyboard focus (the key target is
-not editable, and the bounded services quantity form has not captured the digit first), pressing
+not editable), pressing
 `1`–`4` moves the current dock frame's focus onto the first four rows (1-indexed, rendered order)
 and activates the row through the same confirm path `Enter` uses — a disabled row shows its
 explanation and submits nothing, an in-flight row stays locked, and a held repeat is suppressed.

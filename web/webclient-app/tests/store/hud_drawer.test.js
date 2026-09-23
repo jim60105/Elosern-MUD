@@ -1,16 +1,14 @@
 // H4 (webclient-hud-04-reference-drawers) store drawer-controller tests:
-// the single open-drawer entry (unknown names rejected), the service-frame
-// hosting (a current service frame implies its drawer is open), one-level
-// frame pop on close, and the commit-path teardown (mode change / transport
-// loss closes the services drawers while the status drawer stays openable).
+// the single open-drawer entry (unknown names rejected), frameless drawer
+// close behavior, and the commit-path teardown (mode change / transport
+// loss closes drawers while the status drawer stays openable).
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
 
-// A minimal services panel exposing a guild quest log (drives the 任務記錄
-// service frame) so `ServiceMenu.buildMenus` yields a valid `menus.quests`.
+// A minimal services panel exposing a guild quest log.
 function servicesPanel() {
   return {
     schema_version: 4,
@@ -139,7 +137,7 @@ describe("H4 store reference-drawer controller", () => {
     store.tabToRootAndConfirm("quests", "pointer");
     const depthAtQuest = store.router.depth();
     expect(store.view.hudDrawer).toBe("quest");
-    const ok = store.closeHudDrawer({ popFrame: true });
+    const ok = store.closeHudDrawer();
     expect(ok).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(depthAtQuest);
@@ -147,7 +145,7 @@ describe("H4 store reference-drawer controller", () => {
 
   it("closeHudDrawer on party drawer is frameless and leaves router depth and activeSubDock untouched", () => {
     openSession();
-    store.setActiveSubDock("services");
+    store.setActiveSubDock("character");
     const initialDepth = store.router.depth();
     const initialDescriptor = store.router.currentDescriptor();
 
@@ -155,20 +153,20 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.openHudDrawer("party")).toBe(true);
     expect(store.view.hudDrawer).toBe("party");
 
-    // Close with popFrame: true
-    const ok = store.closeHudDrawer({ popFrame: true });
+    // Close drawer
+    const ok = store.closeHudDrawer();
     expect(ok).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
 
     // Frameless guarantee: activeSubDock and router stack are not mutated
-    expect(store.view.activeSubDock).toBe("services");
+    expect(store.view.activeSubDock).toBe("character");
     expect(store.router.depth()).toBe(initialDepth);
     expect(store.router.currentDescriptor()).toEqual(initialDescriptor);
   });
 
   it("closeHudDrawer on shop drawer is frameless and leaves router depth and activeSubDock untouched", () => {
    openSession();
-   store.setActiveSubDock("services");
+   store.setActiveSubDock("character");
    const initialDepth = store.router.depth();
    const initialDescriptor = store.router.currentDescriptor();
 
@@ -176,13 +174,13 @@ describe("H4 store reference-drawer controller", () => {
    expect(store.openHudDrawer("shop")).toBe(true);
    expect(store.view.hudDrawer).toBe("shop");
 
-   // Close with popFrame: true
-   const ok = store.closeHudDrawer({ popFrame: true });
+   // Close drawer
+   const ok = store.closeHudDrawer();
    expect(ok).toBe(true);
    expect(store.view.hudDrawer).toBe(null);
 
     // Frameless guarantee: activeSubDock and router stack are not mutated
-    expect(store.view.activeSubDock).toBe("services");
+    expect(store.view.activeSubDock).toBe("character");
     expect(store.router.depth()).toBe(initialDepth);
     expect(store.router.currentDescriptor()).toEqual(initialDescriptor);
   });

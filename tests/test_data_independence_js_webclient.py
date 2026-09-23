@@ -35,7 +35,6 @@ MIGRATED_FILES = (
     "web/static/webclient/js/tests/exploration_menu.test.js",
     "web/static/webclient/js/tests/hud_dock_menus.test.js",
     "web/static/webclient/js/tests/protocol.test.js",
-    "web/static/webclient/js/tests/service_menu.test.js",
     "web/webclient-app/tests/data/breakdown_rendering.test.js",
     "web/webclient-app/tests/data/equipment_doll.test.js",
     "web/webclient-app/tests/data/skill_book.test.js",

@@ -117,10 +117,6 @@ export const useElosernStore = defineStore("elosern", () => {
   // publish window (see `settleFrameStack`).
   ctx.settlePopSeen = false;
 
-  // The committed `services` panel signature: a replacement (a reconnect
-  // resync) discards the unsubmitted client-local quantity form.
-  ctx.lastServicesSig = null;
-
   // The reactive view/narrative refs (the view group projects into `view`).
   ctx.view = ref(null); // assigned right after the groups are applied
   ctx.narrative = ref([]);
@@ -234,18 +230,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // (null clears). The sub-dock panels set/clear this on mount/unmount;
     // the suggestions section hides while one is active.
     setActiveSubDock: ctx.setActiveSubDock,
-    // The bounded services quantity form (a local UI exception): exposed so
-    // the services panels can sync their per-row quantity control to the
-    // activated item (the `services-quantity` testid follows the form's
-    // item_key). Discarded (nulled) on a `services` panel replacement.
-    quantityForm: ctx.quantityForm,
-    // The recorded service surface ("guild" / "shop"): exposed so tests can
-    // assert whether a service surface is recorded.
-    serviceSurface: ctx.serviceSurface,
     // H4 (task 4.1/4.2): the reference drawer controller — the single open
     // entry (`openHudDrawer` over the closed name set, unknown names
-    // rejected) and the single close entry (`closeHudDrawer`, which pops
-    // one menu level when the drawer hosts a service frame).
+    // rejected) and the single close entry (`closeHudDrawer`).
     openHudDrawer: ctx.openHudDrawer,
     closeHudDrawer: ctx.closeHudDrawer,
     // H5 (task 5.3): the full-screen overlay controller — the single open
@@ -268,10 +255,5 @@ export const useElosernStore = defineStore("elosern", () => {
     setTextToHtml: ctx.setTextToHtml,
     setReducedMotion: ctx.setReducedMotion,
     setColorblind: ctx.setColorblind,
-    // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
-    // router's current frame is a service frame (guild / shop)
-    // so the drawer layer can render that frame's rows through the shared
-    // row renderer beside the surface's own presentation.
-    currentFrameIsServiceFrame: ctx.currentFrameIsServiceFrame,
   };
 });

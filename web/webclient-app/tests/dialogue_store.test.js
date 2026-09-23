@@ -6,7 +6,7 @@
 // command-line borrow through `borrowDialogueCommand`; ArrowRight keeps its
 // router meaning; the exit row's `dialogue-leave` dispatch rides the single
 // dispatch entry; and exploration-form lifecycle guards widen to dialogue
-// mode (a services/character sub-dock opened while talking closes, re-homes,
+// mode (a character sub-dock opened while talking closes, re-homes,
 // and settles exactly as in exploration mode).
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -276,13 +276,13 @@ describe("dialogue store mode lifecycle", () => {
   it("a character sub-dock opened while talking closes and re-homes on Escape", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    // The services sub-dock mid-conversation (the widened lifecycle guards):
+    // The character sub-dock mid-conversation (the widened lifecycle guards):
     // Escape pops the frame and the widened menu-close cleanup clears the
     // sub-dock, exactly as in exploration mode.
-    store.setActiveSubDock("services");
-    store.router.pushFrame({ source: "exploration.move", params: {} }, "services");
+    store.setActiveSubDock("character");
+    store.router.pushFrame({ source: "exploration.move", params: {} }, "character");
     expect(store.view.dockDepth).toBe(2);
-    expect(store.view.activeSubDock).toBe("services");
+    expect(store.view.activeSubDock).toBe("character");
     expect(store.focusEscape()).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.dockDepth).toBe(1);
@@ -297,7 +297,7 @@ describe("dialogue store mode lifecycle", () => {
     // re-home the exploration root — the widened close guard (align-11 D8).
     store.setActiveSubDock("character");
     expect(store.openHudDrawer("status")).toBe(true);
-    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    expect(store.closeHudDrawer()).toBe(true);
     // The widened non-hosted close guard (align-11 D8): the sub-dock dies
     // with the drawer and the root frame re-homes, exactly as in exploration.
     expect(store.view.activeSubDock).toBe(null);
@@ -311,7 +311,7 @@ describe("dialogue store mode lifecycle", () => {
     // withdrawn. The frame becomes unresolvable; the settle-driven cleanup
     // (the widened dockOnExplorationForm gate, align-11 D8) must pop it,
     // clear the sub-dock, and re-home — in ONE access, no stranded state.
-    store.setActiveSubDock("services");
+    store.setActiveSubDock("character");
     // The genuine push route (the store's pop-policy push, driven through the
     // widened exploration-row gate — itself the align-11 D8 behavior: rows
     // work in dialogue mode).
@@ -339,5 +339,17 @@ describe("dialogue store mode lifecycle", () => {
     // The caption keeps working through the degradation: digits still
     // address the committed dialogue picks.
     expect(store.focusPress("1")).toBe(true);
+  });
+
+  it("closeHudDrawer() on the status drawer opened from Character entry clears character sub-dock and re-homes root", () => {
+    openSession();
+    store.tabToRootAndConfirm("character", "pointer");
+    expect(store.view.hudDrawer).toBe("status");
+    expect(store.view.activeSubDock).toBe("character");
+    expect(store.closeHudDrawer()).toBe(true);
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.router.depth()).toBe(1);
+    expect(store.router.currentMenu().title).toBe("探索");
   });
 });

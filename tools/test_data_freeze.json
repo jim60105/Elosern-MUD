@@ -403,7 +403,6 @@
     "web/static/webclient/js/tests/protocol_title_ballot.test.js",
     "web/static/webclient/js/tests/protocol_title_codex.test.js",
     "web/static/webclient/js/tests/protocol_transport.test.js",
-    "web/static/webclient/js/tests/service_menu.test.js",
     "web/tests/browser/browser_helpers.py",
     "web/tests/browser/browser_settings.py",
     "web/tests/browser/seed.py",

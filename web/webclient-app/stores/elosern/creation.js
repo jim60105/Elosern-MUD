@@ -263,12 +263,9 @@ export function applyCreation(ctx) {
 
   // H4 (task 4.3/4.4): the drawer controller's commit-path sync. Runs on
   // every committed view (the store is the single writer). It (a) tears
-  // down the drawers on a mode change out of exploration, an epoch reset, or
-  // a transport loss (design D3), and (b) hosts the router's service frames
-  // inside the matching reference drawer (design D2): while a service frame
-  // is the router's current frame the drawer is open and renders that
-  // frame's rows; leaving the surface closes the drawer. The status drawer's
-  // payload is available in every mode, so it stays openable in combat.
+  // down the drawers on a mode change, an epoch reset, or a transport loss
+  // (design D3). The status drawer's payload is available in every mode, so it
+  // stays openable in combat.
   ctx.syncHudDrawer = function syncHudDrawer(prev, rs) {
     // Re-entrancy guard: a router stack mutation emits `focus`, which
     // re-enters `publishView`. The old signature gates stopped that loop
@@ -315,7 +312,6 @@ export function applyCreation(ctx) {
         ctx.hudOverlay.value = null;
         ctx.hudOverlayOpener.value = null;
       }
-      ctx.setServiceSurface(null);
       // Teardown final form (webclient-services-combat-creation-frames):
       // every event above yields EXACTLY one root frame — the committed
       // mode's declarative root descriptor. The mode the teardown targets
@@ -326,24 +322,6 @@ export function applyCreation(ctx) {
       return;
     }
 
-    // Frame hosting (design D2): while a service frame is the router's
-    // current frame, ensure the matching reference drawer is open (the
-    // invariant: no state where a service frame is current while its drawer
-    // is closed). Declarative hosting: the CURRENT FRAME'S DESCRIPTOR is
-    // the one source — a hosted services source maps to its drawer. A
-    // service drawer opened manually (e.g. the combat 狀態 opener or a
-    // user action) stays open when no service frame is current until an
-    // explicit close or a teardown event.
-    // The surface still gates the OPEN side: a frame pushed outside a
-    // production handler (no surface recorded — the frameless-bag
-    // defensive state) never steals a manually-opened drawer.
-    const hostedSource = ctx.router.currentDescriptor();
-    if (ctx.descriptorIsServiceFrame(hostedSource) && ctx.serviceSurface.value) {
-      const drawerName = ctx.SERVICE_SURFACE_DRAWERS[ctx.SERVICE_SURFACE_FOR_SOURCE[hostedSource.source]];
-      if (drawerName && ctx.hudDrawer.value !== drawerName) {
-        ctx.hudDrawer.value = drawerName;
-      }
-    }
 
     // webclient-align-05-party-hud: on a committed transition where party
     // data becomes unavailable, or mode transitions into creation, close the party drawer.

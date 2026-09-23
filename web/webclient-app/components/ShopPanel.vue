@@ -12,10 +12,6 @@ import { computed, reactive, ref, watch } from "vue";
 const props = defineProps({
   // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
-  // The store's bounded quantity form (a local UI exception). When the
-  // keyboard flow opens the form, the panel highlights the activated row
-  // (the `services-quantity` control follows the form's item_key).
-  quantityForm: { type: Object, default: null },
 });
 
 const emit = defineEmits(["buy", "sell"]);
@@ -72,20 +68,17 @@ for (const row of sellable.value) {
 // The per-row quantity form (Phase-0 audit §2.3 REMAP-TO-TESTID): the
 // `services-quantity` wrapper and `services-quantity-value` display are
 // served as `data-testid` on the Vue quantity control. The form is open for
-// the activated row only; submit closes it. A reconnect replaces the
-// `services` panel and discards the unsubmitted quantity (local state
-// resets on panel identity change).
+// the activated row only; selection now comes from row focus or click only.
+// A reconnect replaces the `services` panel and discards the unsubmitted
+// quantity (local state resets on panel identity change).
 const selectedKey = ref(null);
 
 watch(
   () => props.services,
   () => {
     // A replaced `services` panel (a reconnect resync) rebuilds the per-item
-    // quantity entries from canonical persistence. The panel-local selection
-    // (`selectedKey`) is owned by the quantity-form watch below: the store
-    // nulls the form on a panel replacement, and that watch's else-branch
-    // clears `selectedKey`. Rebuilding `quantities` here re-defaults every
-    // item's entry to its action's own lower bound.
+    // quantity entries from canonical persistence. Rebuilding `quantities` here
+    // re-defaults every item's entry to its action's own lower bound.
     for (const key of Object.keys(quantities)) {
       delete quantities[key];
     }
@@ -102,19 +95,6 @@ watch(
   }
 );
 
-// The keyboard flow opens the store's quantity form; mirror its open state
-// into the panel selection so the `services-quantity` control tracks the
-// activated item. A closed or null form clears the selection.
-watch(
-  () => props.quantityForm,
-  (form) => {
-    if (form && form.open && form.itemKey) {
-      selectedKey.value = form.itemKey;
-    } else {
-      selectedKey.value = null;
-    }
-  }
-);
 
 function activateRow(row) {
   selectedKey.value = row.item_key;
