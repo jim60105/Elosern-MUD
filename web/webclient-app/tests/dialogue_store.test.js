@@ -6,7 +6,7 @@
 // command-line borrow through `borrowDialogueCommand`; ArrowRight keeps its
 // router meaning; the exit row's `dialogue-leave` dispatch rides the single
 // dispatch entry; and exploration-form lifecycle guards widen to dialogue
-// mode (a services/character sub-dock opened while talking closes, re-homes,
+// mode (a character sub-dock opened while talking closes, re-homes,
 // and settles exactly as in exploration mode).
 
 import { beforeEach, describe, expect, it } from "vitest";

@@ -3,8 +3,7 @@
 // shop-family descriptor is forced current -- no hosted row container
 // ([data-testid="dock-menu"]) or detail pane ([data-testid="dock-detail"])
 // renders inside the drawer and the body's only child surface is
-// [data-testid="shop-panel"]; the 任務 drawer still hosts its guild frame's
-// rows (regression).
+// [data-testid="shop-panel"]; no reference drawer hosts router rows.
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";

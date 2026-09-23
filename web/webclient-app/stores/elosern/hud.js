@@ -75,7 +75,8 @@ export function applyHud(ctx) {
     // When closing a drawer while an exploration sub-dock (character)
     // owns the action dock, clear the sub-dock and
     // re-home the exploration root frame — the same teardown the router's
-    // `escape-root` handler performs. The drawer's own Escape handler now
+    // `escape-root` handler performs. The drawer's own Escape handler
+    // owns the key while focus is trapped in the drawer.
     if (
       ctx.dockOnExplorationForm(ctx.reducer.getState()) &&
       activeSubDock.value

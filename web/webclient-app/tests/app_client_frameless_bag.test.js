@@ -1,7 +1,6 @@
 // make-inventory-drawer-frameless (task 3.4): the composition contract. With
 // the bag drawer open — including after hosted-style navigation — no hosted
-// row container or detail pane renders inside the drawer body while the
-// 公會 drawer still hosts its frame's rows (regression). Each of the
+// row container or detail pane renders inside the drawer body. Each of the
 // three close routes — Escape, the close control, the scrim — restores
 // focus to the 背包 entry that opened it with the router untouched.
 import { mount } from "@vue/test-utils";

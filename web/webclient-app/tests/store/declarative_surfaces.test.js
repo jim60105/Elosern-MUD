@@ -29,7 +29,7 @@ import CombatMenu from "../../lib/combat_menu.js";
 const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 // The 店長 carries a navigate-kind shop affordance so the keyboard path can
-// reach the shop surface (the affordance row pushes the services.shop frame).
+// reach the shop surface (the affordance row opens the frameless shop drawer).
 function explorationPanelWithShop(overrides = {}) {
   return fx.explorationPanel(
     deepMergeLocal(

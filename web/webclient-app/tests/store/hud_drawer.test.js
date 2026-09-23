@@ -1,8 +1,7 @@
 // H4 (webclient-hud-04-reference-drawers) store drawer-controller tests:
-// the single open-drawer entry (unknown names rejected), the service-frame
-// hosting (a current service frame implies its drawer is open), one-level
-// frame pop on close, and the commit-path teardown (mode change / transport
-// loss closes the services drawers while the status drawer stays openable).
+// the single open-drawer entry (unknown names rejected), frameless drawer
+// close behavior, and the commit-path teardown (mode change / transport
+// loss closes drawers while the status drawer stays openable).
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
