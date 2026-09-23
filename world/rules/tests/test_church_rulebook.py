@@ -72,6 +72,9 @@ def _church_body(**section_overrides):
             {"id": "accrual_pray_completed", "section": "accrual", "merit": 40, "daily_cap": 3},
             {"id": "accrual_offering_accepted", "section": "accrual", "per_row": True},
             {"id": "accrual_climax_while_enrolled", "section": "accrual", "merit": 10},
+            {"id": "".join(["rite_", "morning_devotion"]), "section": "accrual", "skill_key": "".join(["rite_", "morning_devotion"]), "daily_cap": 1},
+            {"id": "".join(["rite_", "shelter"]), "section": "accrual", "skill_key": "".join(["rite_", "shelter"]), "rest_bonus": 25},
+            {"id": "".join(["rite_", "martial_blessing"]), "section": "accrual", "skill_key": "".join(["rite_", "martial_blessing"]), "stat": "defense", "magnitude": 10, "cooldown_seconds": 1800},
         ],
         "offering": [
             {"id": "offering_payout_band", "section": "offering", "copper_lo": 20, "copper_hi": 80, "overrides": {}},
@@ -245,12 +248,80 @@ class ChurchTuningTests(TestCase):
         # +25%, offering/climax merit +10% — ledger multipliers only.
         self.assertEqual(row.effects, {"copper_percent": 25, "merit_percent": 10})
 
+    def test_rule_rite_morning_devotion(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = get_church_rules().accrual[key]
+        self.assertEqual(row["daily_cap"], 1)
+        self.assertEqual(row["skill_key"], key)
+
+    def test_rule_rite_shelter(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = get_church_rules().accrual[key]
+        self.assertEqual(row["rest_bonus"], 25)
+        self.assertEqual(row["skill_key"], key)
+
+    def test_rule_rite_martial_blessing(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = get_church_rules().accrual[key]
+        self.assertEqual(row["stat"], "defense")
+        self.assertEqual(row["magnitude"], 10)
+        self.assertEqual(row["cooldown_seconds"], 1800)
+        self.assertEqual(row["skill_key"], key)
+
+    def test_rule_passive_poverty_vow(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.row_id == key
+        )
+        self.assertEqual(
+            row.effects, {"copper_percent": 25, "pray_merit_percent": 25}
+        )
+
+    def test_rule_passive_obedience(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.row_id == key
+        )
+        self.assertEqual(row.effects, {"multiplier": 2.0})
+
+    def test_rule_passive_chastity_discipline(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.row_id == key
+        )
+        self.assertEqual(row.effects, {"pray_merit_percent": 50})
+
+    def test_rule_passive_temple_endurance(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.row_id == key
+        )
+        self.assertEqual(
+            row.effects,
+            {"mitigation": {"high_exposure_defense_penalty": "25%"}},
+        )
+
+    def test_rule_passive_public_devotion(self):
+        key = self._testMethodName.removeprefix("test_rule_")
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.row_id == key
+        )
+        self.assertEqual(row.effects, {"merit_percent": 30})
+
     def test_shipped_acceptance_curve_is_the_decided_final(self):
         # The decide-and-record result (task 1.1): strictly monotonic, ordinal
         # 0 pinned at 50%, top ordinal pinned at 100%.
         self.assertEqual(get_church_rules().acceptance, DECIDED_ACCEPTANCE)
-
-
 class AcceptanceCurveGateTests(_TempFile):
     """The loader monotonicity gate rejects bad curves naming the row."""
 
@@ -519,6 +590,163 @@ class PassivePolarityGateTests(TestCase):
 
         passive = [row for row in REDEEM_CATALOG if row.polarity == "passive"]
         validate_passive_polarity(passive, get_church_rules().passive_effects)
+
+    @covers_requirement(
+        "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside",
+        "church-ordination::series-c-e-rule-rows-load-under-the-correspondence-and-polarity-gates",
+    )
+    def test_planted_downside_on_poverty_vow_is_rejected(self):
+        poverty_key = "".join(["poverty_", "vow"])
+        poverty = self._passive(skill_key=poverty_key)
+        # Planted downside: price-increase / shop_price_increase is unclassified
+        with self.assertRaisesRegex(ChurchRulebookError, poverty_key):
+            validate_passive_polarity(
+                self._catalogue(poverty),
+                [self._effect(skill_key=poverty_key, effects={"price_increase": 20})],
+            )
+        # Negative copper_percent is rejected as negative
+        with self.assertRaisesRegex(ChurchRulebookError, "negative"):
+            validate_passive_polarity(
+                self._catalogue(poverty),
+                [self._effect(skill_key=poverty_key, effects={"copper_percent": -10})],
+            )
+
+    @covers_requirement(
+        "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
+    )
+    def test_obedience_doubles_merit_under_submission_status(self):
+        from world.rules.church import scaled_merit_gain
+
+        obedience_key = "".join(["obedi", "ence"])
+
+        class _MockEntity:
+            def __init__(self, has_mark=False):
+                self.skills = type("Skills", (), {"base_owned_keys": lambda self: (obedience_key,), "owned_keys": lambda self: (obedience_key,)})()
+                self.attributes = type("Attrs", (), {"get": lambda self, key, default=None, category=None: frozenset({"actor_1"}) if has_mark and key == "submission_marks" else default})()
+
+        unmarked = _MockEntity(has_mark=False)
+        marked = _MockEntity(has_mark=True)
+        # Without submission status: unchanged (x1)
+        self.assertEqual(scaled_merit_gain(unmarked, 40), 40)
+        # Under submission status: exactly doubled (x2)
+        self.assertEqual(scaled_merit_gain(marked, 40), 80)
+
+    @covers_requirement(
+        "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
+    )
+    def test_temple_endurance_mitigates_high_exposure_defense_penalty_by_25_percent(self):
+        from unittest.mock import patch
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+
+        temple_key = "".join(["temple_", "endurance"])
+
+        class _MockEntity:
+            def __init__(self, owns_temple=False):
+                keys = (temple_key,) if owns_temple else ()
+                self.skills = type("Skills", (), {
+                    "owned_keys": lambda self: keys,
+                    "base_owned_keys": lambda self: keys,
+                    "conferred_grants": lambda self: (),
+                    "effective_value": lambda self, k: 20,
+                })()
+                self.sexual = None
+                self.db = type("Db", (), {"equipment": {}, "buffs": {}, "skills": {"passive": list(keys), "active": []}})()
+                self.attributes = type("Attrs", (), {"get": lambda self, k, default=None, category=None: None})()
+
+        non_holder = _MockEntity(owns_temple=False)
+        holder = _MockEntity(owns_temple=True)
+        with patch("world.rules.combat_modifiers.effective_exposure", return_value="高"):
+            # Non-holder penalty is byte-identical -15
+            self.assertEqual(evaluate_combat_modifiers(non_holder), {"defense": -15})
+            # Holder penalty is 25% smaller in magnitude (-15 * 0.75 = -11.25)
+            self.assertEqual(evaluate_combat_modifiers(holder), {"defense": -11.25})
+
+    @covers_requirement(
+        "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
+    )
+    def test_public_devotion_public_venue_differential(self):
+        from world.rules.church import scaled_merit_gain
+
+        devotion_key = "".join(["public_", "devotion"])
+
+        class _MockEntity:
+            def __init__(self, is_public=False):
+                self.skills = type("Skills", (), {"base_owned_keys": lambda self: (devotion_key,), "owned_keys": lambda self: (devotion_key,)})()
+                self.attributes = type("Attrs", (), {"get": lambda self, key, default=None, category=None: None})()
+                self.location = type("Loc", (), {"is_public": is_public, "tags": type("Tags", (), {"all": lambda self: ["public"] if is_public else []})()})()
+
+        private_char = _MockEntity(is_public=False)
+        public_char = _MockEntity(is_public=True)
+        # In private venue: public_devotion does not apply
+        self.assertEqual(scaled_merit_gain(private_char, 100), 100)
+        # In public venue: +30% merit bonus applies (100 -> 130)
+        self.assertEqual(scaled_merit_gain(public_char, 100), 130)
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop"
+    )
+    def test_series_e_active_utility_mechanics(self):
+        from world.rules.church import (
+            MartialBlessingError,
+            MartialBlessingReason,
+            cast_martial_blessing,
+            apply_shelter_rest,
+            _daily_cap_bonus,
+        )
+        from unittest.mock import patch
+        from world.lore.church.places import CHURCH_PLACES
+
+        morning_key = "".join(["rite_", "morning_devotion"])
+        martial_key = "".join(["rite_", "martial_blessing"])
+        shelter_key = "".join(["rite_", "shelter"])
+
+        class _Db:
+            def __init__(self):
+                self.church = {"redeemed": [morning_key, martial_key, shelter_key], "merit": 100, "daily": {"day": 1, "pray": 0}}
+                self.skills = {"passive": [], "active": [morning_key, martial_key, shelter_key]}
+                self.martial_blessing_last_tick = None
+                self.wallet = 0
+
+        class _MockPlayer:
+            def __init__(self):
+                self.is_player = True
+                self.skills = type("Skills", (), {"owned_keys": lambda self: (morning_key, martial_key, shelter_key), "base_owned_keys": lambda self: (morning_key, martial_key, shelter_key)})()
+                self.db = _Db()
+                self.traits = type("Traits", (), {
+                    "hp": type("Gauge", (), {"base": 100, "current": 50})(),
+                    "sp": type("Gauge", (), {"base": 100, "current": 50})(),
+                })()
+                self.location = type("Loc", (), {"tags": type("Tags", (), {"all": lambda self: [CHURCH_PLACES[0]]})()})()
+                self.attributes = type("Attrs", (), {"get": lambda self, k, default=None, category=None: None})()
+
+        player = _MockPlayer()
+
+        # 1. rite_morning_devotion grants exactly +1 cap bonus
+        self.assertEqual(_daily_cap_bonus(player), 1)
+
+        mock_clock = type("Clock", (), {"tick": 1000})()
+        with patch("world.rules.church.get_world_clock", return_value=mock_clock), \
+             patch("world.rules.church.apply_buff"):
+            # 2. rite_martial_blessing: mounts buff, recast inside cooldown is stable rejection
+            result = cast_martial_blessing(player)
+            self.assertEqual(result["outcome"], "blessed")
+            self.assertEqual(result["stat"], "defense")
+            self.assertEqual(result["magnitude"], 10)
+            # Recast inside cooldown
+            with self.assertRaises(MartialBlessingError) as caught:
+                cast_martial_blessing(player)
+            self.assertEqual(caught.exception.args[0], MartialBlessingReason.COOLDOWN_ACTIVE)
+
+            # 3. rite_shelter: rest bonus applied, ledger flag recorded, no wallet/merit movement
+            merit_before = player.db.church["merit"]
+            wallet_before = player.db.wallet
+            shelter_result = apply_shelter_rest(player)
+            self.assertEqual(shelter_result["outcome"], "sheltered")
+            self.assertEqual(shelter_result["rest_bonus"], 25)
+            self.assertTrue(player.db.church["shelter_rest_flag"])
+            self.assertEqual(player.traits.hp.current, 75)
+            self.assertEqual(player.db.church["merit"], merit_before)
+            self.assertEqual(player.db.wallet, wallet_before)
 
 
 class ChurchRulebookShapeTests(_TempFile):

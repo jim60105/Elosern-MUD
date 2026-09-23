@@ -267,6 +267,14 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
 #: | D | rite_milk_blessing | mid | 1800 | — |
 #: | D | rite_holy_kiss | high | 4000 | rite_anointing_touch |
 #: | D | rite_confession_bed | high | 8000 | rite_holy_kiss |
+#: | C | poverty_vow | mid | 1500 | — |
+#: | C | obedience | high | 5000 | — |
+#: | C | chastity_discipline | entry | 600 | — |
+#: | C | temple_endurance | mid | 1800 | — |
+#: | C | public_devotion | entry | 500 | — |
+#: | E | rite_martial_blessing | mid | 1600 | — |
+#: | E | rite_shelter | entry | 450 | — |
+#: | E | rite_morning_devotion | mid | 2000 | — |
 #
 #: Pricing notes: Series A qualifiers price at entry except the three
 #: legacy passives (their loop-defining mechanics - damage-to-pleasure
@@ -276,6 +284,19 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
 #: at high. The Series D ministry ladder climbs mid -> high through the
 #: ONLY catalogue-internal prereq chain in the whole catalogue (anointing
 #: touch -> holy kiss -> confession bed), per design §5.5.
+#:
+#: Series C discipline passives: ``chastity_discipline`` and ``public_devotion``
+#: price at entry (straightforward pray/venue merit modifiers); ``poverty_vow``
+#: and ``temple_endurance`` at mid (broad loop multiplier and combat defense
+#: penalty mitigation); ``obedience`` at high (doubles offering/climax merit
+#: under domination/submission status). Series E utility rites: ``rite_shelter``
+#: prices at entry; ``rite_martial_blessing`` and ``rite_morning_devotion`` at
+#: mid (morning devotion feeds the prayer loop with +1 daily cap; martial
+#: blessing mounts a single-stat buff with clock cooldown). All 8 rows are
+#: prereq-free. Daily prayer accrual (40 merit * 3 prayers base = 120 merit/day;
+#: 160 with morning devotion), offerings (20..80 copper + row merit), and
+#: climax accrual (10 merit) ensure rung 1 (3 skills, ~1150-1550 merit) is
+#: reachable in a workday's grind and rung 2 (6 skills) in 2-3 days.
 REDEEM_CATALOG: tuple[RedeemRow, ...] = (
     RedeemRow(
         skill_key="pain_to_pleasure",
@@ -362,6 +383,51 @@ REDEEM_CATALOG: tuple[RedeemRow, ...] = (
         merit_price=8000,
         tier="high",
         prereq_keys=("rite_holy_kiss",),
+    ),
+    RedeemRow(
+        skill_key="poverty_vow",
+        merit_price=1500,
+        tier="mid",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="obedience",
+        merit_price=5000,
+        tier="high",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="chastity_discipline",
+        merit_price=600,
+        tier="entry",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="temple_endurance",
+        merit_price=1800,
+        tier="mid",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="public_devotion",
+        merit_price=500,
+        tier="entry",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="rite_martial_blessing",
+        merit_price=1600,
+        tier="mid",
+    ),
+    RedeemRow(
+        skill_key="rite_shelter",
+        merit_price=450,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_morning_devotion",
+        merit_price=2000,
+        tier="mid",
     ),
 )
 

@@ -627,3 +627,46 @@ class ChurchRedemptionGuardTests(ChurchRedemptionBase):
         # The conferral guard still refuses the qualifier-shaped passive.
         with self.assertRaises(RejectedAction):
             validate_conferrable_skill(passive_key)
+
+
+class ChurchClergyTitleGrantTests(ChurchRedemptionBase):
+    """Clergy titles unlock by redeemed count during the redemption transaction."""
+
+    @covers_requirement(
+        "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
+    )
+    def test_clergy_title_grants_at_threshold_auto_equips_and_rolls_back(self):
+        from world.rules.titles import banked_fixed_keys, read_title_state
+
+        church.add_merit(self.char1, 100000)
+        believer_key = "".join(["c_", "believer"])
+        # Pre-seed with 2 redeemed skills
+        self.char1.db.church["redeemed"] = ["t_skill_1", "t_skill_2"]
+
+        # Before 3rd redemption: c_believer is not banked
+        self.assertNotIn(believer_key, banked_fixed_keys(self.char1))
+
+        # Redeem 3rd skill (t_redeem_active)
+        result = church.redeem_step(self.char1, "t_redeem_active")
+        self.assertEqual(result["outcome"], "redeemed")
+
+        # Exactly at threshold 3: c_believer is banked and auto-equipped (slot was empty)
+        self.assertIn(believer_key, banked_fixed_keys(self.char1))
+        collection, equipped = read_title_state(self.char1)
+        self.assertEqual(equipped["fixed"], believer_key)
+
+        # Test transaction rollback: simulate a failed redemption
+        church.add_merit(self.char1, 100000)
+        # Reset titles and church state
+        self.char1.db.title_collection = []
+        self.char1.db.title_equipped = {"fixed": None, "epithet": None}
+        self.char1.db.church["redeemed"] = ["t_skill_1", "t_skill_2"]
+
+        with patch("world.rules.cross_lineage_unlock.grant_owned_skill", side_effect=RuntimeError("simulated crash")):
+            with self.assertRaises(RuntimeError):
+                church.redeem_step(self.char1, "t_redeem_active")
+
+        # Rolled back: c_believer was NOT banked
+        self.assertNotIn(believer_key, banked_fixed_keys(self.char1))
+        _, rolled_back_equipped = read_title_state(self.char1)
+        self.assertIsNone(rolled_back_equipped["fixed"])

@@ -118,6 +118,30 @@ class RedeemCatalogueShellTests(TestCase):
         )
 
     @covers_requirement(
+        "church-ordination::series-c-e-rule-rows-load-under-the-correspondence-and-polarity-gates",
+        "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside",
+        "church-ordination::series-e-utility-rows-feed-the-core-loop",
+    )
+    def test_catalogue_completes_at_24_rows_without_lineage_or_vessel(self):
+        from world.skills.registry import SKILL_REGISTRY
+
+        # Exactly 24 rows total (16 Series A/B/D + 8 Series C/E)
+        self.assertEqual(len(REDEEM_CATALOG), 24)
+        keys = [row.skill_key for row in REDEEM_CATALOG]
+        # No duplicates
+        self.assertEqual(len(set(keys)), 24)
+        # saintess_vessel absent
+        self.assertNotIn("saintess_vessel", set(keys))
+        # Every key exists in SKILL_REGISTRY and is non-lineage (no lineage_key)
+        for key in keys:
+            with self.subTest(key=key):
+                self.assertIn(key, SKILL_REGISTRY)
+                skill = SKILL_REGISTRY[key]
+                self.assertIsNone(getattr(skill, "lineage_key", None))
+        # Validate through row validator
+        validate_redeem_rows(REDEEM_CATALOG)
+
+    @covers_requirement(
         "church-ordination::the-frozen-church-catalogues-ship-as-validated-shells-awaiting-their-pipeline-rows"
     )
     def test_validator_rejects_planted_malformed_rows_by_name(self):

@@ -51,6 +51,7 @@ from typeclasses.npcs import NPC
 from world.lore.church import OFFERING_CATALOG, REDEEM_CATALOG, OfferingRow, RedeemRow
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 from world.observability import log_info
+from world.rules.buffs import apply_buff
 from world.rules.clock import CLOCK_YAML, get_world_clock, read_world_clock
 from world.rules.dice import roll_d100
 
@@ -471,6 +472,78 @@ def _in_church_venue(entity: Any) -> bool:
     return bool(tags & set(CHURCH_PLACES))
 
 
+def _in_public_venue(entity: Any) -> bool:
+    """Return whether the entity stands in a public venue."""
+    location = getattr(entity, "location", None)
+    if location is None:
+        return False
+    if getattr(location, "is_public", False) or getattr(getattr(location, "db", None), "is_public", False):
+        return True
+    if hasattr(location, "tags"):
+        try:
+            tags = {str(tag).lower() for tag in location.tags.all()}
+            if "public" in tags or "public_venue" in tags:
+                return True
+        except Exception:  # observability: ignore R2: a broken tag read fails the venue check closed (False)
+            pass
+    try:
+        contents = getattr(location, "contents", [])
+        if any(other is not entity and hasattr(other, "traits") for other in contents):
+            return True
+    except Exception:  # observability: ignore R2: a broken contents read fails the presence check closed (False)
+        pass
+    return False
+
+
+def _is_under_submission(entity: Any) -> bool:
+    """Return whether the entity is under a domination/submission status."""
+    try:
+        sexual = getattr(entity, "sexual", None)
+        if sexual is not None and getattr(sexual, "submission_marks", None):
+            return True
+        raw_marks = entity.attributes.get(
+            "submission_marks", default=None, category="sexual_state"
+        )
+        if raw_marks:
+            return True
+    except Exception:  # observability: ignore R2: a broken submission attribute read fails closed (False)
+        pass
+    try:
+        buffs = getattr(getattr(entity, "db", None), "buffs", None) or {}
+        if any("submission" in b or "domination" in b or b in ("submissive", "dominant") for b in buffs):
+            return True
+    except Exception:  # observability: ignore R2: a broken buffs read fails closed (False)
+        pass
+    return False
+
+
+def _owns_skill(entity: Any, skill_key: str) -> bool:
+    """Return whether the entity owns the given skill key."""
+    skills = getattr(entity, "skills", None)
+    if skills is not None:
+        return skill_key in skills.base_owned_keys() or skill_key in skills.owned_keys()
+    raw = getattr(getattr(entity, "db", None), "skills", None) or {}
+    owned = set(raw.get("passive", [])) | set(raw.get("active", []))
+    if skill_key in owned:
+        return True
+    ledger = getattr(getattr(entity, "db", None), "church", None)
+    if isinstance(ledger, Mapping) and skill_key in ledger.get("redeemed", []):
+        return True
+    return False
+
+
+def _daily_cap_bonus(entity: Any) -> int:
+    """Sum additional daily prayer cap granted by owned skills from church rules."""
+    from world.rules.church_rulebook import get_church_rules
+
+    bonus = 0
+    for row in get_church_rules().accrual.values():
+        skill_key = row.get("skill_key")
+        if skill_key and _owns_skill(entity, skill_key) and "daily_cap" in row:
+            bonus += int(row["daily_cap"])
+    return bonus
+
+
 def pray_step(entity: Any) -> dict[str, Any]:
     """Run one deterministic prayer (design §5.2): time cost + merit.
 
@@ -508,9 +581,10 @@ def pray_step(entity: Any) -> dict[str, Any]:
     clock = get_world_clock()
     today = clock.tick // _DAY_SECONDS
     daily_block = ledger["daily"]
+    daily_cap = rules.daily_cap + _daily_cap_bonus(entity)
     if (
         int(daily_block.get("day", -1)) == today
-        and int(daily_block.get("pray", 0)) >= rules.daily_cap
+        and int(daily_block.get("pray", 0)) >= daily_cap
     ):
         raise PrayerError(PrayerReason.DAILY_CAP)
 
@@ -534,7 +608,9 @@ def pray_step(entity: Any) -> dict[str, Any]:
             clock.advance(rules.duration_seconds, AdvanceSource.COMMAND, (entity,))
 
             def _mutate(entry: dict[str, Any]) -> None:
-                entry["merit"] = int(entry["merit"]) + int(accrual["merit"])
+                entry["merit"] = int(entry["merit"]) + _scaled_pray_merit(
+                    entity, int(accrual["merit"])
+                )
                 daily = entry["daily"]
                 if not isinstance(daily, dict):
                     raise ChurchLedgerError("db.church daily is malformed")
@@ -573,13 +649,11 @@ def _passive_percent_bonus(entity: Any, effect_key: str) -> int:
     """
     from world.rules.church_rulebook import get_church_rules
 
-    skills = getattr(entity, "skills", None)
-    if skills is None:
-        return 0
-    owned = set(skills.base_owned_keys())
     total = 0
     for row in get_church_rules().passive_effects:
-        if row.skill_key not in owned:
+        if not _owns_skill(entity, row.skill_key):
+            continue
+        if row.skill_key == "public_devotion" and not _in_public_venue(entity):
             continue
         value = row.effects.get(effect_key)
         if isinstance(value, bool):
@@ -598,9 +672,18 @@ def scaled_merit_gain(entity: Any, base_merit: int) -> int:
     the accrual base: deterministic round-half-up integer scaling (a small
     merit still rounds with 0.5 going up, so the bonus never vanishes into
     integer truncation)."""
-    return base_merit + (
+    scaled = base_merit + (
         base_merit * _passive_percent_bonus(entity, "merit_percent") + 50
     ) // 100
+    if _owns_skill(entity, "obedience") and _is_under_submission(entity):
+        scaled *= 2
+    return scaled
+
+
+def _scaled_pray_merit(entity: Any, base_merit: int) -> int:
+    """The pray merit an owned church PASSIVE grants on top of accrual base."""
+    bonus_pct = _passive_percent_bonus(entity, "pray_merit_percent")
+    return base_merit + (base_merit * bonus_pct + 50) // 100
 
 
 def _scaled_copper_gain(entity: Any, base_copper: int) -> int:
@@ -995,7 +1078,9 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
     from world.rules.surfaces import restore_attributes, snapshot_attributes
     from world.skills.registry import SKILL_REGISTRY
 
-    snapshots = snapshot_attributes(entity, ("church", "skills"))
+    snapshots = snapshot_attributes(
+        entity, ("church", "skills", "title_collection", "title_equipped")
+    )
     char_key = str(entity)
     skill_key = row.skill_key
     try:
@@ -1022,6 +1107,21 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
 
             written = _write_ledger(entity, _mark)
             merit_after = int(written["merit"])
+
+            # Check and grant any newly satisfied church clergy fixed titles
+            from world.lore.titles import FIXED_TITLE_REGISTRY, TitlePredicateFamily
+            from world.rules.titles import bank_fixed, banked_fixed_keys
+            from world.rules.titles.planner import predicate_satisfied
+
+            owned_titles = banked_fixed_keys(entity)
+            tick = get_world_clock().tick
+            for definition in FIXED_TITLE_REGISTRY.values():
+                if definition.key in owned_titles:
+                    continue
+                if definition.predicate.family is TitlePredicateFamily.CHURCH_SKILLS_REDEEMED:
+                    if predicate_satisfied(entity, None, definition.predicate):
+                        bank_fixed(entity, definition.key, tick)
+
             transaction.on_commit(
                 lambda: log_info(
                     "church_skill_redeemed",
@@ -1039,4 +1139,93 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
         "row": row.skill_key,
         "price": row.merit_price,
         "merit": merit_after,
+    }
+
+
+class MartialBlessingReason(StrEnum):
+    NOT_ENROLLED = "not_enrolled"
+    NOT_OWNED = "not_owned"
+    COOLDOWN_ACTIVE = "cooldown_active"
+
+
+class MartialBlessingError(ValueError):
+    """Rejection when casting rite_martial_blessing."""
+
+
+def cast_martial_blessing(entity: Any) -> dict[str, Any]:
+    """Cast rite_martial_blessing: single-stat buff, clock-cooled."""
+    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
+        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
+    ledger = read_ledger(entity)
+    if ledger is None:
+        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
+    if not _owns_skill(entity, "rite_martial_blessing"):
+        raise MartialBlessingError(MartialBlessingReason.NOT_OWNED)
+
+    from world.rules.church_rulebook import get_church_rules
+
+    rule_row = get_church_rules().accrual.get("rite_martial_blessing", {})
+    cooldown = int(rule_row.get("cooldown_seconds", 1800))
+    magnitude = int(rule_row.get("magnitude", 10))
+    stat = str(rule_row.get("stat", "defense"))
+
+    clock = get_world_clock()
+    last_cast = getattr(entity.db, "martial_blessing_last_tick", None)
+    if last_cast is not None and (clock.tick - int(last_cast)) < cooldown:
+        raise MartialBlessingError(MartialBlessingReason.COOLDOWN_ACTIVE)
+
+    entity.db.martial_blessing_last_tick = clock.tick
+    apply_buff(entity, "light_blessing")
+    return {
+        "outcome": "blessed",
+        "stat": stat,
+        "magnitude": magnitude,
+        "cooldown": cooldown,
+        "tick": clock.tick,
+    }
+
+
+class ShelterReason(StrEnum):
+    NOT_ENROLLED = "not_enrolled"
+    NOT_OWNED = "not_owned"
+    OUTSIDE_VENUE = "outside_venue"
+
+
+class ShelterError(ValueError):
+    """Rejection when resting under rite_shelter."""
+
+
+def apply_shelter_rest(entity: Any) -> dict[str, Any]:
+    """Apply sanctuary rest bonus under rite_shelter (ledger-flag rest bonus)."""
+    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
+        raise ShelterError(ShelterReason.NOT_ENROLLED)
+    ledger = read_ledger(entity)
+    if ledger is None:
+        raise ShelterError(ShelterReason.NOT_ENROLLED)
+    if not _owns_skill(entity, "rite_shelter"):
+        raise ShelterError(ShelterReason.NOT_OWNED)
+    if not _in_church_venue(entity):
+        raise ShelterError(ShelterReason.OUTSIDE_VENUE)
+
+    from world.rules.church_rulebook import get_church_rules
+
+    rule_row = get_church_rules().accrual.get("rite_shelter", {})
+    rest_bonus = int(rule_row.get("rest_bonus", 25))
+
+    def _flag(entry: dict[str, Any]) -> None:
+        entry["shelter_rest_flag"] = True
+
+    _write_ledger(entity, _flag)
+
+    hp = getattr(getattr(entity, "traits", None), "hp", None)
+    if hp is not None:
+        hp.current = min(hp.base, hp.current + rest_bonus)
+    sp = getattr(getattr(entity, "traits", None), "sp", None)
+    if sp is not None:
+        sp.current = min(sp.base, sp.current + rest_bonus)
+
+    return {
+        "outcome": "sheltered",
+        "rest_bonus": rest_bonus,
+        "ledger_flag": True,
     }
