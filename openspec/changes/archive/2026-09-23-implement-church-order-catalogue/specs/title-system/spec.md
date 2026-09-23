@@ -23,8 +23,8 @@ The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 cate
 - **THEN** the matching title is banked with the fixed slot auto-equipped at the threshold and remains locked one below it
 
 #### Scenario: The 聖女 display ban is a global registry gate
-- **WHEN** a planted fixed-title row of any category displays 聖女
-- **THEN** registry validation rejects it, and every shipped fixed-title row — ladder or otherwise — passes the gate with a non-聖女 display
+- **WHEN** a planted fixed-title row of any category contains 聖女 in its display name, key, flavor, or hint
+- **THEN** registry validation rejects it, and every shipped fixed-title row — ladder or otherwise — passes the gate with non-聖女 text
 
 #### Scenario: The ladder is display-only
 - **WHEN** the codebase is searched for title state consumed as a prerequisite

@@ -362,3 +362,9 @@
 - code: sword_saint_domain_atk_phys_bonus
   label: 劍豪之境攻擊提升
   severity: beneficial
+- code: martial_blessing
+  label: 武備祝聖
+  severity: beneficial
+- code: martial_blessing_defense_bonus
+  label: 武備祝聖防禦提升
+  severity: beneficial

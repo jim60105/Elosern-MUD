@@ -227,6 +227,7 @@ var TITLE_CODEX_CATEGORIES = [
   "spell",
   "explore",
   "guild",
+  "clergy",
   "romance",
 ];
 

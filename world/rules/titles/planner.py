@@ -112,6 +112,16 @@ def _event_defeats_tier(event_log: Any, monster_tier: str) -> bool:
     )
 
 
+def _church_skills_redeemed_count(entity: Any) -> int:
+    """Read the count of redeemed church skills without materializing state."""
+    from world.rules.church import ChurchLedgerError, redeemed_keys
+
+    try:
+        return len(redeemed_keys(entity))
+    except (ChurchLedgerError, AttributeError, TypeError, ValueError):
+        raise TitleDataError("db.church state is malformed") from None
+
+
 def predicate_satisfied(
     entity: Any,
     event_log: Any,
@@ -139,6 +149,8 @@ def predicate_satisfied(
         return predicate.experience_type in _experience_type_members(entity)
     if family is TitlePredicateFamily.COUNTER_THRESHOLD:
         return _sexual_counter_value(entity, predicate.counter) >= predicate.threshold
+    if family is TitlePredicateFamily.CHURCH_SKILLS_REDEEMED:
+        return _church_skills_redeemed_count(entity) >= predicate.threshold
     if family is TitlePredicateFamily.LINEAGE_COMPLETE:
         if predicate.root_skill_key not in _owned_skill_keys(entity):
             return False

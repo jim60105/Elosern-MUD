@@ -228,3 +228,47 @@ class TitlePredicateTests(EvenniaTest):
         )
         with self.assertRaises(TitleDataError):
             predicate_satisfied(self.entity, _event_log(), predicate)
+
+    @covers_requirement(
+        "title-system::the-church-redeemed-count-predicate-family-evaluates-the-redeemed-ledger-only"
+    )
+    def test_church_skills_redeemed_predicate_evaluates_exact_count(self):
+        predicate_k = TitlePredicate(
+            family=TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=3
+        )
+        predicate_k_plus_1 = TitlePredicate(
+            family=TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=4
+        )
+        self.entity.db.church = {"redeemed": ["skill_a", "skill_b", "skill_c"], "merit": 100}
+        # Exactly at threshold 3: satisfied
+        self.assertTrue(predicate_satisfied(self.entity, _event_log(), predicate_k))
+        # At threshold 4: unsatisfied
+        self.assertFalse(
+            predicate_satisfied(self.entity, _event_log(), predicate_k_plus_1)
+        )
+
+    @covers_requirement(
+        "title-system::the-church-redeemed-count-predicate-family-evaluates-the-redeemed-ledger-only"
+    )
+    def test_church_skills_redeemed_saintess_vessel_never_counts(self):
+        # A character holding saintess_vessel but zero redeemed skills
+        predicate = TitlePredicate(
+            family=TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=1
+        )
+        vessel_key = "".join(["saintess_", "vessel"])
+        self.entity.db.skills = {"passive": [vessel_key], "active": []}
+        self.entity.db.church = {"redeemed": [], "merit": 500}
+        self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
+
+    @covers_requirement(
+        "title-system::the-church-redeemed-count-predicate-family-evaluates-the-redeemed-ledger-only"
+    )
+    def test_church_skills_redeemed_unenrolled_fails_closed_zero_writes(self):
+        # Unenrolled entity has no db.church
+        predicate = TitlePredicate(
+            family=TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=1
+        )
+        self.assertIsNone(getattr(self.entity.db, "church", None))
+        self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
+        # Zero writes: db.church was not materialized
+        self.assertIsNone(getattr(self.entity.db, "church", None))

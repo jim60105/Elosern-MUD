@@ -213,3 +213,8 @@
 - id: sword_saint_domain_atk_phys_bonus
   when: {buff_active: sword_saint_domain}
   then: {atk_phys: 12}
+# 教會武裝降福防禦增益（church Series E rite_martial_blessing）：
+# martial_blessing 效果生效時，提供 defense 加值（基準 10，實際數值動態連動 church.yaml）。
+- id: martial_blessing_defense_bonus
+  when: {buff_active: martial_blessing}
+  then: {defense: 10}

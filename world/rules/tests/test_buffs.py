@@ -412,6 +412,9 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
     def test_buff_lightning_extra_action(self):
         self._assert_buff_loads_applies_and_shows("lightning_extra_action")
 
+    def test_buff_martial_blessing(self):
+        self._assert_buff_loads_applies_and_shows("martial_blessing")
+
     # Ice rulebook rows carry lore-catalog numbers; per the ratified verification
     # discipline these stay load/apply/presence checks.
     def test_buff_ice_slow(self):

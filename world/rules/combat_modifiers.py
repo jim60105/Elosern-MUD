@@ -275,6 +275,45 @@ def _scale_adjustments(adjustments: dict[str, Any], scale: float) -> dict[str, A
     return scaled
 
 
+def _church_mitigation_scale(entity: Any, rule_id: str) -> float:
+    """Return mitigation scale if an owned church passive mitigates rule_id."""
+    from world.rules.church_rulebook import get_church_rules
+
+    try:
+        rules = get_church_rules()
+    except Exception:
+        return 1.0
+    skills = getattr(entity, "skills", None)
+    if skills is not None:
+        owned = set(skills.owned_keys())
+    else:
+        raw_skills = getattr(getattr(entity, "db", None), "skills", None) or {}
+        owned = set(raw_skills.get("passive", [])) | set(raw_skills.get("active", []))
+    scale = 1.0
+    for effect in rules.passive_effects:
+        if effect.skill_key in owned and "mitigation" in effect.effects:
+            mitigation = effect.effects["mitigation"]
+            if rule_id in mitigation:
+                val = mitigation[rule_id]
+                pct = int(val.rstrip("%")) if isinstance(val, str) else int(val)
+                scale *= (1.0 - pct / 100.0)
+    return max(0.0, min(1.0, scale))
+
+
+def _church_martial_blessing_adjustments(base_adjustments: dict[str, Any]) -> dict[str, Any]:
+    """Return adjustments for martial_blessing from church.yaml accrual row."""
+    from world.rules.church_rulebook import get_church_rules
+
+    try:
+        rules = get_church_rules()
+        row = rules.accrual.get("rite_martial_blessing", {})
+        stat = str(row.get("stat", "defense"))
+        mag = int(row.get("magnitude", 10))
+        return {stat: mag}
+    except Exception:
+        return base_adjustments
+
+
 def matched_combat_modifiers(
     entity, context: dict[str, Any] | None = None
 ) -> tuple[tuple[str, dict[str, Any]], ...]:
@@ -309,6 +348,12 @@ def matched_combat_modifiers(
             if scale <= 0:
                 continue
             adjustments = _scale_adjustments(adjustments, scale)
+        if rule.id == "high_exposure_defense_penalty":
+            scale = _church_mitigation_scale(entity, rule.id)
+            if scale < 1.0:
+                adjustments = _scale_adjustments(adjustments, scale)
+        if rule.id == "martial_blessing_defense_bonus":
+            adjustments = _church_martial_blessing_adjustments(adjustments)
         matches.append((rule.id, adjustments))
     return tuple(matches)
 

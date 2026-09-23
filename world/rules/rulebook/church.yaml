@@ -79,6 +79,21 @@
 - id: accrual_climax_while_enrolled
   section: accrual
   merit: 10
+# 3 utility rites rows (Series E)
+- id: rite_morning_devotion
+  section: accrual
+  skill_key: rite_morning_devotion
+  daily_cap: 1
+- id: rite_shelter
+  section: accrual
+  skill_key: rite_shelter
+  rest_bonus: 25
+- id: rite_martial_blessing
+  section: accrual
+  skill_key: rite_martial_blessing
+  stat: defense
+  magnitude: 10
+  cooldown_seconds: 1800
 
 # 2 offering rows — copper payout band (int copper) and the enrollment gate.
 - id: offering_payout_band
@@ -121,3 +136,38 @@
   effects:
     copper_percent: 25
     merit_percent: 10
+# 5 Series C discipline passives (pure-positive only)
+# poverty_vow (清貧之誓): offering copper +25% and pray merit +25% —
+# pure ledger multipliers, pure-positive per the iron rule.
+- id: passive_poverty_vow
+  section: passive_effects
+  skill_key: poverty_vow
+  effects:
+    copper_percent: 25
+    pray_merit_percent: 25
+# obedience (順從戒律): merit doubled (x2) while under a domination/submission status.
+- id: passive_obedience
+  section: passive_effects
+  skill_key: obedience
+  effects:
+    multiplier: 2.0
+# chastity_discipline (貞潔戒律): pray merit +50%.
+- id: passive_chastity_discipline
+  section: passive_effects
+  skill_key: chastity_discipline
+  effects:
+    pray_merit_percent: 50
+# temple_endurance (神殿之忍): mitigates the existing high-arousal defense
+# penalty (high_exposure_defense_penalty) by 25% (0.75 penalty-mitigation scale).
+- id: passive_temple_endurance
+  section: passive_effects
+  skill_key: temple_endurance
+  effects:
+    mitigation:
+      high_exposure_defense_penalty: 25%
+# public_devotion (公開奉獻): merit from acts in public venues +30%.
+- id: passive_public_devotion
+  section: passive_effects
+  skill_key: public_devotion
+  effects:
+    merit_percent: 30

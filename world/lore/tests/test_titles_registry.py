@@ -38,6 +38,7 @@ _FAMILY_SAMPLE = {
     TitlePredicateFamily.GUILD_RANK_REACHED: ("guild_rank", "F"),
     TitlePredicateFamily.SEXUAL_EXPERIENCE: ("experience_type", "自慰"),
     TitlePredicateFamily.COUNTER_THRESHOLD: ("counter", "watched_count"),
+    TitlePredicateFamily.CHURCH_SKILLS_REDEEMED: ("threshold", 3),
 }
 
 # Which injected face validates which predicate parameter.
@@ -85,12 +86,14 @@ def _faces(**overrides):
 
 
 class FixedTitleRegistryContentTests(unittest.TestCase):
-    """The shipped rows: the seven authorized guild pairings and nothing else."""
+    """The shipped rows: the authorized guild pairings and clergy ladder."""
 
-    def test_registry_holds_exactly_the_guild_pairings(self):
+    def test_registry_holds_guild_pairings_and_clergy_ladder(self):
+        guild_keys = {definition.title_key for definition in GUILD_RANK_REGISTRY.values()}
+        clergy_keys = {"c_believer", "c_sister", "c_priest", "c_bishop", "c_cardinal"}
         self.assertEqual(
             set(FIXED_TITLE_REGISTRY),
-            {definition.title_key for definition in GUILD_RANK_REGISTRY.values()},
+            guild_keys | clergy_keys,
         )
 
     def test_pairing_is_one_to_one_in_both_directions(self):
@@ -111,16 +114,90 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
             self.assertEqual(FIXED_TITLE_REGISTRY[key].predicate.guild_rank, rank)
 
     def test_rows_are_categorized_displayed_and_prosed(self):
+        guild_keys = {definition.title_key for definition in GUILD_RANK_REGISTRY.values()}
         displays = set()
         for entry in FIXED_TITLE_REGISTRY.values():
             with self.subTest(key=entry.key):
                 self.assertIsInstance(entry.category, TitleCategory)
-                self.assertIs(entry.category, TitleCategory.GUILD)
+                if entry.key in guild_keys:
+                    self.assertIs(entry.category, TitleCategory.GUILD)
+                else:
+                    self.assertIs(entry.category, TitleCategory.CLERGY)
                 self.assertTrue(entry.display_name_zh.strip())
                 self.assertTrue(entry.flavor_zh.strip())
                 self.assertTrue(entry.hint_zh.strip())
                 displays.add(entry.display_name_zh)
         self.assertEqual(len(displays), len(FIXED_TITLE_REGISTRY))
+
+    @covers_requirement(
+        "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
+    )
+    def test_clergy_ladder_titles_content_contract(self):
+        expected = [
+            ("c_believer", "虔信者", 3),
+            ("c_sister", "修女", 6),
+            ("c_priest", "神官", 10),
+            ("c_bishop", "主教", 15),
+            ("c_cardinal", "樞機", 20),
+        ]
+        for key, display, threshold in expected:
+            with self.subTest(key=key):
+                row = FIXED_TITLE_REGISTRY[key]
+                self.assertEqual(row.key, key)
+                self.assertEqual(row.display_name_zh, display)
+                self.assertIs(row.category, TitleCategory.CLERGY)
+                self.assertIs(
+                    row.predicate.family,
+                    TitlePredicateFamily.CHURCH_SKILLS_REDEEMED,
+                )
+                self.assertEqual(row.predicate.threshold, threshold)
+                self.assertTrue(row.flavor_zh.strip())
+                self.assertTrue(row.hint_zh.strip())
+
+    @covers_requirement(
+        "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
+    )
+    def test_global_saintess_office_name_ban_rejects_planted_rows(self):
+        # Category GUILD
+        row_guild = _row(key="t_saintess_guild", guild_rank="F")
+        object.__setattr__(row_guild, "display_name_zh", "聖女")
+        with self.assertRaisesRegex(TitleRegistryError, "office-name ban"):
+            validate_fixed_titles([row_guild], **_faces())
+
+        # Category CLERGY
+        row_clergy = _row(
+            key="t_saintess_clergy",
+            family=TitlePredicateFamily.CHURCH_SKILLS_REDEEMED,
+            threshold=3,
+        )
+        object.__setattr__(row_clergy, "category", TitleCategory.CLERGY)
+        object.__setattr__(row_clergy, "display_name_zh", "真理聖女")
+        with self.assertRaisesRegex(TitleRegistryError, "office-name ban"):
+            validate_fixed_titles([row_clergy], **_faces())
+
+        # Category COMBAT
+        row_combat = _row(
+            key="t_saintess_combat",
+            family=TitlePredicateFamily.MASTERY_OWNED,
+            element="fire",
+        )
+        object.__setattr__(row_combat, "category", TitleCategory.COMBAT)
+        object.__setattr__(row_combat, "display_name_zh", "聖女騎士")
+        with self.assertRaisesRegex(TitleRegistryError, "office-name ban"):
+            validate_fixed_titles([row_combat], **_faces())
+
+        # In hint_zh or flavor_zh
+        row_hint = _row(key="t_saintess_hint", guild_rank="F")
+        object.__setattr__(row_hint, "hint_zh", "晉升為聖女後獲得。")
+        with self.assertRaisesRegex(TitleRegistryError, "office-name ban"):
+            validate_fixed_titles([row_hint], **_faces())
+
+        # All shipped rows pass the ban
+        for entry in FIXED_TITLE_REGISTRY.values():
+            self.assertNotIn("聖女", entry.display_name_zh)
+            self.assertNotIn("聖女", entry.key)
+            self.assertNotIn("聖女", entry.flavor_zh)
+            self.assertNotIn("聖女", entry.hint_zh)
 
     def test_rows_and_predicates_are_frozen(self):
         entry = FIXED_TITLE_REGISTRY["g_f_rank"]
@@ -160,9 +237,10 @@ class FixedTitleValidatorTests(unittest.TestCase):
     def test_every_family_validates_with_its_own_parameter(self):
         for family, (field, value) in _FAMILY_SAMPLE.items():
             with self.subTest(family=family.value):
-                threshold = 5 if field == "counter" else None
+                threshold = value if field == "threshold" else (5 if field == "counter" else None)
+                params = {field: value} if field != "threshold" else {}
                 row = _row(
-                    family=family, threshold=threshold, **{field: value}
+                    family=family, threshold=threshold, **params
                 )
                 self.assertIsNone(validate_fixed_titles([row], **_faces()))
 
@@ -174,8 +252,8 @@ class FixedTitleValidatorTests(unittest.TestCase):
 
     def test_each_face_rejects_its_own_dangling_reference(self):
         for family, (field, value) in _FAMILY_SAMPLE.items():
-            if field in ("quest_key", "counter"):
-                continue  # quest has its own message test; counter has no face
+            if field in ("quest_key", "counter", "threshold"):
+                continue  # quest has its own message test; counter/threshold have no face
             with self.subTest(face=field):
                 row = _row(key=f"t_{field}", family=family, **{field: value})
                 with self.assertRaises(TitleRegistryError) as caught:
@@ -316,4 +394,25 @@ class FixedTitleValidatorTests(unittest.TestCase):
         with self.assertRaises(TitleRegistryError):
             validate_fixed_titles([row], **_faces())
 
+    @covers_requirement(
+        "title-system::the-church-redeemed-count-predicate-family-evaluates-the-redeemed-ledger-only"
+    )
+    def test_church_skills_redeemed_threshold_shape(self):
+        family = TitlePredicateFamily.CHURCH_SKILLS_REDEEMED
+        bad = (
+            _row(key="t_none", family=family),
+            _row(key="t_zero", family=family, threshold=0),
+            _row(key="t_neg", family=family, threshold=-5),
+            _row(key="t_float", family=family, threshold=2.5),
+            _row(key="t_bool", family=family, threshold=True),
+            _row(key="t_text", family=family, threshold="3"),
+        )
+        for row in bad:
+            with self.subTest(key=row.key), self.assertRaises(TitleRegistryError):
+                validate_fixed_titles([row], **_faces())
+
+        # Foreign parameter on church_skills_redeemed
+        foreign = _row(key="t_foreign", family=family, threshold=3, element="fire")
+        with self.assertRaisesRegex(TitleRegistryError, "unexpected parameters"):
+            validate_fixed_titles([foreign], **_faces())
 

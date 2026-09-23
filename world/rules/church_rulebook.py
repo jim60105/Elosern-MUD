@@ -64,7 +64,7 @@ ACCEPT_TOP_ORDINAL_PERCENT = 100
 #: an ad-hoc key that could smuggle a downside (the iron rule is a load
 #: contract, not a convention).
 _POSITIVE_EFFECT_KEYS = frozenset(
-    {"merit_percent", "copper_percent", "multiplier", "mitigation"}
+    {"merit_percent", "copper_percent", "pray_merit_percent", "multiplier", "mitigation"}
 )
 
 #: Closed set of EXISTING rulebook penalties a church PASSIVE may mitigate.
@@ -99,6 +99,13 @@ def _require_bool(row_id: str, data: Mapping[str, Any], key: str) -> bool:
     value = data.get(key)
     if not isinstance(value, bool):
         raise _error(row_id, f"{key} must be a boolean")
+    return value
+
+
+def _require_str(row_id: str, data: Mapping[str, Any], key: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise _error(row_id, f"{key} must be a non-empty string")
     return value
 
 
@@ -230,7 +237,7 @@ def _classify_passive_effects(
                 "unclassified; every church passive effect must be declared "
                 f"in {sorted(_POSITIVE_EFFECT_KEYS)}",
             )
-        if effect_key in ("merit_percent", "copper_percent"):
+        if effect_key in ("merit_percent", "copper_percent", "pray_merit_percent"):
             _parse_nonnegative_addition(row_id, f"passive row {skill_key!r} effect {effect_key}", value)
         elif effect_key == "multiplier":
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -263,11 +270,17 @@ def _validate_mitigation(row_id: str, skill_key: str, value: Any) -> None:
                 "is not an existing penalty in "
                 f"{sorted(MITIGATION_TARGETS)}",
             )
-        _parse_nonnegative_addition(
+        parsed = _parse_nonnegative_addition(
             row_id,
             f"passive row {skill_key!r} mitigation",
             reduction,
         )
+        if parsed > 100:
+            raise _error(
+                row_id,
+                f"passive row {skill_key!r}: mitigation percentage {parsed}% "
+                "cannot exceed 100%",
+            )
 
 
 def validate_passive_polarity(
@@ -368,7 +381,18 @@ def _validate_pray(rows: list[SectionedRule]) -> PrayConfig:
     return PrayConfig(duration_seconds=duration, merit_per_pray=merit, daily_cap=cap)
 
 
-_ACCRUAL_FIELDS = frozenset({"merit", "daily_cap", "per_row"})
+_ACCRUAL_FIELDS = frozenset(
+    {
+        "merit",
+        "daily_cap",
+        "per_row",
+        "rest_bonus",
+        "stat",
+        "magnitude",
+        "cooldown_seconds",
+        "skill_key",
+    }
+)
 
 
 def _validate_accrual(rows: list[SectionedRule]) -> dict[str, dict[str, Any]]:
@@ -380,20 +404,46 @@ def _validate_accrual(rows: list[SectionedRule]) -> dict[str, dict[str, Any]]:
                 row.id, f"accrual row has unknown fields {sorted(unknown)}"
             )
         if not row.data:
-            raise _error(row.id, "accrual row must declare merit or per_row")
+            raise _error(row.id, "accrual row must declare content")
         entry: dict[str, Any] = {}
         if "merit" in row.data:
             merit = _require_int(row.id, row.data, "merit")
             if merit < 1:
                 raise _error(row.id, "accrual merit must be positive")
             entry["merit"] = merit
-            if "daily_cap" in row.data:
-                cap = _require_int(row.id, row.data, "daily_cap")
-                if cap < 1:
-                    raise _error(row.id, "accrual daily_cap must be positive")
-                entry["daily_cap"] = cap
+        if "daily_cap" in row.data:
+            cap = _require_int(row.id, row.data, "daily_cap")
+            if cap < 1:
+                raise _error(row.id, "accrual daily_cap must be positive")
+            entry["daily_cap"] = cap
         if "per_row" in row.data:
             entry["per_row"] = _require_bool(row.id, row.data, "per_row")
+        if "rest_bonus" in row.data:
+            rest_bonus = _require_int(row.id, row.data, "rest_bonus")
+            if rest_bonus < 1:
+                raise _error(row.id, "accrual rest_bonus must be positive")
+            entry["rest_bonus"] = rest_bonus
+        if "magnitude" in row.data:
+            magnitude = _require_int(row.id, row.data, "magnitude")
+            if magnitude < 1:
+                raise _error(row.id, "accrual magnitude must be positive")
+            entry["magnitude"] = magnitude
+        if "cooldown_seconds" in row.data:
+            cooldown = _require_int(row.id, row.data, "cooldown_seconds")
+            if cooldown < 1:
+                raise _error(row.id, "accrual cooldown_seconds must be positive")
+            entry["cooldown_seconds"] = cooldown
+        if "stat" in row.data:
+            entry["stat"] = _require_str(row.id, row.data, "stat")
+        if "skill_key" in row.data:
+            skill_key = _require_str(row.id, row.data, "skill_key")
+            from world.skills.registry import SKILL_REGISTRY
+            if skill_key not in SKILL_REGISTRY:
+                raise _error(
+                    row.id,
+                    f"accrual row skill_key {skill_key!r} is not a registered skill in SKILL_REGISTRY",
+                )
+            entry["skill_key"] = skill_key
         result[row.id] = entry
     return result
 
