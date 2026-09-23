@@ -28,10 +28,9 @@ export function useDrawers(store, { panel, panelAvailable }) {
   }
 
   // The drawer chrome's close entry (Escape / close control / scrim): route
-  // through the store's single close entry, popping exactly one menu level
-  // when the drawer hosts a service frame (task 4.2).
+  // through the store's single close entry.
   function onHudDrawerClose() {
-    store.closeHudDrawer({ popFrame: true });
+    store.closeHudDrawer();
   }
 
   // quest-drawer-split: the quest drawer hosts the player's quest book

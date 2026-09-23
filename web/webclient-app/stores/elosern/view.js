@@ -8,7 +8,6 @@
 import { computed } from "vue";
 import OptionCards from "../../lib/option_cards.js";
 import LocalMap from "../../lib/local_map.js";
-import stableStringify from "../../lib/stable_stringify.js";
 import { gaugeRatio, isLowHp } from "../../components/vitals.js";
 import {
   NAVIGATION_ITEM_KEYS,
@@ -257,25 +256,12 @@ export function applyView(ctx) {
   ctx.publishView = function publishView() {
     const prev = ctx.view.value;
     const rs = ctx.reducer.getState();
-    // The unsubmitted quantity form is client-local (spec webclient-service-menus):
-    // a replaced `services` panel (e.g. a reconnect resync) discards it.
-    const servicesPanel = (rs.panels && rs.panels.services) || null;
-    const servicesSig = stableStringify(servicesPanel);
-    if (ctx.quantityForm.value && servicesSig !== ctx.lastServicesSig) {
-      ctx.quantityForm.value = null;
-    }
-    ctx.lastServicesSig = servicesSig;
     ctx.handleTransportLifecycle(prev, rs);
     ctx.handleActionResult(rs);
     ctx.releaseIfReady(rs);
     ctx.rebuildCreationDock(prev, rs);
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
-    // The settle MUST precede the drawer sync: the hosting read in
-    // `syncHudDrawer` is itself an access-time settle trigger, which would
-    // otherwise pop the stack BEFORE the settle observes the depth decrease
-    // (its hosted-drawer close and sub-dock rules would never fire) and then
-    // leave a drawer open that hosts nothing.
     ctx.syncHudDrawer(prev, rs);
     ctx.view.value = ctx.buildView(prev, rs);
   };

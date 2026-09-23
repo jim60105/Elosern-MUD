@@ -188,7 +188,7 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
   }
 
   function onNavigateHome() {
-    if (store.view.hudDrawer) store.closeHudDrawer({ popFrame: true });
+    if (store.view.hudDrawer) store.closeHudDrawer();
     store.resetFramesToRoot();
     shellRef.value?.restoreDockFocus();
   }
@@ -229,34 +229,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
     const row = menu.items.find((item) => item.key === focused);
     return !!row && row.enabled === false;
   });
-
-  // The re-homed services confirmation screen (webclient-service-menus: an explicit
-  // confirm/cancel screen in front of the destructive `guild.quest_abandon`). When
-  // the keyboard router's current frame is the service confirm menu (item keys
-  // `confirm-*` / `cancel-*`) and the services sub-dock is active, render the
-  // `.services-confirm` element. No mutation is dispatched until the player
-  // confirms.
-  const servicesConfirm = computed(() => {
-    if (store.view.activeSubDock !== "services") {
-      return null;
-    }
-    const menu = store.view.combatMenu;
-    if (!menu || !Array.isArray(menu.items) || menu.items.length === 0) {
-      return null;
-    }
-    const isConfirmMenu = menu.items.every(
-      (i) => i.key && (i.key.startsWith("confirm-") || i.key.startsWith("cancel-"))
-    );
-    if (!isConfirmMenu) {
-      return null;
-    }
-    const confirmItem = menu.items.find((i) => i.key && i.key.startsWith("confirm-"));
-    return {
-      label: confirmItem ? confirmItem.label : "確認",
-       actionId: confirmItem ? confirmItem.actionId : null,
-       payload: confirmItem ? confirmItem.payload : null,
-     };
-   });
 
   function onAction(intent) {
     // One dispatch intent per activation; the store is the single writer.
@@ -299,7 +271,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
     onTabClick,
     rowPrefix,
     rootItems,
-    servicesConfirm,
     showDetail,
   };
 }

@@ -1,10 +1,9 @@
 // The surface-interaction group of the composed Elosern store: the router
-// submit handlers for the exploration and services surfaces, the dialogue
+// submit handler for the exploration surface, the dialogue
 // caption/borrow seam, the creation-reset entry, and the keyboard-entry
 // adapters (focusPress and friends).
 
 import KeyboardRouter from "../../lib/keyboard_router.js";
-import ServiceMenu from "../../lib/service_menu.js";
 import { classifyPane } from "../../components/dock-panes.js";
 import { dialogueViewModel } from "../dialogue-view.js";
 
@@ -94,23 +93,6 @@ export function applyInteraction(ctx) {
       ctx.openHudDrawer("status");
       return true;
     }
-    if (item.openServiceSubmenu) {
-      ctx.setActiveSubDock("services");
-      // H4 (task 4.3): record the service surface at push time (design D2)
-      // so the frame-hosting watcher routes to the matching reference drawer.
-      // The submenu key maps to a service surface: "guild" / "shop" are
-      // surfaces; "quests" is the guild's quest log (guild surface).
-      const subKey = item.openServiceSubmenu;
-      const surface =
-        subKey === "quests" ? "guild" : (subKey === "guild" ? "guild" : subKey);
-      ctx.setServiceSurface(surface);
-      // Push the declarative service submenu (guild: register/board/quests/
-      // exam; shop: 貨架/販賣) — the frame is ONLY the descriptor; content
-      // resolves from the committed services panel at access time.
-      ctx.pushFrame({ source: "services." + subKey, params: {} }, item.key);
-      ctx.publishView();
-      return true;
-    }
     // A back row returns to the parent menu: pop exactly one router level
     // (the parent's focus key is its own frame state; the copy-driven dock
     // re-sync is gone — the parent frame re-resolves on the next read).
@@ -176,97 +158,6 @@ export function applyInteraction(ctx) {
     return false;
   };
 
-  // Router submit for a services sub-dock item (the re-homed services surface):
-  // board/quests/stock/sell/quest-N open bounded submenus, the 放棄 row opens the
-  // explicit confirmation screen, and the action rows (register / accept / turnin /
-  // exam / buy / sell) dispatch their `guild.*`/`shop.*` action. Returns true
-  // when the item belonged to the services sub-dock.
-  ctx.handleServiceItem = function handleServiceItem(item) {
-    const rs = ctx.reducer.getState();
-    if (!ctx.dockOnExplorationForm(rs) || ctx.activeSubDock.value !== "services") {
-      return false;
-    }
-    // A client-local drawer-open row (the services root's frameless 背包 /
-    // 商店 rows): open the drawer without pushing a frame or recording a
-    // service surface (the exploration-root branch above is the same interception).
-    if (item.openDrawer && FRAMELESS_DRAWER_NAMES.has(item.openDrawer)) {
-      ctx.openHudDrawer(item.openDrawer);
-      return true;
-    }
-    // A bounded services submenu (board / quests / stock / sell / quest-N):
-    // push the declarative submenu frame; the per-quest detail pane (詳情 /
-    // 放棄 / 回報) resolves per-index through the registry.
-    if (item.openSubmenu) {
-      // H4 (task 4.3): record the service surface at push time — the guild
-      // frames (board / quests / quest-detail) route to the 任務 drawer and
-      // the shop frames (stock / sell) route to the 商店 drawer.
-      const subKey = item.openSubmenu;
-      let descriptor = null;
-      if (
-        subKey === "guild" ||
-        subKey === "shop" ||
-        subKey === "board" ||
-        subKey === "quests" ||
-        subKey === "stock" ||
-        subKey === "sell"
-      ) {
-        ctx.setServiceSurface(ctx.SERVICE_SURFACE_FOR_SOURCE["services." + subKey]);
-        descriptor = { source: "services." + subKey, params: {} };
-      } else if (subKey.startsWith("quest-")) {
-        ctx.setServiceSurface("guild");
-        // The quest-detail frame names its quest by the row INDEX the guild
-        // quest rows carry (`quest-<i>`); the resolver re-reads that row from
-        // the committed panel at every access (a vanished index pops it).
-        const questIndex = Number(subKey.split("-")[1]);
-        if (Number.isInteger(questIndex) && questIndex >= 0) {
-          descriptor = { source: "services.quest-detail", params: { questIndex } };
-        }
-      }
-      if (descriptor) {
-        ctx.pushFrame(descriptor, item.key);
-        ctx.publishView();
-        return true;
-      }
-    }
-    // The quest-detail 放棄 row: push the explicit confirmation menu (the
-    // `.services-confirm` screen renders behind it; no mutation is sent yet).
-    if (item.confirmActionId) {
-      // H4 (task 4.3): the abandon confirmation frame belongs to the guild
-      // (quest) surface.
-      ctx.setServiceSurface("guild");
-      // The confirmation frame names its quest by the CURRENT quest-detail
-      // frame's index (the row the 放棄 belongs to) — the resolver composes
-      // the same confirm menu from that row's server-authored fields on
-      // every access. Falling back to index 0 only when no quest-detail
-      // frame is current (unreachable through the UI; the row only exists
-      // inside a quest-detail frame).
-      const current = ctx.router.currentDescriptor();
-      const questIndex =
-        current && current.source === "services.quest-detail" && current.params
-          ? current.params.questIndex
-          : 0;
-      ctx.pushFrame({ source: "services.confirm", params: { questIndex } }, item.key);
-      ctx.publishView();
-      return true;
-    }
-    // A bounded trade row (a stock/sell row carrying a `quantity` {min,max}):
-    // open the local quantity form; the typed quantity is validated against the
-    // bounds before the `shop.buy` / `shop.sell` dispatch.
-    if (item.quantity) {
-      ctx.openQuantityForm(item);
-      return true;
-    }
-    // A services action row (guild.register / quest_accept / quest_turnin /
-    // exam_start / shop.buy / shop.sell): dispatch the exact OOB action,
-    // forwarding the row's server-authored display descriptor (buy/sell rows
-    // carry `itemLabel`; the guild rows resolve from the payload alone).
-    if (item.actionId) {
-      ctx.dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
-      return true;
-    }
-    return false;
-  };
-
   // Open the destructive-reset confirmation (the creation dock's reset button
   // never dispatches `creation.reset` directly): the confirm stage renders the
   // `creation-confirm` screen and the router carries the confirm menu.
@@ -280,43 +171,6 @@ export function applyInteraction(ctx) {
   };
 
   ctx.focusPress = function focusPress(key, repeat) {
-    // The bounded services quantity form (a local UI exception) captures its
-    // own keys before the keyboard router: digits and Backspace edit the
-    // bounded quantity, Enter submits a valid quantity (or keeps the form open
-    // when the value is out of bounds), and Escape closes it.
-    const q = ctx.quantityForm.value;
-    if (q && q.open) {
-      if (key >= "0" && key <= "9") {
-        ServiceMenu.quantityInput(q.state, key);
-        ctx.publishView();
-        return true;
-      }
-      if (key === "Backspace") {
-        ServiceMenu.quantityBackspace(q.state);
-        ctx.publishView();
-        return true;
-      }
-      if (key === "Escape") {
-        q.open = false;
-        ctx.publishView();
-        return true;
-      }
-      if (key === "Enter") {
-        const value = ServiceMenu.validateQuantity(q.state);
-        if (value !== null) {
-          ctx.dispatchAction(
-            q.actionId,
-            { item_key: q.itemKey, quantity: value },
-            q.itemLabel ? { itemLabel: q.itemLabel } : null
-          );
-          q.open = false;
-        }
-        ctx.publishView();
-        return true;
-      }
-      // Any other key while the form is open is consumed locally.
-      return true;
-    }
     // The dock's positional row picks (webclient-align-01-dock-chrome): the
     // legend `數字鍵 1-4 · Enter 執行 · Esc 返回` names the first four rows
     // of the current dock frame as reachable by the top-row number keys. A
