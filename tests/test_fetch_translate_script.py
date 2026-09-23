@@ -18,6 +18,8 @@ import subprocess
 import tempfile
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "fetch-translate-model.sh"
 
@@ -71,11 +73,17 @@ def _run_scenario(stub_podman: str | None, project: str | None = None) -> str:
 
 
 class FetchTranslateScriptResolverTests(unittest.TestCase):
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_project_prefixed_volume_is_resolved(self):
         stub = "#!/usr/bin/env bash\nprintf 'mud_evennia-translate\\nunrelated\\n'\n"
         out = _run_scenario(stub)
         self.assertIn("volume=mud_evennia-translate\nresolved=1", out)
 
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_exact_unprefixed_name_wins_over_scan(self):
         # Even with a project-prefixed candidate present, the exact name is
         # tried first (design D7's candidate order).
@@ -86,11 +94,17 @@ class FetchTranslateScriptResolverTests(unittest.TestCase):
         out = _run_scenario(stub)
         self.assertIn("volume=evennia-translate\nresolved=1", out)
 
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_suffix_scan_matches_a_custom_project_prefixed_volume(self):
         stub = "#!/usr/bin/env bash\nprintf 'emu_evennia-translate\\n'\n"
         out = _run_scenario(stub, project="emu")
         self.assertIn("volume=emu_evennia-translate\nresolved=1", out)
 
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_a_failing_podman_is_no_match_never_an_error(self):
         # The pipefail contract: a failing `podman volume ls` yields no
         # candidates, falls back to the annotated project-prefixed default,
@@ -99,11 +113,17 @@ class FetchTranslateScriptResolverTests(unittest.TestCase):
         out = _run_scenario(stub)
         self.assertIn("volume=mud_evennia-translate\nresolved=0", out)
 
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_absent_podman_falls_back_to_the_annotated_default(self):
         stub = None
         out = _run_scenario(stub)
         self.assertIn("volume=mud_evennia-translate\nresolved=0", out)
 
+    @covers_requirement(
+        "art-prompt-translation::the-operator-seeding-helper-names-the-volume-compose-actually-created"
+    )
     def test_custom_project_name_prefixes_the_fallback(self):
         stub = None
         out = _run_scenario(stub, project="other")

@@ -457,7 +457,7 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
     """The pre-import layout check (6.1): unseeded -> unavailable, no import."""
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_missing_directory_raises_unavailable_without_import_or_network(self):
         backend = self._backend()
@@ -470,7 +470,7 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
         self.assertNotIn("sentencepiece", sys.modules)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_missing_ct2_model_raises_unavailable_without_import(self):
         for model_files in ((), ("config.json",), ("model.bin",)):
@@ -489,7 +489,7 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
                 self.assertNotIn("sentencepiece", sys.modules)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_missing_sentencepiece_model_raises_unavailable_without_import(self):
         self._seed(sp=False)
@@ -503,7 +503,7 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
         self.assertNotIn("sentencepiece", sys.modules)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     @unittest.skipIf(os.geteuid() == 0, "permission bits do not bind root")
     def test_an_unreadable_component_raises_unavailable_without_import(self):
@@ -520,7 +520,7 @@ class CTranslate2BackendLayoutTests(_CT2BackendCase):
         (self.model_dir / "model" / "model.bin").chmod(0o644)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_a_complete_layout_passes_the_pre_import_check(self):
         self._seed()
@@ -542,7 +542,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
     """Bounded failure mapping (6.2): load/ctor -> unavailable, calls -> error."""
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_a_processor_load_failure_is_art_translate_unavailable(self):
         self._seed()
@@ -555,7 +555,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
         self.assertIsInstance(caught.exception.__cause__, RuntimeError)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_a_translator_constructor_failure_is_art_translate_unavailable(self):
         self._seed()
@@ -567,7 +567,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
         self.assertEqual(caught.exception.code, "art_translate_unavailable")
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
     )
     def test_an_encode_failure_is_art_translate_error(self):
         self._seed()
@@ -580,7 +580,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
         self.assertIsInstance(caught.exception.__cause__, RuntimeError)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
     )
     def test_a_translate_failure_is_art_translate_error(self):
         self._seed()
@@ -592,7 +592,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
         self.assertEqual(caught.exception.code, "art_translate_error")
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
     )
     def test_a_decode_failure_is_art_translate_error(self):
         self._seed()
@@ -604,7 +604,7 @@ class CTranslate2BackendFailureTests(_CT2BackendCase):
         self.assertEqual(caught.exception.code, "art_translate_error")
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-translation-backend-is-an-injectable-seam-whose-output-is-validated"
     )
     def test_an_arbitrary_exception_is_bounded_not_escaping(self):
         self._seed()
@@ -795,7 +795,7 @@ class CTranslate2BackendLazinessTests(_CT2BackendCase):
             sys.modules.update(saved)
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-translator-is-built-once-per-process-and-decodes-deterministically-on-the-cpu"
     )
     def test_a_broken_first_use_raises_art_translate_unavailable(self):
         self._seed()
@@ -823,6 +823,9 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
         )
         return patch("world.art.translate_ct2.urlopen", return_value=response)
 
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
+    )
     def test_a_complete_layout_never_fetches_on_the_download_track(self):
         # Scenario: a complete layout never triggers a fetch — even with the
         # flag explicitly on, the check passes and zero network is attempted.
@@ -835,6 +838,9 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
         self.assertEqual(result, ("out0 out1",))
         fetch.assert_not_called()
 
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
+    )
     def test_missing_layout_with_downloads_enabled_fetches_unpacks_and_translates(self):
         # Scenario: an unseeded volume with downloads enabled fetches once —
         # the same call populates, verifies, unpacks, emits exactly one
@@ -872,6 +878,9 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
         self.assertEqual(kwargs["context"]["bytes"], len(_package_bytes()))
         self.assertIsInstance(kwargs["context"]["duration_ms"], int)
 
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
+    )
     def test_fetch_failure_is_bounded_emits_one_warn_and_latches(self):
         # Scenario: a fetch failure degrades and latches — bounded
         # art_translate_unavailable, no library import, exactly one
@@ -991,6 +1000,9 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
                     caught.exception.code, "art_translate_unavailable"
                 )
 
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
+    )
     def test_a_landed_layout_is_never_refetched_after_a_restart(self):
         # Task 6.2 phase pair in one process: land the layout with a fetch,
         # then simulate a restart (latch AND engine cache reset) and observe
@@ -1013,7 +1025,7 @@ class CTranslate2BackendAirGappedTests(_CT2BackendCase):
     """The flag-false track reproduces today's seed-only behavior (3.2)."""
 
     @covers_requirement(
-        "art-prompt-translation::the-model-artifact-is-operator-seeded-and-its-absence-is-bounded"
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
     def test_download_disabled_against_absent_dir_is_todays_exact_behavior(self):
         # Scenario: an unseeded model directory degrades without a fetch —
