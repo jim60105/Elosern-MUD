@@ -70,7 +70,7 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
 When the clock callback, the final clock persistence, or the outer commit fails after a successful
 resolution, the settlement SHALL restore, before propagating the failure, the pre-action state of every
 snapshotted surface — actor and target Evennia Attributes (`traits`, `disguised_stats`, `sexual_traits`,
-`virgin`, `experience_types`, `buffs`, `skill_grants`, `skill_proficiency`, `quest_log`),
+`virgin`, `experience_types`, `buffs`, `skill_grants`, `skill_proficiency`, `quest_log`, `church`),
 the battlefield's fled/knocked-out sets when present, every callback-owned advance surface, and the
 clock tick — because Django rollback reverts only durable rows while Evennia's in-process caches keep
 the uncommitted values. Restore SHALL run in a fixed deterministic order after the rollback, SHALL be
@@ -112,3 +112,10 @@ or post-advance value.
 - **THEN** each skill's effect handlers write only entities within the settlement's declared snapshot
   superset — the actor, the request targets, and the merged advance registry — so no rolled-back cast can
   leave an unsnapshotted write behind
+
+#### Scenario: A rolled-back holy-rite cast restores the church ledger byte-identically
+- **WHEN** a player casts `rite_martial_blessing` out of combat with an existing ledger and the
+  outer settlement commit fails after the buff mount and the `blessing_last_tick` stamp applied
+- **THEN** the failure propagates, `db.buffs`, `db.church` (merit, daily block, and any
+  `blessing_last_tick` key), the trait cache, and the clock tick all equal their pre-action values
+  in cache and storage, and no `rite_cast` event is emitted
