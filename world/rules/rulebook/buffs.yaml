@@ -428,6 +428,15 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 代贖羔印（rite_lamb_mark，church design §5.7）：charge-on-climax 的誘敵 buff ——
+# 每次進入「進行中」期相消耗一 charge，歸零即移除（第二次高潮後封印解除）；
+# charges 是唯一的 charge-on-event 資料原語，隔離測試先於任何整合測試。
+- key: lamb_seal
+  duration: null
+  stacking: refresh
+  polarity: buff
+  charges: 2
+  modifiers: {}
 # 武技系斬技附掛效果（martial-arts-catalog D2）：
 # 斷筋與劍豪之境為 empty-modifier mount，實際數值由 combat_modifiers.yaml 的
 # buff_active 規則結算；暗影創傷比照 fire_ignite 的 60s/10s/-8 DoT 形狀。

@@ -10,7 +10,7 @@ Any NEW test module MUST be registered in exactly one `.github/evennia-shards.js
 
 ## 1. The charges primitive
 
-- [ ] 1.1 Implement the `charges: int` buff-declaration primitive + climax-transition consumption hook (transition into 進行中 consumes one charge; zero → remove the buff). Isolated buff tests FIRST, before any lamb-seal integration: declaration round-trip, save/restore, two-transition consumption sequence, rolled-back consumption does not burn a charge. Annotate ID 1.
+- [x] 1.1 Implement the `charges: int` buff-declaration primitive + climax-transition consumption hook (transition into 進行中 consumes one charge; zero → remove the buff). Isolated buff tests FIRST, before any lamb-seal integration: declaration round-trip, save/restore, two-transition consumption sequence, rolled-back consumption does not burn a charge. Annotate ID 1.
 
 ## 2. Lamb seal
 

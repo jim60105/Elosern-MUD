@@ -10,6 +10,7 @@ from typing import Any
 from math import isfinite
 
 from .buff_class import RulebookBuff
+from .buff_class import get_charges, update_charges
 from .definitions import (
     BUFF_DEFINITIONS,
     BLOCKING_BUFF_KEYS,
@@ -131,6 +132,11 @@ def apply_buff(
     }
     if "divert" in definition.modifiers and not is_refresh and "divert_consumed" not in data:
         cache["divert_consumed"] = 0
+    if definition.charges is not None and not is_refresh and "charges" not in data:
+        # The charge-on-event pool (church design §5.7): seeded on the first
+        # mount only — a refresh never resets consumed charges, mirroring the
+        # divert-budget refresh guard above.
+        cache["charges"] = definition.charges
     entity.buffs.add(
         RulebookBuff,
         key=instance_key or definition_key,
@@ -148,6 +154,33 @@ def apply_buff(
 def entity_active_buffs(entity) -> set[str]:
     """Return logical definition keys for every active buff instance."""
     return {buff.definition_key for buff in _active_buff_instances(entity)}
+
+
+def consume_climax_charges(entity) -> int:
+    """Consume one charge from every active charge-carrying buff (design §5.7).
+
+    Each canonical transition of the bearer's climax phase into 進行中 consumes
+    one charge per buff whose declaration carries a charge pool; a buff whose
+    pool reaches zero is dispelled. Returns the count dispelled. All writes
+    land on the persisted buffcache inside the caller's transaction, so a
+    rolled-back transition restores every charge (pinned by the isolated buff
+    tests before any seal integration is trusted).
+    """
+    dispelled = 0
+    for buff in _active_buff_instances(entity):
+        definition = BUFF_DEFINITIONS.get(buff.definition_key)
+        if definition is None or definition.charges is None:
+            continue
+        remaining = get_charges(buff, default=definition.charges)
+        if remaining <= 0:
+            continue
+        if remaining == 1:
+            key = getattr(buff, "buffkey", None) or buff.definition_key
+            entity.buffs.remove(key, dispel=True)
+            dispelled += 1
+        else:
+            update_charges(buff, remaining - 1)
+    return dispelled
 
 
 def active_buff_keys_from_storage(entity) -> set[str]:

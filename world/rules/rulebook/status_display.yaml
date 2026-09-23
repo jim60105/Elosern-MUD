@@ -266,6 +266,9 @@
 - code: aftermath_humiliated
   label: 狼狽不堪
   severity: warning
+- code: lamb_seal
+  label: 代贖羔印
+  severity: beneficial
 - code: climax_empowerment
   label: 高潮賦能
   severity: beneficial
