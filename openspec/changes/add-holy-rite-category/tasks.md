@@ -53,6 +53,6 @@
 
 ## 4. Docs sweep
 
-- [ ] 4.1 Update any `docs/lore/skill-trees/*` or `docs/game/*` wording that names the church
+- [x] 4.1 Update any `docs/lore/skill-trees/*` or `docs/game/*` wording that names the church
       rites' presentation family (no command surface changes — the docs trio itself is untouched).
-- [ ] 4.2 `git diff --check` clean; every changed requirement's anchor test green.
+- [x] 4.2 `git diff --check` clean; every changed requirement's anchor test green.
