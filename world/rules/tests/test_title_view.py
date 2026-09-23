@@ -289,3 +289,53 @@ class TitleCodexViewTests(EvenniaTest):
         )
         self.assertEqual(before[0], after[0])
         self.assertEqual(before[1], after[1])
+
+    @covers_requirement(
+        "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
+    )
+    def test_clergy_ladder_rows_transition_locked_to_unlocked_as_redeemed_count_crosses_thresholds(self):
+        from world.lore.titles import _FIXED_TITLE_ROWS as _REAL_TITLES
+        from unittest.mock import patch
+
+        # 1. Initially (0 redeemed skills): all 5 clergy ladder rows are locked
+        with patch("world.rules.title_view.FIXED_TITLE_REGISTRY", _REAL_TITLES), \
+             patch("world.rules.titles.state.FIXED_TITLE_REGISTRY", _REAL_TITLES):
+            view = build_title_codex_view(self.character)
+            clergy_rows = {row.key: row for row in view.fixed_rows if row.category == "clergy"}
+            self.assertEqual(len(clergy_rows), 5)
+            for row in clergy_rows.values():
+                self.assertFalse(row.unlocked)
+                self.assertEqual(row.flavor, "")
+                self.assertTrue(len(row.hint) > 0)
+
+            # 2. Bank first rung (crossing threshold 3)
+            first_key = next(iter(clergy_rows))
+            bank_fixed(self.character, first_key, 100)
+            view2 = build_title_codex_view(self.character)
+            clergy_rows2 = {row.key: row for row in view2.fixed_rows if row.category == "clergy"}
+            self.assertTrue(clergy_rows2[first_key].unlocked)
+            self.assertEqual(clergy_rows2[first_key].hint, "")
+            self.assertTrue(len(clergy_rows2[first_key].flavor) > 0)
+            # Other ladder rows remain locked
+            for key in set(clergy_rows) - {first_key}:
+                self.assertFalse(clergy_rows2[key].unlocked)
+
+    @covers_requirement(
+        "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
+    )
+    def test_no_downstream_system_consumes_clergy_title_as_prerequisite(self):
+        # Search-prove: no codebase rules or gates depend on clergy titles as a prerequisite.
+        from pathlib import Path
+        from world.lore.titles import _FIXED_TITLE_ROWS as _REAL_TITLES
+
+        rulebook_dir = Path(__file__).parents[1] / "rulebook"
+        clergy_keys = {k for k, v in _REAL_TITLES.items() if getattr(v, "category", None) == "clergy"}
+        clergy_displays = {v.display_name_zh for v in _REAL_TITLES.values() if getattr(v, "category", None) == "clergy"}
+
+        for yaml_file in rulebook_dir.glob("*.yaml"):
+            text = yaml_file.read_text(encoding="utf-8")
+            for key in clergy_keys:
+                self.assertNotIn(f"skill_owned: {key}", text)
+                self.assertNotIn(f"title_owned: {key}", text)
+            for disp in clergy_displays:
+                self.assertNotIn(f"title: {disp}", text)

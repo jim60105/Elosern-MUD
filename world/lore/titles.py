@@ -40,6 +40,7 @@ class TitleCategory(StrEnum):
     SPELL = "spell"
     EXPLORE = "explore"
     GUILD = "guild"
+    CLERGY = "clergy"
     ROMANCE = "romance"
 
 
@@ -57,6 +58,7 @@ class TitlePredicateFamily(StrEnum):
     GUILD_RANK_REACHED = "guild_rank_reached"
     SEXUAL_EXPERIENCE = "sexual_experience"
     COUNTER_THRESHOLD = "counter_threshold"
+    CHURCH_SKILLS_REDEEMED = "church_skills_redeemed"
 
 
 # The single parameter field each family may carry, keyed by family. Load
@@ -70,6 +72,7 @@ _FAMILY_PARAMETER: dict[TitlePredicateFamily, str] = {
     TitlePredicateFamily.GUILD_RANK_REACHED: "guild_rank",
     TitlePredicateFamily.SEXUAL_EXPERIENCE: "experience_type",
     TitlePredicateFamily.COUNTER_THRESHOLD: "counter",
+    TitlePredicateFamily.CHURCH_SKILLS_REDEEMED: "threshold",
 }
 
 
@@ -201,6 +204,52 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
         "通過 S 級公會考核即可獲得。",
         _predicate(TitlePredicateFamily.GUILD_RANK_REACHED, guild_rank="S"),
     ),
+    # Authorized content: the five clergy ladder rows (church-order-catalogue §1.1/§4.1).
+    # Thresholds: 虔信者 3 ／ 修女 6 ／ 神官 10 ／ 主教 15 ／ 樞機 20.
+    # Daily prayer yields 120 merit/day (40 merit * 3 prayers base = 120 merit/day;
+    # 160 with morning devotion), offerings yield 20..80 copper + row merit, and climax
+    # accrual yields 10 merit, making rung 1 (3 skills) reachable in a workday's
+    # grind, rung 2 (6 skills) in 2-3 days, up to rung 5 (20 skills) near catalogue completion.
+    "c_believer": FixedTitleDef(
+        "c_believer",
+        "虔信者",
+        TitleCategory.CLERGY,
+        "你在教會中虔誠奉獻，以初入聖職者的熱誠回應神明。",
+        "在教會兌換 3 個聖職項目即可獲得。",
+        _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=3),
+    ),
+    "c_sister": FixedTitleDef(
+        "c_sister",
+        "修女",
+        TitleCategory.CLERGY,
+        "立下誓約披上聖袍，以修女之身引領信眾並行使聖儀。",
+        "在教會兌換 6 個聖職項目即可獲得。",
+        _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=6),
+    ),
+    "c_priest": FixedTitleDef(
+        "c_priest",
+        "神官",
+        TitleCategory.CLERGY,
+        "掌握諸多神聖祭儀，主持彌撒與恩寵傳播的神官。",
+        "在教會兌換 10 個聖職項目即可獲得。",
+        _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=10),
+    ),
+    "c_bishop": FixedTitleDef(
+        "c_bishop",
+        "主教",
+        TitleCategory.CLERGY,
+        "總攬一方教區之牧靈職責，具備崇高威望與威信的主教。",
+        "在教會兌換 15 個聖職項目即可獲得。",
+        _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=15),
+    ),
+    "c_cardinal": FixedTitleDef(
+        "c_cardinal",
+        "樞機",
+        TitleCategory.CLERGY,
+        "身披樞機紅袍，立於教會權柄之巔，參與最高聖座議事。",
+        "在教會兌換 20 個聖職項目即可獲得。",
+        _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=20),
+    ),
 }
 
 # The published registry is a read-only proxy: every consumer reads through
@@ -250,6 +299,16 @@ def validate_fixed_titles(
         if not isinstance(entry.category, TitleCategory):
             raise TitleRegistryError(
                 f"{entry.key!r}: category must be a TitleCategory member"
+            )
+        if (
+            "聖女" in entry.display_name_zh
+            or "聖女" in entry.key
+            or "聖女" in entry.flavor_zh
+            or "聖女" in entry.hint_zh
+        ):
+            raise TitleRegistryError(
+                f"{entry.key!r}: fixed-title display and text cannot contain "
+                "'聖女' (global office-name ban)"
             )
         predicate = entry.predicate
         if not isinstance(predicate, TitlePredicate):
@@ -304,10 +363,14 @@ def validate_fixed_titles(
                 "guild_rank",
                 "experience_type",
                 "counter",
+                "threshold",
             )
             if getattr(predicate, name) is not None
         }
-        extras = set(supplied) - {parameter}
+        allowed_params = {parameter}
+        if predicate.family is TitlePredicateFamily.COUNTER_THRESHOLD:
+            allowed_params.add("threshold")
+        extras = set(supplied) - allowed_params
         if extras:
             raise TitleRegistryError(
                 f"{entry.key!r}: family {predicate.family.value} carries "
@@ -318,27 +381,32 @@ def validate_fixed_titles(
                 f"{entry.key!r}: family {predicate.family.value} requires "
                 f"{parameter!r}"
             )
-        if predicate.family is TitlePredicateFamily.COUNTER_THRESHOLD:
+        if predicate.family in (
+            TitlePredicateFamily.COUNTER_THRESHOLD,
+            TitlePredicateFamily.CHURCH_SKILLS_REDEEMED,
+        ):
             if isinstance(predicate.threshold, bool) or not isinstance(
                 predicate.threshold, int
             ):
                 raise TitleRegistryError(
-                    f"{entry.key!r}: counter_threshold requires an integer "
+                    f"{entry.key!r}: {predicate.family.value} requires an integer "
                     "threshold"
                 )
             if predicate.threshold < 1:
                 raise TitleRegistryError(
-                    f"{entry.key!r}: counter_threshold must be >= 1"
+                    f"{entry.key!r}: {predicate.family.value} must be >= 1"
                 )
         elif predicate.threshold is not None:
             raise TitleRegistryError(
-                f"{entry.key!r}: threshold is only valid for counter_threshold"
+                f"{entry.key!r}: threshold is only valid for counter_threshold "
+                "and church_skills_redeemed"
             )
         value = supplied[parameter]
-        if not isinstance(value, str) or not value:
-            raise TitleRegistryError(
-                f"{entry.key!r}: {parameter} must be a non-empty string"
-            )
+        if parameter != "threshold":
+            if not isinstance(value, str) or not value:
+                raise TitleRegistryError(
+                    f"{entry.key!r}: {parameter} must be a non-empty string"
+                )
 
     # Face membership: every referenced parameter must resolve against the
     # injected face set. A dangling reference names the row and the face.
@@ -353,7 +421,7 @@ def validate_fixed_titles(
     for entry in entries:
         predicate = entry.predicate
         parameter = _FAMILY_PARAMETER[predicate.family]
-        if parameter == "counter":
+        if parameter in ("counter", "threshold"):
             continue
         face_name, face = faces[parameter]
         value = getattr(predicate, parameter)

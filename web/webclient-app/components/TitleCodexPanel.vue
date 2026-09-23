@@ -52,6 +52,7 @@ const CATEGORY_TABS = [
   { category: "spell", label: "法術" },
   { category: "explore", label: "探索" },
   { category: "guild", label: "公會" },
+  { category: "clergy", label: "聖職" },
   { category: "romance", label: "風流韻事" },
 ];
 

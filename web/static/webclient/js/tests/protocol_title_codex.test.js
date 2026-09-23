@@ -72,6 +72,7 @@ test("title_codex pins its mirrored bounds and validates the minimal payload", (
     "spell",
     "explore",
     "guild",
+    "clergy",
     "romance",
   ]);
   const normalized = Protocol.validatePanel(
@@ -119,6 +120,13 @@ test("title_codex enforces the hint/flavor exclusivity and category closed set",
     Protocol.validateTitleCodexPanel(
       validTitleCodexPanel({
         fixed_rows: [validTitleCodexFixedRow({ category: "commerce" })],
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        fixed_rows: [validTitleCodexFixedRow({ category: "clergy" })],
       })
     )
   );
