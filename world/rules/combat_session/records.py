@@ -24,9 +24,11 @@ _RECORD_FIELDS = frozenset(
         "exam_id",
     }
 )
-# Optional field: written only when the terminal settlement committed. Older
-# durable records without it stay valid, so it is never a required field.
-_OPTIONAL_RECORD_FIELDS = frozenset({"settled_tick"})
+# Optional fields: ``settled_tick`` is written only when the terminal
+# settlement committed; ``martyr_key`` carries the durable session-id stamps
+# of the martyrdom-vow casts made during this session (church design §5.8).
+# Older durable records without them stay valid, so neither is required.
+_OPTIONAL_RECORD_FIELDS = frozenset({"settled_tick", "martyr_key"})
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,7 @@ class CombatSessionRecord:
     rounds_elapsed: int
     exam_id: str | None
     settled_tick: int | None = None
+    martyr_key: tuple[str, ...] | None = None
 
 
 def _parse_id_list(values: Any, field: str) -> tuple[int, ...]:
@@ -64,6 +67,24 @@ def _require_int(value: Any, field: str) -> int:
             SessionReason.MALFORMED_SESSION, f"record field {field!r} must be an integer"
         )
     return value
+
+
+def _parse_stamp_list(values: Any, field: str) -> tuple[str, ...] | None:
+    """Parse the optional martyr-stamp list: None or a list of non-empty ids."""
+    if values is None:
+        return None
+    if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"record field {field!r} must be a list of session id strings",
+        )
+    items = list(values)
+    if not all(isinstance(item, str) and item for item in items):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"record field {field!r} must hold non-empty session id strings",
+        )
+    return tuple(items)
 
 
 def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
@@ -116,6 +137,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
             raise CombatSessionError(
                 SessionReason.MALFORMED_SESSION, "settled_tick must be non-negative"
             )
+    martyr_key = _parse_stamp_list(data.get("martyr_key"), "martyr_key")
     record = CombatSessionRecord(
         session_id=session_id,
         mode=mode,
@@ -127,6 +149,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         rounds_elapsed=rounds_elapsed,
         exam_id=exam_id,
         settled_tick=settled_tick,
+        martyr_key=martyr_key,
     )
     _validate_participant_shape(record)
     return record
@@ -174,6 +197,9 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         "rounds_elapsed": record.rounds_elapsed,
         "exam_id": record.exam_id,
         "settled_tick": record.settled_tick,
+        "martyr_key": (
+            None if record.martyr_key is None else list(record.martyr_key)
+        ),
     }
 
 

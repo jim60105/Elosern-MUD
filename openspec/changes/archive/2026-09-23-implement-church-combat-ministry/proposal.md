@@ -29,7 +29,7 @@ their rails land here. Authoritative design:
   `lowest_hp`, multi-seal order, two-climaxes-lift, no-seal decision trace
   byte-identical.
 - `rite_martyrdom_vow` session-record `martyr_key` stamp (durable session id) +
-  ONE added filter in `defeat_aftermath/violation.py::_victim_pool`: valid
+  ONE added filter in `defeat_aftermath/violation.py::_violation_pool`: valid
   stamp ∧ non-fled pool member → pool collapses to `[her]`, zero target rolls
   via the existing single-member short-circuit, resist contests keep their
   normal draws; victory consumes the stamp. Tests: collapse,

@@ -175,6 +175,19 @@ class SelfBuffApplyEffect:
 
 
 @dataclass(frozen=True)
+class SessionStampEffect:
+    """Stamp one named session-record field with the caster's durable session id.
+
+    Mounted by the church martyrdom-vow rail (design §5.8): casting the vow
+    writes the current session's id into the field the effect names, so the
+    defeat-aftermath pool filter can identify the marked martyr and stale
+    stamps (a foreign session id) can never fire.
+    """
+
+    key: str
+
+
+@dataclass(frozen=True)
 class ConferGrowthRateEffect:
     """Confer the caster's magic-growth rate on one target."""
 

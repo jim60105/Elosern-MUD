@@ -111,6 +111,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",
+            effects=("self_buff_apply:lamb_seal",),
             category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
@@ -121,6 +122,7 @@ ROWS: tuple[SkillDef, ...] = (
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",
+            effects=("session_stamp:martyr_key",),
             category=SkillCategory.ENHANCEMENT,
         ),
         # ---- Series D — sexual-ministry actives (4; doubling as advanced

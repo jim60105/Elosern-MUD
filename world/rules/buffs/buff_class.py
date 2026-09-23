@@ -45,6 +45,41 @@ def update_divert_consumed(buff: Any, consumed: int) -> None:
         pass
 
 
+def get_charges(buff: Any, default: int = 0) -> int:
+    """Return the remaining charge pool of one buff instance.
+
+    The charge-on-event counter (church design §5.7) rides the same persisted
+    cache channels as the divert budget; ``default`` is used when the instance
+    has never recorded a value (a freshly mounted charge-carrying buff falls
+    back to its declared pool). Unreadable values fail closed to the default.
+    """
+    val = getattr(buff, "charges", None)
+    if val is None and hasattr(buff, "cache") and isinstance(buff.cache, dict):
+        val = buff.cache.get("charges")
+    if val is None and hasattr(buff, "handler") and hasattr(buff.handler, "buffcache"):
+        entry = buff.handler.buffcache.get(getattr(buff, "buffkey", None))
+        if isinstance(entry, dict):
+            val = entry.get("charges")
+    if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+        return default
+    return val
+
+
+def update_charges(buff: Any, charges: int) -> None:
+    """Persist the remaining charge pool on a buff instance cache."""
+    charges_int = max(0, int(charges))
+    if hasattr(buff, "cache") and isinstance(buff.cache, dict):
+        buff.cache["charges"] = charges_int
+    if hasattr(buff, "handler") and hasattr(buff.handler, "buffcache"):
+        key = getattr(buff, "buffkey", None)
+        if key and key in buff.handler.buffcache:
+            buff.handler.buffcache[key]["charges"] = charges_int
+    try:
+        setattr(buff, "charges", charges_int)
+    except Exception:  # observability: ignore R2: optional write-through on foreign test instances
+        pass
+
+
 class RulebookBuff(BaseBuff):
     """One generic buff class parameterized by persistent definition data."""
 

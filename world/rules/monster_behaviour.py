@@ -322,9 +322,31 @@ def monster_behaviour_policy(
     if not single_skills:
         return None
 
-    from world.rules.buffs import has_positional_marker
+    from world.rules.buffs import entity_active_buffs, has_positional_marker
     from world.rules.spell_conditions import is_strike_class
 
+    # Lamb-seal narrowing (church design §5.7): BEFORE target-strategy
+    # evaluation, if any living enemy carries lamb_seal the single-target
+    # candidate base narrows to the seal-bearers in canonical order (player
+    # first, then ascending pk). With no seal anywhere the base stays exactly
+    # the living enemies, so every no-seal decision is byte-identical. AREA
+    # paths already returned above; the positional-marker exclusion below
+    # remains an orthogonal filter and is never substituted by the seal.
+    sealed = [
+        enemy for enemy in enemies if "lamb_seal" in entity_active_buffs(enemy)
+    ]
+    if sealed:
+        from typeclasses.characters import PlayerCharacter
+
+        sealed.sort(
+            key=lambda enemy: (
+                0 if isinstance(enemy, PlayerCharacter) else 1,
+                int(getattr(enemy, "pk", 0) or 0),
+            )
+        )
+        base = sealed
+    else:
+        base = enemies
     # Selection hygiene (design D6): a SINGLE-target kit that is exclusively
     # strike-class excludes displaced candidates; a monster owning magic-
     # school SINGLE damage keeps the full set and, against a displaced
@@ -332,12 +354,18 @@ def monster_behaviour_policy(
     # and dice-free; resolution-time gating stays the single authority.
     has_magic_single = any(not is_strike_class(skill) for skill in single_skills)
     if not has_magic_single:
-        candidates = [enemy for enemy in enemies if not has_positional_marker(enemy)]
+        candidates = [enemy for enemy in base if not has_positional_marker(enemy)]
         if not candidates:
             return None
     else:
-        candidates = enemies
-    target = _choose_target(entity, candidates, profile.target_strategy)
+        candidates = base
+    if sealed:
+        # Multi-seal canonical order IS the target resolution: the first
+        # seal-bearer is chosen without strategy-metric evaluation or
+        # tie-break dice (the preference overrides the metric, design §5.7).
+        target = candidates[0]
+    else:
+        target = _choose_target(entity, candidates, profile.target_strategy)
     if has_positional_marker(target):
         eligible_skills = [skill for skill in single_skills if not is_strike_class(skill)]
         if not eligible_skills:

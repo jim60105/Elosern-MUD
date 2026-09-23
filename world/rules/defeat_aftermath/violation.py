@@ -14,7 +14,11 @@ from typing import Any
 from django.conf import settings
 
 from world.observability import log_info, log_warn
-from world.rules.action import _attribute_snapshot, _restore_attribute
+from world.rules.action import (
+    _attribute_snapshot,
+    _restore_attribute,
+    _stored_trait_value,
+)
 from world.rules.clock import (
     AdvanceSource,
     _ADVANCE_ENTITY_SURFACES,
@@ -360,7 +364,10 @@ def _violation_pool(
     player first, companions by ascending ``pk`` — so the same durable
     session re-derives identical selection from either a reconstructed
     battlefield or the degraded record-only path. The player is always in
-    the pool and always first.
+    the pool and always first. One added filter stage (martyrdom vow, design
+    §5.8): a valid session martyr stamp collapses the pool to the marked
+    non-fled survivor; with no stamp or no eligible martyr the pool is
+    returned byte-identically.
     """
     companions: list[Any] = []
     if battlefield is not None:
@@ -390,7 +397,58 @@ def _violation_pool(
             if entity is not None:
                 companions.append(entity)
     companions.sort(key=lambda entity: int(entity.pk))
-    return [actor, *companions]
+    pool = [actor, *companions]
+    return _martyr_pool_collapse(session, battlefield, pool)
+
+
+def _session_id_for_member(session: Any, dbref: int) -> str | None:
+    """Rebuild the durable session id one participant holds in this session.
+
+    A session id has the shape ``<mode>:<caster pk>:<tick>``; the record's own
+    id names the player's session, and every party participant's id in the
+    SAME engagement differs only in the pk slot. Rebuilding from the record is
+    a pure function of durable record state — never a live clock read — so a
+    rolled-back retry re-derives the identical pool, and a stamp from another
+    session (different caster pk or tick) can never match a member.
+    """
+    parts = session.session_id.split(":")
+    if len(parts) != 3:
+        return None
+    mode, _caster_pk, tick = parts
+    return f"{mode}:{dbref}:{tick}"
+
+
+def _martyr_pool_collapse(
+    session: Any, battlefield: Any | None, pool: list[Any]
+) -> list[Any]:
+    """One added filter stage: a valid martyr stamp collapses the pool.
+
+    Edge rules (church design §5.8): the marker died before the wipe (0 HP)
+    or fled → no eligible martyr → the normal pool; multiple markers → the
+    first by canonical order (the pool's own order: player first, then
+    ascending pk); a session-id mismatch (stale stamp) can never fire because
+    member ids are rebuilt from THIS session's id. Zero target rolls come
+    from the existing single-member short-circuit in the draw selector.
+    """
+    stamps = session.martyr_key
+    if not stamps:
+        return pool
+    for member in pool:
+        member_id = _session_id_for_member(session, int(member.pk))
+        if member_id is None or member_id not in stamps:
+            continue
+        if (
+            str(member.key) in getattr(battlefield, "fled", ())
+            or int(member.pk) in session.fled_ids
+        ):
+            # The marker fled: not an eligible survivor, match the next one.
+            continue
+        if _stored_trait_value(member.traits.hp) <= 0:
+            # The marker died before the wipe: never a survivor (kill
+            # semantics), so the pool falls through to the next candidate.
+            continue
+        return [member]
+    return pool
 
 
 def _select_violation_victim(

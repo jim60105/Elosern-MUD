@@ -44,6 +44,18 @@ def _apply_climax_phase_set(entity, target_level: str) -> str | None:
     from world.rules.phase_hooks import dispatch_phase_reaction
 
     dispatch_phase_reaction(entity, from_phase=current, to_phase=target_level)
+    # Charge-on-event consumption (church design §5.7): each canonical
+    # transition INTO 進行中 consumes one charge from every charge-carrying
+    # buff (the lamb_seal mount); a pool reaching zero dispels its buff. This
+    # hook is the single canonical edge every 進行中 entry routes through
+    # (pleasure gains, the rulebook engine, and violation deltas), so a
+    # rolled-back transition restores the consumed charges with everything
+    # else. Function-local import keeps the buff package out of this module's
+    # import closure, like the phase-hooks leaf above.
+    if target_level == "進行中":
+        from world.rules.buffs import consume_climax_charges
+
+        consume_climax_charges(entity)
     return "cycle"
 
 

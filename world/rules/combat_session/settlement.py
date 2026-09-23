@@ -206,12 +206,19 @@ def settle_session(
                     # surfaces when it rolls back after this settlement
                     # returned.
                     register_pending_undo(aftermath.undo)
-            # Record the world tick at which the settlement committed; a non-None
-            # value marks the session as settled for any later reader.
-            _persist(
-                actor,
-                replace(record, settled_tick=get_world_clock().tick),
+            # Record the world tick at which the settlement committed; a
+            # non-None value marks the session as settled for any later
+            # reader. Victory also consumes any martyr stamp (design §5.8):
+            # the marked fight ended in the clergy's favour, so the stamp is
+            # spent and a later defeat in another session can never fire it.
+            settled_record = replace(
+                record, settled_tick=get_world_clock().tick
             )
+            if outcome == "victory" and settled_record.martyr_key is not None:
+                settled_record = replace(
+                    settled_record, martyr_key=None
+                )
+            _persist(actor, settled_record)
             clear_session(actor, battlefield, record)
             if record.mode == "guild_exam":
                 # Simulated battle: restore both sides inside the settlement

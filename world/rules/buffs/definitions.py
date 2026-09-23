@@ -52,6 +52,7 @@ class BuffDefinition:
     polarity: str = "buff"
     marker: str | None = None
     round_order: dict[str, str] | None = None
+    charges: int | None = None
 
 
 @dataclass(frozen=True)
@@ -238,6 +239,23 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     f"{path}: buff {key!r} has invalid round_order {ro_val!r}; must be a mapping with action in {sorted(ROUND_ORDER_VOCABULARY)}"
                 )
             round_order = dict(ro_val)
+        charges = None
+        if "charges" in entry:
+            charges_val = entry["charges"]
+            # The charge-on-event counter (church design §5.7): a declared
+            # buff carries a strictly positive whole-number charge pool; an
+            # absent clause leaves the buff charge-less, and malformed values
+            # fail closed at load so a typo can never ship a non-consuming
+            # seal or a negative pool.
+            if (
+                isinstance(charges_val, bool)
+                or not isinstance(charges_val, int)
+                or charges_val <= 0
+            ):
+                raise ValueError(
+                    f"{path}: buff {key!r} charges must be a positive integer"
+                )
+            charges = charges_val
         definitions[key] = BuffDefinition(
             key=key,
             duration=entry.get("duration"),
@@ -247,6 +265,7 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
             polarity=polarity,
             marker=marker,
             round_order=round_order,
+            charges=charges,
         )
     return definitions
 

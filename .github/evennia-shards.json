@@ -6,6 +6,7 @@
       "labels": [
         "world.rules.tests.test_account_roster",
         "world.rules.tests.test_action_evidence",
+        "world.rules.tests.test_church_combat_ministry",
         "world.rules.tests.test_unconditional_multi_strike",
         "world.rules.tests.test_action_pipeline_atomicity",
         "world.rules.tests.test_action_pipeline_rejections",
@@ -119,6 +120,7 @@
         "world.rules.tests.test_lore_knowledge",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",
+        "world.rules.tests.test_church_lamb_seal",
         "world.rules.tests.test_monster_behaviour_determinism",
         "world.rules.tests.test_monster_behaviour_golden",
         "world.rules.tests.test_monster_behaviour_integration",

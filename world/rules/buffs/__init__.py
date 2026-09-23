@@ -23,6 +23,8 @@ re-exported here.
 from world.rules.buffs.buff_class import (  # noqa: F401
     RulebookBuff,
     get_divert_consumed,
+    get_charges,
+    update_charges,
     update_divert_consumed,
 )
 from world.rules.buffs.definitions import (  # noqa: F401
@@ -58,6 +60,7 @@ from world.rules.buffs.surface import (  # noqa: F401
     blocks_action,
     cleanse_debuffs,
     clear_conferred_growth_rates,
+    consume_climax_charges,
     entity_active_buffs,
     grant_conferred_growth_rate,
     growth_rate_multiplier,

@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 from dataclasses import replace as _dc_replace
 
+from django.db import transaction
+
 from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -28,13 +30,22 @@ from world.rules.buffs import (
     active_buff_keys_from_storage,
     blocks_action,
     cleanse_debuffs,
+    consume_climax_charges,
     entity_active_buffs,
+    get_charges,
     grant_conferred_growth_rate,
     growth_rate_multiplier,
     load_buff_definitions,
     remove_by_selector,
     tick_buffs,
 )
+from world.rules.sexual_state import _apply_climax_phase_set
+
+# Importing the reaction engine registers the canonical phase dispatcher, so
+# the consumption tests below exercise the same registered-transition path the
+# shipped game runs (the church merit rows fail closed for unenrolled
+# entities, leaving the buffer untouched by reactions).
+from world.rules import state_reactions  # noqa: F401
 
 
 def _write_yaml(content: str) -> Path:
@@ -108,6 +119,24 @@ class BuffDefinitionValidationTests(unittest.TestCase):
                 path = _write_yaml(f"- key: {selector}\n")
                 with self.assertRaises(ValueError):
                     load_buff_definitions(path)
+
+    def test_charges_declaration_round_trip(self):
+        """The charge-on-event primitive round-trips the loader (church §5.7)."""
+        path = _write_yaml("- key: t_charged\n  charges: 3\n")
+        self.assertEqual(load_buff_definitions(path)["t_charged"].charges, 3)
+        path = _write_yaml("- key: t_plain\n")
+        self.assertIsNone(load_buff_definitions(path)["t_plain"].charges)
+
+    def test_charges_validation_rejects_non_positive_pools(self):
+        """A malformed charge pool fails closed at load, never shipping a
+        non-consuming or negative seal."""
+        for bad in ("0", "-1", "true", "two"):
+            with self.subTest(bad=bad):
+                path = _write_yaml(f"- key: t_bad_charges\n  charges: {bad}\n")
+                with self.assertRaises(ValueError) as ctx:
+                    load_buff_definitions(path)
+                self.assertIn("t_bad_charges", str(ctx.exception))
+                self.assertIn("charges", str(ctx.exception))
 
     def test_noop_rate_target_tick_does_nothing(self):
         entity = SimpleNamespace(traits=SimpleNamespace())
@@ -205,6 +234,74 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         before = entity.traits.hp.value
         tick_buffs(entity)
         self.assertEqual(entity.traits.hp.value, before - 5)
+
+    def test_buff_lamb_seal(self):
+        """The shipped seal row mounts with its charge pool and stays live."""
+        definition = BUFF_DEFINITIONS["lamb_seal"]
+        self.assertEqual(definition.charges, 2)
+        entity = self._entity()
+        apply_buff(entity, "lamb_seal")
+        self.assertIn("lamb_seal", entity_active_buffs(entity))
+        self.assertEqual(get_charges(entity.buffs.all["lamb_seal"]), 2)
+
+    def test_charges_save_and_restore(self):
+        """The charge pool is durable record state, never instance memory."""
+        definition = self._synth_buff(key="t_charged_pool", charges=3)
+        entity = self._entity()
+        apply_buff(entity, definition.key)
+        # Saved: the pool is seeded into the persisted buff storage...
+        persisted = entity.attributes.get("buffs")[definition.key]
+        self.assertEqual(persisted["charges"], 3)
+        # ...and restore: a cold re-read (attribute-cache reset) re-derives it.
+        entity.attributes.reset_cache()
+        self.assertEqual(get_charges(entity.buffs.all[definition.key]), 3)
+        # Consumption persists through the same cold round-trip.
+        consume_climax_charges(entity)
+        entity.attributes.reset_cache()
+        self.assertEqual(get_charges(entity.buffs.all[definition.key]), 2)
+
+    def test_charges_two_transition_consumption_lifts_the_seal(self):
+        """Two 進行中 transitions consume the pool; the second removes the buff."""
+        entity = self._entity()
+        apply_buff(entity, "lamb_seal")
+        _apply_climax_phase_set(entity, "接近")
+        _apply_climax_phase_set(entity, "進行中")
+        self.assertIn("lamb_seal", entity_active_buffs(entity))
+        self.assertEqual(get_charges(entity.buffs.all["lamb_seal"]), 1)
+        # Afterglow → critical point → the second climax consumes the last.
+        _apply_climax_phase_set(entity, "餘韻")
+        _apply_climax_phase_set(entity, "接近")
+        _apply_climax_phase_set(entity, "進行中")
+        self.assertNotIn("lamb_seal", entity_active_buffs(entity))
+
+    def test_rolled_back_climax_consumption_burns_no_charge(self):
+        """A rolled-back 進行中 transition restores the consumed charge."""
+        entity = self._entity()
+        apply_buff(entity, "lamb_seal")
+        with transaction.atomic():
+            _apply_climax_phase_set(entity, "接近")
+            _apply_climax_phase_set(entity, "進行中")
+            transaction.set_rollback(True)
+        # The DB — not the transaction-unaware in-memory attribute cache —
+        # proves the charge survived: flush the idmapped attribute rows so the
+        # next read re-derives the rolled-back persisted buff cache.
+        from evennia.objects.models import ObjectDB
+
+        from evennia.typeclasses.attributes import Attribute as DBAttribute
+
+        through = ObjectDB.db_attributes.through
+        for row in through.objects.filter(objectdb__pk=entity.pk):
+            attribute = getattr(row, "attribute")
+            if attribute.db_key == "buffs":
+                DBAttribute._flush_cached_by_key(attribute.pk)
+        entity.attributes.reset_cache()
+        stored = dict(entity.attributes.get("buffs"))
+        self.assertIn("lamb_seal", stored)
+        self.assertEqual(
+            stored["lamb_seal"]["charges"],
+            2,
+            "a rolled-back consumption must not burn a charge",
+        )
 
     def test_buff_fire_scorch(self):
         self.assertIn("fire_scorch", BUFF_DEFINITIONS)
