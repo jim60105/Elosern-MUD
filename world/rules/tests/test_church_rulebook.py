@@ -46,6 +46,7 @@ from world.rules.rulebook.schema import (
     MissingRuleIdError,
     load_sectioned_rules,
 )
+from world.rules.player_messages import rejection_message
 from world.rules.clock import WorldClock, _DAY_SECONDS
 from world.rules.targeting import RoomActionContext
 
@@ -806,6 +807,7 @@ class ChurchSeriesECastTests(EvenniaTestCase):
     @covers_requirement(
         "church-ordination::series-e-utility-rows-feed-the-core-loop",
         "church-ordination::the-merit-ledger-is-persisted-character-state-with-a-single-writer",
+        "action-resolution-pipeline::the-church-rite-effect-handlers-reject-with-four-named-stable-reasons",
     )
     def test_martial_blessing_cast_cooldown_and_unenrolled_rejections(self):
         room = create_object(Room, key="t_bless_room")
@@ -880,6 +882,7 @@ class ChurchSeriesECastTests(EvenniaTestCase):
     @covers_requirement(
         "church-ordination::series-e-utility-rows-feed-the-core-loop",
         "church-ordination::the-merit-ledger-is-persisted-character-state-with-a-single-writer",
+        "action-resolution-pipeline::the-church-rite-effect-handlers-reject-with-four-named-stable-reasons",
     )
     def test_shelter_cast_venue_rest_bonus_and_day_rollover(self):
         church_room = create_object(Room, key="t_sanctuary_venue")
@@ -973,6 +976,16 @@ class ChurchSeriesECastTests(EvenniaTestCase):
         self.assertEqual(settlement2.result.outcome, "success")
         self.assertEqual(player.db.church["daily"]["day"], 2)
         self.assertEqual(player.db.church["daily"]["shelter"], 1)
+
+        # 5. Every rite rejection renders its fixed zh-TW line (player-message surface)
+        for reason, line in (
+            (RejectReason.RITE_NOT_ENROLLED, "你尚未入教，無法施展聖禮。"),
+            (RejectReason.RITE_COOLDOWN_ACTIVE, "聖禮冷卻中，尚無法再次施展。"),
+            (RejectReason.RITE_OUTSIDE_VENUE, "此處並非教會聖所，無法施展此聖禮。"),
+            (RejectReason.RITE_ALREADY_SHELTERED, "今日已獲得聖所庇護，無法再次施展。"),
+        ):
+            with self.subTest(reason=reason):
+                self.assertEqual(rejection_message(reason), line)
 
     @covers_requirement(
         "church-ordination::series-e-utility-rows-feed-the-core-loop",
