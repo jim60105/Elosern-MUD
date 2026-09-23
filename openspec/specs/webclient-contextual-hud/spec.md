@@ -1095,6 +1095,25 @@ The 背包 · 裝備 drawer SHALL present no router frame. Activating a 背包 e
 - **WHEN** a keyboard-only player moves through the open bag drawer
 - **THEN** every committed inventory row is reachable through the focusable item tiles with the shared inspector, and no parallel navigation list of those rows exists to traverse
 
+### Requirement: The shop drawer opens without a router frame and hosts no row region
+The 商店 drawer SHALL present no router frame. Activating the 商店 entry — the exploration target frame's shop `navigate` affordance row — SHALL open the drawer as a client-local open: the router's frame stack, current frame, breadcrumb, and menu keys SHALL be unchanged by the open, no sub-dock switch SHALL occur, and no drawer-hosted service surface SHALL be recorded. The drawer's body SHALL present only the shop surface rendered from the committed `services` panel, and no hosted row container, listbox, or detail pane SHALL render inside it in any state. Closing the shop drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the 商店 entry that opened it. Every committed stock and sellable row SHALL render within the drawer body and SHALL support keyboard interaction through native focusable controls (Tab, typing, Enter) without touching the router.
+
+#### Scenario: Opening the shop leaves the router unchanged
+- **WHEN** the player activates the shop `navigate` affordance row inside an open merchant target frame
+- **THEN** the 商店 drawer opens, the router's current frame remains the frame that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
+
+#### Scenario: The shop body carries no hosted row region
+- **WHEN** the shop drawer is open with the committed services panel available, including while a stock or sellable row's controls hold focus
+- **THEN** the drawer body contains the shop surface only, and no `dock-menu` row region and no `dock-detail` pane renders inside it
+
+#### Scenario: Closing the shop pops nothing and returns focus
+- **WHEN** the open shop drawer closes by Escape, by its close control, or by the scrim
+- **THEN** focus returns to the 商店 entry that opened it, the router's frame stack is exactly what it was before the open, and no action is dispatched
+
+#### Scenario: A keyboard-only trade needs no router row
+- **WHEN** a keyboard-only player moves into a stock row of the open shop drawer, types a quantity within the row's advertised bounds into that row's quantity entry, and activates its buy control
+- **THEN** the row becomes the selected row carrying the quantity hooks, and exactly one `shop.buy` action is emitted with that row's `item_key` and the typed quantity through the client's single dispatch entry
+
 ### Requirement: The equipment doll renders only server-authored slots and drops nothing
 The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 · 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title. The doll SHALL lay out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels. The doll SHALL render the server's three singleton slots and one accessory summary as four named positions in the square grid. The main-hand, armor, and accessory-summary positions SHALL each render a fixed local SVG selected by its server-authored slot role; the off-hand position SHALL be the iconless position. The doll SHALL NOT select an item icon from an item key or display name. A singleton slot with no row SHALL render a visible named empty state with a dashed outline. An occupied singleton slot SHALL render its visible slot label in the grid and its committed display name in the 裝備描述 column; when the committed rows carry more than one row for a recognised singleton slot, the square position consumes only the first row and every further row for that slot SHALL render as a labelled overflow row, so no committed row is lost. The accessory summary SHALL render its visible label and committed item count, while every repeatable accessory row SHALL render in the 裝備描述 column's accessory group. Any slot key outside the recognised set SHALL render as a labelled fallback row rather than being discarded, so no row the payload sends is lost. When the committed rows carry no equipment at all the doll SHALL render only its visible empty statement.
 

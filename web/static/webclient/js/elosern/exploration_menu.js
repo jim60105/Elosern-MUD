@@ -10,9 +10,10 @@
  * supplied by the local-map panel so `explore.move` passes its stale guard.
  *
  * The `navigate`-kind service affordance is dock-navigation only: it opens an
- * existing `services` submenu and is never submitted as an action. Disabled
- * entries stay focusable so their server-provided reason is readable, and
- * every server string is display text -- never parsed narrative.
+ * existing `services` submenu (guild) or frameless drawer (shop) and is never
+ * submitted as an action. Disabled entries stay focusable so their
+ * server-provided reason is readable, and every server string is display
+ * text -- never parsed narrative.
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -467,16 +468,32 @@
       } else if (affordance.kind === "navigate") {
         // A navigate-kind service affordance is dock-navigation only; it is
         // never submitted as an action and never carries an action_id.
-        items.push({
-          key: "service-" + affordance.surface,
-          label: affordance.label || (affordance.surface === "guild" ? "公會服務" : "商店"),
-          enabled: !!affordance.enabled,
-          actionId: null,
-          payload: null,
-          openServiceSubmenu: affordance.surface,
-          description: null,
-          disabledReason: affordance.disabled_reason || null,
-        });
+        // make-shop-drawer-frameless: the shop surface opens client-local
+        // (openDrawer: "shop", the 背包 precedent), leaving the router's
+        // frame stack untouched; the guild row stays byte-identical.
+        if (affordance.surface === "shop") {
+          items.push({
+            key: "service-" + affordance.surface,
+            label: affordance.label || "商店",
+            enabled: !!affordance.enabled,
+            actionId: null,
+            payload: null,
+            openDrawer: "shop",
+            description: null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+        } else {
+          items.push({
+            key: "service-" + affordance.surface,
+            label: affordance.label || (affordance.surface === "guild" ? "公會服務" : "商店"),
+            enabled: !!affordance.enabled,
+            actionId: null,
+            payload: null,
+            openServiceSubmenu: affordance.surface,
+            description: null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+        }
       }
     });
      if (items.length === 0) {

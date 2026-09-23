@@ -42,6 +42,7 @@ function explorationPanelWithShop(overrides = {}) {
             affordances: [
               { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
               { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
+             { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
             ],
           },
         ],
@@ -104,16 +105,16 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(store.view.hudDrawer).toBe("quest");
   }
 
-  // Walk into the shop surface via the 店長's navigate affordance.
-  function enterShopSurface() {
+  // Walk into the guild surface via the 店長's navigate affordance.
+  function enterGuildSurface() {
     expect(store.focusItemByKey("interact")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("target-7")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
-    expect(store.focusItemByKey("service-shop")).toBe(true);
+    expect(store.focusItemByKey("service-guild")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
-    expect(store.router.currentDescriptor().source).toBe("services.shop");
-    expect(store.view.hudDrawer).toBe("shop");
+    expect(store.router.currentDescriptor().source).toBe("services.guild");
+    expect(store.view.hudDrawer).toBe("quest");
   }
 
   beforeEach(() => {
@@ -124,41 +125,33 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   });
 
   describe("hosted-drawer coupling", () => {
-    it("closing a hosted drawer pops exactly one level and discards the quantity form", () => {
+   it("closing a hosted drawer pops exactly one level", () => {
       openSession();
-      enterShopSurface();
-      // Descend into the stock frame and open the bounded quantity form on a
-      // buy row (client-local state riding the shop surface).
-      expect(store.focusItemByKey("stock")).toBe(true);
+     enterGuildSurface();
+     // Descend into the board frame
+     expect(store.focusItemByKey("board")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("services.stock");
+     expect(store.router.currentDescriptor().source).toBe("services.board");
       const depth = store.router.depth();
-      expect(store.focusItemByKey("stock-0")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
-      expect(store.quantityForm.open).toBe(true);
-      // Explicit close: the hosted stock frame pops exactly one level, the
-      // drawer closes once, and the quantity form is discarded with it.
+     // Explicit close: the hosted board frame pops exactly one level, the
+     // drawer closes once.
       expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
       expect(store.view.hudDrawer).toBe(null);
-      expect(store.quantityForm).toBe(null);
       expect(store.router.depth()).toBe(depth - 1);
-      expect(store.router.currentDescriptor().source).toBe("services.shop");
+     expect(store.router.currentDescriptor().source).toBe("services.guild");
       expect(sender.sent.actions.length).toBe(0);
     });
 
     it("a committed panel removing the hosted surface closes the drawer through the settle", () => {
       openSession();
-      enterShopSurface();
-      expect(store.focusItemByKey("stock")).toBe(true);
+     enterGuildSurface();
+     expect(store.focusItemByKey("board")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
-      expect(store.focusItemByKey("stock-0")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
-      expect(store.quantityForm.open).toBe(true);
+     expect(store.router.currentDescriptor().source).toBe("services.board");
       // The services panel goes away in the committed state: the settle pops
-      // the whole shop family back to the last resolvable exploration frame
+     // the whole guild family back to the last resolvable exploration frame
       // (the 店長 affordance menu still resolves), closes the drawer that
-      // lost its hosted frame, and discards the quantity form (panel-loss
-      // discard, webclient-service-menus' contract).
+     // lost its hosted frame.
       const withoutServices = snapshot();
       delete withoutServices.panels.services;
       withoutServices.revision = 2;
@@ -168,7 +161,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.router.depth()).toBe(3);
       expect(store.router.currentDescriptor().source).toBe("exploration.target");
       expect(store.view.hudDrawer).toBe(null);
-      expect(store.quantityForm).toBe(null);
     });
 
     it("quest-detail loss pops to the hosted parent surface and keeps the drawer", () => {
@@ -384,4 +376,39 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.view.hudDrawer).toBe(null);
     });
   });
+
+ describe("frameless shop drawer", () => {
+   it("activating service-shop opens shop drawer leaving frame stack and depth unchanged", () => {
+     openSession();
+     expect(store.focusItemByKey("interact")).toBe(true);
+     expect(store.focusConfirm()).toBe(true);
+     expect(store.focusItemByKey("target-7")).toBe(true);
+     expect(store.focusConfirm()).toBe(true);
+
+     const depthBefore = store.router.depth();
+     const descriptorBefore = store.router.currentDescriptor();
+     const trailBefore = store.router.trail();
+
+     expect(store.focusItemByKey("service-shop")).toBe(true);
+     expect(store.focusConfirm()).toBe(true);
+
+     // Shop drawer opens without pushing a frame or recording a service surface
+     expect(store.view.hudDrawer).toBe("shop");
+     expect(store.router.depth()).toBe(depthBefore);
+     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+     expect(store.router.trail()).toEqual(trailBefore);
+     expect(store.view.activeSubDock).toBe(null);
+     expect(store.serviceSurface).toBe(null);
+
+     // A services-panel commit while the shop drawer is open never records a hosted surface or pushes a frame
+     const updateSnap = snapshot({ revision: 2 });
+     expect(store.receive(1, "ui_snapshot", [updateSnap], {}).accepted).toBe(true);
+
+     expect(store.view.hudDrawer).toBe("shop");
+     expect(store.router.depth()).toBe(depthBefore);
+     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
+     expect(store.view.activeSubDock).toBe(null);
+     expect(store.serviceSurface).toBe(null);
+});
+ });
 });

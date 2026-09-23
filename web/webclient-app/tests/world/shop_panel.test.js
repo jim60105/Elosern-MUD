@@ -91,12 +91,91 @@ describe("ShopPanel (B4 world / services family)", () => {
       [{ action_id: "shop.buy", payload: { item_key: "item_iron_sword", quantity: 3 } }],
     ]);
 
-    // Out-of-bounds quantities are not emitted (no invented values).
-    qty.setValue(9);
+   // Out-of-bounds quantities set without a change event are not emitted (no invented values).
+   qty.element.value = "9";
+   await qty.trigger("input");
     await row.find(".shop-row__buy").trigger("click");
     expect(w.emitted("buy")).toEqual([
       [{ action_id: "shop.buy", payload: { item_key: "item_iron_sword", quantity: 3 } }],
     ]);
+  });
+
+  it("focusing a stock row quantity entry marks that row with services-quantity and services-quantity-value", async () => {
+   const w = mountPanel();
+   const row = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
+   const qty = row.find("input.shop-row__qty");
+
+   expect(w.find('[data-testid="services-quantity"]').exists()).toBe(false);
+   expect(w.find('[data-testid="services-quantity-value"]').exists()).toBe(false);
+
+   await qty.trigger("focusin");
+   expect(w.find('[data-testid="services-quantity"]').exists()).toBe(true);
+   expect(w.find('[data-testid="services-quantity-value"]').exists()).toBe(true);
+   expect(row.find('[data-testid="services-quantity"]').exists()).toBe(true);
+  });
+
+  it("clamps quantity on change above max to max and below min or empty to min", async () => {
+   const w = mountPanel();
+   const row = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
+   const qty = row.find("input.shop-row__qty");
+   expect(qty.attributes("min")).toBe("1");
+   expect(qty.attributes("max")).toBe("8");
+
+   // Change above max (e.g. 10 -> clamps to 8)
+   await qty.setValue(10);
+   await qty.trigger("change");
+   expect(qty.element.value).toBe("8");
+
+   // Change below min (e.g. 0 or -1 -> clamps to 1)
+   await qty.setValue(0);
+   await qty.trigger("change");
+   expect(qty.element.value).toBe("1");
+
+   // Empty or non-integer -> clamps to min (1)
+   await qty.setValue("");
+   await qty.trigger("change");
+   expect(qty.element.value).toBe("1");
+  });
+
+  it("buyNow and sellNow emit nothing for an out-of-bounds value set without a change event", async () => {
+   const w = mountPanel();
+   const stockRow = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
+   const stockQty = stockRow.find("input.shop-row__qty");
+
+   // Setting an out-of-bounds value without a change event (input only)
+   stockQty.element.value = "99";
+   await stockQty.trigger("input");
+   await stockRow.find(".shop-row__buy").trigger("click");
+   expect(w.emitted("buy")).toBeUndefined();
+
+   // Same for sellNow
+   const sellRow = w.get('[data-testid="shop-panel__sellable--item_herb_moon"]');
+   const sellQty = sellRow.find("input.shop-row__qty");
+   sellQty.element.value = "99";
+   await sellQty.trigger("input");
+   await sellRow.find(".shop-row__sell").trigger("click");
+   expect(w.emitted("sell")).toBeUndefined();
+  });
+
+  it("tab order reaches every enabled row's entry and button, and disabled button stays rendered with reason", () => {
+   const w = mountPanel();
+   const stockRows = w.findAll('.shop-panel__section:first-of-type .shop-row');
+   expect(stockRows.length).toBeGreaterThan(0);
+
+   for (const row of stockRows) {
+     const input = row.find("input.shop-row__qty");
+     const button = row.find("button.shop-row__buy");
+     expect(input.exists()).toBe(true);
+     expect(button.exists()).toBe(true);
+     expect(input.attributes("tabindex")).not.toBe("-1");
+     if (button.attributes("disabled") !== undefined) {
+       const reason = row.find(".shop-row__reason");
+       expect(reason.exists()).toBe(true);
+       expect(reason.text().length).toBeGreaterThan(0);
+     } else {
+       expect(button.attributes("tabindex")).not.toBe("-1");
+     }
+   }
   });
 
   it("renders the sellable row and emits a shop.sell intent with payload values", async () => {
@@ -114,8 +193,9 @@ describe("ShopPanel (B4 world / services family)", () => {
     expect(w.emitted("sell")).toEqual([
       [{ action_id: "shop.sell", payload: { item_key: "item_herb_moon", quantity: 2 } }],
     ]);
-    // Above the held-count bound: not emitted.
-    qty.setValue(4);
+   // Above the held-count bound set without a change event: not emitted.
+   qty.element.value = "4";
+   await qty.trigger("input");
     await sellable.find(".shop-row__sell").trigger("click");
     expect(w.emitted("sell")).toEqual([
       [{ action_id: "shop.sell", payload: { item_key: "item_herb_moon", quantity: 2 } }],

@@ -174,8 +174,39 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             f"the {surface_key} host's navigate row ({item_key}) is not in the "
             "open target's affordance frame",
         )
-        _press(page, "Enter")  # open the service submenu
+        _press(page, "Enter")  # open the service submenu / frameless drawer
+        if surface_key == "shop":
+            wait_for_store_state(
+                page,
+                lambda s: s.get("hudDrawer") == "shop",
+                dom_readiness={
+                    "selector": '[data-testid="shop-panel"]',
+                    "predicate": (
+                        "() => !!document.querySelector('[data-testid=\"shop-panel\"]')"
+                    ),
+                    "description": "frameless shop drawer rendered",
+                },
+            )
         return self._services_panel(page)
+
+    def _tab_until_focused(self, page, selector, max_presses=30):
+        """Press Tab until document.activeElement matches selector inside the drawer."""
+        for _ in range(max_presses):
+            _press(page, "Tab")
+            matched = page.evaluate(
+                "(sel) => document.activeElement && document.activeElement.matches(sel)",
+                selector,
+            )
+            if matched:
+                return True
+        self.fail(
+            f"Tab did not reach element matching {selector} after {max_presses} presses"
+        )
+
+    def _replace_focused_number(self, page, value):
+        """Replace the currently focused number entry's value using the keyboard."""
+        page.keyboard.press("Control+A")
+        page.keyboard.type(str(value))
 
     def _open_guild_menu(self, page):
         return self._open_surface(page, "guild")

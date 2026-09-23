@@ -674,4 +674,120 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="hud-drawer"]').exists()).toBe(false);
   });
+
+ it("closing shop drawer by Escape, close button, and scrim pops nothing, dispatches nothing, and restores focus", async () => {
+   mountAppClient();
+   const sender = fx.createFakeSender();
+   store.setSender(sender);
+   store.beginTransport(1);
+   store.setConnected(true);
+   store.receive(
+     1,
+     "ui_snapshot",
+     [
+       fx.snapshot({
+         mode: "exploration",
+         panels: {
+           status: fx.statusPanel(),
+           services: SERVICES_PANEL_SAMPLE,
+           exploration: fx.explorationPanel({
+             interact: [
+               {
+                 identity: 7,
+                 display_name: "店長",
+                 portrait_ref: null,
+                 affordances: [
+                   { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+                   { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
+                 ],
+               },
+             ],
+           }),
+         },
+       }),
+     ],
+   );
+   await wrapper.vm.$nextTick();
+
+   // Navigate to 店長 affordances
+   expect(store.focusItemByKey("interact")).toBe(true);
+   expect(store.focusConfirm()).toBe(true);
+   expect(store.focusItemByKey("target-7")).toBe(true);
+   expect(store.focusConfirm()).toBe(true);
+   await wrapper.vm.$nextTick();
+
+   const depthBefore = store.router.depth();
+   const trailBefore = store.router.trail();
+
+   const closeRoutes = {
+     "close button": async () => {
+       await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+     },
+     "Escape": async () => {
+       await wrapper.get('[data-testid="hud-drawer"]').trigger("keydown", { key: "Escape" });
+     },
+     "scrim": async () => {
+       await wrapper.get('[data-testid="hud-drawer-scrim"]').trigger("click");
+     },
+   };
+
+   for (const [name, closeAction] of Object.entries(closeRoutes)) {
+     const actionsCountBefore = sender.sent.actions.length;
+
+     // Focus and activate service-shop
+     expect(store.focusItemByKey("service-shop")).toBe(true);
+     expect(store.focusConfirm()).toBe(true);
+     await wrapper.vm.$nextTick();
+
+     expect(store.view.hudDrawer, name).toBe("shop");
+     expect(wrapper.find('[data-testid="shop-panel"]').exists(), name).toBe(true);
+     expect(store.router.depth(), name).toBe(depthBefore);
+     expect(store.view.activeSubDock, name).toBe(null);
+
+     await closeAction();
+     await wrapper.vm.$nextTick();
+
+     expect(store.view.hudDrawer, name).toBe(null);
+     expect(wrapper.find('[data-testid="hud-drawer"]').exists(), name).toBe(false);
+     expect(store.router.depth(), name).toBe(depthBefore);
+     expect(store.router.trail(), name).toEqual(trailBefore);
+     expect(store.view.activeSubDock, name).toBe(null);
+     expect(sender.sent.actions.length, name).toBe(actionsCountBefore);
+     expect(store.router.currentItem().key, name).toBe("service-shop");
+   }
+});
+
+ it("closing guild-hosted quest drawer pops exactly one level (regression)", async () => {
+   mountAppClient();
+   store.beginTransport(1);
+   store.setConnected(true);
+   store.receive(
+     1,
+     "ui_snapshot",
+     [
+       fx.snapshot({
+         mode: "exploration",
+         panels: {
+           status: fx.statusPanel(),
+           exploration: fx.explorationPanel(),
+           context_actions: fx.explorationActions(),
+           services: SERVICES_PANEL_SAMPLE,
+         },
+       }),
+     ],
+   );
+   await wrapper.vm.$nextTick();
+
+   // Open guild quest log via top navigation
+   store.tabToRootAndConfirm("quests", "pointer");
+   await wrapper.vm.$nextTick();
+   expect(store.view.hudDrawer).toBe("quest");
+   const depthAtQuest = store.router.depth();
+
+   await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+   await wrapper.vm.$nextTick();
+
+    expect(store.view.hudDrawer).toBe(null);
+   expect(store.router.depth()).toBe(depthAtQuest - 1);
+ });
 });

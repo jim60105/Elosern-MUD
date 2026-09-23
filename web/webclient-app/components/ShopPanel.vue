@@ -48,20 +48,20 @@ const sellable = computed(() => {
 // One quantity entry per item_key, defaulted to the action's own lower
 // bound (an invented default is a fabricated value); stock and sellable
 // rows for the same item share the entry.
+function quantityBounds(action) {
+   return { min: action?.quantity?.min ?? 1, max: action?.quantity?.max ?? 1 };
+  }
+
 const quantities = reactive({});
 for (const row of stock.value) {
   if (!(row.item_key in quantities)) {
-    quantities[row.item_key] = row.buy?.quantity?.min ?? 1;
-  }
+     quantities[row.item_key] = quantityBounds(row.buy).min;
 }
+  }
 for (const row of sellable.value) {
   if (!(row.item_key in quantities)) {
-    quantities[row.item_key] = row.sell?.quantity?.min ?? 1;
-  }
+     quantities[row.item_key] = quantityBounds(row.sell).min;
 }
-
-function quantityBounds(action) {
-  return { min: action?.quantity?.min ?? 1, max: action?.quantity?.max ?? Number.MAX_SAFE_INTEGER };
 }
 
 // The buy/sell intents are the exact OOB action envelope (the `action_id`
@@ -91,12 +91,12 @@ watch(
     }
     for (const row of stock.value) {
       if (!(row.item_key in quantities)) {
-        quantities[row.item_key] = row.buy?.quantity?.min ?? 1;
+        quantities[row.item_key] = quantityBounds(row.buy).min;
       }
     }
     for (const row of sellable.value) {
       if (!(row.item_key in quantities)) {
-        quantities[row.item_key] = row.sell?.quantity?.min ?? 1;
+        quantities[row.item_key] = quantityBounds(row.sell).min;
       }
     }
   }
@@ -118,6 +118,16 @@ watch(
 
 function activateRow(row) {
   selectedKey.value = row.item_key;
+}
+
+function clampQuantity(row, action) {
+   const { min, max } = quantityBounds(action);
+   const raw = Number(quantities[row.item_key]);
+   if (!Number.isInteger(raw) || raw < min) {
+     quantities[row.item_key] = min;
+   } else if (raw > max) {
+     quantities[row.item_key] = max;
+}
 }
 
 function buyNow(row) {
@@ -176,6 +186,7 @@ function sellNow(row) {
         class="shop-row"
         :data-testid="`shop-panel__stock--${row.item_key}`"
         @click="activateRow(row)"
+       @focusin="activateRow(row)"
       >
         <span class="shop-row__name">{{ row.display_name }}</span>
         <span class="shop-row__price">購買 {{ formatCopper(row.buy_copper) }} 銅</span>
@@ -189,9 +200,11 @@ function sellNow(row) {
             v-model="quantities[row.item_key]"
             class="shop-row__qty"
             type="number"
-            min="1"
-            :max="row.buy?.quantity?.max ?? 1"
+           :min="quantityBounds(row.buy).min"
+           :max="quantityBounds(row.buy).max"
             aria-label="購買數量"
+           @change="clampQuantity(row, row.buy)"
+           @blur="clampQuantity(row, row.buy)"
           />
           <span
             class="shop-row__qty-value"
@@ -221,6 +234,7 @@ function sellNow(row) {
         class="shop-row"
         :data-testid="`shop-panel__sellable--${row.item_key}`"
         @click="activateRow(row)"
+       @focusin="activateRow(row)"
       >
         <span class="shop-row__name">{{ row.display_name }}</span>
         <span class="shop-row__price">出賣 {{ formatCopper(row.sell_copper) }} 銅</span>
@@ -233,9 +247,11 @@ function sellNow(row) {
             v-model="quantities[row.item_key]"
             class="shop-row__qty"
             type="number"
-            min="1"
-            :max="row.sell?.quantity?.max ?? 1"
+           :min="quantityBounds(row.sell).min"
+           :max="quantityBounds(row.sell).max"
             aria-label="賣出數量"
+           @change="clampQuantity(row, row.sell)"
+           @blur="clampQuantity(row, row.sell)"
           />
           <span
             class="shop-row__qty-value"

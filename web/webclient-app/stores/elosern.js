@@ -239,6 +239,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // activated item (the `services-quantity` testid follows the form's
     // item_key). Discarded (nulled) on a `services` panel replacement.
     quantityForm: ctx.quantityForm,
+    // The recorded service surface ("guild" / "shop"): exposed so tests can
+    // assert whether a service surface is recorded.
+    serviceSurface: ctx.serviceSurface,
     // H4 (task 4.1/4.2): the reference drawer controller — the single open
     // entry (`openHudDrawer` over the closed name set, unknown names
     // rejected) and the single close entry (`closeHudDrawer`, which pops

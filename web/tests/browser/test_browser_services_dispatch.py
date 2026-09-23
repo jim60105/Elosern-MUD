@@ -133,13 +133,15 @@ class ReconnectJourney(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         wallet = panel["player"]["wallet"]
         generation_before = store_state(page)["generation"]
+        shelf = panel["shop"]["stock"][0]
+        first_key = shelf["item_key"]
 
-        # Enter the quantity form but do not submit; the value is local.
+        # Type an unsubmitted quantity in the shop drawer; the value is local.
         self._open_surface(page, "shop")
-        _press(page, "Enter")  # 貨架
-        _press(page, "Enter")  # first shelf buy row
-        _press(page, "5", wait_ms=40)
-        self.assertTrue(page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]') !== null"))
+        first_stock_input_sel = f'[data-testid="shop-panel__stock--{first_key}"] input.shop-row__qty'
+        self._tab_until_focused(page, first_stock_input_sel)
+        self._replace_focused_number(page, "5")
+        self.assertTrue(page.evaluate("() => document.querySelector('[data-testid=\"services-quantity\"]') !== null"))
 
         # Abnormally close the raw WebSocket (preserves login) and wait for the
         # offline overlay.
@@ -159,6 +161,10 @@ class ReconnectJourney(ServicesBrowserTest):
             },
             timeout=30000,
         )
+        # The drawer closes on transport loss
+        self.assertIsNone(store_state(page).get("hudDrawer"))
+        self.assertTrue(page.evaluate("() => document.querySelector('[data-testid=\"hud-drawer\"]') === null"))
+
         # Wait for the reconnected transport to open a new generation, nudging
         # the stock reconnection path once if the socket did not reopen.
         deadline = time.monotonic() + 30
@@ -181,9 +187,14 @@ class ReconnectJourney(ServicesBrowserTest):
         # The new snapshot rebuilt the services view from canonical persistence.
         self.assertEqual(panel["player"]["wallet"], wallet)
         self.assertTrue(panel["available"])
-        # The unsubmitted quantity was discarded and nothing was retried.
+
+        # Reopen the shop drawer: unsubmitted quantity was discarded, value is back at lower bound
+        self._open_surface(page, "shop")
+        val = page.evaluate(f"() => document.querySelector('{first_stock_input_sel}').value")
+        self.assertEqual(val, str(shelf["buy"]["quantity"]["min"]))
+        # services-quantity is absent until a row takes focus
         self.assertEqual(
-            page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]') === null"),
+             page.evaluate("() => document.querySelector('[data-testid=\"services-quantity\"]') === null"),
             True,
             "unsubmitted quantity must be discarded on reconnect",
         )
