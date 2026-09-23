@@ -270,11 +270,17 @@ def _validate_mitigation(row_id: str, skill_key: str, value: Any) -> None:
                 "is not an existing penalty in "
                 f"{sorted(MITIGATION_TARGETS)}",
             )
-        _parse_nonnegative_addition(
+        parsed = _parse_nonnegative_addition(
             row_id,
             f"passive row {skill_key!r} mitigation",
             reduction,
         )
+        if parsed > 100:
+            raise _error(
+                row_id,
+                f"passive row {skill_key!r}: mitigation percentage {parsed}% "
+                "cannot exceed 100%",
+            )
 
 
 def validate_passive_polarity(
@@ -430,7 +436,14 @@ def _validate_accrual(rows: list[SectionedRule]) -> dict[str, dict[str, Any]]:
         if "stat" in row.data:
             entry["stat"] = _require_str(row.id, row.data, "stat")
         if "skill_key" in row.data:
-            entry["skill_key"] = _require_str(row.id, row.data, "skill_key")
+            skill_key = _require_str(row.id, row.data, "skill_key")
+            from world.skills.registry import SKILL_REGISTRY
+            if skill_key not in SKILL_REGISTRY:
+                raise _error(
+                    row.id,
+                    f"accrual row skill_key {skill_key!r} is not a registered skill in SKILL_REGISTRY",
+                )
+            entry["skill_key"] = skill_key
         result[row.id] = entry
     return result
 

@@ -294,12 +294,15 @@ class TitleCodexViewTests(EvenniaTest):
         "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
     )
     def test_clergy_ladder_rows_transition_locked_to_unlocked_as_redeemed_count_crosses_thresholds(self):
-        from world.lore.titles import _FIXED_TITLE_ROWS as _REAL_TITLES
+        from world.lore.titles import SHIPPED_FIXED_TITLES, TitleCategory
         from unittest.mock import patch
+        from world.rules.titles import bank_fixed
+        from world.rules.titles.planner import predicate_satisfied
 
-        # 1. Initially (0 redeemed skills): all 5 clergy ladder rows are locked
-        with patch("world.rules.title_view.FIXED_TITLE_REGISTRY", _REAL_TITLES), \
-             patch("world.rules.titles.state.FIXED_TITLE_REGISTRY", _REAL_TITLES):
+        with patch("world.rules.title_view.FIXED_TITLE_REGISTRY", SHIPPED_FIXED_TITLES), \
+             patch("world.rules.titles.state.FIXED_TITLE_REGISTRY", SHIPPED_FIXED_TITLES), \
+             patch("world.lore.titles.FIXED_TITLE_REGISTRY", SHIPPED_FIXED_TITLES):
+            # 1. Initially (0 redeemed skills): all 5 clergy ladder rows are locked
             view = build_title_codex_view(self.character)
             clergy_rows = {row.key: row for row in view.fixed_rows if row.category == "clergy"}
             self.assertEqual(len(clergy_rows), 5)
@@ -308,17 +311,33 @@ class TitleCodexViewTests(EvenniaTest):
                 self.assertEqual(row.flavor, "")
                 self.assertTrue(len(row.hint) > 0)
 
-            # 2. Bank first rung (crossing threshold 3)
-            first_key = next(iter(clergy_rows))
-            bank_fixed(self.character, first_key, 100)
-            view2 = build_title_codex_view(self.character)
-            clergy_rows2 = {row.key: row for row in view2.fixed_rows if row.category == "clergy"}
-            self.assertTrue(clergy_rows2[first_key].unlocked)
-            self.assertEqual(clergy_rows2[first_key].hint, "")
-            self.assertTrue(len(clergy_rows2[first_key].flavor) > 0)
-            # Other ladder rows remain locked
-            for key in set(clergy_rows) - {first_key}:
-                self.assertFalse(clergy_rows2[key].unlocked)
+            # 2. Seed 2 redeemed skills (below threshold 3): evaluation grants nothing
+            self.character.db.church = {"merit": 100, "redeemed": ["s1", "s2"]}
+            for defn in SHIPPED_FIXED_TITLES.values():
+                if defn.category == TitleCategory.CLERGY and predicate_satisfied(self.character, None, defn.predicate):
+                    bank_fixed(self.character, defn.key, 100)
+            view_sub = build_title_codex_view(self.character)
+            for row in view_sub.fixed_rows:
+                if row.category == "clergy":
+                    self.assertFalse(row.unlocked)
+
+            # 3. Seed 3 redeemed skills (crosses first threshold 3): grant path unlocks first rung
+            self.character.db.church = {"merit": 100, "redeemed": ["s1", "s2", "s3"]}
+            unlocked_keys = []
+            for defn in SHIPPED_FIXED_TITLES.values():
+                if defn.category == TitleCategory.CLERGY and predicate_satisfied(self.character, None, defn.predicate):
+                    bank_fixed(self.character, defn.key, 100)
+                    unlocked_keys.append(defn.key)
+
+            view_unlocked = build_title_codex_view(self.character)
+            clergy_unlocked = {row.key: row for row in view_unlocked.fixed_rows if row.category == "clergy"}
+            self.assertEqual(len(unlocked_keys), 1)
+            first_key = unlocked_keys[0]
+            self.assertTrue(clergy_unlocked[first_key].unlocked)
+            self.assertEqual(clergy_unlocked[first_key].hint, "")
+            self.assertTrue(len(clergy_unlocked[first_key].flavor) > 0)
+            for k in set(clergy_unlocked) - {first_key}:
+                self.assertFalse(clergy_unlocked[k].unlocked)
 
     @covers_requirement(
         "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"
@@ -326,11 +345,11 @@ class TitleCodexViewTests(EvenniaTest):
     def test_no_downstream_system_consumes_clergy_title_as_prerequisite(self):
         # Search-prove: no codebase rules or gates depend on clergy titles as a prerequisite.
         from pathlib import Path
-        from world.lore.titles import _FIXED_TITLE_ROWS as _REAL_TITLES
+        from world.lore.titles import SHIPPED_FIXED_TITLES, TitleCategory
 
         rulebook_dir = Path(__file__).parents[1] / "rulebook"
-        clergy_keys = {k for k, v in _REAL_TITLES.items() if getattr(v, "category", None) == "clergy"}
-        clergy_displays = {v.display_name_zh for v in _REAL_TITLES.values() if getattr(v, "category", None) == "clergy"}
+        clergy_keys = {k for k, v in SHIPPED_FIXED_TITLES.items() if getattr(v, "category", None) == TitleCategory.CLERGY}
+        clergy_displays = {v.display_name_zh for v in SHIPPED_FIXED_TITLES.values() if getattr(v, "category", None) == TitleCategory.CLERGY}
 
         for yaml_file in rulebook_dir.glob("*.yaml"):
             text = yaml_file.read_text(encoding="utf-8")

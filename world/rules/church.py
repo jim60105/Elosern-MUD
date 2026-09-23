@@ -475,45 +475,30 @@ def _in_church_venue(entity: Any) -> bool:
 def _in_public_venue(entity: Any) -> bool:
     """Return whether the entity stands in a public venue."""
     location = getattr(entity, "location", None)
-    if location is None:
+    if location is None or not hasattr(location, "tags"):
         return False
-    if getattr(location, "is_public", False) or getattr(getattr(location, "db", None), "is_public", False):
-        return True
-    if hasattr(location, "tags"):
-        try:
-            tags = {str(tag).lower() for tag in location.tags.all()}
-            if "public" in tags or "public_venue" in tags:
-                return True
-        except Exception:  # observability: ignore R2: a broken tag read fails the venue check closed (False)
-            pass
     try:
-        contents = getattr(location, "contents", [])
-        if any(other is not entity and hasattr(other, "traits") for other in contents):
-            return True
-    except Exception:  # observability: ignore R2: a broken contents read fails the presence check closed (False)
-        pass
-    return False
+        tags = {str(tag).lower() for tag in location.tags.all()}
+        return "public" in tags or "public_venue" in tags
+    except (AttributeError, TypeError):  # observability: ignore R2: a broken tag read fails the venue check closed (False)
+        return False
 
 
 def _is_under_submission(entity: Any) -> bool:
     """Return whether the entity is under a domination/submission status."""
-    try:
-        sexual = getattr(entity, "sexual", None)
-        if sexual is not None and getattr(sexual, "submission_marks", None):
-            return True
-        raw_marks = entity.attributes.get(
-            "submission_marks", default=None, category="sexual_state"
-        )
-        if raw_marks:
-            return True
-    except Exception:  # observability: ignore R2: a broken submission attribute read fails closed (False)
-        pass
-    try:
-        buffs = getattr(getattr(entity, "db", None), "buffs", None) or {}
-        if any("submission" in b or "domination" in b or b in ("submissive", "dominant") for b in buffs):
-            return True
-    except Exception:  # observability: ignore R2: a broken buffs read fails closed (False)
-        pass
+    sexual = getattr(entity, "sexual", None)
+    if sexual is not None and getattr(sexual, "submission_marks", None):
+        return True
+    attributes = getattr(entity, "attributes", None)
+    if attributes is not None and hasattr(attributes, "get"):
+        try:
+            raw_marks = attributes.get(
+                "submission_marks", default=None, category="sexual_state"
+            )
+            if raw_marks:
+                return True
+        except (AttributeError, TypeError):  # observability: ignore R2: missing attribute fails submission check closed (False)
+            pass
     return False
 
 
@@ -532,8 +517,11 @@ def _owns_skill(entity: Any, skill_key: str) -> bool:
     return False
 
 
-def _daily_cap_bonus(entity: Any) -> int:
-    """Sum additional daily prayer cap granted by owned skills from church rules."""
+def daily_cap_bonus(entity: Any) -> int:
+    """Sum additional daily prayer cap granted by owned skills from church rules.
+
+    Acceptable single-player tradeoff: live DB read per prayer cap check.
+    """
     from world.rules.church_rulebook import get_church_rules
 
     bonus = 0
@@ -542,6 +530,9 @@ def _daily_cap_bonus(entity: Any) -> int:
         if skill_key and _owns_skill(entity, skill_key) and "daily_cap" in row:
             bonus += int(row["daily_cap"])
     return bonus
+
+
+_daily_cap_bonus = daily_cap_bonus
 
 
 def pray_step(entity: Any) -> dict[str, Any]:
@@ -640,18 +631,26 @@ def pray_step(entity: Any) -> dict[str, Any]:
 
 
 def _passive_percent_bonus(entity: Any, effect_key: str) -> int:
-    """Sum the additive percent bonus a redeemed PASSIVE grants on one
-    ledger channel (design §5.5: ``vow_of_service`` — offering copper +25%
-    and offering/climax merit +10%, ledger multipliers only, pure-positive;
-    prayer is deliberately untouched). The values ride the ``church.yaml``
+    """Sum the additive percent bonus an owned PASSIVE grants on one ledger
+    channel (Series A ``vow_of_service``: offering copper +25% and offering/
+    climax merit +10%; Series C ``poverty_vow``: offering copper +25% and pray
+    merit +25%; ``chastity_discipline``: pray merit +50%; ``public_devotion``:
+    merit +30% in public venues). The values ride the ``church.yaml``
     ``passive_effects`` rows keyed by PASSIVE redemption-catalogue skills;
     a skill the entity does not own contributes nothing.
     """
     from world.rules.church_rulebook import get_church_rules
 
+    skills = getattr(entity, "skills", None)
+    if skills is not None:
+        owned = set(skills.base_owned_keys())
+    else:
+        raw = getattr(getattr(entity, "db", None), "skills", None) or {}
+        owned = set(raw.get("passive", [])) | set(raw.get("active", []))
+
     total = 0
     for row in get_church_rules().passive_effects:
-        if not _owns_skill(entity, row.skill_key):
+        if row.skill_key not in owned:
             continue
         if row.skill_key == "public_devotion" and not _in_public_venue(entity):
             continue
@@ -675,8 +674,17 @@ def scaled_merit_gain(entity: Any, base_merit: int) -> int:
     scaled = base_merit + (
         base_merit * _passive_percent_bonus(entity, "merit_percent") + 50
     ) // 100
-    if _owns_skill(entity, "obedience") and _is_under_submission(entity):
-        scaled *= 2
+    from world.rules.church_rulebook import get_church_rules
+
+    rules = get_church_rules()
+    for row in rules.passive_effects:
+        if not _owns_skill(entity, row.skill_key):
+            continue
+        multiplier = row.effects.get("multiplier")
+        if multiplier is not None and isinstance(multiplier, (int, float)):
+            if row.skill_key == "obedience" and not _is_under_submission(entity):
+                continue
+            scaled = int(scaled * float(multiplier))
     return scaled
 
 
@@ -1112,22 +1120,34 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
             from world.lore.titles import FIXED_TITLE_REGISTRY, TitlePredicateFamily
             from world.rules.titles import bank_fixed, banked_fixed_keys
             from world.rules.titles.planner import predicate_satisfied
+            from world.rules.titles.state import TitleDataError
 
             owned_titles = banked_fixed_keys(entity)
             tick = get_world_clock().tick
+            granted_notifications: list[str] = []
             for definition in FIXED_TITLE_REGISTRY.values():
                 if definition.key in owned_titles:
                     continue
                 if definition.predicate.family is TitlePredicateFamily.CHURCH_SKILLS_REDEEMED:
-                    if predicate_satisfied(entity, None, definition.predicate):
-                        bank_fixed(entity, definition.key, tick)
+                    try:
+                        satisfied = predicate_satisfied(entity, None, definition.predicate)
+                    except (TitleDataError, AttributeError, TypeError, ValueError):  # observability: ignore R2: malformed foreign title predicate skips row per planner contract
+                        continue
+                    if satisfied:
+                        if bank_fixed(entity, definition.key, tick):
+                            display = definition.display_name_zh
+                            granted_notifications.append(f"獲得稱號：{display}")
 
-            transaction.on_commit(
-                lambda: log_info(
+            def _on_commit_actions() -> None:
+                log_info(
                     "church_skill_redeemed",
                     context={"char": char_key, "skill": skill_key},
                 )
-            )
+                if hasattr(entity, "msg"):
+                    for note in granted_notifications:
+                        entity.msg(note)
+
+            transaction.on_commit(_on_commit_actions)
     except ChurchLedgerError as error:
         restore_attributes(entity, snapshots)
         raise RedemptionError(RedemptionReason.MALFORMED_LEDGER) from error
@@ -1175,7 +1195,7 @@ def cast_martial_blessing(entity: Any) -> dict[str, Any]:
         raise MartialBlessingError(MartialBlessingReason.COOLDOWN_ACTIVE)
 
     entity.db.martial_blessing_last_tick = clock.tick
-    apply_buff(entity, "light_blessing")
+    apply_buff(entity, "martial_blessing")
     return {
         "outcome": "blessed",
         "stat": stat,
@@ -1189,6 +1209,7 @@ class ShelterReason(StrEnum):
     NOT_ENROLLED = "not_enrolled"
     NOT_OWNED = "not_owned"
     OUTSIDE_VENUE = "outside_venue"
+    ALREADY_SHELTERED = "already_sheltered"
 
 
 class ShelterError(ValueError):
@@ -1206,6 +1227,8 @@ def apply_shelter_rest(entity: Any) -> dict[str, Any]:
         raise ShelterError(ShelterReason.NOT_OWNED)
     if not _in_church_venue(entity):
         raise ShelterError(ShelterReason.OUTSIDE_VENUE)
+    if ledger.get("shelter_rest_flag", False):
+        raise ShelterError(ShelterReason.ALREADY_SHELTERED)
 
     from world.rules.church_rulebook import get_church_rules
 

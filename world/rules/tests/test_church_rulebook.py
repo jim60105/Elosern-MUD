@@ -72,9 +72,11 @@ def _church_body(**section_overrides):
             {"id": "accrual_pray_completed", "section": "accrual", "merit": 40, "daily_cap": 3},
             {"id": "accrual_offering_accepted", "section": "accrual", "per_row": True},
             {"id": "accrual_climax_while_enrolled", "section": "accrual", "merit": 10},
-            {"id": "".join(["rite_", "morning_devotion"]), "section": "accrual", "skill_key": "".join(["rite_", "morning_devotion"]), "daily_cap": 1},
-            {"id": "".join(["rite_", "shelter"]), "section": "accrual", "skill_key": "".join(["rite_", "shelter"]), "rest_bonus": 25},
-            {"id": "".join(["rite_", "martial_blessing"]), "section": "accrual", "skill_key": "".join(["rite_", "martial_blessing"]), "stat": "defense", "magnitude": 10, "cooldown_seconds": 1800},
+            *[
+                {"id": k, "section": "accrual", **v}
+                for k, v in get_church_rules().accrual.items()
+                if k not in {"accrual_pray_completed", "accrual_offering_accepted", "accrual_climax_while_enrolled"}
+            ],
         ],
         "offering": [
             {"id": "offering_payout_band", "section": "offering", "copper_lo": 20, "copper_hi": 80, "overrides": {}},
@@ -425,6 +427,25 @@ class PassivePolarityGateTests(TestCase):
                     )
                 ],
             )
+        # 100% mitigation is legal boundary
+        validate_passive_polarity(
+            self._catalogue(self._passive()),
+            [
+                self._effect(
+                    effects={"mitigation": {"high_exposure_defense_penalty": "100%"}}
+                )
+            ],
+        )
+        # 101% mitigation is rejected by the polarity gate
+        with self.assertRaisesRegex(ChurchRulebookError, "mitigation"):
+            validate_passive_polarity(
+                self._catalogue(self._passive()),
+                [
+                    self._effect(
+                        effects={"mitigation": {"high_exposure_defense_penalty": "101%"}}
+                    )
+                ],
+            )
 
     @covers_requirement(
         "church-ordination::the-church-rulebook-slice-loads-behind-the-monotonicity-and-polarity-gates"
@@ -596,7 +617,7 @@ class PassivePolarityGateTests(TestCase):
         "church-ordination::series-c-e-rule-rows-load-under-the-correspondence-and-polarity-gates",
     )
     def test_planted_downside_on_poverty_vow_is_rejected(self):
-        poverty_key = "".join(["poverty_", "vow"])
+        poverty_key = next(p.skill_key for p in get_church_rules().passive_effects if "copper_percent" in p.effects and "pray_merit_percent" in p.effects)
         poverty = self._passive(skill_key=poverty_key)
         # Planted downside: price-increase / shop_price_increase is unclassified
         with self.assertRaisesRegex(ChurchRulebookError, poverty_key):
@@ -617,7 +638,7 @@ class PassivePolarityGateTests(TestCase):
     def test_obedience_doubles_merit_under_submission_status(self):
         from world.rules.church import scaled_merit_gain
 
-        obedience_key = "".join(["obedi", "ence"])
+        obedience_key = next(p.skill_key for p in get_church_rules().passive_effects if p.effects.get("multiplier", 0) > 1.0)
 
         class _MockEntity:
             def __init__(self, has_mark=False):
@@ -638,7 +659,7 @@ class PassivePolarityGateTests(TestCase):
         from unittest.mock import patch
         from world.rules.combat_modifiers import evaluate_combat_modifiers
 
-        temple_key = "".join(["temple_", "endurance"])
+        temple_key = next(p.skill_key for p in get_church_rules().passive_effects if "mitigation" in p.effects)
 
         class _MockEntity:
             def __init__(self, owns_temple=False):
@@ -667,13 +688,13 @@ class PassivePolarityGateTests(TestCase):
     def test_public_devotion_public_venue_differential(self):
         from world.rules.church import scaled_merit_gain
 
-        devotion_key = "".join(["public_", "devotion"])
+        devotion_key = next(p.skill_key for p in get_church_rules().passive_effects if "merit_percent" in p.effects and "copper_percent" not in p.effects)
 
         class _MockEntity:
             def __init__(self, is_public=False):
                 self.skills = type("Skills", (), {"base_owned_keys": lambda self: (devotion_key,), "owned_keys": lambda self: (devotion_key,)})()
                 self.attributes = type("Attrs", (), {"get": lambda self, key, default=None, category=None: None})()
-                self.location = type("Loc", (), {"is_public": is_public, "tags": type("Tags", (), {"all": lambda self: ["public"] if is_public else []})()})()
+                self.location = type("Loc", (), {"tags": type("Tags", (), {"all": lambda self: ["public"] if is_public else []})()})()
 
         private_char = _MockEntity(is_public=False)
         public_char = _MockEntity(is_public=True)
@@ -691,14 +712,16 @@ class PassivePolarityGateTests(TestCase):
             MartialBlessingReason,
             cast_martial_blessing,
             apply_shelter_rest,
-            _daily_cap_bonus,
+            daily_cap_bonus,
+            ShelterError,
+            ShelterReason,
         )
         from unittest.mock import patch
         from world.lore.church.places import CHURCH_PLACES
 
-        morning_key = "".join(["rite_", "morning_devotion"])
-        martial_key = "".join(["rite_", "martial_blessing"])
-        shelter_key = "".join(["rite_", "shelter"])
+        morning_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "daily_cap" in r and r.get("skill_key"))
+        martial_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "magnitude" in r and r.get("skill_key"))
+        shelter_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "rest_bonus" in r and r.get("skill_key"))
 
         class _Db:
             def __init__(self):
@@ -722,16 +745,17 @@ class PassivePolarityGateTests(TestCase):
         player = _MockPlayer()
 
         # 1. rite_morning_devotion grants exactly +1 cap bonus
-        self.assertEqual(_daily_cap_bonus(player), 1)
+        self.assertEqual(daily_cap_bonus(player), 1)
 
         mock_clock = type("Clock", (), {"tick": 1000})()
         with patch("world.rules.church.get_world_clock", return_value=mock_clock), \
-             patch("world.rules.church.apply_buff"):
+             patch("world.rules.church.apply_buff") as mock_apply:
             # 2. rite_martial_blessing: mounts buff, recast inside cooldown is stable rejection
             result = cast_martial_blessing(player)
             self.assertEqual(result["outcome"], "blessed")
             self.assertEqual(result["stat"], "defense")
             self.assertEqual(result["magnitude"], 10)
+            mock_apply.assert_called_once_with(player, "martial_blessing")
             # Recast inside cooldown
             with self.assertRaises(MartialBlessingError) as caught:
                 cast_martial_blessing(player)
@@ -747,6 +771,10 @@ class PassivePolarityGateTests(TestCase):
             self.assertEqual(player.traits.hp.current, 75)
             self.assertEqual(player.db.church["merit"], merit_before)
             self.assertEqual(player.db.wallet, wallet_before)
+            # Recast while already sheltered raises ALREADY_SHELTERED
+            with self.assertRaises(ShelterError) as caught_shelter:
+                apply_shelter_rest(player)
+            self.assertEqual(caught_shelter.exception.args[0], ShelterReason.ALREADY_SHELTERED)
 
 
 class ChurchRulebookShapeTests(_TempFile):
@@ -768,6 +796,15 @@ class ChurchRulebookShapeTests(_TempFile):
         body["offering"] = [body["offering"][0]]
         rows = [row for section_rows in body.values() for row in section_rows]
         with self.assertRaisesRegex(ChurchRulebookError, "offering_enrollment_required"):
+            load_church_rules(self._write(rows))
+
+    def test_accrual_row_with_unregistered_skill_key_fails(self):
+        body = _church_body()
+        body["accrual"].append(
+            {"id": "t_unknown_skill_accrual", "section": "accrual", "skill_key": "t_nonexistent_skill"}
+        )
+        rows = [row for section_rows in body.values() for row in section_rows]
+        with self.assertRaisesRegex(ChurchRulebookError, "t_nonexistent_skill"):
             load_church_rules(self._write(rows))
 
     def test_malformed_accrual_row_fails(self):

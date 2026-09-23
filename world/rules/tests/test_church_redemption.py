@@ -637,9 +637,15 @@ class ChurchClergyTitleGrantTests(ChurchRedemptionBase):
     )
     def test_clergy_title_grants_at_threshold_auto_equips_and_rolls_back(self):
         from world.rules.titles import banked_fixed_keys, read_title_state
+        from world.lore.titles import TitleCategory
+        from world.rules.tests._knowledge_probes import live_fixed_title_registry
 
         church.add_merit(self.char1, 100000)
-        believer_key = "".join(["c_", "believer"])
+        believer_key = next(
+            r.key
+            for r in live_fixed_title_registry().values()
+            if r.category == TitleCategory.CLERGY and r.predicate.threshold == 3
+        )
         # Pre-seed with 2 redeemed skills
         self.char1.db.church["redeemed"] = ["t_skill_1", "t_skill_2"]
 

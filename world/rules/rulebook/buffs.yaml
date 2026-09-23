@@ -457,3 +457,10 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 武備祝聖（rite_martial_blessing，church design §5.7 / Series E）：
+# 戰前祝聖武備的單一數值增益，冷卻 1800 秒，實際防禦數值由 church.yaml 與 combat_modifiers.yaml 結算。
+- key: martial_blessing
+  duration: 1800
+  stacking: refresh
+  polarity: buff
+  modifiers: {}

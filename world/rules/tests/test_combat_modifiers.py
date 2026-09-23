@@ -776,6 +776,44 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "light_blessing")
         self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 18})
 
+    def test_rule_martial_blessing_defense_bonus(self):
+        entity = self._entity()
+        apply_buff(entity, "martial_blessing")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 10})
+
+    def test_martial_blessing_consumes_church_rulebook_magnitude(self):
+        from unittest.mock import patch
+        from world.rules.church_rulebook import get_church_rules
+        entity = self._entity()
+        apply_buff(entity, "martial_blessing")
+        martial_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "magnitude" in r and r.get("skill_key"))
+        mock_rules = type("MockChurchRules", (), {
+            "accrual": {martial_key: {"stat": "defense", "magnitude": 15, "cooldown_seconds": 1800}},
+            "passive_effects": get_church_rules().passive_effects,
+        })()
+        with patch("world.rules.church_rulebook.get_church_rules", return_value=mock_rules):
+            self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 15})
+
+    def test_church_mitigation_scale_is_clamped_and_never_negative(self):
+        from world.rules.combat_modifiers import _church_mitigation_scale
+        from world.rules.church_rulebook import get_church_rules, PassiveEffectRow
+        from unittest.mock import patch
+        entity = self._entity()
+        temple_key = next(p.skill_key for p in get_church_rules().passive_effects if "mitigation" in p.effects)
+        entity.db.skills = {"active": [], "passive": [temple_key]}
+        bad_passive = PassiveEffectRow(
+            row_id=f"passive_{temple_key}",
+            skill_key=temple_key,
+            effects={"mitigation": {"high_exposure_defense_penalty": "120%"}}
+        )
+        mock_rules = type("MockChurchRules", (), {
+            "passive_effects": (bad_passive,),
+            "accrual": get_church_rules().accrual,
+        })()
+        with patch("world.rules.church_rulebook.get_church_rules", return_value=mock_rules):
+            scale = _church_mitigation_scale(entity, "high_exposure_defense_penalty")
+            self.assertEqual(scale, 0.0)
+
     # 土護甲路線計時階梯（earth-spell-catalog）：correspondence gate 僅要求每條
     # rule id 有一個具名測試；結算行為由 test_earth_terrain_guard 的合成階梯覆蓋。
     def test_rule_earth_hardened_skin_defense_bonus(self):

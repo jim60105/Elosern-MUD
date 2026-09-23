@@ -256,6 +256,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
 # ``.get`` / ``.values`` / ``[key]`` / ``in``, and no subsystem may mutate lore
 # data in place.
 FIXED_TITLE_REGISTRY = MappingProxyType(_FIXED_TITLE_ROWS)
+SHIPPED_FIXED_TITLES = MappingProxyType(_FIXED_TITLE_ROWS)
 
 
 class TitleRegistryError(ValueError):
