@@ -239,6 +239,31 @@ test("service menus carry fixed breadcrumb titles", () => {
   assert.equal(menus.inventory, undefined);
 });
 
+test("exploration target menu: shop navigate row carries openDrawer and no openServiceSubmenu", () => {
+   const panel = explorationPanel();
+   panel.interact = [
+     {
+       identity: 8,
+       display_name: "商人",
+       affordances: [
+         { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
+         { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
+       ],
+     },
+   ];
+   const model = ExplorationMenu.buildMenus(panel, {});
+   const target = ExplorationMenu.targetById(model, 8);
+   const menu = ExplorationMenu.targetMenuFor(model, target);
+   const shopRow = menu.items.find((it) => it.key === "service-shop");
+   const guildRow = menu.items.find((it) => it.key === "service-guild");
+   assert.ok(shopRow);
+   assert.equal(shopRow.openDrawer, "shop");
+   assert.equal(shopRow.openServiceSubmenu, undefined);
+   assert.ok(guildRow);
+   assert.equal(guildRow.openServiceSubmenu, "guild");
+   assert.equal(guildRow.openDrawer, undefined);
+});
+
 test("creation and character menus carry fixed breadcrumb titles", () => {
   const creation = CreationMenu.buildMenus({
     schema_version: 1,

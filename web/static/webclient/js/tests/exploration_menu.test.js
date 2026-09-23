@@ -226,6 +226,55 @@ test("the navigate-kind service affordance is dock-navigation only, never an act
   assert.equal(service.actionId, null);
   assert.equal(service.payload, null);
   assert.equal(service.openServiceSubmenu, "guild");
+   assert.equal(service.openDrawer, undefined);
+});
+
+test("shop navigate affordance carries openDrawer: 'shop' and no openServiceSubmenu", () => {
+   const panel = validPanel({
+     interact: [
+       {
+         identity: 7,
+         display_name: "雜貨店老闆",
+         portrait_ref: null,
+         affordances: [
+           {
+             kind: "navigate",
+             surface: "shop",
+             label: "商店",
+             enabled: true,
+             disabled_reason: null,
+           },
+           {
+             kind: "navigate",
+             surface: "shop",
+             label: "打烊的商店",
+             enabled: false,
+             disabled_reason: "店家已打烊",
+           },
+         ],
+       },
+     ],
+});
+   const model = ExplorationMenu.buildMenus(panel, {});
+   const target = ExplorationMenu.targetById(model, 7);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+
+   const shopOpen = targetMenu.items[0];
+   assert.equal(shopOpen.key, "service-shop");
+   assert.equal(shopOpen.label, "商店");
+   assert.equal(shopOpen.enabled, true);
+   assert.equal(shopOpen.actionId, null);
+   assert.equal(shopOpen.payload, null);
+   assert.equal(shopOpen.openDrawer, "shop");
+   assert.equal(shopOpen.openServiceSubmenu, undefined);
+   assert.equal(shopOpen.description, null);
+   assert.equal(shopOpen.disabledReason, null);
+
+   const shopClosed = targetMenu.items[1];
+   assert.equal(shopClosed.enabled, false);
+   assert.equal(shopClosed.openDrawer, "shop");
+   assert.equal(shopClosed.openServiceSubmenu, undefined);
+   assert.equal(shopClosed.disabledReason, "店家已打烊");
 });
 
 test("scripted keyword buttons submit explore.talk_scripted with the server IDs", () => {

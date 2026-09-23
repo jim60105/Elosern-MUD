@@ -1,7 +1,7 @@
 ## 1. Menu model
 
-- [ ] 1.1 In `web/static/webclient/js/elosern/exploration_menu.js` (the UMD source behind `web/webclient-app/lib/exploration_menu.js`), make the `navigate`-kind affordance branch emit `openDrawer: "shop"` (no `openServiceSubmenu`) when `affordance.surface === "shop"`, keeping `key: "service-shop"`, the label fallback, `enabled`, `description: null`, and `disabledReason`; the `surface === "guild"` row stays byte-identical (`openServiceSubmenu: "guild"`). Update the file header comment for the new shop shape. Verify with the Node tests in 1.2.
-- [ ] 1.2 Update `web/static/webclient/js/tests/exploration_menu.test.js` and `hud_dock_menus.test.js`: the shop navigate row carries `openDrawer: "shop"` and no `openServiceSubmenu`, a disabled shop navigate row keeps its server reason, and the guild navigate row is unchanged. Run `node --test web/static/webclient/js/tests/*.test.js` green.
+- [x] 1.1 In `web/static/webclient/js/elosern/exploration_menu.js` (the UMD source behind `web/webclient-app/lib/exploration_menu.js`), make the `navigate`-kind affordance branch emit `openDrawer: "shop"` (no `openServiceSubmenu`) when `affordance.surface === "shop"`, keeping `key: "service-shop"`, the label fallback, `enabled`, `description: null`, and `disabledReason`; the `surface === "guild"` row stays byte-identical (`openServiceSubmenu: "guild"`). Update the file header comment for the new shop shape. Verify with the Node tests in 1.2.
+- [x] 1.2 Update `web/static/webclient/js/tests/exploration_menu.test.js` and `hud_dock_menus.test.js`: the shop navigate row carries `openDrawer: "shop"` and no `openServiceSubmenu`, a disabled shop navigate row keeps its server reason, and the guild navigate row is unchanged. Run `node --test web/static/webclient/js/tests/*.test.js` green.
 
 ## 2. Store and shell wiring
 
