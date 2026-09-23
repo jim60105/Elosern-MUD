@@ -44,24 +44,24 @@
 
 ## 4. Tests follow
 
-- [ ] 4.1 Re-anchor `test_church_rulebook.py`'s Series E block to the resolver face: success casts
+- [x] 4.1 Re-anchor `test_church_rulebook.py`'s Series E block to the resolver face: success casts
       mount the stamp/buff and the rest bonus; cooldown recast is `RITE_COOLDOWN_ACTIVE`; shelter
       outside a venue is `RITE_OUTSIDE_VENUE`; same-day recast is `RITE_ALREADY_SHELTERED`; a day
       boundary re-arms shelter; `rite_morning_devotion` lands passive and refuses its cast while the
       cap bonus stays live.
-- [ ] 4.2 Add one rollback proof per handler driving a genuine INNER commit failure (a second
+- [x] 4.2 Add one rollback proof per handler driving a genuine INNER commit failure (a second
       staged pending effect whose `apply()` raises after the church-surface write, not just an
       outer settlement failure): assert `COMMIT_FAILED` and that ledger, buffs, traits, and tick
       are byte-identical with no `rite_cast` event — this is the test that proves 1.2b's
       dispatcher branch, not just the outer snapshot.
-- [ ] 4.3 Move the `covers_requirement` anchors for the amended `church-ordination` requirements to
+- [x] 4.3 Move the `covers_requirement` anchors for the amended `church-ordination` requirements to
       the new resolver-face tests (literal IDs); run
       `uv run --locked python -m tools.spec_traceability check` plus the observability lint
       (`tools.observability_lint check`) in the same batch as the touched files' focused labels.
 
 ## 5. Docs sweep
 
-- [ ] 5.1 No command-surface change: confirm `docs/game/commands.md`, `docs/game/command-reference.md`,
+- [x] 5.1 No command-surface change: confirm `docs/game/commands.md`, `docs/game/command-reference.md`,
       and `tests/test_command_docs.py` stay untouched; update `docs/lore/skill-trees/light.md` (or
       the church doc) where it names the Series E rows' cast behaviour.
-- [ ] 5.2 `git diff --check` clean.
+- [x] 5.2 `git diff --check` clean.

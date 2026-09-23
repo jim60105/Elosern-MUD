@@ -140,13 +140,13 @@ def _handle_rite_blessing(
     return [
         PendingEffect(
             actor,
-            f"rite_blessing_cooldown|{_entity_key(actor)}|{buff_key}",
+            f"rite_blessing|{_entity_key(actor)}",
             frozenset({"church"}),
             lambda: record_rite_blessing(actor, tick),
         ),
         PendingEffect(
             actor,
-            f"rite_blessing_buff|{_entity_key(actor)}|{buff_key}",
+            f"self_buff_applied|{_entity_key(actor)}|{buff_key}",
             frozenset({"buffs"}),
             lambda: apply_buff(actor, buff_key),
         ),
@@ -193,28 +193,30 @@ def _handle_rite_shelter(
     rest_bonus = int(rules.get("rest_bonus", 25))
     tick = clock.tick
 
-    def _apply_traits(actor=actor, bonus=rest_bonus) -> None:
-        hp = getattr(getattr(actor, "traits", None), "hp", None)
-        if hp is not None:
-            hp.current = min(hp.base, hp.current + bonus)
-        sp = getattr(getattr(actor, "traits", None), "sp", None)
-        if sp is not None:
-            sp.current = min(sp.base, sp.current + bonus)
-
     return [
         PendingEffect(
             actor,
-            f"rite_shelter_ledger|{_entity_key(actor)}",
+            f"rite_shelter|{_entity_key(actor)}",
             frozenset({"church"}),
             lambda: record_rite_shelter(actor, today, tick),
         ),
         PendingEffect(
             actor,
-            f"rite_shelter_traits|{_entity_key(actor)}",
+            f"self_heal|{_entity_key(actor)}|{rest_bonus}",
             frozenset({"traits"}),
-            _apply_traits,
+            lambda: _apply_shelter_traits(actor, rest_bonus),
         ),
     ]
+
+
+def _apply_shelter_traits(actor: Any, rest_bonus: int) -> None:
+    """Apply the sanctuary rest bonus to the actor's HP and SP gauges."""
+    hp = getattr(getattr(actor, "traits", None), "hp", None)
+    if hp is not None:
+        hp.current = min(hp.base, hp.current + rest_bonus)
+    sp = getattr(getattr(actor, "traits", None), "sp", None)
+    if sp is not None:
+        sp.current = min(sp.base, sp.current + rest_bonus)
 
 
 register_effect_handler(

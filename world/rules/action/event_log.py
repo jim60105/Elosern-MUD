@@ -25,6 +25,8 @@ _ENTRY_TEMPLATES = {
     "resource_spend": "{actor} 消耗了資源。",
     "self_return_clear": "{actor} 重整架勢，重返戰鬥位置。",
     "session_stamp": "{actor} 立下了殉者之誓。",
+    "rite_blessing": "{actor} 祝聖了自身的武備。",
+    "rite_shelter": "{actor} 在聖所中獲得了庇護。",
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "disguise_lifted": "{actor} 解除了 {target} 的偽裝狀態。",
