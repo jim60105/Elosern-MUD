@@ -1,9 +1,9 @@
 """Data-contract test: frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract
 
 The shipped OFFERING_CATALOG seeds resolve against the live sexual-act
-catalogue, REDEEM_CATALOG ships as a validated empty shell with its row
-validator rejecting planted malformed rows by name, `saintess_vessel` never
-enters the redemption catalogue, and the church-place set is derived
+catalogue, the shipped REDEEM_CATALOG rows validate through the row
+validator (which rejects planted malformed rows by name), `saintess_vessel`
+never enters the redemption catalogue, and the church-place set is derived
 fail-closed from the place registry's authored `church` kwargs. The lore
 documents are realigned with the shipped mechanics: the once-per-generation
 Saintess framing is retired in favour of the no-uniqueness enrollment grant,
@@ -51,17 +51,26 @@ class OfferingCatalogueTests(TestCase):
     def test_shipped_offering_seeds_resolve_against_the_act_catalogue(self):
         from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
         from world.skills.sexual_acts import unlocked_act_keys_for
+        from world.skills.registry import SKILL_REGISTRY
 
         self.assertTrue(OFFERING_CATALOG)
         ownable = unlocked_act_keys_for(owned_keys=(), counter_values={})
         for row in OFFERING_CATALOG:
             with self.subTest(offering=row.key):
-                self.assertIn(row.act_key, SEXUAL_ACT_REGISTRY)
-                # Seed rows are the currently-ownable acts (a fresh character
-                # owns them through the empty-unlock seed gates): the accrual
-                # change's row menu projects over current ownership, so a seed
-                # row must never reference an act a fresh character cannot own.
-                self.assertIn(row.act_key, ownable)
+                if row.act_key in SEXUAL_ACT_REGISTRY:
+                    # Seed rows are the currently-ownable acts (a fresh
+                    # character owns them through the empty-unlock seed
+                    # gates): the accrual change's row menu projects over
+                    # current ownership, so a seed row must never reference
+                    # an act a fresh character cannot own.
+                    self.assertIn(row.act_key, ownable)
+                else:
+                    # Advanced Series D ministry rows (implement-church-
+                    # redemption) resolve against the redemption catalogue's
+                    # own SKILL_REGISTRY row by the shared act key — the
+                    # same registry row serves both catalogues with zero
+                    # duplicated data (design §4.2/§5.5).
+                    self.assertIn(row.act_key, SKILL_REGISTRY)
 
     @covers_requirement(
         "church-ordination::the-frozen-church-catalogues-ship-as-validated-shells-awaiting-their-pipeline-rows"
@@ -96,10 +105,13 @@ class RedeemCatalogueShellTests(TestCase):
     @covers_requirement(
         "church-ordination::the-frozen-church-catalogues-ship-as-validated-shells-awaiting-their-pipeline-rows"
     )
-    def test_shipped_shell_is_validated_and_empty(self):
-        # The validated EMPTY shell: no placeholder prices, and the vessel
-        # appears nowhere in it (the negative-set contract).
-        self.assertEqual(REDEEM_CATALOG, ())
+    def test_shipped_catalogue_is_validated_and_vessel_absent(self):
+        # The 16 Series A/B/D rows land with implement-church-redemption
+        # (Series C/E with the order-catalogue change). The lasting pins:
+        # the shipped set validates through the row validator, and the
+        # vessel appears nowhere in it (the permanent negative-set
+        # contract) at any price.
+        self.assertTrue(REDEEM_CATALOG)
         validate_redeem_rows(REDEEM_CATALOG)
         self.assertNotIn(
             "saintess_vessel", {row.skill_key for row in REDEEM_CATALOG}

@@ -1,21 +1,25 @@
 """Frozen Light Church lore catalogues (design 2026-09-22 §4.2).
 
-Two frozen-dataclass registry shells, validated at import exactly like every
+Two frozen-dataclass registries, validated at import exactly like every
 other lore registry in this package:
 
 - :data:`OFFERING_CATALOG` — the sexual-ministry offering rows
   ``{key, act_key, merit, copper, min_lineage?}``. Seeds ship for the act
   keys that are currently ownable at character creation (the ``unlock={}``,
-  non-``ownership_gated`` seed acts of the solo/partner/shame lines); they
-  stay inert until ``implement-church-accrual`` wires the offering rail. A
-  ``copper`` of ``None`` means the offering pays the rulebook band default
-  (``church.yaml`` ``offering_payout_band``).
+  non-``ownership_gated`` seed acts of the solo/partner/shame lines), and
+  the four advanced Series D ministry rows ``implement-church-redemption``
+  lands: their ``act_key`` IS the redemption skill key (``rite_holy_kiss``
+  etc.), so the offering projection and the redemption catalogue reference
+  the same ``SKILL_REGISTRY`` row with zero duplicated data (design
+  §4.2/§5.3, advanced rows). A ``copper`` of ``None`` means the offering
+  pays the rulebook band default (``church.yaml`` ``offering_payout_band``).
 - :data:`REDEEM_CATALOG` — the ordination redemption rows
-  ``{skill_key, merit_price, tier, prereq_keys, polarity}``, a VALIDATED
-  EMPTY shell: the 16 Series A/B/D rows and their price finals arrive with
-  ``implement-church-redemption`` (Series C/E with the order-catalogue
-  change). Placeholder prices are forbidden — the row validator rejects
-  ``merit_price <= 0``.
+  ``{skill_key, merit_price, tier, prereq_keys, polarity}``: the 16
+  Series A/B/D rows with their price finals (decide-and-record task 1.1,
+  design §5.5/§5.6; Series C/E arrive with the order-catalogue change).
+  Placeholder prices are forbidden — the row validator rejects
+  ``merit_price <= 0``. Catalogue-internal prereq chains ride the Series D
+  high rows only.
 
 Registry resolution (``act_key`` against the sexual-act catalogue,
 ``saintess_vessel`` never in the redemption catalogue) is proven by the
@@ -167,9 +171,12 @@ def validate_redeem_rows(rows: tuple[RedeemRow, ...]) -> None:
 #: The shipped offering rows: seed rows for the currently-ownable act keys
 #: (the ``unlock={}``, non-``ownership_gated`` seed acts of the solo, partner
 #: and shame lines — see the act catalogue, which is the single source of
-#: what a fresh character owns). They stay inert until
-#: ``implement-church-accrual`` wires the offering rail; ``copper: None``
-#: defers each payout to the ``church.yaml`` band default.
+#: what a fresh character owns) plus the four advanced Series D ministry
+#: rows (``act_key`` = the redemption skill key; ``implement-church-
+#: redemption`` decided their per-row merits: the ministry acts pay above
+#: the seed floor, anointing 8 / milk_blessing 10 / holy_kiss 12 /
+#: confession_bed 10). ``copper: None`` defers each payout to the
+#: ``church.yaml`` band default.
 OFFERING_CATALOG: tuple[OfferingRow, ...] = (
     OfferingRow(
         key="offering_solo_self_touch",
@@ -207,12 +214,156 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
         merit=6,
         copper=None,
     ),
+    # Advanced Series D sexual-ministry rows (design §5.5): the same rows
+    # serve both catalogues by key — ``act_key`` equals the redemption
+    # skill_key, so the offering menu projection and the ordination ladder
+    # reference one ``SKILL_REGISTRY`` entry with no duplicated data.
+    OfferingRow(
+        key="offering_rite_anointing_touch",
+        act_key="rite_anointing_touch",
+        merit=8,
+        copper=None,
+    ),
+    OfferingRow(
+        key="offering_rite_milk_blessing",
+        act_key="rite_milk_blessing",
+        merit=10,
+        copper=None,
+    ),
+    OfferingRow(
+        key="offering_rite_holy_kiss",
+        act_key="rite_holy_kiss",
+        merit=12,
+        copper=None,
+    ),
+    OfferingRow(
+        key="offering_rite_confession_bed",
+        act_key="rite_confession_bed",
+        merit=10,
+        copper=None,
+    ),
 )
 
-#: The validated EMPTY redemption shell. The 16 Series A/B/D rows and their
-#: price finals land with ``implement-church-redemption`` (Series C/E with
-#: the order-catalogue change); nothing ships a placeholder price.
-REDEEM_CATALOG: tuple[RedeemRow, ...] = ()
+#: The shipped ordination rows — the 16 Series A/B/D price finals
+#: (decide-and-record task 1.1 inside the design §5.5 placeholders; Series
+#: C/E append with the order-catalogue change). Price bands: entry
+#: 300-600, mid 1200-2500, high 4000-8000.
+#
+#: | Series | skill_key | tier | price | prereqs |
+#: | --- | --- | --- | --- | --- |
+#: | A | pain_to_pleasure | mid | 1800 | — |
+#: | A | priestly_grace | mid | 1500 | — |
+#: | A | rapture_renewal | mid | 2200 | — |
+#: | A | vow_of_service | entry | 500 | — |
+#: | B | rite_heal_light | entry | 400 | — |
+#: | B | rite_cleanse | entry | 350 | — |
+#: | B | rite_calm | entry | 450 | — |
+#: | B | rite_bless_water | entry | 400 | — |
+#: | B | rite_sanctify_ground | entry | 550 | — |
+#: | B | rite_absolution | entry | 600 | — |
+#: | B | rite_lamb_mark | high | 6000 | — |
+#: | B | rite_martyrdom_vow | high | 6500 | — |
+#: | D | rite_anointing_touch | mid | 1400 | — |
+#: | D | rite_milk_blessing | mid | 1800 | — |
+#: | D | rite_holy_kiss | high | 4000 | rite_anointing_touch |
+#: | D | rite_confession_bed | high | 8000 | rite_holy_kiss |
+#
+#: Pricing notes: Series A qualifiers price at entry except the three
+#: legacy passives (their loop-defining mechanics - damage-to-pleasure
+#: conversion, arousal-scaled recovery, climax self-heal - sit at mid);
+#: ``vow_of_service`` is a pure ledger-multiplier row priced entry. The six
+#: modest rite actives price at entry; the two combat rites (tank-making)
+#: at high. The Series D ministry ladder climbs mid -> high through the
+#: ONLY catalogue-internal prereq chain in the whole catalogue (anointing
+#: touch -> holy kiss -> confession bed), per design §5.5.
+REDEEM_CATALOG: tuple[RedeemRow, ...] = (
+    RedeemRow(
+        skill_key="pain_to_pleasure",
+        merit_price=1800,
+        tier="mid",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="priestly_grace",
+        merit_price=1500,
+        tier="mid",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="rapture_renewal",
+        merit_price=2200,
+        tier="mid",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="vow_of_service",
+        merit_price=500,
+        tier="entry",
+        polarity="passive",
+    ),
+    RedeemRow(
+        skill_key="rite_heal_light",
+        merit_price=400,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_cleanse",
+        merit_price=350,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_calm",
+        merit_price=450,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_bless_water",
+        merit_price=400,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_sanctify_ground",
+        merit_price=550,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_absolution",
+        merit_price=600,
+        tier="entry",
+    ),
+    RedeemRow(
+        skill_key="rite_lamb_mark",
+        merit_price=6000,
+        tier="high",
+    ),
+    RedeemRow(
+        skill_key="rite_martyrdom_vow",
+        merit_price=6500,
+        tier="high",
+    ),
+    RedeemRow(
+        skill_key="rite_anointing_touch",
+        merit_price=1400,
+        tier="mid",
+    ),
+    RedeemRow(
+        skill_key="rite_milk_blessing",
+        merit_price=1800,
+        tier="mid",
+    ),
+    RedeemRow(
+        skill_key="rite_holy_kiss",
+        merit_price=4000,
+        tier="high",
+        prereq_keys=("rite_anointing_touch",),
+    ),
+    RedeemRow(
+        skill_key="rite_confession_bed",
+        merit_price=8000,
+        tier="high",
+        prereq_keys=("rite_holy_kiss",),
+    ),
+)
 
 validate_offering_rows(OFFERING_CATALOG)
 validate_redeem_rows(REDEEM_CATALOG)

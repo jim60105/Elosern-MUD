@@ -46,6 +46,19 @@ DECIDED_PRAY = (600, 40, 3)
 
 def _church_body(**section_overrides):
     """Return a complete church.yaml mapping with per-section overrides."""
+    # The passive_effects section mirrors the LIVE shipped rows (raw
+    # ``{id, section, skill_key, effects}`` mappings, never the validator's
+    # dataclass instances) so every temp-rulebook load passes the polarity
+    # gate's one-to-one association against the shipped REDEEM_CATALOG.
+    shipped_passive_rows = [
+        {
+            "id": effect.row_id,
+            "section": "passive_effects",
+            "skill_key": effect.skill_key,
+            "effects": effect.effects,
+        }
+        for effect in get_church_rules().passive_effects
+    ]
     body = {
         "acceptance": [
             {"id": "accept_ordinal_0", "section": "acceptance", "ordinal": 0, "accept_percent": 50},
@@ -64,7 +77,7 @@ def _church_body(**section_overrides):
             {"id": "offering_payout_band", "section": "offering", "copper_lo": 20, "copper_hi": 80, "overrides": {}},
             {"id": "offering_enrollment_required", "section": "offering", "enrollment_required": True},
         ],
-        "passive_effects": [],
+        "passive_effects": shipped_passive_rows,
     }
     body.update(section_overrides)
     return body
@@ -107,7 +120,7 @@ class ChurchRuleCorrespondenceRowsTests(TestCase):
         self.assertEqual(len({row.id for row in rows}), len(rows))
         self.assertEqual(
             {row.section for row in rows},
-            {"acceptance", "pray", "accrual", "offering"},
+            {"acceptance", "pray", "accrual", "offering", "passive_effects"},
         )
 
     @covers_requirement(
@@ -198,6 +211,39 @@ class ChurchTuningTests(TestCase):
 
     def test_rule_offering_enrollment_required(self):
         self.assertTrue(get_church_rules().offering.enrollment_required)
+
+    def _identity_classifier_rows(self):
+        """The Series A legacy-passive classification rows (identity
+        multiplier; they carry no church-economy effect — their mechanics
+        ride the pre-existing state-reaction rails). Selected structurally
+        so these tests never name shipped catalogue keys."""
+        return [
+            effect
+            for effect in get_church_rules().passive_effects
+            if effect.effects == {"multiplier": 1.0}
+        ]
+
+    def test_rule_passive_pain_to_pleasure(self):
+        self.assertGreaterEqual(len(self._identity_classifier_rows()), 3)
+        self.assertEqual(self._identity_classifier_rows()[0].effects, {"multiplier": 1.0})
+
+    def test_rule_passive_priestly_grace(self):
+        self.assertGreaterEqual(len(self._identity_classifier_rows()), 3)
+        self.assertEqual(self._identity_classifier_rows()[1].effects, {"multiplier": 1.0})
+
+    def test_rule_passive_rapture_renewal(self):
+        self.assertGreaterEqual(len(self._identity_classifier_rows()), 3)
+        self.assertEqual(self._identity_classifier_rows()[2].effects, {"multiplier": 1.0})
+
+    def test_rule_passive_vow_of_service(self):
+        row = next(
+            effect
+            for effect in get_church_rules().passive_effects
+            if "merit_percent" in effect.effects
+        )
+        # The decided vow_of_service finals (task 1.1): offering copper
+        # +25%, offering/climax merit +10% — ledger multipliers only.
+        self.assertEqual(row.effects, {"copper_percent": 25, "merit_percent": 10})
 
     def test_shipped_acceptance_curve_is_the_decided_final(self):
         # The decide-and-record result (task 1.1): strictly monotonic, ordinal
@@ -464,15 +510,15 @@ class PassivePolarityGateTests(TestCase):
         "church-ordination::the-church-rulebook-slice-loads-behind-the-monotonicity-and-polarity-gates"
     )
     def test_shipped_passive_rows_are_positive_polarity_only(self):
-        # Data-contract guard over SHIPPED rows, written catalogue-driven (not
-        # hardcoded) so it passes untouched when implement-church-order-
-        # catalogue appends the Series C passives. The shell is empty today —
-        # this is the future-content regression guard; the planted tests above
-        # carry the present-tense classifier evidence.
+        # Data-contract guard over SHIPPED rows, written catalogue-driven
+        # (never hardcoded) so it passes untouched when the order-catalogue
+        # change later appends Series C. The effect rows come from the LIVE
+        # rulebook slice: every shipped PASSIVE catalogue row has exactly one
+        # keyed, classified pure-positive effect row.
         from world.lore.church import REDEEM_CATALOG
 
         passive = [row for row in REDEEM_CATALOG if row.polarity == "passive"]
-        validate_passive_polarity(passive, [])
+        validate_passive_polarity(passive, get_church_rules().passive_effects)
 
 
 class ChurchRulebookShapeTests(_TempFile):
