@@ -29,7 +29,7 @@
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports",
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
-        "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frames_render_inside_drawer"
+        "web.tests.browser.test_browser_services_quest_drawer.KeyboardServiceDrawerJourneys.test_keyboard_service_journey_frameless_drawer"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
@@ -100,7 +100,7 @@
       "name": "exploration-5",
       "files_a": [
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
-        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_service_submenu_leaves_root_clean",
+        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_drawer_leaves_root_clean",
         "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport",
         "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
@@ -294,7 +294,7 @@
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_overlay_renders_scale_note_as_neutral_info_entry",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_tall_lattice_with_long_remembered_list_stays_within_the_island",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_abandon_requires_confirmation",
-        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_drawer_closes_with_the_hosted_frame",
+        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open",
         "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication"
       ],
