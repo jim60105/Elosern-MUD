@@ -33,11 +33,21 @@ removes a whole class of "the stage looked broken but was unseeded" deployments.
   `art_translate_unavailable`, structurally no network. `scripts/fetch-translate-model.sh`
   stays as the operator seeding route for this mode (and for pre-seeding the
   volume before the first download-enabled run).
+- Test hermeticity is enforced at the settings level: `test_settings.py` pins
+  `ART_TRANSLATE_DOWNLOAD_ENABLED = False`, so every test run — including the
+  existing worker test that resolves the shipped backend against an unseeded
+  directory — sits on the air-gapped track and can never attempt a download.
 - **BREAKING (spec text only):** the `art-prompt-translation` requirement
   "The model artifact is operator-seeded and its absence is bounded" — which
   mandates "the backend SHALL NOT download, fetch, or otherwise populate that
   directory at run time" — is superseded by a dual-track acquisition requirement
   under a new name.
+- **BREAKING (spec text only):** the reachability requirement "The shipped
+  backend is a neural machine translator, never a chat model" is re-scoped: the
+  ban stays on the generative layer (`world.ai`, `LLM_*`, completion endpoints)
+  and general-purpose transports, but `urllib.request` and `world.observability`
+  become permitted in the backend module for the acquisition lifecycle, with any
+  outbound request pinned to the `https://argos-net.com` model URL.
 - The container contract keeps its teeth: the image STILL bakes no translation
   model; the layer-scan contract is unchanged. Only the sentence "this volume
   SHALL NOT be populated at run time" changes to match rembg's volume language.
@@ -60,11 +70,15 @@ None. This change re-policies the acquisition behavior of the existing
   and rewritten as the dual-track acquisition requirement (download-enabled
   first-use fetch into the volume, download-disabled air-gapped verification,
   bounded degradation for both), plus a new requirement that the operator
-  seeding helper name the REAL compose volume.
+  seeding helper name the REAL compose volume. The "never a chat model"
+  reachability requirement is MODIFIED to re-scope the import ban to the
+  generative layer and general-purpose transports, permitting `urllib.request`
+  and `world.observability` for the pinned-URL acquisition lifecycle.
 - `settings-environment-overrides`: `ART_TRANSLATE_DOWNLOAD_ENABLED` joins the
   exact env-backed inventory (case-insensitive boolean words, default `true`)
-  and the test-settings sanitization list; `ART_TRANSLATE_MODEL_DIR` stays
-  code-only.
+  and the test-settings sanitization list, and the test settings additionally pin
+  it `False` so test runs are structurally air-gapped; `ART_TRANSLATE_MODEL_DIR`
+  stays code-only.
 - `container-image`: the `/app/server/.translate` volume paragraph changes from
   "never populated at run time" to the rembg-parity contract — fetched on first
   use into the volume when downloads are enabled, operator-pre-seeded with
@@ -79,20 +93,20 @@ volume).
 
 Independent of `recut-art-portrait-prompt` (archived) in both directions.
 
-Size: ~24 tasks / one engineer-day.
+Size: 18 tasks / ~1.2 engineer-days.
 
 ## Batch:
 
 Batch: solo.
 
 depends-on: add-ctranslate2-translate-backend
-depends-on: (none active; see conflict notes)
 
 Code-conflict notes: owns `world/art/translate_ct2.py`,
 `scripts/fetch-translate-model.sh`, and the translate-acquisition requirements. It
-APPENDS lines to `server/conf/settings.py`, `server/conf/test_settings.py`,
+EDITS `server/conf/settings.py`, `server/conf/test_settings.py`,
 `server/conf/tests/test_env_overrides/_support.py`, `.env.example`,
-`docs/development/settings-and-environment.md`, and `world/art/tests/test_translate.py`
+`docs/development/settings-and-environment.md`, `docs/gm/prompts.md`,
+`world/art/tests/test_translate.py`, and `world/art/tests/test_art_observability.py`
 — files no active change (`implement-church-combat-ministry`,
 `implement-church-order-catalogue`; their deltas touch only `church-ordination`
 and `title-system`) reads or edits. Its `settings-environment-overrides` delta is
@@ -103,10 +117,18 @@ written against the post-ctranslate2 archived text, which is the current main sp
 - Edited: `world/art/translate_ct2.py` (download track + air-gapped gating),
   `server/conf/settings.py`, `server/conf/test_settings.py`,
   `server/conf/tests/test_env_overrides/_support.py` (inventory/default/coercion/
-  rejection rows), `world/art/tests/test_translate.py`, `.env.example`,
-  `docs/development/settings-and-environment.md`, `scripts/fetch-translate-model.sh`
+  rejection rows), `world/art/tests/test_translate.py` (download-track tests +
+  reachability-test rewrite), `world/art/tests/test_art_observability.py`
+  (forward-default hermeticity), `.env.example`,
+  `docs/development/settings-and-environment.md`, `docs/gm/prompts.md`
+  (seed-policy paragraph + settings-table row),
+  `scripts/fetch-translate-model.sh`
   (volume-name fix; download/verify logic otherwise unchanged).
+- Docstring/comment rewrites inside edited files: `translate_ct2.py` module +
+  class docstrings and the `settings.py` `ART_TRANSLATE_MODEL_DIR` comment move
+  to dual-track wording; the script header's "NEVER downloads" sentence likewise.
 - Unchanged by design: `compose.yaml`, `Containerfile`, the image layer-scan
   contract (no model baked), `ART_TRANSLATE_MODEL_DIR` code-only status, the
   translation seam's bounded codes and worker event contract, and the fake
-  translator used by tests and the browser harness (no test ever downloads).
+  translator used by tests and the browser harness (test and browser settings
+  force the air-gapped track, so no test can download).

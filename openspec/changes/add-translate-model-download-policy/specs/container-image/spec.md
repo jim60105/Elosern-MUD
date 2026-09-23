@@ -25,7 +25,11 @@ prepare that directory `root:0` and group-writable in the application-layout sta
 alongside the other persistent paths, exactly like `/app/server/.art`, so an arbitrary-UID run can
 write it. The ~1 GB model artifact SHALL NOT be baked into the image: it is fetched on first use
 into the volume and reused across container recreations, and an operator MAY pre-seed the volume
-and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment. The model cache SHALL NOT
+and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment. The model cache
+SHALL NOT live under `/app/server/.art`, whose contents are governed by the art store's
+confinement, media route, and orphan-prune rules, and SHALL NOT use the library default
+under `$HOME`, which the image maps to the `tmpfs`-mounted `/tmp` and would therefore
+re-download on every container start.
 
 The translation model cache SHALL be a writable named volume mounted at
 `/app/server/.translate`, matching the code-only `ART_TRANSLATE_MODEL_DIR` setting. The image
@@ -38,9 +42,6 @@ an operator MAY pre-seed the volume with `scripts/fetch-translate-model.sh` and 
 structurally impossible. An empty volume on either track is a bounded
 `art_translate_unavailable`, never a crash, and the image itself carries no model on either
 track.
-live under `/app/server/.art`, whose contents are governed by the art store's confinement, media
-route, and orphan-prune rules, and SHALL NOT use the library default under `$HOME`, which the image
-maps to the `tmpfs`-mounted `/tmp` and would therefore re-download on every container start.
 
 It SHALL also
 provide a profile-gated, interactive one-shot bootstrap service for initializing a fresh database

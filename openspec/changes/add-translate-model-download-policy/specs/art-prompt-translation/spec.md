@@ -7,6 +7,11 @@
 
 ## MODIFIED Requirements
 
+(Note: the two rewritten scenarios of the acquisition requirement —
+"The server never fetches a translation model" and "A malformed model directory
+is bounded, not fatal" — intentionally KEEP their names, so existing
+`covers_requirement` annotations and scenario IDs do not break.)
+
 ### Requirement: The model artifact follows the dual-track download policy
 The backend SHALL load its model from the code-only `ART_TRANSLATE_MODEL_DIR`
 directory, which SHALL contain a CTranslate2 model directory and a SentencePiece
@@ -17,13 +22,19 @@ When `ART_TRANSLATE_DOWNLOAD_ENABLED` is true (the default) and the layout check
 fails, the backend MAY fetch and unpack the model package into that directory at
 first use. The fetch SHALL be LAZY — never at module import and never at server
 startup — SHALL run only on the engine-construction path under the construction
-lock (the worker thread), SHALL be bounded by request timeouts and a hard
-response-size cap with no retries, SHALL verify zip integrity, member-path safety,
+lock (the worker thread): the layout check, the engine-cache re-check, the fetch,
+and the post-fetch re-check SHALL ALL run under that lock, so concurrent callers
+block and then observe the completed layout instead of degrading mid-fetch. The
+fetch SHALL be bounded by request timeouts and a hard
+response-size cap enforced while streaming — an oversize `Content-Length` is
+rejected before reading and the read aborts at the cap — with no retries, SHALL verify zip integrity, member-path safety,
 and the required layout before any required file becomes visible at its final
 name, SHALL keep the package's `README.md` (provenance; the packaged model is
 CC-BY 4.0), and SHALL land each required file by atomic replacement so a complete
 layout is never destroyed and an interrupted fetch leaves a directory that simply
-fails the layout check again. A successful fetch SHALL be observable through
+fails the layout check again. Temp files SHALL be written inside
+`ART_TRANSLATE_MODEL_DIR` — never a cross-filesystem temporary — and deleted on
+failure. A successful fetch SHALL be observable through
 exactly one bounded info event carrying the source URL, byte count, and duration.
 
 When `ART_TRANSLATE_DOWNLOAD_ENABLED` is false, a failing layout check SHALL raise
@@ -32,13 +43,15 @@ library is imported: the supported air-gapped configuration (pre-seed the volume
 with `scripts/fetch-translate-model.sh` from a trusted machine, disable runtime
 downloads — the fetch then becomes structurally impossible).
 
-Every download, verification, or unpacking failure SHALL raise the bounded
+Every download, verification, unpacking, or write failure (including
+`OSError`/ENOSPC on a full volume) SHALL raise the bounded
 `art_translate_unavailable` — never an unbounded exception, never a worker crash —
 SHALL be observable through exactly one bounded warn event carrying the source URL
 and the failure chain on the first failure, and SHALL take the stage's existing
 degraded path (the record settles `done` with its untranslated description). A
 process whose fetch has failed SHALL NOT attempt another download for the rest of
-its process lifetime: subsequent calls fail immediately with
+its process lifetime (a per-process global latch, not per-model-directory):
+subsequent calls fail immediately with
 `art_translate_unavailable`, recovery being a restart or an operator seed.
 
 A missing or unreadable model component on the air-gapped track, or a load
@@ -63,8 +76,8 @@ SHALL NEVER be re-fetched, refreshed, or upgraded by the server.
   built engine
 
 #### Scenario: A fetch failure degrades and latches
-- **WHEN** the download times out, exceeds the size cap, fails verification, or
-  cannot be unpacked
+- **WHEN** the download times out, exceeds the size cap, fails verification,
+  cannot be unpacked, or cannot be written (e.g. ENOSPC on a full volume)
 - **THEN** the backend raises `art_translate_unavailable` and the worker emits its
   normal `art_translate_failed` warn with the record settling `done` on the
   untranslated description, exactly one download-failure warn event is emitted,
@@ -90,9 +103,44 @@ SHALL NEVER be re-fetched, refreshed, or upgraded by the server.
 - **THEN** no outbound network call is attempted for the model in any run
 
 #### Scenario: Tests never download
-- **WHEN** the art test suite and the browser harness run at default settings
+- **WHEN** the art test suite and the browser harness run at their own settings
 - **THEN** no translation library is imported and no network call is attempted,
-  because both keep the recorded fake translator as the backend
+  because the test and browser settings force the air-gapped track
+  (`ART_TRANSLATE_DOWNLOAD_ENABLED=False`) and both harnesses keep the recorded
+  fake translator as the backend seam
+
+### Requirement: The shipped backend is a neural machine translator, never a chat model
+The shipped translation backend SHALL be a sequence-to-sequence neural machine
+translation model executed locally on the CPU. It SHALL NOT be an instruction-tuned
+or chat-completion model, and the stage SHALL NOT call the project's LLM client,
+any `LLM_*` profile, or any remote completion endpoint.
+
+The reason is a correctness property of this project, not a preference: the
+descriptions this stage translates are adult content, and an aligned chat model
+refuses some fraction of them. A refusal string substituted into an image prompt is
+a strictly worse outcome than the untranslated text, and it would arrive through
+the SUCCESS path where the stage's failure handling cannot see it. A translation
+model has no refusal behaviour available to it.
+
+The reachability ban this requirement enforces SHALL cover the generative layer
+and any general-purpose transport: the backend module SHALL NEVER import
+`world.ai`, `requests`, or `http.client`/`http`, SHALL NEVER read any `LLM_*`
+setting, and any outbound request it makes SHALL be exclusively the pinned model
+URL at `https://argos-net.com`. Importing `urllib.request` (the stdlib fetch of
+the dual-track download policy) and `world.observability` (the bounded download
+lifecycle events) is PERMITTED for the acquisition lifecycle; the ban on
+`socket`/`importlib` imports is likewise lifted for the acquisition path, which
+needs neither.
+
+#### Scenario: No generative-layer transport is reachable from the stage
+- **WHEN** the translation stage and its shipped backend are exercised
+- **THEN** no `world.ai` client, no `LLM_*` profile, and no completion endpoint is consulted, and
+  the only model invoked is the local translation model
+
+#### Scenario: The acquisition transport is the pinned model URL only
+- **WHEN** the backend module's source is inspected for outbound capability
+- **THEN** `world.ai`, `requests`, and `http` are absent, no `LLM_*` setting is
+  read, and the only URL present is the pinned `https://argos-net.com` model URL
 
 ## ADDED Requirements
 
@@ -104,8 +152,9 @@ guess: compose project prefixing means the real volume is
 `COMPOSE_PROJECT_NAME`), and a command naming only `evennia-translate` seeds a
 silently orphaned volume. When `podman` is available the script SHALL resolve the
 name dynamically — the exact name, then the project-prefixed name, then a
-`podman volume ls` suffix match on `_evennia-translate` — and print the first
-match; when `podman` is absent or no volume matches it SHALL print the
+`podman volume ls` suffix match on `(^|_)evennia-translate$` — and print the first
+match (a failing `podman volume ls` is treated as no match, never an error); when
+`podman` is absent or no volume matches it SHALL print the
 project-prefixed default annotated as unresolved. Name resolution SHALL NOT
 change the script's exit status or its download/verify behavior.
 

@@ -59,17 +59,26 @@ entries where the module can import nothing host-side.
 
 ### D2 — Fetch happens only when the layout check fails, inside the construction lock
 
-Order inside the first engine miss: `_check_layout` → complete layout: today's
-path unchanged, zero network. Incomplete/missing AND
-`ART_TRANSLATE_DOWNLOAD_ENABLED=true`: fetch + verify + unpack, then re-check
-layout, then the existing lazy-import engine build. AND `false`: today's exact
-error, raised before any library import — structurally no network, because the
-fetch call site simply does not exist in that branch. This keeps the "no import
-cost for an unseeded deployment" property on the air-gapped track and adds
-network only where the artifact is actually absent. Alternatives: fetch eagerly
-at startup (rejected — boot-time network for a stage that defaults off and may
-translate nothing); fetch on every process start (rejected — a complete layout is
-never refreshed, matching rembg's fill-once volume semantics).
+Normative sequencing: the layout check, the engine-cache re-check, the fetch,
+and the post-fetch re-check ALL run under `_ENGINE_LOCK`. Today `_check_layout`
+runs OUTSIDE the lock before `_engine()`; the call order MUST be restructured so
+the locked construction path owns the whole check → fetch → re-check sequence
+(waiters then re-check the cache and see the completed engine). Order inside the
+first engine miss: `_check_layout` → complete layout: today's translation path
+unchanged, zero network. Incomplete/missing AND
+`ART_TRANSLATE_DOWNLOAD_ENABLED=true`: fetch + verify + unpack under the lock,
+then re-check layout, then the existing lazy-import engine build. AND `false`:
+today's exact error, raised before any library import — structurally no network,
+because the fetch call site simply does not exist in that branch. Fetching
+outside the lock was rejected: it would leave a multi-minute window in which
+every concurrent Han-bearing call fails the layout check and degrades while a
+fetch is in flight; under the lock, concurrent callers block and then observe
+the completed layout. This keeps the "no import cost for an unseeded
+deployment" property on the air-gapped track and adds network only where the
+artifact is actually absent. Alternatives: fetch eagerly at startup (rejected —
+boot-time network for a stage that defaults off and may translate nothing);
+fetch on every process start (rejected — a complete layout is never refreshed,
+matching rembg's fill-once volume semantics).
 
 ### D3 — File-level atomic landing; never destroy a valid seed
 
@@ -80,15 +89,23 @@ layout check and is repaired by the next attempt. The backend never deletes
 existing content except by replacing exactly the required filenames, so a
 valid seed is never in flight while being destroyed (the script's `replacement/`
 concern does not apply: we fetch only when the layout is already invalid).
-Concurrent-process races on one volume are benign by the same property. The
-engine cache already serialises construction per process via `_ENGINE_LOCK`.
+Temp files are written INSIDE `ART_TRANSLATE_MODEL_DIR` (never `/tmp`) so
+`os.replace` never crosses a filesystem, and every temp is deleted on failure —
+including `OSError`/ENOSPC mid-write, which must not leave a nearly-full volume
+behind for the operator seed to trip over. Concurrent-process races on one
+volume are benign by the same property. The engine cache already serialises
+construction per process via `_ENGINE_LOCK` (D2 puts the fetch under it too).
 
 ### D4 — Bounded fetch: size cap, timeouts, and a per-process failure latch
 
 `urllib.request` with a connect/read timeout, a hard response-size cap of
 128 MiB (generous headroom over the observed 74 MB), HTTPS URL fixed to
-`https://argos-net.com/v1/translate-zh_en-1_9.argosmodel`, zero retries. Any
-failure raises `art_translate_unavailable` AND trips a module-level latch: once a
+`https://argos-net.com/v1/translate-zh_en-1_9.argosmodel`, zero retries. The cap
+is enforced as STREAMING bounds — reject an oversize `Content-Length` before
+reading, and abort once N bytes have been read — never a post-hoc check after the
+body has been buffered. ANY failure — timeout, oversize, bad zip, unsafe member,
+missing entry, or a write error (`OSError`, ENOSPC on a full volume) — raises
+`art_translate_unavailable` AND trips the latch: once a
 download has failed in this process, later calls skip the fetch and fail
 immediately, so an unreachable network cannot make every Han-bearing job re-bill
 a 74 MB attempt. Recovery is a restart or an operator seed — acceptable because
@@ -96,6 +113,9 @@ the degradation costs a worse prompt, never an image. Alternative: timed backoff
 retry — rejected until there is evidence the restart path is not enough; rembg
 has no latch because its library retries invisibly, which is the behavior this
 design deliberately avoids.
+Latch scope is per-process global (one module-level flag, NOT per-model-dir):
+`ART_TRANSLATE_MODEL_DIR` is code-only, so a second directory is unreachable at
+run time and a per-directory latch would only complicate the test.
 Observability: exactly one `art_translate_model_download_done` info event on
 successful fetch (context: url, bytes, duration) and one
 `art_translate_model_download_failed` warn event on the first failure (context:
@@ -144,6 +164,10 @@ failure falls back to the annotated default, exit status unchanged).
   → bounded (size cap + timeouts, no retries), one-time per volume, and the job
   degrades gracefully if it fails or is slow; deployments that cannot tolerate it
   set the knob false and pre-seed.
+- [Han-bearing callers serialize behind the first fetch (D2 holds the whole
+  check → fetch → re-check under the construction lock)] → bounded by the
+  download timeouts and size cap, one-time per volume; callers that cannot
+  tolerate the wait set the knob false and pre-seed.
 - [The latch turns a transient network failure into a process-lifetime
   unavailability] → documented cost; the image still gets made, `ART_TRANSLATE_*`
   restarts are cheap, and the warn event tells the operator exactly why.

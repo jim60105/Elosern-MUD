@@ -66,6 +66,10 @@ free-text knob SHALL yield the empty "server default" value. For the same-named 
 The test settings bootstrap `server/conf/test_settings.py` SHALL remove every env-backed
 variable name from `os.environ` before importing the production settings, so a test run's
 effective settings never depend on a developer's or CI runner's inherited shell environment.
+After the settings import, the test settings SHALL additionally pin
+`ART_TRANSLATE_DOWNLOAD_ENABLED = False`, so every test run sits on the translation
+air-gapped track regardless of the knob's code default — a test can never trigger a
+model download even when the shipped backend resolves against an unseeded directory.
 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
@@ -123,6 +127,12 @@ effective settings never depend on a developer's or CI runner's inherited shell 
   `ART_REMBG_ENABLED=true` present in the shell environment
 - **THEN** the effective `ART_SD_PROBE_TIMEOUT_MS` for the test session is the documented
   default `5000` and the effective `ART_REMBG_ENABLED` is the documented default `False`
+
+#### Scenario: Test settings force the translation air-gapped track
+- **WHEN** the test settings module is imported, with `ART_TRANSLATE_DOWNLOAD_ENABLED=true`
+  present in the shell environment in one run and absent in another
+- **THEN** the effective `ART_TRANSLATE_DOWNLOAD_ENABLED` for the test session is `False`
+  in both runs, overriding the documented code default `True`
 
 #### Scenario: The translation switch coerces and rejects like every other boolean knob
 - **WHEN** the settings module is imported with `ART_TRANSLATE_ENABLED=on` and
