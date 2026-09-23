@@ -29,5 +29,5 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Run the Node gate, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, and `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`; all green.
-- [ ] 6.2 Run `openspec validate retire-service-keyboard-frames --strict` and `git diff --check`; both clean.
+- [x] 6.1 Run the Node gate, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, and `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`; all green.
+- [x] 6.2 Run `openspec validate retire-service-keyboard-frames --strict` and `git diff --check`; both clean.
