@@ -28,6 +28,7 @@ from world.art.sd_worker import SDError
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.translate import TranslateError
+import world.art.translate_ct2 as translate_ct2
 from world.art.worker import drain_synchronous
 
 
@@ -438,6 +439,14 @@ class TranslationEventTests(EvenniaTest):
             ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
         )
         self.art_settings.enable()
+        # The translation download latch is process-global; a worker test
+        # that trips it must not leak into later tests, and no engine built
+        # for a previous directory may be reused.
+        self.addCleanup(self._reset_translate_module_state)
+
+    def _reset_translate_module_state(self):
+        translate_ct2._DOWNLOAD_LATCHED = False
+        translate_ct2._ENGINES.clear()
 
     def tearDown(self):
         self.art_settings.disable()
@@ -503,17 +512,24 @@ class TranslationEventTests(EvenniaTest):
         "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
     )
     def test_forward_default_failure_emits_one_bounded_event_and_still_settles(self):
-        # Forward default with no override: the shipped CTranslate2Backend
-        # resolves, but the model directory is unseeded, so the layout check
-        # raises art_translate_unavailable. The stage boundary maps every
-        # failure inside a backend call to art_translate_error (the seam's
-        # own contract), the worker emits one bounded event, and the record
-        # still settles with the authored prompt.
+        # Forward default with no backend override: the shipped
+        # CTranslate2Backend resolves, but the model directory is unseeded, so
+        # the layout check raises art_translate_unavailable. The run is
+        # air-gapped by settings — the explicit DOWNLOAD_ENABLED=False here is
+        # belt-and-braces beside the test-settings pin (task 3.4), so the test
+        # neither populates server/.translate nor trips the module download
+        # latch. The stage boundary maps every failure inside a backend call
+        # to art_translate_error (the seam's own contract), the worker emits
+        # one bounded event, and the record still settles with the authored
+        # prompt.
         subject = _subject("t_synth_translate_forward_default")
         description = "模型尚未種子"
         ensure(subject, description)
         client = FakeSDWebUIClient()
-        with override_settings(ART_TRANSLATE_ENABLED=True):
+        with override_settings(
+            ART_TRANSLATE_ENABLED=True,
+            ART_TRANSLATE_DOWNLOAD_ENABLED=False,
+        ):
             with self._client(client):
                 with patch("world.art.worker.log_info") as info:
                     with patch("world.art.worker.log_warn") as warn:
@@ -540,6 +556,50 @@ class TranslationEventTests(EvenniaTest):
         self.assertIsInstance(cause, TranslateError)
         self.assertEqual(cause.code, "art_translate_unavailable")
         self.assertEqual(client.calls, [(subject, description)])
+        self.assertFalse(translate_ct2._DOWNLOAD_LATCHED)
+
+    @covers_requirement(
+        "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
+    )
+    def test_download_failure_degrades_the_prompt_and_never_costs_the_image(self):
+        # The download track end to end through the worker: a fetch failure is
+        # observed as the normal one art_translate_failed warn (never a crash,
+        # never a settled failure), the backend's own download-failed warn has
+        # fired exactly once, and the record settles done with the authored
+        # prompt while the image is still produced.
+        subject = _subject("t_synth_translate_download_failure")
+        description = "模型下載失敗"
+        ensure(subject, description)
+        client = FakeSDWebUIClient()
+        with override_settings(
+            ART_TRANSLATE_ENABLED=True,
+            ART_TRANSLATE_DOWNLOAD_ENABLED=True,
+            ART_TRANSLATE_MODEL_DIR=str(Path(self.tempdir.name)),
+        ):
+            with patch(
+                "world.art.translate_ct2.urlopen",
+                side_effect=OSError("connection refused"),
+            ):
+                with self._client(client):
+                    with patch("world.art.worker.log_info") as info:
+                        with patch("world.art.worker.log_warn") as warn:
+                            with patch(
+                                "world.art.translate_ct2.log_warn"
+                            ) as backend_warn:
+                                drain_synchronous(10)
+        failed = _events(warn, "art_translate_failed")
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(_events(info, "art_translate_done"), [])
+        self.assertEqual(
+            failed[0].kwargs["context"]["code"], "art_translate_error"
+        )
+        self.assertEqual(client.calls, [(subject, description)])
+        download_failed = _events(backend_warn, "art_translate_model_download_failed")
+        self.assertEqual(len(download_failed), 1)
+        self.assertEqual(
+            download_failed[0].kwargs["context"]["url"],
+            translate_ct2._MODEL_URL,
+        )
 
     @covers_requirement(
         "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
