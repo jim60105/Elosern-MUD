@@ -239,7 +239,7 @@ test("service menus carry fixed breadcrumb titles", () => {
   assert.equal(menus.inventory, undefined);
 });
 
-test("exploration target menu: shop navigate row carries openDrawer and no openServiceSubmenu", () => {
+test("exploration target menu: shop and guild navigate rows carry openDrawer and no openServiceSubmenu", () => {
    const panel = explorationPanel();
    panel.interact = [
      {
@@ -260,8 +260,8 @@ test("exploration target menu: shop navigate row carries openDrawer and no openS
    assert.equal(shopRow.openDrawer, "shop");
    assert.equal(shopRow.openServiceSubmenu, undefined);
    assert.ok(guildRow);
-   assert.equal(guildRow.openServiceSubmenu, "guild");
-   assert.equal(guildRow.openDrawer, undefined);
+   assert.equal(guildRow.openDrawer, "quest");
+   assert.equal(guildRow.openServiceSubmenu, undefined);
 });
 
 test("creation and character menus carry fixed breadcrumb titles", () => {

@@ -75,6 +75,17 @@ test("root routes Move/Look/Interact/Character plus available quests and invento
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
   const keys = model.menus.root.items.map((item) => item.key);
   assert.deepEqual(keys, ["move", "look", "interact", "character", "quests", "inventory", "wait"]);
+  // 任務 is a frameless drawer open (the 背包 precedent):
+  // the exact shape carries openDrawer and no submenu/service-submenu field.
+  const quests = model.menus.root.items.find((item) => item.key === "quests");
+  assert.deepEqual(quests, {
+    key: "quests",
+    label: "任務",
+    enabled: true,
+    actionId: null,
+    payload: null,
+    openDrawer: "quest",
+  });
   // The 背包 root row is a frameless drawer open (the 角色 row precedent):
   // the exact shape carries openDrawer and no submenu/service-submenu field.
   const inventory = model.menus.root.items.find((item) => item.key === "inventory");
@@ -225,8 +236,8 @@ test("the navigate-kind service affordance is dock-navigation only, never an act
   assert.equal(service.enabled, true);
   assert.equal(service.actionId, null);
   assert.equal(service.payload, null);
-  assert.equal(service.openServiceSubmenu, "guild");
-   assert.equal(service.openDrawer, undefined);
+  assert.equal(service.openDrawer, "quest");
+   assert.equal(service.openServiceSubmenu, undefined);
 });
 
 test("shop navigate affordance carries openDrawer: 'shop' and no openServiceSubmenu", () => {
@@ -275,6 +286,53 @@ test("shop navigate affordance carries openDrawer: 'shop' and no openServiceSubm
    assert.equal(shopClosed.openDrawer, "shop");
    assert.equal(shopClosed.openServiceSubmenu, undefined);
    assert.equal(shopClosed.disabledReason, "店家已打烊");
+});
+
+test("guild navigate affordance carries openDrawer: 'quest', no openServiceSubmenu, and disabled reason preserved", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 9,
+        display_name: "公會執事",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "navigate",
+            surface: "guild",
+            label: "公會服務",
+            enabled: false,
+            disabled_reason: "公會整修中",
+          },
+        ],
+      },
+    ],
+});
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 9);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const row = targetMenu.items[0];
+  assert.equal(row.key, "service-guild");
+  assert.equal(row.label, "公會服務");
+  assert.equal(row.enabled, false);
+  assert.equal(row.actionId, null);
+  assert.equal(row.payload, null);
+  assert.equal(row.openDrawer, "quest");
+  assert.equal(row.openServiceSubmenu, undefined);
+  assert.equal(row.description, null);
+  assert.equal(row.disabledReason, "公會整修中");
+});
+
+test("no exploration menu item carries openServiceSubmenu", () => {
+  const model = ExplorationMenu.buildMenus(validPanel(), {});
+  for (const [menuKey, menu] of Object.entries(model.menus)) {
+    for (const item of menu.items) {
+      assert.equal(
+        item.openServiceSubmenu,
+        undefined,
+        `item ${item.key} in menu ${menuKey} carried openServiceSubmenu`
+      );
+    }
+  }
 });
 
 test("scripted keyword buttons submit explore.talk_scripted with the server IDs", () => {
