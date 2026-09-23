@@ -107,6 +107,11 @@ there, not double-restoring.
 
 Registry row gains `effects=("rite_blessing:martial_blessing",)` — payload is
 the `buffs.yaml` buff key, matching the `self_buff_apply:<key>` grammar.
+`world/skills/effects/` gains the typed pair in the same commit:
+`RiteBlessingEffect(buff_key)` via the single-argument parse helper, and the
+recognized-prefix set in `parse_effect` grows to admit `rite_blessing` — the
+closed-set discipline (`skill-effect-model`) fails any unregistered prefix at
+registry load, so parser and declaration ship together.
 
 New handler in `world/rules/action/effects/church.py` (same home as
 `_handle_session_stamp`), registered with surfaces
@@ -133,7 +138,8 @@ New handler in `world/rules/action/effects/church.py` (same home as
 ### 4.3 `rite_shelter` — effect prefix `rite_shelter` (bare)
 
 Registry row gains `effects=("rite_shelter",)` (bare prefix like
-`set_disguise`; payload fails at parse).
+`set_disguise`; payload fails at parse) and the same closed-set admission in
+`parse_effect`.
 
 New handler registered with surfaces `frozenset({"church", "traits"})`:
 
