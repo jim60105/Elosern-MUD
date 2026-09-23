@@ -51,7 +51,6 @@ from typeclasses.npcs import NPC
 from world.lore.church import OFFERING_CATALOG, REDEEM_CATALOG, OfferingRow, RedeemRow
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 from world.observability import log_info
-from world.rules.buffs import apply_buff
 from world.rules.clock import CLOCK_YAML, get_world_clock, read_world_clock
 from world.rules.dice import roll_d100
 
@@ -1203,96 +1202,4 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
         "row": row.skill_key,
         "price": row.merit_price,
         "merit": merit_after,
-    }
-
-
-class MartialBlessingReason(StrEnum):
-    NOT_ENROLLED = "not_enrolled"
-    NOT_OWNED = "not_owned"
-    COOLDOWN_ACTIVE = "cooldown_active"
-
-
-class MartialBlessingError(ValueError):
-    """Rejection when casting rite_martial_blessing."""
-
-
-def cast_martial_blessing(entity: Any) -> dict[str, Any]:
-    """Cast rite_martial_blessing: single-stat buff, clock-cooled."""
-    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
-        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
-    ledger = read_ledger(entity)
-    if ledger is None:
-        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
-    if not _owns_skill(entity, "rite_martial_blessing"):
-        raise MartialBlessingError(MartialBlessingReason.NOT_OWNED)
-
-    from world.rules.church_rulebook import get_church_rules
-
-    rule_row = get_church_rules().accrual.get("rite_martial_blessing", {})
-    cooldown = int(rule_row.get("cooldown_seconds", 1800))
-    magnitude = int(rule_row.get("magnitude", 10))
-    stat = str(rule_row.get("stat", "defense"))
-
-    clock = get_world_clock()
-    last_cast = getattr(entity.db, "martial_blessing_last_tick", None)
-    if last_cast is not None and (clock.tick - int(last_cast)) < cooldown:
-        raise MartialBlessingError(MartialBlessingReason.COOLDOWN_ACTIVE)
-
-    entity.db.martial_blessing_last_tick = clock.tick
-    apply_buff(entity, "martial_blessing")
-    return {
-        "outcome": "blessed",
-        "stat": stat,
-        "magnitude": magnitude,
-        "cooldown": cooldown,
-        "tick": clock.tick,
-    }
-
-
-class ShelterReason(StrEnum):
-    NOT_ENROLLED = "not_enrolled"
-    NOT_OWNED = "not_owned"
-    OUTSIDE_VENUE = "outside_venue"
-    ALREADY_SHELTERED = "already_sheltered"
-
-
-class ShelterError(ValueError):
-    """Rejection when resting under rite_shelter."""
-
-
-def apply_shelter_rest(entity: Any) -> dict[str, Any]:
-    """Apply sanctuary rest bonus under rite_shelter (ledger-flag rest bonus)."""
-    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
-        raise ShelterError(ShelterReason.NOT_ENROLLED)
-    ledger = read_ledger(entity)
-    if ledger is None:
-        raise ShelterError(ShelterReason.NOT_ENROLLED)
-    if not _owns_skill(entity, "rite_shelter"):
-        raise ShelterError(ShelterReason.NOT_OWNED)
-    if not _in_church_venue(entity):
-        raise ShelterError(ShelterReason.OUTSIDE_VENUE)
-    if ledger.get("shelter_rest_flag", False):
-        raise ShelterError(ShelterReason.ALREADY_SHELTERED)
-
-    from world.rules.church_rulebook import get_church_rules
-
-    rule_row = get_church_rules().accrual.get("rite_shelter", {})
-    rest_bonus = int(rule_row.get("rest_bonus", 25))
-
-    def _flag(entry: dict[str, Any]) -> None:
-        entry["shelter_rest_flag"] = True
-
-    _write_ledger(entity, _flag)
-
-    hp = getattr(getattr(entity, "traits", None), "hp", None)
-    if hp is not None:
-        hp.current = min(hp.base, hp.current + rest_bonus)
-    sp = getattr(getattr(entity, "traits", None), "sp", None)
-    if sp is not None:
-        sp.current = min(sp.base, sp.current + rest_bonus)
-
-    return {
-        "outcome": "sheltered",
-        "rest_bonus": rest_bonus,
-        "ledger_flag": True,
     }

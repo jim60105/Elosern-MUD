@@ -33,11 +33,11 @@
 
 ## 3. Clean cutover
 
-- [ ] 3.1 Delete `cast_martial_blessing`, `apply_shelter_rest`, `MartialBlessingReason`/`Error`,
+- [x] 3.1 Delete `cast_martial_blessing`, `apply_shelter_rest`, `MartialBlessingReason`/`Error`,
       `ShelterReason`/`Error` from `world/rules/church.py`; remove the
       `martial_blessing_last_tick` attribute and root `shelter_rest_flag` key everywhere (LSP
       references first, no shims).
-- [ ] 3.2 Emit the `rite_cast` info event at each successful settlement boundary through the
+- [x] 3.2 Emit the `rite_cast` info event at each successful settlement boundary through the
       observability facade with `char`/`rite`/`tick` context — commit-bound via
       `transaction.on_commit` inside the `church.py` mutator (the `church_pray` precedent), never
       inside a handler's staged `apply` and never before the settlement returns success.
