@@ -12,13 +12,24 @@ change appends Series rows.
 
 from tools.spec_traceability import covers_requirement
 
+from copy import deepcopy
 import tempfile
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 import yaml
 
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTestCase
+
+from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
 from world.lore.church import RedeemRow
+from world.lore.church.places import resolve_church_place_keys
+from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.cast_settlement import settle_out_of_combat_cast
+from world.rules.church import daily_cap_bonus
 from world.rules.church_rulebook import (
     ACCEPT_ORDINAL_0_PERCENT,
     ACCEPT_TOP_ORDINAL_PERCENT,
@@ -35,6 +46,8 @@ from world.rules.rulebook.schema import (
     MissingRuleIdError,
     load_sectioned_rules,
 )
+from world.rules.clock import WorldClock, _DAY_SECONDS
+from world.rules.targeting import RoomActionContext
 
 RULEBOOK_PATH = Path(__file__).parents[1] / "rulebook" / "church.yaml"
 
@@ -703,79 +716,6 @@ class PassivePolarityGateTests(TestCase):
         # In public venue: +30% merit bonus applies (100 -> 130)
         self.assertEqual(scaled_merit_gain(public_char, 100), 130)
 
-    @covers_requirement(
-        "church-ordination::series-e-utility-rows-feed-the-core-loop"
-    )
-    def test_series_e_active_utility_mechanics(self):
-        from world.rules.church import (
-            MartialBlessingError,
-            MartialBlessingReason,
-            cast_martial_blessing,
-            apply_shelter_rest,
-            daily_cap_bonus,
-            ShelterError,
-            ShelterReason,
-        )
-        from unittest.mock import patch
-        from world.lore.church.places import CHURCH_PLACES
-
-        morning_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "daily_cap" in r and r.get("skill_key"))
-        martial_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "magnitude" in r and r.get("skill_key"))
-        shelter_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "rest_bonus" in r and r.get("skill_key"))
-
-        class _Db:
-            def __init__(self):
-                self.church = {"redeemed": [morning_key, martial_key, shelter_key], "merit": 100, "daily": {"day": 1, "pray": 0}}
-                self.skills = {"passive": [], "active": [morning_key, martial_key, shelter_key]}
-                self.martial_blessing_last_tick = None
-                self.wallet = 0
-
-        class _MockPlayer:
-            def __init__(self):
-                self.is_player = True
-                self.skills = type("Skills", (), {"owned_keys": lambda self: (morning_key, martial_key, shelter_key), "base_owned_keys": lambda self: (morning_key, martial_key, shelter_key)})()
-                self.db = _Db()
-                self.traits = type("Traits", (), {
-                    "hp": type("Gauge", (), {"base": 100, "current": 50})(),
-                    "sp": type("Gauge", (), {"base": 100, "current": 50})(),
-                })()
-                self.location = type("Loc", (), {"tags": type("Tags", (), {"all": lambda self: [CHURCH_PLACES[0]]})()})()
-                self.attributes = type("Attrs", (), {"get": lambda self, k, default=None, category=None: None})()
-
-        player = _MockPlayer()
-
-        # 1. rite_morning_devotion grants exactly +1 cap bonus
-        self.assertEqual(daily_cap_bonus(player), 1)
-
-        mock_clock = type("Clock", (), {"tick": 1000})()
-        with patch("world.rules.church.get_world_clock", return_value=mock_clock), \
-             patch("world.rules.church.apply_buff") as mock_apply:
-            # 2. rite_martial_blessing: mounts buff, recast inside cooldown is stable rejection
-            result = cast_martial_blessing(player)
-            self.assertEqual(result["outcome"], "blessed")
-            self.assertEqual(result["stat"], "defense")
-            self.assertEqual(result["magnitude"], 10)
-            mock_apply.assert_called_once_with(player, "martial_blessing")
-            # Recast inside cooldown
-            with self.assertRaises(MartialBlessingError) as caught:
-                cast_martial_blessing(player)
-            self.assertEqual(caught.exception.args[0], MartialBlessingReason.COOLDOWN_ACTIVE)
-
-            # 3. rite_shelter: rest bonus applied, ledger flag recorded, no wallet/merit movement
-            merit_before = player.db.church["merit"]
-            wallet_before = player.db.wallet
-            shelter_result = apply_shelter_rest(player)
-            self.assertEqual(shelter_result["outcome"], "sheltered")
-            self.assertEqual(shelter_result["rest_bonus"], 25)
-            self.assertTrue(player.db.church["shelter_rest_flag"])
-            self.assertEqual(player.traits.hp.current, 75)
-            self.assertEqual(player.db.church["merit"], merit_before)
-            self.assertEqual(player.db.wallet, wallet_before)
-            # Recast while already sheltered raises ALREADY_SHELTERED
-            with self.assertRaises(ShelterError) as caught_shelter:
-                apply_shelter_rest(player)
-            self.assertEqual(caught_shelter.exception.args[0], ShelterReason.ALREADY_SHELTERED)
-
 
 class ChurchRulebookShapeTests(_TempFile):
     """Section-shape rejections name the offending row."""
@@ -829,6 +769,307 @@ class ChurchRulebookShapeTests(_TempFile):
         rows = [row for section_rows in body.values() for row in section_rows]
         with self.assertRaisesRegex(ChurchRulebookError, "t_orphan"):
             load_church_rules(self._write(rows))
+
+
+class ChurchSeriesECastTests(EvenniaTestCase):
+    """The Series E holy rite utility rows on the unified cast rail."""
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop"
+    )
+    def test_morning_devotion_lands_passive_and_refuses_cast_while_cap_bonus_stays_live(self):
+        player = create_object(PlayerCharacter, key="t_morning_sister")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.db.skills = {"passive": ["rite_morning_devotion"], "active": []}
+        player.db.church = {
+            "merit": 100,
+            "enrolled_tick": 0,
+            "redeemed": ["rite_morning_devotion"],
+            "blessing_last_tick": None,
+            "daily": {"day": 0, "pray": 0},
+        }
+        self.assertEqual(daily_cap_bonus(player), 1)
+
+        room = create_object(Room, key="t_room")
+        player.location = room
+        request = ActionRequest(
+            actor=player,
+            skill_key="rite_morning_devotion",
+            targets=[player],
+            context=RoomActionContext(room=room),
+        )
+        result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.reason, RejectReason.SKILL_NOT_ACTIVE)
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop",
+        "church-ordination::the-merit-ledger-is-persisted-character-state-with-a-single-writer",
+    )
+    def test_martial_blessing_cast_cooldown_and_unenrolled_rejections(self):
+        room = create_object(Room, key="t_bless_room")
+
+        # 1. Unenrolled caster is rejected before staging
+        unenrolled = create_object(PlayerCharacter, key="t_unenrolled")
+        unenrolled.race = "human"
+        unenrolled.apply_race_baseline()
+        unenrolled.db.skills = {"active": ["rite_martial_blessing"], "passive": []}
+        unenrolled.location = room
+        req_unenrolled = ActionRequest(
+            actor=unenrolled,
+            skill_key="rite_martial_blessing",
+            targets=[unenrolled],
+            context=RoomActionContext(room=room),
+        )
+        res_unenrolled = ActionResolver.resolve(req_unenrolled)
+        self.assertEqual(res_unenrolled.outcome, "rejected")
+        self.assertEqual(res_unenrolled.reason, RejectReason.RITE_NOT_ENROLLED)
+
+        # 2. Enrolled caster succeeds: mounts buff, updates cooldown stamp, emits rite_cast
+        player = create_object(PlayerCharacter, key="t_blessed_sister")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = room
+        player.db.skills = {"active": ["rite_martial_blessing"], "passive": []}
+        player.db.church = {
+            "merit": 100,
+            "enrolled_tick": 0,
+            "redeemed": ["rite_martial_blessing"],
+            "blessing_last_tick": None,
+            "daily": {"day": 0, "pray": 0},
+        }
+        clock = WorldClock(tick=1000)
+        req = ActionRequest(
+            actor=player,
+            skill_key="rite_martial_blessing",
+            targets=[player],
+            context=RoomActionContext(room=room),
+        )
+        with (
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch("world.rules.church.log_info") as mock_info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settlement = settle_out_of_combat_cast(req, clock=clock)
+
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertEqual(player.db.church["blessing_last_tick"], 1000)
+        self.assertTrue(player.db.buffs and "martial_blessing" in player.db.buffs)
+        self.assertFalse(player.attributes.has("martial_blessing_last_tick"))
+
+        # Event verified
+        rite_calls = [c for c in mock_info.call_args_list if c.args and c.args[0] == "rite_cast"]
+        self.assertEqual(len(rite_calls), 1)
+        self.assertEqual(rite_calls[0].kwargs["context"]["rite"], "rite_martial_blessing")
+        self.assertEqual(rite_calls[0].kwargs["context"]["char"], str(player))
+        self.assertEqual(rite_calls[0].kwargs["context"]["tick"], 1000)
+
+        # 3. Recast inside cooldown window is stable rejection
+        recast_req = ActionRequest(
+            actor=player,
+            skill_key="rite_martial_blessing",
+            targets=[player],
+            context=RoomActionContext(room=room),
+        )
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            recast_res = ActionResolver.resolve(recast_req)
+        self.assertEqual(recast_res.outcome, "rejected")
+        self.assertEqual(recast_res.reason, RejectReason.RITE_COOLDOWN_ACTIVE)
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop",
+        "church-ordination::the-merit-ledger-is-persisted-character-state-with-a-single-writer",
+    )
+    def test_shelter_cast_venue_rest_bonus_and_day_rollover(self):
+        church_room = create_object(Room, key="t_sanctuary_venue")
+        church_place = next(iter(resolve_church_place_keys()))
+        church_room.tags.add(church_place)
+
+        plain_room = create_object(Room, key="t_plain_field")
+
+        player = create_object(PlayerCharacter, key="t_sheltered_sister")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.traits.hp.current = 50
+        player.traits.sp.current = 50
+        player.db.wallet = 100
+        player.db.skills = {"active": ["rite_shelter"], "passive": []}
+        player.db.church = {
+            "merit": 100,
+            "enrolled_tick": 0,
+            "redeemed": ["rite_shelter"],
+            "blessing_last_tick": None,
+            "daily": {"day": 1, "pray": 0},
+        }
+
+        # 1. Outside church venue: rejected
+        player.location = plain_room
+        req_outside = ActionRequest(
+            actor=player,
+            skill_key="rite_shelter",
+            targets=[player],
+            context=RoomActionContext(room=plain_room),
+        )
+        res_outside = ActionResolver.resolve(req_outside)
+        self.assertEqual(res_outside.outcome, "rejected")
+        self.assertEqual(res_outside.reason, RejectReason.RITE_OUTSIDE_VENUE)
+
+        # 2. Inside church venue: success
+        player.location = church_room
+        clock = WorldClock(tick=1 * _DAY_SECONDS + 500)
+        req_inside = ActionRequest(
+            actor=player,
+            skill_key="rite_shelter",
+            targets=[player],
+            context=RoomActionContext(room=church_room),
+        )
+        with (
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch("world.rules.church.log_info") as mock_info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settlement = settle_out_of_combat_cast(req_inside, clock=clock)
+
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertGreaterEqual(player.traits.hp.current, 75)
+        self.assertGreaterEqual(player.traits.sp.current, 75)
+        self.assertEqual(player.db.church["daily"].get("shelter"), 1)
+        self.assertNotIn("shelter_rest_flag", player.db.church)
+        self.assertEqual(player.db.church["merit"], 100)
+        self.assertEqual(player.db.wallet, 100)
+
+        rite_calls = [c for c in mock_info.call_args_list if c.args and c.args[0] == "rite_cast"]
+        self.assertEqual(len(rite_calls), 1)
+        self.assertEqual(rite_calls[0].kwargs["context"]["rite"], "rite_shelter")
+
+        # 3. Same-day recast: rejected
+        recast_req = ActionRequest(
+            actor=player,
+            skill_key="rite_shelter",
+            targets=[player],
+            context=RoomActionContext(room=church_room),
+        )
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            recast_res = ActionResolver.resolve(recast_req)
+        self.assertEqual(recast_res.outcome, "rejected")
+        self.assertEqual(recast_res.reason, RejectReason.RITE_ALREADY_SHELTERED)
+
+        # 4. Day rollover: advances to day 2, re-arms shelter
+        next_day_clock = WorldClock(tick=2 * _DAY_SECONDS + 100)
+        next_day_req = ActionRequest(
+            actor=player,
+            skill_key="rite_shelter",
+            targets=[player],
+            context=RoomActionContext(room=church_room),
+        )
+        with (
+            patch("world.rules.clock.get_world_clock", return_value=next_day_clock),
+            patch("world.rules.church.log_info") as mock_info2,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settlement2 = settle_out_of_combat_cast(next_day_req, clock=next_day_clock)
+
+        self.assertEqual(settlement2.result.outcome, "success")
+        self.assertEqual(player.db.church["daily"]["day"], 2)
+        self.assertEqual(player.db.church["daily"]["shelter"], 1)
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop",
+        "battlefield-commit-surface::snapshotted-surfaces-gains-a-battlefield-surface-covering-battlefield-fled",
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces",
+    )
+    def test_martial_blessing_inner_commit_failure_rolls_back_church_surface(self):
+        church_room = create_object(Room, key="t_sanctuary_rb")
+        player = create_object(PlayerCharacter, key="t_bless_rollback")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = church_room
+        player.db.skills = {"active": ["rite_martial_blessing"], "passive": []}
+        initial_ledger = {
+            "merit": 100,
+            "enrolled_tick": 0,
+            "redeemed": ["rite_martial_blessing"],
+            "blessing_last_tick": None,
+            "daily": {"day": 1, "pray": 0},
+        }
+        player.db.church = deepcopy(initial_ledger)
+        before_buffs = deepcopy(player.db.buffs)
+        before_tick = 5000
+        clock = WorldClock(tick=before_tick)
+
+        req = ActionRequest(
+            actor=player,
+            skill_key="rite_martial_blessing",
+            targets=[player],
+            context=RoomActionContext(room=church_room),
+        )
+
+        with (
+            patch("world.rules.buffs.apply_buff", side_effect=RuntimeError("injected buff failure")),
+            patch("world.rules.church.log_info") as mock_info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settlement = settle_out_of_combat_cast(req, clock=clock)
+
+        self.assertEqual(settlement.result.outcome, "rejected")
+        self.assertEqual(settlement.result.reason, RejectReason.COMMIT_FAILED)
+        self.assertEqual(player.db.church, initial_ledger)
+        self.assertEqual(player.db.buffs, before_buffs)
+        self.assertEqual(clock.tick, before_tick)
+        events = [c.args[0] for c in mock_info.call_args_list if c.args]
+        self.assertNotIn("rite_cast", events)
+
+    @covers_requirement(
+        "church-ordination::series-e-utility-rows-feed-the-core-loop",
+        "battlefield-commit-surface::snapshotted-surfaces-gains-a-battlefield-surface-covering-battlefield-fled",
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces",
+    )
+    def test_shelter_inner_commit_failure_rolls_back_church_surface(self):
+        church_room = create_object(Room, key="t_sanctuary_rb2")
+        church_place = next(iter(resolve_church_place_keys()))
+        church_room.tags.add(church_place)
+
+        player = create_object(PlayerCharacter, key="t_shelter_rollback")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.traits.hp.current = 40
+        player.traits.sp.current = 40
+        player.location = church_room
+        player.db.skills = {"active": ["rite_shelter"], "passive": []}
+        initial_ledger = {
+            "merit": 100,
+            "enrolled_tick": 0,
+            "redeemed": ["rite_shelter"],
+            "blessing_last_tick": None,
+            "daily": {"day": 1, "pray": 0},
+        }
+        player.db.church = deepcopy(initial_ledger)
+        before_tick = 1 * _DAY_SECONDS + 200
+        clock = WorldClock(tick=before_tick)
+
+        req = ActionRequest(
+            actor=player,
+            skill_key="rite_shelter",
+            targets=[player],
+            context=RoomActionContext(room=church_room),
+        )
+
+        with (
+            patch("world.rules.action.effects.church._apply_shelter_traits", side_effect=RuntimeError("injected trait failure")),
+            patch("world.rules.church.log_info") as mock_info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settlement = settle_out_of_combat_cast(req, clock=clock)
+
+        self.assertEqual(settlement.result.outcome, "rejected")
+        self.assertEqual(settlement.result.reason, RejectReason.COMMIT_FAILED)
+        self.assertEqual(player.db.church, initial_ledger)
+        self.assertEqual(player.traits.hp.current, 40)
+        self.assertEqual(player.traits.sp.current, 40)
+        self.assertEqual(clock.tick, before_tick)
+        events = [c.args[0] for c in mock_info.call_args_list if c.args]
+        self.assertNotIn("rite_cast", events)
 
 
 if __name__ == "__main__":

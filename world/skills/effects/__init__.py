@@ -50,6 +50,8 @@ from world.skills.effects.passives import (  # noqa: F401
     MovementEffect,
     RevealDisguiseEffect,
     RevokeGrantsEffect,
+    RiteBlessingEffect,
+    RiteShelterEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
     SessionStampEffect,

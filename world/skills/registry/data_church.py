@@ -228,6 +228,7 @@ ROWS: tuple[SkillDef, ...] = (
             usable_out_of_combat=True,
             element="light",
             category=SkillCategory.HOLY_RITE,
+            effects=("rite_blessing:martial_blessing",),
         ),
         _skill(
             "rite_shelter",
@@ -238,12 +239,13 @@ ROWS: tuple[SkillDef, ...] = (
             usable_out_of_combat=True,
             element="light",
             category=SkillCategory.HOLY_RITE,
+            effects=("rite_shelter",),
         ),
         _skill(
             "rite_morning_devotion",
             "晨禱聖儀",
             "深化晨曦靈修，使每日祈禱次數上限增加一次。",
-            SkillKind.ACTIVE,
+            SkillKind.PASSIVE,
             TargetSpec.SELF,
             usable_out_of_combat=True,
             element="light",

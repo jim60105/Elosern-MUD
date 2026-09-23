@@ -51,7 +51,6 @@ from typeclasses.npcs import NPC
 from world.lore.church import OFFERING_CATALOG, REDEEM_CATALOG, OfferingRow, RedeemRow
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 from world.observability import log_info
-from world.rules.buffs import apply_buff
 from world.rules.clock import CLOCK_YAML, get_world_clock, read_world_clock
 from world.rules.dice import roll_d100
 
@@ -102,6 +101,7 @@ def _new_ledger() -> dict[str, Any]:
         "merit": 0,
         "enrolled_tick": 0,
         "redeemed": [],
+        "blessing_last_tick": None,
         "daily": {"day": _clock_day(), "pray": 0},
     }
 
@@ -259,6 +259,16 @@ def record_redemption(entity: Any, key: str) -> tuple[str, ...]:
     return tuple(ledger["redeemed"])
 
 
+def _normalize_daily_block(daily_block: dict[str, Any], today: int) -> dict[str, Any]:
+    """Ensure the daily block belongs to ``today``, resetting counters on day change."""
+    if not isinstance(daily_block, dict):
+        raise ChurchLedgerError("db.church daily is malformed")
+    if int(daily_block.get("day", -1)) != today:
+        daily_block.clear()
+        daily_block.update({"day": today, "pray": 0})
+    return daily_block
+
+
 def ensure_daily_reset(entity: Any) -> None:
     """Reset the daily counters when the world-clock day has changed.
 
@@ -274,14 +284,51 @@ def ensure_daily_reset(entity: Any) -> None:
 
     def _mutate(entry: dict[str, Any]) -> None:
         daily_block = entry["daily"]
-        if not isinstance(daily_block, dict):
-            raise ChurchLedgerError("db.church daily is malformed")
-        if int(daily_block.get("day", -1)) == today:
-            return
-        daily_block.clear()
-        daily_block.update({"day": today, "pray": 0})
+        _normalize_daily_block(daily_block, today)
 
     _write_ledger(entity, _mutate)
+
+
+def record_rite_blessing(entity: Any, tick: int) -> dict[str, Any]:
+    """Record rite_martial_blessing cooldown tick on the church ledger."""
+    def _mutate(entry: dict[str, Any]) -> None:
+        entry["blessing_last_tick"] = int(tick)
+
+    written = _write_ledger(entity, _mutate)
+    char_key = str(entity)
+    transaction.on_commit(
+        lambda: log_info(
+            "rite_cast",
+            context={
+                "char": char_key,
+                "rite": "rite_martial_blessing",
+                "tick": int(tick),
+            },
+        )
+    )
+    return written
+
+
+def record_rite_shelter(entity: Any, today: int, tick: int) -> dict[str, Any]:
+    """Record rite_shelter day-block marker on the church ledger."""
+    def _mutate(entry: dict[str, Any]) -> None:
+        daily = entry.get("daily")
+        _normalize_daily_block(daily, today)
+        daily["shelter"] = 1
+
+    written = _write_ledger(entity, _mutate)
+    char_key = str(entity)
+    transaction.on_commit(
+        lambda: log_info(
+            "rite_cast",
+            context={
+                "char": char_key,
+                "rite": "rite_shelter",
+                "tick": int(tick),
+            },
+        )
+    )
+    return written
 
 
 def build_initial_arousal_baseline(level: str) -> dict[str, Any]:
@@ -603,11 +650,7 @@ def pray_step(entity: Any) -> dict[str, Any]:
                     entity, int(accrual["merit"])
                 )
                 daily = entry["daily"]
-                if not isinstance(daily, dict):
-                    raise ChurchLedgerError("db.church daily is malformed")
-                if int(daily.get("day", -1)) != today:
-                    daily.clear()
-                    daily.update({"day": today, "pray": 0})
+                _normalize_daily_block(daily, today)
                 daily["pray"] = int(daily.get("pray", 0)) + 1
 
             written = _write_ledger(entity, _mutate)
@@ -1159,96 +1202,4 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
         "row": row.skill_key,
         "price": row.merit_price,
         "merit": merit_after,
-    }
-
-
-class MartialBlessingReason(StrEnum):
-    NOT_ENROLLED = "not_enrolled"
-    NOT_OWNED = "not_owned"
-    COOLDOWN_ACTIVE = "cooldown_active"
-
-
-class MartialBlessingError(ValueError):
-    """Rejection when casting rite_martial_blessing."""
-
-
-def cast_martial_blessing(entity: Any) -> dict[str, Any]:
-    """Cast rite_martial_blessing: single-stat buff, clock-cooled."""
-    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
-        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
-    ledger = read_ledger(entity)
-    if ledger is None:
-        raise MartialBlessingError(MartialBlessingReason.NOT_ENROLLED)
-    if not _owns_skill(entity, "rite_martial_blessing"):
-        raise MartialBlessingError(MartialBlessingReason.NOT_OWNED)
-
-    from world.rules.church_rulebook import get_church_rules
-
-    rule_row = get_church_rules().accrual.get("rite_martial_blessing", {})
-    cooldown = int(rule_row.get("cooldown_seconds", 1800))
-    magnitude = int(rule_row.get("magnitude", 10))
-    stat = str(rule_row.get("stat", "defense"))
-
-    clock = get_world_clock()
-    last_cast = getattr(entity.db, "martial_blessing_last_tick", None)
-    if last_cast is not None and (clock.tick - int(last_cast)) < cooldown:
-        raise MartialBlessingError(MartialBlessingReason.COOLDOWN_ACTIVE)
-
-    entity.db.martial_blessing_last_tick = clock.tick
-    apply_buff(entity, "martial_blessing")
-    return {
-        "outcome": "blessed",
-        "stat": stat,
-        "magnitude": magnitude,
-        "cooldown": cooldown,
-        "tick": clock.tick,
-    }
-
-
-class ShelterReason(StrEnum):
-    NOT_ENROLLED = "not_enrolled"
-    NOT_OWNED = "not_owned"
-    OUTSIDE_VENUE = "outside_venue"
-    ALREADY_SHELTERED = "already_sheltered"
-
-
-class ShelterError(ValueError):
-    """Rejection when resting under rite_shelter."""
-
-
-def apply_shelter_rest(entity: Any) -> dict[str, Any]:
-    """Apply sanctuary rest bonus under rite_shelter (ledger-flag rest bonus)."""
-    if not isinstance(entity, PlayerCharacter) and not getattr(entity, "is_player", False):
-        raise ShelterError(ShelterReason.NOT_ENROLLED)
-    ledger = read_ledger(entity)
-    if ledger is None:
-        raise ShelterError(ShelterReason.NOT_ENROLLED)
-    if not _owns_skill(entity, "rite_shelter"):
-        raise ShelterError(ShelterReason.NOT_OWNED)
-    if not _in_church_venue(entity):
-        raise ShelterError(ShelterReason.OUTSIDE_VENUE)
-    if ledger.get("shelter_rest_flag", False):
-        raise ShelterError(ShelterReason.ALREADY_SHELTERED)
-
-    from world.rules.church_rulebook import get_church_rules
-
-    rule_row = get_church_rules().accrual.get("rite_shelter", {})
-    rest_bonus = int(rule_row.get("rest_bonus", 25))
-
-    def _flag(entry: dict[str, Any]) -> None:
-        entry["shelter_rest_flag"] = True
-
-    _write_ledger(entity, _flag)
-
-    hp = getattr(getattr(entity, "traits", None), "hp", None)
-    if hp is not None:
-        hp.current = min(hp.base, hp.current + rest_bonus)
-    sp = getattr(getattr(entity, "traits", None), "sp", None)
-    if sp is not None:
-        sp.current = min(sp.base, sp.current + rest_bonus)
-
-    return {
-        "outcome": "sheltered",
-        "rest_bonus": rest_bonus,
-        "ledger_flag": True,
     }

@@ -33,6 +33,10 @@ _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.TIME_COST_LOOKUP_FAILED: "這項行動無法完成。",
     RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE: "這項行動無法完成。",
     RejectReason.COMMIT_FAILED: "這項行動無法完成。",
+    RejectReason.RITE_NOT_ENROLLED: "你尚未入教，無法施展聖禮。",
+    RejectReason.RITE_COOLDOWN_ACTIVE: "聖禮冷卻中，尚無法再次施展。",
+    RejectReason.RITE_OUTSIDE_VENUE: "此處並非教會聖所，無法施展此聖禮。",
+    RejectReason.RITE_ALREADY_SHELTERED: "今日已獲得聖所庇護，無法再次施展。",
 }
 
 _REJECTION_FALLBACK = "這項行動無法完成。"

@@ -188,6 +188,18 @@ class SessionStampEffect:
 
 
 @dataclass(frozen=True)
+class RiteBlessingEffect:
+    """Stage a church rite martial blessing buff mount and ledger cooldown stamp."""
+
+    buff_key: str
+
+
+@dataclass(frozen=True)
+class RiteShelterEffect:
+    """Stage a church rite sanctuary rest bonus and day marker."""
+
+
+@dataclass(frozen=True)
 class ConferGrowthRateEffect:
     """Confer the caster's magic-growth rate on one target."""
 

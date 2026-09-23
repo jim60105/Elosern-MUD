@@ -27,6 +27,8 @@ from world.skills.effects.passives import (
     MovementEffect,
     RevealDisguiseEffect,
     RevokeGrantsEffect,
+    RiteBlessingEffect,
+    RiteShelterEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
     SessionStampEffect,
@@ -172,6 +174,12 @@ def parse_effect(effect_id: str) -> object:
         return SelfBuffApplyEffect(buff_key=_parse_single_arg(effect_id, prefix))
     if prefix == "session_stamp":
         return SessionStampEffect(key=_parse_single_arg(effect_id, prefix))
+    if prefix == "rite_blessing":
+        buff_key = _parse_single_arg(effect_id, prefix)
+        return RiteBlessingEffect(buff_key=buff_key)
+    if prefix == "rite_shelter":
+        _parse_bare(effect_id, prefix)
+        return RiteShelterEffect()
     if prefix == "confer_growth_rate":
         _parse_bare(effect_id, prefix)
         return ConferGrowthRateEffect()

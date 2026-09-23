@@ -67,6 +67,7 @@ class ChurchLedgerLifecycleTests(EvenniaTestCase):
                 "merit": 5,
                 "enrolled_tick": 0,
                 "redeemed": [],
+                "blessing_last_tick": None,
                 "daily": {"day": 0, "pray": 0},
             },
         )
