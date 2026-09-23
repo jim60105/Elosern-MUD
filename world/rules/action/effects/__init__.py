@@ -7,6 +7,7 @@ importing the package (or any handler module) before resolving an action.
 
 from world.rules.action.effects import (  # noqa: F401  (import for registration side effects)
     buffs,
+    church,
     conferral,
     divine,
     gauge_transfer,

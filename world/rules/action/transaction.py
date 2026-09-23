@@ -200,6 +200,8 @@ def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
         snapshot["reward_claims"] = _attribute_snapshot(obj, "guild_reward_claims")
     if "action_evidence" in surfaces:
         snapshot["action_evidence"] = _attribute_snapshot(obj, "action_evidence")
+    if "active_combat" in surfaces:
+        snapshot["active_combat"] = _attribute_snapshot(obj, "active_combat")
     return snapshot
 
 
@@ -235,6 +237,8 @@ def _restore_touched(
         _restore_attribute(obj, "guild_reward_claims", snapshot["reward_claims"])
     if "action_evidence" in surfaces and "action_evidence" in snapshot:
         _restore_attribute(obj, "action_evidence", snapshot["action_evidence"])
+    if "active_combat" in surfaces and "active_combat" in snapshot:
+        _restore_attribute(obj, "active_combat", snapshot["active_combat"])
 
 
 def _restore_touched_best_effort(

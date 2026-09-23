@@ -132,6 +132,7 @@ EffectHandler = Callable[
 ]
 SNAPSHOTTED_SURFACES = frozenset(
     {
+        "active_combat",
         "traits",
         "sexual",
         "buffs",

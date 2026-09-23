@@ -52,6 +52,7 @@ from world.skills.effects.passives import (  # noqa: F401
     RevokeGrantsEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
+    SessionStampEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
     WeaponStyleEffect,

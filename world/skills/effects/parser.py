@@ -29,6 +29,7 @@ from world.skills.effects.passives import (
     RevokeGrantsEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
+    SessionStampEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
     WeaponStyleEffect,
@@ -169,6 +170,8 @@ def parse_effect(effect_id: str) -> object:
         return BuffApplyEffect(buff_key=_parse_single_arg(effect_id, prefix))
     if prefix == "self_buff_apply":
         return SelfBuffApplyEffect(buff_key=_parse_single_arg(effect_id, prefix))
+    if prefix == "session_stamp":
+        return SessionStampEffect(key=_parse_single_arg(effect_id, prefix))
     if prefix == "confer_growth_rate":
         _parse_bare(effect_id, prefix)
         return ConferGrowthRateEffect()
