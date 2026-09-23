@@ -82,6 +82,8 @@ open **角色狀態 → 技能書**, then choose **修煉** beside an active ski
 | [`church join`](/game/command-reference?id=church-join) | 在主祭面前入教（入教／洗禮）。 |
 | [`church pray`](/game/command-reference?id=church-pray) | 在教會聖所祈禱，花費時間累積恩寵（祈禱）。 |
 | [`church offer`](/game/command-reference?id=church-offer) | 向 NPC 獻上性愛服務，依對方意願獲得恩寵與銅錢。 |
+| [`church redeem`](/game/command-reference?id=church-redeem) | 以恩寵兌換教會敘階（敘階）。 |
+| [`church merit`](/game/command-reference?id=church-merit) | 查閱自己的教會恩寵記錄（唯讀）。 |
 
 ## 知識圖鑑
 

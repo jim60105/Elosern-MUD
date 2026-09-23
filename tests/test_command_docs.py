@@ -128,6 +128,14 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "church offer <npc> [row_key]",
         "context": "教會（需已入教）",
     },
+    "church redeem": {
+        "syntax": "church redeem [list|<key>]",
+        "context": "教會（需已入教）",
+    },
+    "church merit": {
+        "syntax": "church merit",
+        "context": "教會（需已入教）",
+    },
     "shop stock": {"syntax": "shop stock", "context": "經濟（需當地商人）"},
     "buy": {"syntax": "buy <item_key> [數量]", "context": "經濟（需當地商人）"},
     "sell": {"syntax": "sell <item_key> [數量]", "context": "經濟（需當地商人）"},
@@ -490,6 +498,25 @@ class CommandDocsContractTests(unittest.TestCase):
         overview = parse_overview_links(self.overview)
         self.assertEqual(overview["church pray"], "church-pray")
         self.assertEqual(overview["church offer"], "church-offer")
+
+    @covers_requirement(
+        "church-ordination::the-church-redeem-and-merit-commands-are-documented-in-the-docs-trio"
+    )
+    def test_church_redeem_and_merit_entries_are_documented(self):
+        for key in ("church redeem", "church merit"):
+            entry = self.entries[key]
+            self.assertEqual(entry["指令"], key)
+            self.assertEqual(
+                entry["語法"].replace("`", ""),
+                EXPECTED_COMMANDS[key]["syntax"],
+            )
+            self.assertEqual(entry["情境"], EXPECTED_COMMANDS[key]["context"])
+            self.assertIn("教會", entry["說明"])
+        self.assertEqual(parse_aliases(self.entries["church redeem"]["別名"]), {"敘階"})
+        self.assertEqual(parse_aliases(self.entries["church merit"]["別名"]), set())
+        overview = parse_overview_links(self.overview)
+        self.assertEqual(overview["church redeem"], "church-redeem")
+        self.assertEqual(overview["church merit"], "church-merit")
 
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_persona_command_family_is_documented(self):

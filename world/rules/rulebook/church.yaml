@@ -28,9 +28,16 @@
 #     inert until implement-church-accrual wires the offering rail);
 #     enrollment required.
 #   - passive_effects: the rulebook home of PASSIVE redemption-catalogue
-#     effects (Series C, order-catalogue change). Empty now; the loader's
-#     polarity gate and its one-to-one PASSIVE-row association bind rows
-#     added here.
+#     effects. Series A ships here with implement-church-redemption (the
+#     three legacy clergy passives declare identity classifiers — their
+#     mechanics ride the pre-existing state-reaction rails
+#     (state_reactions.yaml / combat_modifiers.yaml), so their category row
+#     is the pure-positive identity multiplier the polarity gate requires;
+#     vow_of_service owns the offering copper +25% and offering/climax
+#     merit +10% ledger multipliers, consumed by world/rules/church.py).
+#     Series C rows (order-catalogue change) append after this change.
+#     The loader's polarity gate and its one-to-one PASSIVE-row association
+#     bind every row added here.
 
 # 5 acceptance rows — NPC arousal ordinal 0..4 -> accept percent.
 - id: accept_ordinal_0
@@ -82,3 +89,35 @@
 - id: offering_enrollment_required
   section: offering
   enrollment_required: true
+
+# 4 passive_effects rows — one keyed effect row per PASSIVE redemption-
+# catalogue row (Series A; the polarity gate requires the one-to-one
+# association). The three legacy passives carry the identity multiplier:
+# their mechanics are the pre-existing pain/recovery/climax rails declared
+# in state_reactions.yaml and combat_modifiers.yaml, and they add no
+# church-economy numbers — a 1.0 identity is the honest pure-positive
+# classification (no invented tuning).
+- id: passive_pain_to_pleasure
+  section: passive_effects
+  skill_key: pain_to_pleasure
+  effects:
+    multiplier: 1.0
+- id: passive_priestly_grace
+  section: passive_effects
+  skill_key: priestly_grace
+  effects:
+    multiplier: 1.0
+- id: passive_rapture_renewal
+  section: passive_effects
+  skill_key: rapture_renewal
+  effects:
+    multiplier: 1.0
+# vow_of_service (侍奉之誓): offering copper +25% and offering/climax
+# merit +10% — pure ledger multipliers, applied to the offering/climax
+# channels only (pray is untouched) by world/rules/church.py.
+- id: passive_vow_of_service
+  section: passive_effects
+  skill_key: vow_of_service
+  effects:
+    copper_percent: 25
+    merit_percent: 10
