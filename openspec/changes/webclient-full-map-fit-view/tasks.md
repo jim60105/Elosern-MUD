@@ -101,7 +101,7 @@
 
 ## 5. Tests
 
-- [ ] 5.1 `web/webclient-app/tests/overlays/map_overlay.test.js`:
+- [x] 5.1 `web/webclient-app/tests/overlays/map_overlay.test.js`:
   - In "renders the shared lattice in the overlay body…", assert that there is no `local-map__legend` before the toggle is clicked, and that there is one after.
   - In "renders the draft overlay chrome…", open the popover before asserting `.local-map__legend-chip--current`.
   - Add these cases:
@@ -114,13 +114,13 @@
     - the `MapLattice` child receives `fitView: true` and no `maxWidth` prop
   - Move the three legend cases from `tests/world/map_lattice_legend_labels.test.js` into this file, mounting `MapOverlay` and opening the popover: "pairs every legend entry with a dot chip at both scales" (overlay scale only), "renders a fifth beyond-state entry as a neutral info chip, text intact", and "styles every entry beyond the fourth as info, for any payload".
   - Run the file green.
-- [ ] 5.2 `web/webclient-app/tests/world/map_lattice_renderer.test.js`:
+- [x] 5.2 `web/webclient-app/tests/world/map_lattice_renderer.test.js`:
   - Delete "mounts no legend element when the legend switch is off", and drop the `local-map__legend-item--` count from both "renders identical node/edge/legend content…" cases.
   - In the overlay case, replace the `width: 100%` / `maxWidth: 848px` style assertions with an unstyled natural-size assertion.
   - Add "fitView fills its viewport and windows the whole canvas before layout": the style is `width: 100%` and `height: 100%`, the `viewBox` is `0 0 canvasWidth canvasHeight`, and the viewport carries `local-map__viewport--fit`.
   - Add "a drag past the threshold never emits move": dispatch `pointerdown` on an actionable node, `pointermove` by 12px, `pointerup`, then `click`, and assert that no `move` event is emitted. A 2px move followed by a click emits `move` once.
   - `web/webclient-app/tests/world/map_lattice_legend_labels.test.js`: delete the three moved legend cases, and update the header comment.
-- [ ] 5.3 Fixture churn: delete the `maxWidth` / `maxHeight` / `fillWidth` / `showLegend` keys from these files:
+- [x] 5.3 Fixture churn: delete the `maxWidth` / `maxHeight` / `fillWidth` / `showLegend` keys from these files:
   - `web/webclient-app/tests/world/map_lattice_support.js`
   - `map_layout_variants.test.js`, where you also drop the two `local-map__legend-item--` count assertions in "draws the same committed content in both layouts"
   - `map_lattice_fidelity.test.js`, where "Task 2.4" becomes a natural-size assertion with no `max-width` style, and "Task 1.1" / "Task 2.6" keep their pinned widths and heights

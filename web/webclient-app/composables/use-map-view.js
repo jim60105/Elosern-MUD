@@ -211,7 +211,10 @@ export function useMapView({
   }
 
   function onPointerDown(event) {
-    if (!toValue(enabled) || !view.value) return;
+    // The drag gesture is tracked from the enabled flag alone: the click
+    // suppression it arms is a gesture concern, independent of whether the
+    // viewport has measured a box yet.
+    if (!toValue(enabled)) return;
     if (event.button !== 0) return;
 
     pointerStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
@@ -220,7 +223,7 @@ export function useMapView({
   }
 
   function onPointerMove(event) {
-    if (!toValue(enabled) || !view.value || !pointerStart) return;
+    if (!toValue(enabled) || !pointerStart) return;
     if (event.pointerId !== pointerStart.id) return;
 
     if (!isDragging.value) {
