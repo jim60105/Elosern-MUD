@@ -14,7 +14,7 @@
 // Escape level, design D5) and the `+` / `-` zoom keys. Actionable adjacent
 // nodes forward a `move` event so the C-wire store can consume the OOB
 // `explore.move` intent.
-import { computed, ref, useId } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -60,12 +60,21 @@ function legendState(index) {
   return index < LEGEND_STATES.length ? LEGEND_STATES[index] : null;
 }
 
+// Root element, used to find the host overlay `<section>` to key-bind on.
+const rootEl = ref(null);
+
 // Root keyboard handling (design D3/D5): this handler runs before the
-// OverlayHost section handler in bubble order. Escape while the popover is
+// OverlayHost section handler in dispatch order. Escape while the popover is
 // open closes only the popover and stops propagation, so the overlay stays
 // open and the document keyboard router never sees the key. `+` / `=` zoom
 // in and `-` zoom out about the viewport centre; a modifier held means the
 // reader is driving browser page zoom, so the key passes through untouched.
+// It is bound in capture on the host `<section>` — not on this body root —
+// because the delta states the keys while focus is anywhere *inside the
+// overlay*: focus lands on the host's close button when the surface opens,
+// and a keydown from the header never passes through this body root at all.
+// The capture phase on the section precedes OverlayHost's own bubble handler,
+// so `stopPropagation` here still keeps Escape out of the surface close.
 function onKeydown(event) {
   if (event.key === "Escape") {
     if (legendOpen.value) {
@@ -83,6 +92,19 @@ function onKeydown(event) {
     latticeRef.value?.zoomOut();
   }
 }
+
+// The section to bind on: the mounted host when present (every product
+// mount), else this component's own root (the showcase/unit mounts, which
+// have no host chrome around the body).
+let boundSection = null;
+onMounted(() => {
+  boundSection = rootEl.value?.closest("[data-testid=\"overlay-host\"]") ?? rootEl.value;
+  boundSection?.addEventListener("keydown", onKeydown, true);
+});
+onBeforeUnmount(() => {
+  boundSection?.removeEventListener("keydown", onKeydown, true);
+  boundSection = null;
+});
 
 // A pointer press inside the overlay but outside both the popover and its
 // toggle closes the popover without consuming the event, so the press still
@@ -115,7 +137,7 @@ function handleMove(payload) {
   <div
     class="map-overlay-body"
     data-testid="map-overlay"
-    @keydown="onKeydown"
+    ref="rootEl"
     @pointerdown.capture="onPointerDownOutside"
   >
     <p
