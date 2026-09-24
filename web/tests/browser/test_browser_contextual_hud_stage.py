@@ -374,6 +374,52 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "true",
             "the map overlay recesses the stage",
         )
+
+        # webclient-full-map-fit-view D5/D3: the open map surface's only view
+        # controls are the four toolbar buttons, each with its accessible
+        # name; the guide row names the gestures; and no text on the surface
+        # reads as a zoom-level or scale figure.
+        for test_id, name in (
+            ("map-overlay-zoom-out", "縮小"),
+            ("map-overlay-zoom-in", "放大"),
+        ):
+            control = page.locator(f'[data-testid="{test_id}"]')
+            self.assertEqual(control.count(), 1)
+            self.assertEqual(control.get_attribute("aria-label"), name)
+        recentre = page.locator('[data-testid="map-overlay-recentre"]')
+        self.assertEqual(recentre.count(), 1)
+        self.assertEqual(recentre.inner_text(), "置中")
+        legend_toggle = page.locator('[data-testid="map-overlay-legend-toggle"]')
+        self.assertEqual(legend_toggle.count(), 1)
+        self.assertEqual(legend_toggle.get_attribute("aria-label"), "圖例")
+        self.assertIn(
+            "滾輪或 +／− 縮放 · 拖曳平移",
+            page.locator('[data-testid="map-overlay"] .map-overlay__guide').inner_text(),
+        )
+        import re
+
+        scale_figure = re.compile(r"\d+\s*%|×\s*\d")
+        surface_text = page.locator('[data-testid="map-overlay"]').inner_text()
+        self.assertIsNone(
+            scale_figure.search(surface_text),
+            f"the map surface shows a zoom/scale figure: {surface_text!r}",
+        )
+
+        # Two-Escape precedence (webclient-full-map-fit-view D5): with the
+        # legend popover open, the FIRST Escape closes only the popover and
+        # the overlay stays open; the second closes the overlay.
+        page.locator('[data-testid="map-overlay-legend-toggle"]').click()
+        page.wait_for_selector('[data-testid="map-overlay-legend-popover"]', timeout=15000)
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"map-overlay-legend-popover\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.locator('[data-testid="map-overlay"]').count(), 1,
+            "the first Escape closes only the legend popover, never the overlay",
+        )
+
         page.keyboard.press("Escape")
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",

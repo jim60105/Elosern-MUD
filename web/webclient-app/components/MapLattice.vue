@@ -1,9 +1,10 @@
 <script setup>
-// MapLattice (improve-webclient-map-overlay-scale): the shared `local_map`
+// MapLattice (webclient-full-map-fit-view design D1): the shared `local_map`
 // lattice renderer. Extracted from `LocalMap.vue` so the minimap island
 // (`LocalMap.vue`) and the full-map overlay (`MapOverlay.vue`) share one
-// node/marker/edge/label/legend rendering logic, parameterized by scale
-// props rather than the island's fixed constants. The island keeps its
+// node/marker/edge/label rendering logic, parameterized by scale
+// props rather than the island's fixed constants. The full-map overlay
+// declares a fitted view (`fitView: true`); the island keeps its
 // selection state and detail line; this component owns only the stateless
 // lattice rendering and emits `select`/`hover`/`leave`/`move` so each
 // caller drives its own chrome.
@@ -13,7 +14,7 @@
 // below is a group's verbatim state/helper, destructured so the template is
 // unchanged. The scoped stylesheet lives in ./map-lattice.css (included via
 // the style src, same mechanism as CreationOverlay.vue).
-import { computed, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import {
   useMapLatticeGeometry,
   MARKER_CURRENT_R,
@@ -23,6 +24,7 @@ import {
   HALO_R,
 } from "../composables/use-map-lattice-geometry.js";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
+import { useMapView } from "../composables/use-map-view.js";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (the available form or the
@@ -38,14 +40,9 @@ const props = defineProps({
   // visibility states scale together and inherit the crowding fix's
   // non-collision spacing at any scale.
   markerScale: { type: Number, default: 1 },
-  // Canvas caps for surfaces without a fixed square canvas. `null` disables
-  // a cap (the overlay relies on its host's `overflow-y: auto` fallback).
-  maxWidth: { default: 206 },
-  maxHeight: { default: 296 },
-  // Fill-width layout variant: the canvas claims the caller's content width
-  // instead of drawing at its natural pixel size (used by the overlay to fill
-  // the overlay body).
-  fillWidth: { type: Boolean, default: false },
+  // Fitted view (webclient-full-map-fit-view design D1): when set, the SVG fills
+  // a clipped viewport box and its viewBox becomes a window over the unchanged drawing.
+  fitView: { type: Boolean, default: false },
   // Type size for node labels (SVG user units). Defaults to 11 for the overlay
   // and bare mounts; the island passes 9 to respect the type proportion and
   // stay below the island's own 10px chrome step.
@@ -84,13 +81,6 @@ const props = defineProps({
   // it changes coordinate sourcing ONLY: markers, edges, labels, legend,
   // activation, focus, and accessible names stay the shared wave-1 renderer.
   variant: { type: String, default: "lattice" },
-  // Legend-display switch (slim-minimap-island D1): the shared renderer
-  // mounts the draft dot-chip state legend wherever this is on. It defaults
-  // to on (the full-map overlay and every bare mount keep the legend); the
-  // minimap island passes false so no legend element exists in its DOM for
-  // any payload — v-if, not a CSS hide, so DOM assertions and the island's
-  // budget measurement never see a stray legend.
-  showLegend: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -101,7 +91,6 @@ const fogId = computed(() => `map-lattice-fog-${uid}`);
 
 const geometry = useMapLatticeGeometry(props);
 const {
-  legend,
   edges,
   drawnNodes,
   edgeGeoms,
@@ -124,27 +113,79 @@ const {
   labelY,
   labelTier,
   edgeClass,
-  legendState,
   activateNode,
   markerNameX,
   markerNameY,
   markerNameAnchor,
 } = useMapLatticeRender(props, emit, geometry);
+
+const viewportEl = ref(null);
+const currentNodeId = computed(
+  () => props.localMap.nodes?.find((n) => n.visibility === "current")?.id,
+);
+
+const mapView = useMapView({
+  enabled: computed(() => props.fitView),
+  canvasWidth,
+  canvasHeight,
+  currentPos,
+  nodePos,
+  currentNodeId,
+  viewportEl,
+  markerScale: computed(() => props.markerScale),
+  labelFont: computed(() => props.labelFont),
+});
+
+const {
+  viewBox: mapViewBox,
+  canZoomIn,
+  canZoomOut,
+  canRecentre,
+  isDragging,
+  zoomIn,
+  zoomOut,
+  recentre,
+  onWheel,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onClickCapture,
+  onFocusIn,
+} = mapView;
+
+defineExpose({
+  zoomIn,
+  zoomOut,
+  recentre,
+  canZoomIn,
+  canZoomOut,
+  canRecentre,
+});
 </script>
 
 <template>
-  <!-- The overlay scrolls the diagram independently of its legend.
-       display:contents leaves the minimap's existing SVG sizing unchanged. -->
   <div
+    ref="viewportEl"
     class="local-map__viewport"
-    :class="{ 'local-map__viewport--canvas': overlayChrome }"
+    :class="{
+      'local-map__viewport--fit': fitView,
+      'local-map__viewport--fit--dragging': fitView && isDragging,
+    }"
+    @wheel="onWheel"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+    @click.capture="onClickCapture"
+    @focusin="onFocusIn"
   >
   <svg
     class="local-map__lattice"
     :class="{ 'local-map__lattice--canvas': overlayChrome }"
     :width="canvasSize ?? canvasWidth"
     :height="canvasSize ?? canvasHeight"
-    :viewBox="viewBox"
+    :viewBox="fitView ? mapViewBox : viewBox"
     :style="latticeStyle"
     :role="overlayChrome ? 'group' : 'img'"
     :aria-label="overlayChrome ? '區域地圖' : '區域地圖縮圖'"
@@ -390,34 +431,6 @@ const {
     </g>
   </svg>
   </div>
-
-  <!-- The draft dot-chip state legend (webclient-map-01-draft-chrome D6):
-       an 11px radius-3 colour chip paired with its text label. The chip
-       border style carries non-colour redundancy — the remembered chip's
-       dashed border differs from the visited chip's solid border (delta
-       scenario "Legend chips stay text-labelled at both scales"). Mounted
-       wherever the `showLegend` switch is on (slim-minimap-island D1): the
-       overlay keeps it, the minimap island passes false and mounts no
-       legend element at all. -->
-  <ul v-if="showLegend" class="local-map__legend" data-testid="local-map__legend">
-    <li
-      v-for="(entry, i) in legend"
-      :key="`legend-${i}`"
-      class="local-map__legend-item"
-      :data-testid="`local-map__legend-item--${i}`"
-    >
-      <span
-        class="local-map__legend-chip"
-        :class="
-          legendState(i) === null
-            ? 'local-map__legend-chip--info'
-            : `local-map__legend-chip--${legendState(i)}`
-        "
-        aria-hidden="true"
-      />
-      {{ entry }}
-    </li>
-  </ul>
 </template>
 
 <style scoped src="./map-lattice.css"></style>

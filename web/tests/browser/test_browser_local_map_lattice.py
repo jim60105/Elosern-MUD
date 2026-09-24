@@ -406,17 +406,23 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             """() => {
               const overlay = document.querySelector('[data-testid="map-overlay"]');
               const svg = overlay.querySelector('svg.local-map__lattice');
-              const svgRect = svg.getBoundingClientRect();
-              const scale = svgRect.width / svg.viewBox.baseVal.width;
-
-              const gutterUnits = (svg.viewBox.baseVal.width - 840) / 2;
-              const gutterPx = gutterUnits * scale;
-
+              // webclient-full-map-fit-view: the surface draws through a
+              // fitted viewBox window, so the SVG rect no longer maps the
+              // canvas rect. Map the canvas's own user-unit box (its
+              // width/height attributes) through the live screen CTM —
+              // the same transform every getBoundingClientRect below lives
+              // under — instead of pinning any absolute pixel figure.
+              const ctm = svg.getScreenCTM();
+              const W = Number(svg.getAttribute("width"));
+              const H = Number(svg.getAttribute("height"));
+              // The node core spans the natural 840 × 650 units at the
+              // overlay's declared pitches; the marker gutter is the rest.
+              const gutter = (W - 840) / 2;
               const canvasRect = {
-                left: svgRect.left + gutterPx,
-                right: svgRect.right - gutterPx,
-                top: svgRect.top + gutterPx,
-                bottom: svgRect.bottom - gutterPx,
+                left: ctm.a * gutter + ctm.e,
+                right: ctm.a * (W - gutter) + ctm.e,
+                top: ctm.d * gutter + ctm.f,
+                bottom: ctm.d * (H - gutter) + ctm.f,
               };
 
               const nameEls = Array.from(svg.querySelectorAll('.local-map__edge-marker-name'));

@@ -419,7 +419,12 @@ export function useMapLatticeGeometry(props) {
     return ((pitch / 2 + originOffsetY) % pitch + pitch) % pitch;
   });
 
-  function nodePos(node) {
+  function nodePos(nodeOrId) {
+    const node =
+      typeof nodeOrId === "object" && nodeOrId !== null
+        ? nodeOrId
+        : nodeById.value[nodeOrId] || nodes.value.find((n) => n.id === nodeOrId);
+    if (!node) return null;
     if (radial.value) {
       const placed = radialById.value[node.id];
       // A node the placement omits is not drawn (same omission contract as
@@ -467,27 +472,6 @@ export function useMapLatticeGeometry(props) {
   // height cap and fills the body width — bound as inline styles so the
   // caller controls the layout variant.
   //
-  // Every cap is resolved into ONE width bound, because under `fillWidth` the
-  // element's width is definite (100% of the caller's content box) and a bare
-  // `max-height` would then be an engine-dependent constraint: the replaced-
-  // element constraint table is meant to shrink the width back to preserve the
-  // intrinsic ratio, but the observable behaviour across engines ranges from
-  // that, to a distorted box, to a `preserveAspectRatio` letterbox that leaves
-  // the canvas's background/border painted around a thin drawing. The renderer
-  // knows the exact canvas ratio, so it spends the height budget as its
-  // equivalent width instead: the drawing then fills its box in every engine,
-  // and the rendered height is exactly the budget. `max-height` is still bound
-  // as the belt-and-braces cap it always was (it can no longer bind, since the
-  // width bound is floored, never rounded up).
-  function widthCaps() {
-    const caps = [];
-    if (props.maxWidth != null) caps.push(Number(props.maxWidth));
-    if (props.maxHeight != null && canvasHeight.value > 0) {
-      caps.push((Number(props.maxHeight) * canvasWidth.value) / canvasHeight.value);
-    }
-    return caps;
-  }
-
   const latticeStyle = computed(() => {
     if (props.canvasSize != null) {
       return {
@@ -495,18 +479,16 @@ export function useMapLatticeGeometry(props) {
         height: props.canvasSize + "px",
       };
     }
-    const style = {};
-    if (props.fillWidth) style.width = "100%";
-    const caps = widthCaps();
-    // Floored to 2 decimals: a bound rounded UP could re-cross the height
-    // budget by a sub-pixel and hand the anchor a scrollbar.
-    if (caps.length) style.maxWidth = Math.floor(Math.min(...caps) * 100) / 100 + "px";
-    if (props.maxHeight != null) style.maxHeight = props.maxHeight + "px";
-    return style;
+    if (props.fitView) {
+      return {
+        width: "100%",
+        height: "100%",
+      };
+    }
+    return {};
   });
 
   return {
-    legend,
     edges,
     drawnNodes,
     edgeGeoms,

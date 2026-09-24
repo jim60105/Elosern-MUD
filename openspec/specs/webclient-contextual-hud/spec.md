@@ -1345,9 +1345,11 @@ reference drawer SHALL NOT be open together: opening either SHALL close the othe
 focus-trapped surface exists at any moment. An open overlay SHALL register itself as an open surface so
 the stage recession this capability already requires applies without a second mechanism.
 
-Escape SHALL be resolved by a single precedence order, topmost first — the open overlay, then an open
-drawer, then the focused command field, then the dock's current menu level — with each level consuming
-the key and stopping.
+Escape SHALL be resolved by a single precedence order, topmost first — a popover open inside the open
+overlay, then the open overlay, then an open drawer, then the focused command field, then the dock's
+current menu level — with each level consuming the key and stopping. A popover open inside an overlay
+SHALL close on Escape without closing the overlay, keeping focus inside the overlay, and the next
+Escape SHALL close the overlay; while no such popover is open, Escape closes the overlay as above.
 
 A mode change into creation, a presentation-epoch reset and a loss of the transport SHALL each close
 every open overlay. The mode-driven character-creation surface SHALL NOT be part of this single-open
@@ -1377,6 +1379,11 @@ stack, because it is not opened by the player and a utility control must never d
 - **WHEN** the committed mode changes to creation while an overlay is open
 - **THEN** that overlay closes, focus is routed to the action dock, and the character-creation surface is not itself treated as one of the single-open overlays
 
+#### Scenario: An overlay's own popover takes Escape first
+- **WHEN** the full-map overlay is open with its legend popover expanded, and the player presses Escape twice
+- **THEN** the first Escape closes only the popover and focus stays inside the overlay, and the second Escape closes the overlay and returns focus to the trigger that opened it
+
+
 ### Requirement: The map, settings, and help surfaces are reachable from the live client
 The map, settings and help surfaces SHALL each be reachable from the running client by a labelled
 control, not only from the component showcase. The minimap island SHALL carry a labelled control that
@@ -1389,8 +1396,15 @@ The map surface SHALL render the committed `local_map` payload through the same 
 island renders, and SHALL re-render its available and unavailable branches whenever that read model is
 replaced, so a superseded payload never leaves a stale map or a stale reason on screen; when a newly
 committed payload resolves to the other layout variant, the surface follows the resolved value with no
-control of its own. It SHALL present no zoom or pan affordance and SHALL NOT advertise one. It SHALL
-render no bearing, compass angle, distance, or coordinate figure, on any layer.
+control of its own. It SHALL open fitted, showing the whole drawing inside its body, and SHALL offer
+exactly the view affordances the full-map fit-view requirement of the local-map capability defines —
+wheel and `+` / `-` zoom within that requirement's bounds, labelled 放大 and 縮小 buttons, drag-pan, a
+labelled 置中 button that recentres the current node, and a `?` disclosure button named 圖例 that opens
+the state legend in a popover — and it SHALL name those gestures in words in its guide row. Those
+affordances change only the view of the drawing: none of them SHALL change the committed payload, the
+resolved layout variant, or any geometry the surface declares, and none SHALL be persisted. It SHALL
+render no bearing, compass angle, distance, or coordinate figure, on any layer, and no zoom level,
+scale ratio, or other figure describing the view.
 
 The map surface's body SHALL carry the redesign draft's map-canvas framing (the radial-gradient dark
 terrain background painted as pure CSS inside a rounded ink border), and SHALL NOT fabricate terrain
@@ -1411,7 +1425,10 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 
 #### Scenario: The map surface advertises no zoom or pan
 - **WHEN** the map surface renders on any layer
-- **THEN** no zoom or pan control, hint or legend entry is present, and no bearing, compass angle or distance figure appears
+- **THEN** its only view controls are the labelled 縮小, 放大, and 置中 buttons and the 圖例 disclosure
+  button, its guide row names the wheel, `+` / `-`, and drag gestures in words, the legend appears only
+  inside the 圖例 popover, and no zoom level, scale ratio, bearing, compass angle, or distance figure
+  appears anywhere on the surface
 
 #### Scenario: The map surface frames the draft canvas without invented terrain
 - **WHEN** the map surface renders an available payload
@@ -1420,6 +1437,7 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 #### Scenario: The help surface tells the truth about what it knows
 - **WHEN** the help surface renders with no committed panel carrying authored guide content
 - **THEN** it renders the client's own control reference and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
+
 
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
 The client SHALL expose a narrative prose scale with three steps, selectable from the settings surface,

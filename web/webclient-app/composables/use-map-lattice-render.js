@@ -124,17 +124,6 @@ export function useMapLatticeRender(props, emit, geometry) {
     return edge.traversable ? "local-map__edge--traversable" : "local-map__edge--blocked";
   }
 
-  // Legend entries follow the fixed visibility order: current, visible_unvisited,
-  // visible_visited, remembered. Entries beyond the four states are explanatory
-  // notes (e.g. the wilderness scale line), never visibility states: they get a
-  // dedicated neutral info treatment instead of cycling the state glyphs, so a
-  // note can never masquerade as a fifth node state (webclient-map-scale-legend
-  // D3). `null` marks the beyond-state range.
-  const LEGEND_STATES = ["current", "visible_unvisited", "visible_visited", "remembered"];
-  function legendState(index) {
-    return index < LEGEND_STATES.length ? LEGEND_STATES[index] : null;
-  }
-
   // Node activation: every click first emits `select` (the island's selection
   // state updates its detail line) and only emits `move` when the node
   // carries an exact `move` action.
@@ -201,7 +190,6 @@ export function useMapLatticeRender(props, emit, geometry) {
     labelY,
     labelTier,
     edgeClass,
-    legendState,
     activateNode,
     markerNameX,
     markerNameY,

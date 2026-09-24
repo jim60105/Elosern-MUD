@@ -193,7 +193,6 @@ function onIslandClick(event) {
         :marker-name-font="10"
         :show-axis="true"
         :fog-vignette="true"
-        :show-legend="false"
         :marker-names="true"
         @move="(p) => emit('move', p)"
       />

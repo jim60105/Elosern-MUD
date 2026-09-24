@@ -89,8 +89,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         markerScale: 4.83,
         labelFont: 11,
         labelMax: 10,
-        maxWidth: 848,
-        fillWidth: true,
         overlayChrome: true,
       });
       const dotField = w.find('[data-testid="local-map__dot-field"]');
@@ -465,14 +463,14 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE),
         colPitch: 40,
         rowPitch: 40,
-        canvasSize: 208,
       });
       expect(w.props("maxUpscale")).toBeUndefined();
       expect(w.props("fieldFill")).toBeUndefined();
+      // webclient-full-map-fit-view D6: a bare mount declares neither the
+      // island's square canvas nor the overlay's fitted view, so it draws
+      // at the canvas's natural size — no inline size and no max-width.
       const style = w.get("svg.local-map__lattice").attributes("style");
-      expect(style).toContain("width: 208px");
-      expect(style).toContain("height: 208px");
-      expect(style).not.toContain("max-width");
+      expect(style).toBeUndefined();
     });
 
     it("Task 2.6: overlay geometry is identical to pre-change baseline and gains dot field", () => {
@@ -484,8 +482,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         labelMax: 10,
         labelFont: 11,
         markerNameFont: 11,
-        maxWidth: 848,
-        fillWidth: true,
         overlayChrome: true,
         markerNames: true,
       });

@@ -102,9 +102,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(current.is_visible())
 
         # The full-map overlay keeps the payload's legend, chips paired with
-        # their text labels (slim-minimap-island).
+        # their text labels — inside the `?` popover, which opens closed
+        # (webclient-full-map-fit-view D5), so open it first.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        page.click('[data-testid="map-overlay-legend-toggle"]')
+        page.wait_for_selector('[data-testid="map-overlay-legend-popover"]', timeout=15000)
         legend_text = page.locator(
             '[data-testid="map-overlay"] [data-testid="local-map__legend"]'
         ).inner_text()

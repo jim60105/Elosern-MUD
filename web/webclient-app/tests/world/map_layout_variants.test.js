@@ -40,9 +40,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
     rowPitch: 212,
     labelMax: 10,
     markerScale: 4.83,
-    maxWidth: 848,
-    maxHeight: null,
-    fillWidth: true,
     overlayChrome: true,
     markerNames: true,
   };
@@ -55,7 +52,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
     const w1 = mountLattice({ localMap: lattice, variant: lattice.layoutVariant });
     expect(lattice.layoutVariant).toBe("lattice");
     expect(w1.findAll('[data-testid^="local-map__node--"]')).toHaveLength(3);
-    expect(w1.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(4);
     expect(w1.findAll('[data-testid="local-map__actionable"]')).toHaveLength(1);
 
     const graph = localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE);
@@ -65,9 +61,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(graph.radial.nodes).toHaveLength(graph.nodes.length);
     expect(w2.findAll('[data-testid^="local-map__node--"]')).toHaveLength(graph.nodes.length);
     expect(w2.findAll('[data-testid^="local-map__edge--"]')).toHaveLength(graph.edges.length);
-    expect(w2.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(
-      graph.legend.length,
-    );
     // The interior payload's actionable node keeps its halo and move action.
     expect(w2.findAll('[data-testid="local-map__actionable"]')).toHaveLength(1);
   });

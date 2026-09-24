@@ -29,16 +29,14 @@ const renderLattice = (args) => ({
 
 const renderOverlayScale = (args) => ({
   render: () =>
-    h("div", { style: "width: 848px;" }, [
+    h("div", { style: "width: 848px; height: 560px;" }, [
       h(MapLattice, {
         colPitch: 280,
         rowPitch: 212,
         labelMax: 10,
         labelFont: 14,
         markerScale: 2.2,
-        maxWidth: 848,
-        maxHeight: null,
-        fillWidth: true,
+        fitView: true,
         ...args,
       }),
     ]),
@@ -58,7 +56,6 @@ const latticeOf = (fixture) => {
   return {
     localMap: model,
     variant: model.layoutVariant,
-    showLegend: false,
     canvasSize: 208,
     colPitch: 40,
     rowPitch: 40,
@@ -97,17 +94,19 @@ export const IslandScaleRadial = {
 };
 
 // Overlay scale: the full-map overlay's larger pitches (280px column /
-// 212px row), 10-char labels, 2.2x markers, fill-width layout at the
-// 848px body content width. The overlay chrome mirrors MapOverlay.vue: it
-// turns on the mapcanvas framing, the pin, and the marker NAME boxes.
+// 212px row), 10-char labels, 2.2x markers, opened through the fitted view
+// inside an 848 × 560 box (the overlay body's stage). The island-scale
+// stories no longer set any width/height caps — after
+// webclient-full-map-fit-view no cap exists to pass; they declare C1's
+// `canvasSize` square instead. The overlay chrome mirrors MapOverlay.vue:
+// it turns on the mapcanvas framing, the pin, and the marker NAME boxes.
 const overlayOf = (fixture) => {
   const model = localMapModelFor(fixture);
   return {
     localMap: model,
     variant: model.layoutVariant,
     overlayChrome: true,
-    showLegend: true,
-    fillWidth: true,
+    fitView: true,
     markerNames: true,
   };
 };

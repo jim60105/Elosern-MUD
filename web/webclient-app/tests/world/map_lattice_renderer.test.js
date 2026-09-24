@@ -47,7 +47,6 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // node (grid:altoria:5:5), whose endpoint is not on the canvas — the
     // renderer omits it per the spec's edge-omission rule, so 2 edges draw.
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
-    expect(w.findAll('[data-testid^="local-map__legend-item--"]').length).toBe(4);
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
     // The edge-marker decoration layer: one diamond for the remembered
     // place, in the island's name-free presentation (aria-hidden, no text).
@@ -66,13 +65,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(Number(svg.attributes("height"))).toBeCloseTo(719.9034542254337, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
-    expect(w.findAll('[data-testid^="local-map__legend-item--"]').length).toBe(4);
-    // The fill-width variant renders the canvas at the body's available
-    // width (848px content box) with no height cap.
-    const style = svg.element.style;
-    expect(style.width).toBe("100%");
-    expect(style.maxWidth).toBe("848px");
-    expect(style.maxHeight).toBe("");
+    // webclient-full-map-fit-view D6: an overlay-scale mount without
+    // fitView draws at the canvas's natural size — no inline style at all
+    // (the legend moved to the overlay's popover, so none renders here).
+    expect(svg.element.style.cssText).toBe("");
     // At the overlay's scale the marker carries its place name and an
     // accessible name (the overlay has no remembered list).
     const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
@@ -81,17 +77,39 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(edgeMarker.find("text").text()).toBe("舊街區");
   });
 
-  // slim-minimap-island D1: the legend-display switch. Default-on keeps
-  // every bare mount (and the overlay) rendering the legend; off mounts no
-  // legend element at all while the canvas content is untouched.
-  it("mounts no legend element when the legend switch is off", () => {
-    const w = mountLattice({ showLegend: false });
-    expect(w.find('[data-testid="local-map__legend"]').exists()).toBe(false);
-    expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(0);
-    // The rest of the shared render is unchanged by the switch.
-    expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
-    expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
-    expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
+  // webclient-full-map-fit-view D1/D4: with fitView the SVG fills its
+  // clipped viewport and its viewBox is the view window. Before any layout
+  // (jsdom measures no viewport box) the view is null and the window is the
+  // whole canvas, which under `meet` is also a fitted rendering.
+  it("fitView fills its viewport and windows the whole canvas before layout", () => {
+    const w = mountLattice({ ...OVERLAY_PROPS, fitView: true });
+    const svg = w.get("svg.local-map__lattice");
+    expect(svg.element.style.width).toBe("100%");
+    expect(svg.element.style.height).toBe("100%");
+    const W = Number(svg.attributes("width"));
+    const H = Number(svg.attributes("height"));
+    expect(svg.attributes("viewBox")).toBe(`0 0 ${W} ${H}`);
+    expect(w.get(".local-map__viewport").classes()).toContain("local-map__viewport--fit");
+  });
+
+  // webclient-full-map-fit-view D3: a primary-button drag past the
+  // threshold pans the view and its trailing click is suppressed, so a
+  // drag that ends on a node never submits that node's move. A press that
+  // stays within the threshold is an ordinary click and still moves.
+  it("a drag past the threshold never emits move", async () => {
+    const w = mountLattice({ ...OVERLAY_PROPS, fitView: true });
+    const node = w.get('[data-testid="local-map__node--grid:altoria:2:2"]');
+    await node.trigger("pointerdown", { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+    await node.trigger("pointermove", { pointerId: 1, clientX: 112, clientY: 100 });
+    await node.trigger("pointerup", { pointerId: 1, clientX: 112, clientY: 100 });
+    await node.trigger("click");
+    expect(w.emitted("move")).toBeUndefined();
+
+    await node.trigger("pointerdown", { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
+    await node.trigger("pointermove", { pointerId: 2, clientX: 102, clientY: 100 });
+    await node.trigger("pointerup", { pointerId: 2, clientX: 102, clientY: 100 });
+    await node.trigger("click");
+    expect(w.emitted("move")).toHaveLength(1);
   });
 
   it("keeps node markers and labels non-intersecting at the overlay's scale", () => {
