@@ -200,7 +200,7 @@ The gallery-control clause of the removed contextual-hud requirement moves into 
 
 Annotations to re-anchor (from `grep -rn` of the old IDs):
 - the command drawer: `web/tests/browser/test_browser_input_narrative.py` (3), `test_browser_shell_command_line.py` (5), `test_browser_exploration_dialogue.py` (1), `web/webclient/tests/test_node_suite_evidence.py` (2)
-- the permanent bar: `test_browser_input_narrative.py` (1)
+- the permanent bar: `test_browser_input_narrative.py` (1), `test_browser_contextual_hud_stage.py` (1)
 - the codex: `test_browser_contextual_hud_drawers.py` (4)
 
 All other requirement IDs are unchanged.

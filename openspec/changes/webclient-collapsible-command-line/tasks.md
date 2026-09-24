@@ -1,9 +1,9 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm C4c (`webclient-avg-stage-hud-anchors`) is archived, or will be before this change (archive order C1 → C2 → C3 → C4a → C4b → C4c → C5).
+- [x] 1.1 Confirm C4c (`webclient-avg-stage-hud-anchors`) is archived, or will be before this change (archive order C1 → C2 → C3 → C4a → C4b → C4c → C5).
   - If a requirement text this change builds on changed after it was written, re-sync this change's block to it and keep only this change's edits (design D9). Those texts are C4c's visibility block, C4b's required-desktop-surfaces block, C3's "map, settings, and help" block, and C3's echo requirement.
   - Confirm `tests/desktop_navigation.test.js` (added by C4b) exists, and that `HudFrame.vue` carries C4a's `command-line` anchor rule (`bottom: var(--band-h)`).
-- [ ] 1.2 List every consumer to update. Stop and report any hit outside the files named in sections 2–5.
+- [x] 1.2 List every consumer to update. Stop and report any hit outside the files named in sections 2–5.
   - `grep -rn "command-line-lineage\|command-line-lore\|command-line-codex\|command-line-settings\|command-line-help\|gallery-opener\|galleryAvailable\|gallery-available\|cmdutil" web --include='*.vue' --include='*.js' --include='*.py' --include='*.css'` (excluding `dist/` and `node_modules/`)
   - `grep -rnE 'inputfield|command-line-input-field|command-line\\?"|anchor-command-line' web/tests/browser web/webclient-app/tests`
   - `grep -rn "permanently present\|always-present\|never closed" web/webclient-app --include='*.vue' --include='*.js'` (excluding `dist/`)
@@ -68,7 +68,7 @@
   - delete the utility-cluster cases, including the lore / codex case at the `command-line-lore` / `command-line-codex` selectors
   - add: `sent` is emitted once on an accepted submit, and is not emitted when `mutationsLocked`, `inFlight`, or `!connected` (the draft is kept)
   - add: the bar renders no `cmdutil`, `gallery-opener`, or `command-line-settings` element
-- [ ] 4.2 `tests/app.test.js`, `tests/preserved_contract.test.js`, `tests/bridge/app_shell_bridge.test.js`, `tests/app_client_completion.test.js`:
+- [ ] 4.2 `tests/app.test.js`, `tests/preserved_contract.test.js`, `tests/bridge/app_shell_bridge.test.js`, `tests/bridge/bridge.test.js`, `tests/app_client_completion.test.js`:
   - on mount, `[data-anchor="command-line"]` has `data-expanded="false"`, `command-line-toggle` has `aria-expanded="false"`, and `#inputfield` still exists inside `.inputfieldwrapper`
   - `focusCommandField()` sets `data-expanded="true"` and, after `nextTick`, focuses `#inputfield`
   - `focus-parent` restores `#action-dock` focus and collapses
@@ -100,7 +100,7 @@
   - add `open_command_line(page)`, which presses `/` outside an editable control and waits until `document.activeElement` is `#inputfield`
   - `REQUIRED_SURFACES` names `[data-testid="command-line-toggle"]` instead of `[data-testid="command-line"]`, and its comment is rewritten
 
-  For every hit of 1.2's `inputfield` grep, open the line before `fill` / `click` / `type`, or keep it as a presence-only `count()` check, or turn it into a collapsed-state assertion. Files: `test_browser_actions.py`, `test_browser_shell_narrative.py`, `test_browser_exploration_dialogue.py`, `test_browser_input_narrative.py`, `test_browser_shell_command_line.py`, `test_browser_layout.py`, `test_browser_contextual_hud_stage.py`, `test_browser_shell_surfaces.py`, `test_vue_foundation.py`. A journey that sends a second command opens the line again first.
+  For every hit of 1.2's `inputfield` grep, open the line before `fill` / `click` / `type`, or keep it as a presence-only `count()` check, or turn it into a collapsed-state assertion. Files: `test_browser_actions.py`, `test_browser_art.py`, `test_browser_shell_narrative.py`, `test_browser_exploration_dialogue.py`, `test_browser_input_narrative.py`, `test_browser_shell_command_line.py`, `test_browser_layout.py`, `test_browser_contextual_hud_stage.py`, `test_browser_shell_surfaces.py`, `test_vue_foundation.py`. A journey that sends a second command opens the line again first.
 - [ ] 5.2 `test_browser_shell_command_line.py`:
   - rewrite `test_keyboard_field_focus_send_cancel_and_focus_restoration`: collapsed on load, `/` expands and focuses, a send clears, collapses, and focuses `#action-dock`, then `/`, Escape with a draft collapses and keeps the draft on the next `/`
   - rewrite `test_pointer_focused_field_sends_on_enter`: click `command-line-toggle`, type, Enter; one send, then collapsed and dock focus
