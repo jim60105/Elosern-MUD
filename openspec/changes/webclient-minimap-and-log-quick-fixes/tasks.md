@@ -87,10 +87,10 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Run these gates, all green:
+- [x] 6.1 Run these gates, all green:
   - `node --test web/static/webclient/js/tests/*.test.js` (no model change is expected)
   - `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root)
   - `uv run --locked python -m tools.test_data_lint check`
   - `uv run --locked python -m tools.spec_traceability check`
   - the browser modules `test_browser_local_map_geometry`, `test_browser_local_map_lattice`, `test_browser_local_map_rendering`, `test_browser_local_map_layout_variants`, `test_browser_local_map_interaction`, `test_browser_contextual_hud_stage`, and `test_browser_shell_surfaces` via `uv run --locked python -m unittest web.tests.browser.<module>`
-- [ ] 6.2 Take a 1920×1080 screenshot of the guild hall (interior) and of a wilderness cell. Confirm the island is 218px wide with a single 1px frame, no chip list, and a drawing that fills the canvas. Then run `openspec validate webclient-minimap-and-log-quick-fixes --strict` and `git diff --check`, both clean.
+- [x] 6.2 Take a 1920×1080 screenshot of the guild hall (interior) and of a wilderness cell. Confirm the island is 218px wide with a single 1px frame, no chip list, and a drawing that fills the canvas. Then run `openspec validate webclient-minimap-and-log-quick-fixes --strict` and `git diff --check`, both clean.
