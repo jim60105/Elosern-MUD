@@ -139,15 +139,18 @@
     --header-h: 80px;
     --left-column: clamp(220px, 20vw, 330px);
     --right-column: clamp(230px, 22vw, 360px);
-    --dock-h: clamp(126px, 17vh, 160px);
+    /* The AVG stage's bottom band (design §5.1): the message region and the
+       command region share this one fixed height. It scales with the
+       viewport height only and never depends on content, frame, or mode. */
+    --band-h: clamp(260px, 27.8vh, 400px);
     /* The persistent command line's own height (HudFrame's
        [data-anchor="command-line"] rule consumes it). */
     --command-line-h: 64px;
-    /* How far above the stage bottom the dock's top edge sits: the dock's own
-       height plus the command line beneath it. Every surface positioned above
-       the dock derives its offset from this single token, never re-deriving
-       the command line's height by hand. */
-    --stage-content-bottom: calc(var(--dock-h) + var(--command-line-h));
+    /* The edge every stage surface above the band clears: the band plus the
+       command-line row docked on its top edge. Every surface positioned
+       above the band derives its offset from this single token, never
+       re-deriving the command line's height by hand. */
+    --stage-content-bottom: calc(var(--band-h) + var(--command-line-h));
    /* ---- z-index scale ----
       Every full-screen surface consumes --z-surface-modal (or a value derived
       from it); nothing but the offline overlay may exceed --z-offline.

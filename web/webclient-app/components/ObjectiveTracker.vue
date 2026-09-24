@@ -96,7 +96,7 @@ function isDone(row) {
 .obj {
   position: absolute;
   z-index: 4;
-  bottom: calc(var(--dock-h) + 60px);
+  bottom: calc(var(--band-h) + 12px);
   right: 16px;
   width: 238px;
   background: var(--panel);

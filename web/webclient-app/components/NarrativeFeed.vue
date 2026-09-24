@@ -6,8 +6,9 @@ import { portraitFor, portraitGlyph } from "./party-helpers.js";
 import { faceObjectPosition } from "./face-rect.js";
 
 // Bounded narrative caption card (H1, design D4): the narrative is a
-// bounded caption at the visual centre of the stage — `width:min(880px,90vw)`,
-// `max-height:30vh` (set by the `feed` anchor), blurred panel chrome. The
+// bounded caption filling the bottom band's message region (HudFrame
+// `data-anchor="band-message"`, the band's left two thirds at the fixed
+// `--band-h` height; webclient-avg-stage-shell), blurred panel chrome. The
 // card carries a head row naming the mode and a single labelled control
 // (`完整日誌 ↑`) that opens the full-log surface presenting the complete
 // retained narrative through the same markup renderer (never a second markup
@@ -510,8 +511,9 @@ export default {
   text-transform: uppercase;
 }
 
-/* The dedicated scroll viewport: the bounded region (the 32vh caption bound
-   moved here), positioned so the dialogue pin can measure the box's offsetTop
+/* The dedicated scroll viewport: the bounded region (the standalone 32vh
+   bound; inside the band's message region the shell lets it fill the card),
+   positioned so the dialogue pin can measure the box's offsetTop
    against the viewport itself. */
 .elosern-narrative .narrative-scroll {
   position: relative;
