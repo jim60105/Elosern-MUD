@@ -49,9 +49,12 @@ export const FullLattice = {
 export const InteriorWithRemembered = {
   render: renderOverlay,
   args: {
+    // Remembered rooms travel in the payload's `nodes` list with
+    // `visibility: "remembered"`; the model splits them into `remembered`.
     localMap: localMapModelFor({
       ...LOCAL_MAP_INTERIOR_SAMPLE,
-      remembered: [
+      nodes: [
+        ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
         { id: "room:rem1", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
         { id: "room:rem2", label: "檔案室", x: 2, y: 5, visibility: "remembered", landmark: true },
       ],

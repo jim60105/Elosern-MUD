@@ -6,9 +6,10 @@
 // this component renders only the `local_map` payload's branch — the
 // available map (reused MapLattice opened through its fitted view, so the
 // whole drawing shows inside the body and the reader zooms instead of
-// scrolling) or the registry-owned unavailable reason. The guide row carries
-// the view toolbar (縮小 / 放大 / 置中) and the legend disclosure; the state
-// legend lives only in this surface's `?` popover (design D5). The host's
+// scrolling) or the registry-owned unavailable reason. The guide row is a
+// text caption; the view toolbar (縮小 / 放大 / 置中) and the legend
+// disclosure float over the map's top-right corner as one control pill, and
+// the state legend lives only in that pill's `?` popover (design D5). The host's
 // focus trap and the labelled close control own the surface's chrome; this
 // root handles Escape-while-the-popover-is-open (the popover is the topmost
 // Escape level, design D5) and the `+` / `-` zoom keys. Actionable adjacent
@@ -151,41 +152,6 @@ function handleMove(payload) {
       <div class="map-overlay__guide">
         <p>點選可通行的相鄰節點，繼續探索。</p>
         <span>Tab 切換路徑 · Enter 確認移動 · 滾輪或 +／− 縮放 · 拖曳平移</span>
-        <div class="map-overlay__toolbar" role="group" aria-label="地圖檢視">
-          <button
-            type="button"
-            class="map-overlay__view-button"
-            data-testid="map-overlay-zoom-out"
-            aria-label="縮小"
-            :aria-disabled="!latticeRef?.canZoomOut"
-            @click="latticeRef?.zoomOut()"
-          >−</button>
-          <button
-            type="button"
-            class="map-overlay__view-button"
-            data-testid="map-overlay-zoom-in"
-            aria-label="放大"
-            :aria-disabled="!latticeRef?.canZoomIn"
-            @click="latticeRef?.zoomIn()"
-          >+</button>
-          <button
-            type="button"
-            class="map-overlay__view-button"
-            data-testid="map-overlay-recentre"
-            :aria-disabled="!latticeRef?.canRecentre"
-            @click="latticeRef?.recentre()"
-          >置中</button>
-          <button
-            ref="legendToggleEl"
-            type="button"
-            class="map-overlay__view-button"
-            data-testid="map-overlay-legend-toggle"
-            aria-label="圖例"
-            :aria-expanded="legendOpen"
-            :aria-controls="legendPopoverId"
-            @click="toggleLegend"
-          >?</button>
-        </div>
       </div>
       <!-- The viewport cell takes every row the guide and the remembered
            list leave (design D7), and the lattice fills it through its
@@ -209,6 +175,46 @@ function handleMove(payload) {
           :marker-name-font="11"
           @move="handleMove"
         />
+        <!-- The view controls float over the map's top-right corner as one
+             pill (zoom pair, 置中, legend), so they read as part of the map
+             they drive; the legend popover drops from the pill. -->
+        <div class="map-overlay__toolbar" role="group" aria-label="地圖檢視">
+          <button
+            type="button"
+            class="map-overlay__view-button"
+            data-testid="map-overlay-zoom-out"
+            aria-label="縮小"
+            :aria-disabled="!latticeRef?.canZoomOut"
+            @click="latticeRef?.zoomOut()"
+          >−</button>
+          <button
+            type="button"
+            class="map-overlay__view-button"
+            data-testid="map-overlay-zoom-in"
+            aria-label="放大"
+            :aria-disabled="!latticeRef?.canZoomIn"
+            @click="latticeRef?.zoomIn()"
+          >+</button>
+          <span class="map-overlay__toolbar-sep" aria-hidden="true"></span>
+          <button
+            type="button"
+            class="map-overlay__view-button"
+            data-testid="map-overlay-recentre"
+            :aria-disabled="!latticeRef?.canRecentre"
+            @click="latticeRef?.recentre()"
+          >置中</button>
+          <span class="map-overlay__toolbar-sep" aria-hidden="true"></span>
+          <button
+            ref="legendToggleEl"
+            type="button"
+            class="map-overlay__view-button"
+            data-testid="map-overlay-legend-toggle"
+            aria-label="圖例"
+            :aria-expanded="legendOpen"
+            :aria-controls="legendPopoverId"
+            @click="toggleLegend"
+          >?</button>
+        </div>
         <div
           v-if="legendOpen"
           ref="legendPopoverEl"
@@ -261,7 +267,7 @@ function handleMove(payload) {
         >
           <svg
             class="map-overlay__remembered-marker"
-            viewBox="-16 -16 32 32"
+            viewBox="-11 -11 22 22"
             width="14"
             height="14"
             aria-hidden="true"
@@ -298,76 +304,153 @@ function handleMove(payload) {
    below the fold. */
 .map-overlay__content {
   display: grid;
-  grid-template-rows: auto minmax(240px, 1fr) auto;
-  gap: 20px;
+  grid-template-rows: auto minmax(240px, 1fr);
+  /* The remembered list is an implicit third row, so a payload without it
+     leaves no trailing gap under the viewport. */
+  grid-auto-rows: auto;
+  gap: var(--sp-3);
   height: 100%;
 }
 
+/* The caption row: the instruction in the serif voice on the left, the
+   input hint as a quiet footnote at the right edge. The view controls live
+   on the map itself (below), so this row carries text only. */
 .map-overlay__guide {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px 20px;
+  gap: var(--sp-1) var(--sp-4);
+  padding: 0 var(--sp-1);
 }
 
 .map-overlay__guide p {
   margin: 0;
   color: var(--paper-100);
   font-family: var(--f-serif);
+  font-size: var(--text-body);
+  letter-spacing: 0.06em;
 }
 
 .map-overlay__guide span {
-  color: var(--paper-300);
-  font-size: 12px;
+  color: var(--paper-500);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
 }
 
+/* The map frame: one hairline, the surface radius, and a soft inner shade.
+   The SVG inside is borderless and clipped by this frame, so the fitted
+   view spends exactly the frame's content box and no edge is ever cut. */
+.map-overlay__viewport {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--map-canvas-lo);
+  box-shadow: inset 0 0 80px #0006;
+}
+
+.map-overlay__viewport :deep(.local-map__lattice--canvas) {
+  border: 0;
+  border-radius: 0;
+}
+
+/* The view controls: one floating glass pill in the map's top-right corner,
+   grouped as zoom pair · 置中 · legend with hairline separators. */
 .map-overlay__toolbar {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: var(--sp-1);
+  gap: 2px;
+  padding: 3px;
+  border: var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+
+.map-overlay__toolbar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--ink-700);
 }
 
 /* View buttons never use the `disabled` attribute (design D3): a bound
    control carries aria-disabled and keeps focus inside the trap. */
 .map-overlay__view-button {
-  min-width: 28px;
-  padding: 2px var(--sp-2);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--panel-hi);
-  color: var(--paper-100);
-  font-family: var(--f-mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper-200);
+  font-family: var(--f-sans);
   font-size: var(--text-sm);
-  line-height: 1.4;
+  letter-spacing: 0.08em;
+  line-height: 1;
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+/* The two zoom glyphs are drawn a step larger than the label text so the
+   pair reads as symbols rather than punctuation. */
+.map-overlay__view-button[data-testid="map-overlay-zoom-out"],
+.map-overlay__view-button[data-testid="map-overlay-zoom-in"] {
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.map-overlay__view-button:hover:not([aria-disabled="true"]) {
+  background: var(--panel-hi);
+  color: var(--gold-300);
+}
+
+.map-overlay__view-button[aria-expanded="true"] {
+  background: var(--gold-glow);
+  color: var(--gold-400);
+}
+
+.map-overlay__view-button:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: -2px;
 }
 
 .map-overlay__view-button[aria-disabled="true"] {
-  color: var(--paper-500);
+  color: var(--paper-700);
   cursor: default;
 }
 
-.map-overlay__viewport {
-  position: relative;
-  min-height: 0;
-}
-
-/* The legend popover (design D5): floats over the top-right of the map
-   viewport inside this cell's stacking context and takes no layout space.
-   Its z-index is local to the cell. */
+/* The legend popover (design D5): drops from the control pill's right edge,
+   floats over the map inside this cell's stacking context, and takes no
+   layout space. */
 .map-overlay__legend-popover {
   position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-2);
-  z-index: 1;
-  max-width: min(100%, 480px);
+  top: calc(var(--sp-3) + 44px);
+  right: var(--sp-3);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--sp-3));
   box-sizing: border-box;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border: var(--line);
   border-radius: var(--radius);
-  background: var(--ink-900);
-  box-shadow: 0 4px 16px #0006;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-lg);
 }
 
 /* The draft dot-chip legend (webclient-map-01-draft-chrome D6): an 11px
@@ -378,8 +461,8 @@ function handleMove(payload) {
    this surface is the legend's only renderer. */
 .local-map__legend {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
+  flex-direction: column;
+  gap: var(--sp-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -388,9 +471,9 @@ function handleMove(payload) {
 .local-map__legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--paper-500);
-  font-size: 11px;
+  gap: var(--sp-2);
+  color: var(--paper-300);
+  font-size: 12px;
 }
 
 .local-map__legend-chip {
@@ -429,40 +512,47 @@ function handleMove(payload) {
   border: 1px dotted var(--ink-edge);
 }
 
-.map-overlay__content :deep(.local-map__lattice--canvas) {
-  border-color: var(--gold-500);
-  box-shadow: inset 0 0 60px #0005;
-}
-
+/* The graph variant's remembered rooms (C1 D5): a quiet caption row under
+   the map — a small-caps style lead-in, then each room as a dashed diamond
+   (the legend's remembered glyph) and its full name. Plain text, no boxes:
+   the entries are not controls. */
 .map-overlay__remembered {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
   margin: 0;
-  padding: 0;
+  padding: 0 var(--sp-1);
   list-style: none;
   box-sizing: border-box;
+}
+
+.map-overlay__remembered::before {
+  /* Visible lead-in only; the list's aria-label already names it. */
+  content: "記得的地點" / "";
+  color: var(--paper-500);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
 }
 
 .map-overlay__remembered-item {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  padding: 2px var(--sp-2);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-300);
-  font-size: var(--text-sm);
+  gap: 6px;
 }
 
 .map-overlay__remembered-marker rect {
-  fill: var(--paper-500);
+  fill: var(--map-canvas-hi);
+  stroke: var(--gold-500);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
 }
 
 .map-overlay__remembered-label {
   color: var(--paper-300);
-  font-family: var(--f-mono);
-  font-size: 11px;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
 }
 </style>

@@ -514,11 +514,11 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 
 #### Scenario: The full-map overlay omits the remembered-node list and the readout line
 - **WHEN** the full-map overlay is open with an available lattice payload carrying remembered gateways
-- **THEN** the overlay body shows only its guide row with its view controls and legend popover control, and the map canvas in the lattice variant with its named edge markers, and does not render a remembered-node list or the island's coordinate readout line
+- **THEN** the overlay body shows only its guide row, the map canvas with its view controls and legend popover control floating over the canvas's top-right corner, in the lattice variant with its named edge markers, and does not render a remembered-node list or the island's coordinate readout line
 
 #### Scenario: The full-map overlay lists a graph payload's remembered rooms
 - **WHEN** the full-map overlay is open with an available interior payload carrying remembered rooms
-- **THEN** the overlay body shows its guide row with its view controls and legend popover control, the map canvas in the graph variant, and a visible remembered list outside the canvas and below it with exactly one entry per remembered room in payload order, each pairing the remembered state's non-colour indicator with the room's full name, carrying no tab stop, no role that invites activation, and no travel action, and the body renders no coordinate readout line
+- **THEN** the overlay body shows its guide row, the map canvas in the graph variant with its view controls and legend popover control floating over the canvas's top-right corner, and a visible remembered list outside the canvas and below it with exactly one entry per remembered room in payload order, each pairing the remembered state's non-colour indicator with the room's full name, carrying no tab stop, no role that invites activation, and no travel action, and the body renders no coordinate readout line
 
 #### Scenario: Draft marker ladder reads without colour
 - **WHEN** the island renders a current node, a visited node, an unvisited node, and a landmark node
@@ -887,14 +887,14 @@ The surface SHALL offer these view operations:
   under the pointer fixed, and SHALL NOT scroll the body or the page. The `+` key (and `=`) and the
   `-` key SHALL zoom in and out by a fixed step about the viewport's centre while focus is inside
   the overlay; a key pressed with Ctrl, Meta, or Alt SHALL be left to the browser. Labelled
-  `放大` and `縮小` buttons in the guide row SHALL do the same.
+  `放大` and `縮小` buttons in the view-control group floating over the map's top-right corner SHALL do the same.
 - **Pan.** Dragging with the primary pointer button SHALL move the window with the pointer, and SHALL
   stop at the drawing's edges so no empty space opens beyond a canvas edge on an axis where the
   drawing is larger than the viewport. A press that moves more than a small threshold is a drag: it
   SHALL NOT activate the node it started or ended on, so a drag never submits a move. A press that
   stays within the threshold is an ordinary click, so pointer travel on an actionable node is
   unchanged.
-- **Recentre.** A labelled `置中` button in the guide row SHALL centre the `current` node in the
+- **Recentre.** A labelled `置中` button in that view-control group SHALL centre the `current` node in the
   viewport at the current zoom level, clamped to the drawing's edges.
 
 Each view control SHALL be a real `<button>` with an accessible name. A control whose operation
@@ -909,7 +909,7 @@ animate, so the reduced-motion preference has nothing to disable and a reduced-m
 exactly the same frames.
 
 The state legend SHALL NOT occupy the overlay body's layout. It SHALL open from a `?` disclosure
-button in the guide row named 圖例, which states whether the popover is expanded; the popover SHALL
+button in that view-control group named 圖例, which states whether the popover is expanded; the popover SHALL
 float above the top-right of the map viewport, SHALL hold the payload's full legend with its
 dot-chips and text labels and no focusable content, and SHALL be absent from the DOM while closed.
 It SHALL close on a second activation of its button, on a pointer press inside the overlay outside
