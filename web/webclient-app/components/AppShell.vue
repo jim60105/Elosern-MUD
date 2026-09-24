@@ -26,7 +26,6 @@
 // action dock *before* the CSS hides it (design D2; the side-effect-free
 // `restoreDockFocus` path — no second focus path).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { boundLetters } from "../lib/quick_chips.js";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
@@ -197,26 +196,6 @@ function onWindowKeydown(event) {
     event.preventDefault();
     return;
   }
-  // Quickbar letter bindings (webclient-align-02-quickbar-shortcuts): outside
-  // any text-entry surface, in the committed exploration/combat mode only, a
-  // bound chip letter is equivalent to activating its chip — the letter plus a
-  // trailing space goes through the command line's single insert path and
-  // focus moves to the field, never submitting. Digits 1-4 (the dock's row
-  // picks), Tab, Escape, and the arrows stay with their owning surfaces; the
-  // bridge/router see letters unclaimed, so they reach this listener. A held
-  // key repeats are suppressed: one physical press is one insert.
-  if (event.repeat || isEditable(event.target)) {
-    return;
-  }
-  // Normalize a printable single-character press (Caps Lock / Shift produce
-  // uppercase event.key values) to its canonical lowercase badge letter —
-  // the server command words are lowercase, so the physical key always
-  // prepares its command regardless of modifier state.
-  const letter = key.length === 1 ? key.toLowerCase() : key;
-  if (boundLetters(props.mode).includes(letter)) {
-    event.preventDefault();
-    commandLine.value?.insertText(letter);
-  }
 }
 
 // A mode change that hides the surface holding focus moves focus to the
@@ -310,7 +289,6 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #command-line>
         <CommandLine
           ref="commandLine"
-          :mode="props.mode"
           :prompt="props.prompt"
           :history="props.commandHistory"
           :connected="props.connected"

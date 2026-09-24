@@ -3,7 +3,7 @@
 // shared full-screen overlay surface. The modal chrome (position, z-index,
 // close button, aria-modal) now belongs to the OverlayHost. The body
 // renders the client's own control reference — the keys this client binds,
-// the dock's navigation model, the quick-word chips and the close paths —
+// the dock's navigation model and the close paths —
 // from the single client-owned source `lib/controls-reference.js`, with one
 // line stating how the game's own `help` output is reached. No authored
 // game-help content is invented here.

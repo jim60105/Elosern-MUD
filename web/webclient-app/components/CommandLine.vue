@@ -3,13 +3,12 @@
 // D1/D2/D4/D5/D13): the persistent command line — a single always-rendered
 // bar filling H1's 46px `command-line` anchor. No open/closed state: the
 // input field is present in the DOM, visible and focusable without any
-// opening action (design D1). The bar renders, in this order: the mode's
-// quick-word chips, a `›` prompt chevron, the `#inputfield` inside its
+// opening action (design D1). The bar renders, in this order: a `›` prompt
+// chevron, the `#inputfield` inside its
 // preserved `.inputfieldwrapper`, the hint cluster (`↑↓ 歷史 · Tab 補全` —
 // both affordances implemented, webclient-align-02-quickbar-shortcuts: Tab
-// completes the draft before the caret over session history, the mode's
-// chip badge letters, and the committed exploration panel's exit/target
-// names; unique → full completion, many → longest-common-prefix then
+// completes the draft before the caret over session history and the committed
+// exploration panel's exit/target names; unique → full completion, many → longest-common-prefix then
 // Tab/Shift+Tab cycle, none → untouched), the 上一筆/下一筆 history controls (the pointer
 // path to the same walk state the ArrowUp/ArrowDown keys drive, design D5),
 // and the utility controls that open the settings and help overlays (design
@@ -23,8 +22,6 @@
 // (offline or mutations locked) preserves the typed text.
 import { computed, nextTick, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
-import QuickWordChips from "./QuickWordChips.vue";
-import { chipLetters } from "../lib/quick_chips.js";
 
 const props = defineProps({
   // The server-transformed prompt line (e.g. a room name). Rendered through
@@ -37,8 +34,6 @@ const props = defineProps({
   // The store's mutation-lock flag: a rejected send preserves the typed
   // speech (webclient-desktop-shell).
   mutationsLocked: { type: Boolean, default: false },
-  // The committed mode, forwarded to the quick-word chip sets (design D4).
-  mode: { type: String, default: "exploration" },
   // The action client's in-flight mutation flag (webclient-input-narrative):
   // a free-form send blocked by an in-flight mutation keeps the typed speech.
   inFlight: { type: Boolean, default: false },
@@ -61,7 +56,7 @@ const draft = ref("");
 // Tab-completion cycle state (webclient-align-02): null = not cycling;
 // otherwise the current candidate list and a cursor where -1 is the
 // longest-common-prefix rung and 0..n-1 the candidate rungs (Tab advances,
-// Shift+Tab reverses, both wrap). Any manual edit, send, chip insert, or
+// Shift+Tab reverses, both wrap). Any manual edit, send, or
 // history walk resets it — the cycle never resurrects stale candidates.
 let completion = null;
 
@@ -69,14 +64,13 @@ function resetCompletion() {
   completion = null;
 }
 
-// The candidate set: session history + the committed mode's chip badge
-// letters + the committed exploration panel names, deduplicated
-// case-insensitively with first-seen order (history oldest-first, then
-// chips, then panel rows — the cycle follows this stable order).
+// The candidate set: session history + the committed exploration panel
+// names, deduplicated case-insensitively with first-seen order (history
+// oldest-first, then panel rows — the cycle follows this stable order).
 const candidateList = computed(() => {
   const seen = new Set();
   const out = [];
-  for (const value of [...props.history, ...chipLetters(props.mode), ...props.completionCandidates]) {
+  for (const value of [...props.history, ...props.completionCandidates]) {
     const text = String(value ?? "");
     if (text === "") {
       continue;
@@ -323,23 +317,6 @@ function focusField() {
   field.value?.focus();
 }
 
-function onChipInsert(verb) {
-  // A chip prepares, it does not send: write the inserted text (the badge
-  // letter, webclient-align-02) plus a trailing space and focus the field
-  // (design D4). The global bound-letter router inserts through this same
-  // path — one insert implementation.
-  insertText(String(verb));
-}
-
-// The shared letter-insert path (webclient-align-02): a chip click and a
-// bound-letter keypress both land here — write the letter + trailing space,
-// focus the field, never submit.
-function insertText(text) {
-  draft.value = text + " ";
-  resetCompletion();
-  focusField();
-}
-
 function onHistoryUp() {
   walkHistory("up");
 }
@@ -370,12 +347,11 @@ function onFieldBlur() {
   emit("focus-lost");
 }
 
-defineExpose({ focusField, insertText });
+defineExpose({ focusField });
 </script>
 
 <template>
   <div class="cmdline" aria-label="指令列" data-testid="command-line">
-    <QuickWordChips :mode="mode" @insert="onChipInsert" />
     <div class="cmdfield" data-testid="command-line-input">
       <span v-if="!prompt" class="pt cmdfield__prompt" data-testid="command-line-prompt">›</span>
       <span v-else class="pt cmdfield__prompt" data-testid="command-line-prompt">
@@ -594,20 +570,15 @@ defineExpose({ focusField, insertText });
   white-space: nowrap;
 }
 
-/* Constrained width (design D5): the hint cluster is the first element
-   dropped, then the chip cluster scrolls; the field, the history controls
-   and the utility controls are never dropped. Implemented as always-on
-   flexbox degradation (no mobile breakpoint is shipped, design D1/D5). */
+/* Constrained width (design D5): the hint cluster is the first element dropped;
+   the field, the history controls and the utility controls are never dropped.
+   Implemented as always-on flexbox degradation (no mobile breakpoint is
+   shipped, design D1/D5). */
 .cmdline .hint {
   flex-shrink: 3;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-}
-.cmdline .qwc {
-  flex-shrink: 1;
-  min-width: 0;
-  overflow-x: auto;
 }
 
 .hist {

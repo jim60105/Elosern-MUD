@@ -87,56 +87,20 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get("#elosern-action-live").text().trim()).toBe("");
   });
 
-  // webclient-align-02-quickbar-shortcuts: the bound-letter router.
-  it("a bound letter outside any field inserts letter + space and focuses; typing stays inside", async () => {
+  // webclient-retire-redundant-hud: bound letters retired, unclaimed keys do not insert or focus
+  it("in exploration mode, a keydown of g on a non-editable target leaves #inputfield empty and does not move focus", async () => {
     const w = mountShell({ mode: "exploration" });
     const input = w.get("textarea#inputfield");
-    // From a non-editable target (the dock), `g` behaves like a chip click.
+    const target = w.get('[data-testid="narrative-fulllog-control"]');
+    target.element.focus();
+    expect(document.activeElement).toBe(target.element);
+
     pressKey(window, "g");
     await w.vm.$nextTick();
-    expect(input.element.value).toBe("g ");
-    expect(document.activeElement).toBe(input.element, "focus moves to the field");
+
+    expect(input.element.value).toBe("");
+    expect(document.activeElement).toBe(target.element, "focus remains on the target");
     expect(w.emitted("submit-command")).toBeUndefined();
-    // Inside the field the letter is ordinary text: the router never claims
-    // it (not defaultPrevented — the browser's own insertion proceeds), and no
-    // chip-insert rerouting happens (the draft keeps growing as typed text).
-    const typed = new KeyboardEvent("keydown", { key: "t", bubbles: true, cancelable: true });
-    input.element.dispatchEvent(typed);
-    await w.vm.$nextTick();
-    expect(typed.defaultPrevented).toBe(false, "the router leaves in-field letters to the browser");
-    // Emulate the browser's native insertion that follows an unclaimed keydown.
-    input.element.value = "g t";
-    input.trigger("input");
-    await w.vm.$nextTick();
-    expect(input.element.value).toBe("g t", "typed text accumulates; the router did not overwrite it");
-  });
-
-  it("the physical badge key works regardless of Caps Lock / Shift casing", async () => {
-    const w = mountShell({ mode: "exploration" });
-    // Caps Lock (or Shift) yields an uppercase event.key outside the field.
-    pressKey(window, "G");
-    await w.vm.$nextTick();
-    expect(w.get("textarea#inputfield").element.value).toBe(
-      "g ",
-      "the uppercase press inserts the canonical lowercase command word",
-    );
-  });
-
-  it("letter bindings follow the committed mode: combat binds s/c only, creation none", async () => {
-    let combat = mountShell({ mode: "combat" });
-    pressKey(window, "c");
-    await combat.vm.$nextTick();
-    expect(combat.get("textarea#inputfield").element.value).toBe("c ");
-    pressKey(window, "l");
-    await combat.vm.$nextTick();
-    expect(combat.get("textarea#inputfield").element.value).toBe("c ", "l is unbound in combat");
-    combat.unmount();
-    wrapper = null;
-
-    const creation = mountShell({ mode: "creation" });
-    pressKey(window, "g");
-    await creation.vm.$nextTick();
-    expect(creation.get("textarea#inputfield").element.value).toBe("", "creation binds no letters");
   });
 
   it("unclaimed keys and modified letters fall through untouched", async () => {

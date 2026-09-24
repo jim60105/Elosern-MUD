@@ -48,12 +48,12 @@
 
 ## 3. Quick-word chips and letter bindings
 
-- [ ] 3.1 Delete these files:
+- [x] 3.1 Delete these files:
   - `web/webclient-app/components/QuickWordChips.vue`
   - `lib/quick_chips.js`
   - `stories/Core/QuickWordChips.stories.js`
   - `tests/quick_word_chips.test.js`
-- [ ] 3.2 `components/CommandLine.vue` (design D6):
+- [x] 3.2 `components/CommandLine.vue` (design D6):
   - delete the `QuickWordChips` import and mount, `onChipInsert`, `insertText`, the `chipLetters` import and its use in the candidate list, and the `mode` prop
   - make `defineExpose` expose `focusField` only
   - delete any chip-cluster CSS and comments
@@ -70,19 +70,19 @@
   - rewrite the header comment
 
   `grep -rn "quick_chips\|QuickWordChips\|boundLetters\|chipLetters\|insertText\|qwc" web/webclient-app --include='*.js' --include='*.vue' --include='*.css'` (excluding `dist/`) returns nothing.
-- [ ] 3.3 `lib/controls-reference.js`:
+- [x] 3.3 `lib/controls-reference.js`:
   - delete the `Quick-word chips` and `l g s t w / s c` entries
   - reword the `Tab` detail to "complete against history and the room's exits and targets"
 
   `components/HelpOverlay.vue`: drop "the quick-word chips" from the header comment.
-- [ ] 3.4 `web/webclient-app/tests/command_line.test.js`:
+- [x] 3.4 `web/webclient-app/tests/command_line.test.js`:
   - delete "the quick-word chips prepare without submitting" and "chip sets follow the mode"
   - rewrite "Tab is stable across candidate kinds" so the unique completion comes from a history or panel candidate instead of the chip letter `s`
   - stop passing `mode` to `mountLine` (keep the host's `data-elosern-mode` attribute only if another case still reads it)
   - add one case: in exploration mode, a keydown of `g` on a non-editable target leaves `#inputfield` empty and does not move focus. Mount `AppShell` for this case, or put it in the existing AppShell test file if `grep -rln "AppShell.vue" web/webclient-app/tests` finds one.
 
   Run `pnpm exec vitest run web/webclient-app/tests/command_line.test.js web/webclient-app/tests/overlays/help_overlay.test.js` (repository root); green.
-- [ ] 3.5 `commands/tests/test_localized/test_surface_and_quickbar.py`:
+- [x] 3.5 `commands/tests/test_localized/test_surface_and_quickbar.py`:
   - delete the `QuickbarLetterPinningTests` class and its imports that become unused
   - reword the module docstring to name only `LocalizedCommandSurfaceTests`
 
