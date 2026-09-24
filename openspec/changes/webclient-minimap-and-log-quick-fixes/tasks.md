@@ -23,17 +23,17 @@
 
 ## 2. Island: delete the list and the budget, fix the chrome (design D1, D2, D5)
 
-- [ ] 2.1 `web/webclient-app/components/LocalMap.vue`:
+- [x] 2.1 `web/webclient-app/components/LocalMap.vue`:
   - Delete `measureCanvasBudget`, `anchorHeightBudget`, `ANCHOR_BOTTOM_CLEARANCE`, `sectionHeight`, `canvasMaxHeight`, the `metaEl` / `rememberedEl` / `detailEl` refs and their `ref=` bindings, the `onMounted` ResizeObserver, `onUpdated`, and the now-unused Vue imports.
   - Delete the long "Dynamic canvas height budget" comments, and the `.visually-hidden` exclusion comment's reference to `measureCanvasBudget()`.
   - Mount `MapLattice` with `:canvas-size="208"` and without `max-height`, `fill-width`, or `field-fill`.
   - Check: `grep -n "measureCanvasBudget\|anchorHeightBudget\|ANCHOR_BOTTOM_CLEARANCE\|canvasMaxHeight\|ResizeObserver\|field-fill" web/webclient-app/components/LocalMap.vue` returns nothing.
-- [ ] 2.2 Same file:
+- [x] 2.2 Same file:
   - Delete the `<ul class="local-map__remembered" data-testid="local-map-remembered">` block, `showsRememberedList`, and the `.local-map__remembered*` and `.local-map__node-label` CSS.
   - Add the graph-variant mirror `<ul v-if="isGraph && remembered.length" class="visually-hidden" aria-label="記得的地點" data-testid="local-map-remembered-mirror">`, with one `<li>` per remembered node in payload order giving `node.label`.
   - Update the header comment and the `onIslandClick` comment, which currently mention remembered-list items.
   - Check: `grep -rn "local-map-remembered\"\|local-map__remembered" web/webclient-app --include='*.vue' --include='*.js' --include='*.css'` (excluding `dist/`) returns only test files that section 4 rewrites.
-- [ ] 2.3 Island chrome:
+- [x] 2.3 Island chrome:
   - In `LocalMap.vue` `<style>`:
     - `.local-map` gets `padding: var(--sp-1)`, `width: auto`, and `align-self: flex-end`, and keeps its single `border: var(--line)`, panel fill, blur, radius, and shadow.
     - `.local-map :deep(.local-map__lattice)` gets `border: 0`.

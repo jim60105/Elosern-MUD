@@ -30,9 +30,8 @@
 }
 
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
-   cells) and scales proportionally under the caller-supplied caps, which
-   both callers resolve into the single `max-width` bound computed in
-   `latticeStyle` (the island passes its measured height budget; the overlay
+   cells) and scales proportionally under caller-supplied caps or renders as
+   the fixed square canvasSize (the overlay
    passes no height cap and fills the body width). */
 .local-map__lattice {
   display: block;
