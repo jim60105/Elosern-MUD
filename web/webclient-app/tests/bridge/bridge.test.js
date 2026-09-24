@@ -205,9 +205,8 @@ describe("window.Elosern bridge", () => {
     const unclaimed = press("l");
     expect(unclaimed.defaultPrevented).toBe(false);
 
-    // `/` is consumed by the router (H5, webclient-hud-05-overlays-and-command-line:
-    // the command line is permanently present, so `/` moves focus into the
-    // always-present field — no toggle state); the bridge claims it and
+    // `/` is consumed by the router (webclient-collapsible-command-line:
+    // `/` expands the command line and moves focus into the field); the bridge claims it and
     // prevents the default so the character never falls through to the text
     // path.
     const slash = press("/");

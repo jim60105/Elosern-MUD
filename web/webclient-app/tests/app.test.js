@@ -38,11 +38,15 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get('[data-testid="connection-state"]').text()).toBe("○ 未連線");
     expect(w.get('[data-testid="narrative-feed"]')).toBeTruthy();
     expect(w.get('[data-testid="narrative-fulllog-control"]')).toBeTruthy();
-    // H5: the command line is a permanently present bar — no open/closed
-    // state, no entry control, no `aria-expanded`.
+    // webclient-collapsible-command-line: the command line starts collapsed
+    // (`data-expanded="false"`), its ⌨ toggle is in `#band-message` with
+    // `aria-expanded="false"`, and `#inputfield` stays in the DOM.
     expect(w.get('[data-testid="command-line"]').exists()).toBe(true);
     expect(w.find('textarea#inputfield').exists()).toBe(true);
-    expect(w.findAll("[aria-expanded]").length).toBe(0);
+    expect(w.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("false");
+    const toggle = w.get('[data-testid="anchor-band-message"] [data-testid="command-line-toggle"]');
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(toggle.attributes("aria-controls")).toBe("command-line-bar");
     expect(w.get('[data-testid="connect-overlay"]').attributes("data-status")).toBe("connecting");
     expect(w.get("#elosern-action-live").attributes("aria-live")).toBe("polite");
     expect(w.get("#elosern-offline-overlay").attributes("data-visible")).toBe("false");
@@ -123,12 +127,10 @@ describe("AppShell root (B1 core family)", () => {
   });
 
   it("`/` focuses the command field; Escape returns focus to the action dock; slash stays literal in the field", async () => {
-    // H5 (task 3.6): the command line has no open/closed state — `/` is an
-    // unconditional focus claim (no literal slash inserted), and Escape from
-    // the focused field routes `focus-parent` → `releaseCommandField(true)`
-    // → `#action-dock` focus rescue (the dock's menu level is untouched).
-    // Mount the dock into the shell's action-dock slot as the preserved focus
-    // target.
+    // webclient-collapsible-command-line (design D2): `focusCommandField`
+    // expands the row (`data-expanded="true"`) and after `nextTick` focuses
+    // `#inputfield`; Escape from the focused field routes `focus-parent` →
+    // `releaseCommandField(true)` → `#action-dock` focus rescue and collapses.
     const host = document.createElement("div");
     host.id = "elosern-app";
     document.body.appendChild(host);
@@ -138,27 +140,31 @@ describe("AppShell root (B1 core family)", () => {
     });
     wrapper = w;
 
-    // `/` from the dock (a non-editable target) focuses the field. The shell's
-    // window handler claims the key (preventDefault — no literal slash); the
-    // exposed `focusCommandField` API (the store's single focus entry) moves
-    // focus into the always-present field.
+    const anchor = w.get('[data-testid="anchor-command-line"]');
+    expect(anchor.attributes("data-expanded")).toBe("false");
+
+    // `/` from the dock (a non-editable target) prevents a literal slash; the
+    // exposed `focusCommandField` API expands the row and focuses the field.
     pressKey(window, "/");
     await w.vm.$nextTick();
-    w.vm.focusCommandField();
+    await w.vm.focusCommandField();
     await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
+    expect(w.get('[data-testid="command-line-toggle"]').attributes("aria-expanded")).toBe("true");
     let input = w.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
 
     // Escape from the focused field: nothing is sent, focus returns to the
-    // action dock; the field stays present (it is never closed).
+    // action dock, and the command line collapses while the field stays in DOM.
     pressKey(input.element, "Escape");
     await w.vm.$nextTick();
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    expect(anchor.attributes("data-expanded")).toBe("false");
     expect(w.find("textarea#inputfield").exists()).toBe(true);
 
-    // Refocus the always-present field so the literal-slash step's premise
+    // Re-expand and focus the field so the literal-slash step's premise
     // (an editable control is focused) holds after the Escape rescue.
-    w.vm.focusCommandField();
+    await w.vm.focusCommandField();
     await w.vm.$nextTick();
 
     // A `/` pressed while an editable control (the field) is focused is
@@ -175,13 +181,21 @@ describe("AppShell root (B1 core family)", () => {
     expect(document.activeElement).toBe(input.element);
   });
 
-  it("emits exactly one submit-command per deliberate send", async () => {
-    const w = mountShell({ connected: true });
-    // The field is permanently present (H5): no entry button to click —
-    // focus the field directly and send.
+  it("emits submit-command, collapses, and focuses the dock on an accepted send; stays expanded with text when locked", async () => {
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    const w = mount(AppShell, {
+      attachTo: host,
+      props: { connected: true, mutationsLocked: false },
+      slots: { "action-dock": () => h(ActionDock) },
+    });
+    wrapper = w;
+    const anchor = w.get('[data-testid="anchor-command-line"]');
     const input = w.get("textarea#inputfield");
-    w.vm.focusCommandField();
+    await w.vm.focusCommandField();
     await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
     input.element.value = "look";
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
     pressKey(input.element, "Enter");
@@ -191,6 +205,71 @@ describe("AppShell root (B1 core family)", () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual(["look"]);
     expect(input.element.value).toBe("");
+    expect(anchor.attributes("data-expanded")).toBe("false");
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
+
+    // A locked Enter keeps the line expanded, keeps focus, and keeps the draft.
+    await w.setProps({ mutationsLocked: true });
+    await w.vm.focusCommandField();
+    await w.vm.$nextTick();
+    input.element.value = "talk 老周";
+    input.element.dispatchEvent(new Event("input", { bubbles: true }));
+    pressKey(input.element, "Enter");
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
+    expect(input.element.value).toBe("talk 老周");
+    expect(document.activeElement).toBe(input.element);
+  });
+
+  it("the ⌨ toggle expands and focuses the field, then collapses while leaving focus on the toggle", async () => {
+    const w = mountShell({ connected: true });
+    const anchor = w.get('[data-testid="anchor-command-line"]');
+    const toggle = w.get('[data-testid="command-line-toggle"]');
+    const input = w.get("textarea#inputfield");
+    expect(anchor.attributes("data-expanded")).toBe("false");
+
+    toggle.element.focus();
+    await toggle.trigger("click");
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(input.element);
+
+    toggle.element.focus();
+    await toggle.trigger("click");
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("false");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle.element);
+  });
+
+  it("entering creation collapses an expanded command line and rescues focus to the dock", async () => {
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    const w = mount(AppShell, {
+      attachTo: host,
+      props: { mode: "exploration" },
+      slots: { "action-dock": () => h(ActionDock) },
+    });
+    wrapper = w;
+    const anchor = w.get('[data-testid="anchor-command-line"]');
+    await w.vm.focusCommandField();
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
+    expect(document.activeElement).toBe(w.get("textarea#inputfield").element);
+
+    await w.setProps({ mode: "creation" });
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("false");
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
+
+    // A focusCommandField request while in creation is ignored so returning to
+    // exploration starts collapsed.
+    await w.vm.focusCommandField();
+    await w.setProps({ mode: "exploration" });
+    await w.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("false");
   });
 });
 

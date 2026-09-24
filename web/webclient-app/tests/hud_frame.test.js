@@ -182,6 +182,21 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     feedEl.focus();
     expect(document.activeElement).toBe(feedEl);
   });
+
+  it("tracks commandLineExpanded on [data-anchor='command-line'] and hides the collapsed anchor in stage CSS", async () => {
+    const frame = mount(HudFrame, { props: { mode: "exploration", commandLineExpanded: false } });
+    const anchor = frame.get('[data-anchor="command-line"]');
+    expect(anchor.attributes("data-expanded")).toBe("false");
+    await frame.setProps({ commandLineExpanded: true });
+    expect(anchor.attributes("data-expanded")).toBe("true");
+    await frame.setProps({ commandLineExpanded: false });
+    expect(anchor.attributes("data-expanded")).toBe("false");
+    frame.unmount();
+
+    const css = styleBlock("components/HudFrame.vue");
+    const collapsedRule = extractRule(css, '.elosern-stage [data-anchor="command-line"][data-expanded="false"]');
+    expect(collapsedRule).toContain("display: none");
+  });
 });
 
 describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () => {

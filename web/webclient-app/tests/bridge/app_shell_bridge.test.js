@@ -2,9 +2,9 @@
 // AppShell key handlers coexist safely. The bridge (document listener)
 // claims the keys consumed by the keyboard router; the shell's window
 // handler (H5, webclient-hud-05-overlays-and-command-line) claims `/` only
-// when the target is not editable — the command line is permanently
-// present, so `/` moves focus into the always-present field (no open/closed
-// state to toggle). One keypress must act exactly once — no double
+// when the target is not editable — `/` expands the collapsed command line
+// and moves focus into `#inputfield` (design D2). One keypress must act
+// exactly once — no double
 // activation.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
@@ -70,21 +70,26 @@ afterEach(() => {
 });
 
 describe("bridge + AppShell key-routing coexistence (one effect per keypress)", () => {
-  it("`/` focuses the always-present command field exactly once per press", async () => {
+  it("`/` expands the collapsed command line and focuses the field exactly once per press", async () => {
     const store = mountAll();
     openActiveSession(store);
+    const anchor = wrapper.get('[data-testid="anchor-command-line"]');
+    expect(anchor.attributes("data-expanded")).toBe("false");
 
     // Press 1: the shell's window handler claims `/` (the target, `body`,
-    // is not editable) and focuses the command field.
+    // is not editable), expands the line, and focuses the command field.
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
     const input = wrapper.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
 
-    // Press 2: the claim is idempotent (no open/closed state — the command
-    // line is permanently present, design D1).
+    // Press 2: the claim is idempotent while expanded.
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(anchor.attributes("data-expanded")).toBe("true");
     expect(document.activeElement).toBe(input.element);
   });
 
@@ -93,6 +98,7 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     openActiveSession(store);
 
     dispatchWindowKey("/");
+    await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
     let input = wrapper.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
@@ -121,9 +127,11 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     await wrapper.vm.$nextTick();
     expect(store.view.dockDepth).toBe(2);
 
-    // `/` focuses the always-present field.
+    // `/` expands the command line and focuses the field.
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("true");
     const input = wrapper.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
 
@@ -136,6 +144,7 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     await wrapper.vm.$nextTick();
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("false");
     expect(store.view.dockDepth).toBe(2, "the dock's menu level is untouched by the field's Escape");
   });
 

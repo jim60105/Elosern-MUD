@@ -22,6 +22,11 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(controls.exists()).toBe(true);
     const rows = controls.findAll('[data-testid^="help-controls-row-"]');
     expect(rows.length).toBeGreaterThan(0);
+    const controlsText = controls.text();
+    expect(controlsText).toContain("Open the command line");
+    expect(controlsText).toContain("Expands the collapsed line and focuses its field; no literal slash is inserted.");
+    expect(controlsText).toContain("a successful send collapses the line and returns to the dock");
+    expect(controlsText).toContain("open overlay → open drawer → focused command field (collapses the line) → dock menu level");
     const gameHelp = wrapper.get('[data-testid="help-controls-gamehelp"]').text();
     expect(gameHelp).toMatch(/help/i);
   });

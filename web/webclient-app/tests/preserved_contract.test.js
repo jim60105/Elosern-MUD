@@ -3,9 +3,9 @@
 // the OOB bridge depend on — `#action-dock` (with `data-mode`, `tabindex`
 // and the listbox composite role), `#elosern-action-live`,
 // `#elosern-offline-overlay`, `#inputfield` inside its `.inputfieldwrapper`
-// wrapper (H5, webclient-hud-05-overlays-and-command-line, task 1.2: the
-// command line is permanently present, so the field survives in every mode
-// matrix that renders the command-line anchor), `#narrative-unread`,
+// wrapper (webclient-collapsible-command-line: CommandLine stays mounted while
+// its anchor is collapsed, so the field survives in the DOM in every mode),
+// `#narrative-unread`,
 // `data-testid="narrative-feed"`, `data-testid="action-dock"`, and the
 // `action-*` / `target-*` item keys — are preserved unchanged by the stage
 // restructure. The `layout_store.js` `REQUIRED_COMPONENTS` entry
@@ -162,20 +162,22 @@ describe("H1 preserved DOM contract (design D6)", () => {
       expect(wrapper.find(`#${id}`).exists(), `#${id} must survive`).toBe(true);
     }
     expect(wrapper.find('[data-testid="narrative-feed"]').exists()).toBe(true);
-    // H5 (task 1.2): the command line is permanently present — the bar is
-    // always rendered (no open/closed state), so `#inputfield` inside its
-    // `.inputfieldwrapper` survives without any opening action.
+    // webclient-collapsible-command-line: the command line starts collapsed
+    // (`data-expanded="false"`), and `CommandLine` stays mounted so
+    // `#inputfield` inside its `.inputfieldwrapper` survives in the DOM.
+    expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("false");
     expect(wrapper.find('[data-testid="command-line"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="action-live-region"]').exists()).toBe(true);
 
-    // The preserved `#inputfield` field lives inside the always-present
-    // command line; focusing it is a side-effect-free claim (no drawer state
-    // to toggle, design D1).
+    // The preserved `#inputfield` field lives inside the collapsible command
+    // line; `focusCommandField` expands the row and focuses the field after
+    // `nextTick` (design D2).
     const inputfield = wrapper.find("#inputfield");
     expect(inputfield.exists(), "#inputfield must survive").toBe(true);
     expect(inputfield.element.closest(".inputfieldwrapper")).not.toBeNull();
-    wrapper.vm.focusCommandField();
+    await wrapper.vm.focusCommandField();
     await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("true");
     expect(document.activeElement).toBe(inputfield.element);
     wrapper.unmount();
   });

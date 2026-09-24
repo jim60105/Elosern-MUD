@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { h } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import AppClient from "../../AppClient.vue";
 import manifest from "../../component-manifest.json";
-import CommandLine from "../../components/CommandLine.vue";
 import CreationOverlay from "../../components/CreationOverlay.vue";
 import DockMenu from "../../components/DockMenu.vue";
 import HelpOverlay from "../../components/HelpOverlay.vue";
@@ -16,6 +17,8 @@ import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import SkillDetailPane from "../../components/SkillDetailPane.vue";
 import ToastQueue from "../../components/ToastQueue.vue";
 import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
+import { useElosernStore } from "../../stores/elosern.js";
+import * as fx from "../store/protocol_fixtures.js";
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
@@ -396,17 +399,38 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
     expect(wrapper.emitted("open-map")).toBeTruthy();
   });
 
-  it("the command line's settings and help buttons open the settings and help overlays", async () => {
-    const wrapper = mount(CommandLine);
-    const settings = wrapper.get('[data-testid="command-line-settings"]');
-    const help = wrapper.get('[data-testid="command-line-help"]');
-    expect(settings.exists()).toBe(true);
-    expect(help.exists()).toBe(true);
+  it("the top bar's settings and help buttons open the settings and help overlays and restore focus on close", async () => {
+    setActivePinia(createPinia());
+    const store = useElosernStore();
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    const wrapper = mount(AppClient, { attachTo: host });
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(1, "ui_snapshot", [fx.snapshot({ panels: { status: fx.statusPanel() } })]);
+    await wrapper.vm.$nextTick();
+
+    const settings = wrapper.get('[data-testid="nav-settings"]');
+    const help = wrapper.get('[data-testid="nav-tool-help"]');
+    settings.element.focus();
     await settings.trigger("click");
-    expect(wrapper.emitted("open-overlay")).toBeTruthy();
-    expect(wrapper.emitted("open-overlay")[0][0]).toBe("settings");
+    expect(store.view.hudOverlay).toBe("settings");
+    expect(wrapper.find('[data-testid="settings-overlay"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="overlay-host-close"]').trigger("click");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(document.activeElement).toBe(settings.element);
+
+    help.element.focus();
     await help.trigger("click");
-    expect(wrapper.emitted("open-overlay")[1][0]).toBe("help");
+    expect(store.view.hudOverlay).toBe("help");
+    expect(wrapper.find('[data-testid="help-overlay"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="overlay-host-close"]').trigger("click");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(document.activeElement).toBe(help.element);
+
+    wrapper.unmount();
+    document.body.innerHTML = "";
   });
 
   it("the narrative feed's full-log control opens the full log", async () => {
