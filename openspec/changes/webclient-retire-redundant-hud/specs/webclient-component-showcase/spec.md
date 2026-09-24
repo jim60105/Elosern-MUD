@@ -1,0 +1,251 @@
+## MODIFIED Requirements
+
+### Requirement: Every required UI component is a Vue SFC with a documented Storybook story
+Every UI component named in the required-component manifest SHALL be implemented as a Vue
+single-file component and SHALL have at least one Storybook story that documents its props, the
+events/actions it emits, and its primary states. At the completion of the contextual HUD
+redesign the required manifest SHALL enumerate at minimum: the header; the narrative feed and its
+unread indicator; the command line; the action dock with its menu,
+submenu, and choice-card frames; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
+local map; the scene backdrop and the reference artwork frame; the shop, quest board, and lore drawer (each backed by the `services`
+panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
+only data sourced from the OOB panel allowlist (art, status, context_actions, local_map, services,
+creation, exploration, character) or the transport text stream; a surface with no backing read
+model is out of scope and MUST NOT invent data.
+
+A story of a component that consumes a derived render model (a view model the
+application builds from a committed payload through a DOM-independent reducer)
+SHALL be bound to that same derived shape, not to the raw payload: story args
+MUST reproduce the exact prop shape the live wiring passes, so a story that
+renders a degenerate or partial surface because it skipped the application's
+derivation step is a contract violation and not a presentation choice. The
+derived-shape binding SHALL come from one shared story fixture helper reused by
+every story of that component family.
+
+#### Scenario: A required component always has a story
+- **WHEN** the required-component manifest is enumerated
+- **THEN** every listed component has at least one registered Storybook story
+
+#### Scenario: A story documents contract and primary states
+- **WHEN** a component story is rendered
+- **THEN** the component is bound to representative prop values and exposes at least its primary states
+
+#### Scenario: A surface with no backing read model is absent
+- **WHEN** the 設計稿 shows a surface that has no backing OOB read model today
+- **THEN** that surface is not among the required components and no component presents invented data for it
+
+#### Scenario: A model-consuming component is story-bound to the model
+- **WHEN** a component's live wiring passes a reducer-derived view model and one
+  of its stories instead passes the raw committed payload
+- **THEN** the showcase contract is violated: the story renders a partial
+  surface, and the fix is to bind the story args through the shared derived-shape
+  helper the application's derivation produces
+
+### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
+The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`
+components SHALL present the `status` panel payload (schema version 1), the `character` panel
+payload (schema version 3), and the character's skill data: gauges (hp/mp/sp), the counter (guild_merit),
+static traits (atk_phys/agility/defense/magic_power), wallet, and conditions with their derived modifiers; character
+details, the equipment doll's equipped items, disguise, guild rank/merit, and persona; and a skill
+book with active/passive tabs, categories, search, and per-skill cost/target/cast/availability detail. The gauges and conditions come from the `status` payload; the counters,
+static traits, wallet, character details, equipment, disguise, guild, and persona come from the
+`character` payload. Per-skill cost, target, cast, and out-of-combat-availability detail fields are rendered only when the
+character's skill data provides them (a row the data gives without detail renders without detail
+cells, so nothing is invented); where the slice carries them they are the display subset of the
+`context_actions` v5 skill descriptor (a `cost` object — the empty object is the free form —,
+`target_spec`, the optional `freeform_scales`, and the boolean `usable_out_of_combat`). `shorthands`
+is a combat-only field: the character panel's skill data SHALL NOT carry it, because the shorthand set
+depends on a live battlefield/participant roster that does not exist outside combat. The character
+panel's presenter SHALL populate `cost`, `target_spec`, `usable_out_of_combat`, and (for a freeform-
+eligible skill the actor has mastery to scale) `freeform_scales` for every **active** skill row it can
+resolve against the skill registry; a passive skill row SHALL carry only `key` and `label`, and an
+active row whose key the registry cannot resolve SHALL carry only `key` and `label` as well (nothing is
+invented for an unregistered key).
+
+The skill book's category summaries, group labels, and per-skill rows SHALL NOT convey their meaning by
+colour alone: a category summary pairs its skill count with the visible digit text and its
+expand/collapse state with a rotating chevron shape (not a colour change); a cost cell's resource
+colour-coding (MP/SP/free) always pairs with the resource unit or the word "免費" already present in
+the cost text; the out-of-combat `combat` pill and the passive `被動` badge each carry their own visible
+text, never a bare colour swatch. An elemental group's colour dot is decorative and SHALL be present
+only for an element the binding visual reference (`docs/design/elosern-redesign/index.html`) itself
+colour-codes; a group for any other element renders its text label with no dot — no dot colour is
+invented for an element the reference never colour-codes. A skill row that carries target or cast detail
+renders that detail on the name side of the row, with the cost cell as the row's rightmost column
+(matching the reference's `.srow .cost` right-alignment via `margin-left:auto`). A group without a
+label SHALL keep the pre-change 8px top spacing, so removing the group-container margin does not regress
+ungrouped content.
+
+`StatusPanel` SHALL present its share of that data — the `status` payload's gauges and conditions —
+as the stage's left HUD island stack rather than as a single boxed column card: a vitals island and a
+conditions island, composed from the `VitalsTrack` and `ConditionChips` components, shown and hidden
+by `webclient-contextual-hud`'s vitals visibility rule. It SHALL render no identity card: the display
+name, full title, true traits, guild rank and merit, and disguise are presented by the character
+status drawer, the wallet only by the inventory drawer, and no race, subrace, class, or faction line
+is rendered anywhere, because no such field exists in either payload. No persistently visible HUD
+surface SHALL render the wallet.
+
+Status and health information SHALL never be conveyed by color alone: gauges SHALL pair an icon and a
+text label with an explicit current/maximum numeric value, each counter and static trait SHALL render
+its numeric value, and each condition SHALL pair a non-color severity glyph — one distinct glyph shape
+per severity, so two severities are never separated by color alone — with its label plus every numeric
+or derived-modifier value the payload provides. Where a condition renders as an icon-only chip, that
+label, duration, and modifier text SHALL be carried in the chip's accessible name and SHALL also be
+presented visibly when the chip is focused or hovered, and any bounded overflow SHALL keep every
+committed condition reachable in one action. A gauge's trailing damage indicator SHALL be decorative,
+absent from the accessibility tree, and SHALL never display a value that was not previously committed
+for that same gauge. Disguised statistics are display-only and SHALL be shown distinct from true
+traits, and a disguised displayed value SHALL NOT be substituted for a true trait row.
+The character status drawer SHALL present the `character` payload's character details, the equipment
+doll's equipped items, disguise, guild rank/merit, and persona, and SHALL NOT present a field the
+payload does not carry. Each surface renders only its OOB-backed payload and SHALL NOT invent any
+field (the intimate/adult block has no backing field and is not built).
+
+#### Scenario: Status is never color-only
+- **WHEN** a gauge, counter, or condition is displayed
+- **THEN** the gauge pairs an icon and a text label with an explicit current/maximum numeric value, each counter and static trait renders its numeric value, and each condition pairs a distinct non-color severity glyph with its label plus every numeric or derived-modifier value the payload provides — no value is conveyed by color alone
+
+#### Scenario: Disguised stats are display-only and distinct from true traits
+- **WHEN** the character payload carries disguised statistics
+- **THEN** the drawer shows them as display values distinct from the true traits, every true trait row keeps its true value, and no disguised value alters combat resolution
+
+#### Scenario: Only backed fields render
+- **WHEN** the status, character, or skill surface renders
+- **THEN** every shown field comes from the `status`/`character`/`skill` OOB payload and no field (including any intimate/adult field, any race, subrace, class, or faction line, and any `shorthands` value on a character-panel skill row) is invented
+
+#### Scenario: The status surface renders as an island stack
+- **WHEN** the `StatusPanel` renders with the `status` panel available, a vital below its maximum, and one condition
+- **THEN** it renders the vitals and the conditions as separate HUD islands composed from `VitalsTrack` and `ConditionChips`, not as one boxed column card, and renders no identity card and no wallet
+
+#### Scenario: An icon-only condition chip keeps its text reachable
+- **WHEN** a condition renders as an icon-only chip with a duration badge
+- **THEN** its label, remaining duration, and every derived modifier are in its accessible name and are shown visibly when the chip is focused or hovered, and any hidden overflow is reachable in one action
+
+#### Scenario: The trailing damage indicator carries no information of its own
+- **WHEN** a gauge's trailing damage indicator renders
+- **THEN** it is absent from the accessibility tree, shows only a previously committed ratio of that same gauge, and the numerals already carry the same information
+
+#### Scenario: The character status drawer presents only the backed character fields
+- **WHEN** the character status drawer renders with the `character` panel available
+- **THEN** it presents the character details, the equipment doll's equipped items, disguise, guild rank/merit, and persona, and no field the payload does not carry is rendered
+
+#### Scenario: An active skill row carries its registry-backed descriptor detail
+- **WHEN** the character panel's presenter serializes an active skill row whose key resolves in the skill registry
+- **THEN** the row carries `cost`, `target_spec`, `usable_out_of_combat`, and — when the skill is freeform-eligible and the actor holds scaling mastery — `freeform_scales`, and the `SkillBook` renders a `combat` pill for a row whose `usable_out_of_combat` is `true`
+
+#### Scenario: A passive row and an unregistered active key stay bare
+- **WHEN** the character panel's presenter serializes a passive skill row, or an active skill row whose key does not resolve in the skill registry
+- **THEN** the row carries only `key` and `label`, and `SkillBook` renders it with no cost, target, cast, or `combat` pill
+
+#### Scenario: A skill category and cost cell are never color-only
+- **WHEN** a skill category summary or a skill row's cost cell renders
+- **THEN** the category summary shows its skill count as a digit and its open/closed state as a rotating chevron shape, and the cost cell's colour always accompanies the `mp`/`sp`/`免費` text already in the cell — no state is conveyed by colour alone
+
+#### Scenario: A group dot renders only for a reference-sampled element
+- **WHEN** an elemental-magic group renders whose element the binding visual reference colour-codes (fire, water, wind) or whose category is `sexual_act`
+- **THEN** its label is preceded by the reference's exact colour dot; a group for any other element renders with no dot, because no dot colour is invented for an element the reference never colour-codes
+
+#### Scenario: A passive row carries a visible passive badge
+- **WHEN** the skill book renders a skill row on the passive tab
+- **THEN** the row displays a `被動` badge that carries its own visible text, never a bare colour swatch, and the badge is absent from active-tab rows
+
+#### Scenario: The active tab shows the list-conventions legend
+- **WHEN** the skill book's active tab renders its category list
+- **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend
+
+### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
+The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 payload with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding, in the placement variant (coordinate lattice or radial connected graph) that the payload's `layer` resolves to — the showcase stories pass the renderer's explicit variant parameter and SHALL NOT present a layout control — and SHALL invent no distance, bearing, or terrain geometry in either variant. Art SHALL render the committed scene as a cover-style 16:9 stage backdrop with its label and alternative text outside the bitmap, SHALL render portrait catalog entries only inside the framed-portrait surfaces that consume them (never as a standalone catalog strip), and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
+
+`InventoryPanel` SHALL render committed inventory display name, held count, equipped flag, nullable presentation, and nullable action descriptor together with committed character equipment rows. A non-null presentation SHALL supply only committed kind, icon key, rarity, and summary; a null presentation SHALL remain an explicit unknown-item state. The inventory SHALL use its local icon map only from committed icon keys and action behavior only from committed action descriptors. It SHALL provide keyboard-equivalent inspection and activation, confirmation for usable items, direct equipment toggle, and committed disabled-reason states without inventing an effect, recovery amount, condition, consumable flag, equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or drop behavior. Unknown rows SHALL remain visibly inspect-only. No surface SHALL invent data, including a dedicated party panel.
+
+The showcase required-set manifest SHALL include deterministic offline stories and tests for actionable use, use confirmation, full-HP rejection, direct equipment toggle, equipped state, five accessories, accessory-cap warning, unknown items, and services unavailability.
+
+#### Scenario: Art degrades to a truthful placeholder
+- **WHEN** the art asset is missing, pending without a prior image, failed, invalid, or unavailable
+- **THEN** the art surface renders a truthful scene placeholder with no invented image
+
+#### Scenario: Art renders validated content when available
+- **WHEN** the art payload is available
+- **THEN** the backdrop renders the 16:9 scene with its external scene label and alternative text, and a framed-portrait surface renders a catalog entry it is given with the shared rect crop
+
+#### Scenario: Services and inventory are backed only
+- **WHEN** a services-backed panel renders
+- **THEN** it renders only committed panel fields and locally mapped controls, with no invented world, item, or mechanic data
+
+#### Scenario: Inventory inspection is equivalent for focus and hover
+- **WHEN** a committed row with presentation is hovered or focused
+- **THEN** both story states expose the same committed name, kind, rarity, summary, count, equipped marker, and action availability, and focus references the inspector through `aria-describedby`
+
+#### Scenario: Unknown item metadata degrades visibly and safely
+- **WHEN** an inventory row has `presentation` null and `action` null
+- **THEN** its story renders the neutral unknown state with real name and quantity and no inferred metadata or action
+
+#### Scenario: Inventory use confirmation is showcased
+- **WHEN** the actionable healing-potion story activates its tile
+- **THEN** the story opens the labelled confirmation and dispatches only after confirm
+
+#### Scenario: Disabled item reasons are showcased
+- **WHEN** the full-HP potion or sixth-accessory story activates its tile
+- **THEN** the story displays the committed rejection reason without dispatch
+
+#### Scenario: Equipment and five accessories are showcased
+- **WHEN** the equipment stories render direct toggle and five-accessory states
+- **THEN** committed equipped markers and the five-item accessory summary render without a locally inferred slot or replacement
+
+#### Scenario: Services unavailable surfaces render only the registered reason
+- **WHEN** the services OOB channel is unavailable
+- **THEN** shop, quest, lore, and inventory stories render only the registered reason with no fabricated values or controls
+
+### Requirement: The frozen component set grows only through a governed redesign wave
+
+The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
+through a change that names the growth as part of its own scope: a change in the WebClient
+Contextual HUD Redesign roadmap's delivery table, a change in the WebClient AVG stage redesign series
+(`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md`, whose changes are a
+governed redesign wave that MAY both add and delete components), or a feature change that introduces a component
+backed by a committed presentation panel — the portrait-gallery family
+(`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
+`Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) joins the frozen set under
+exactly this route. A change that adds a component SHALL, in the same change, add its title to
+the manifest, ship its Storybook story with deterministic offline args, and extend this
+capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
+committed backing read model SHALL NOT be added under either route; it belongs on the deferred
+list instead. A component SHALL NOT be wired into the live application before its story exists. A governed
+wave change that deletes a component SHALL, in the same change, delete the component file, remove
+its title from the manifest, delete its Storybook story, delete or re-point every test that mounts it,
+and edit this capability's spec so no requirement names it — never a component deletion that leaves
+a manifest title, a story, or a spec reference behind.
+On completion of the redesign the manifest SHALL be re-frozen at the complete set then current,
+and each later growth SHALL re-freeze it at its new complete set.
+
+#### Scenario: A wave adds a component with its story in the same change
+
+- **WHEN** a roadmap wave introduces a new component
+- **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
+
+#### Scenario: A feature change adds a backed component under the same obligations
+
+- **WHEN** a feature change outside the redesign roadmap introduces a component rendered entirely from a committed presentation panel
+- **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
+
+#### Scenario: The gallery family joins the frozen set in its own change
+
+- **WHEN** the gallery-UI change lands its five gallery components
+- **THEN** the same change's manifest append, story files, and spec entry keep the component-coverage gate green, and no gallery component is mounted in the live application before its story exists
+- **AND** `Data/GalleryPanel` includes an offline interactive storyboard for the
+  complete management journey, with a documented frame guide
+
+#### Scenario: A manifest edit without a story fails the gate
+
+- **WHEN** a manifest title is added without a matching registered story
+- **THEN** the component-coverage gate fails and the change cannot land
+
+#### Scenario: A story without a manifest entry fails the gate
+
+- **WHEN** a story is registered whose title is absent from the manifest
+- **THEN** the component-coverage gate fails, so the frozen set cannot grow silently
+
+#### Scenario: A governed wave deletes a component in lockstep
+
+- **WHEN** a change in the AVG stage redesign series deletes a manifest-listed component
+- **THEN** the same change removes the component file, its manifest title, its Storybook story, and every spec and test reference to it, and the component-coverage gate passes on the smaller re-frozen set

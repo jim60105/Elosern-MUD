@@ -60,7 +60,8 @@ needs, and reference information lives behind a menu.
    dialogue, combat). The character is player-authored and the stage is where
    it is shown. An appearance change crossfades.
 4. **Vitals are hidden at full health** and auto-appear when any vital is below
-   its maximum or any condition is active. In combat they are always shown.
+   its maximum or an abnormal condition (severity `warning` or worse) is
+   active. In combat they are always shown.
 5. **Dialogue shows both portraits:** the player on the left, the NPC on the
    right. The command panel collapses during dialogue.
 6. **`交談` enters the dialogue screen immediately**, opened by the NPC's
@@ -192,9 +193,14 @@ through the command line.
 
 ### 5.3 Vitals visibility
 
-`vitalsVisible = mode === "combat" || lowHp || anyVitalBelowMax || conditions.length > 0`,
+`vitalsVisible = mode === "combat" || lowHp || anyVitalBelowMax || anyAbnormalCondition`,
 derived client-side from the committed `status` panel (the same panel
-`VitalsTrack` already reads). The low-HP vignette rule is unchanged. The badge
+`VitalsTrack` already reads). A condition is abnormal when its `severity`
+(vocabulary in `world/rules/status_display.py`) is `warning`, `harmful`, or
+`critical`. `beneficial` and `informational` conditions — including passive
+skill-owned combat-modifier rows — never force the vitals visible; they would
+otherwise keep the vitals on screen permanently for characters owning such
+skills. The low-HP vignette rule is unchanged. The badge
 fades in and out through the motion layer (§9).
 
 ### 5.4 Top bar and reference drawers
