@@ -50,7 +50,10 @@ describe("AppShell root (B1 core family)", () => {
     // and the named anchors; the top band carries the brand + meta pill.
     expect(w.get('[data-testid="elosern-stage"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-place"] [data-testid="place-card"]').exists()).toBe(true);
-    expect(w.get('[data-testid="anchor-hud-left"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-vitals"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-map"]').exists()).toBe(true);
+    expect(w.find('[data-testid="anchor-hud-left"]').exists()).toBe(false);
+    expect(w.find('[data-testid="anchor-hud-right"]').exists()).toBe(false);
     expect(w.get('[data-testid="stage-band"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-band-message"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-band-command"]').exists()).toBe(true);
@@ -87,7 +90,7 @@ describe("AppShell root (B1 core family)", () => {
     // surface invents data (a surface with no backing read model is never
     // shown).
     const w = mountShell();
-    for (const selector of ['[data-anchor="hud-left"]', '[data-anchor="hud-right"]']) {
+    for (const selector of ['[data-anchor="vitals"]', '[data-anchor="map"]']) {
       const panel = w.get(selector);
       expect(panel.element.children.length).toBe(0);
       expect(panel.text().trim()).toBe("");

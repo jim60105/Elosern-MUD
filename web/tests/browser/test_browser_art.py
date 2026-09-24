@@ -683,7 +683,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
                     f" const names = Array.from(f.querySelectorAll('.participant-frame__name')).map((n) => n.textContent);"
                     f" return names.some((n) => n && n.indexOf('{monster_name}') !== -1); }}"
                 ),
-                "description": "the participant frame (hud-left island) shows the monster's name",
+                "description": "the participant frame (map anchor island) shows the monster's name",
             },
             timeout=15000,
         )

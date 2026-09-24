@@ -355,11 +355,16 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "combat.flee"), 1)
 
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
+    @covers_requirement(
+        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits"
+    )
     def test_dock_and_participant_frame_geometry_at_both_desktop_viewports(self):
         # H3 task 8.8: at both 1440x900 and 1280x720, the dock panel must
         # stay inside its anchor, the deepest combat frame's cast/confirm
         # control must be reachable without clipping, and the participant
-        # frame must not intersect the dock or the narrative caption.
+        # frame must sit in the `map` anchor (never a portrait anchor) and
+        # intersect neither the dock, the narrative caption, nor the command
+        # line (webclient-avg-stage-hud-anchors design D4).
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
@@ -385,7 +390,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         const r = el.getBoundingClientRect();
                         return { x: r.left, y: r.top, w: r.width, h: r.height };
                       };
-                      // The participant frame sits in the bounded hud-left anchor
+                      // The participant frame sits in the bounded `map` anchor
                       // (`max-height` + `overflow-y:auto`), so only the portion
                       // of the frame inside the anchor is visible.
                       const clampTo = (inner, outer) => {
@@ -409,10 +414,12 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         && (r.y + r.h) <= window.innerHeight);
                       const dock = rectOf('#action-dock');
                       const anchor = rectOf('[data-testid="anchor-band-command"]');
-                      const hudLeft = rectOf('[data-anchor="hud-left"]');
+                      const mapAnchor = rectOf('[data-anchor="map"]');
                       const participantRaw = rectOf('[data-testid="participant-frame"]');
-                      const participant = clampTo(participantRaw, hudLeft);
+                      const participant = clampTo(participantRaw, mapAnchor);
                       const caption = rectOf('[data-testid="narrative-feed"]');
+                      const commandLine = rectOf('[data-anchor="command-line"]');
+                      const frameEl = document.querySelector('[data-testid="participant-frame"]');
                       // The focused row of the committed frame: the pane-kind
                       // variants mark focus with per-kind classes (the token
                       // rows of the target frame carry only aria-selected).
@@ -429,6 +436,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         confirmReachable: withinViewport(confirm),
                         participantNoDock: noIntersect(participant, dock),
                         participantNoCaption: noIntersect(participant, caption),
+                        participantNoCommandLine: noIntersect(participant, commandLine),
+                        participantVisible: !!participant,
+                        inMapAnchor: !!(frameEl && frameEl.closest('[data-anchor="map"]')),
+                        onActorRight: !!(frameEl && frameEl.closest('[data-anchor="actor-right"]')),
                         hasParticipant: !!participantRaw,
                         hasConfirm: !!confirm,
                         hasAnchor: !!anchor,
@@ -442,6 +453,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 self.assertTrue(geo["confirmReachable"], f"confirm control clipped at {viewport}")
                 self.assertTrue(geo["participantNoDock"], f"participant frame intersects dock at {viewport}")
                 self.assertTrue(geo["participantNoCaption"], f"participant frame intersects caption at {viewport}")
+                self.assertTrue(geo["participantVisible"], f"participant frame has no visible box in its anchor at {viewport}")
+                self.assertTrue(geo["participantNoCommandLine"], f"participant frame intersects the command line at {viewport}")
+                self.assertTrue(geo["inMapAnchor"], f"participant frame is not in the map anchor at {viewport}")
+                self.assertFalse(geo["onActorRight"], f"participant frame sits on the actor-right anchor at {viewport}")
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_attack_flow_submits_basic_attack_once(self):

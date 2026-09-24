@@ -272,11 +272,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self.assertGreater(length, 0, "a connector edge must stay visible outside the marker footprints")
 
             # The island's required content (meta/title, legend, detail line)
-            # stays visible without scrolling: the hud-right anchor must not
+            # stays visible without scrolling: the `map` anchor must not
             # need to scroll a required surface out of view.
             fit = page.evaluate(
                 """() => {
-              const anchor = document.querySelector('[data-anchor="hud-right"]');
+              const anchor = document.querySelector('[data-anchor="map"]');
               return {
                 anchorScrollHeight: anchor.scrollHeight,
                 anchorClientHeight: anchor.clientHeight,
