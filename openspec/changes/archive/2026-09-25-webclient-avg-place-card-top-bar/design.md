@@ -39,6 +39,10 @@ The brand becomes one row: `.topbar-brand { flex-direction: row; align-items: ba
 
 `DesktopNavigation` buttons use `flex-direction: row; gap: 7px; padding: 0 14px; width: auto` with an 18px icon, so they fit 48px.
 
+At `(max-width: 1350px)`, where `--left-column` is 216px, the wordmark drops to 16px with `.2em` tracking and the brand padding to 16px, so the row fits the column without reaching the navigation.
+
+The top-meta pill holds only the connection state, so its two-row grid becomes a plain flex row.
+
 *Alternative:* keep the stacked brand at a smaller font. Rejected: 9px text is below the redesign's smallest chrome step.
 
 ### D2. The home entry is deleted, not hidden in exploration only

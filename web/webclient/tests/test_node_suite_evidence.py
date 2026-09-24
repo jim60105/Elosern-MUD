@@ -413,6 +413,30 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
+    )
+    def test_place_card_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/place_card.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "place-card Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-contextual-hud::the-party-drawer-presents-compbig-rows-and-the-fixed-follow-rules",
     )
     def test_party_drawer_node_suite_passes(self):

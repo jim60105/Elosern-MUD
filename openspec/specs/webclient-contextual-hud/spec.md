@@ -14,10 +14,16 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
-named stage anchors — the island anchors `hud-left` and `hud-right`, the portrait anchors
+named stage anchors — the `place` anchor, the island anchors `hud-left` and `hud-right`, the portrait anchors
 `actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, and
 the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
 required surface out of view.
+
+The top band SHALL be 48px tall at every supported viewport and SHALL carry only the brand, the top
+navigation bar, the possession banner when present, the character switcher, and the connection
+state; it SHALL carry no location label and no time label. The `place` anchor SHALL sit at the stage
+box's top-left corner, below the top band, at a fixed height that does not depend on the label
+lengths it holds, and the `hud-left` anchor SHALL begin below it.
 
 The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
 `clamp(260px, 27.8vh, 400px)` (300px at the 1920x1080 reference viewport), taken from a single
@@ -29,7 +35,8 @@ the remaining right third; in creation mode, where the message region is hidden,
 SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
 the hairline top border, and the upward shadow) on the band itself, not on the content inside it.
 The stage box — the region between the top band's lower edge and the bottom band's upper edge — is
-where the scene is seen, and every surface other than the band SHALL be positioned relative to the
+where the scene is seen, and at the 1920x1080 reference viewport it SHALL be at least 65% of the
+viewport's height — at least 702px of 1080; the 48px top band and the 300px bottom band leave 731px. Every surface other than the band SHALL be positioned relative to the
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
@@ -41,7 +48,7 @@ in exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry 
 portrait anchors are non-interactive art: they SHALL carry no focusable element and SHALL NOT
 intercept pointer events, and they MAY sit behind the HUD islands and the command-line row.
 
-At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`hud-left`, `hud-right`,
+At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `hud-left`, `hud-right`,
 `band-message`, `band-command`, `command-line`) SHALL overlap another interactive anchor's content,
 and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
 anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
@@ -86,6 +93,14 @@ introduced into the band this way.
 - **WHEN** the shell renders at 1280x720, where `min(62vh, 680px)` exceeds the stage box's height
 - **THEN** the player portrait's height equals the stage box's height and its top edge is not above the top band's lower edge
 
+#### Scenario: The stage box is at least 65% of the reference viewport
+- **WHEN** the shell renders in exploration mode at 1920x1080
+- **THEN** the top band is 48px tall, the bottom band is 300px tall (each ±1px), and the stage box between them is at least 702px tall (65% of 1080)
+
+#### Scenario: The top band carries no location or time
+- **WHEN** the shell renders in exploration mode with a committed location label and world time
+- **THEN** the top band's rendered height is 48px, no element inside the top band states the location label or the world time, and the place anchor below the top band states both
+
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
 visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
@@ -94,6 +109,7 @@ the accessibility tree and the tab order. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
+| place card (location, world time) | visible | visible | visible | hidden |
 | narrative caption (band message region) | visible | visible | visible (dialogue focus) | hidden |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
@@ -128,11 +144,11 @@ the action dock before the surface is removed, using the existing focus-restore 
 
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
-- **THEN** the narrative caption, the HUD island stack, the minimap, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
+- **THEN** the place card, the narrative caption, the HUD island stack, the minimap, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the narrative caption, minimap, objective tracker, player standing portrait, action dock, and command line all
+- **THEN** the place card, narrative caption, minimap, objective tracker, player standing portrait, action dock, and command line all
   remain rendered, the vitals and party islands keep following the same data rules as in
   exploration, the action dock keeps its regular exploration form
   with every ordinary root affordance present, and only the narrative presentation changes
@@ -1359,7 +1375,6 @@ stack, because it is not opened by the player and a utility control must never d
 - **WHEN** the full-map overlay is open with its legend popover expanded, and the player presses Escape twice
 - **THEN** the first Escape closes only the popover and focus stays inside the overlay, and the second Escape closes the overlay and returns focus to the trigger that opened it
 
-
 ### Requirement: The map, settings, and help surfaces are reachable from the live client
 The map, settings and help surfaces SHALL each be reachable from the running client by a labelled
 control, not only from the component showcase. The minimap island SHALL carry a labelled control that
@@ -1414,7 +1429,6 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 #### Scenario: The help surface tells the truth about what it knows
 - **WHEN** the help surface renders with no committed panel carrying authored guide content
 - **THEN** it renders the client's own control reference and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
-
 
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
 The client SHALL expose a narrative prose scale with three steps, selectable from the settings surface,
@@ -1814,3 +1828,40 @@ as well as their gold or warm-red emphasis.
 - **THEN** the band element's background gradient, top border, and box-shadow are the same values
   `docs/design/elosern-redesign/index.html` draws for its dock surface, and the `#action-dock`
   content column itself paints no background, border, or shadow
+
+### Requirement: The place card names the current location and the world time
+The stage SHALL carry a place card in its `place` anchor, at the stage box's top-left corner below the
+top band, while the committed mode is exploration, dialogue, or combat, and SHALL NOT render it in
+creation mode. The card SHALL state the current location as its heading and the world date/time
+beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
+The location SHALL be the best server-authored place name the client already holds, resolved in a
+fixed order: the committed `local_map` panel's `current_node` label when that panel is available,
+names a current node, that node is present in the panel's nodes, and its label is a non-empty string;
+otherwise the committed status panel's actor location label; otherwise the card's own unavailable
+placeholder `位置：--`. The world date/time SHALL be the committed world-time label, and the card's own
+unavailable placeholder `時間：--` when none is committed. The card SHALL NOT compose a third string
+from the two location candidates, SHALL NOT derive a name from any node or room identifier, SHALL NOT
+render a raw room key while a committed panel carries the authored place name for the same room, and
+SHALL render no raw mode label in place of the location.
+
+The card SHALL wear the HUD island chrome (the translucent panel fill, the backdrop blur, the
+hairline border, the shared radius and shadow, all from the shared design tokens), SHALL keep a fixed
+height whatever the label lengths, and SHALL truncate a label that exceeds its width with an overflow
+indicator while keeping the full label as its accessible text. It SHALL be display-only: no control,
+no tab stop, and no dispatch.
+
+#### Scenario: The card names the location and the time
+- **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 · 12:00`, and no `local_map` panel
+- **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 · 12:00`, and no other stage or top-band element states either string
+
+#### Scenario: The card names the region, not the raw room key
+- **WHEN** the player stands in a wilderness cell whose status location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
+- **THEN** the card's heading reads 西部丘陵與谷地, `Wilderness` is rendered nowhere in the card, and no composed string pairing the two appears
+
+#### Scenario: The card falls back to its placeholders
+- **WHEN** neither the `local_map` panel nor the status panel supplies a location label, and no world time is committed
+- **THEN** the card reads `位置：--` and `時間：--`
+
+#### Scenario: The card keeps its size and is absent in creation
+- **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation
+- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode the place card is not rendered and holds no tab stop

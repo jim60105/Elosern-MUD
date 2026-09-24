@@ -1,8 +1,10 @@
 <script setup>
 // AppShell (H1 contextual HUD, webclient-hud-01-shell-and-scene): the
 // full-bleed cinematic stage (design D1). `HudFrame` is a
-// `position:relative; overflow:hidden` stage with named anchors: the HUD
-// islands (`hud-left`, `hud-right`), the portrait anchors (`actor-left`,
+// `position:relative; overflow:hidden` stage with named anchors: the place
+// card (`place`, holding PlaceCard — location and world time,
+// webclient-avg-place-card-top-bar design D3), the HUD islands (`hud-left`,
+// `hud-right`), the portrait anchors (`actor-left`,
 // `actor-right`), the fixed-height bottom band's message and command
 // regions (`band-message` holds the narrative caption, `band-command` the
 // action dock), and the `command-line` row docked on the message region
@@ -32,6 +34,7 @@ import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
 import NarrativeFeed from "./NarrativeFeed.vue";
+import PlaceCard from "./PlaceCard.vue";
 import TopBar from "./TopBar.vue";
 import { retireReplacedFallback } from "../fallback.js";
 
@@ -40,6 +43,8 @@ const props = defineProps({
   // combat / creation). Rendered on the stage root as data-elosern-mode.
   mode: { type: String, default: "exploration" },
   connected: { type: Boolean, default: false },
+  // The store's resolved location and world-time labels, stated only by the
+  // place card (null renders its placeholders).
   locationLabel: { type: String, default: null },
   timeLabel: { type: String, default: null },
   narrative: { type: Array, default: () => [] },
@@ -210,7 +215,7 @@ function onWindowKeydown(event) {
 // `display:none` gate runs when the `data-elosern-mode` attribute updates,
 // so the rescue must happen in the pre-update phase of the watcher.
 const HIDDEN_BY_MODE = {
-  creation: "[data-anchor='band-message'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
+  creation: "[data-anchor='place'], [data-anchor='band-message'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
   combat: ".local-map",
   exploration: "",
   // webclient-align-08-dialogue-surface: dialogue keeps the whole cockpit
@@ -286,6 +291,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #backdrop>
         <slot name="backdrop" />
       </template>
+      <template #place>
+        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" />
+      </template>
       <template #hud-left>
         <slot name="panel-left" />
       </template>
@@ -337,13 +345,12 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       </template>
     </HudFrame>
 
-    <!-- The header split (design D5): the top-left brand element and the
-         top-right meta pill, both anchored in the stage's top band. -->
+    <!-- The 48px top band (design D5; webclient-avg-place-card-top-bar D1):
+         the top-left brand element, the navigation row, and the top-right
+         switcher and connection pill. -->
     <slot name="navigation" />
     <TopBar
       :connected="connected"
-      :location-label="locationLabel"
-      :time-label="timeLabel"
       :roster-available="rosterAvailable"
       :roster-characters="rosterCharacters"
       :roster-can-create="rosterCanCreate"

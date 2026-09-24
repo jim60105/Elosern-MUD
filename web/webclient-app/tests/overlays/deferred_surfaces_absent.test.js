@@ -200,6 +200,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       "Data/CharacterStatusDrawer",
       "World/MapLattice",
      "Feedback/ToastQueue",
+      // The AVG stage series adds the stage place card.
+      "Core/PlaceCard",
     ]) {
       expect(manifest.required).toContain(title);
     }

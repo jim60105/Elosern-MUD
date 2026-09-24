@@ -6,7 +6,8 @@ import HudFrame from "../../components/HudFrame.vue";
 // args: each committed mode renders its stage gradient; the mode × surface
 // visibility matrix gates surfaces with `display:none`; the open-surface
 // registry drives the stage recession. Sample blocks fill every slot so the
-// band split, the portrait anchor, and the command-line row are visible.
+// place card, the band split, the portrait anchor, and the command-line row
+// are visible.
 
 const sample = (label, extra = "") =>
   h(
@@ -25,6 +26,7 @@ const renderFrame = (args) => ({
     h(HudFrame, args, {
       "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
       "actor-right": () => sample("actor-right（保留）"),
+      place: () => sample("place · 地點卡"),
       "hud-left": () => sample("hud-left", "height:120px;"),
       "hud-right": () => sample("hud-right", "height:200px;"),
       "band-message": () => sample("band-message · 訊息視窗（2/3）"),
@@ -42,13 +44,14 @@ export default {
       description: {
         component:
           "The full-bleed stage: a `position:relative; overflow:hidden` root " +
-          "with named anchors — the HUD islands (`hud-left`, `hud-right`), the " +
+          "with named anchors — the place card (`place`, top-left, fixed " +
+          "`--place-h`), the HUD islands (`hud-left` below it, `hud-right`), the " +
           "portrait anchors (`actor-left`, `actor-right`) standing on the band, " +
           "the fixed-height bottom band (`--band-h`) split into `band-message` " +
           "(left 2/3) and `band-command` (right 1/3), and the `command-line` " +
           "row docked on the message region's top edge. Mode gating is " +
           "CSS-only on `data-elosern-mode` (display:none): creation hides the " +
-          "message region and the command region spans the whole band. The " +
+          "place card and the message region, and the command region spans the whole band. The " +
           "open-surface registry drives the stage recession behind open " +
           "drawers and overlays.",
       },

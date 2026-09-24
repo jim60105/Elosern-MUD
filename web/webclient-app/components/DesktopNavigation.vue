@@ -1,4 +1,10 @@
 <script setup>
+// DesktopNavigation: the top bar's navigation row (webclient-desktop-shell;
+// webclient-avg-place-card-top-bar design D1/D2). One labelled control per
+// navigation-presented entry plus the map and settings controls, each an
+// icon and a label on one row inside the 48px band. There is no home entry:
+// the stage itself is the screen the player is on, and Escape and the
+// dock's back controls return the dock to its root.
 import { glyphPath } from "./dock-icons.js";
 
 defineProps({
@@ -6,16 +12,12 @@ defineProps({
   items: { type: Array, default: () => [] },
   drawer: { type: String, default: null },
 });
-defineEmits(["navigate", "overlay", "home"]);
+defineEmits(["navigate", "overlay"]);
 const drawerKeys = { character: "status", inventory: "inventory", bag: "inventory", quests: "quest" };
 </script>
 
 <template>
   <nav v-if="mode !== 'creation'" class="desktop-navigation" aria-label="主要導覽" @keydown.enter.stop @keydown.space.stop>
-    <button type="button" :aria-current="!drawer ? 'page' : undefined" @click="$emit('home')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="glyphPath(mode === 'combat' ? 'attack' : 'look')" /></svg>
-      <span>{{ mode === "combat" ? "戰鬥" : "探索" }}</span>
-    </button>
     <button
       v-for="item in items"
       :key="item.key"
@@ -50,13 +52,13 @@ const drawerKeys = { character: "status", inventory: "inventory", bag: "inventor
   z-index: 8;
 }
 .desktop-navigation button {
-  width: clamp(58px, 5.3vw, 86px);
   white-space: nowrap;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 7px;
+  padding: 0 14px;
   border: 0;
   border-inline: 1px solid transparent;
   border-bottom: 2px solid transparent;
@@ -64,11 +66,13 @@ const drawerKeys = { character: "status", inventory: "inventory", bag: "inventor
   background: transparent;
   color: var(--paper-500);
   font: 14px var(--f-serif);
+  letter-spacing: .08em;
   cursor: pointer;
 }
 .desktop-navigation svg {
-  width: 23px;
-  height: 23px;
+  width: 18px;
+  height: 18px;
+  flex: none;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;

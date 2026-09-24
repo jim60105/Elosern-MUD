@@ -328,11 +328,11 @@ describe("store view slices", () => {
   });
 
   // webclient-minimap-04-island-single-affordance (D5, tasks 3.1 & 3.2):
-  // the top-meta locationLabel fallback order:
+  // the place card's locationLabel fallback order:
   // 1. local_map panel's current node label (when available, carries
   //    current_node, matches a node, and has non-empty string label)
   // 2. status panel's actor.location.label
-  // 3. null (TopBar renders 「位置：--」)
+  // 3. null (the place card renders 「位置：--」)
 
   it("prefers the map current node label over the status panel label (wilderness case)", () => {
     openActiveSession(store);
@@ -474,7 +474,7 @@ describe("store view slices", () => {
     );
     expect(store.view.statusSlice.locationLabel).toBe("狀態位置");
 
-    // Snapshot with no status and no local_map -> locationLabel is null (TopBar renders 「位置：--」)
+    // Snapshot with no status and no local_map -> locationLabel is null (the place card renders 「位置：--」)
     const emptySnap = fx.snapshot({
           revision: 3,
           panels: {

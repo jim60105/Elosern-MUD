@@ -7,7 +7,7 @@ import { computed } from "vue";
 import { classifyPane } from "../components/dock-panes.js";
 import { portraitFor } from "../components/party-helpers.js";
 
-export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }) {
+export function useDock(store, { panel, dispatchIntent, openRestForm }) {
   // Normalize the committed top navigation and action-root entries identically.
   function normalizeRootItems(items) {
     return items.map((item) => {
@@ -187,12 +187,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
     store.tabToRootAndConfirm(key, "pointer");
   }
 
-  function onNavigateHome() {
-    if (store.view.hudDrawer) store.closeHudDrawer();
-    store.resetFramesToRoot();
-    shellRef.value?.restoreDockFocus();
-  }
-
   // H3 (task 4.6): the crumb's back chevron pops exactly one router level —
   // matching the keyboard Escape path.
   function onDockBack() {
@@ -267,7 +261,6 @@ export function useDock(store, { panel, shellRef, dispatchIntent, openRestForm }
     onDockBack,
     onDockFocusChange,
     onInteractionTarget,
-    onNavigateHome,
     onTabClick,
     rowPrefix,
     rootItems,

@@ -2,7 +2,10 @@
 // HudFrame (H1, webclient-hud-01-shell-and-scene; AVG stage shell,
 // webclient-avg-stage-shell design D1/D3/D4/D7): the full-bleed cinematic
 // stage. A `position:relative; overflow:hidden` root with named anchors:
-// - the HUD island anchors `hud-left` and `hud-right`;
+// - the `place` anchor (webclient-avg-place-card-top-bar design D4): the
+//   place card at the stage box's top-left, at the fixed `--place-h`;
+// - the HUD island anchors `hud-left` (below the place card) and
+//   `hud-right`;
 // - the portrait anchors `actor-left` (the player's standing portrait) and
 //   `actor-right` (reserved), standing on the bottom band's top edge;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
@@ -15,8 +18,8 @@
 // 不顯示的絕對隱藏，不是灰掉).
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
-// the veil in DOM order, so the player stays bright in combat), HUD islands
-// 4, band 5, command line 6.
+// the veil in DOM order, so the player stays bright in combat), the place
+// card and the HUD islands 4, band 5, command line 6.
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -72,6 +75,13 @@ defineExpose({ menuOpen });
       data-testid="anchor-actor-right"
     >
       <slot name="actor-right" />
+    </div>
+    <div
+      class="stage-anchor"
+      data-anchor="place"
+      data-testid="anchor-place"
+    >
+      <slot name="place" />
     </div>
     <div
       class="stage-anchor"
@@ -156,23 +166,36 @@ defineExpose({ menuOpen });
   box-sizing: border-box;
 }
 
+/* place: the place card's anchor at the stage box's top-left corner, one
+   fixed height whatever the labels (webclient-avg-place-card-top-bar design
+   D4), aligned to the brand column above it. */
+.elosern-stage [data-anchor="place"] {
+  top: calc(var(--header-h) + 16px);
+  left: 16px;
+  width: calc(var(--left-column) - 32px);
+  height: var(--place-h);
+  z-index: 4;
+}
+
 /* hud-left / hud-right: the HUD island stacks. Bounded above the bottom
-   band (never the band's content) and scrolling internally; the top offset
-   clears the top-anchored brand element (design D5/D10). */
+   band (never the band's content) and scrolling internally. hud-left
+   begins below the place card; hud-right clears only the top bar. The
+   `.elosern-root` override in app-shell.css repeats these offsets (it sets
+   the column widths); keep the two in step. */
 .elosern-stage [data-anchor="hud-left"] {
-  top: 64px;
+  top: calc(var(--header-h) + 16px + var(--place-h) + 12px);
   left: 16px;
   width: 262px;
   z-index: 4;
   display: flex;
   flex-direction: column;
   gap: 9px;
-  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 44px);
   overflow-y: auto;
   overflow-x: hidden;
 }
 .elosern-stage [data-anchor="hud-right"] {
-  top: 64px;
+  top: calc(var(--header-h) + 16px);
   right: 16px;
   width: 230px;
   z-index: 4;
@@ -249,10 +272,11 @@ defineExpose({ menuOpen });
 
 /* Mode-gated visibility (design D2/D7): CSS-only on data-elosern-mode,
    display:none so hidden surfaces leave the a11y tree and tab order. The
-   matrix: the message region, the HUD island stack (hud-left), and the
-   command line are hidden in creation, where the command region spans the
+   matrix: the place card, the message region, the HUD island stack
+   (hud-left), and the command line are hidden in creation, where the command region spans the
    whole band; the minimap is hidden in combat and creation; the command
    region and the scene backdrop stay visible in every mode. */
+.elosern-stage[data-elosern-mode="creation"] [data-anchor="place"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="hud-left"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="command-line"] {
