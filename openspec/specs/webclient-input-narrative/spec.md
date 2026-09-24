@@ -105,7 +105,8 @@ confirmation items), fields read verbatim from committed state at dispatch
 time (shop row display names, the uniquely matching local-map edge label or
 the destination node label, NPC display names, the committed creation
 confirmation descriptor), or the payload itself — so a deliberate activation
-from any surface (backpack row, shop drawer row, minimap move, combat row with or without a non-default magnitude, services row,
+from any surface (backpack row, shop drawer row, minimap
+move, combat row with or without a non-default magnitude, services row,
 creation activate/reset confirmation) produces its line instead of silently
 resolving to `null`; an ambiguous local-map edge match MUST NOT pick an
 arbitrary edge and instead degrades to the destination-node label. A surface
