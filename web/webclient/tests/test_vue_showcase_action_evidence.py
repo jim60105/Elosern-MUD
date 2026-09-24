@@ -176,6 +176,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/GalleryGenerateDrawer",
                 "Overlays/GalleryBindingDrawer",
                 "Overlays/GalleryFaceRectModal",
+                # The AVG stage series (a governed redesign wave) adds the
+                # stage place card (webclient-avg-place-card-top-bar).
+                "Core/PlaceCard",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

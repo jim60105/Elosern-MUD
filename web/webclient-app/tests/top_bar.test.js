@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import TopBar from "../components/TopBar.vue";
 
-describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
+describe("TopBar (the slim top band: brand + switcher + connection pill)", () => {
   let wrapper;
 
   afterEach(() => {
@@ -10,12 +10,14 @@ describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
     wrapper = null;
   });
 
-  it("shows the top-left brand and the top-right meta pill (location · time · connection, glyph + label, never color alone)", () => {
-    wrapper = mount(TopBar, {
-      props: { connected: true, locationLabel: "測試起點", timeLabel: "春季 3 日 · 12:00" },
-    });
-    expect(wrapper.get('[data-testid="topbar-location"]').text()).toBe("測試起點");
-    expect(wrapper.get('[data-testid="topbar-clock"]').text()).toBe("春季 3 日 · 12:00");
+  it("shows the brand with the game name and a meta pill that states only the connection (glyph + label, never color alone)", () => {
+    // webclient-avg-place-card-top-bar: location and world time moved to the
+    // stage's place card; the top band states neither.
+    wrapper = mount(TopBar, { props: { connected: true } });
+    expect(wrapper.get('[data-testid="topbar-title"]').text()).toContain("伊洛瑟恩");
+    expect(wrapper.get('[data-testid="topbar"]').text()).toBe("● 已連線");
+    expect(wrapper.find('[data-testid="topbar-location"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="topbar-clock"]').exists()).toBe(false);
     const conn = wrapper.get('[data-testid="connection-state"]');
     expect(conn.text()).toBe("● 已連線");
     expect(wrapper.get('[data-testid="topbar"]').classes()).toContain("connected");
@@ -27,12 +29,6 @@ describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
     expect(wrapper.get('[data-testid="topbar"]').classes()).toContain("disconnected");
   });
 
-  it("falls back to the placeholder labels when the slice is absent", () => {
-    wrapper = mount(TopBar, { props: { connected: false } });
-    expect(wrapper.get('[data-testid="topbar-location"]').text()).toBe("位置：--");
-    expect(wrapper.get('[data-testid="topbar-clock"]').text()).toBe("時間：--");
-  });
-
   it("mounts CharacterSwitcher in top-right cluster when roster is available and re-emits intents", async () => {
     const sampleChars = [
       { identity: 1, name: "艾莉亞", current: true, pending: false, portrait: null },
@@ -41,8 +37,6 @@ describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
     wrapper = mount(TopBar, {
       props: {
         connected: true,
-        locationLabel: "測試起點",
-        timeLabel: "春季 3 日 · 12:00",
         rosterAvailable: true,
         rosterCharacters: sampleChars,
         rosterCanCreate: true,
@@ -71,8 +65,6 @@ describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
     wrapper = mount(TopBar, {
       props: {
         connected: true,
-        locationLabel: "位置：亞爾托利亞冒險者公會總部前廣場",
-        timeLabel: "春季 30 日 · 23:59",
         rosterAvailable: true,
         rosterCharacters: sampleChars,
       },

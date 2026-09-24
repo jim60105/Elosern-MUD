@@ -809,6 +809,95 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(clamp["top"] + 1, clamp["header"], "the portrait never passes under the top bar")
 
     @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
+        "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
+    )
+    def test_stage_box_is_at_least_65_percent_at_the_reference_viewport(self):
+        """webclient-avg-place-card-top-bar (design D1/D6): at 1920x1080 the
+        48px top band and the 300px bottom band leave a stage box of at least
+        65% of the viewport; the top band states no location, no time, and no
+        home entry, and the place card states both. At 1280x720 the one-row
+        brand fits its column without reaching the navigation.
+        """
+        page = self.logged_in_page((1920, 1080))
+        page.wait_for_selector('[data-testid="place-card"]', timeout=15000)
+        state = page.evaluate(
+            """() => {
+              const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+              const header = parseFloat(getComputedStyle(document.querySelector('.elosern-root'), '::before').height);
+              const band = box('[data-testid="stage-band"]');
+              const place = box('[data-testid="anchor-place"]');
+              const location = document.querySelector('[data-testid="place-card__location"]').textContent.trim();
+              const time = document.querySelector('[data-testid="place-card__time"]').textContent.trim();
+              const topBand = ['.topbar-brand', '.topbar-right', '.desktop-navigation']
+                .map((sel) => document.querySelector(sel)?.textContent || '').join(' ');
+              const navLabels = [...document.querySelectorAll('.desktop-navigation button')]
+                .map((b) => b.textContent.trim());
+              return { header, bandTop: band.top, bandHeight: band.height, placeTop: place.top,
+                       location, time, topBand, navLabels };
+            }"""
+        )
+        self.assertAlmostEqual(state["header"], 48, delta=1.0, msg="the top band is 48px")
+        self.assertAlmostEqual(state["bandHeight"], 300, delta=1.0, msg="the bottom band is 300px")
+        self.assertGreaterEqual(state["bandTop"] - state["header"], 702, "the stage box is at least 65% of 1080")
+        self.assertGreaterEqual(state["placeTop"], state["header"], "the place card sits below the top band")
+        self.assertTrue(state["location"] and state["location"] != "位置：--", "the place card states the location")
+        self.assertNotIn(state["location"], state["topBand"], "the top band states no location")
+        self.assertNotIn(state["time"], state["topBand"], "the top band states no world time")
+        self.assertNotIn("探索", state["navLabels"])
+        self.assertNotIn("戰鬥", state["navLabels"])
+
+        small = self.logged_in_page((1280, 720))
+        brand = small.evaluate(
+            """() => {
+              const brand = document.querySelector('.topbar-brand');
+              const last = brand.lastElementChild.getBoundingClientRect();
+              const nav = document.querySelector('.desktop-navigation').getBoundingClientRect();
+              return { contentRight: last.right, brandRight: brand.getBoundingClientRect().right,
+                       scroll: brand.scrollWidth, client: brand.clientWidth, navLeft: nav.left };
+            }"""
+        )
+        self.assertLessEqual(brand["scroll"], brand["client"], "the brand row does not overflow its column")
+        self.assertLessEqual(brand["contentRight"], brand["brandRight"])
+        self.assertLessEqual(brand["contentRight"], brand["navLeft"], "the brand does not reach the navigation")
+
+        # The navigation row and the right cluster stay side by side with a
+        # maximum-length (128-character) character name committed in the
+        # roster: the name is bounded and truncated, so the cluster never
+        # grows into the navigation.
+        inject_snapshot(small, {"roster": {
+            "schema_version": 2,
+            "available": True,
+            "characters": [{
+                "identity": 1, "name": "長" * 128, "current": True, "pending": False,
+                "portrait": {
+                    "subject_key": None, "status": "missing", "url": None,
+                    "aspect_ratio": None, "alt": "角色肖像",
+                    "placeholder": {"kind": "missing", "label": "尚無肖像"},
+                    "face_rect": None,
+                },
+            }],
+            "can_create": False,
+            "max_characters": 3,
+            "switch_locked": False,
+            "lock_reason": None,
+        }})
+        small.wait_for_selector('[data-testid="character-switcher-name"]', timeout=15000)
+        cluster = small.evaluate(
+            """() => {
+              const name = document.querySelector('[data-testid="character-switcher-name"]');
+              const nav = document.querySelector('.desktop-navigation').getBoundingClientRect();
+              const right = document.querySelector('.topbar-right').getBoundingClientRect();
+              return { hasName: !!name, navRight: nav.right, rightLeft: right.left,
+                       rightRight: right.right, rightBottom: right.bottom, width: innerWidth };
+            }"""
+        )
+        self.assertTrue(cluster["hasName"], "the switcher renders the committed name")
+        self.assertLessEqual(cluster["navRight"], cluster["rightLeft"], "the navigation and the switcher do not collide")
+        self.assertLessEqual(cluster["rightRight"], cluster["width"])
+        self.assertLessEqual(cluster["rightBottom"], 48 + 1, "the right cluster stays inside the top band")
+
+    @covers_requirement(
         "webclient-input-narrative::the-full-log-surface-opens-at-its-latest-line"
     )
     def test_full_log_opens_at_latest_line(self):

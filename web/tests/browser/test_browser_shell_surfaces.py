@@ -121,6 +121,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-status-presentation::server-time-and-location-are-read-only-presentation-data",
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
+        "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
     )
     def test_header_shows_location_time_and_connection_dot(self):
         page = self.logged_in_page()
@@ -128,22 +129,29 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(state["mode"], "exploration")
         self.assertIsNotNone(state["serverTime"])
 
-        # The header identifies location, world time, and the connected state;
-        # the raw mode label is gone (the dock content identifies the mode).
+        # The header states the connected state; the stage's place card states
+        # location and world time (webclient-avg-place-card-top-bar), and the
+        # top band states neither. The raw mode label is gone (the dock
+        # content identifies the mode).
         header = page.locator('[data-testid="topbar"]')
         self.assertEqual(header.evaluate("el => el.classList.contains('connected')"), True)
-        location = page.locator('[data-testid="topbar-location"]').inner_text()
+        location = page.locator('[data-testid="place-card__location"]').inner_text()
         self.assertNotEqual(location, "位置：--", "location must be synced")
         self.assertTrue(location.strip())
-        clock = page.locator('[data-testid="topbar-clock"]').inner_text()
+        clock = page.locator('[data-testid="place-card__time"]').inner_text()
         self.assertRegex(clock, r"\d+ 日 · \d{2}:\d{2}")
+        self.assertEqual(page.locator('[data-testid="topbar-location"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="topbar-clock"]').count(), 0)
+        header_text = header.inner_text()
+        self.assertNotIn(location.strip(), header_text)
+        self.assertNotIn(clock.strip(), header_text)
         conn = page.locator(".meta-conn").inner_text()
         self.assertIn("●", conn)
         self.assertIn("已連線", conn)
         self.assertEqual(page.locator(".header-mode").count(), 0, "no raw mode label")
 
         # Wilderness location preference (webclient-minimap-04-island-single-affordance D5):
-        # on a wilderness snapshot the top-meta location states the region name
+        # on a wilderness snapshot the place card states the region name
         # from the local_map panel, not the raw room key "Wilderness" from the
         # status panel.
         wilderness_status = valid_status_panel("影行者", "42")
@@ -175,9 +183,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         }
         inject_snapshot(page, {"status": wilderness_status, "local_map": wilderness_map})
         page.wait_for_timeout(300)
-        loc = page.locator('[data-testid="topbar-location"]').inner_text()
+        loc = page.locator('[data-testid="place-card__location"]').inner_text()
         self.assertEqual(loc, "苔影濕谷")
-        self.assertNotIn("Wilderness", loc)
+        self.assertNotIn("Wilderness", page.locator('[data-testid="place-card"]').inner_text())
+        self.assertNotIn("Wilderness", page.locator(".topbar-right").inner_text())
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
@@ -195,7 +204,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             overlap = page.evaluate(
                 """() => {
-                  const testids = ["anchor-hud-left", "anchor-hud-right", "anchor-band-message",
+                  const testids = ["anchor-place", "anchor-hud-left", "anchor-hud-right", "anchor-band-message",
                                    "anchor-band-command", "anchor-command-line"];
                   const anchors = testids
                     .map((t) => {

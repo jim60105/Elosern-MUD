@@ -49,6 +49,7 @@ describe("AppShell root (B1 core family)", () => {
     // The cinematic stage (H1): the full-bleed root carries the mode attribute
     // and the named anchors; the top band carries the brand + meta pill.
     expect(w.get('[data-testid="elosern-stage"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-place"] [data-testid="place-card"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-hud-left"]').exists()).toBe(true);
     expect(w.get('[data-testid="stage-band"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-band-message"]').exists()).toBe(true);

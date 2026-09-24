@@ -17,9 +17,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-hud-left", "anchor-hud-right", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
+              const ids = ["anchor-place", "anchor-hud-left", "anchor-hud-right", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
               return ids.map((id) => {
-                const el = document.getElementById(id);
+                const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };
                 return { id, rect: el.getBoundingClientRect() };
               });
@@ -32,9 +32,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         for i in range(len(present)):
             for j in range(i + 1, len(present)):
                 a, b = present[i]["rect"], present[j]["rect"]
+                # The rects arrive as plain dicts (DOMRect serialized).
                 overlap = not (
-                    a.right <= b.left or b.right <= a.left
-                    or a.bottom <= b.top or b.bottom <= a.top
+                    a["right"] <= b["left"] or b["right"] <= a["left"]
+                    or a["bottom"] <= b["top"] or b["bottom"] <= a["top"]
                 )
                 if overlap:
                     return True

@@ -269,6 +269,7 @@
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_stage_box_is_at_least_65_percent_at_the_reference_viewport",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_root_tab_bar_truthful_count_badges",
