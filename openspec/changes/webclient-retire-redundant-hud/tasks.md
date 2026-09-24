@@ -128,7 +128,7 @@
 
 ## 5. Party strip, party opener, gallery opener
 
-- [ ] 5.1 `components/PartyStrip.vue`:
+- [x] 5.1 `components/PartyStrip.vue`:
   - render the root only when `safeSlots.length > 0`
   - rewrite the header comment (drop "Empty party renders one row of 4 dashed invite cells")
 
@@ -137,7 +137,7 @@
   `stories/Overlays/PartyStrip.stories.js`: keep `EmptyParty` (story ID unchanged) and document that it renders nothing.
 
   `tests/app_client_drawers.test.js`: add an available, empty `party` panel case asserting no `party-strip`.
-- [ ] 5.2 `components/CharacterStatusDrawer.vue`:
+- [x] 5.2 `components/CharacterStatusDrawer.vue`:
   - add a `partyAvailable` prop and an `open-party` emit
   - add a `同伴 · 隊伍` button (`data-testid="character-status-drawer__open-party"`) beside `character-status-drawer__open-skill`, rendered only when `partyAvailable`
 
@@ -148,7 +148,7 @@
   `tests/app_client_drawers.test.js`: with an empty party, open the status drawer, activate the button, and see `store.view.hudDrawer === "party"` and a mounted `party-drawer`.
 
   `stories/Data/CharacterStatusDrawer.stories.js`: pass `partyAvailable: true` in the full-payload story.
-- [ ] 5.3 Gallery opener (design D5):
+- [x] 5.3 Gallery opener (design D5):
   - `components/CommandLine.vue`: add a `galleryAvailable` prop and, inside `span.cmdutil`, a `button.cmdutil__btn` with `aria-label="角色肖像圖庫"`, `data-testid="gallery-opener"`, and `@click="onOpenOverlay('gallery')"`, rendered only when `galleryAvailable`
   - `AppShell.vue`: add and forward the `galleryAvailable` prop
   - `AppClient.vue`: bind `:gallery-available="panelAvailable('gallery')"`, and delete the left-column button and the `.gallery-opener` CSS block

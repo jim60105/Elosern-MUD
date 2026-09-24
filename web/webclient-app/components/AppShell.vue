@@ -77,6 +77,8 @@ const props = defineProps({
   // Vitals island visibility derived client-side (design D1/D2/D3).
   // Focus is rescued before the island hides with display:none.
   vitalsVisible: { type: Boolean, default: true },
+  // Whether the gallery panel is available (forwarded to CommandLine).
+  galleryAvailable: { type: Boolean, default: false },
   // The client-local text-to-HTML narrative preference (H5): forwarded to
   // the command line's prompt line — when off, the prompt renders as literal
   // text (the preference chooses whether the markup pipeline runs, never
@@ -307,6 +309,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #command-line>
         <CommandLine
           ref="commandLine"
+          :gallery-available="props.galleryAvailable"
           :prompt="props.prompt"
           :history="props.commandHistory"
           :connected="props.connected"

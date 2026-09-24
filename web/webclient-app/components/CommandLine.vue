@@ -34,6 +34,8 @@ const props = defineProps({
   // The store's mutation-lock flag: a rejected send preserves the typed
   // speech (webclient-desktop-shell).
   mutationsLocked: { type: Boolean, default: false },
+  // Whether the gallery panel is available (webclient-retire-redundant-hud design D5).
+  galleryAvailable: { type: Boolean, default: false },
   // The action client's in-flight mutation flag (webclient-input-narrative):
   // a free-form send blocked by an in-flight mutation keeps the typed speech.
   inFlight: { type: Boolean, default: false },
@@ -405,6 +407,20 @@ defineExpose({ focusField });
         </button>
       </span>
       <span class="cmdutil">
+        <button
+          v-if="galleryAvailable"
+          type="button"
+          class="cmdutil__btn"
+          aria-label="角色肖像圖庫"
+          data-testid="gallery-opener"
+          @click="onOpenOverlay('gallery')"
+        >
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+        </button>
         <button
           type="button"
           class="cmdutil__btn"

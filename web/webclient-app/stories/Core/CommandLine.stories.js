@@ -25,6 +25,7 @@ export const Exploration = {
     connected: true,
     mutationsLocked: false,
     textToHtml: true,
+    galleryAvailable: true,
   },
 };
 

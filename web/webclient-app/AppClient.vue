@@ -98,6 +98,7 @@ const {
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
         :vitals-visible="store.view.vitals.visible"
+        :gallery-available="panelAvailable('gallery')"
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
         :completion-candidates="completionCandidates"
@@ -158,12 +159,6 @@ const {
           :art-panel="panel('art')"
           @open-drawer="() => store.openHudDrawer('party')"
         />
-        <button
-          v-if="panelAvailable('gallery')"
-          class="gallery-opener"
-          data-testid="gallery-opener"
-          @click="openOverlayByName('gallery')"
-        >角色肖像圖庫</button>
       </template>
       <template #panel-right>
         <!-- The minimap island (H2, design D9): the stage's right anchor,
@@ -375,6 +370,8 @@ const {
         :status="panel('status') || {}"
         :character="panel('character') || {}"
         :low-hp="store.view.vitals.lowHp"
+        :party-available="store.partyAvailable"
+        @open-party="() => store.openHudDrawer('party')"
         @open-skill="() => store.openHudDrawer('skill')"
         @persona-edit="onPersonaEdit"
       />
@@ -505,18 +502,6 @@ const {
   height: 100%;
   width: 100%;
 }
-
-.gallery-opener {
-  width: 100%;
-  padding: 10px;
-  font: inherit;
-  color: var(--gold-400);
-  background: linear-gradient(120deg, #392e1d, #15171e);
-  border: 1px solid #bca57988;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.gallery-opener:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 3px; }
 
 /* H3 (task 6.4): the skill master-detail layout — the skill list and the
    detail pane sit side by side inside the dock pane (the draft's `.skwrap`

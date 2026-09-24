@@ -136,13 +136,11 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     expect(img.element.style.objectPosition).toBe("50% 31%");
   });
 
-  it("renders four dashed invite cells and 0 / 4 for an empty party", () => {
+  it("renders nothing for an empty party", () => {
     const w = mountStrip({
       slots: PARTY_PANEL_EMPTY_SAMPLE.slots,
     });
-    expect(w.get('[data-testid="party-strip__count"]').text()).toBe("0 / 4");
-    expect(w.findAll('[data-testid^="party-strip__slot-"]')).toHaveLength(0);
-    expect(w.findAll('[data-testid="party-strip__empty-slot"]')).toHaveLength(4);
+    expect(w.find('[data-testid="party-strip"]').exists()).toBe(false);
   });
 
   it("renders zero dashed invite cells and 4 / 4 for a full party", () => {
@@ -172,7 +170,7 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
   });
 
   it("activating island or slots emits open-drawer without mutating or dispatching", async () => {
-    const w = mountStrip();
+    const w = mountStrip({ slots: [PARTY_PANEL_SAMPLE.slots[0]] });
 
     // Click strip root
     await w.get('[data-testid="party-strip"]').trigger("click");

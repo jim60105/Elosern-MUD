@@ -51,6 +51,17 @@ describe("CharacterStatusDrawer", () => {
     return wrapper;
   }
 
+  it("renders the party drawer opener only when partyAvailable, emitting open-party without dispatching", async () => {
+    const wWithout = mountDrawer({ partyAvailable: false });
+    expect(wWithout.find('[data-testid="character-status-drawer__open-party"]').exists()).toBe(false);
+
+    const wWith = mountDrawer({ partyAvailable: true });
+    const btn = wWith.get('[data-testid="character-status-drawer__open-party"]');
+    expect(btn.text()).toBe("同伴 · 隊伍");
+    await btn.trigger("click");
+    expect(wWith.emitted("open-party")).toHaveLength(1);
+  });
+
   it("renders the status vitals and the FULL condition roster (no 6-chip cap)", () => {
     const w = mountDrawer();
     // Vitals: the three gauge values.

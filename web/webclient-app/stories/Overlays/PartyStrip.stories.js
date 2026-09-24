@@ -10,7 +10,7 @@ import {
 
 // PartyStrip (webclient-align-05-party-hud):
 // the left-HUD companion quickbar (.comps) stories — empty, two companions
-// (with combat token), full four companions, and missing-portrait fallback.
+// (with combat token), full four companions, and missing-portrait fallback. Empty renders nothing.
 
 export default {
   title: "Overlays/PartyStrip",
@@ -39,6 +39,7 @@ export const TwoCompanions = {
 };
 
 export const EmptyParty = {
+  // An empty party renders nothing (webclient-retire-redundant-hud).
   render: renderStrip,
   args: {
     slots: PARTY_PANEL_EMPTY_SAMPLE.slots,

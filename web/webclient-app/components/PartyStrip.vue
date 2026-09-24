@@ -3,7 +3,7 @@
 // the left-HUD companion quickbar (.comps). Renders the committed `party.slots`
 // with avatar initial fallback, display name, HP hairline bar, state row with
 // joined combat token prefix `a2`, padded with dashed `+ 邀請` cells up to 4.
-// Empty party renders one row of 4 dashed invite cells.
+// When empty, renders nothing.
 // Activating the island or any cell opens the 同伴 · 隊伍 drawer and dispatches nothing.
 import { computed } from "vue";
 import {
@@ -49,6 +49,7 @@ function onActivate() {
 
 <template>
   <div
+    v-if="safeSlots.length > 0"
     class="hud comps"
     data-testid="party-strip"
     role="region"

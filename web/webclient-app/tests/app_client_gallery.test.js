@@ -37,6 +37,8 @@ describe("gallery application integration", () => {
     await snapshot(null);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
     await snapshot(GALLERY_SAMPLE, 2);
+    const opener = wrapper.get('[data-testid="gallery-opener"]');
+    expect(opener.element.closest('[data-testid="command-line"]')).not.toBeNull();
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     expect(wrapper.find('[data-testid="gallery-panel"]').exists()).toBe(true);
     await snapshot({ schema_version: 1, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);

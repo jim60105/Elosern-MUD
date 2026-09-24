@@ -60,6 +60,8 @@ function renderDrawer(args) {
                       : STATUS_PANEL_SAMPLE,
                   character,
                   lowHp: false,
+                  partyAvailable: args.partyAvailable ?? (args.combat ? false : true),
+                  onOpenParty: () => {},
                   onOpenSkill: () => {},
                 }),
             },
@@ -71,7 +73,7 @@ function renderDrawer(args) {
 
 export const Full = {
   render: renderDrawer,
-  args: {},
+  args: { partyAvailable: true },
 };
 
 export const Undisguised = {
