@@ -45,6 +45,19 @@ export const FullLattice = {
   },
 };
 
+export const InteriorWithRemembered = {
+  render: renderOverlay,
+  args: {
+    localMap: localMapModelFor({
+      ...LOCAL_MAP_INTERIOR_SAMPLE,
+      remembered: [
+        { id: "room:rem1", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
+        { id: "room:rem2", label: "檔案室", x: 2, y: 5, visibility: "remembered", landmark: true },
+      ],
+    }),
+  },
+};
+
 export const Minimal = {
   render: renderOverlay,
   args: {

@@ -45,13 +45,13 @@
 
 ## 3. Overlay list and full log (design D5, D6)
 
-- [ ] 3.1 `web/webclient-app/components/MapOverlay.vue`: when `localMap.layoutVariant === 'graph'` and `localMap.remembered` is non-empty, render `<ul class="map-overlay__remembered" data-testid="map-overlay-remembered" aria-label="記得的地點">` after `MapLattice`.
+- [x] 3.1 `web/webclient-app/components/MapOverlay.vue`: when `localMap.layoutVariant === 'graph'` and `localMap.remembered` is non-empty, render `<ul class="map-overlay__remembered" data-testid="map-overlay-remembered" aria-label="記得的地點">` after `MapLattice`.
   - Each `<li>` pairs an `aria-hidden` remembered diamond SVG (the markup moved from the island) with the full label as text.
   - No `tabindex`, no role, no click handler.
   - Scoped CSS uses tokens only, and the container is capped at `max-width: 848px` like the guide row.
   - `web/webclient-app/stories/Overlays/MapOverlay.stories.js`: add an interior story carrying remembered rooms.
-- [ ] 3.2 `web/webclient-app/components/FullLogOverlay.vue`: in `focusSelf()`, after `trap.enter()`, set `overlayEl.value.scrollTop = overlayEl.value.scrollHeight`. Update the header comment to name the open-at-latest-line rule. Add no watcher on `lines`.
-- [ ] 3.3 `web/webclient-app/tests/full_log_overlay.test.js`: add cases with 80 lines. After `focusSelf()`, `scrollTop` is set to `scrollHeight` (stub `scrollHeight` on the element, which jsdom does not lay out). Appending a line while open leaves `scrollTop` unchanged. Run `pnpm exec vitest run web/webclient-app/tests/full_log_overlay.test.js` green.
+- [x] 3.2 `web/webclient-app/components/FullLogOverlay.vue`: in `focusSelf()`, after `trap.enter()`, set `overlayEl.value.scrollTop = overlayEl.value.scrollHeight`. Update the header comment to name the open-at-latest-line rule. Add no watcher on `lines`.
+- [x] 3.3 `web/webclient-app/tests/full_log_overlay.test.js`: add cases with 80 lines. After `focusSelf()`, `scrollTop` is set to `scrollHeight` (stub `scrollHeight` on the element, which jsdom does not lay out). Appending a line while open leaves `scrollTop` unchanged. Run `pnpm exec vitest run web/webclient-app/tests/full_log_overlay.test.js` green.
 
 ## 4. Vitest updates
 

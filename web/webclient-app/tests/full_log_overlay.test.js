@@ -92,4 +92,39 @@ describe("FullLogOverlay (H1 D4)", () => {
     expect(wrapper.find('[data-testid="choicepoint-block"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="option-card"]').exists()).toBe(false);
   });
+
+  it("opens at latest line: sets scrollTop to scrollHeight upon focusSelf() with 80 lines and leaves scrollTop unchanged when appending a line while open", async () => {
+    const lines = Array.from({ length: 80 }, (_, i) => ({
+      kind: "out",
+      text: `第 ${i + 1} 行敘事內容。`,
+    }));
+    const host = document.createElement("div");
+    host.id = "fulllog-host-80";
+    document.body.appendChild(host);
+
+    wrapper = mount(FullLogOverlay, {
+      attachTo: host,
+      props: { lines },
+    });
+
+    const overlay = wrapper.get('[data-testid="fulllog-overlay"]').element;
+    let currentScrollTop = 0;
+    Object.defineProperty(overlay, "scrollHeight", { value: 1600, configurable: true });
+    Object.defineProperty(overlay, "scrollTop", {
+      get: () => currentScrollTop,
+      set: (val) => {
+        currentScrollTop = val;
+      },
+      configurable: true,
+    });
+
+    wrapper.vm.focusSelf();
+    expect(overlay.scrollTop).toBe(1600);
+
+    // Appending a line while open leaves scrollTop unchanged
+    await wrapper.setProps({
+      lines: [...lines, { kind: "out", text: "第 81 行敘事內容。" }],
+    });
+    expect(overlay.scrollTop).toBe(1600);
+  });
 });
