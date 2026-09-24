@@ -7,7 +7,8 @@ import HudFrame from "../../components/HudFrame.vue";
 // visibility matrix gates surfaces with `display:none`; the open-surface
 // registry drives the stage recession. Sample blocks fill every slot so the
 // place card, the island anchors, the band split, the portrait anchor, and
-// the command-line row are visible.
+// the collapsible command-line row (collapsed by default, expanded when
+// `commandLineExpanded` is true) can be inspected in both states.
 
 const sample = (label, extra = "") =>
   h(
@@ -53,7 +54,9 @@ export default {
           "portrait anchors (`actor-left`, `actor-right`) standing on the band, " +
           "the fixed-height bottom band (`--band-h`) split into `band-message` " +
           "(left 2/3) and `band-command` (right 1/3), and the `command-line` " +
-          "row docked on the message region's top edge. Mode gating is " +
+          "row docked on the message region's top edge (`data-expanded` " +
+          "follows `commandLineExpanded`; collapsed is `display:none`, " +
+          "expanded is a 44px row). Mode gating is " +
           "CSS-only on `data-elosern-mode` (display:none): creation hides the " +
           "place card, the message region, and both island anchors, and the " +
           "command region spans the whole band; the objective line shows only " +
@@ -67,12 +70,12 @@ export default {
 
 export const ExplorationStage = {
   render: renderFrame,
-  args: { mode: "exploration" },
+  args: { mode: "exploration", commandLineExpanded: false },
 };
 
 export const CombatStage = {
   render: renderFrame,
-  args: { mode: "combat" },
+  args: { mode: "combat", commandLineExpanded: true },
 };
 
 export const CreationStage = {

@@ -189,8 +189,8 @@ export function applyFrames(ctx) {
       return;
     }
     if (name === "toggle-drawer") {
-      // H5: the `/` key routes bridge -> router -> here. Bump `drawerRequest`
-      // so the shell's watcher focuses the always-present command field (D1/D2).
+      // The `/` key routes bridge -> router -> here. Bump `drawerRequest`
+      // so the shell's watcher expands the command line and focuses the field.
       ctx.drawerRequest += 1;
       ctx.publishView();
       return;

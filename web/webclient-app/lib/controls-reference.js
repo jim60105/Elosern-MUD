@@ -8,13 +8,14 @@
 export const CONTROLS_REFERENCE = [
   {
     key: "/",
-    label: "Focus the command input field",
-    detail: "No literal slash is inserted.",
+    label: "Open the command line",
+    detail: "Expands the collapsed line and focuses its field; no literal slash is inserted.",
   },
   {
     key: "Enter",
     label: "Send the command",
-    detail: "A single send path; Shift+Enter inserts a newline without sending.",
+    detail:
+      "A single send path; a successful send collapses the line and returns to the dock; Shift+Enter inserts a newline without sending.",
   },
   {
     key: "↑ / ↓",
@@ -25,7 +26,7 @@ export const CONTROLS_REFERENCE = [
     key: "Esc",
     label: "Close the topmost open surface",
     detail:
-      "Precedence: open overlay → open drawer → focused command field → dock menu level.",
+      "Precedence: open overlay → open drawer → focused command field (collapses the line) → dock menu level.",
   },
   {
     key: "Tab",

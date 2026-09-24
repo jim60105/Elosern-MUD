@@ -4,10 +4,10 @@
 import { onMounted, watch } from "vue";
 
 export function useShellFocus(store, shellRef, sceneBackdropRef) {
-  // The shell instance handle (H5, design D1/D6): the store-driven freeform
-  // dialogue entry point (a freeform affordance) requests command-line field
-  // focus through the exposed AppShell method — the field is permanently
-  // present, so there is no open/closed state to toggle.
+  // The shell instance handle (webclient-collapsible-command-line design D2):
+  // `/` and the store-driven freeform dialogue borrow request command-line
+  // expansion and field focus through the exposed AppShell
+  // `focusCommandField` method.
   watch(
     () => store.view.drawerRequest,
     (request) => {
@@ -17,9 +17,8 @@ export function useShellFocus(store, shellRef, sceneBackdropRef) {
     },
   );
   // A successful dock-borrowed send (freeform dialogue) restores action-dock
-  // focus (webclient-desktop-shell: the borrowed send returns focus to the
-  // dock). The field is never closed, so the completion signal is the focus
-  // return, not a surface close (H5, design D6).
+  // focus and collapses the command line through `releaseCommandField(true)`
+  // (webclient-collapsible-command-line design D2/D3).
   watch(
     () => store.view.drawerCloseRequest,
     (request) => {

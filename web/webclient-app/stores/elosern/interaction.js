@@ -49,8 +49,8 @@ export function applyInteraction(ctx) {
 
   // The free-dialogue borrow (the `→` key and the trailing free row): the
   // SAME path the exploration 互動 → 自由對話 row uses — set the guarded
-  // freeform target to the committed host identity and request command-field
-  // focus (the field is permanently present, design D1). Dispatches nothing.
+  // freeform target to the committed host identity and expand and focus the
+  // command line through `drawerRequest` (design D2). Dispatches nothing.
   ctx.borrowDialogueCommand = function borrowDialogueCommand() {
     const rs = ctx.reducer.getState();
     const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
@@ -137,9 +137,9 @@ export function applyInteraction(ctx) {
       ctx.publishView();
       return true;
     }
-    // A free-form dialogue item: open the command drawer for the selected
-    // target; the typed speech submits as explore.talk_freeform with the
-    // target's npc_id (the guarded dialogue seam, webclient-exploration-menu).
+    // A free-form dialogue item: expand and focus the command line for the
+    // selected target; the typed speech submits as explore.talk_freeform with
+    // the target's npc_id (the guarded dialogue seam, webclient-exploration-menu).
     if (item.freeform) {
       ctx.freeformTarget = item.npcId;
       ctx.lastTarget = String(item.npcId);

@@ -28,3 +28,16 @@ export const Combat = {
   render: renderNavigation,
   args: { mode: "combat", items: [{ key: "bag", label: "背包", enabled: true }] },
 };
+
+export const WithGallery = {
+  render: renderNavigation,
+  args: {
+    mode: "exploration",
+    galleryAvailable: true,
+    items: [
+      { key: "character", label: "角色狀態", enabled: true },
+      { key: "inventory", label: "背包", enabled: true },
+      { key: "quests", label: "任務", enabled: true },
+    ],
+  },
+};

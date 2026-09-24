@@ -14,7 +14,9 @@
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
 //   split into the message region `band-message` (left 2/3) and the command
 //   region `band-command` (right 1/3). No frame, mode, or content resizes it;
-// - the `command-line` row, docked on the message region's top edge.
+// - the `command-line` row, docked on the message region's top edge and
+//   collapsed by default (`data-expanded="false"` -> `display:none`,
+//   webclient-collapsible-command-line design D1/D4).
 // Mode gating is CSS-only on the `data-elosern-mode` attribute (the single
 // source for the committed mode), using `display:none` so hidden surfaces
 // leave the accessibility tree and the tab order (REDESIGN.md §0.1:
@@ -39,6 +41,9 @@ const props = defineProps({
   // The low-HP flag (design D7): H2 supplies the state from the status
   // payload; H1 ships the CSS hook, defaulting off.
   lowhp: { type: Boolean, default: false },
+  // Whether the collapsible command-line row is expanded (design D1):
+  // rendered as `data-expanded` on `[data-anchor="command-line"]`.
+  commandLineExpanded: { type: Boolean, default: false },
 });
 
 // The open-surface registry drives the `menu-open` mark (design D9): the
@@ -120,6 +125,7 @@ defineExpose({ menuOpen });
       class="stage-anchor"
       data-anchor="command-line"
       data-testid="anchor-command-line"
+      :data-expanded="commandLineExpanded ? 'true' : 'false'"
     >
       <slot name="command-line" />
     </div>
@@ -270,6 +276,9 @@ defineExpose({ menuOpen });
   bottom: var(--band-h);
   height: var(--command-line-h);
   z-index: 6;
+}
+.elosern-stage [data-anchor="command-line"][data-expanded="false"] {
+  display: none;
 }
 
 /* Mode-gated visibility (design D2/D7): CSS-only on data-elosern-mode,

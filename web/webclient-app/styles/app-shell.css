@@ -380,6 +380,20 @@ body {
   .elosern-root .m-dialogue .dlg .who { font-size: 17px; margin-bottom: 5px; }
   .elosern-root .m-dialogue .choices { margin-top: 12px; gap: 8px; }
 }
+/* The ⌨ command-line toggle sits at the bottom-right of the message region
+   (webclient-collapsible-command-line design D5); 36px of bottom scroll
+   padding keeps the latest narrative or dialogue line clear of the toggle. */
+.elosern-root [data-anchor="band-message"] .narrative-scroll {
+  padding-bottom: 36px;
+}
+.elosern-root .command-line-toggle {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  width: 30px;
+  height: 30px;
+  z-index: 1;
+}
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar { flex-wrap: nowrap; align-items: stretch; }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
   flex: 1;
@@ -423,7 +437,7 @@ body {
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 4px 10px #0003; }
 .elosern-root .cmdline {
   height: var(--command-line-h);
-  padding: 9px 14px;
+  padding: 5px 14px;
   gap: 12px;
   background: linear-gradient(180deg, #121419e8, #141019f5);
   border: 1px solid #bda47733;
@@ -432,9 +446,8 @@ body {
   box-shadow: 0 -10px 24px -18px #000;
   backdrop-filter: blur(6px);
 }
-.elosern-root .cmdfield { min-height: 44px; border: 1px solid #c5a76f; border-radius: 6px; box-shadow: 0 0 8px #cfa45c25, inset 0 0 8px #cfa45c10; }
+.elosern-root .cmdfield { border: 1px solid #c5a76f; border-radius: 6px; box-shadow: 0 0 8px #cfa45c25, inset 0 0 8px #cfa45c10; }
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
-.elosern-root .cmdutil__btn { border: 1px solid #5d594e; min-width: 32px; min-height: 32px; }
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-band { filter: brightness(.45); }
 .elosern-root .hud-drawer-scrim { background: #080a0c78; backdrop-filter: none; }
