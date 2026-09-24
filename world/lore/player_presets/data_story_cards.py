@@ -104,7 +104,9 @@ ROWS: dict[str, PlayerPreset] = {
         starting_companions=(StartingCompanion("violet_altoria", 95, "殿下"),),
     ),
     "yuka_darknight": PlayerPreset(
-        # Reconverted from tmp/story_settings/character/YukaDarknight.md: age
+        # Pre-departure Yuka: still living in Shadow Valley Village, the
+        # village's youngest blade prodigy, Yuna at her side. Reconverted
+        # from tmp/story_settings/character/YukaDarknight.md: age
         # 16; base statics 88/92/90 exact (the x1000 body enhancement is the
         # skill, not the allocation); the remaining budget inflates magic
         # power above the story's 250 because the elf gauge floors consume no
@@ -127,7 +129,7 @@ ROWS: dict[str, PlayerPreset] = {
                             "dark_elf_ninja_garb"),
         persona=PresetPersona(
             identity=PresetIdentity(
-                public="暗影谷村的年輕黑暗精靈、擁有罕見黑髮的雙刀使、悠奈的旅伴與妹妹",
+                public="暗影谷村的年輕黑暗精靈、擁有罕見黑髮的雙刀使、悠奈的雙胞胎妹妹",
                 hidden="轉生者（前世為現代日本的女高中生）、刀術狂熱者、悠奈最珍視的伴侶",
             ),
             personality=(
@@ -144,8 +146,8 @@ ROWS: dict[str, PlayerPreset] = {
                 "眼成為暗影谷村黑暗精靈的新生兒，前世記憶一如昨日。4 歲第一次握上木"
                 "刀的瞬間找到此世歸屬，感動到幾乎落淚；5 歲轉生特典「武感」顯現，能"
                 "本能預判對手攻擊意圖。10 歲已是同輩最出色的刀術使，14 歲修成身體超"
-                "強化。16 歲與悠奈一同離開村子。不管去哪裡，只要跟悠奈在一起就是好"
-                "地方。"
+                "強化，是目前村裡最年輕的雙刀使。她聽悠奈說起過很多次外面的世界，"
+                "人類城鎮似乎比村子更熱鬧。不管去哪裡，只要跟悠奈在一起就是好地方。"
             ),
             habit=(
                 "每天固定體能訓練與刀術練習，練完滿身大汗回到悠奈身邊；走路步伐輕"
@@ -172,7 +174,7 @@ ROWS: dict[str, PlayerPreset] = {
             ),
             background=(
                 "暗影谷村出身的黑暗精靈雙刀使，罕見的黑短髮在銀髮同族中格外醒目。"
-                "雙刃旋舞與影斬名聲在外，轉生特典武感使她總能先一步抵達對手要害。"
+                "雙刃旋舞與影斬在村裡沒有對手，轉生特典武感使她總能先一步抵達對手要害。"
                 "陽光開朗，視戰鬥為與自身極限的對話，與姊姊悠奈形影不離。"
             ),
         ),
@@ -184,13 +186,15 @@ ROWS: dict[str, PlayerPreset] = {
             sensitivity=(("乳房", "極高"), ("私處", "極高"), ("耳朵", "高")),
             wetness="濕潤", shame="輕微", exposure="中等",
         ),
-        # The twins arrive together: 悠花's own card is her companion, seeded
-        # at 95 (above the invite threshold, inside 至愛 with headroom), with
-        # 悠奈 as the elder sister.
+        # The twins start side by side: 悠花's own card is her companion,
+        # seeded at 95 (above the invite threshold, inside 至愛 with headroom),
+        # with 悠奈 as the elder sister.
         starting_companions=(StartingCompanion("yuna_darknight", 95, "雙胞胎姊姊"),),
     ),
     "yuna_darknight": PlayerPreset(
-        # Reconverted from tmp/story_settings/character/YunaDarknight.md: age
+        # Pre-departure Yuna: the village's acknowledged sex-magic prodigy,
+        # still in Shadow Valley Village. Reconverted from
+        # tmp/story_settings/character/YunaDarknight.md: age
         # 16; story defense 92 exact, the story's 65/65 physical floor sits
         # under the elf minimum, and the remaining budget inflates magic
         # power above the story's 350 (the budget must be spent in full).
@@ -227,8 +231,8 @@ ROWS: dict[str, PlayerPreset] = {
                 "魔法主宰」顯現，一道魔力讓悠花瞬間高潮失神；8 歲自如融合暗魔法與性"
                 "魔法；10 歲在村中廣場疊加七層性魔法，持續高潮整個下午。12 歲起研究"
                 "神之秘法的性愛系統，發現能創造不存在於物理法則中的快感；14 歲已是村"
-                "中公認的性魔法天才。16 歲與悠花離開村子。她斷定人類的反應比精靈更有"
-                "趣。"
+                "中公認的性魔法天才。她動過很多次「去人類的世界玩一玩」的念頭：這具"
+                "轉生來的肉體玩不壞，前世不能做的事，這一世沒有做不了的。"
             ),
             habit=(
                 "公共場合坐下時從不刻意併攏雙腿，穿這樣就是要給人看的；思考時下意"
@@ -254,7 +258,7 @@ ROWS: dict[str, PlayerPreset] = {
                 ("悠花", "雙胞胎妹妹、前世的性伴侶、此世最喜歡的實驗對象；互稱「悠花」「悠奈」。深愛著她，愛的表現方式是把她玩到死去活來"),
             ),
             background=(
-                "與雙胞胎妹妹一同離開暗影谷村的黑暗精靈，罕見的黑長髮與知性外表之下，"
+                "暗影谷村出身的黑暗精靈，罕見的黑長髮與知性外表之下，"
                 "是將性魔法鑽研到極致的享樂主義者。精通火與闇屬性，"
                 "並以神之秘法觸及性愛系統的領域。"
             ),
