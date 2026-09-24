@@ -7,7 +7,9 @@ backdrop, the bounded narrative caption, drawer/overlay stage recessing, and the
 re-chrome contract: the centred floating dock panel, the root tab bar with truthful count badges,
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
+
 ## Requirements
+
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the narrative caption card above it, the HUD islands above that, the action dock
@@ -538,8 +540,8 @@ existing per-node movement submission SHALL be unchanged.
   full-map affordance itself
 - **THEN** only that control's own behavior runs — the node submits its move and no additional
   map-open is emitted, the affordance opens the map exactly once, and the marker, which carries no
-  behaviour and no tab stop, lets the click fall through to the island body so the
-  map opens exactly once from there
+  behaviour and no tab stop, lets the click fall through to the island body so the map opens exactly
+  once from there
 
 #### Scenario: A remembered place is readable on the island without a tab stop
 - **WHEN** the island renders a coordinate-bearing payload carrying remembered gateways and, in turn,
@@ -1766,4 +1768,3 @@ menu key, or the meaning of Escape.
 #### Scenario: An emptied right-hand stack costs nothing
 - **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
 - **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
-
