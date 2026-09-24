@@ -26,6 +26,33 @@ export const HALO_R = 10;
 
 const LABEL_BAND = 14;
 
+// The island's legibility floor (design §11: "keeps the current node centred
+// when the box exceeds the minimap"): a square drawing that would have to be
+// scaled below this factor to fit the fixed canvas is instead shown through a
+// window of side `canvasSize / ISLAND_MIN_SCALE` centred on the current node
+// and clamped to the drawing, so a long street never collapses into a
+// hairline. The full-map overlay remains the surface for the whole drawing.
+export const ISLAND_MIN_SCALE = 0.75;
+
+function islandWindow(S, canvasSize, cur) {
+  const V = Math.min(S, canvasSize / ISLAND_MIN_SCALE);
+  if (V >= S || !cur) return { x: 0, y: 0, side: S };
+  const clamp = (v) => Math.min(Math.max(v, 0), S - V);
+  return { x: clamp(cur.x - V / 2), y: clamp(cur.y - V / 2), side: V };
+}
+
+function windowed(geometry, S, canvasSize, cur) {
+  const win = islandWindow(S, canvasSize, cur);
+  return {
+    ...geometry,
+    viewBoxX: win.x,
+    viewBoxY: win.y,
+    viewBoxWidth: win.side,
+    viewBoxHeight: win.side,
+    viewBox: `${win.x} ${win.y} ${win.side} ${win.side}`,
+  };
+}
+
 export function useMapLatticeGeometry(props) {
   const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
   const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
@@ -203,7 +230,13 @@ export function useMapLatticeGeometry(props) {
         const fH = S;
         const mX = (fW - cW) / 2;
         const mY = (fH - (cH + LABEL_BAND)) / 2;
-        return {
+        const cur = current
+          ? {
+              x: current.col * p + p / 2 + mX,
+              y: (rowsVal - 1 - current.row) * p + p / 2 + mY,
+            }
+          : null;
+        return windowed({
           fieldW: fW,
           fieldH: fH,
           marginX: mX,
@@ -219,7 +252,7 @@ export function useMapLatticeGeometry(props) {
           markers: [],
           colPitch: p,
           rowPitch: p,
-        };
+        }, S, canvasSize, cur);
       }
 
       let g = 0;
@@ -273,7 +306,7 @@ export function useMapLatticeGeometry(props) {
       mX = (fW - cW) / 2;
       mY = (fH - (cH + LABEL_BAND)) / 2;
 
-      return {
+      return windowed({
         fieldW: fW,
         fieldH: fH,
         marginX: mX,
@@ -289,7 +322,10 @@ export function useMapLatticeGeometry(props) {
         markers: markersResult ? markersResult.markers : [],
         colPitch: p,
         rowPitch: p,
-      };
+      }, S, canvasSize, {
+        x: current.col * p + p / 2 + mX + g,
+        y: (rowsVal - 1 - current.row) * p + p / 2 + mY + g,
+      });
     }
 
     // canvasSize == null (overlay and bare mounts)

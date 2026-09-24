@@ -432,6 +432,10 @@ function onIslandClick(event) {
   z-index: 1;
   pointer-events: none;
   border: 0;
+  /* A drawing larger than the legibility floor is windowed around the
+     current node (ISLAND_MIN_SCALE); clip it to the fixed square so the
+     rest of the street never paints over the stage. */
+  overflow: hidden;
 }
 
 .local-map :deep(.local-map__node) {
