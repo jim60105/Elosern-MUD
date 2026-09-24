@@ -32,7 +32,6 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     ...useDrawers(store, { panel, panelAvailable }),
     ...useDock(store, {
       panel,
-      shellRef,
       dispatchIntent,
       openRestForm: restWait.openRestForm,
     }),

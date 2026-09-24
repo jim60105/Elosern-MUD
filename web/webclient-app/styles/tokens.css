@@ -136,7 +136,12 @@
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
   --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
-    --header-h: 80px;
+    /* The slim top bar (webclient-avg-place-card-top-bar design D1): one
+       48px row at every supported viewport. */
+    --header-h: 48px;
+    /* The place card's fixed height (design D3/D4): a 20px serif heading and
+       a 12px time line inside the island padding. */
+    --place-h: 68px;
     --left-column: clamp(220px, 20vw, 330px);
     --right-column: clamp(230px, 22vw, 360px);
     /* The AVG stage's bottom band (design §5.1): the message region and the

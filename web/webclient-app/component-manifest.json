@@ -2,6 +2,7 @@
   "required": [
     "Core/AppShell",
     "Core/TopBar",
+    "Core/PlaceCard",
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
     "Core/CharacterSwitcher",

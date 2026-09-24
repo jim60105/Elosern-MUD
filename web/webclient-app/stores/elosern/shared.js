@@ -43,12 +43,12 @@ export const PANEL_ALLOWLIST = [
   "quest_log",
 ];
 
-// D5 (webclient-minimap-04-island-single-affordance): top-meta locationLabel
+// D5 (webclient-minimap-04-island-single-affordance): the place card's locationLabel
 // fallback resolution:
 // 1. local_map panel's current node label (when available, carries
 //    current_node, matches a node, and has non-empty string label)
 // 2. status panel's actor.location.label
-// 3. null (TopBar renders 「位置：--」)
+// 3. null (the place card renders 「位置：--」)
 //
 // Why the map label wins: the status panel's label is the raw room
 // key (「Wilderness」 for every wilderness cell), while the map

@@ -1,20 +1,15 @@
 <script setup>
-// TopBar (H1, webclient-hud-01-shell-and-scene, design D5; MC5 multichar-05-topbar-switcher-ui):
-// the header is
-// split into the top-left brand element (the game name 「伊洛瑟恩」, preserving
-// the `webclient-login-gate` brand surface set) and the top-right cluster
-// hosting the CharacterSwitcher dropdown pill and the meta pill
-// (location · world date/time · connection state, with the ok-green dot paired
-// with a text label — never color alone). The wallet is deliberately not added
-// here (it belongs to H2's island stack).
-//
-// All elements are anchored to the stage's top band; the HUD island anchors
-// start below them at top:64px (design D10).
+// TopBar (H1, webclient-hud-01-shell-and-scene; MC5
+// multichar-05-topbar-switcher-ui; webclient-avg-place-card-top-bar design
+// D1): the slim 48px top band. The top-left brand element carries the game
+// name 「伊洛瑟恩」 (the `webclient-login-gate` brand surface set) beside the
+// ELOSERN wordmark on one row; the top-right cluster hosts the possession
+// banner, the CharacterSwitcher pill, and the meta pill, which states only
+// the connection state (the ok-green dot paired with a text label — never
+// color alone). Location and world time live in the stage's place card.
 import CharacterSwitcher from "./CharacterSwitcher.vue";
 
 defineProps({
-  locationLabel: { type: String, default: null },
-  timeLabel: { type: String, default: null },
   connected: { type: Boolean, default: false },
   rosterAvailable: { type: Boolean, default: false },
   rosterCharacters: { type: Array, default: () => [] },
@@ -39,7 +34,7 @@ defineEmits({
     :class="connected ? 'connected' : 'disconnected'"
   >
     <span class="topbar-wordmark">ELOSERN</span>
-    <span class="topbar-tagline">伊洛瑟恩 · 文字構築的另一個世界</span>
+    <span class="topbar-tagline">伊洛瑟恩</span>
   </div>
   <div class="topbar-right">
     <div
@@ -65,14 +60,6 @@ defineEmits({
       data-testid="topbar"
       :class="connected ? 'connected' : 'disconnected'"
     >
-      <span class="meta-loc" data-testid="topbar-location">
-        {{ locationLabel || "位置：--" }}
-      </span>
-      <span class="sep" aria-hidden="true"></span>
-      <span class="meta-clock" data-testid="topbar-clock">
-        {{ timeLabel || "時間：--" }}
-      </span>
-      <span class="sep" aria-hidden="true"></span>
       <span class="meta-conn" data-testid="connection-state">
         {{ connected ? "● 已連線" : "○ 未連線" }}
       </span>
@@ -82,8 +69,8 @@ defineEmits({
 
 <style>
 /* The top band: the brand at the top-left corner, the meta pill at the
-   top-right corner. The HUD island anchors begin at top:64px (design D10),
-   so this band is bounded above them and nothing overlaps. */
+   top-right corner. The stage anchors begin below the band's lower edge,
+   so nothing overlaps it. */
 .topbar-brand {
   position: absolute;
   top: 16px;
@@ -126,22 +113,6 @@ defineEmits({
   color: var(--paper-300);
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.topbar-meta .meta-loc {
-  color: var(--gold-400);
-  font-weight: 600;
-}
-
-.topbar-meta .sep {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--paper-700);
-}
-
-.topbar-meta .meta-clock {
-  font-family: var(--f-mono);
 }
 
 .topbar-meta .meta-conn {

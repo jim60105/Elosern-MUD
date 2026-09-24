@@ -69,7 +69,7 @@ const {
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_CAST_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind, interactionOpen,
   interactionTarget, interactionChoices, onInteractionTarget, onTabClick,
-  onNavigateHome, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
+  onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail, focusedRowDisabled,
   onAction, onDockActivate, onDockFocusChange,
   onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
@@ -127,7 +127,6 @@ const {
             :drawer="store.view.hudDrawer"
             @navigate="onTabClick"
             @overlay="onOpenOverlay"
-            @home="onNavigateHome"
           />
         </template>
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
@@ -136,11 +135,6 @@ const {
              truthful placeholder. -->
         <template #backdrop>
           <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
-          <div v-if="store.view.mode !== 'creation'" class="scene-heading">
-            <span class="scene-heading__eyebrow">{{ store.view.mode === "combat" ? "戰鬥" : "探索伊洛瑟恩" }}</span>
-            <h1>{{ store.view.statusSlice.locationLabel }}</h1>
-            <p>{{ store.view.statusSlice.timeLabel }}</p>
-          </div>
         </template>
         <!-- The player's standing portrait (webclient-avg-stage-shell D4):
              the current roster character's portrait stands on the bottom

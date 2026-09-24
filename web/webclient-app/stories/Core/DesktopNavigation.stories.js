@@ -9,7 +9,7 @@ export default {
 const renderNavigation = (args) => ({
   components: { DesktopNavigation },
   setup: () => ({ args }),
-  template: '<div style="position:relative;height:100px;--left-column:16px;--header-h:80px"><DesktopNavigation v-bind="args" /></div>',
+  template: '<div style="position:relative;height:100px;--left-column:16px;--header-h:48px"><DesktopNavigation v-bind="args" /></div>',
 });
 
 export const Exploration = {
