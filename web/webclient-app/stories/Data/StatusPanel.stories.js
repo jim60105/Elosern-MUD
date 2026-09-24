@@ -1,16 +1,13 @@
 import { h } from "vue";
 import StatusPanel from "../../components/StatusPanel.vue";
 import {
-  CHARACTER_PANEL_SAMPLE,
   STATUS_PANEL_COMBAT_SAMPLE,
   STATUS_PANEL_MINIMAL_SAMPLE,
   STATUS_PANEL_SAMPLE,
 } from "../fixtures.js";
 
-// StatusPanel: the expanded status surface. Props: status (the committed
-// `status` v1 panel payload — gauges, conditions, disguise flag, combat) and
-// character (the committed `character` v3 panel payload — counters, static
-// traits, wallet). Read-only: no events.
+// StatusPanel: the expanded status surface. Props: status (the committed `status`
+// v1 panel payload — gauges, conditions, combat) and visible. Read-only: no events.
 
 const renderPanel = (args) => ({
   render: () =>
@@ -28,7 +25,7 @@ export const FullPayload = {
   render: renderPanel,
   args: {
     status: STATUS_PANEL_SAMPLE,
-    character: CHARACTER_PANEL_SAMPLE,
+    visible: true,
   },
 };
 
@@ -36,7 +33,7 @@ export const CombatRounds = {
   render: renderPanel,
   args: {
     status: STATUS_PANEL_COMBAT_SAMPLE,
-    character: CHARACTER_PANEL_SAMPLE,
+    visible: true,
   },
 };
 
@@ -44,6 +41,14 @@ export const Minimal = {
   render: renderPanel,
   args: {
     status: STATUS_PANEL_MINIMAL_SAMPLE,
-    character: CHARACTER_PANEL_SAMPLE,
+    visible: true,
+  },
+};
+
+export const HiddenAtFullHealth = {
+  render: renderPanel,
+  args: {
+    status: STATUS_PANEL_SAMPLE,
+    visible: false,
   },
 };

@@ -409,7 +409,6 @@
     "web/webclient-app/tests/action/dock_menu_panes.test.js",
     "web/webclient-app/tests/components/dock_panes.test.js",
     "web/webclient-app/tests/data/breakdown_rendering.test.js",
-    "web/webclient-app/tests/data/character_head.test.js",
     "web/webclient-app/tests/data/equipment_doll.test.js",
     "web/webclient-app/tests/data/party_drawer.test.js",
     "web/webclient-app/tests/data/skill_book.test.js",

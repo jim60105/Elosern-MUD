@@ -1,16 +1,16 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import VitalsTrack from "../../components/VitalsTrack.vue";
 import StatusPanel from "../../components/StatusPanel.vue";
 import {
-  CHARACTER_PANEL_SAMPLE,
   STATUS_PANEL_COMBAT_SAMPLE,
   STATUS_PANEL_MINIMAL_SAMPLE,
   STATUS_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
 // StatusPanel (H2, webclient-hud-02-status-islands, design D1): the
-// `hud-left` island stack. It composes three separately-chromed islands —
-// CharacterHead, VitalsTrack, and ConditionChips — and keeps the preserved
+// `hud-left` island stack. It composes two separately-chromed islands —
+// VitalsTrack and ConditionChips — and keeps the preserved
 // `data-testid="status-panel"` root and the three
 // `status-panel__gauge-value--{hp,mp,sp}` hooks (now carried by the
 // VitalsTrack rows), so the combat and transport-mount browser journeys
@@ -26,10 +26,12 @@ describe("StatusPanel (H2 island-stack root)", () => {
   });
 
   function mountPanel(props = {}) {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
     wrapper = mount(StatusPanel, {
+      attachTo: host,
       props: {
         status: STATUS_PANEL_SAMPLE,
-        character: CHARACTER_PANEL_SAMPLE,
         lowHp: false,
         revision: 1,
         epoch: 0,
@@ -39,24 +41,52 @@ describe("StatusPanel (H2 island-stack root)", () => {
     return wrapper;
   }
 
-  it("renders the head card, the vitals, and the conditions as three sibling islands in fixed order", () => {
+  it("renders the vitals and the conditions as two sibling islands in fixed order", () => {
     const w = mountPanel();
-    const head = w.get('[data-testid="character-head"]');
     const vitals = w.get('[data-testid="vitals-track"]');
     const conditions = w.get('[data-testid="status-panel__conditions"]');
-    // The three islands are siblings of the preserved stack root, in the
-    // head → vitals → conditions order (design D1).
-    expect(head.exists()).toBe(true);
     expect(vitals.exists()).toBe(true);
     expect(conditions.exists()).toBe(true);
     const root = w.get('[data-testid="status-panel"]');
     const children = root.element.children;
-    expect(children).toHaveLength(3);
-    // The island testids are on the children themselves (not descendants),
-    // so assert the attribute on the child element directly.
-    expect(children[0].getAttribute("data-testid")).toBe("character-head");
-    expect(children[1].getAttribute("data-testid")).toBe("vitals-track");
-    expect(children[2].getAttribute("data-testid")).toBe("status-panel__conditions");
+    expect(children).toHaveLength(2);
+    expect(children[0].getAttribute("data-testid")).toBe("vitals-track");
+    expect(children[1].getAttribute("data-testid")).toBe("status-panel__conditions");
+  });
+
+  it("visible: false gives a root with display: none that is still in the DOM", () => {
+    const w = mountPanel({ visible: false });
+    const root = w.get('[data-testid="status-panel"]');
+    expect(root.isVisible()).toBe(false);
+    expect(root.element.style.display).toBe("none");
+  });
+
+  it("the trailing-bar memory survives a hidden-then-shown revision", async () => {
+    const initialStatus = {
+      ...STATUS_PANEL_SAMPLE,
+      resources: {
+        hp: { current: 100, maximum: 100 },
+        mp: { current: 50, maximum: 50 },
+        sp: { current: 40, maximum: 40 },
+      },
+    };
+    const w = mountPanel({ status: initialStatus, visible: false, revision: 1, epoch: 1 });
+    expect(w.get('[data-testid="status-panel"]').isVisible()).toBe(false);
+
+    const damagedStatus = {
+      ...STATUS_PANEL_SAMPLE,
+      resources: {
+        hp: { current: 80, maximum: 100 },
+        mp: { current: 50, maximum: 50 },
+        sp: { current: 40, maximum: 40 },
+      },
+    };
+    await w.setProps({ status: damagedStatus, visible: true, revision: 2, epoch: 1 });
+    expect(w.get('[data-testid="status-panel"]').element.style.display).not.toBe("none");
+    expect(w.findComponent(VitalsTrack).exists()).toBe(true);
+    const ghost = w.get('[data-testid="status-panel__gauge--hp"] .ghost');
+    expect(ghost.attributes("data-instant")).toBe("false");
+    expect(ghost.element.style.width).toBe("80%");
   });
 
   it("keeps the preserved root testid and the three gauge-value hooks", () => {
@@ -73,17 +103,17 @@ describe("StatusPanel (H2 island-stack root)", () => {
     }
   });
 
-  it("relocates every pre-change row so no row loses its only home", () => {
-    const w = mountPanel();
-    // magic_power badge + guild rank/merit + wallet moved to the head card's
-    // badge, rank, and wallet lines (design D1/D11); no rank word remains.
-    const rank = w.get('[data-testid="character-head__rank"]').text();
-    expect(rank).not.toMatch(/學徒|術師|大師|賢者|主宰/);
-    expect(rank).toContain("公會 E");
-    expect(rank).toContain("功績 140");
-    expect(w.get('[data-testid="character-head__wallet"]').text()).toBe("錢包 3,240 銅");
-    // The disguise flag moved to the head card's marker.
-    expect(w.get('[data-testid="character-head__disguise"]').text()).toBe("目前有偽裝");
+  it("renders both condition chips when visible with beneficial and harmful conditions", () => {
+    const status = {
+      ...STATUS_PANEL_SAMPLE,
+      conditions: [
+        { code: "defense_instinct_defense_bonus", label: "防禦本能", severity: "beneficial" },
+        { code: "poison", label: "中毒", severity: "harmful" },
+      ],
+    };
+    const w = mountPanel({ status, visible: true });
+    const chips = w.findAll('[data-testid^="status-panel__condition--"]');
+    expect(chips).toHaveLength(2);
   });
 
   it("moves the combat session line into the vitals island's header row", () => {

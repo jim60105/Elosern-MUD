@@ -83,14 +83,18 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # art placeholder inside the art surface.
         placeholders = page.locator(".elosern-placeholder").all_inner_texts()
         self.assertEqual(len(placeholders), 0, "no foundation placeholder remains")
-        art_surface = page.locator(".art-panel")
-        self.assertEqual(art_surface.count(), 1, "art surface present")
-        self.assertTrue(art_surface.is_visible())
+        self.assertEqual(page.locator('[data-testid="art-panel"]').count(), 0, "art-panel absent")
         # The minimap surface renders (or gracefully reports unavailable) and
         # is no longer a placeholder.
         local_map_surface = page.locator('[data-testid="local-map"]')
         self.assertEqual(local_map_surface.count(), 1, "local-map surface present")
         self.assertTrue(local_map_surface.is_visible())
+
+        # Inject below-max HP so the vitals island is visible and gauge rows render text
+        status = valid_status_panel("艾倫·灰誓", "char-42")
+        status["resources"]["hp"]["current"] = 80
+        inject_snapshot(page, {"status": status})
+        page.wait_for_timeout(200)
 
         # H2 re-map: the preserved `status-panel__gauge-value--<key>` hooks
         # now live on the vitals island's rows (the old `.status-gauge__value`
@@ -268,9 +272,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_populated_island_stack_fits_its_anchor_at_both_viewports(self):
         """H2 task 9.5: at 1440x900 and 1280x720, the left island stack,
         the minimap island, the narrative caption, and the dock must not
-        intersect — with the condition overflow disclosed and ArtPanel
-        present and populated (design D12: the assertions run against the
-        layout that actually ships, not an idealised three-island stack)."""
+        intersect — with the condition overflow disclosed."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
@@ -280,6 +282,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 # An 8-condition status panel makes the +N overflow chip
                 # render, so the assertion runs with the overflow disclosed.
                 status = valid_status_panel("艾倫·灰誓", "char-42")
+                status["resources"]["hp"]["current"] = 80
                 status["conditions"] = [
                     {
                         "code": f"cond_{i}",
@@ -331,57 +334,53 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                             intersect(selectors[i], selectors[j]),
                             f"{selectors[i]} intersects {selectors[j]} at {viewport}",
                         )
-                # ArtPanel is present and populated in the left anchor
-                # (design D12), so the height budget is asserted against the
-                # real layout.
-                self.assertTrue(
-                    page.locator('[data-testid="art-panel"]').count() >= 1,
-                    "ArtPanel present in the left anchor",
-                )
                 page.close()
 
     @covers_requirement(
-        "webclient-contextual-hud::the-character-head-card-renders-only-backed-identity",
+        "webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention",
     )
-    def test_character_head_card_renders_only_backed_identity(self):
-        """H2 head-card: the glyph portrait, the numeric magic-level badge,
-        the display name, the derived magic-rank title paired with the guild
-        rank and merit, and the thousands-grouped wallet — and no race,
-        subrace, class, or faction line (none exists in either payload)."""
+    def test_vitals_island_hides_at_full_health_outside_combat(self):
+        """The vitals island hides with display:none at full health outside combat."""
         page = self.logged_in_page()
-        status = valid_status_panel("艾倫·灰誓", "char-42")
-        character = valid_character_panel()
-        inject_snapshot(page, {"status": status, "character": character})
-        page.wait_for_timeout(300)
+        # 1. Full vitals with no conditions outside combat: status-panel is attached but not visible (display:none)
+        full_status = valid_status_panel("艾倫·灰誓", "char-42")
+        full_status["resources"]["hp"]["current"] = full_status["resources"]["hp"]["maximum"]
+        full_status["resources"]["mp"]["current"] = full_status["resources"]["mp"]["maximum"]
+        full_status["resources"]["sp"]["current"] = full_status["resources"]["sp"]["maximum"]
+        full_status["conditions"] = []
+        inject_snapshot(page, {"status": full_status}, mode="exploration")
+        page.wait_for_timeout(200)
+        panel = page.locator('[data-testid="status-panel"]')
+        self.assertEqual(panel.count(), 1)
+        self.assertFalse(panel.is_visible(), "vitals island hidden at full health outside combat")
 
-        head = page.locator('[data-testid="character-head"]')
-        # Glyph portrait: first grapheme of the display name (艾).
-        self.assertEqual(page.locator('[data-testid="character-head__glyph"]').inner_text(), "艾")
-        # Numeric magic-power badge from the magic_power static trait row.
-        self.assertEqual(
-            page.locator('[data-testid="character-head__badge"]').inner_text(), "27"
-        )
-        # The display name from status.actor.name.
-        self.assertEqual(
-            page.locator('[data-testid="character-head__name"]').inner_text(), "艾倫·灰誓"
-        )
-        # The rank line is guild-only: the derived magic-rank ladder is
-        # retired with the XP system (magic-power-static-rename).
-        # The single guild span is the whole line, spelled exactly — proving
-        # no retired magic-rank word (or anything else) rides it.
-        rank_text = page.locator('[data-testid="character-head__rank"]').inner_text()
-        self.assertEqual(rank_text, "公會 銀牌 · 功績 120")
-        # The wallet, thousands-grouped integer copper (design D11).
-        self.assertEqual(
-            page.locator('[data-testid="character-head__wallet"]').inner_text(),
-            "錢包 3,240 銅",
-        )
-        # Disguise marker is absent when no disguise is active.
-        self.assertEqual(page.locator('[data-testid="character-head__disguise"]').count(), 0)
-        # No race / subrace / class / faction line anywhere on the card.
-        head_text = head.inner_text()
-        for token in ("種族", "職業", "陣營", "subrace", "faction", "class"):
-            self.assertNotIn(token, head_text, f"head card must not render a {token} line")
+        # 2. Full vitals with only a beneficial condition: still not visible
+        beneficial_status = dict(full_status)
+        beneficial_status["conditions"] = [
+            {"code": "defense_instinct_defense_bonus", "label": "防禦本能", "severity": "beneficial"}
+        ]
+        inject_snapshot(page, {"status": beneficial_status}, mode="exploration")
+        page.wait_for_timeout(200)
+        self.assertFalse(panel.is_visible(), "vitals island stays hidden with only beneficial conditions")
+
+        # 3. Full vitals with one harmful condition: visible with that chip
+        harmful_status = dict(full_status)
+        harmful_status["conditions"] = [
+            {"code": "poison", "label": "中毒", "severity": "harmful"}
+        ]
+        inject_snapshot(page, {"status": harmful_status}, mode="exploration")
+        page.wait_for_timeout(200)
+        self.assertTrue(panel.is_visible(), "vitals island visible with harmful condition")
+        self.assertEqual(page.locator('[data-testid="status-panel__condition--poison"]').count(), 1)
+
+        # 4. MP below max with no condition: visible
+        injured_status = dict(full_status)
+        injured_status["resources"] = dict(full_status["resources"])
+        injured_status["resources"]["mp"] = {"current": 40, "maximum": 60}
+        injured_status["conditions"] = []
+        inject_snapshot(page, {"status": injured_status}, mode="exploration")
+        page.wait_for_timeout(200)
+        self.assertTrue(panel.is_visible(), "vitals island visible when mp below max")
         page.close()
 
     @covers_requirement(

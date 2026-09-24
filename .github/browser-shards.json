@@ -11,11 +11,9 @@
         "web.tests.browser.test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_bound_letter_outside_the_field_inserts_like_a_chip",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_hint_names_history_and_completion_and_controls_share_the_walk",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_command_line_is_permanently_present_and_focusable",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_field_is_focusable_without_an_opening_action",
-        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_quick_word_chip_prepares_a_command_without_sending",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_settings_prose_scale_is_a_client_local_preference",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_focuses_the_always_present_field",
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest"
@@ -109,7 +107,7 @@
       "files_b": [
         "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest",
         "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_action_dock_renders_the_mockup_command_surface",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_character_head_card_renders_only_backed_identity",
+        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_vitals_island_hides_at_full_health_outside_combat",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_command_line_field_button_alignment_at_both_viewports",
         "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_dock_shortcut_legend_renders_once_with_real_behaviour_wording",
         "web.tests.browser.test_browser_shell_dock.ShellAcceptanceTest.test_full_log_opens_in_one_action_and_escapes_with_focus_restoration",
@@ -335,7 +333,6 @@
       "name": "art-16",
       "files_a": [
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_exploration_portrait_tiles_match_the_catalog",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_1280x720",
         "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use"

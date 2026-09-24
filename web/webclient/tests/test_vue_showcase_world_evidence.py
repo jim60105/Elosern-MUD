@@ -59,7 +59,6 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # design D5).
 WORLD_FAMILY_KEYS = (
     "World/LocalMap",
-    "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestLog",
     "World/GuildCounter",
@@ -72,9 +71,6 @@ WORLD_FAMILY_KEYS = (
 # built Storybook index.json entry ids for every story exported by this
 # change (title "World/<Component>", deterministic story names).
 WORLD_FAMILY_STORY_IDS = {
-    "world-artpanel--full-payload",
-    "world-artpanel--pending",
-    "world-artpanel--unavailable",
     "world-inventorypanel--empty-bag",
     "world-inventorypanel--mixed-bag",
     "world-inventorypanel--ceiling-bag",
@@ -113,8 +109,8 @@ WORLD_FAMILY_STORY_IDS = {
 # (webclient-vue-06-showcase-overlays) are added at the manifest freeze
 # (design D3): after B5 the frozen manifest carries the complete required
 # set, so this baseline must extend — not restructure. The H1/H2/H3 HUD
-# waves added eleven more keys (HudFrame, SceneBackdrop, FullLogOverlay,
-# RestForm, DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead,
+# waves added keys (HudFrame, SceneBackdrop, FullLogOverlay,
+# RestForm, DockTabBar, DockBreadcrumb, SkillDetailPane,
 # VitalsTrack, ConditionChips, ParticipantFrame), which this baseline now
 # carries as well. The Feedback/ToastQueue key from the
 # add-action-feedback-toasts change joins it at the manifest's refreeze
@@ -127,7 +123,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
     "Core/CommandLine",
-    "Core/QuickWordChips",
     "Core/HudFrame",
     "Core/SceneBackdrop",
     "Core/FullLogOverlay",
@@ -142,7 +137,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     "Data/StatusPanel",
-    "Data/CharacterHead",
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
@@ -298,7 +292,7 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         self.assertEqual(
             family_titles,
             {f"World/{component}" for component in (
-                "LocalMap", "ArtPanel", "ShopPanel",
+                "LocalMap", "ShopPanel",
                 "QuestLog", "GuildCounter", "LoreCodexDrawer", "InventoryPanel",
                 "MapLattice",
             )},

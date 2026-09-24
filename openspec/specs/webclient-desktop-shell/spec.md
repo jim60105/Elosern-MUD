@@ -32,8 +32,10 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 
 ### Requirement: Required desktop surfaces remain visible and usable
 The narrative SHALL occupy the visual centre of the stage as a bounded caption whose complete log is
-reachable in one action, with the brand, the top-meta pill, the HUD island stack, the action dock and
-the command line visible at 1440x900 and 1280x720. The action dock, the narrative caption, and the
+reachable in one action, with the brand, the top-meta pill, the action dock and the command line visible at 1440x900 and
+1280x720, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
+island in combat or while a vital or a `warning`, `harmful`, or `critical` condition needs attention, the party island while the party is
+non-empty). The action dock, the narrative caption, and the
 command line SHALL NOT be permanently closable, and the command line's input field SHALL be present and
 usable without an opening action; every other surface MAY be opened on demand and closed. The reference
 surfaces — the skill book, the bag and equipment, the shop, the quest board, the lore reference, and
@@ -85,7 +87,7 @@ the exit control all stay reachable at 1280x720.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
-- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar, the HUD island stack, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
+- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar, every HUD island its own rule renders, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
@@ -275,7 +277,7 @@ any opening action: there SHALL be no entry control, no `aria-expanded` state an
 the client's text control cannot be hidden by a stale stored layout and cannot be reached only through
 a second control. The field SHALL keep the `#inputfield` identifier inside its `.inputfieldwrapper`
 wrapper. Focus SHALL move into the field when the player presses `/` while no editable control is
-focused, when the player activates the field or a quick-word chip with a pointer or keyboard, or when a
+focused, when the player activates the field with a pointer or keyboard, or when a
 dock borrows the field for its own free-form dialogue; `/` SHALL move focus without inserting a literal
 `/` into the field. Focusing the input field by any of those entrance paths SHALL leave it ready to send
 through its single send implementation. The field SHALL send ordinary text through Evennia's text

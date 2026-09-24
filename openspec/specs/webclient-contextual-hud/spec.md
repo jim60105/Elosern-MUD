@@ -55,9 +55,9 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | narrative caption | visible | visible | visible (dialogue focus) | hidden |
-| HUD island stack (character/vitals/conditions) | visible | visible | visible | hidden |
+| vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
-| party quickbar island | visible | visible | visible | hidden |
+| party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
 | objective tracker island | visible | visible | visible | hidden |
 | action dock | visible | visible | visible (regular exploration form) | visible (creation form) |
 | command line | visible | visible | visible | hidden |
@@ -66,8 +66,11 @@ the accessibility tree and the tab order. The matrix SHALL be:
 While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
 exploration art truthfully — the reference's dialogue focus is carried by the dialogue box
 itself, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
-sets SHALL stay consistent with this matrix. When a mode change hides the surface that currently
-holds focus, the shell SHALL move focus to the
+sets SHALL stay consistent with this matrix. A cell that names a data rule instead of `visible` means
+the surface is shown in that mode only while its own requirement's rule holds for the committed state,
+and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
+says so). When a mode change, or a committed revision that turns a
+surface's data rule false, hides the surface that currently holds focus, the shell SHALL move focus to
 action dock before the surface is removed, using the existing focus-restore path.
 
 #### Scenario: The minimap disappears in combat
@@ -88,8 +91,9 @@ action dock before the surface is removed, using the existing focus-restore path
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the narrative caption, HUD islands, minimap, party quickbar, objective tracker, action
-  dock, and command line all remain rendered, the action dock keeps its regular exploration form
+- **THEN** the narrative caption, minimap, objective tracker, action dock, and command line all
+  remain rendered, the vitals and party islands keep following the same data rules as in
+  exploration, the action dock keeps its regular exploration form
   with every ordinary root affordance present, and only the narrative presentation changes
 
 #### Scenario: Dialogue backdrop keeps its committed art
@@ -227,15 +231,16 @@ The surfaces placed in the stage's `hud-left` and `hud-right` anchors SHALL rend
 islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and
 the shared drop shadow, each island a separate box separated by the anchor's gap — never a single
 boxed column card and never an opaque `<aside>` stacked in a layout column. The left anchor SHALL
-carry the character head card, the vitals, and the conditions as three sibling islands in that fixed
-order. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
+carry the vitals, the conditions, and the party quickbar as sibling islands in that fixed order, each
+present only while its own requirement renders it; the left anchor SHALL carry no character head card
+and no portrait catalog strip. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
 every island populated, so no required island depends on scrolling the anchor to be seen. Every
 island's chrome SHALL be expressed through the shared design tokens, so a token change or the
 reduced-motion block reaches all of them at once.
 
 #### Scenario: The left anchor renders separate islands
-- **WHEN** the shell renders in exploration mode with the `status` and `character` panels available
-- **THEN** the head card, the vitals, and the conditions render as three separately-chromed islands in that order, each with the translucent blurred panel chrome, and none of them is a single opaque column card
+- **WHEN** the shell renders in exploration mode with a vital below its maximum, a committed `harmful` condition, and a non-empty party
+- **THEN** the vitals, the conditions, and the party quickbar render as three separately-chromed islands in that order, each with the translucent blurred panel chrome, none of them is a single opaque column card, and no head card or portrait catalog strip is rendered
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
@@ -245,52 +250,59 @@ reduced-motion block reaches all of them at once.
 - **WHEN** an island renders
 - **THEN** its fill, border, radius, shadow, and transitions resolve from the shared design tokens rather than from per-component literals
 
-### Requirement: The character head card renders only backed identity
-The character head card SHALL render exactly the identity the committed payloads carry: a glyph
-portrait tile derived from the display name in `status.actor.name`, a numeric badge from the
-`magic_power` trait row's current value, that display name, a guild line pairing the guild rank
-and merit from `character.guild` (rendering an explicit 未加入公會 marker when the actor has no
-guild), the wallet from `character.wallet` formatted as thousands-grouped integer copper, and an
-explicit disguise marker when `status.disguise_active` is true. The deleted magic-rank title
-ladder SHALL NOT be reconstructed client-side: the card shows no magic-derived rank word in any
-form, because the growth redesign retired that display system (the title-system change line owns
-title display).
+### Requirement: The vitals island is shown only in combat or while a vital or a condition needs attention
+The HUD SHALL show the vitals island — the vitals rows together with the conditions island beneath
+them — only while at least one of these holds for the committed state: the committed mode is
+`combat`; the derived low-HP presentation state is true; any `status.resources` vital (hp, mp, sp)
+carries a numeric `current` below its numeric `maximum`; or `status.conditions` carries at least one
+entry whose `severity` is `warning`, `harmful`, or `critical`. A condition whose `severity` is
+`beneficial` or `informational` — including a passive `skill_owned` combat-modifier row — SHALL NOT
+by itself make the island visible, and neither SHALL an entry with a missing or unknown `severity`.
+While the island is visible its condition chips SHALL render every committed condition, whatever its
+severity. Otherwise the island SHALL be hidden with `display:none`, so it leaves the accessibility tree and the
+tab order and contributes no visible box. The rule SHALL be derived client-side from the committed
+`status` panel and the committed mode alone: no server field, request, or timer is involved, and a
+vital that is absent from the payload or carries a non-numeric field SHALL NOT count as below its
+maximum. Dialogue mode SHALL follow the same rule as exploration; creation mode hides the island
+through the visibility matrix; an unavailable `status` panel renders no vitals island at all.
 
-The portrait tile SHALL be a glyph and SHALL NOT contain an image element: the player is never a
-present focusable subject of their own exploration catalog, so no portrait asset exists for them
-and none SHALL be invented. An empty or absent display name SHALL render an empty tile rather than
-a substitute character.
+While hidden, the island SHALL keep its trailing-bar memory, so the first committed revision that
+lowers a vital from full shows the island with the trailing bar lagging from the previously committed
+ratio exactly as an always-visible island would. When a committed revision turns the rule false while
+focus is inside the island, focus SHALL move to the action dock before the island is hidden, through
+the same focus-restore path a mode change uses.
 
-The card SHALL NOT render a race, subrace, class, or faction line in any form — not as a value, not as
-a placeholder, and not as an unknown marker — because no such field exists in the `status` or
-`character` payload. When a disguise is active, the badge and the guild line SHALL render the
-**true** trait value; a displayed disguise value SHALL NOT be substituted for it.
+#### Scenario: Full health outside combat hides the island
+- **WHEN** the committed mode is exploration, every committed vital's `current` equals its `maximum`, and `status.conditions` is empty
+- **THEN** the vitals island is hidden with `display:none`, is absent from the accessibility tree and the tab order, and no vitals, numerals, or low-HP marker are visible
 
-The head card SHALL be the client's single persistent wallet surface.
+#### Scenario: A vital below its maximum shows the island
+- **WHEN** a committed revision in exploration mode carries `mp` at 40 of 60 with no condition
+- **THEN** the vitals island renders with every vital's icon, label, and `current / maximum` numerals
 
-#### Scenario: The head card renders the backed identity fields
-- **WHEN** the `status` and `character` panels are committed for an actor with a magic power, a guild rank and merit, and a wallet balance
-- **THEN** the card shows the glyph portrait tile with the numeric magic-power badge, the display name, the guild rank paired with the merit, and the thousands-grouped wallet in copper, and no magic-rank word appears anywhere on the card
+#### Scenario: A condition shows the island at full health
+- **WHEN** a committed revision in exploration mode carries full vitals and one condition whose `severity` is `harmful`
+- **THEN** the vitals island renders with its vitals rows and the condition chip
 
-#### Scenario: No race, class, or faction line is rendered
-- **WHEN** the head card renders for any actor
-- **THEN** no race, subrace, class, or faction value, placeholder, or unknown marker appears anywhere on the card
+#### Scenario: A beneficial-only condition keeps the island hidden at full health
+- **WHEN** a committed revision in exploration mode carries full vitals and only conditions whose `severity` is `beneficial`, such as a passive `skill_owned` combat-modifier row
+- **THEN** the vitals island stays hidden with `display:none` and none of its condition chips is visible or focusable
 
-#### Scenario: The portrait is a glyph, never an image
-- **WHEN** the head card renders outside combat
-- **THEN** the portrait tile contains a glyph derived from the display name and contains no image element and no asset URL
+#### Scenario: Visible island renders every condition chip
+- **WHEN** the vitals island is visible because a vital is below its maximum and the committed conditions carry one `beneficial` and one `informational` entry
+- **THEN** the island renders both condition chips
 
-#### Scenario: An active disguise leaves the true magic power on the card
-- **WHEN** a disguise is active and the `character` payload's displayed rows carry a magic-power value that differs from the true trait
-- **THEN** the badge renders the true trait value, and the displayed disguise value does not replace it
+#### Scenario: Combat always shows the island
+- **WHEN** the committed mode is combat with every vital full and no condition
+- **THEN** the vitals island renders
 
-#### Scenario: A guild-less actor shows the explicit marker
-- **WHEN** the head card renders for an actor whose `character.guild` carries no rank
-- **THEN** the guild line shows the 未加入公會 marker rather than an invented rank
+#### Scenario: The first hit from full health keeps its trailing bar
+- **WHEN** the island is hidden at full health and the next committed revision in the same epoch lowers `hp`
+- **THEN** the island renders, the hp fill shows the new ratio, and the trailing bar starts from the previously committed full ratio
 
-#### Scenario: The wallet has one persistent surface
-- **WHEN** the HUD renders with the `character` panel available
-- **THEN** the wallet is present on the head card and no other persistently-visible HUD surface renders a second wallet figure
+#### Scenario: Focus is rescued before the island hides
+- **WHEN** focus is on a `harmful` condition chip outside combat with every vital full, and a committed revision clears that condition, leaving only `beneficial` conditions
+- **THEN** focus moves to the action dock before the island is hidden, and no focus is lost to the document body
 
 ### Requirement: Vitals pair an icon, a label, and numerals with a trailing damage bar
 Each of hp, mp, and sp SHALL render as one vital row carrying an icon, a Traditional Chinese label,
@@ -1206,8 +1218,12 @@ keep the server-advertised minimum and maximum and SHALL NOT permit a value outs
 
 ### Requirement: The command line is a permanently present bar in the stage's command-line anchor
 The client's text control SHALL render as a single bar filling the stage's `command-line` anchor,
-containing — in this order — the mode's quick-word chips, a prompt chevron, the command input field, a
-hint cluster, the command-history controls, and the overlay utility controls. In the modes this
+containing — in this order — a prompt chevron, the command input field, a hint cluster, the
+command-history controls, and the overlay utility controls. The bar SHALL carry no quick-word chip and
+no other control that only writes a fixed command word into the field. The overlay utility controls
+SHALL include a labelled 角色肖像圖庫 control that renders only while the committed `gallery` panel is
+available and opens the portrait gallery overlay through the same opener-captured path the other
+utility controls use, so closing the gallery returns focus to that control. In the modes this
 capability's visibility matrix renders the command line (exploration and combat), the input field SHALL
 be present in the DOM, visible and focusable without any opening action: there SHALL be no entry
 control, no `aria-expanded` state and no closed state. No stored presentation state SHALL be able to
@@ -1215,8 +1231,7 @@ remove it. (The command line is intentionally absent from the layout in creation
 visibility matrix and design D10.)
 
 The bar SHALL NOT overlap the action dock, the narrative caption or any HUD anchor at 1440x900 or
-1280x720. When horizontal space is insufficient, the hint cluster SHALL be dropped first and the
-quick-word chips SHALL scroll within their own cluster; the input field, the history controls and the
+1280x720. When horizontal space is insufficient, the hint cluster SHALL be dropped first; the input field, the history controls and the
 utility controls SHALL never be dropped, because they are the only pointer path to their behaviour.
 
 #### Scenario: The field is usable without an opening action
@@ -1224,74 +1239,26 @@ utility controls SHALL never be dropped, because they are the only pointer path 
 - **THEN** the command input field is present in the DOM and focusable, no entry control is rendered, and no element in the bar reports an `aria-expanded` state
 
 #### Scenario: The bar keeps its geometry at the minimum viewport
-- **WHEN** the stage renders at 1280x720 with the full quick-word chip set
+- **WHEN** the stage renders at 1280x720 with every utility control rendered, including the gallery control
 - **THEN** the bar's rendered box intersects no other stage anchor's box, and the input field, the history controls and the utility controls are all still rendered
 
 #### Scenario: Constrained width drops the hint before any control
 - **WHEN** the bar's content exceeds its available width
-- **THEN** the hint cluster is removed first and the chip cluster scrolls within itself, and no input field, history control or utility control is removed
+- **THEN** the hint cluster is removed first, and no input field, history control or utility control is removed
 
-### Requirement: Quick-word chips prepare a command without submitting it
-The command line SHALL render quick-word chips for the committed mode. Activating a chip SHALL write
-its command text into the input field and move focus to the field, and SHALL NOT submit: a prepared
-command SHALL still travel through the field's single send implementation, so exactly one send path
-exists.
+#### Scenario: The gallery control follows the committed gallery panel
+- **WHEN** the committed `gallery` panel is available, the player activates the 角色肖像圖庫 utility control, closes the overlay, and a later revision commits the panel's unavailable form
+- **THEN** the control opens the portrait gallery overlay, closing the overlay returns focus to the control, and after the unavailable form commits the control is absent from the bar and the tab order
 
-Each chip SHALL render the draft's structure: a visible Traditional Chinese command label plus a
-letter badge, and the text the chip inserts SHALL be exactly the badge letter followed by a trailing
-space — a complete command word the server's installed command set accepts on every transport. A
-badge letter SHALL therefore be an installed command key or alias, and SHALL also be the client's
-keybinding for that chip: a chip SHALL NOT render a badge letter the client does not bind, and the
-client SHALL NOT bind a letter that is not installed as a command word. Each chip SHALL carry a
-decorative icon beside its text label, drawn from this client's stable glyph vocabulary (the same
-table the action dock's tab bar and pane rows draw from); the icon SHALL be hidden from assistive
-technology and SHALL NOT appear without its accompanying text label. Chips that do not apply to the
-committed mode SHALL be removed with `display:none` so they leave the accessibility tree and the tab
-order, never dimmed.
-
-Pressing a chip's bound letter while focus is in no text-entry surface SHALL be equivalent to
-activating the chip: the bound letter plus a trailing space SHALL be written into the input field
-and focus SHALL move to the field, without submitting. In the exploration set the bound letters are
-`l`→看, `g`→拿, `s`→說, `t`→交談, `w`→等待; in the combat set, `s`→說 and `c`→施法. A bound-letter
-press SHALL NOT interfere with keys owned by other surfaces (the `/` focus key, Escape, arrows, the
-1–4 card picks, and Tab).
-
-#### Scenario: A chip prepares, it does not send
-- **WHEN** the player activates a quick-word chip
-- **THEN** the chip's badge letter plus a trailing space is written into the input field, focus
-  moves to the field, and no text message and no `ui_action` is sent
-
-#### Scenario: The chip set follows the mode
-- **WHEN** the committed mode changes from exploration to combat
-- **THEN** the exploration-only chips are hidden with `display:none` so they leave the
-  accessibility tree and the tab order (never dimmed, and still present in the DOM), and the
-  combat chip set renders in their place
-
-#### Scenario: Every badge letter is an installed command word
-- **WHEN** the rendered chip set is enumerated in any mode
-- **THEN** every chip inserts exactly its badge letter plus a space, and every badge letter is a
-  command key or alias the server installs
-
-#### Scenario: A bound letter inserts like a chip click
-- **WHEN** focus is in no text-entry surface and the player presses `g` in exploration mode
-- **THEN** the command field holds `g `, focus moves to the field, and nothing is submitted
-
-#### Scenario: Bound letters do not fire inside the field
-- **WHEN** focus is in the command input field and the player types the letter `t`
-- **THEN** the character is inserted into the draft text and no chip-insert routing occurs
-
-#### Scenario: Every chip carries a decorative icon paired with its label
-- **WHEN** the rendered chip set is enumerated in any mode
-- **THEN** every chip renders an `aria-hidden` icon alongside its visible text label, and no chip
-  renders an icon without that label
+#### Scenario: No quick-word chip is rendered
+- **WHEN** the bar renders in exploration or combat mode
+- **THEN** no quick-word chip, letter badge, or chip cluster is present in the bar
 
 ### Requirement: The command line advertises only affordances this client implements
 The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
 recall keys and the Tab-completion affordance — matching the draft's `↑↓ 歷史 · Tab 補全` — and
 Tab completion SHALL behave as named: pressing Tab inside the input field completes the current
-draft against the client's candidate set (session command history, the committed mode's chip badge
-letters, and the committed exploration panel's exit names and interact-target display names,
-deduplicated). With exactly one matching candidate the field SHALL hold the full completion with
+draft against the client's candidate set (session command history and the committed exploration panel's exit names and interact-target display names, deduplicated). With exactly one matching candidate the field SHALL hold the full completion with
 the caret at its end; with several the field SHALL hold the longest common prefix and successive
 Tab presses SHALL cycle the matching candidates, with Shift+Tab reversing the cycle. A draft that
 matches no candidate SHALL leave the field untouched, and Tab SHALL never move focus away from the
@@ -1411,8 +1378,9 @@ terrain background painted as pure CSS inside a rounded ink border), and SHALL N
 geometry the payload does not claim.
 
 The help surface SHALL render the client's own control reference — the keys this client binds, the dock's
-navigation model, the quick-word chips and the close paths — from a single client-owned source, and SHALL
-state how the game's own help output is reached. It SHALL NOT render authored game-help content for which
+navigation model and the close paths — from a single client-owned source, and SHALL
+state how the game's own help output is reached. It SHALL name no key binding
+or control the client does not implement, and SHALL NOT render authored game-help content for which
 no committed panel exists, and SHALL NOT stand a placeholder in for it.
 
 #### Scenario: Each surface has a live trigger
@@ -1529,9 +1497,10 @@ does not carry.
 - **THEN** it renders as plain serif prose without the sys marker
 
 ### Requirement: The party quickbar island presents the committed party only
-The left HUD SHALL carry a party island while the committed `party` panel is available in
-exploration, combat, or dialogue mode, and SHALL render no party island when the panel is unavailable or the
-committed mode is creation. The island's header SHALL read `同伴` with the slot count as
+The left HUD SHALL carry a party island while the committed `party` panel is available with at
+least one slot in exploration, combat, or dialogue mode, and SHALL render no party island — no header,
+no count, and no invite cell — when the panel is unavailable, when its `slots` list is empty, or when
+the committed mode is creation. The island's header SHALL read `同伴` with the slot count as
 `N / 4`, where `N` equals the committed slot count. Each row of `party.slots` SHALL render one
 cell carrying: the companion's display name; an avatar showing the bound portrait only when the
 row's `portrait_ref` resolves through the client's art catalog, otherwise the display name's
@@ -1540,10 +1509,13 @@ initial letter in the reference's gold display face; an HP hairline bar whose fi
 name. When the committed combat panel's participant rows carry a row with the same `identity`,
 the state row SHALL additionally prefix the joined participant's session token (e.g. `a2`); a
 companion not fighting SHALL show no token. The slot row SHALL be padded with dashed
-`+ 邀請` cells — one per missing companion up to four — and an empty party SHALL render a row
-of four dashed invite cells. Activating the island or any cell SHALL open the 同伴 · 隊伍
+`+ 邀請` cells — one per missing companion up to four. Activating the island or any cell SHALL open the 同伴 · 隊伍
 drawer and SHALL NOT dispatch any action. The island SHALL present no affinity numeral, no
 companion trait the panel does not carry, and no estimate.
+
+Because the island is absent for an empty party, the character-status drawer SHALL carry one
+labelled `同伴 · 隊伍` control, rendered while the committed `party` panel is available, that opens
+the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachable at every party size.
 
 #### Scenario: The quickbar mirrors the committed party
 - **WHEN** a snapshot commits two party slots with HP 180/220 and 144/160 and bond stages 親睦
@@ -1568,6 +1540,14 @@ companion trait the panel does not carry, and no estimate.
 #### Scenario: The quickbar opens the drawer without mutating
 - **WHEN** the player activates a party cell
 - **THEN** the 同伴 · 隊伍 drawer opens and no `ui_action` or text command is sent
+
+#### Scenario: An empty party renders no island
+- **WHEN** the committed `party` panel is available with an empty `slots` list in exploration mode
+- **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the left anchor is focusable on its behalf
+
+#### Scenario: The party drawer stays reachable with an empty party
+- **WHEN** the committed party is empty and the player opens the character-status drawer and activates its `同伴 · 隊伍` control
+- **THEN** the 同伴 · 隊伍 drawer opens with its 空位 row and follow rules, and no `ui_action` or text command is sent
 
 ### Requirement: The party drawer presents compbig rows and the fixed follow rules
 The 同伴 · 隊伍 drawer SHALL render on the shared right-anchored drawer contract with the sub-count
@@ -1603,18 +1583,6 @@ that has no backing read model.
 - **WHEN** the drawer body is enumerated
 - **THEN** the 跟隨規則 card carries the reference draft's three fixed statements and no invented
   rules
-
-### Requirement: Bound quickbar letters are pinned against the installed player cmdset
-The server SHALL install single-letter aliases `g` (拿), `s` (說), `t` (交談/talk), `w` (等待/wait),
-and `c` (施法/cast) alongside the existing `l` (看), and a test SHALL pin that every letter the
-client binds as a quick-word badge resolves to a command in the installed player cmdset, so the
-chip badge contract cannot drift from the server's command set.
-
-#### Scenario: The five letters resolve in the player cmdset
-- **WHEN** the pinning test loads the installed player cmdset and enumerates the bound letters
-  `l`, `g`, `s`, `t`, `w`, `c`
-- **THEN** each letter resolves to its pinned command (看, 拿, 說, talk, wait, cast) with no
-  collision against another installed key or alias
 
 ### Requirement: The objective tracker island presents the committed objectives only
 The HUD SHALL carry a bottom-right objective tracker island while the committed `objectives`

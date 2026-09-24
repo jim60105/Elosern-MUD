@@ -29,3 +29,39 @@ export function isLowHp(resources) {
   const hp = gaugeRatio(resources && resources.hp);
   return hp !== null && hp <= LOW_HP_THRESHOLD * 100;
 }
+
+const ATTENTION_SEVERITIES = new Set(["warning", "harmful", "critical"]);
+
+// Vitals island visibility (webclient-retire-redundant-hud, design D2):
+// The vitals island is shown only in combat or while a vital or a condition
+// needs attention. An injured state, combat mode, or a condition whose
+// severity is warning, harmful, or critical makes the island visible.
+// Beneficial/informational conditions alone at full vitals in exploration
+// or dialogue leave the island hidden.
+export function isVitalsVisible({ mode, resources, conditions, lowHp } = {}) {
+  if (mode === "combat") {
+    return true;
+  }
+  if (lowHp) {
+    return true;
+  }
+  if (resources && typeof resources === "object") {
+    for (const key of ["hp", "mp", "sp"]) {
+      const gauge = resources[key];
+      if (
+        gauge &&
+        typeof gauge.current === "number" &&
+        typeof gauge.maximum === "number" &&
+        Number.isFinite(gauge.current) &&
+        Number.isFinite(gauge.maximum) &&
+        gauge.current < gauge.maximum
+      ) {
+        return true;
+      }
+    }
+  }
+  if (Array.isArray(conditions)) {
+    return conditions.some((c) => c && typeof c.severity === "string" && ATTENTION_SEVERITIES.has(c.severity));
+  }
+  return false;
+}

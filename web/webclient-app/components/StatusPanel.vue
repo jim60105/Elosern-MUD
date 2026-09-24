@@ -1,21 +1,15 @@
 <script setup>
-// StatusPanel (H2, webclient-hud-02-status-islands, design D1): the
-// `hud-left` island stack. It composes three separately-chromed islands —
-// CharacterHead, VitalsTrack, and ConditionChips — replacing the single
-// boxed column card H1 had re-homed here. The preserved
+// StatusPanel: the `hud-left` island stack. It composes two separately-chromed
+// islands — VitalsTrack and ConditionChips. The preserved
 // `data-testid="status-panel"` root and the three
-// `status-panel__gauge-value--{hp,mp,sp}` hooks (now carried by the
-// VitalsTrack rows) keep the combat and transport-mount browser journeys
-// unchanged.
-import CharacterHead from "./CharacterHead.vue";
+// `status-panel__gauge-value--{hp,mp,sp}` hooks (carried by the VitalsTrack
+// rows) keep the combat and transport-mount browser journeys unchanged.
 import ConditionChips from "./ConditionChips.vue";
 import VitalsTrack from "./VitalsTrack.vue";
 
 const props = defineProps({
   // The committed `status` v1 panel payload.
   status: { type: Object, required: true },
-  // The committed `character` v3 panel payload.
-  character: { type: Object, required: true },
   // The derived low-HP presentation state from the store's `view.vitals`
   // slice (design D5); forwarded to the vitals island.
   lowHp: { type: Boolean, default: false },
@@ -24,12 +18,15 @@ const props = defineProps({
   // committed ratio within an epoch and resets on an epoch change.
   revision: { type: [Number, String], default: null },
   epoch: { type: [Number, String], default: null },
+  // Vitals island visibility derived client-side (design D1/D2). Hidden
+  // with v-show (display: none) at full health outside combat while keeping
+  // VitalsTrack mounted so trailing bar memory is preserved.
+  visible: { type: Boolean, default: true },
 });
 </script>
 
 <template>
-  <div class="island-stack" data-testid="status-panel">
-    <CharacterHead :status="status" :character="character" />
+  <div v-show="visible" class="island-stack" data-testid="status-panel">
     <VitalsTrack
       :status="status"
       :low-hp="lowHp"

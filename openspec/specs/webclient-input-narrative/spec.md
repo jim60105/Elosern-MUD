@@ -89,7 +89,7 @@ come only from the server.
 - **WHEN** the catalog is asked for `options.dismiss`
 - **THEN** it returns `null` and no narrative line is appended
 
-### Requirement: Every deliberate mutation echo appears exactly once at dispatch
+### Requirement: A deliberate mutation echo appears exactly once at dispatch
 
 The browser SHALL append the resolved display line to the narrative exactly once
 per deliberate mutation in the single submit path: the echo fires at the moment
@@ -105,8 +105,7 @@ confirmation items), fields read verbatim from committed state at dispatch
 time (shop row display names, the uniquely matching local-map edge label or
 the destination node label, NPC display names, the committed creation
 confirmation descriptor), or the payload itself — so a deliberate activation
-from any surface (backpack row, shop drawer row, quantity-form Enter, minimap
-move, combat row with or without a non-default magnitude, services row,
+from any surface (backpack row, shop drawer row, minimap move, combat row with or without a non-default magnitude, services row,
 creation activate/reset confirmation) produces its line instead of silently
 resolving to `null`; an ambiguous local-map edge match MUST NOT pick an
 arbitrary edge and instead degrades to the destination-node label. A surface
@@ -120,9 +119,7 @@ submission is blocked the typed speech SHALL remain in the field and the field
 SHALL keep focus (the borrowed interaction is not complete and nothing is
 lost). Because the command field is permanently present, the completion of a
 borrowed dialogue SHALL be signalled by returning focus to the action dock
-rather than by closing a surface. A quick-word chip SHALL NOT echo: it prepares
-text in the field and dispatches nothing, so no line exists to append until the
-player sends. The echo line SHALL be inserted as literal text via the same
+rather than by closing a surface. Text written into the command field without sending (typing, a history walk, or Tab completion) SHALL NOT echo: it dispatches nothing, so no line exists to append until the player sends. The echo line SHALL be inserted as literal text via the same
 narrative append path (scroll-keep + polite unread marker) used by server
 output, SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a
 submitted command, and SHALL have no effect on the validated action payload
@@ -153,10 +150,10 @@ acted.
   field clears and returns focus to the action dock, and no second raw-text
   echo appears
 
-#### Scenario: Preparing a command from a chip echoes nothing
+#### Scenario: Preparing a command in the field echoes nothing
 
-- **WHEN** the player activates a quick-word chip and the verb is written into
-  the command field
+- **WHEN** the player types a command into the field, walks the history, or
+  completes it with Tab, without sending
 - **THEN** no display line is appended and no request is dispatched, and exactly
   one line is appended only once the player sends the prepared command
 

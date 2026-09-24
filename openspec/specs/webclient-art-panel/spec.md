@@ -210,11 +210,14 @@ single visible placeholder node deterministically.
 
 ### Requirement: Art panel browser acceptance is keyboard-first, accessible, and desktop-bounded
 The scene full view SHALL open by click on the backdrop's scene control or Enter on that focused
-control and SHALL close on Escape; the portrait SHALL have its own accessible full-view control. The
+control and SHALL close on Escape. Portrait catalog entries SHALL render only inside the framed-portrait
+surfaces that consume them (the combat participant frame, the party strip and party drawer, the
+dialogue host avatar, the interact target avatars and dock target rows); the client SHALL render no
+standalone portrait catalog strip and no per-portrait full-view control. The
 scene label and alternative text SHALL remain visible as text outside the bitmap, alternative text
 SHALL be meaningful, and no required information SHALL exist only inside an image. Server-authored
 labels SHALL be inserted as text, not trusted HTML, and reduced-motion preference SHALL disable
-nonessential transitions. The stage backdrop and the 3:4 portrait SHALL remain usable at both
+nonessential transitions. The stage backdrop and the framed portraits SHALL remain usable at both
 1440x900 and 1280x720 without the backdrop covering the scene label, the HUD islands, or required
 status.
 
@@ -255,9 +258,8 @@ image with that centered crop; only a placeholder entry (a null URL) SHALL rende
 placeholder with no image element. Each framed-portrait surface — the combat participant frame, the
 party strip and party drawer, the dialogue host avatar in the narrative feed, the interact target
 avatars and the dock's target rows, and the top-bar character switcher — SHALL apply the mapping to
-that entry's rectangle. The 美術展示 catalog browser's own grid tiles and full view MAY use the
-centered default crop; scene backdrops consume scene media, not portrait entries, and are outside
-this requirement.
+that entry's rectangle. Scene backdrops consume scene media, not portrait
+entries, and are outside this requirement.
 
 #### Scenario: A well-formed rectangle centers its face region
 - **WHEN** a framed portrait renders a catalog entry whose rectangle is `{x: 0.25, y: 0.06, w: 0.5, h: 0.5}`

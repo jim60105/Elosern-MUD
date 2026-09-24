@@ -32,12 +32,14 @@ const props = defineProps({
   character: { type: Object, required: true },
   // The derived low-HP presentation state (store view.vitals.lowHp).
   lowHp: { type: Boolean, default: false },
+  // Whether the party panel is available in the store (webclient-retire-redundant-hud design D4).
+  partyAvailable: { type: Boolean, default: false },
 });
 
-// `open-skill` opens the skill drawer; `persona-edit` carries one
+// `open-skill` opens the skill drawer; `open-party` opens the party drawer; `persona-edit` carries one
 // `{ field, text }` persona edit intent (text null clears the field) that
 // AppClient dispatches as exactly one character.persona.update action.
-const emit = defineEmits(["open-skill", "persona-edit"]);
+const emit = defineEmits(["open-skill", "open-party", "persona-edit"]);
 
 // The condition prose is the shared label rule (the same label, duration,
 // and modifier text the H2 chips carry in their accessible names) — one
@@ -108,6 +110,17 @@ const {
       @click="$emit('open-skill')"
     >
       技能書
+    </button>
+
+    <!-- The single labelled control that opens the party drawer (webclient-retire-redundant-hud design D4). -->
+    <button
+      v-if="partyAvailable"
+      type="button"
+      class="character-status-drawer__skill-link"
+      data-testid="character-status-drawer__open-party"
+      @click="$emit('open-party')"
+    >
+      同伴 · 隊伍
     </button>
 
     <!-- Vitals: the three gauges, rendered directly from status.resources. -->

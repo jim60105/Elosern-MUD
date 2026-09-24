@@ -26,7 +26,6 @@
 // action dock *before* the CSS hides it (design D2; the side-effect-free
 // `restoreDockFocus` path — no second focus path).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { boundLetters } from "../lib/quick_chips.js";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
@@ -75,6 +74,11 @@ const props = defineProps({
   // attribute binding, no structural edit to the frame. The stage then
   // renders its red vignette and the HP fill renders its pulse.
   lowHp: { type: Boolean, default: false },
+  // Vitals island visibility derived client-side (design D1/D2/D3).
+  // Focus is rescued before the island hides with display:none.
+  vitalsVisible: { type: Boolean, default: true },
+  // Whether the gallery panel is available (forwarded to CommandLine).
+  galleryAvailable: { type: Boolean, default: false },
   // The client-local text-to-HTML narrative preference (H5): forwarded to
   // the command line's prompt line — when off, the prompt renders as literal
   // text (the preference chooses whether the markup pipeline runs, never
@@ -197,26 +201,6 @@ function onWindowKeydown(event) {
     event.preventDefault();
     return;
   }
-  // Quickbar letter bindings (webclient-align-02-quickbar-shortcuts): outside
-  // any text-entry surface, in the committed exploration/combat mode only, a
-  // bound chip letter is equivalent to activating its chip — the letter plus a
-  // trailing space goes through the command line's single insert path and
-  // focus moves to the field, never submitting. Digits 1-4 (the dock's row
-  // picks), Tab, Escape, and the arrows stay with their owning surfaces; the
-  // bridge/router see letters unclaimed, so they reach this listener. A held
-  // key repeats are suppressed: one physical press is one insert.
-  if (event.repeat || isEditable(event.target)) {
-    return;
-  }
-  // Normalize a printable single-character press (Caps Lock / Shift produce
-  // uppercase event.key values) to its canonical lowercase badge letter —
-  // the server command words are lowercase, so the physical key always
-  // prepares its command regardless of modifier state.
-  const letter = key.length === 1 ? key.toLowerCase() : key;
-  if (boundLetters(props.mode).includes(letter)) {
-    event.preventDefault();
-    commandLine.value?.insertText(letter);
-  }
 }
 
 // A mode change that hides the surface holding focus moves focus to the
@@ -251,6 +235,21 @@ watch(
     // The command line is now permanent (design D1 — no drawer to close): a
     // mode change into creation only runs the pre-hide focus rescue; the CSS
     // then hides the `command-line` anchor itself (H1's matrix).
+  },
+);
+
+// Pre-flush focus rescue for data-driven vitals island hide (design D3):
+// when the island hides outside combat (all vitals full and conditions cleared),
+// any focus held inside the island is restored to the action dock before display:none.
+watch(
+  () => props.vitalsVisible,
+  (nextVisible, prevVisible) => {
+    if (prevVisible && !nextVisible) {
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('[data-testid="status-panel"]')) {
+        restoreDockFocus();
+      }
+    }
   },
 );
 
@@ -310,7 +309,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #command-line>
         <CommandLine
           ref="commandLine"
-          :mode="props.mode"
+          :gallery-available="props.galleryAvailable"
           :prompt="props.prompt"
           :history="props.commandHistory"
           :connected="props.connected"

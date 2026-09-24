@@ -837,4 +837,121 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
      expect(store.router.currentItem().key, name).toBe("service-guild");
    }
  });
+
+  it("focuses a harmful condition chip, then commits full vitals with only a beneficial condition; the island hides and focus lands on #action-dock", async () => {
+    const w = mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+
+    const harmfulStatus = fx.statusPanel({
+      resources: {
+        hp: { current: 100, maximum: 100 },
+        mp: { current: 50, maximum: 50 },
+        sp: { current: 40, maximum: 40 },
+      },
+      conditions: [{ code: "poison", label: "中毒", severity: "harmful" }],
+});
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      revision: 1,
+      mode: "exploration",
+      panels: { status: harmfulStatus },
+    })], {});
+    await w.vm.$nextTick();
+
+    const chip = w.get('[data-testid="status-panel__condition--poison"]');
+    chip.element.focus();
+    expect(document.activeElement).toBe(chip.element);
+
+    const beneficialStatus = fx.statusPanel({
+      resources: {
+        hp: { current: 100, maximum: 100 },
+        mp: { current: 50, maximum: 50 },
+        sp: { current: 40, maximum: 40 },
+      },
+      conditions: [{ code: "defense_instinct_defense_bonus", label: "防禦本能", severity: "beneficial" }],
+    });
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      revision: 2,
+      mode: "exploration",
+      panels: { status: beneficialStatus },
+    })], {});
+    await w.vm.$nextTick();
+
+    expect(w.get('[data-testid="status-panel"]').isVisible()).toBe(false);
+    expect(document.activeElement?.id).toBe("action-dock");
+  });
+
+  it("with an available, empty party panel, no party-strip is rendered in the HUD", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 1,
+          mode: "exploration",
+          panels: {
+            party: {
+              schema_version: 1,
+              available: true,
+              slots: [],
+            },
+            status: fx.statusPanel(),
+          },
+        }),
+      ],
+      {},
+    );
+    await wrapper.vm.$nextTick();
+
+    expect(store.partyAvailable).toBe(true);
+    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+  });
+
+  it("with an empty party, opens the status drawer, activates the open-party button, and opens party drawer", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+
+    // Commit empty-but-available party panel before opening drawer (proves reactivity)
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 1,
+          mode: "exploration",
+          panels: {
+            party: {
+              schema_version: 1,
+              available: true,
+              slots: [],
+            },
+            status: fx.statusPanel(),
+            character: fx.characterPanel ? fx.characterPanel() : CHARACTER_PANEL_SAMPLE,
+          },
+        }),
+      ],
+      {},
+    );
+    await wrapper.vm.$nextTick();
+
+    // Open status drawer
+    store.openHudDrawer("status");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("status");
+
+    const openPartyBtn = wrapper.get('[data-testid="character-status-drawer__open-party"]');
+    await openPartyBtn.trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
+  });
 });

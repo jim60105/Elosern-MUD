@@ -107,8 +107,8 @@ DEFERRED_TITLE_PATTERNS = (
 # The required-set baseline with the overlays family keys removed: the B1
 # core, B2 action-dock, B3 data, and B4 world + services keys, plus the
 # H1–H3 HUD wave keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
-# DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead, VitalsTrack,
-# ConditionChips, ParticipantFrame) and the `World/MapLattice` key the
+# DockTabBar, DockBreadcrumb, SkillDetailPane, VitalsTrack, ConditionChips,
+# ParticipantFrame) and the `World/MapLattice` key the
 # improve-webclient-map-overlay-scale change added to the frozen set. The
 # Feedback/ToastQueue key from the add-action-feedback-toasts change joins
 # it at the manifest's refreeze at 42.
@@ -120,7 +120,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
     "Core/CommandLine",
-    "Core/QuickWordChips",
     "Core/HudFrame",
     "Core/SceneBackdrop",
     "Core/FullLogOverlay",
@@ -135,7 +134,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     "Data/StatusPanel",
-    "Data/CharacterHead",
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
@@ -143,7 +141,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/EquipmentDoll",
     "Data/CharacterStatusDrawer",
     "World/LocalMap",
-    "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestLog",
     "World/GuildCounter",

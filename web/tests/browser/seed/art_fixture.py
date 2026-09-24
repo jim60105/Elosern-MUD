@@ -79,8 +79,8 @@ def _art_fixture(character, room) -> None:
     )
     # A named portrait policy on the dialogue host: the actor is excluded from
     # its own exploration-mode portrait catalog (art_view), so the focusable
-    # catalog entry is the host's; settling it done gives the ArtPanel's
-    # portrait full-view control (v-if="entry.url") a URL to render.
+    # catalog entry is the host's; settling it done gives the portrait
+    # entry a URL to render.
     host.db.portrait_policy = {
         "mode": "named",
         "stable_key": "browser-host",
@@ -120,8 +120,8 @@ def _art_fixture(character, room) -> None:
         # Ensure the named portrait records exist and claim every pending
         # record (the startup sync enqueued ~10 scenes, the monster tiers,
         # and the named portraits) so the scene and both named portraits
-        # settle as done, giving the ArtPanel's portrait full-view control
-        # (v-if="entry.url") a URL to render.
+        # settle as done, giving the portrait entries
+        # a URL to render.
         host_subject = character_subject_for(host)
         actor_subject = character_subject_for(character)
         for subject in (actor_subject, host_subject):

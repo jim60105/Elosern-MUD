@@ -121,44 +121,6 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(w.emitted("focus-parent")).toBeUndefined();
   });
 
-  it("the quick-word chips prepare without submitting (task 4.5)", async () => {
-    const w = mountLine({ mode: "exploration" });
-    const input = w.get("textarea#inputfield");
-    const chip = w.get('[data-testid="quick-word-chip-看"]');
-    expect(chip.exists()).toBe(true);
-    chip.trigger("click");
-    await w.vm.$nextTick();
-    // webclient-align-02: the insert text is the badge letter (the installed
-    // command word), not the zh-TW label.
-    expect(input.element.value).toBe("l ", "the chip's badge letter plus a trailing space");
-    expect(document.activeElement).toBe(input.element, "focus moves to the field");
-    expect(w.emitted("submit")).toBeUndefined();
-  });
-
-  it("chip sets follow the mode (task 4.5): combat chips are absent in exploration", async () => {
-    const w = mountLine({ mode: "exploration" });
-    // jsdom cannot resolve the compound mode-gate selector
-    // (`.elosern-stage[data-elosern-mode="exploration"] .qwc-combat`), so
-    // assert the mechanism: the driver attribute, the in-DOM (gated) group,
-    // and the loaded CSSOM rule that hides it.
-    const host = document.querySelector(".elosern-stage");
-    expect(host.getAttribute("data-elosern-mode")).toBe("exploration");
-    const combatGroup = w.get('[data-testid="quick-word-chips-combat"]');
-    expect(combatGroup.exists()).toBe(true, "the inactive group is gated, not removed");
-    const ruleLoaded = Array.from(document.styleSheets).some((sheet) => {
-      try {
-        return Array.from(sheet.cssRules || []).some(
-          (rule) =>
-            rule.selectorText &&
-            rule.selectorText.includes('data-elosern-mode="exploration"] .qwc-combat'),
-        );
-      } catch {
-        return false;
-      }
-    });
-    expect(ruleLoaded).toBe(true, "the mode-gate CSS rule is loaded and hides the group");
-  });
-
   // webclient-align-02-quickbar-shortcuts: the truthful hint + Tab completion.
   it("the hint cluster states exactly the draft's history + completion affordance", () => {
     const w = mountLine();
@@ -215,14 +177,13 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(w.get("textarea#inputfield").element.value).toBe("cast wind_wall");
   });
 
-  it("Tab is stable across candidate kinds: mode chip letters join the set", async () => {
-    const w = mountLine({ mode: "exploration" });
-    typeInto(w, "s");
+  it("Tab is stable across candidate kinds: panel candidate joins the set", async () => {
+    const w = mountLine({ completionCandidates: ["south"] });
+    typeInto(w, "sou");
     await w.vm.$nextTick();
     pressTab(w);
     await w.vm.$nextTick();
-    // only the chip letter `s` (and nothing else) matches — unique completion
-    expect(w.get("textarea#inputfield").element.value).toBe("s");
+    expect(w.get("textarea#inputfield").element.value).toBe("south");
   });
 
   it("a manual edit resets the cycle and re-derives from the new draft", async () => {

@@ -30,7 +30,6 @@ function extractRule(css, selector) {
 const SURFACE_RULES = [
   ["components/HudDrawer.vue", ".hud-drawer-scrim", "z-index: calc(var(--z-surface-modal) - 100)"],
   ["components/HudDrawer.vue", ".hud-drawer", "z-index: var(--z-surface-modal)"],
-  ["components/ArtPanel.vue", ".art-panel__fullview", "z-index: var(--z-surface-modal)"],
   ["components/SceneBackdrop.vue", ".scene-backdrop .scene-backdrop__fullview", "z-index: var(--z-surface-modal)"],
   ["components/FullLogOverlay.vue", ".fulllog-overlay", "z-index: var(--z-surface-modal)"],
   ["components/InventoryPanel.vue", ".inventory-confirm", "z-index: calc(var(--z-surface-modal) + 100)"],

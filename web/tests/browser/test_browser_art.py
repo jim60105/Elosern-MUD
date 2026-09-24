@@ -61,12 +61,6 @@ def _boxes_overlap(a, b):
     )
 
 
-def _art_panel_available(state: dict) -> bool:
-    """The art panel renders when its committed payload is present and not unavailable."""
-    art = (state.get("panels") or {}).get("art")
-    return art is not None and art.get("available") is not False
-
-
 def _art_portrait_ready(state: dict) -> bool:
     """A portrait tile renders only when the art panel is available and its catalog has entries."""
     art = (state.get("panels") or {}).get("art") or {}
@@ -116,16 +110,6 @@ def _connected_active(state: dict) -> bool:
     return bool(state.get("connected")) and state.get("phase") == "active"
 
 
-ART_PANEL_DOM = {
-    "selector": '[data-testid="art-panel"]',
-    "predicate": (
-        "() => { const p = document.querySelector('[data-testid=\"art-panel\"]'); "
-        "if (!p) { return false; } "
-        "const r = p.getBoundingClientRect(); "
-        "return r.width > 0 && r.height > 0; }"
-    ),
-    "description": "art panel rendered and visible",
-}
 
 # H3: in combat mode the ArtPanel is hidden and the portraits render in the
 # ParticipantFrame (the 我方/敵方 token rows). This DOM readiness targets the
@@ -642,17 +626,6 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self.assertEqual(sent_action_count(page, None), 0)
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
-    def test_exploration_portrait_tiles_match_the_catalog(self):
-        page = self.logged_in_page()
-        # The exploration room seeds a present dialogue host, which the server
-        # authors into the portrait catalog. The renderer shows exactly one
-        # portrait tile per catalog entry — no extra client-built cards.
-        panel = store_state(page)["panels"]["art"]
-        expected = len(panel.get("portrait_catalog") or {})
-        wait_for_store_state(page, _art_panel_available, ART_PANEL_DOM)
-        self.assertEqual(page.locator(".art-panel__portrait-tile").count(), expected)
-
-    @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_portrait_overlay_usable_at_1280x720(self):
         page = self.logged_in_page((1280, 720))
         self._engage(page)
