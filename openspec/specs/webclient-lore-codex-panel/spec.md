@@ -187,16 +187,17 @@ unavailable panel SHALL render the registry-owned unavailable reason and no code
 - **WHEN** the panel is the common unavailable form
 - **THEN** the drawer renders that reason and no category strip, entry list, or card
 
-### Requirement: The codex opens from the command-line utility strip, not from the quest drawer
+### Requirement: The codex opens from the top navigation bar, not from the quest drawer
 
-The codex drawer SHALL be opened by a labelled control in the command line's utility strip, and by no
-control inside the quest drawer. The control SHALL open the codex reference drawer through the
-store's single open-drawer entry point, so at most one focus-trapped surface is open at a time and
-the existing drawer teardown rules apply unchanged. Its glyph SHALL be visually distinct from the
-adjacent title-codex control, which opens a different system.
+The codex drawer SHALL be opened by the labelled 圖鑑 control in the top navigation bar's tool group,
+and by no control inside the quest drawer or the command line. The control SHALL open the codex
+reference drawer through the store's single open-drawer entry point, so at most one focus-trapped
+surface is open at a time and the existing drawer teardown rules apply unchanged, and closing the
+drawer SHALL return focus to the control. Its glyph SHALL be visually distinct from the adjacent
+title-codex (稱號冊) control, which opens a different system.
 
-#### Scenario: The utility strip opens the codex
-- **WHEN** the player activates the codex control in the command line's utility strip
+#### Scenario: The top navigation bar opens the codex
+- **WHEN** the player activates the 圖鑑 control in the top navigation bar's tool group while the command line is collapsed
 - **THEN** the codex reference drawer opens and any previously open drawer or overlay closes
 
 #### Scenario: The quest drawer offers no codex control
@@ -204,6 +205,6 @@ adjacent title-codex control, which opens a different system.
 - **THEN** it contains no control that opens the codex
 
 #### Scenario: The two codex controls are distinguishable
-- **WHEN** the utility strip renders
+- **WHEN** the top navigation bar's tool group renders
 - **THEN** the world-codex control and the title-codex control carry distinct labels and distinct
   glyphs
