@@ -66,8 +66,8 @@
       "files_b": [
         "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_gate_room_renders_its_own_approach_cell_and_no_footprint",
         "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_island_type_ladder_stays_under_its_own_chrome_step",
-        "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_marker_mirror_is_out_of_the_island_height_budget",
         "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_minimap_content_stays_inside_its_island",
+        "web.tests.browser.test_browser_local_map_geometry.LocalMapBrowserTest.test_mirrors_are_clipped_non_focusable_and_do_not_change_island_box",
         "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_minimap_renders_and_distinguishes_states_without_color",
         "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_reconnect_rebuilds_minimap_from_persisted_knowledge",
         "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_remembered_remote_node_presentation_and_accessibility",
@@ -265,9 +265,10 @@
       "files_b": [
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_without_prior_image_uses_placeholder",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_action_dock_floating_panel_persists_across_modes",
+        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_action_dock_fills_the_band_command_region_across_modes",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_root_tab_bar_truthful_count_badges",
@@ -277,6 +278,7 @@
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_full_log_opens_at_latest_line",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable"
       ]
     },
@@ -287,10 +289,11 @@
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_adjacent_traversable_node_submits_explore_move",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_densely_populated_lattice_scales_down_without_reintroducing_overlap",
+        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_long_remembered_list_never_resizes_the_island",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_pointer_events_blank_canvas_opens_overlay_while_actionable_moves",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_visible_and_keyboard_usable_at_both_viewports",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_overlay_renders_scale_note_as_neutral_info_entry",
-        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_tall_lattice_with_long_remembered_list_stays_within_the_island",
+        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_full_map_opens_fitted_zooms_pans_and_recentres",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_abandon_requires_confirmation",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open",
         "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",

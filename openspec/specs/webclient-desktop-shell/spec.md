@@ -31,8 +31,8 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 - **THEN** no tab-title chrome is rendered anywhere, every required surface is present, and each surface carries its own self-identifying content instead of a component-name tab title
 
 ### Requirement: Required desktop surfaces remain visible and usable
-The narrative SHALL occupy the visual centre of the stage as a bounded caption whose complete log is
-reachable in one action, with the brand, the top-meta pill, the action dock and the command line visible at 1440x900 and
+The narrative SHALL occupy the bottom band's message region as a bounded caption whose complete log is
+reachable in one action, with the brand, the top-meta pill, the action dock and the command line visible at 1920x1080, 1440x900, and
 1280x720, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
 island in combat or while a vital or a `warning`, `harmful`, or `critical` condition needs attention, the party island while the party is
 non-empty). The action dock, the narrative caption, and the
@@ -62,7 +62,7 @@ raw room key while a committed panel carries the authored place name for the sam
 wilderness room key is one string for the whole continent, while the map panel names the region the
 player is standing in. Neither payload contract changes: the shell chooses between two labels the
 server already committed at the same revision. The action dock SHALL render as the approved command surface: a
-floating panel bounded to a maximum width and centred in the stage's dock anchor, whose root menu
+panel filling the bottom band's command region (the band's right third), whose root menu
 frame renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold fill, and
 whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
 naming the shortcuts (direction keys to choose, Enter to confirm, Escape to return, `/` to focus the
@@ -72,18 +72,16 @@ dock SHALL render a breadcrumb naming the parent and current frames with a back 
 render each frame's rows in the form that frame calls for — an exit outlet, navigation rows, a
 target's affordance rows under its name, suggestion cards, or the combat forms — beside a detail pane
 that names the focused item, its availability, and the next key action wherever the frame carries one.
-The stage SHALL size the action dock's band and the narrative caption's lower edge from one shared
-dock-band measure that adapts to the frame the dock currently carries - the interaction workspace and
-the three-card waiting frame grow it, the combat band stays shorter, and an empty pane host collapses
-it in two tiers (any mode's empty host - including the ordinary non-degraded exploration root, whose
-row region the tab bar alone fills - collapses to 144px, and an empty combat host overrides that to
-100px) - outside combat both surfaces position from that one measure with their own fixed/viewport
-offsets, while combat coordinates its feed and dock through its own shorter band plus explicit
-offsets, so the narrative caption and the action dock never overlap and neither clips the
-other at a supported viewport. A frame whose rows exceed the band SHALL scroll inside the pane host
-while the tab bar and breadcrumb stay fixed above it. In dialogue mode the narrative caption SHALL
-likewise bound its own growth so the host, the latest line, the choice rows, the free-form input and
-the exit control all stay reachable at 1280x720.
+The stage SHALL give the narrative caption and the action dock one fixed-height bottom band - the
+message region on the left two thirds and the command region on the right third - whose height comes
+from one shared band-height token and never depends on the frame the dock carries, on the mode, or on
+the narrative: the interaction workspace, the waiting frame, the combat frames, and an empty pane host
+all render inside the same command-region box, so the narrative caption and the action dock never
+overlap and neither clips the other at a supported viewport. A frame whose rows exceed the region
+SHALL scroll inside the pane host while the tab bar and breadcrumb stay fixed above it. In dialogue
+mode the narrative caption SHALL keep the message region's fixed box, and the host, the latest line,
+the choice rows, the free-form input and the exit control SHALL all stay reachable at 1280x720 by
+scrolling inside the caption, never by growing it.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
@@ -131,19 +129,19 @@ the exit control all stay reachable at 1280x720.
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one centred floating panel in the dock anchor, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a muted-gold fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
+- **THEN** it renders as one panel filling the band's command region, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a muted-gold fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
 
 #### Scenario: A tall frame grows the band without touching the narrative
-- **WHEN** the dock carries a taller frame (the interaction workspace or the three-card waiting frame) at 1440x900 or 1280x720
-- **THEN** the shared dock band grows for that frame, the narrative caption's lower edge stays above the dock's upper edge, and neither surface clips the other
+- **WHEN** the dock carries a taller frame (the interaction workspace or the waiting frame) at 1440x900 or 1280x720
+- **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the narrative caption's box is unchanged, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
-- **WHEN** the active frame's rows exceed the dock band's height
+- **WHEN** the active frame's rows exceed the command region's height
 - **THEN** the rows scroll within the pane host, the tab bar and breadcrumb remain visible and fixed above the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1280x720
-- **THEN** the host identity, the latest line, every choice row, the free-form input and the exit control are all reachable without document-level scrolling
+- **THEN** the host identity, the latest line, every choice row, the free-form input and the exit control are all reachable by scrolling inside the caption, without document-level scrolling and without the caption or the band changing size
 
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. Because the portal converts server output to HTML before the `text` message is sent, the narrative log SHALL render that stream through the `webclient-narrative-markup` allowlist pipeline rather than inserting it as a single text node; it SHALL NOT display markup source to the player, and it SHALL NOT interpret anything outside that pipeline's allowlist. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom; the indicator SHALL be a labeled control that states its count and its jump action — a button reading "↓ N 則新訊息（點擊返回最新）" or equivalent — SHALL be announced through a polite live region, SHALL be hidden entirely while the count is zero, and SHALL, when activated, scroll the log to the latest output and clear the count, exactly as scrolling to the bottom does. Narrative output SHALL remain usable if every structured renderer is unavailable, and SHALL remain usable if a message cannot be fully tokenized — such a message degrades to readable literal text rather than suppressing the log.

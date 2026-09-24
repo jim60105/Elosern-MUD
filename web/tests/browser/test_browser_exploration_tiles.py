@@ -310,8 +310,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     def test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport(self):
-        # fix-webclient-hud-dock-exploration-grid-width: at 400x720 the outlet
-        # pane is two content-sized columns wide. The invariant is that the
+        # fix-webclient-hud-dock-exploration-grid-width: at 1280x720 the
+        # outlet pane lives in the bottom band's command region (the band's
+        # right third, webclient-avg-stage-shell design D5), roughly 400px
+        # wide, so it holds two content-sized columns. The invariant is that the
         # last row never leaves blank horizontal space: a partial last row
         # must span the remaining columns via an inline grid-column style,
         # and a row the shipped exit count fills exactly must not span. The
@@ -319,12 +321,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # the assertion tracks the shipped fixture topology (the south gate
         # gained the wilderness exit since this test was written: the move
         # frame is 4 exits, i.e. two full rows here) instead of pinning it.
-        page = self.logged_in_page((400, 720))
+        page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         self._open_root(page, 0)  # Move
         pane_box = page.locator(".dock-menu__outlet").bounding_box()
-        self.assertIsNotNone(pane_box, "the outlet pane must be visible at 400x720")
+        self.assertIsNotNone(pane_box, "the outlet pane must be visible at 1280x720")
         tiles = page.locator(".dock-menu__outlet-tile")
         self.assertGreaterEqual(
             tiles.count(), 3, "the move frame must render at least 3 exit tiles"

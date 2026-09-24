@@ -61,7 +61,9 @@ defineEmits(["dismiss"]);
   top: calc(var(--header-h) + 12px);
   right: 16px;
   width: min(320px, calc(100vw - 32px));
-  max-height: calc(100dvh - var(--header-h) - var(--command-line-h) - 24px);
+  /* Bounded above the bottom band and its command-line row, so a tall stack
+     never covers the dock or the message window (webclient-avg-stage-shell). */
+  max-height: calc(100dvh - var(--header-h) - var(--stage-content-bottom) - 24px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;

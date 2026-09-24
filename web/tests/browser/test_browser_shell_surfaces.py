@@ -195,8 +195,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             overlap = page.evaluate(
                 """() => {
-                  const testids = ["anchor-hud-left", "anchor-hud-right", "anchor-feed",
-                                   "anchor-dock", "anchor-command-line"];
+                  const testids = ["anchor-hud-left", "anchor-hud-right", "anchor-band-message",
+                                   "anchor-band-command", "anchor-command-line"];
                   const anchors = testids
                     .map((t) => {
                       const el = document.querySelector('[data-testid="' + t + '"]');

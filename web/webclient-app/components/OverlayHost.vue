@@ -1,7 +1,9 @@
 <script setup>
 // OverlayHost (H5, webclient-hud-05-overlays-and-command-line, design D7):
-// the shared overlay workspace. The shell leaves the navigation and
-// command line visible around it; the header row carries the
+// the shared overlay workspace. The shell leaves the navigation visible
+// above it and a strip of the bottom band below it (since the AVG stage
+// shell the command line sits on the band's top edge, so an open overlay
+// covers it, like the drawers); the header row carries the
 // icon slot, the overlay title, the subtitle, and a labelled close control.
 // Focus is trapped through H4's shared `focus-trap.js` (one trap, not a
 // second one). The opener element is captured at open time by the caller;

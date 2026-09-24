@@ -1,4 +1,4 @@
-"""Contextual HUD action-dock acceptance (webclient-contextual-hud): the floating dock panel, tab-bar count badges, the router breadcrumb, digit-row activation, and per-kind pane vocabulary.
+"""Contextual HUD action-dock acceptance (webclient-contextual-hud): the dock in the band's command region, tab-bar count badges, the router breadcrumb, digit-row activation, and per-kind pane vocabulary.
 """
 
 from __future__ import annotations
@@ -32,24 +32,63 @@ from ._journey_support import (
 )
 
 
+def _selectable_target(identity: int, name: str) -> dict:
+    """An interact target carrying one affordance, so the workspace can select it."""
+    target = _interact_target(identity, name)
+    target["affordances"] = [{
+        "kind": "action",
+        "action_id": "explore.talk_freeform",
+        "label": "自由對話",
+        "enabled": True,
+        "disabled_reason": None,
+    }]
+    return target
+
+
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
     """Contextual HUD action-dock behavior on the shared managed server."""
     @covers_requirement(
-        "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
+        "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size"
     )
-    def test_action_dock_floating_panel_persists_across_modes(self):
-        """The dock band paints the full stage width; the content column is
-        centred inside it (webclient-align-01-dock-chrome).
+    def test_action_dock_fills_the_band_command_region_across_modes(self):
+        """The dock fills the bottom band's command region at a fixed size
+        (webclient-avg-stage-shell design D1/D5).
 
-        The painted chrome (the draft's `.dockwrap` gradient, hairline top
-        border, upward shadow, and padding) belongs to the full-width dock
-        ANCHOR; `#action-dock` is the centred max-width-1180 content column
-        (the draft's `.dock`) and paints nothing itself. Verified across the
-        scenario's viewport range (1280x720 through 1920x1080).
+        The band (``stage-band``) is ``clamp(260px, 27.8vh, 400px)`` tall and
+        paints the draft's `.dockwrap` chrome (gradient, hairline top border,
+        upward shadow); its right third is the command region, which holds
+        ``#action-dock`` — a content column that paints nothing itself. No
+        frame (the interaction workspace with a target selected, the waiting
+        frame) moves or resizes the region. Verified across the scenario's
+        viewport range (1280x720 through 1920x1080).
         """
+        measure = """() => {
+          const band = document.querySelector('[data-testid="stage-band"]');
+          const region = document.querySelector('[data-testid="anchor-band-command"]');
+          const dock = document.querySelector('#action-dock');
+          const b = band.getBoundingClientRect();
+          const r = region.getBoundingClientRect();
+          const d = dock.getBoundingClientRect();
+          const bandStyle = getComputedStyle(band);
+          const dockStyle = getComputedStyle(dock);
+          return {
+            bandTop: b.top, bandBottom: b.bottom, bandHeight: b.height,
+            regionLeft: r.left, regionRight: r.right, regionTop: r.top,
+            regionBottom: r.bottom, regionWidth: r.width,
+            dockLeft: d.left, dockRight: d.right, dockTop: d.top, dockBottom: d.bottom,
+            bandBackgroundImage: bandStyle.backgroundImage,
+            bandBorderTopWidth: bandStyle.borderTopWidth,
+            bandBoxShadow: bandStyle.boxShadow,
+            dockBackgroundImage: dockStyle.backgroundImage,
+            dockBorderTopWidth: dockStyle.borderTopWidth,
+            dockBoxShadow: dockStyle.boxShadow,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+          };
+        }"""
         for viewport in ((1280, 720), (1600, 900), (1920, 1080)):
             page = self.logged_in_page(viewport)
-            exploration = _exploration_panel([_interact_target(11, "小販")])
+            exploration = _exploration_panel([_selectable_target(11, "小販")])
             _inject_snapshot(
                 page,
                 {
@@ -65,100 +104,66 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
             dock = page.locator("#action-dock")
             self.assertEqual(dock.count(), 1, "exactly one #action-dock element")
-            self.assertTrue(dock.is_visible(), "the floating dock panel is visible")
-            page.evaluate(
-                "() => { const d = document.querySelector('#action-dock'); d.__tracked = true; }"
-            )
+            self.assertTrue(dock.is_visible(), "the action dock is visible")
 
-            geometry = page.evaluate(
-                """() => {
-                  const dock = document.querySelector('#action-dock');
-                  const anchor = document.querySelector('[data-testid="anchor-dock"]');
-                  const d = dock.getBoundingClientRect();
-                  const a = anchor.getBoundingClientRect();
-                  const style = getComputedStyle(dock);
-                  const anchorStyle = getComputedStyle(anchor);
-                  return {
-                    dockLeft: d.left, dockWidth: d.width, dockHeight: d.height,
-                    anchorLeft: a.left, anchorWidth: a.width, anchorHeight: a.height,
-                    maxWidth: style.maxWidth,
-                    dockBackgroundImage: style.backgroundImage,
-                    dockBorderTopWidth: style.borderTopWidth,
-                    dockBoxShadow: style.boxShadow,
-                    borderTopWidth: anchorStyle.borderTopWidth,
-                    backgroundImage: anchorStyle.backgroundImage,
-                    boxShadow: anchorStyle.boxShadow,
-                    padTop: parseFloat(anchorStyle.paddingTop),
-                    padBottom: parseFloat(anchorStyle.paddingBottom),
-                    viewportWidth: window.innerWidth,
-                  };
-                }"""
-            )
-            # The desktop redesign re-tenanted the dock anchor from the
-            # full-width draft band to the spec's floating panel
-            # (webclient-desktop-shell: "a floating panel bounded to a
-            # maximum width and centred in the stage's dock anchor";
-            # app-shell.css .elosern-root [data-anchor="dock"] left: 35%).
+            geometry = page.evaluate(measure)
+            expected_band = min(max(260.0, geometry["viewportHeight"] * 0.278), 400.0)
             self.assertAlmostEqual(
-                geometry["anchorLeft"],
-                float(geometry["viewportWidth"]) * 0.35,
-                delta=1.0,
-                msg=f"the dock anchor is the workspace's left-anchored panel at {viewport}",
+                geometry["bandHeight"], expected_band, delta=1.0,
+                msg=f"the band is clamp(260px, 27.8vh, 400px) tall at {viewport}",
             )
-            self.assertLess(
-                geometry["anchorWidth"],
-                float(geometry["viewportWidth"]),
-                f"the dock anchor is a bounded panel, not the full-width band, at {viewport}",
+            self.assertAlmostEqual(
+                geometry["bandBottom"], geometry["viewportHeight"], delta=1.0,
+                msg=f"the band sits on the stage's bottom edge at {viewport}",
             )
-            self.assertIn(
-                "gradient",
-                geometry["backgroundImage"],
-                f"the band paints the draft's gradient at {viewport}",
+            self.assertAlmostEqual(
+                geometry["regionLeft"], geometry["viewportWidth"] * 2 / 3, delta=1.0,
+                msg=f"the command region starts at two thirds of the width at {viewport}",
             )
-            self.assertTrue(
-                geometry["borderTopWidth"].startswith("1px"),
-                "the panel carries the --line hairline border",
+            self.assertAlmostEqual(
+                geometry["regionRight"], geometry["viewportWidth"], delta=1.0,
+                msg=f"the command region ends at the stage's right edge at {viewport}",
             )
-            self.assertIn(
-                "inset",
-                geometry["boxShadow"],
-                "the panel carries the redesign's inset highlight",
-            )
-            # The panel is horizontally centred within the anchor.
-            self.assertLess(
-                abs((geometry["dockLeft"] + geometry["dockWidth"] / 2)
-                    - (geometry["anchorLeft"] + geometry["anchorWidth"] / 2)),
-                4.0,
-                f"the dock must be centred within the dock anchor at {viewport}",
-            )
-            self.assertLessEqual(
-                geometry["dockWidth"],
-                min(1180.0, geometry["anchorWidth"]),
-                f"the content column stays inside max-width 1180 at {viewport}",
-            )
-            self.assertEqual(geometry["maxWidth"], "1180px")
-            # The content column paints nothing: the band owns the chrome.
+            self.assertAlmostEqual(geometry["regionTop"], geometry["bandTop"], delta=1.0)
+            self.assertAlmostEqual(geometry["regionBottom"], geometry["bandBottom"], delta=1.0)
+            # The dock lies inside the command region.
+            self.assertGreaterEqual(geometry["dockLeft"], geometry["regionLeft"] - 0.5)
+            self.assertLessEqual(geometry["dockRight"], geometry["regionRight"] + 0.5)
+            self.assertGreaterEqual(geometry["dockTop"], geometry["regionTop"] - 0.5)
+            self.assertLessEqual(geometry["dockBottom"], geometry["regionBottom"] + 0.5)
+            # The band paints the draft's chrome; the content column paints nothing.
+            self.assertIn("gradient", geometry["bandBackgroundImage"])
+            self.assertTrue(geometry["bandBorderTopWidth"].startswith("1px"))
+            self.assertNotEqual(geometry["bandBoxShadow"], "none")
             self.assertEqual(geometry["dockBackgroundImage"], "none")
             self.assertEqual(geometry["dockBorderTopWidth"], "0px")
             self.assertEqual(geometry["dockBoxShadow"], "none")
-            # The band's border-box height is the --dock-h token (the anchor
-            # is border-box: height = token); the content column fills the
-            # band's padded content box (vertical padding + border subtract).
-            self.assertAlmostEqual(
-                geometry["dockHeight"],
-                geometry["anchorHeight"]
-                - geometry["padTop"]
-                - geometry["padBottom"]
-                - 2.0,
-                places=1,
-                msg=f"the content column fills the band's padded box at {viewport}",
+
+            # No frame moves or resizes the region: Interact with a target
+            # selected, then Wait.
+            baseline = (geometry["regionLeft"], geometry["regionTop"],
+                        geometry["regionRight"], geometry["regionBottom"],
+                        geometry["bandHeight"])
+            page.evaluate(
+                "() => window.__elosernBridge.store.tabToRootAndConfirm('interact', 'pointer')"
             )
-            # The panel stays inside the anchor's box.
-            self.assertGreaterEqual(geometry["dockLeft"], geometry["anchorLeft"])
-            self.assertLessEqual(
-                geometry["dockLeft"] + geometry["dockWidth"],
-                geometry["anchorLeft"] + geometry["anchorWidth"],
+            page.wait_for_selector(".interaction-workspace", timeout=15000)
+            page.locator(".interaction-workspace .dock-menu__nav-row").first.click()
+            page.wait_for_selector(".interaction-workspace--selected", timeout=15000)
+            after_interact = page.evaluate(measure)
+            page.evaluate(
+                "() => window.__elosernBridge.store.tabToRootAndConfirm('wait', 'pointer')"
             )
+            page.wait_for_selector(".waiting-screen", timeout=15000)
+            after_wait = page.evaluate(measure)
+            for label, state in (("interact", after_interact), ("wait", after_wait)):
+                box = (state["regionLeft"], state["regionTop"], state["regionRight"],
+                       state["regionBottom"], state["bandHeight"])
+                for got, want in zip(box, baseline):
+                    self.assertAlmostEqual(
+                        got, want, delta=1.0,
+                        msg=f"the {label} frame left the command region unchanged at {viewport}",
+                    )
 
         # One #action-dock element persists across a mode change (not remounted),
         # and its data-mode switches to the committed mode.

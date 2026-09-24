@@ -31,6 +31,10 @@ body {
 
 /* Reference-led desktop composition. Game state and focus remain component-owned. */
 .elosern-root {
+  /* The drawer workspace's bottom inset. Drawers are reference surfaces laid
+     over the stage: they keep their full height and cover the bottom band
+     and the command-line row above it (webclient-avg-stage-shell design D8),
+     leaving only the band's lowest strip visible. */
   --workspace-bottom: calc(var(--command-line-h) + 12px);
   background: var(--ink-950);
 }
@@ -99,9 +103,12 @@ body {
 .elosern-root .topbar-meta .sep { display: none; }
 .elosern-root .topbar-right > :has(.character-switcher) { min-width: 0; }
 .elosern-root .stage-vignette { box-shadow: inset 0 -150px 160px #0b0d10, inset 0 0 100px #0008; }
+/* The backdrop's box is the stage box: from the top band's lower edge to
+   the bottom band's upper edge, so the cover crop never hides scene art
+   behind the band (webclient-avg-stage-shell design D8). */
 .elosern-root .scene-backdrop {
   top: var(--header-h);
-  bottom: var(--command-line-h);
+  bottom: var(--band-h);
 }
 .scene-backdrop__sample {
   position: absolute;
@@ -128,7 +135,7 @@ body {
   object-position: center top;
   mask-image: linear-gradient(#000 55%, transparent);
 }
-.elosern-root .scene-backdrop__placeholder {
+.elosern-root .scene-backdrop .scene-backdrop__placeholder {
   top: 14px;
   bottom: auto;
   left: auto;
@@ -139,30 +146,51 @@ body {
   font-size: 11px;
 }
 .elosern-root .scene-backdrop__placeholder-kind { display: none; }
-.elosern-root .scene-backdrop__scene-label,
-.elosern-root .scene-backdrop__scene-alt,
-.elosern-root .scene-backdrop__generating {
+/* These captions are positioned inside the backdrop box, whose lower edge
+   is already the band's top edge: they clear only the command-line row that
+   overlays the box's bottom strip (design D8). The selectors carry the
+   `.scene-backdrop` class so they outrank SceneBackdrop.vue's standalone
+   base rules, which load later at equal specificity. */
+.elosern-root .scene-backdrop .scene-backdrop__scene-label,
+.elosern-root .scene-backdrop .scene-backdrop__scene-alt,
+.elosern-root .scene-backdrop .scene-backdrop__generating {
   left: calc(var(--left-column) + 16px);
   max-width: calc(100% - var(--left-column) - var(--right-column) - 80px);
-  bottom: calc(var(--dock-h) + 28vh + 44px);
+  bottom: calc(var(--command-line-h) + 28vh + 44px);
   transform: none;
 }
-.elosern-root .scene-backdrop__scene-alt { bottom: calc(var(--dock-h) + 28vh + 76px); }
-.elosern-root .scene-backdrop__fullview-control {
+.elosern-root .scene-backdrop .scene-backdrop__scene-alt { bottom: calc(var(--command-line-h) + 28vh + 76px); }
+.elosern-root .scene-backdrop .scene-backdrop__fullview-control {
   right: calc(var(--right-column) + 12px);
-  bottom: calc(var(--dock-h) + 28vh + 44px);
+  bottom: calc(var(--command-line-h) + 28vh + 44px);
 }
-.elosern-root .stage-portrait {
-  position: absolute;
-  top: calc(var(--header-h) + 14px);
-  bottom: var(--command-line-h);
-  left: 15%;
-  width: 25%;
-  z-index: 2;
+/* The player's standing portrait (design D4): soft side edges and a long
+   fade at the feet, so the figure dissolves into the band it stands on
+   instead of ending in a hard rectangle. The two masks intersect. */
+.elosern-root [data-anchor="actor-left"] .reference-artwork img,
+.elosern-root [data-anchor="actor-left"] .reference-artwork__placeholder {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), linear-gradient(#000 72%, transparent 98%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), linear-gradient(#000 72%, transparent 98%);
+  mask-composite: intersect;
 }
-.stage-portrait img {
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 75%, transparent);
-  object-position: center 12%;
+.elosern-root [data-anchor="actor-left"] .reference-artwork img { object-position: center 12%; }
+/* The portrait's caption reads as a small name plate at the figure's lower
+   left, clear of the command-line row that starts at the island column. */
+/* The placeholder already states its label on the figure itself. */
+.elosern-root [data-anchor="actor-left"] .reference-artwork figcaption[data-sample="true"] { display: none; }
+.elosern-root [data-anchor="actor-left"] .reference-artwork figcaption {
+  left: 17%;
+  right: auto;
+  bottom: calc(var(--command-line-h) * .35);
+  max-width: calc(var(--left-column) - 6vw - 17% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--paper-100);
+  font: 12px var(--f-serif);
+  letter-spacing: .12em;
 }
 .scene-heading {
   position: absolute;
@@ -182,14 +210,14 @@ body {
   top: calc(var(--header-h) + 16px);
   left: 16px;
   width: calc(var(--left-column) - 32px);
-  max-height: calc(100% - var(--header-h) - var(--command-line-h) - 32px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
   gap: 12px;
 }
 .elosern-root .elosern-stage [data-anchor="hud-right"] {
   top: calc(var(--header-h) + 16px);
   right: 16px;
   width: calc(var(--right-column) - 28px);
-  max-height: calc(100% - var(--header-h) - var(--command-line-h) - 32px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
   align-items: stretch;
   gap: 14px;
 }
@@ -197,50 +225,42 @@ body {
 .elosern-root [data-anchor="hud-right"] > * { flex-shrink: 0; }
 .elosern-root [data-anchor="hud-left"],
 .elosern-root [data-anchor="hud-right"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
-.elosern-root .elosern-stage [data-anchor="feed"] {
-  left: 35%;
-  right: calc(var(--right-column) + 12px);
-  bottom: calc(var(--stage-content-bottom) + 14px);
-  width: auto;
-  height: 30vh;
-  max-height: calc(100% - var(--header-h) - var(--stage-content-bottom) - 36px);
-  transform: none;
+/* The bottom band (webclient-avg-stage-shell design D1/D6). The narrative
+   caption fills the message region; the region's own padding is the gutter,
+   so the old left hairline rule is off. */
+.elosern-root .elosern-stage [data-anchor="band-message"] > .elosern-narrative {
+  background: linear-gradient(180deg, #16181cd9, #0f1114e6);
+  border-color: #3a3833;
+  box-shadow: inset 0 1px 0 #ffffff08;
 }
+/* The command region (design D5): the dock fills it at a fixed size, and
+   every master-detail frame keeps list and detail side by side inside the
+   narrow region without horizontal overflow. */
+.elosern-root [data-anchor="band-command"] .dock-detail { flex: 0 1 min(220px, 45%); min-width: 0; }
+.elosern-root [data-anchor="band-command"] .skill-detail-pane { flex: 1 1 min(220px, 45%); min-width: 0; }
+.elosern-root [data-anchor="band-command"] .dock-pane-host.interaction-workspace { gap: 10px 14px; }
+/* The target cells keep the router's column count (an inline style) and
+   compact themselves to the region instead: a smaller avatar and gap. */
+.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-row { gap: 8px; padding: 7px; min-width: 0; }
+.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-avatar { width: 34px; height: 40px; font-size: 19px; }
+.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The root tab bar shares the region's width: every tab stays on the first
+   row (equal shares, centred), and the shortcut hint takes its own
+   right-aligned row, so no tab ever wraps into the breadcrumb. */
+.elosern-root [data-anchor="band-command"] .dock-tab-bar { flex-wrap: wrap; row-gap: 2px; }
+.elosern-root [data-anchor="band-command"] .dock-tab-bar__tab { flex: 1 1 0; min-width: 0; justify-content: center; gap: 6px; padding-inline: 6px; white-space: nowrap; }
+.elosern-root [data-anchor="band-command"] .dock-tab-bar__hint { flex: 1 0 100%; text-align: right; }
+/* The command-line row sits on the message region's top edge (design D3):
+   a tab-like strip that reads as part of the band beneath it — rounded top
+   corners, a hairline gold top edge, and no seam against the band. */
+.elosern-root [data-anchor="command-line"] { display: flex; align-items: flex-end; }
+.elosern-root [data-anchor="command-line"] > * { flex: 1; min-width: 0; }
 .elosern-root .elosern-narrative { height: 100%; display: flex; flex-direction: column; }
 .elosern-root .elosern-narrative::before { display: none; }
 .elosern-root .elosern-narrative .narrative-head { padding: 10px 16px; border-bottom: var(--line); }
 .elosern-root .elosern-narrative .narrative-mode-label { color: var(--gold-400); font: 14px var(--f-serif); }
 .elosern-root .elosern-narrative .narrative-scroll { flex: 1; min-height: 0; max-height: none; padding: 10px 0; scrollbar-color: #55524b transparent; scrollbar-width: thin; }
 .elosern-root .elosern-narrative .narrative-line { padding-inline: 16px; font-size: calc(14px * var(--prose-scale)); }
-.elosern-root .elosern-stage [data-anchor="dock"] {
-  left: 35%;
-  right: calc(var(--right-column) + 12px);
-  bottom: calc(var(--command-line-h) + 6px);
-  padding: 10px;
-  border: var(--line);
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, #1b1d21ed, #101215f5);
-  box-shadow: inset 0 1px 0 #ffffff09;
-}
-/* Narrow viewports: the floating-panel inset is a wide-workspace layout —
-   below the workspace columns the anchor keeps the frame-resolution
-   contract's full-width band (the 400x720 outlet-tile scenarios pin a
-   ~384px pane), so the band spans the stage instead of collapsing. */
-@media (max-width: 1000px) {
-  .elosern-root .elosern-stage [data-anchor="dock"] {
-    left: calc(var(--left-column) + 12px);
-    right: 12px;
-  }
-}
-@media (max-width: 720px) {
-  .elosern-root .elosern-stage [data-anchor="dock"] {
-    left: 12px;
-  }
-}
-.elosern-root .elosern-stage {
-  --dock-h: clamp(260px, 34vh, 340px);
-  --stage-content-bottom: calc(var(--dock-h) + var(--command-line-h));
-}
 .elosern-root .dock-tab-bar {
   height: auto;
   min-height: 38px;
@@ -250,7 +270,9 @@ body {
 .elosern-root .dock-tab-bar__tab { border: 1px solid #53504a; border-radius: 5px; padding: 8px 10px; background: linear-gradient(#ffffff05, #0002); font-family: var(--f-serif); }
 .elosern-root .dock-tab-bar__tab--on { background: var(--gold-glow); border-color: var(--gold-400); color: var(--gold-400); box-shadow: inset 0 -2px var(--gold-500); }
 .elosern-root .dock-tab-bar__hint { font-size: 10px; opacity: .8; }
-.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; }
+/* The waiting frame renders inside the band's narrow command region: its
+   three cards stack in one column (design D5). */
+.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
 .waiting-card { min-width: 0; padding: 14px; background: #141719; border: 1px solid #746342; border-radius: 5px; display: flex; flex-direction: column; gap: 12px; }
 .waiting-card--focused { border-color: var(--gold-400); }
 .waiting-card h3, .practice-screen h2 { margin: 0; color: var(--gold-400); font-family: var(--f-serif); }
@@ -263,26 +285,9 @@ body {
 .elosern-root .waiting-card .exploration-rest-form { padding: 0; border: 0; background: transparent; }
 .practice-screen { display: grid; gap: 12px; max-width: 640px; margin: auto; }
 .practice-screen label { display: grid; gap: 10px; color: var(--gold-400); }
-@media (max-width: 1000px) { .waiting-screen { grid-template-columns: 1fr; } }
 .elosern-root .action-dock__pane {
   overflow-x: hidden;
   scrollbar-width: thin;
-}
-.elosern-root .elosern-stage:has(.dock-pane-host:empty) {
-  --dock-h: 144px;
-  --stage-content-bottom: calc(var(--dock-h) + var(--command-line-h));
-}
-.elosern-root .elosern-stage:has(.interaction-workspace) {
-  --dock-h: clamp(300px, 40vh, 390px);
-}
-.elosern-root .elosern-stage:has(.waiting-screen) {
-  --dock-h: clamp(360px, 46vh, 430px);
-}
-.elosern-root .elosern-stage:has(.waiting-screen) [data-anchor="dock"] {
-  left: calc(var(--left-column) + 12px);
-}
-.elosern-root .elosern-stage:has(.interaction-workspace) [data-anchor="dock"] {
-  left: calc(var(--left-column) + 12px);
 }
 .elosern-root .dock-pane-host.interaction-workspace {
   display: grid;
@@ -362,9 +367,6 @@ body {
 .interaction-workspace .dock-menu__aff-btn { width: 100%; min-height: 40px; padding: 9px 12px; border-radius: var(--radius-sm); text-align: left; }
 .interaction-workspace .dock-menu__plain { display: grid; gap: 7px; }
 .interaction-workspace .dock-menu-item { min-height: 40px; padding: 9px 12px; justify-content: flex-start; text-align: left; }
-.elosern-root .elosern-stage[data-elosern-mode="dialogue"] [data-anchor="feed"] {
-  height: clamp(390px, 56vh, 540px);
-}
 .elosern-root .m-dialogue .narrative-scroll { padding: 16px 20px; }
 .elosern-root .m-dialogue .dlg { gap: 18px; padding: 0; border: 0; background: none; }
 .elosern-root .m-dialogue .dlg .av { width: 82px; height: 96px; border-radius: var(--radius-sm); }
@@ -385,23 +387,6 @@ body {
   .elosern-root .m-dialogue .dlg .who { font-size: 17px; margin-bottom: 5px; }
   .elosern-root .m-dialogue .choices { margin-top: 12px; gap: 8px; }
 }
-[data-elosern-mode="combat"] .elosern-stage [data-anchor="feed"],
-[data-elosern-mode="combat"] .elosern-stage [data-anchor="dock"] { left: calc(var(--left-column) + 12px); }
-.elosern-root [data-elosern-mode="combat"] .elosern-stage {
-  --dock-h: clamp(230px, 29vh, 290px);
-}
-.elosern-root [data-elosern-mode="combat"] .elosern-stage:has(.dock-pane-host:empty) {
-  --dock-h: 100px;
-}
-.elosern-root [data-elosern-mode="combat"] [data-anchor="feed"] {
-  left: calc(var(--left-column) + 12px);
-  bottom: calc(var(--command-line-h) + 14px);
-  height: 18vh;
-}
-.elosern-root [data-elosern-mode="combat"] [data-anchor="dock"] {
-  left: calc(var(--left-column) + 12px);
-  bottom: calc(var(--command-line-h) + 18vh + 24px);
-}
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar { flex-wrap: nowrap; align-items: stretch; }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
   flex: 1;
@@ -411,6 +396,21 @@ body {
 }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__icon { width: 21px; height: 21px; }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__hint { display: none; }
+/* In a narrow command region (1440 and 1280 wide viewports) the combat
+   root's seven tabs stack icon over label, so all of them keep one row
+   without touching (webclient-avg-stage-shell design D5). */
+.elosern-root [data-anchor="band-command"] { container: band-command / inline-size; }
+@container band-command (max-width: 560px) {
+  .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
+    flex-direction: column;
+    gap: 3px;
+    height: auto;
+    min-height: 52px;
+    padding: 6px 2px;
+    font-size: 12px;
+  }
+  .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__icon { width: 17px; height: 17px; }
+}
 .elosern-root .skill-detail-pane { border-radius: 5px; padding: 14px 18px; }
 .elosern-root .skill-detail-pane__name { font: 21px var(--f-serif); }
 .elosern-root .skill-detail-pane__desc { font: 14px/1.8 var(--f-serif); color: var(--paper-300); }
@@ -425,19 +425,25 @@ body {
 .elosern-root .participant-frame__portrait,
 .elosern-root .participant-frame__portrait-placeholder { grid-column: 3; grid-row: 1 / 3; width: 40px; box-sizing: border-box; }
 .elosern-root .participant-frame__state { grid-column: 2 / 4; }
-.elosern-root [data-elosern-mode="combat"] .stage-portrait { left: -2%; width: 25%; opacity: .8; }
-.elosern-root [data-elosern-mode="combat"] [data-anchor="hud-left"] {
-  top: calc(var(--header-h) + 28vh);
-  max-height: calc(100% - var(--header-h) - 28vh - var(--command-line-h) - 16px);
-}
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 4px 10px #0003; }
-.elosern-root .cmdline { padding: 9px 16px; gap: 12px; background: #0b0d10ed; border-top: 1px solid #bda47730; }
+.elosern-root .cmdline {
+  height: var(--command-line-h);
+  padding: 9px 14px;
+  gap: 12px;
+  background: linear-gradient(180deg, #121419e8, #141019f5);
+  border: 1px solid #bda47733;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -10px 24px -18px #000;
+  backdrop-filter: blur(6px);
+}
 .elosern-root .cmdfield { min-height: 44px; border: 1px solid #c5a76f; border-radius: 6px; box-shadow: 0 0 8px #cfa45c25, inset 0 0 8px #cfa45c10; }
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
 .elosern-root .cmdutil__btn { border: 1px solid #5d594e; min-width: 32px; min-height: 32px; }
-.elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor,
+.elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
+.elosern-root .elosern-stage[data-menu-open="true"] .stage-band,
 .elosern-root .elosern-stage[data-menu-open="true"] .obj { filter: brightness(.45); }
 .elosern-root .hud-drawer-scrim { background: #080a0c78; backdrop-filter: none; }
 .elosern-root .hud-drawer {
@@ -508,8 +514,6 @@ body {
 .elosern-root .guild-counter__action,
 .elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: 8px 20px; border-radius: 5px; }
 
-.elosern-root [data-elosern-mode="creation"] [data-anchor="dock"] { left: 16px; right: 16px; bottom: 0; }
-
 @media (max-width: 1350px) {
   :root { --header-h: 72px; --left-column: 216px; --right-column: 244px; }
   .topbar-wordmark { font-size: 23px; }
@@ -530,7 +534,6 @@ body {
   .elosern-root .topbar-right { right: 8px; max-width: 160px; }
   .elosern-root .topbar-meta .meta-clock,
   .elosern-root .topbar-meta .meta-loc { display: none; }
-  .elosern-root .stage-portrait { left: 8%; width: 35%; opacity: .65; }
   .elosern-root .character-status-drawer { grid-template-columns: 1fr; }
   .elosern-root .inventory-panel { grid-template-columns: 1fr; }
   .inventory-panel__details { grid-column: 1; grid-row: auto; }

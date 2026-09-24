@@ -1,11 +1,11 @@
 <script setup>
 // ActionDock (H3 webclient-hud-03-action-dock, task 4.1/4.8): the
-// non-closable bottom action surface: the centered content column inside
-// H1's `dock` anchor (HudFrame `data-anchor="dock"`). Since
-// webclient-align-01-dock-chrome the visual band (the draft's upward
-// gradient, the `--line` top border, the upward shadow, and the band
-// padding) is owned by the full-width anchor element itself (the draft's
-// `.dockwrap`); this container keeps only `max-width:1180px` centering and
+// non-closable action surface: the content column inside the bottom band's
+// command region (HudFrame `data-anchor="band-command"`, the band's right
+// third; webclient-avg-stage-shell). The band chrome (the draft's upward
+// gradient, the `--line` top border, the upward shadow) is owned by the
+// band element itself (`.stage-band`); this container keeps only
+// `max-width:1180px` centering and
 // the fixed-bar / crumb / scrolling-pane layout (the draft's `.dock`). The
 // preserved `#action-dock` element keeps its `tabindex`, `data-mode`, and the
 // listbox composite role (the row container carrying `data-testid="dock-menu"`
@@ -121,10 +121,9 @@ function onPaneActivate(payload) {
 
 <style scoped>
 /* The content column (the draft's `.dock`): centred, bounded width, and the
-   vertical layout only. webclient-align-01-dock-chrome moved the band chrome
-   (gradient, top border, shadow, padding) onto the full-width dock anchor in
-   `HudFrame.vue` — the painted band spans the whole stage; gutters never
-   exist. */
+   vertical layout only. The band chrome (gradient, top border, shadow) lives
+   on HudFrame's `.stage-band`, which spans the whole stage; this column
+   fills the band's command region and paints nothing. */
 .action-dock {
   max-width: 1180px;
   margin: 0 auto;

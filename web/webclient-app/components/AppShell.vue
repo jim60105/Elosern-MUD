@@ -1,10 +1,12 @@
 <script setup>
 // AppShell (H1 contextual HUD, webclient-hud-01-shell-and-scene): the
-// full-bleed cinematic stage (design D1). The old four-row grid and the
-// 300px/1fr/300px main row are replaced by `HudFrame` — a
-// `position:relative; overflow:hidden` stage with named, absolutely
-// positioned anchors (`hud-left`, `hud-right`, `feed`, `dock`,
-// `command-line`), sized from `--dock-h` (design D1/D10).
+// full-bleed cinematic stage (design D1). `HudFrame` is a
+// `position:relative; overflow:hidden` stage with named anchors: the HUD
+// islands (`hud-left`, `hud-right`), the portrait anchors (`actor-left`,
+// `actor-right`), the fixed-height bottom band's message and command
+// regions (`band-message` holds the narrative caption, `band-command` the
+// action dock), and the `command-line` row docked on the message region
+// (webclient-avg-stage-shell design D1/D3/D6).
 //
 // Mode gating (design D2): the committed mode renders on the stage root as
 // `data-elosern-mode`; surface visibility is CSS-only `display:none`, so
@@ -13,7 +15,7 @@
 // Preserved DOM contract (design D6): `#action-dock` (with `data-mode`,
 // `tabindex` and the listbox composite role, rendered by the dock),
 // `#elosern-action-live`, `#elosern-offline-overlay`, `#inputfield`
-// (inside the command line), `#narrative-unread` (inside the feed), and the
+// (inside the command line), `#narrative-unread` (inside the narrative caption), and the
 // `action-*` / `target-*` item keys all remain.
 //
 // Shell-owned view behavior (H5, webclient-hud-05-overlays-and-command-line):
@@ -208,7 +210,7 @@ function onWindowKeydown(event) {
 // `display:none` gate runs when the `data-elosern-mode` attribute updates,
 // so the rescue must happen in the pre-update phase of the watcher.
 const HIDDEN_BY_MODE = {
-  creation: "[data-anchor='feed'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
+  creation: "[data-anchor='band-message'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
   combat: ".local-map",
   exploration: "",
   // webclient-align-08-dialogue-surface: dialogue keeps the whole cockpit
@@ -290,7 +292,13 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #hud-right>
         <slot name="panel-right" />
       </template>
-      <template #feed>
+      <template #actor-left>
+        <slot name="actor-left" />
+      </template>
+      <template #actor-right>
+        <slot name="actor-right" />
+      </template>
+      <template #band-message>
         <NarrativeFeed
           ref="feed"
           :mode="props.mode"
@@ -303,7 +311,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @dialogue-leave="() => emit('dialogue-leave')"
         />
       </template>
-      <template #dock>
+      <template #band-command>
         <slot name="action-dock" />
       </template>
       <template #command-line>
@@ -382,8 +390,8 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
   overflow: hidden;
 }
 
-/* The stage (HudFrame) fills the shell; anchors are absolutely positioned
-   and sized from --dock-h (design D1/D10). */
+/* The stage (HudFrame) fills the shell; its anchors are positioned from the
+   fixed band-height token (webclient-avg-stage-shell design D1/D2). */
 .elosern-app-shell .elosern-stage {
   position: absolute;
   inset: 0;

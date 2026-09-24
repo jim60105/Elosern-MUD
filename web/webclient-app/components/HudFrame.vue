@@ -1,14 +1,22 @@
 <script setup>
-// HudFrame (H1, webclient-hud-01-shell-and-scene, design D1/D2/D7/D9/D10):
-// the full-bleed cinematic stage. A `position:relative; overflow:hidden`
-// root with named, absolutely-positioned HUD anchors: `hud-left`, `hud-right`,
-// `feed`, `dock`, and `command-line`. Mode gating is CSS-only on the
-// `data-elosern-mode` attribute (the single source for the committed mode),
-// using `display:none` so hidden surfaces leave the accessibility tree and
-// the tab order (REDESIGN.md §0.1: 不顯示的絕對隱藏，不是灰掉). The scene
-// backdrop renders as the lowest stage layer (z 0); the vignette sits above
-// it (z 1); the caption (z 3), the HUD islands (z 4), the dock (z 5), and
-// the command line (z 6) layer above.
+// HudFrame (H1, webclient-hud-01-shell-and-scene; AVG stage shell,
+// webclient-avg-stage-shell design D1/D3/D4/D7): the full-bleed cinematic
+// stage. A `position:relative; overflow:hidden` root with named anchors:
+// - the HUD island anchors `hud-left` and `hud-right`;
+// - the portrait anchors `actor-left` (the player's standing portrait) and
+//   `actor-right` (reserved), standing on the bottom band's top edge;
+// - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
+//   split into the message region `band-message` (left 2/3) and the command
+//   region `band-command` (right 1/3). No frame, mode, or content resizes it;
+// - the `command-line` row, docked on the message region's top edge.
+// Mode gating is CSS-only on the `data-elosern-mode` attribute (the single
+// source for the committed mode), using `display:none` so hidden surfaces
+// leave the accessibility tree and the tab order (REDESIGN.md §0.1:
+// 不顯示的絕對隱藏，不是灰掉).
+//
+// Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
+// the veil in DOM order, so the player stays bright in combat), HUD islands
+// 4, band 5, command line 6.
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -49,6 +57,22 @@ defineExpose({ menuOpen });
       :data-mode="mode"
     ></div>
     <slot name="backdrop" />
+    <!-- The portrait anchors come after the combat veil (same z-index), so
+         the standing portraits paint above it (design D1/D4). -->
+    <div
+      class="stage-anchor stage-actor"
+      data-anchor="actor-left"
+      data-testid="anchor-actor-left"
+    >
+      <slot name="actor-left" />
+    </div>
+    <div
+      class="stage-anchor stage-actor"
+      data-anchor="actor-right"
+      data-testid="anchor-actor-right"
+    >
+      <slot name="actor-right" />
+    </div>
     <div
       class="stage-anchor"
       data-anchor="hud-left"
@@ -63,19 +87,21 @@ defineExpose({ menuOpen });
     >
       <slot name="hud-right" />
     </div>
-    <div
-      class="stage-anchor"
-      data-anchor="feed"
-      data-testid="anchor-feed"
-    >
-      <slot name="feed" />
-    </div>
-    <div
-      class="stage-anchor"
-      data-anchor="dock"
-      data-testid="anchor-dock"
-    >
-      <slot name="dock" />
+    <div class="stage-band" data-testid="stage-band">
+      <div
+        class="stage-anchor"
+        data-anchor="band-message"
+        data-testid="anchor-band-message"
+      >
+        <slot name="band-message" />
+      </div>
+      <div
+        class="stage-anchor"
+        data-anchor="band-command"
+        data-testid="anchor-band-command"
+      >
+        <slot name="band-command" />
+      </div>
     </div>
     <div
       class="stage-anchor"
@@ -130,83 +156,110 @@ defineExpose({ menuOpen });
   box-sizing: border-box;
 }
 
-/* hud-left: the HUD island stack (character card / vitals / conditions, H2).
-   Bounded above the dock + caption reserved space; scrolls internally. The
-   top offset clears the top-anchored brand element (design D5/D10). */
+/* hud-left / hud-right: the HUD island stacks. Bounded above the bottom
+   band (never the band's content) and scrolling internally; the top offset
+   clears the top-anchored brand element (design D5/D10). */
 .elosern-stage [data-anchor="hud-left"] {
   top: 64px;
   left: 16px;
-   width: 262px;
-   z-index: 4;
-   display: flex;
-   flex-direction: column;
-   gap: 9px;
-   max-height: calc(100% - var(--dock-h) - 110px);
-   overflow-y: auto;
-   overflow-x: hidden;
- }
- .elosern-stage [data-anchor="hud-right"] {
-   top: 64px;
-   right: 16px;
-   width: 230px;
+  width: 262px;
   z-index: 4;
   display: flex;
   flex-direction: column;
   gap: 9px;
-   align-items: flex-end;
-   max-height: calc(100% - var(--dock-h) - 110px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.elosern-stage [data-anchor="hud-right"] {
+  top: 64px;
+  right: 16px;
+  width: 230px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-end;
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
- /* feed: the bounded lower-centre narrative caption (design D4). The
-    width is constrained to the clear space between the two HUD islands so
-    the caption never intersects them at the supported viewports. */
-.elosern-stage [data-anchor="feed"] {
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--stage-content-bottom) + 60px);
-  width: min(880px, calc(90vw - 524px));
-  z-index: 3;
+/* The portrait anchors (design D4): standing on the band's top edge,
+   `min(62vh, 680px)` tall but never taller than the stage box, inset 6%
+   from their own side. Non-interactive art: no pointer events. */
+.elosern-stage [data-anchor="actor-left"],
+.elosern-stage [data-anchor="actor-right"] {
+  bottom: var(--band-h);
+  height: min(62vh, 680px, calc(100% - var(--header-h) - var(--band-h)));
+  aspect-ratio: 2 / 3;
+  z-index: 2;
+  pointer-events: none;
 }
+.elosern-stage [data-anchor="actor-left"] { left: 6%; }
+.elosern-stage [data-anchor="actor-right"] { right: 6%; }
+.elosern-stage .stage-actor > .reference-artwork { height: 100%; }
 
-/* dock: the full-width band (the draft's `.dockwrap`), sized from the shared
-   --dock-h token. webclient-align-01-dock-chrome: the band chrome (the
-   upward gradient, the `--line` hairline top border, the upward shadow, and
-   the band padding) lives here on the full-width anchor — never on the
-   centered content container — so no stage background can ever show beside
-   the band at any viewport width. The values match the reference draft
-   (`docs/design/elosern-redesign/index.html`) verbatim. */
-.elosern-stage [data-anchor="dock"] {
-  left: 0;
-  right: 0;
-  bottom: var(--command-line-h);
-  height: var(--dock-h);
-  z-index: 5;
-  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
-  border-top: var(--line);
-  box-shadow: 0 -14px 34px -24px #000;
-  padding: 11px 18px 12px;
-}
-
-/* command-line: the persistent command line (H5 upgrades the chrome). */
-.elosern-stage [data-anchor="command-line"] {
+/* The bottom band (design D1): one fixed-height container spanning the
+   stage bottom. It carries the reference draft's band chrome (the upward
+   gradient, the `--line` hairline top border, the upward shadow —
+   `docs/design/elosern-redesign/index.html`'s `.dockwrap`) once across both
+   regions, so no seam and no stage background ever shows inside it. Its
+   height is the `--band-h` token alone. */
+.elosern-stage .stage-band {
+  position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  height: var(--band-h);
+  z-index: 5;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
+  border-top: var(--line);
+  box-shadow: 0 -14px 34px -24px #000;
+}
+/* The two band regions are in-flow grid cells (overriding the anchors'
+   absolute default): they share the band's top edge and height by
+   construction. */
+.elosern-stage .stage-band > .stage-anchor {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.elosern-stage [data-anchor="band-message"] {
+  padding: 10px 12px 12px 18px;
+}
+.elosern-stage [data-anchor="band-command"] {
+  padding: 10px 18px 12px 6px;
+}
+
+/* command-line: one row docked on the message region's top edge (design
+   D3), from the left island column's edge to the message region's right
+   edge. It overlays the lowest strip of the stage box, never the band. */
+.elosern-stage [data-anchor="command-line"] {
+  left: var(--left-column);
+  right: 33.3333%;
+  bottom: var(--band-h);
   height: var(--command-line-h);
   z-index: 6;
 }
 
-/* Mode-gated visibility (design D2): CSS-only on data-elosern-mode,
+/* Mode-gated visibility (design D2/D7): CSS-only on data-elosern-mode,
    display:none so hidden surfaces leave the a11y tree and tab order. The
-   matrix: the narrative caption, the HUD island stack (hud-left), and the
-   command line are hidden in creation; the minimap is hidden in combat and
-   creation; the dock and the scene backdrop stay visible in every mode. */
-.elosern-stage[data-elosern-mode="creation"] [data-anchor="feed"],
+   matrix: the message region, the HUD island stack (hud-left), and the
+   command line are hidden in creation, where the command region spans the
+   whole band; the minimap is hidden in combat and creation; the command
+   region and the scene backdrop stay visible in every mode. */
+.elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="hud-left"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="command-line"] {
   display: none;
+}
+.elosern-stage[data-elosern-mode="creation"] .stage-band {
+  grid-template-columns: minmax(0, 1fr);
 }
 .elosern-stage[data-elosern-mode="combat"] .local-map,
 .elosern-stage[data-elosern-mode="creation"] .local-map {
@@ -217,7 +270,8 @@ defineExpose({ menuOpen });
    the stage is visually recessed; the mark clears only when nothing is
    open. The transition is token-gated, so prefers-reduced-motion disables
    it at the token level while the recessed state still applies. */
-.elosern-stage[data-menu-open="true"] .stage-anchor,
+.elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
+.elosern-stage[data-menu-open="true"] .stage-band,
 .elosern-stage[data-menu-open="true"] .obj {
   filter: var(--menu-open-filter);
   transition: filter var(--motion-base) var(--ease-standard);

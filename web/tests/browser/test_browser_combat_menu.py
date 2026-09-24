@@ -408,7 +408,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         && (r.x + r.w) <= window.innerWidth
                         && (r.y + r.h) <= window.innerHeight);
                       const dock = rectOf('#action-dock');
-                      const anchor = rectOf('[data-testid="anchor-dock"]');
+                      const anchor = rectOf('[data-testid="anchor-band-command"]');
                       const hudLeft = rectOf('[data-anchor="hud-left"]');
                       const participantRaw = rectOf('[data-testid="participant-frame"]');
                       const participant = clampTo(participantRaw, hudLeft);

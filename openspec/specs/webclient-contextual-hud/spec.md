@@ -4,7 +4,7 @@
 The full-bleed cinematic stage with its anchored HUD surfaces (scene backdrop, narrative caption,
 HUD islands, action dock, command line), the committed-mode visibility matrix, the truthful scene
 backdrop, the bounded narrative caption, drawer/overlay stage recessing, and the action-dock
-re-chrome contract: the centred floating dock panel, the root tab bar with truthful count badges,
+re-chrome contract: the fixed bottom band's command region, the root tab bar with truthful count badges,
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
 
@@ -12,31 +12,55 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
-the lowest layer, the narrative caption card above it, the HUD islands above that, the action dock
-above those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed
-by named stage anchors (`hud-left`, `hud-right`, `feed`, `dock`, `command-line`) that form the
-reference's left/status, centre/scene, and right/context composition, and SHALL NOT be placed inside a page-scrolling container that can push a required surface
-out of view. The dock's reserved height SHALL come from the shared `--dock-h` token, and the narrative
-caption and the right-hand HUD stack SHALL be positioned relative to it so they never overlap it. At
-both 1440x900 and 1280x720 no stage anchor SHALL overlap another anchor's content, and the top band's
-own elements SHALL neither overlap one another nor extend into the HUD island anchor region: a band
-element whose content is variable-width SHALL be bounded and truncated rather than sized by its
-content. A transient popover opened from a top-band element MAY overlay the island anchors while
-open, provided it does not change the band's own rendered box and closes on Escape and on outside
-activation; a surface that permanently occupies vertical space SHALL NOT be introduced into the band
-this way.
+the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
+those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
+named stage anchors — the island anchors `hud-left` and `hud-right`, the portrait anchors
+`actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, and
+the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
+required surface out of view.
+
+The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
+`clamp(260px, 27.8vh, 400px)` (300px at the 1920x1080 reference viewport), taken from a single
+shared band-height token. The band's height SHALL NOT depend on its content, on the dock frame, on
+the committed mode, or on any measurement: no frame, pane, line count, dialogue exchange, or mode
+change SHALL grow or shrink it. The band SHALL be divided into the message region `band-message`,
+covering the left two thirds of the band's width, and the command region `band-command`, covering
+the remaining right third; in creation mode, where the message region is hidden, the command region
+SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
+the hairline top border, and the upward shadow) on the band itself, not on the content inside it.
+The stage box — the region between the top band's lower edge and the bottom band's upper edge — is
+where the scene is seen, and every surface other than the band SHALL be positioned relative to the
+band-height token so that none of them overlaps the band.
+
+The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
+SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset 6% of the stage
+width from its own side, and SHALL never cover the band. The `actor-left` anchor SHALL carry the
+player's standing portrait — the current roster character's portrait, resolved exactly as the
+stage portrait was before this requirement, with the truthful placeholder when no image exists —
+in exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry no content. The
+portrait anchors are non-interactive art: they SHALL carry no focusable element and SHALL NOT
+intercept pointer events, and they MAY sit behind the HUD islands and the command-line row.
+
+At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`hud-left`, `hud-right`,
+`band-message`, `band-command`, `command-line`) SHALL overlap another interactive anchor's content,
+and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
+anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
+than sized by its content. A transient popover opened from a top-band element MAY overlay the
+island anchors while open, provided it does not change the band's own rendered box and closes on
+Escape and on outside activation; a surface that permanently occupies vertical space SHALL NOT be
+introduced into the band this way.
 
 #### Scenario: The stage fills the viewport with layered surfaces
 - **WHEN** the shell mounts at 1440x900
-- **THEN** the scene backdrop fills the viewport, and the narrative caption, the HUD islands, the action dock, and the command line are layered above it in that order with no page-level scrollbar
+- **THEN** the scene backdrop fills the stage box, and the player portrait, the HUD islands, the bottom band, and the command line are layered above it in that order with no page-level scrollbar
 
 #### Scenario: Required surfaces never scroll out of view
-- **WHEN** the HUD islands hold more content than their anchor's height
-- **THEN** the island stack itself is bounded and no required surface is pushed below the visible viewport
+- **WHEN** the HUD islands hold more content than their anchor's height, or the dock frame or the narrative holds more content than its band region
+- **THEN** the island stack or the band region itself is bounded and scrolls internally, and no required surface is pushed below the visible viewport
 
 #### Scenario: Anchors do not overlap at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every mode-visible surface present
-- **THEN** no stage anchor's rendered box intersects another anchor's rendered box
+- **THEN** no interactive stage anchor's rendered box intersects another interactive anchor's rendered box
 
 #### Scenario: The top band's own elements do not collide
 - **WHEN** the shell renders at 1280x720 with every top-band element present and a maximum-length character name committed
@@ -46,6 +70,22 @@ this way.
 - **WHEN** a transient popover is opened from a top-band element
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
+#### Scenario: The bottom band keeps one height whatever it holds
+- **WHEN** the shell renders at 1920x1080 and the player moves through the exploration root, the interaction workspace, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **THEN** the bottom band's rendered height is 300px (±1px) in every one of those states, and the message region's and the command region's boxes are unchanged between them
+
+#### Scenario: The band splits two thirds and one third
+- **WHEN** the shell renders in exploration mode at 1920x1080, 1440x900, and 1280x720
+- **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, and in creation mode the command region spans the whole band
+
+#### Scenario: The player portrait stands on the band
+- **WHEN** the shell renders in exploration mode at 1920x1080 with a committed roster portrait for the current character
+- **THEN** the `actor-left` anchor renders that portrait, its bottom edge coincides with the band's top edge, its height is `min(62vh, 680px)` (±1px), its left edge is 6% of the stage width from the stage's left edge, it holds no focusable element, and the `actor-right` anchor renders no content
+
+#### Scenario: The portrait never outgrows the stage box
+- **WHEN** the shell renders at 1280x720, where `min(62vh, 680px)` exceeds the stage box's height
+- **THEN** the player portrait's height equals the stage box's height and its top edge is not above the top band's lower edge
+
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
 visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
@@ -54,12 +94,13 @@ the accessibility tree and the tab order. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
-| narrative caption | visible | visible | visible (dialogue focus) | hidden |
+| narrative caption (band message region) | visible | visible | visible (dialogue focus) | hidden |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
 | party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
 | objective tracker island | visible | visible | visible | hidden |
-| action dock | visible | visible | visible (regular exploration form) | visible (creation form) |
+| player standing portrait | visible | visible | visible | hidden |
+| action dock (band command region) | visible | visible | visible (regular exploration form) | visible (creation form, full band width) |
 | command line | visible | visible | visible | hidden |
 | scene backdrop | visible (exploration stage) | visible (combat stage) | visible (unchanged art) | visible |
 
@@ -71,7 +112,7 @@ the surface is shown in that mode only while its own requirement's rule holds fo
 and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
 says so). When a mode change, or a committed revision that turns a
 surface's data rule false, hides the surface that currently holds focus, the shell SHALL move focus to
-action dock before the surface is removed, using the existing focus-restore path.
+the action dock before the surface is removed, using the existing focus-restore path.
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
@@ -87,11 +128,11 @@ action dock before the surface is removed, using the existing focus-restore path
 
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
-- **THEN** the narrative caption, the HUD island stack, the minimap, and the command line are absent, and the action dock renders the creation form
+- **THEN** the narrative caption, the HUD island stack, the minimap, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the narrative caption, minimap, objective tracker, action dock, and command line all
+- **THEN** the narrative caption, minimap, objective tracker, player standing portrait, action dock, and command line all
   remain rendered, the vitals and party islands keep following the same data rules as in
   exploration, the action dock keeps its regular exploration form
   with every ordinary root affordance present, and only the narrative presentation changes
@@ -117,18 +158,20 @@ The backdrop SHALL NOT present an invented image as authoritative and
 SHALL NOT present a stale image as current. The scene label, its alternative text, and any truthful
 placeholder label SHALL be rendered as text outside the bitmap, so no required information exists only
 inside an image. The gradient stage SHALL differ per mode (exploration, dialogue, combat) and SHALL
-carry an inset vignette.
+carry an inset vignette. The backdrop's image SHALL be cover-cropped to the stage box (from the top
+band's lower edge to the bottom band's upper edge), so no part of the scene the crop keeps is hidden
+behind the bottom band.
 
 The backdrop's own floating caption elements (the truthful-placeholder card, the `目前場景圖片生成中`
 pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
-positioned so that none of them overlaps the action dock's or the command line's rendered content, at
-both 1440x900 and 1280x720 — extending the sibling stage requirement's general anchor non-overlap
-invariant to these backdrop-internal captions, which sit outside the five named stage anchors but are
-absolutely positioned within the same full-bleed stage.
+positioned so that none of them overlaps the bottom band, the action dock's, or the command line's
+rendered content, at 1920x1080, 1440x900, and 1280x720 — extending the sibling stage requirement's
+general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
+stage anchors but are absolutely positioned within the same full-bleed stage.
 
 #### Scenario: A done scene paints the stage
 - **WHEN** the committed art panel carries a `done` scene with a same-origin URL
-- **THEN** the backdrop renders that image cover-cropped behind every HUD surface, and the scene label and alternative text render as text outside the bitmap
+- **THEN** the backdrop renders that image cover-cropped to the stage box behind every HUD surface, and the scene label and alternative text render as text outside the bitmap
 
 #### Scenario: A missing scene degrades to the mode gradient
 - **WHEN** the committed art panel carries a missing, failed, or invalid scene
@@ -149,26 +192,27 @@ absolutely positioned within the same full-bleed stage.
 #### Scenario: The truthful-placeholder caption never intrudes on the action dock
 - **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the truthful-placeholder
   card renders
-- **THEN** the placeholder card's rendered bounding box does not intersect the action dock's rendered
-  bounding box at either 1440x900 or 1280x720
+- **THEN** the placeholder card's rendered bounding box intersects neither the bottom band's nor the
+  command line's rendered bounding box at 1920x1080, 1440x900, or 1280x720
 
 #### Scenario: The scene label, alt text, and full-view control clear the dock at both viewports
 - **WHEN** the scene label, alternative-text caption, pending notice, or full-view control render above
-  the dock
-- **THEN** each one's rendered bounding box stays above the action dock's top edge and above the command
-  line, at both 1440x900 and 1280x720
+  the band
+- **THEN** each one's rendered bounding box stays above the bottom band's top edge and above the
+  command-line row, at 1920x1080, 1440x900, and 1280x720
 
 ### Requirement: The narrative is a bounded caption whose complete log is reachable in one action
-The narrative SHALL render as a bounded caption card at the visual centre of the stage, constrained in
-both measure and height so it never grows to fill the stage, drawn with the reference's caption panel
-treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The card SHALL carry a head
+The narrative SHALL render as a caption card that fills the bottom band's message region — the left
+two thirds of the band, at the band's fixed height — so it never grows to fill the stage and never
+changes size with its content, drawn with the reference's caption panel treatment: charcoal panel
+fill, a hairline border, shared radius and restrained shadow. The card SHALL carry a head
 row styled as the reference's caption head (small uppercase letter-spaced label): on the left, a mode
 label — `敘述` while the committed mode is exploration, `戰鬥日誌` while it is combat, and `對話`
 while it is dialogue — and on the right, a single labelled capsule control that opens a full-log surface presenting the complete
 retained narrative through the same markup renderer as the caption — never a second markup path. The
 head row SHALL be a static sibling ABOVE the card's scroll viewport, never an element inside the
 scrolled content, so no narrative line can ever render between the card's border and the head row at
-any scroll offset. Only the content region below the head SHALL scroll, and the card's bounded height
+any scroll offset. Only the content region below the head SHALL scroll, and the band's fixed height
 SHALL bound that scroll region. The
 full-log surface SHALL be scrollable, SHALL trap focus while open, SHALL close on Escape, and SHALL
 restore focus to the control that opened it. While the committed mode is dialogue and the
@@ -180,8 +224,8 @@ be unchanged.
 
 #### Scenario: The caption card is bounded
 - **WHEN** the narrative holds more lines than the caption card can show
-- **THEN** the card scrolls internally within its bounded height and does not expand to fill the
-  stage
+- **THEN** the card keeps the message region's box — the band's height and two thirds of its
+  width — scrolls internally, and does not expand into the stage
 
 #### Scenario: No content renders above the head row
 - **WHEN** the caption is scrolled to any offset in any mode
@@ -564,46 +608,6 @@ existing per-node movement submission SHALL be unchanged.
   technology — with the marker's octant direction word on the lattice variant and no direction on the
   graph variant — and in neither case does the island offer a second tab stop beyond its full-map
   affordance
-
-### Requirement: The action dock renders as a floating panel in the stage's dock anchor
-The action dock SHALL occupy the stage's bounded central `dock` anchor, drawn with a charcoal
-panel gradient, fine border, and restrained shadow. Exploration places it below the narrative;
-combat places it directly above the battle log, beneath the battle scene. Its height SHALL
-come from the shared `--dock-h` token, with a compact root and a larger open-frame state, and
-SHALL NOT grow with its content. The content column SHALL be laid out as a fixed-height tab bar,
-an optional breadcrumb line, and one remaining region that holds the current frame's rows; that
-region SHALL be the surface's only scrolling area, so no dock content is ever pushed outside the
-anchor. The panel SHALL be the same single `#action-dock` element in every mode, carrying its
-existing tab index, its `data-mode` attribute and its role as the surface's documented focus
-target, and SHALL NOT be remounted when the mode changes.
-
-The band SHALL use the current charcoal-and-gold presentation. Selected actions remain
-distinguishable by text and shape as well as their gold or warm-red emphasis.
-
-#### Scenario: The band is bounded to the central content area
-- **WHEN** the shell renders at any viewport width from 1280x720 to 1920x1080 in exploration mode
-- **THEN** the painted band fills its dock anchor without covering either side's status/context
-  content or the command line
-
-#### Scenario: An overflowing frame scrolls inside the panel
-- **WHEN** the current frame holds more rows than the dock's row region can display
-- **THEN** the row region scrolls internally, the tab bar and the breadcrumb stay fixed, and no
-  row is rendered outside the dock anchor
-
-#### Scenario: One dock element persists across a mode change
-- **WHEN** the committed mode changes between exploration, combat and creation
-- **THEN** exactly one `#action-dock` element exists at every point, its `data-mode` attribute
-  switches to the new mode, and it is not removed and re-created
-
-#### Scenario: The panel stays inside its anchor at the minimum viewport
-- **WHEN** the shell renders at 1280x720 with the deepest combat frame open
-- **THEN** the dock's rendered box stays within the dock anchor, and the frame's confirm control
-  is reachable by scrolling the row region without being clipped
-
-#### Scenario: The band's background matches the reference's shadowed gradient
-- **WHEN** the dock band renders in any mode
-- **THEN** the band element's background gradient, top border, and box-shadow are the same values
-  `docs/design/elosern-redesign/index.html` draws for its dock surface
 
 ### Requirement: The dock's root frame renders as an icon tab bar with truthful count badges
 The current dock surface's root menu frame SHALL render as a horizontal tab bar, one tab per root
@@ -1219,7 +1223,11 @@ keep the server-advertised minimum and maximum and SHALL NOT permit a value outs
 ### Requirement: The command line is a permanently present bar in the stage's command-line anchor
 The client's text control SHALL render as a single bar filling the stage's `command-line` anchor,
 containing — in this order — a prompt chevron, the command input field, a hint cluster, the
-command-history controls, and the overlay utility controls. The bar SHALL carry no quick-word chip and
+command-history controls, and the overlay utility controls. The `command-line` anchor SHALL be one
+row docked to the top edge of the bottom band's message region: its lower edge SHALL coincide with
+the band's upper edge, it SHALL extend from the left HUD island column's right edge to the message
+region's right edge, and it SHALL overlay the lowest strip of the stage box, never the band. The bar
+SHALL carry no quick-word chip and
 no other control that only writes a fixed command word into the field. The overlay utility controls
 SHALL include a labelled 角色肖像圖庫 control that renders only while the committed `gallery` panel is
 available and opens the portrait gallery overlay through the same opener-captured path the other
@@ -1230,8 +1238,9 @@ control, no `aria-expanded` state and no closed state. No stored presentation st
 remove it. (The command line is intentionally absent from the layout in creation mode, per H1's
 visibility matrix and design D10.)
 
-The bar SHALL NOT overlap the action dock, the narrative caption or any HUD anchor at 1440x900 or
-1280x720. When horizontal space is insufficient, the hint cluster SHALL be dropped first; the input field, the history controls and the
+The bar SHALL NOT overlap the action dock, the narrative caption, the bottom band, or any HUD island
+anchor at 1920x1080, 1440x900, or 1280x720. When horizontal space is insufficient, the hint cluster
+SHALL be dropped first; the input field, the history controls and the
 utility controls SHALL never be dropped, because they are the only pointer path to their behaviour.
 
 #### Scenario: The field is usable without an opening action
@@ -1240,7 +1249,7 @@ utility controls SHALL never be dropped, because they are the only pointer path 
 
 #### Scenario: The bar keeps its geometry at the minimum viewport
 - **WHEN** the stage renders at 1280x720 with every utility control rendered, including the gallery control
-- **THEN** the bar's rendered box intersects no other stage anchor's box, and the input field, the history controls and the utility controls are all still rendered
+- **THEN** the bar's lower edge sits on the bottom band's upper edge, its rendered box intersects no HUD island anchor, band region, or other interactive stage anchor, and the input field, the history controls and the utility controls are all still rendered
 
 #### Scenario: Constrained width drops the hint before any control
 - **WHEN** the bar's content exceeds its available width
@@ -1627,11 +1636,13 @@ resolves, otherwise the display name's initial letter in the reference's gold di
 gold speaker line carrying the host's `display_name` plus ` · 羈絆 <stage>` only when
 `bond_stage` is non-null, and the serif reply line carrying the panel's `line` verbatim; below
 the box, one numbered pick row per `dialogue.choices` entry in payload order with its mono
-digit badge and bounded label, laid out in a compact row grid (at most two pick columns) so the
-whole exchange — box, picks, and trailing rows — fits the caption's bounded height for normal
-lines, followed by a trailing free-dialogue row (`⌨` badge,
+digit badge and bounded label, laid out in a compact row grid (at most two pick columns),
+followed by a trailing free-dialogue row (`⌨` badge,
 `自由對話（輸入任意話語）→ 指令列`) and, after it, a trailing exit row (`✕` badge, label
-`結束對話`). Activating a pick row SHALL dispatch
+`結束對話`). The exchange SHALL keep the caption's fixed box in the band's message region: when box,
+picks, and trailing rows exceed it they SHALL scroll inside the caption's scroll region, with the
+dialogue box at the top of that region when the picks first render, and SHALL NOT grow the caption
+or the band. Activating a pick row SHALL dispatch
 `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` under the existing dispatch
 contract; activating the free-dialogue row SHALL focus the borrowed command line through the
 existing freeform-borrow path and SHALL dispatch nothing itself; activating the exit row SHALL
@@ -1749,8 +1760,57 @@ menu key, or the meaning of Escape.
 
 #### Scenario: Every reference surface is reachable from the dock
 - **WHEN** the player starts at the dock's root frame or the top navigation bar
-- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption remains the visual centre of the stage
+- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption stays in the bottom band's message region
 
 #### Scenario: An emptied right-hand stack costs nothing
 - **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
-- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
+- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
+
+### Requirement: The action dock fills the band's command region at a fixed size
+The action dock SHALL fill the bottom band's command region — the right third of the band, or the
+whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed
+elsewhere on the stage. Its box SHALL be the command region's box in every mode and for every frame:
+no frame (the interaction workspace, the waiting frame, the combat frames, the skill master-detail,
+the destructive confirmation, or an empty pane host) SHALL widen, heighten, shorten, or move it, and
+no surface outside the band SHALL be positioned from the frame the dock currently carries. The
+content column SHALL be laid out as a fixed-height tab bar, an optional breadcrumb line, and one
+remaining region that holds the current frame's rows; that region SHALL be the surface's only
+scrolling area, so no dock content is ever pushed outside the command region. A frame whose content
+does not fit the region's width SHALL wrap or collapse its own columns inside the region, never
+overflow it horizontally. The panel SHALL be the same single `#action-dock` element in every mode,
+carrying its existing tab index, its `data-mode` attribute and its role as the surface's documented
+focus target, and SHALL NOT be remounted when the mode changes.
+
+The command region SHALL use the current charcoal-and-gold presentation, and the band that contains
+it SHALL paint the reference's band chrome. Selected actions remain distinguishable by text and shape
+as well as their gold or warm-red emphasis.
+
+#### Scenario: The command region is the band's right third
+- **WHEN** the shell renders in exploration mode at 1920x1080, 1440x900, and 1280x720
+- **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
+
+#### Scenario: No frame resizes the command region
+- **WHEN** the dock moves at 1440x900 from the exploration root to the interaction workspace, to the waiting frame, and, in combat, to the deepest skill target frame
+- **THEN** the command region's rendered box is identical (±1px) in all four states and the band's height is unchanged
+
+#### Scenario: An overflowing frame scrolls inside the panel
+- **WHEN** the current frame holds more rows than the dock's row region can display
+- **THEN** the row region scrolls internally, the tab bar and the breadcrumb stay fixed, and no
+  row is rendered outside the command region
+
+#### Scenario: One dock element persists across a mode change
+- **WHEN** the committed mode changes between exploration, combat and creation
+- **THEN** exactly one `#action-dock` element exists at every point, its `data-mode` attribute
+  switches to the new mode, and it is not removed and re-created
+
+#### Scenario: The panel stays inside its region at the minimum viewport
+- **WHEN** the shell renders at 1280x720 with the deepest combat frame open
+- **THEN** the dock's rendered box stays within the command region, no dock content overflows the
+  region horizontally, and the frame's confirm control is reachable by scrolling the row region
+  without being clipped
+
+#### Scenario: The band's background matches the reference's shadowed gradient
+- **WHEN** the bottom band renders in any mode
+- **THEN** the band element's background gradient, top border, and box-shadow are the same values
+  `docs/design/elosern-redesign/index.html` draws for its dock surface, and the `#action-dock`
+  content column itself paints no background, border, or shadow

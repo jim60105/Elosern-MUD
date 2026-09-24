@@ -136,12 +136,17 @@ const {
              truthful placeholder. -->
         <template #backdrop>
           <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
-          <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" class="stage-portrait" />
           <div v-if="store.view.mode !== 'creation'" class="scene-heading">
             <span class="scene-heading__eyebrow">{{ store.view.mode === "combat" ? "戰鬥" : "探索伊洛瑟恩" }}</span>
             <h1>{{ store.view.statusSlice.locationLabel }}</h1>
             <p>{{ store.view.statusSlice.timeLabel }}</p>
           </div>
+        </template>
+        <!-- The player's standing portrait (webclient-avg-stage-shell D4):
+             the current roster character's portrait stands on the bottom
+             band's top edge in the `actor-left` anchor, outside creation. -->
+        <template #actor-left>
+          <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" />
         </template>
         <template #panel-left>
         <StatusPanel

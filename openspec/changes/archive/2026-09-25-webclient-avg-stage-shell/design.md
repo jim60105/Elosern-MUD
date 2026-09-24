@@ -66,6 +66,10 @@ z-order:
 
 `.elosern-stage .stage-vignette`'s inset shadow stays on the full stage.
 
+The open-surface recession (`data-menu-open`) dims `.stage-band` itself and every `.stage-anchor` outside it (`:not(.stage-band > .stage-anchor)`), so the band chrome recesses with its regions and the regions are not dimmed twice.
+
+The command-line row's chrome (`app-shell.css` `.cmdline`) is a tab-like strip that reads as part of the band: a band-coloured gradient, a hairline gold border on three sides with no bottom border, rounded top corners, and a soft upward shadow. The bar fills the anchor's `--command-line-h` height.
+
 ### D2. Tokens
 `tokens.css`:
 - gains `--band-h: clamp(260px, 27.8vh, 400px)`: 300.24px at 1080, 260px at 900 and 720, 400px at 1440 tall
@@ -105,6 +109,10 @@ The third `min()` term clamps the portrait to the stage box. At 1280x720, `min(6
 
 The `.stage-portrait` blocks in `app-shell.css` are deleted: the base rule, `.stage-portrait img` (the horizontal mask moves to the anchor selector), the combat `left: -2%` override, and the 1000px override. The portrait keeps its truthful placeholder (`ReferenceArtwork` is unchanged).
 
+Presentation inside the anchor:
+- The portrait image (and the placeholder) carry two intersected masks, soft side edges and a long fade at the feet, so the figure dissolves into the band instead of ending in a hard rectangle.
+- The `figcaption` becomes a small left-aligned serif name plate at the figure's lower left, bounded to end before the command-line row starts at `--left-column`. When the placeholder renders, the figcaption is hidden, because the placeholder already states the same label on the figure.
+
 `actor-right` renders an empty anchor, reserved:
 - C10 (`webclient-dialogue-stage`) puts the dialogue host's `StageActor` there.
 - C13 animates foe portraits there.
@@ -126,6 +134,10 @@ What the command region still needs, all inside the region:
 - `.dock-pane-host.interaction-workspace` keeps its two columns; that is the exploration-menu contract. Its `.interaction-target-grid` (`auto-fit, minmax(min(170px, 100%), 1fr)`) collapses to one column on its own at the region's width.
 - Inside `[data-anchor="band-command"]`, the combat skill detail pane (`SkillDetailPane` root, `flex: 1 1 260px; min-width: 220px`) and the generic dock detail (`flex: 0 0 220px`) get `min-width: 0` and a basis of `min(220px, 45%)`. At 1280x720 the region's content width is about 400px, so the row region and the detail pane stay side by side, which the direct-children requirement requires, without horizontal overflow.
 - The combat tab-bar rules (`flex-wrap: nowrap`, `flex: 1` tabs, hidden hint) stay.
+- The exploration root tab bar inside the region keeps every tab on its first row (`flex: 1 1 0`, centred, `min-width: 0`), and the shortcut hint takes its own right-aligned row (`flex-basis: 100%`). Without this, the fifth tab wraps into the breadcrumb at 1280x720.
+- `[data-anchor="band-command"]` is an inline-size container (`container: band-command`). Below 560px of region width (the 1440 and 1280 wide viewports), the combat root's seven tabs stack icon over label, so they keep one row without touching.
+- The interaction workspace's target cells keep the router's column count. `DockMenu` sets it as an inline `grid-template-columns` from `gridCols`, and changing the router is out of scope. So the cells compact to the region instead: a 34x40 avatar, smaller gaps, and ellipsized names. The design's "collapses to one column on its own" does not hold for that inline grid. C8c deletes the workspace.
+- The waiting frame's router keeps `gridCols: 3` while its cards stack in one column, so ArrowRight moves to the next card, which is now visually below. This keeps the router untouched (Non-Goals). C8b/C8c replace these frames.
 
 The 400x720 case in `test_browser_exploration_tiles.py` pins a roughly 384px outlet pane that only existed through the deleted narrow rule. At 1280x720 the command region's pane is about 400px, so the same last-row invariant is re-pointed there.
 
@@ -134,6 +146,7 @@ The 400x720 case in `test_browser_exploration_tiles.py` pins a roughly 384px out
 - The dialogue variant's rows scroll inside `.narrative-scroll`. The dialogue pin (`offsetTop` against the scroll viewport) is unchanged, so the box is at the top when the picks first render.
 - The `(max-height: 780px)` dialogue compaction rules stay.
 - The `.elosern-narrative::before` gutter rule (`left: -16px`) now falls into the band's left padding, as it did outside the old caption. Keep it.
+- Inside the message region the card uses a slightly lighter vertical gradient and a warm hairline border (`[data-anchor="band-message"] > .elosern-narrative`), so it reads as a window set into the band rather than a second band.
 
 ### D7. Mode gating and focus rescue
 - HudFrame's creation rule hides `[data-anchor="band-message"]`, `[data-anchor="hud-left"]`, and `[data-anchor="command-line"]`.
@@ -142,9 +155,11 @@ The 400x720 case in `test_browser_exploration_tiles.py` pins a roughly 384px out
 
 ### D8. Surfaces positioned from the band
 - `.elosern-root .scene-backdrop` gets `bottom: var(--band-h)`, so the cover crop is the stage box (the "A done scene paints the stage" scenario).
-- The scene label, alt text, generating notice, and full-view control in `app-shell.css` switch from `var(--dock-h) + 28vh + …` to `var(--stage-content-bottom) + 28vh + …` (same `28vh` lift).
+- The scene label, alt text, generating notice, and full-view control in `app-shell.css` switch from `var(--dock-h) + 28vh + …` to `var(--command-line-h) + 28vh + …` (same `28vh` lift). These captions are positioned inside `.scene-backdrop`, whose box now ends at the band's top edge, so they clear only the command-line row that overlays the box's lowest 64px. `var(--stage-content-bottom) + 28vh + …` would count the band twice and push every caption past the box's top edge at all three viewports (1920x1080: 708px offset in a 700px box; 1280x720: 570px in 388px), where `overflow: hidden` would clip it.
+- The `app-shell.css` placeholder and caption overrides are written as `.elosern-root .scene-backdrop .scene-backdrop__…` (specificity 0,3,0). Before this change they were `.elosern-root .scene-backdrop__…` (0,2,0) and lost to `SceneBackdrop.vue`'s equally specific base rules, which load later, so the truthful-placeholder card was stretched from `top: 14px` down to the base `bottom` into a large empty box in the middle of the stage. With the override winning, the card is the intended small chip at the top right. `SceneBackdrop.vue`'s base rules keep `--stage-content-bottom`: they only apply standalone, where the backdrop spans the whole stage.
 - `ObjectiveTracker.vue` uses `bottom: calc(var(--band-h) + 12px)`. It is on the right, above the command region, which the command row does not cover.
-- `hud-left` and `hud-right` use `max-height: calc(100% - var(--header-h) - var(--band-h) - 32px)` in every mode. The old values were bounded by the command line, not the band, so they would now overlap it.
+- Drawers and full-screen overlays keep their current bottom inset (`--workspace-bottom` and `OverlayHost`'s `calc(var(--command-line-h) + 12px)`). Stopping them above the band would make a drawer about 310px tall at 1280x720, too short for the inventory and status layouts, and the design keeps drawer presentation unchanged (§3 non-goals). While a drawer or overlay is open, it covers the band and the command-line row. Both stay present in the DOM behind it, as the desktop-shell requirement asks, and closing the drawer returns focus to its opener. `ToastQueue`'s stack is bounded by `--stage-content-bottom`, so a tall stack never covers the band.
+- `hud-left` and `hud-right` use `max-height: calc(100% - var(--header-h) - var(--band-h) - 32px)` in every mode, both in `HudFrame.vue` and in `app-shell.css`'s `.elosern-root .elosern-stage [data-anchor="hud-left"|"hud-right"]` overrides (the overrides outrank the component rule, so both must change). The old values were bounded by the command line, not the band, so they would now overlap it.
 
 ### D9. Stage height and viewports
 The design's "at least 65% of the viewport is stage" is not asserted here. With the unchanged 80px header, the 1920x1080 stage box is 1080 − 80 − 300 = 700px (64.8%). C4b's 48px bar makes it 732px (67.8%) and adds the assertion. This change asserts the band's fixed height and split at 1920x1080 (the design's reference), 1440x900, and 1280x720, and keeps every existing non-overlap check at 1440x900 and 1280x720.

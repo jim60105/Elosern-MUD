@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import AppShell from "../components/AppShell.vue";
+import HudFrame from "../components/HudFrame.vue";
 import ActionDock from "../components/ActionDock.vue";
 import LocalMap from "../components/LocalMap.vue";
 import SceneBackdrop from "../components/SceneBackdrop.vue";
@@ -153,20 +154,21 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     // presentation changes (the feed variant lives inside NarrativeFeed).
     const dialogue = mountShell("dialogue", true);
     expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="feed"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="band-message"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="actor-left"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="hud-left"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="command-line"]').exists()).toBe(true);
     expect(dialogue.find(".local-map").exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="dock"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="band-command"]').exists()).toBe(true);
 
     // The HudFrame gate rules name ONLY creation/combat — a dialogue mode
     // can never match a display:none arm (source-level guard, the same
     // style used by the dock-band ownership guard).
     const css = styleBlock("components/HudFrame.vue");
-    // The gate arms exist (creation feed / combat minimap), and NO arm ever
-    // names the dialogue mode.
+    // The gate arms exist (creation message region / combat minimap), and NO
+    // arm ever names the dialogue mode.
     expect(css).toMatch(
-      /\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="feed"\]/,
+      /\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="band-message"\]/,
     );
     expect(css).toMatch(/\.elosern-stage\[data-elosern-mode="combat"\] \.local-map/);
     expect(/data-elosern-mode="dialogue"/.test(css)).toBe(false);
@@ -181,37 +183,69 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
   });
 });
 
-describe("dock band ownership (webclient-align-01-dock-chrome)", () => {
-  it("paints the full-width band on the dock anchor, not the content column", () => {
+describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () => {
+  it("paints the band chrome once on the stage band, never on the regions or the dock column", () => {
     // Source-level ownership guard (the z-index-scale precedent): the
-    // painted band's declarations must live on the full-width anchor rule
-    // in HudFrame.vue and be ABSENT from the centered `.action-dock` rule.
-    // The real-browser gutter/paint proof lives in
-    // web/tests/browser/test_browser_contextual_hud.py.
-    const anchorRule = extractRule(
-      styleBlock("components/HudFrame.vue"),
-      ".elosern-stage [data-anchor=\"dock\"]",
-    );
-    expect(anchorRule, "the dock anchor rule exists").not.toBe("");
-    expect(anchorRule).toContain("left: 0");
-    expect(anchorRule).toContain("right: 0");
+    // painted band's declarations live on the full-width `.stage-band` rule
+    // in HudFrame.vue, whose height is the fixed `--band-h` token; the
+    // command region and the `.action-dock` content column paint nothing.
+    const css = styleBlock("components/HudFrame.vue");
+    const bandRule = extractRule(css, ".elosern-stage .stage-band");
+    expect(bandRule, "the band rule exists").not.toBe("");
+    expect(bandRule).toContain("left: 0");
+    expect(bandRule).toContain("right: 0");
+    expect(bandRule).toContain("bottom: 0");
+    expect(bandRule).toContain("height: var(--band-h)");
+    expect(bandRule).toContain("grid-template-columns: minmax(0, 2fr) minmax(0, 1fr)");
     // The draft's `.dockwrap` values, verbatim.
-    expect(anchorRule).toContain("linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))");
-    expect(anchorRule).toContain("border-top: var(--line)");
-    expect(anchorRule).toContain("box-shadow: 0 -14px 34px -24px #000");
-    expect(anchorRule).toContain("padding: 11px 18px 12px");
+    expect(bandRule).toContain("linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))");
+    expect(bandRule).toContain("border-top: var(--line)");
+    expect(bandRule).toContain("box-shadow: 0 -14px 34px -24px #000");
+
+    const commandRule = extractRule(css, '.elosern-stage [data-anchor="band-command"]');
+    expect(commandRule, "the command region rule exists").not.toBe("");
+    expect(commandRule).not.toContain("background");
+    expect(commandRule).not.toContain("box-shadow");
 
     const dockRule = extractRule(
       styleBlock("components/ActionDock.vue"),
       ".action-dock",
     );
     expect(dockRule, "the content column rule exists").not.toBe("");
-    expect(dockRule).toContain("max-width: 1180px");
-    expect(dockRule).toContain("margin: 0 auto");
     // The content column paints nothing: no background, border, or shadow.
     expect(dockRule).not.toContain("linear-gradient");
     expect(dockRule).not.toContain("box-shadow");
     expect(dockRule).not.toContain("border-top");
     expect(dockRule).not.toContain("background");
+  });
+
+  it("sizes the stage from --band-h alone; --dock-h is gone", () => {
+    const css = styleBlock("components/HudFrame.vue");
+    expect(css).not.toContain("--dock-h");
+    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
+    expect(tokens).toContain("--band-h: clamp(260px, 27.8vh, 400px);");
+    expect(tokens).toContain("--stage-content-bottom: calc(var(--band-h) + var(--command-line-h));");
+    expect(tokens).not.toContain("--dock-h");
+    const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    expect(shellCss).not.toContain("--dock-h");
+    expect(shellCss).not.toContain("stage-portrait");
+  });
+
+  it("places the portrait anchors after the combat veil so the player paints above it", () => {
+    const wrapper = mount(HudFrame, { props: { mode: "combat" } });
+    const stage = wrapper.get('[data-testid="elosern-stage"]').element;
+    const order = [...stage.children].map(
+      (el) => el.getAttribute("data-testid") || el.className,
+    );
+    const veil = order.indexOf("stage-combat-veil");
+    expect(veil).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("anchor-actor-left")).toBeGreaterThan(veil);
+    expect(order.indexOf("anchor-actor-right")).toBeGreaterThan(veil);
+    // The band holds exactly the two regions, message first.
+    const band = wrapper.get('[data-testid="stage-band"]');
+    expect(band.findAll(":scope > [data-anchor]").map((el) => el.attributes("data-anchor"))).toEqual([
+      "band-message",
+      "band-command",
+    ]);
   });
 });
