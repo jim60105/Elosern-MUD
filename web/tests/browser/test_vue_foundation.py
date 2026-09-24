@@ -91,7 +91,7 @@ VUE_ROOT = '[data-testid="elosern-vue-root"]'
 CORE_SURFACE_TESTIDS = (
     "topbar",
     "narrative-feed",
-    "command-line",
+    "command-line-toggle",
 )
 
 
@@ -279,12 +279,12 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     " viewport",
                 )
 
-            # H5 (task 8.4/8.5): the command line is permanently present —
-            # no entry button and no open/closed state. A real pointer
-            # round-trip on the always-present field must succeed (a covered
-            # or clipped surface would fail): the field accepts text, Enter
-            # sends (the field clears), and Escape releases the field back to
-            # the action dock (the command line itself is never closed).
+            # webclient-collapsible-command-line: the command line starts
+            # collapsed; clicking the ⌨ toggle expands it, Enter sends (the
+            # field clears, the line collapses, and focus returns to the
+            # action dock), and Escape from a re-opened line also collapses
+            # and returns focus to the action dock.
+            page.locator('[data-testid="command-line-toggle"]').click()
             field = page.locator('[data-testid="command-line-input-field"]')
             field.fill("look")
             field.press("Enter")
@@ -295,12 +295,15 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     "selector": '[data-testid="command-line-input-field"]',
                     "predicate": (
                         "() => { const i = document.querySelector('[data-testid=\"command-line-input-field\"]');"
-                        " return i && i.value === ''; }"
+                        " const a = document.querySelector('[data-anchor=\"command-line\"]');"
+                        " return i && i.value === '' && a && a.getAttribute('data-expanded') === 'false'; }"
                     ),
-                    "description": "the command-line input field cleared after send",
+                    "description": "the command-line input field cleared and collapsed after send",
                 },
                 timeout=10000,
             )
+            page.locator('[data-testid="command-line-toggle"]').click()
+            page.wait_for_function("() => document.activeElement === document.getElementById('inputfield')", timeout=10000)
             field.press("Escape")
             self.assertTrue(
                 page.evaluate(

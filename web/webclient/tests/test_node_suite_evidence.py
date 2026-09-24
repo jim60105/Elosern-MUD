@@ -99,7 +99,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_actions_client_node_suite_passes(self):
         # The legacy `actions.test.js` Node file was retired with the Vue
@@ -222,7 +222,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
     )
     def test_ui_contract_node_suite_passes(self):
@@ -241,6 +241,30 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
             result.returncode,
             0,
             "UI contract Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-top-navigation-bar-carries-the-tool-group",
+    )
+    def test_desktop_navigation_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/desktop_navigation.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "desktop-navigation Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

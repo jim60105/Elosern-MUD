@@ -49,21 +49,19 @@ def fixture_home_xyz_arg() -> str:
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the
-# narrative feed, and the command line (H5, webclient-hud-05-overlays-and-
-# command-line: the command line is permanently present — the input field
-# `#inputfield` renders in the DOM in every mode matrix that shows the
-# command-line anchor, so it IS required for the shared shell-active wait).
+# narrative feed, and the ⌨ command-line toggle in `#band-message`
+# (webclient-collapsible-command-line: the command line itself starts
+# collapsed with `display:none`, while its toggle is rendered in every mode
+# that renders the message region).
 # The status panel and the action dock are conditional (rendered only when
 # their panels are available), so they are also not required here. The
-# narrative feed and command line are addressed through the Vue SPA's stable
-# `data-testid` hooks (the legacy `.elosern-narrative` class hooks are
-# preserved by the Vue app, but the `data-testid` hooks are the stable
-# contract); the header still renders under its legacy `.elosern-header`
-# class.
+# narrative feed and the command-line toggle are addressed through the Vue
+# SPA's stable `data-testid` hooks; the header renders under
+# `[data-testid="topbar"]`.
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
-    '[data-testid="command-line"]',
+    '[data-testid="command-line-toggle"]',
 )
 
 
@@ -276,6 +274,42 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
             "focus did not land on #action-dock or a focusable descendant; activeElement=%r"
             % active
         )
+
+
+def open_command_line(page: Page, timeout: int = 30000) -> None:
+    """Expand the collapsible command line with ``/`` and wait for ``#inputfield`` focus."""
+    page.evaluate(
+        """() => {
+          const active = document.activeElement;
+          const field = document.getElementById('inputfield');
+          const anchor = document.querySelector('[data-anchor="command-line"]');
+          if (active && field && active === field && anchor && anchor.getAttribute('data-expanded') === 'true') {
+            return;
+          }
+          const dock = document.getElementById('action-dock');
+          if (dock && typeof dock.focus === 'function') {
+            dock.focus();
+          } else if (active && typeof active.blur === 'function') {
+            active.blur();
+          }
+        }"""
+    )
+    page.keyboard.press("/")
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#inputfield",
+            "predicate": (
+                "() => { const f = document.getElementById('inputfield'); "
+                "const a = document.querySelector('[data-anchor=\"command-line\"]'); "
+                "return !!f && !!a && a.getAttribute('data-expanded') === 'true' "
+                "&& document.activeElement === f; }"
+            ),
+            "description": "command line expanded and #inputfield focused",
+        },
+        timeout=timeout,
+    )
 
 
 def focus_creation_action_dock(page: Page, timeout: int = 30000) -> None:

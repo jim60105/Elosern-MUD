@@ -182,7 +182,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_codex_drawer_opens_from_the_utility_strip(self):
         """The command line's 圖鑑 utility control opens the codex reference
@@ -194,9 +194,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        # The real trigger path: a clean-state click on the utility-strip
-        # control (no modal covers the command line).
-        page.locator('[data-testid="command-line-lore"]').click()
+        # The real trigger path: a clean-state click on the top-bar tool-group
+        # control while the command line is collapsed.
+        page.locator('[data-testid="nav-tool-lore"]').click()
         page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="lore-codex-drawer"]').count(),
@@ -226,10 +226,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "false",
             "the recession mark clears when the codex drawer closes",
         )
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "nav-tool-lore",
+            "closing the codex drawer returns focus to the top-bar 圖鑑 control",
+        )
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_codex_drawer_replaces_the_open_drawer_or_overlay(self):
         """At most one focus-trapped surface is open: opening the codex drawer
@@ -271,7 +276,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_quest_drawer_offers_no_codex_control(self):
         """The quest drawer contains no control that opens the codex: the
@@ -306,7 +311,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_the_two_codex_controls_are_distinguishable(self):
         """The world-codex control and the title-codex control in the utility
@@ -315,8 +320,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         _wait_mode(page, "exploration")
 
-        lore = page.locator('[data-testid="command-line-lore"]')
-        codex = page.locator('[data-testid="command-line-codex"]')
+        lore = page.locator('[data-testid="nav-tool-lore"]')
+        codex = page.locator('[data-testid="nav-tool-codex"]')
         lore_label = lore.get_attribute("aria-label")
         codex_label = codex.get_attribute("aria-label")
         self.assertNotEqual(
@@ -325,12 +330,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the two codex controls carry distinct accessible labels",
         )
         lore_glyph = page.evaluate(
-            "() => { const b = document.querySelector('[data-testid=\"command-line-lore\"]');"
+            "() => { const b = document.querySelector('[data-testid=\"nav-tool-lore\"]');"
             " return Array.from(b.querySelectorAll('path, circle, ellipse'))"
             ".map((n) => n.outerHTML); }"
         )
         codex_glyph = page.evaluate(
-            "() => { const b = document.querySelector('[data-testid=\"command-line-codex\"]');"
+            "() => { const b = document.querySelector('[data-testid=\"nav-tool-codex\"]');"
             " return Array.from(b.querySelectorAll('path, circle, ellipse'))"
             ".map((n) => n.outerHTML); }"
         )

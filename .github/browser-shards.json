@@ -116,6 +116,8 @@
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_open_rest_form_never_swallows_command_line_enter",
         "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_shift_enter_in_field_inserts_newline_without_sending",
+        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_rejected_send_keeps_the_line_open",
+        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_toggle_collapses_and_keeps_focus",
         "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_stage_anchors_do_not_intersect_at_both_viewports"
       ]
     },
@@ -281,6 +283,7 @@
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_full_log_opens_at_latest_line",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_top_bar_tool_group_fits_and_opens_with_line_collapsed",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable"
       ]
     },

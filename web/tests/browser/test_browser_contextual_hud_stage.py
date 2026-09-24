@@ -9,6 +9,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    open_command_line,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -29,6 +30,7 @@ from ._journey_support import (
     _wait_mode,
     _press,
 )
+from .harness import wait_command_field_released
 
 
 def _selectable_target(identity: int, name: str) -> dict:
@@ -42,6 +44,37 @@ def _selectable_target(identity: int, name: str) -> dict:
         "disabled_reason": None,
     }]
     return target
+
+_GALLERY_PANEL = {
+    "schema_version": 1,
+    "available": True,
+    "kind": "gallery",
+    "subjects": [
+        {
+            "subject_key": "portrait:character:7001",
+            "kind": "portrait:character",
+            "display_name": "夜行者",
+            "is_puppet": True,
+        }
+    ],
+    "selected": "portrait:character:7001",
+    "filters": {"all": 0, "defaults": 0, "bound": 0, "pending": 0, "failed": 0},
+    "capabilities": {
+        "supports_bindings": True,
+        "supports_field_selection": True,
+        "supports_free_text": True,
+        "max_cards": None,
+    },
+    "cards": [],
+    "equipment_summary": {
+        "weapon_main": {"value": None, "display_name": "未裝備"},
+        "weapon_off": {"value": None, "display_name": "未裝備"},
+        "armor": {"value": None, "display_name": "未裝備"},
+        "accessories": {"value": [], "display_names": [], "equipped_count": 0},
+    },
+    "binding_warnings": [],
+    "error_state": None,
+}
 
 
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
@@ -66,17 +99,20 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(minimap.count(), 1, "the minimap island renders in exploration")
         self.assertTrue(minimap.is_visible(), "the minimap is visible in exploration")
 
-        # H5 (task 8.6): the command line's `#inputfield` is present and
-        # visible in exploration with no opening action (the field is always
-        # in the DOM, design D1).
+        # webclient-collapsible-command-line: the command line starts collapsed
+        # in exploration; `#inputfield` stays in the DOM but is hidden, and
+        # the ⌨ toggle is visible with `aria-expanded="false"`.
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        toggle = page.locator('[data-testid="command-line-toggle"]')
         field = page.locator("#inputfield")
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
+        self.assertTrue(toggle.is_visible(), "the command-line toggle is visible in exploration")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertEqual(field.count(), 1, "the command field is present in exploration")
-        self.assertTrue(field.is_visible(), "the command field is visible in exploration")
+        self.assertFalse(field.is_visible(), "the command field starts collapsed in exploration")
 
         # Commit combat: the minimap is removed from the layout with
-        # display:none (never merely dimmed); the other mode-visible surfaces
-        # (narrative feed, command line, action dock) stay up (H5: the command
-        # line is permanently present, webclient-hud-05-overlays-and-command-line).
+        # display:none (never merely dimmed); the command line stays collapsed.
         _inject_snapshot(page, {"local_map": map_panel}, mode="combat")
         _wait_mode(page, "combat")
         self.assertEqual(
@@ -92,26 +128,37 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(hidden, "the minimap is display:none in combat, not merely dimmed")
         for selector in (
             '[data-testid="narrative-feed"]',
-            # H5 (webclient-hud-05-overlays-and-command-line): the command
-            # line is permanently present (design D1) — it stays visible in
-            # combat mode.
-            '[data-testid="command-line"]',
+            '[data-testid="command-line-toggle"]',
             "#action-dock",
         ):
             self.assertTrue(
                 page.locator(selector).is_visible(),
                 f"{selector} must stay visible in combat",
             )
-        # H5 (task 8.6): the command field stays present and visible in
-        # combat (the command line is never closed).
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertEqual(page.locator("#inputfield").count(), 1, "the command field is present in combat")
-        self.assertTrue(
+        self.assertFalse(
             page.locator("#inputfield").is_visible(),
-            "the command field is visible in combat",
+            "the command field stays collapsed in combat",
         )
 
-        # Commit creation: per H1's mode matrix, the command-line anchor is
-        # display:none, so the command field is absent from the layout.
+        # Commit dialogue: the toggle remains visible and the command line
+        # stays collapsed until opened.
+        _inject_snapshot(page, {"local_map": map_panel}, mode="dialogue")
+        _wait_mode(page, "dialogue")
+        self.assertTrue(toggle.is_visible(), "the command-line toggle is visible in dialogue")
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertFalse(field.is_visible(), "the command field stays collapsed in dialogue")
+
+        # Expand the command line, then commit creation: focus is rescued to
+        # the action dock, both the command line and its toggle are hidden in
+        # creation, and returning to exploration starts collapsed.
+        open_command_line(page)
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
+        self.assertTrue(field.is_visible())
+
         _inject_snapshot(page, {"local_map": map_panel}, mode="creation")
         _wait_mode(page, "creation")
         self.assertEqual(
@@ -124,6 +171,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "return el ? (el.offsetParent === null) : true; }"
         )
         self.assertTrue(field_absent, "the command field is absent (display:none) in creation mode")
+        self.assertFalse(toggle.is_visible(), "the command-line toggle is hidden in creation mode")
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
+
+        _inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
+        _wait_mode(page, "exploration")
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false", "returning from creation starts collapsed")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertTrue(toggle.is_visible())
+        self.assertFalse(field.is_visible(), "the command field is collapsed after returning from creation")
 
     @covers_requirement(
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage"
@@ -371,7 +427,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         # Each of the three triggers opens exactly its own overlay.
         # settings trigger -> settings overlay.
-        page.locator('[data-testid="command-line-settings"]').click()
+        page.locator('[data-testid="nav-settings"]').click()
         page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
@@ -387,7 +443,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
         # help trigger -> help overlay.
-        page.locator('[data-testid="command-line-help"]').click()
+        page.locator('[data-testid="nav-tool-help"]').click()
         page.wait_for_selector('[data-testid="help-overlay"]', timeout=15000)
 
         # Mutual exclusion: opening a second overlay closes the first (the store
@@ -607,7 +663,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size"
     )
     @covers_requirement(
-        "webclient-contextual-hud::the-command-line-is-a-permanently-present-bar-in-the-stage-s-command-line-anchor"
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge"
     )
     def test_command_line_never_overlaps_dock_caption_or_hud(self):
         """H5 (task 8.8): at every supported viewport and at each of the
@@ -631,25 +687,28 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 mode="exploration",
             )
             _wait_mode(page, "exploration")
+            open_command_line(page)
             for scale in (0.92, 1, 1.12):
                 page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
-                overlaps = page.evaluate(
+                geo = page.evaluate(
                     """() => {
                       const byId = (sel) => {
                         const el = document.querySelector(sel);
                         return el && el.getBoundingClientRect();
                       };
                       const cmd = byId('[data-testid="command-line"]');
-                      if (!cmd) { return ["command-line missing"]; }
+                      if (!cmd) { return { hits: ["command-line missing"] }; }
                       const targets = {
                         dock: byId('#action-dock'),
                         caption: byId('[data-testid="narrative-feed"]'),
+                        messageRegion: byId('[data-testid="anchor-band-message"]'),
                         vitals: byId('[data-testid="anchor-vitals"]'),
                         map: byId('[data-testid="anchor-map"]'),
                         band: byId('[data-testid="stage-band"]'),
                       };
                       const hits = [];
                       for (const key of Object.keys(targets)) {
+                        if (key === "messageRegion") { continue; }
                         const b = targets[key];
                         if (!b) { continue; }
                         const overlap = !(
@@ -662,16 +721,28 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (band && Math.abs(cmd.bottom - band.top) > 1) {
                         hits.push("not-on-band-top");
                       }
-                      return hits;
+                      const leftCol = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-column'));
+                      return {
+                        hits,
+                        height: cmd.height,
+                        left: cmd.left,
+                        right: cmd.right,
+                        leftCol,
+                        messageRight: targets.messageRegion ? targets.messageRegion.right : null,
+                      };
                     }"""
                 )
                 self.assertEqual(
-                    overlaps,
+                    geo["hits"],
                     [],
                     "the command line overlaps %s at %dx%d @ scale %s" % (
-                        ", ".join(overlaps), viewport[0], viewport[1], scale,
+                        ", ".join(geo["hits"]), viewport[0], viewport[1], scale,
                     ),
                 )
+                self.assertAlmostEqual(geo["height"], 44.0, delta=1.0, msg=f"expanded row is 44px at {viewport}")
+                self.assertAlmostEqual(geo["left"], geo["leftCol"], delta=1.5, msg=f"row starts at --left-column at {viewport}")
+                self.assertAlmostEqual(geo["right"], geo["messageRight"], delta=1.5, msg=f"row ends at message region's right edge at {viewport}")
+            page.close()
 
     @covers_requirement(
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces"
@@ -1079,4 +1150,152 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertTrue(at_bottom_again, "reopening full log must open at the latest line again")
+        page.close()
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-top-navigation-bar-carries-the-tool-group",
+        "webclient-pointer-activation::keyboard-input-is-dispatched-through-the-webclient-plugin-contract",
+    )
+    def test_top_bar_tool_group_fits_and_opens_with_line_collapsed(self):
+        """webclient-collapsible-command-line (design D6): at 1280x720 with a
+        maximum-length character name and an available gallery panel, every
+        `nav-tools` button lies inside the 48px bar without intersecting
+        `.topbar-right`; Tab reaches each tool in order, Enter opens its
+        surface and Escape returns focus to it while the command line stays
+        collapsed; and ArrowUp on the dock with the line collapsed is claimed
+        by the router, while `/` then ArrowUp in the field walks history."""
+        page = self.logged_in_page((1280, 720))
+        exploration = _exploration_panel([_selectable_target(11, "小販")])
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+                "lore_codex": valid_lore_codex_panel(),
+                "gallery": _GALLERY_PANEL,
+                "roster": {
+                    "schema_version": 2,
+                    "available": True,
+                    "characters": [{
+                        "identity": 1,
+                        "name": "長" * 128,
+                        "current": True,
+                        "pending": False,
+                        "portrait": {
+                            "subject_key": None,
+                            "status": "missing",
+                            "url": None,
+                            "aspect_ratio": None,
+                            "alt": "角色肖像",
+                            "placeholder": {"kind": "missing", "label": "尚無肖像"},
+                            "face_rect": None,
+                        },
+                    }],
+                    "can_create": False,
+                    "max_characters": 3,
+                    "switch_locked": False,
+                    "lock_reason": None,
+                },
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+        page.wait_for_selector('[data-testid="gallery-opener"]', timeout=15000)
+        page.wait_for_selector('[data-testid="character-switcher-name"]', timeout=15000)
+
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "false",
+        )
+        fit = page.evaluate(
+            """() => {
+              const right = document.querySelector('.topbar-right').getBoundingClientRect();
+              const navButtons = [...document.querySelectorAll('.desktop-navigation button')].map((b) => {
+                const r = b.getBoundingClientRect();
+                return { testid: b.getAttribute('data-testid'), left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+              });
+              const tools = [...document.querySelectorAll('[data-testid="nav-tools"] button')].map((b) => {
+                const r = b.getBoundingClientRect();
+                return {
+                  testid: b.getAttribute('data-testid'),
+                  aria: b.getAttribute('aria-label'),
+                  title: b.getAttribute('title'),
+                  top: r.top,
+                  bottom: r.bottom,
+                  left: r.left,
+                  right: r.right,
+                };
+              });
+              return { rightLeft: right.left, navButtons, tools };
+            }"""
+        )
+        self.assertEqual(
+            [t["testid"] for t in fit["tools"]],
+            ["nav-tool-lineage", "nav-tool-lore", "nav-tool-codex", "gallery-opener", "nav-tool-help"],
+        )
+        for tool in fit["tools"]:
+            self.assertEqual(tool["aria"], tool["title"])
+            self.assertGreaterEqual(tool["top"], -1)
+            self.assertLessEqual(tool["bottom"], 48 + 1, f"{tool['testid']} extends below the 48px bar")
+        for btn in fit["navButtons"]:
+            self.assertLessEqual(btn["right"], fit["rightLeft"], f"nav button {btn['testid']} intersects .topbar-right")
+
+        # Sequential Tab from nav-settings reaches each tool in order; Enter
+        # opens its surface and Escape returns focus to that tool.
+        page.locator('[data-testid="nav-settings"]').focus()
+        expected_tools = (
+            ("nav-tool-lineage", '[data-testid="overlay-host"][data-elosern-overlay="lineage"]'),
+            ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
+            ("nav-tool-codex", '[data-testid="overlay-host"][data-elosern-overlay="codex"]'),
+            ("gallery-opener", '[data-testid="gallery-panel"]'),
+            ("nav-tool-help", '[data-testid="help-overlay"]'),
+        )
+        for testid, surface_sel in expected_tools:
+            page.keyboard.press("Tab")
+            self.assertEqual(
+                page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+                testid,
+                f"Tab did not reach {testid}",
+            )
+            page.keyboard.press("Enter")
+            page.wait_for_selector(surface_sel, timeout=15000)
+            page.keyboard.press("Escape")
+            page.wait_for_function(
+                "(sel) => document.querySelector(sel) === null",
+                surface_sel,
+                timeout=15000,
+            )
+            self.assertEqual(
+                page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+                testid,
+                f"Escape did not restore focus to {testid}",
+            )
+
+        # Pointer-activation scenario: with the line collapsed, ArrowUp on the
+        # dock is claimed by the router and does not walk history; `/` then
+        # ArrowUp in the focused field walks the command history.
+        open_command_line(page)
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        wait_command_field_released(page)
+        claimed = page.evaluate(
+            """() => {
+              const ev = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+              document.getElementById('action-dock').dispatchEvent(ev);
+              return {
+                prevented: ev.defaultPrevented,
+                value: document.getElementById('inputfield').value,
+              };
+            }"""
+        )
+        self.assertTrue(claimed["prevented"], "ArrowUp on the dock with the line collapsed is claimed by the router")
+        self.assertEqual(claimed["value"], "", "collapsed command line owns no key")
+        open_command_line(page)
+        page.keyboard.press("ArrowUp")
+        self.assertEqual(
+            page.evaluate("document.getElementById('inputfield').value"),
+            "look",
+            "ArrowUp in the expanded, focused field walks the command history",
+        )
         page.close()

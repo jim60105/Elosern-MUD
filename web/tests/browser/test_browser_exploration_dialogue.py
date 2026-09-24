@@ -339,7 +339,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_cancelled_freeform_dialogue_cannot_capture_a_later_command(self):
         page = self.logged_in_page()
@@ -376,17 +376,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             dom_readiness={
                 "selector": "#action-dock",
                 "predicate": (
-                    "() => { const d = document.querySelector('[data-testid=\"command-line\"]'); "
-                    "const linePresent = !!d; "
+                    "() => { const a = document.querySelector('[data-anchor=\"command-line\"]'); "
+                    "const d = document.querySelector('[data-testid=\"command-line\"]'); "
+                    "const collapsed = !!a && a.getAttribute('data-expanded') === 'false' && !!d; "
                     "const dock = document.getElementById('action-dock'); "
-                    "const a = document.activeElement; "
-                    "return linePresent && !!dock && (a === dock || (a && dock.contains(a))); }"
+                    "const active = document.activeElement; "
+                    "return collapsed && !!dock && (active === dock || (active && dock.contains(active))); }"
                 ),
-                "description": "command line present and action dock focused",
+                "description": "command line collapsed and action dock focused",
             },
         )
 
-        # Send an ordinary command through the always-present command line: it
+        # Expand the command line with `/` and send an ordinary command: it
         # must travel as text, never as explore.talk_freeform speech to the
         # previously selected NPC.
         page.keyboard.press("/")

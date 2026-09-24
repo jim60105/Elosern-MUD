@@ -9,6 +9,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    open_command_line,
     sent_action_count,
     store_state,
     valid_art_panel,
@@ -29,8 +30,9 @@ def _wait_field_focused(page, timeout=30000):
         dom_readiness={
             "selector": "#inputfield",
             "predicate": (
-                "() => document.activeElement === "
-                "document.getElementById('inputfield')"
+                "() => { const f = document.getElementById('inputfield');"
+                " const a = document.querySelector('[data-anchor=\"command-line\"]');"
+                " return !!f && !!a && a.getAttribute('data-expanded') === 'true' && document.activeElement === f; }"
             ),
             "description": "#inputfield focused",
         },
@@ -101,31 +103,36 @@ def _append_narrative_fillers(page, count=80):
 class ShellAcceptanceTest(BrowserAcceptanceTest):
     """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_keyboard_field_focus_send_cancel_and_focus_restoration(self):
         page = self.logged_in_page()
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        toggle = page.locator('[data-testid="command-line-toggle"]')
 
-        # H5: the command line is permanently present — `/` focuses the
-        # always-present field (no opening action). Send an ordinary command:
-        # the field clears and focus stays in the field, so consecutive
-        # commands need no pointer interaction.
+        # Collapsed on load; `#inputfield` stays in the DOM inside its wrapper
+        # but is hidden, and the ⌨ toggle is visible with aria-expanded="false".
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertEqual(page.locator("#inputfield").count(), 1)
+        self.assertFalse(page.locator("#inputfield").is_visible())
+
+        # `/` expands the row and focuses `#inputfield`.
         focus_action_dock(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()", "the command line is present"))
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        self.assertTrue(page.locator("#inputfield").is_visible())
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         wait_for_narrative_settled(page, narrative_before.__len__())
-        # Focus retained in the field, command line still present, field cleared.
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
-        self.assertTrue(
-            page.evaluate(
-                "document.activeElement === document.getElementById('inputfield')"
-            )
-        )
+        # Accepted send clears the field, collapses the line, and restores focus to #action-dock.
+        wait_command_field_released(page)
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
         )
@@ -134,26 +141,21 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             narrative_after, narrative_before, "command-line send produced no narrative"
         )
 
-        # A second command can be sent with no pointer interaction.
-        page.keyboard.type("look")
-        page.keyboard.press("Enter")
-        wait_for_narrative_settled(page, narrative_after.__len__())
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
-        self.assertTrue(
-            page.evaluate(
-                "document.activeElement === document.getElementById('inputfield')"
-            )
-        )
-
-        # Cancel path: Escape from the focused field sends nothing and
-        # restores action-dock focus; the command line itself is never
-        # closed (it is permanently present, design D1).
-        page.keyboard.press("Escape")
-        wait_command_field_released(page)
-        focus_action_dock(page)
+        # A second consecutive command is sent without pointer interaction by
+        # pressing `/` first.
         page.keyboard.press("/")
         _wait_field_focused(page)
         page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        wait_for_narrative_settled(page, narrative_after.__len__())
+        wait_command_field_released(page)
+
+        # Cancel path: Escape from the focused field sends nothing and
+        # restores action-dock focus while collapsing the command line and
+        # preserving the unsent draft for the next expansion.
+        page.keyboard.press("/")
+        _wait_field_focused(page)
+        page.keyboard.type("unsent draft")
         narrative_before_cancel = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.keyboard.press("Escape")
         wait_command_field_released(page)
@@ -161,6 +163,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page.locator('[data-testid="narrative-feed"]').inner_text(),
             narrative_before_cancel,
             "Escape must not send command-line text",
+        )
+        page.keyboard.press("/")
+        _wait_field_focused(page)
+        self.assertEqual(
+            page.evaluate("document.getElementById('inputfield').value"),
+            "unsent draft",
+            "Escape preserves the unsent draft for the next expansion",
         )
 
     @covers_requirement(
@@ -298,32 +307,30 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_pointer_focused_field_sends_on_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        toggle = page.locator('[data-testid="command-line-toggle"]')
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
 
-        # H5: the command line is permanently present — pointer activation
-        # of the always-present field must send exactly one ordinary text
-        # message through the single send path, clear the field, and keep
-        # focus in it (the plugin contract reports no unhandled keydown).
-        page.locator("#inputfield").click()
+        # Clicking the ⌨ toggle expands the row and focuses `#inputfield`;
+        # Enter sends once, clears the field, collapses the row, and returns
+        # focus to `#action-dock`.
+        toggle.click()
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         _wait_narrative_grew(page, narrative_before.__len__())
+        wait_command_field_released(page)
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"),
             "",
             "the field must clear after a pointer-focused send",
-        )
-        self.assertTrue(
-            page.evaluate(
-                "document.activeElement === document.getElementById('inputfield')"
-            ),
-            "focus stays in the field after an input-area send",
         )
         sends = [
             args[0]
@@ -334,16 +341,75 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertTrue(any("look" in str(item) for item in sends))
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
+    )
+    def test_rejected_send_keeps_the_line_open(self):
+        page = self.logged_in_page()
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        open_command_line(page)
+        # Inject a reload-required protocol error so mutationsLocked becomes true.
+        generation = store_state(page)["generation"]
+        accepted = page.evaluate(
+            """(args) => window.__elosernBridge.store.receive(
+              args.generation, 'ui_error', [{
+                protocol_version: 1,
+                code: 'unsupported_version',
+                message: '不支援的協定版本',
+                reload_required: true,
+              }], {})""",
+            {"generation": generation},
+        )
+        self.assertTrue(accepted["accepted"])
+        self.assertTrue(store_state(page)["mutationsLocked"])
+
+        page.keyboard.type("keep this draft")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(200)
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
+        self.assertTrue(page.locator("#inputfield").is_visible())
+        self.assertEqual(
+            page.evaluate("document.getElementById('inputfield').value"),
+            "keep this draft",
+        )
+        self.assertTrue(
+            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
+            "a rejected send keeps focus in #inputfield",
+        )
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
+    )
+    def test_toggle_collapses_and_keeps_focus(self):
+        page = self.logged_in_page()
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        toggle = page.locator('[data-testid="command-line-toggle"]')
+        open_command_line(page)
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
+
+        toggle.click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-anchor=\"command-line\"]').getAttribute('data-expanded') === 'false'",
+            timeout=10000,
+        )
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertFalse(page.locator("#inputfield").is_visible())
+        self.assertTrue(
+            page.evaluate(
+                "document.activeElement === document.querySelector('[data-testid=\"command-line-toggle\"]')"
+            ),
+            "collapsing with the ⌨ toggle leaves focus on the toggle",
+        )
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_shift_enter_in_field_inserts_newline_without_sending(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
-        # H5: the field is permanently present; focus it directly (no opening
-        # action is needed — design D1).
-        page.locator("#inputfield").click()
-        _wait_field_focused(page)
+        open_command_line(page)
         page.keyboard.type("first line")
         page.keyboard.press("Shift+Enter")
         page.keyboard.type("second line")
@@ -358,7 +424,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertIn("first line\nsecond line", str(sends[0]))
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
@@ -399,11 +465,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 "description": "rest form rendered",
             },
         )
-        # H5: the command line is permanently present — focus the always-present
-        # field and send; the rest form's capture-phase handler must yield,
-        # and the command travels as ordinary text (never an explore.wait
-        # submission).
-        page.locator("#inputfield").click()
+        # Expand the command line via the ⌨ toggle and send; the rest form's
+        # handler must yield, and the command travels as ordinary text (never
+        # an explore.wait submission).
+        page.locator('[data-testid="command-line-toggle"]').click()
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
@@ -424,7 +489,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_command_line_field_button_alignment_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):

@@ -532,11 +532,11 @@ class ManagedServerTearDownMixin:
 
 
 def wait_command_field_released(page, timeout=30000):
-    """Gate on the action dock holding focus after Escape from the field.
+    """Gate on the command line collapsing and the action dock holding focus.
 
-    H5 (webclient-hud-05-overlays-and-command-line): the command line is
-    permanently present — the release path is focus restoration to
-    ``#action-dock`` (design D2); the field is never closed (design D1).
+    webclient-collapsible-command-line (design D2): Escape or an accepted
+    send restores focus to ``#action-dock`` and collapses the command-line
+    anchor (``data-expanded="false"``) while ``#inputfield`` stays in the DOM.
     """
     wait_for_store_state(
         page,
@@ -544,13 +544,14 @@ def wait_command_field_released(page, timeout=30000):
         dom_readiness={
             "selector": "#action-dock",
             "predicate": (
-                "() => { const d = document.querySelector('[data-testid=\"command-line\"]');"
+                "() => { const a = document.querySelector('[data-anchor=\"command-line\"]');"
+                " const d = document.querySelector('[data-testid=\"command-line\"]');"
                 " const dock = document.getElementById('action-dock');"
-                " return d && dock && "
+                " return a && a.getAttribute('data-expanded') === 'false' && d && dock && "
                 "(document.activeElement === dock || "
                 "(document.activeElement && dock.contains(document.activeElement))); }"
             ),
-            "description": "command field released: #action-dock focused, command line still present",
+            "description": "command field released: #action-dock focused, command line collapsed",
         },
         timeout=timeout,
     )
