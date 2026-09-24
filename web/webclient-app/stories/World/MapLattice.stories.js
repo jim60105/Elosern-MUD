@@ -18,10 +18,10 @@ import {
 // the old private copy deleted), reusing the existing `local_map` fixtures
 // so both surfaces render the identical committed payload.
 
-// The island column's CONTENT box: the 230px hud-right anchor less the
-// island's 9px padding and 1px border on each side. Island-scale stories fill
-// it the way the island does, so a story shows the same canvas the minimap
-// draws rather than a natural-size one.
+// The minimap island's fixed 208px canvas (the island sits at the top of the
+// stage's `map` anchor). Island-scale stories fill it the way the island
+// does, so a story shows the same canvas the minimap draws rather than a
+// natural-size one.
 const renderLattice = (args) => ({
   render: () =>
     h("div", { style: "width: 208px;" }, [h(MapLattice, args)]),

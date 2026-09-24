@@ -312,4 +312,45 @@ function onChipKeydown(event) {
   font-family: var(--f-mono);
   font-size: var(--text-sm);
 }
+
+/* Short viewports (webclient-avg-stage-hud-anchors design D6): smaller
+   chips and a tighter island, so the vitals stack fits its anchor. */
+@media (max-height: 820px) {
+  .conditions {
+    padding: 7px 12px 9px;
+  }
+
+  .clab {
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+
+  .chips {
+    gap: 5px;
+  }
+
+  .chip {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+
+  .chip .glyph {
+    font-size: 14px;
+  }
+
+  .chip.more {
+    min-width: 26px;
+    padding: 0 6px;
+  }
+
+  .disclosure {
+    max-height: 64px;
+    padding: 4px 8px;
+  }
+
+  .disclosure-row {
+    padding: 1px 0;
+  }
+}
 </style>

@@ -4,8 +4,11 @@
 // stage. A `position:relative; overflow:hidden` root with named anchors:
 // - the `place` anchor (webclient-avg-place-card-top-bar design D4): the
 //   place card at the stage box's top-left, at the fixed `--place-h`;
-// - the HUD island anchors `hud-left` (below the place card) and
-//   `hud-right`;
+// - the island anchors named by their content
+//   (webclient-avg-stage-hud-anchors design D1): `vitals` below the place
+//   card (the vitals, conditions, and compact party islands) and `map` at
+//   the top-right (the minimap, the one-line objective, the combat
+//   participant frame, and the title ballot);
 // - the portrait anchors `actor-left` (the player's standing portrait) and
 //   `actor-right` (reserved), standing on the bottom band's top edge;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
@@ -19,7 +22,7 @@
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
 // the veil in DOM order, so the player stays bright in combat), the place
-// card and the HUD islands 4, band 5, command line 6.
+// card and the island anchors 4, band 5, command line 6.
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -85,17 +88,17 @@ defineExpose({ menuOpen });
     </div>
     <div
       class="stage-anchor"
-      data-anchor="hud-left"
-      data-testid="anchor-hud-left"
+      data-anchor="vitals"
+      data-testid="anchor-vitals"
     >
-      <slot name="hud-left" />
+      <slot name="vitals" />
     </div>
     <div
       class="stage-anchor"
-      data-anchor="hud-right"
-      data-testid="anchor-hud-right"
+      data-anchor="map"
+      data-testid="anchor-map"
     >
-      <slot name="hud-right" />
+      <slot name="map" />
     </div>
     <div class="stage-band" data-testid="stage-band">
       <div
@@ -120,7 +123,6 @@ defineExpose({ menuOpen });
     >
       <slot name="command-line" />
     </div>
-    <slot name="objectives" />
   </div>
 </template>
 
@@ -170,32 +172,32 @@ defineExpose({ menuOpen });
    fixed height whatever the labels (webclient-avg-place-card-top-bar design
    D4), aligned to the brand column above it. */
 .elosern-stage [data-anchor="place"] {
-  top: calc(var(--header-h) + 16px);
+  top: calc(var(--header-h) + var(--stage-inset-y));
   left: 16px;
   width: calc(var(--left-column) - 32px);
   height: var(--place-h);
   z-index: 4;
 }
 
-/* hud-left / hud-right: the HUD island stacks. Bounded above the bottom
-   band (never the band's content) and scrolling internally. hud-left
-   begins below the place card; hud-right clears only the top bar. The
+/* vitals / map: the island stacks. Bounded above the bottom band (never the
+   band's content) and scrolling internally. vitals begins below the place
+   card; map clears only the top bar. The
    `.elosern-root` override in app-shell.css repeats these offsets (it sets
    the column widths); keep the two in step. */
-.elosern-stage [data-anchor="hud-left"] {
-  top: calc(var(--header-h) + 16px + var(--place-h) + 12px);
+.elosern-stage [data-anchor="vitals"] {
+  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px);
   left: 16px;
   width: 262px;
   z-index: 4;
   display: flex;
   flex-direction: column;
   gap: 9px;
-  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 44px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px - 2 * var(--stage-inset-y));
   overflow-y: auto;
   overflow-x: hidden;
 }
-.elosern-stage [data-anchor="hud-right"] {
-  top: calc(var(--header-h) + 16px);
+.elosern-stage [data-anchor="map"] {
+  top: calc(var(--header-h) + var(--stage-inset-y));
   right: 16px;
   width: 230px;
   z-index: 4;
@@ -203,7 +205,7 @@ defineExpose({ menuOpen });
   flex-direction: column;
   gap: 9px;
   align-items: flex-end;
-  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -272,22 +274,28 @@ defineExpose({ menuOpen });
 
 /* Mode-gated visibility (design D2/D7): CSS-only on data-elosern-mode,
    display:none so hidden surfaces leave the a11y tree and tab order. The
-   matrix: the place card, the message region, the HUD island stack
-   (hud-left), and the command line are hidden in creation, where the command region spans the
-   whole band; the minimap is hidden in combat and creation; the command
-   region and the scene backdrop stay visible in every mode. */
+   matrix: the place card, the message region, both island anchors (`vitals`
+   and `map`, with every island in them), and the command line are hidden in
+   creation, where the command region spans the whole band; the minimap is
+   hidden in combat; the objective line shows only in exploration; the
+   command region and the scene backdrop stay visible in every mode. */
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="place"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
-.elosern-stage[data-elosern-mode="creation"] [data-anchor="hud-left"],
+.elosern-stage[data-elosern-mode="creation"] [data-anchor="vitals"],
+.elosern-stage[data-elosern-mode="creation"] [data-anchor="map"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="command-line"] {
   display: none;
 }
 .elosern-stage[data-elosern-mode="creation"] .stage-band {
   grid-template-columns: minmax(0, 1fr);
 }
-.elosern-stage[data-elosern-mode="combat"] .local-map,
-.elosern-stage[data-elosern-mode="creation"] .local-map {
+.elosern-stage[data-elosern-mode="combat"] .local-map {
   display: none !important;
+}
+/* The objective line (webclient-avg-stage-hud-anchors design D2) is an
+   exploration-only surface; it carries no tab stop, so no focus rescue. */
+.elosern-stage:not([data-elosern-mode="exploration"]) [data-anchor="map"] .obj {
+  display: none;
 }
 
 /* The open-surface registry (design D9): when a drawer or overlay is open
@@ -295,8 +303,7 @@ defineExpose({ menuOpen });
    open. The transition is token-gated, so prefers-reduced-motion disables
    it at the token level while the recessed state still applies. */
 .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
-.elosern-stage[data-menu-open="true"] .stage-band,
-.elosern-stage[data-menu-open="true"] .obj {
+.elosern-stage[data-menu-open="true"] .stage-band {
   filter: var(--menu-open-filter);
   transition: filter var(--motion-base) var(--ease-standard);
 }

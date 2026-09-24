@@ -1,5 +1,5 @@
 <script setup>
-// StatusPanel: the `hud-left` island stack. It composes two separately-chromed
+// StatusPanel: the `vitals` anchor's island stack. It composes two separately-chromed
 // islands — VitalsTrack and ConditionChips. The preserved
 // `data-testid="status-panel"` root and the three
 // `status-panel__gauge-value--{hp,mp,sp}` hooks (carried by the VitalsTrack
@@ -52,7 +52,7 @@ const props = defineProps({
   /* The stack root is a transparent container; each child island carries
      the shared island chrome (design D2.1). The anchor's own 9px gap
      separates the islands. `min-height: 0` lets the whole stack compress
-     inside the capped hud-left anchor instead of overflowing the budget. */
+     inside the capped vitals anchor instead of overflowing the budget. */
   min-height: 0;
   font-family: var(--f-sans);
 }
