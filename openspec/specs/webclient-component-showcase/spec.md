@@ -144,7 +144,7 @@ presented visibly when the chip is focused or hovered, and any bounded overflow 
 committed condition reachable in one action. A gauge's trailing damage indicator SHALL be decorative,
 absent from the accessibility tree, and SHALL never display a value that was not previously committed
 for that same gauge. Disguised statistics are display-only and SHALL be shown distinct from true
-traits, and a disguised displayed value SHALL NOT be substituted for a true trait on the head card.
+traits, and a disguised displayed value SHALL NOT be substituted for a true trait row.
 The character status drawer SHALL present the `character` payload's character details, the equipment
 doll's equipped items, disguise, guild rank/merit, and persona, and SHALL NOT present a field the
 payload does not carry. Each surface renders only its OOB-backed payload and SHALL NOT invent any
@@ -358,7 +358,7 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
 through a change that names the growth as part of its own scope: a change in the WebClient
-Contextual HUD Redesign roadmap's delivery table, or a feature change that introduces a component
+Contextual HUD Redesign roadmap's delivery table, a change in the WebClient AVG stage redesign series
 (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md`, whose changes are a
 governed redesign wave that MAY both add and delete components), or a feature change that introduces a component
 backed by a committed presentation panel — the portrait-gallery family
