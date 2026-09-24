@@ -17,7 +17,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-place", "anchor-hud-left", "anchor-hud-right", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
+              const ids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
               return ids.map((id) => {
                 const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };
@@ -57,7 +57,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 )
                 self.assertGreater(
                     feed_width, 400,
-                    f"the narrative caption is wider than before the hud-right removal at {viewport}",
+                    f"the narrative caption is wider than 400px at {viewport}",
                 )
                 self.assertFalse(
                     self._anchors_overlap(page),

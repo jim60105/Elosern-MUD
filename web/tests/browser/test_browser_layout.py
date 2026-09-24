@@ -416,7 +416,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-place", "anchor-hud-left", "anchor-hud-right", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
+              const ids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
               return ids.map((id) => {
                 const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };
@@ -529,7 +529,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
 
                 # Creation: the full gated set is display:none (H1's visibility
                 # matrix + design D10) — the place card, the band's message region, the
-                # left HUD island stack (hud-left), the command-line anchor, and the minimap.
+                # vitals and map island anchors (with the minimap), and the command-line anchor.
                 # Focus the command field first so the mode change hides the focused
                 # surface; the shell rescues focus to the action dock.
                 page.locator("#inputfield").click()
@@ -538,7 +538,8 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 for selector in (
                     '[data-anchor="place"]',
                     '[data-anchor="band-message"]',
-                    '[data-anchor="hud-left"]',
+                    '[data-anchor="vitals"]',
+                    '[data-anchor="map"]',
                     '[data-anchor="command-line"]',
                     '[data-testid="local-map"]',
                 ):

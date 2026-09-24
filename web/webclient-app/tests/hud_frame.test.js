@@ -57,7 +57,7 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     };
     if (withMap) {
       const mapPanel = fx.localMapPanel();
-      slots["panel-left"] = () => h(LocalMap, { localMap: mapPanel });
+      slots.map = () => h(LocalMap, { localMap: mapPanel });
     }
     wrapper = mount(AppShell, { attachTo: host, props: { mode }, slots });
     return wrapper;
@@ -156,7 +156,8 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="band-message"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="actor-left"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="hud-left"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="vitals"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="map"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="command-line"]').exists()).toBe(true);
     expect(dialogue.find(".local-map").exists()).toBe(true);
     expect(dialogue.find('[data-anchor="band-command"]').exists()).toBe(true);

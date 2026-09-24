@@ -8,24 +8,27 @@ import {
   ART_PANEL_SAMPLE,
 } from "../fixtures.js";
 
-// PartyStrip (webclient-align-05-party-hud):
-// the left-HUD companion quickbar (.comps) stories — empty, two companions
-// (with combat token), full four companions, and missing-portrait fallback. Empty renders nothing.
+// PartyStrip (webclient-align-05-party-hud; webclient-avg-stage-hud-anchors
+// design D3): the compact companion quickbar (.comps) stories — two
+// companions (with combat token badges), a full party of four, and an empty
+// party, which renders nothing. No invite padding cells. The frame is the
+// `vitals` anchor's width at 1920x1080 (298px); `NarrowAnchor` is its
+// narrowest width, 184px at 1280x720.
 
 export default {
   title: "Overlays/PartyStrip",
   component: PartyStrip,
 };
 
-const renderStrip = (args) => ({
+const renderStrip = ({ width = 298, ...props }) => ({
   render: () =>
     h(
       "div",
       {
         style:
-          "position: relative; width: 280px; padding: 16px; background: var(--ink-950, #0d0a12);",
+          `position: relative; width: ${width}px; padding: 16px; background: var(--ink-950, #0d0a12);`,
       },
-      [h(PartyStrip, args)],
+      [h(PartyStrip, props)],
     ),
 });
 
@@ -54,5 +57,15 @@ export const FullParty = {
     slots: PARTY_PANEL_FULL_SAMPLE.slots,
     combatParticipants: PARTY_COMBAT_PARTICIPANTS_SAMPLE,
     artPanel: null,
+  },
+};
+
+export const NarrowAnchor = {
+  render: renderStrip,
+  args: {
+    slots: PARTY_PANEL_FULL_SAMPLE.slots,
+    combatParticipants: [],
+    artPanel: ART_PANEL_SAMPLE,
+    width: 184,
   },
 };

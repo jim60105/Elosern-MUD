@@ -27,6 +27,48 @@ REQUIRED_SURFACES = (
 )
 
 
+def _party_panel(count: int) -> dict:
+    """A committed party v1 panel with ``count`` slots (no bound portraits)."""
+    names = ("蕾娜", "幽", "艾德蒙", "雪莉")
+    return {
+        "schema_version": 1,
+        "available": True,
+        "slots": [
+            {
+                "identity": 101 + i,
+                "display_name": names[i],
+                "portrait_ref": None,
+                "hp_current": 90 + i,
+                "hp_maximum": 120,
+                "bond_stage": "初識",
+            }
+            for i in range(count)
+        ],
+    }
+
+
+def _objectives_panel(count: int) -> dict:
+    """A committed objectives v1 panel with ``count`` tracked rows."""
+    return {
+        "schema_version": 1,
+        "available": True,
+        "rows": [
+            {
+                "quest_id": f"q_{1042 + i}",
+                "display_name": f"委託{i + 1}",
+                "objective_line": f"前往第{i + 1}個渡口",
+                "stage_index": 1,
+                "stage_total": 1,
+                "stage_progress": 0,
+                "objective_quantity": 1,
+                "reward_copper": 80 if i else None,
+                "deadline_line": "剩餘 2 日" if i == 1 else None,
+            }
+            for i in range(count)
+        ],
+    }
+
+
 class ShellAcceptanceTest(BrowserAcceptanceTest):
     """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
     def assert_surfaces_visible(self, page):
@@ -194,7 +236,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_stage_anchors_do_not_intersect_at_both_viewports(self):
         """H1 group 8.3: the full-bleed stage's named HUD anchors must not overlap.
 
-        The stage anchors (``hud-left``, ``hud-right``, ``feed``, ``dock``,
+        The stage anchors (``place``, ``vitals``, ``map``, the band regions,
         ``command-line``) are absolutely positioned; any pair of *visible*
         anchors sharing a non-zero-area intersection would visually collide,
         breaking the "surfaces remain usable" contract. Verified at both
@@ -204,7 +246,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             overlap = page.evaluate(
                 """() => {
-                  const testids = ["anchor-place", "anchor-hud-left", "anchor-hud-right", "anchor-band-message",
+                  const testids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message",
                                    "anchor-band-command", "anchor-command-line"];
                   const anchors = testids
                     .map((t) => {
@@ -279,9 +321,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-hud-island-stack-renders-as-bounded-floating-islands-not-column-cards",
     )
     def test_populated_island_stack_fits_its_anchor_at_both_viewports(self):
-        """H2 task 9.5: at 1440x900 and 1280x720, the left island stack,
-        the minimap island, the narrative caption, and the dock must not
-        intersect — with the condition overflow disclosed."""
+        """H2 task 9.5; webclient-avg-stage-hud-anchors (design D3/D6): at
+        1440x900 and 1280x720, with every island populated — eight conditions
+        with the overflow disclosed, a party of four, the minimap, and a
+        three-row objective line — each island anchor's stack fits its anchor
+        without scrolling, the `vitals` stack clears the place card, and
+        neither stack intersects the bottom band, the command line, or the
+        other anchor's islands."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
@@ -307,42 +353,71 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                         "status": status,
                         "local_map": valid_local_map_panel(),
                         "art": valid_art_panel(),
+                        "party": _party_panel(4),
+                        "objectives": _objectives_panel(3),
                     },
                     mode="exploration",
                 )
-                page.wait_for_timeout(300)
+                page.wait_for_selector('[data-testid="party-strip"]', timeout=15000)
+                page.wait_for_selector('[data-testid="objective-tracker"]', timeout=15000)
                 overflow = page.locator('[data-testid="status-panel__condition-overflow"]')
-                if overflow.count() > 0:
-                    overflow.click()
-                    page.wait_for_timeout(200)
+                self.assertEqual(overflow.count(), 1, f"the +N overflow chip renders at {viewport}")
+                overflow.click()
+                page.wait_for_selector('[data-testid="status-panel__condition-disclosure"]', timeout=5000)
+                # Park the pointer off the islands so no hover detail line is open.
+                page.mouse.move(viewport[0] // 2, viewport[1] // 2)
+                page.wait_for_timeout(200)
 
-                def intersect(sel_a, sel_b):
-                    return page.evaluate(
-                        """(sels) => {
-                          const a = document.querySelector(sels[0]);
-                          const b = document.querySelector(sels[1]);
-                          if (!a || !b) return false;
-                          const ra = a.getBoundingClientRect();
-                          const rb = b.getBoundingClientRect();
-                          const T = 1;
-                          return !(ra.right <= rb.left + T || rb.right <= ra.left + T ||
-                                  ra.bottom <= rb.top + T || rb.bottom <= ra.top + T);
-                        }""",
-                        [sel_a, sel_b],
+                geo = page.evaluate(
+                    """() => {
+                      const rect = (sel) => {
+                        const el = document.querySelector(sel);
+                        if (!el) return null;
+                        const r = el.getBoundingClientRect();
+                        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+                      };
+                      const hits = (a, b) => !!(a && b) && !(
+                        a.right <= b.left + 1 || b.right <= a.left + 1 ||
+                        a.bottom <= b.top + 1 || b.bottom <= a.top + 1);
+                      const fit = (sel) => {
+                        const el = document.querySelector(sel);
+                        return el ? { scroll: el.scrollHeight, client: el.clientHeight } : null;
+                      };
+                      const vitalsIslands = ['[data-testid="status-panel"]', '[data-testid="party-strip"]'];
+                      const mapIslands = ['[data-testid="local-map"]', '[data-testid="objective-tracker"]'];
+                      const blockers = {
+                        place: rect('[data-anchor="place"]'),
+                        band: rect('[data-testid="stage-band"]'),
+                        commandLine: rect('[data-anchor="command-line"]'),
+                      };
+                      const found = [];
+                      for (const sel of vitalsIslands.concat(mapIslands)) {
+                        const r = rect(sel);
+                        if (!r) { found.push("missing " + sel); continue; }
+                        for (const key of Object.keys(blockers)) {
+                          if (hits(r, blockers[key])) { found.push(sel + " <-> " + key); }
+                        }
+                      }
+                      for (const a of vitalsIslands) {
+                        for (const b of mapIslands) {
+                          if (hits(rect(a), rect(b))) { found.push(a + " <-> " + b); }
+                        }
+                      }
+                      return {
+                        vitals: fit('[data-anchor="vitals"]'),
+                        map: fit('[data-anchor="map"]'),
+                        intersections: found,
+                      };
+                    }"""
+                )
+                self.assertEqual(geo["intersections"], [], f"island intersections at {viewport}")
+                for anchor in ("vitals", "map"):
+                    # The +1 absorbs sub-pixel rounding of scrollHeight.
+                    self.assertLessEqual(
+                        geo[anchor]["scroll"],
+                        geo[anchor]["client"] + 1,
+                        f"the {anchor} stack needs scrolling at {viewport}: {geo[anchor]}",
                     )
-
-                selectors = [
-                    '[data-testid="status-panel"]',
-                    '[data-testid="local-map"]',
-                    '[data-testid="narrative-feed"]',
-                    "#action-dock",
-                ]
-                for i in range(len(selectors)):
-                    for j in range(i + 1, len(selectors)):
-                        self.assertFalse(
-                            intersect(selectors[i], selectors[j]),
-                            f"{selectors[i]} intersects {selectors[j]} at {viewport}",
-                        )
                 page.close()
 
     @covers_requirement(

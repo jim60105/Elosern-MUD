@@ -14,7 +14,7 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
-named stage anchors — the `place` anchor, the island anchors `hud-left` and `hud-right`, the portrait anchors
+named stage anchors — the top-left `place` and `vitals` anchors, the top-right `map` anchor, the portrait anchors
 `actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, and
 the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
 required surface out of view.
@@ -23,7 +23,10 @@ The top band SHALL be 48px tall at every supported viewport and SHALL carry only
 navigation bar, the possession banner when present, the character switcher, and the connection
 state; it SHALL carry no location label and no time label. The `place` anchor SHALL sit at the stage
 box's top-left corner, below the top band, at a fixed height that does not depend on the label
-lengths it holds, and the `hud-left` anchor SHALL begin below it.
+lengths it holds, and the `vitals` anchor SHALL begin below it. The `map` anchor SHALL sit at the stage
+box's top-right corner, below the top band; its content column (the minimap island, then the
+objective line, then any other island this capability places there) SHALL be right-aligned to the
+stage's right gutter and bounded above the bottom band.
 
 The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
 `clamp(260px, 27.8vh, 400px)` (300px at the 1920x1080 reference viewport), taken from a single
@@ -48,7 +51,7 @@ in exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry 
 portrait anchors are non-interactive art: they SHALL carry no focusable element and SHALL NOT
 intercept pointer events, and they MAY sit behind the HUD islands and the command-line row.
 
-At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `hud-left`, `hud-right`,
+At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
 `band-message`, `band-command`, `command-line`) SHALL overlap another interactive anchor's content,
 and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
 anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
@@ -114,7 +117,7 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
 | party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
-| objective tracker island | visible | visible | visible | hidden |
+| objective line (under the minimap) | visible | hidden | hidden | hidden |
 | player standing portrait | visible | visible | visible | hidden |
 | action dock (band command region) | visible | visible | visible (regular exploration form) | visible (creation form, full band width) |
 | command line | visible | visible | visible | hidden |
@@ -144,12 +147,12 @@ the action dock before the surface is removed, using the existing focus-restore 
 
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
-- **THEN** the place card, the narrative caption, the HUD island stack, the minimap, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
+- **THEN** the place card, the narrative caption, the `vitals` and `map` anchors with every island in them, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the place card, narrative caption, minimap, objective tracker, player standing portrait, action dock, and command line all
-  remain rendered, the vitals and party islands keep following the same data rules as in
+- **THEN** the place card, narrative caption, minimap, player standing portrait, action dock, and command line all
+  remain rendered, the objective line is hidden with `display:none` because only exploration shows it, the vitals and party islands keep following the same data rules as in
   exploration, the action dock keeps its regular exploration form
   with every ordinary root affordance present, and only the narrative presentation changes
 
@@ -157,6 +160,10 @@ the action dock before the surface is removed, using the existing focus-restore 
 - **WHEN** the committed mode is dialogue
 - **THEN** the scene backdrop renders the same committed exploration art as before the mode
   change, unmodified
+
+#### Scenario: The objective line shows only in exploration
+- **WHEN** a non-empty committed `objectives` panel stays committed while the mode changes from exploration to combat, then to dialogue, then back to exploration
+- **THEN** the objective line renders in exploration, is hidden with `display:none` in combat and in dialogue, and renders again on the return to exploration
 
 ### Requirement: The scene backdrop renders the art payload truthfully behind the stage
 The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with
@@ -287,13 +294,16 @@ the recessed state itself still applies.
 - **THEN** the stage stays recessed until the last open surface closes
 
 ### Requirement: The HUD island stack renders as bounded floating islands, not column cards
-The surfaces placed in the stage's `hud-left` and `hud-right` anchors SHALL render as floating HUD
+The surfaces placed in the stage's `vitals` and `map` anchors SHALL render as floating HUD
 islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and
 the shared drop shadow, each island a separate box separated by the anchor's gap — never a single
-boxed column card and never an opaque `<aside>` stacked in a layout column. The left anchor SHALL
-carry the vitals, the conditions, and the party quickbar as sibling islands in that fixed order, each
-present only while its own requirement renders it; the left anchor SHALL carry no character head card
-and no portrait catalog strip. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
+boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor,
+under the place card, SHALL carry the vitals, the conditions, and the compact party quickbar as sibling
+islands in that fixed order, each present only while its own requirement renders it, and SHALL carry
+no character head card and no portrait catalog strip. The `map` anchor SHALL carry, in this order, the
+minimap island, the objective line, the combat participant frame while it is mounted, and the title
+ballot menu while it is mounted, each present only while its own requirement renders it; no reference
+panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
 every island populated, so no required island depends on scrolling the anchor to be seen. Every
 island's chrome SHALL be expressed through the shared design tokens, so a token change or the
 reduced-motion block reaches all of them at once.
@@ -304,11 +314,15 @@ reduced-motion block reaches all of them at once.
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
-- **THEN** the island stack's rendered box fits inside its anchor and does not intersect the action dock, the narrative caption, or the opposite anchor's content
+- **THEN** each island anchor's stack fits inside its anchor, the `vitals` stack does not intersect the place card, and neither stack intersects the bottom band, the command line, or the other island anchor's content
 
 #### Scenario: Island chrome comes from the shared tokens
 - **WHEN** an island renders
 - **THEN** its fill, border, radius, shadow, and transitions resolve from the shared design tokens rather than from per-component literals
+
+#### Scenario: The map anchor stacks its islands in order
+- **WHEN** the shell renders in exploration mode with a committed `local_map` panel, a non-empty `objectives` panel, and title-ballot candidates, and later in combat mode
+- **THEN** exploration renders the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the participant frame there with no minimap and no objective line
 
 ### Requirement: The vitals island is shown only in combat or while a vital or a condition needs attention
 The HUD SHALL show the vitals island — the vitals rows together with the conditions island beneath
@@ -480,8 +494,8 @@ emptied surface.
 - **THEN** no condition island is rendered anywhere in the HUD
 
 ### Requirement: The minimap island states only its own drawing convention
-The minimap SHALL render as a bounded HUD island in the stage's right anchor, beneath the top-meta
-surface, carrying the committed `local_map` payload's title. Where the resolved layout variant is the
+The minimap SHALL render as a bounded HUD island at the top of the stage's `map` anchor, directly
+below the top band and above the objective line, carrying the committed `local_map` payload's title. Where the resolved layout variant is the
 coordinate lattice — which exactly the coordinate-bearing layers (`grid`, `wilderness`) select — the
 island SHALL state the renderer's own axis convention as orientation marks in its header following the
 redesign draft's header treatment (the letterspaced title style and the `北↑ 東→` marks the draft's
@@ -500,7 +514,7 @@ vignette pictures the limit of what the payload knows. On a coordinate-bearing l
 committed, with no unit, delta, or derived quantity — as the entire content of its readout line, so
 the island's position statement is the drawing convention plus the current cell's world coordinates
 and nothing else. The readout SHALL NOT restate the current node's place name, its visibility state,
-or a movement destination: the place name belongs to the shell's own top-meta location surface, and a
+or a movement destination: the place name belongs to the stage's place card, and a
 minimap shows the current position by definition. The readout SHALL NOT be driven by hover or by
 selection, and the island SHALL keep no hovered-node or selected-node state; a node's own name stays
 available as its on-canvas accessible name and, for a remembered node, as visible text on the surface
@@ -858,7 +872,8 @@ server-authored explanation, and SHALL submit nothing.
 - **THEN** the row keeps focus, exposes its accessible disabled state and its server-authored explanation, and no action is submitted
 
 ### Requirement: The combat participant frame presents the session's participants and their portraits
-In combat the shell SHALL render a participant frame in the HUD island area, grouped into the
+In combat the shell SHALL render a participant frame as a HUD island in the stage's top-right `map`
+anchor, where the minimap is hidden in combat, and SHALL NOT place it in either portrait anchor, grouped into the
 player's side and the opposing side using the committed participants' server-authored team values, in
 the presenter's order. Each participant SHALL render its session token, its display name, its current
 and maximum hit points as numerals, and its state; a non-active state SHALL be conveyed by an explicit
@@ -891,6 +906,10 @@ dock's target frame.
 #### Scenario: The frame does not compete for focus
 - **WHEN** the participant frame is mounted during combat
 - **THEN** it is not reachable by sequential keyboard navigation, the dock's active row container remains the surface's only listbox, and no portrait strip is rendered outside the frame
+
+#### Scenario: The frame sits in the map anchor, not on a portrait anchor
+- **WHEN** a combat session commits participants at 1440x900 and 1280x720
+- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds no participant content, and the frame's visible box intersects neither the bottom band nor the command line
 
 ### Requirement: Combat skills are chosen through a bounded master-detail
 In combat, opening Skills SHALL present the committed skill categories as a bounded frame of category
@@ -1520,20 +1539,22 @@ does not carry.
 - **THEN** it renders as plain serif prose without the sys marker
 
 ### Requirement: The party quickbar island presents the committed party only
-The left HUD SHALL carry a party island while the committed `party` panel is available with at
-least one slot in exploration, combat, or dialogue mode, and SHALL render no party island — no header,
-no count, and no invite cell — when the panel is unavailable, when its `slots` list is empty, or when
-the committed mode is creation. The island's header SHALL read `同伴` with the slot count as
-`N / 4`, where `N` equals the committed slot count. Each row of `party.slots` SHALL render one
-cell carrying: the companion's display name; an avatar showing the bound portrait only when the
-row's `portrait_ref` resolves through the client's art catalog, otherwise the display name's
-initial letter in the reference's gold display face; an HP hairline bar whose fill ratio is
-`hp_current / hp_maximum`; and a state row carrying the HP numerals and the row's bond stage
-name. When the committed combat panel's participant rows carry a row with the same `identity`,
-the state row SHALL additionally prefix the joined participant's session token (e.g. `a2`); a
-companion not fighting SHALL show no token. The slot row SHALL be padded with dashed
-`+ 邀請` cells — one per missing companion up to four. Activating the island or any cell SHALL open the 同伴 · 隊伍
-drawer and SHALL NOT dispatch any action. The island SHALL present no affinity numeral, no
+The `vitals` anchor SHALL carry a compact party island, beneath the vitals and conditions islands, while
+the committed `party` panel is available with at least one slot in exploration, combat, or dialogue
+mode, and SHALL render no party island — no header, no count, and no cell — when the panel is
+unavailable, when its `slots` list is empty, or when the committed mode is creation. The island's
+header SHALL read `同伴` with the slot count as `N / 4`, where `N` equals the committed slot count. Each
+row of `party.slots` SHALL render one compact cell, in payload order and in one row, carrying: an avatar
+showing the bound portrait only when the row's `portrait_ref` resolves through the client's art
+catalog, otherwise the display name's initial letter in the reference's gold display face; beneath it
+an HP hairline bar whose fill ratio is `hp_current / hp_maximum`; and an accessible name, also exposed
+as the cell's tooltip, stating the display name, the HP numerals, and the row's bond stage name. When
+the committed combat panel's participant rows carry a row with the same `identity`, the cell SHALL
+additionally show that participant's session token (e.g. `a2`) as a visible badge on the avatar; a
+companion not fighting SHALL show no token. The island SHALL render no invite cell and no padding for
+missing companions: inviting and the 空位 row live in the 同伴 · 隊伍 drawer, where every row's name,
+numerals, and bond stage are also visible text. Activating the island or any cell SHALL open the
+同伴 · 隊伍 drawer and SHALL NOT dispatch any action. The island SHALL present no affinity numeral, no
 companion trait the panel does not carry, and no estimate.
 
 Because the island is absent for an empty party, the character-status drawer SHALL carry one
@@ -1543,13 +1564,14 @@ the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachab
 #### Scenario: The quickbar mirrors the committed party
 - **WHEN** a snapshot commits two party slots with HP 180/220 and 144/160 and bond stages 親睦
   and 信賴
-- **THEN** the island reads `同伴 2 / 4` and renders both cells with their HP bars, numerals, and
-  stage names, plus two dashed invite cells, and no numeric affinity appears
+- **THEN** the island reads `同伴 2 / 4` and renders exactly two compact cells with their HP hairline
+  bars, each cell's accessible name and tooltip state its display name, `180/220` or `144/160`, and
+  `親睦` or `信賴`, no invite cell is rendered, and no numeric affinity appears
 
 #### Scenario: The combat token is joined by identity
 - **WHEN** the committed combat panel carries a participant row whose `identity` equals a party
   slot's `identity` with token `a2`
-- **THEN** that companion's state row shows the `a2` prefix, and a party row with no matching
+- **THEN** that companion's cell shows the `a2` badge on its avatar, and a party row with no matching
   participant shows no token
 
 #### Scenario: No portrait falls back to the initial letter
@@ -1566,7 +1588,7 @@ the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachab
 
 #### Scenario: An empty party renders no island
 - **WHEN** the committed `party` panel is available with an empty `slots` list in exploration mode
-- **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the left anchor is focusable on its behalf
+- **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the `vitals` anchor is focusable on its behalf
 
 #### Scenario: The party drawer stays reachable with an empty party
 - **WHEN** the committed party is empty and the player opens the character-status drawer and activates its `同伴 · 隊伍` control
@@ -1608,38 +1630,45 @@ that has no backing read model.
   rules
 
 ### Requirement: The objective tracker island presents the committed objectives only
-The HUD SHALL carry a bottom-right objective tracker island while the committed `objectives`
-panel is available with a non-empty `rows` list in exploration, combat, or
-dialogue mode, and SHALL render no
-tracker island when `rows` is empty, when the panel is unavailable, or in creation mode. The
-island's header SHALL read `目標` with the mono-gold count `N 追蹤`, where `N` equals the
-committed row count. Each row of `objectives.rows` SHALL render, in payload order: a stage box
-showing a completion check when `stage_progress >= objective_quantity` and an empty box
-otherwise; the row's `objective_line`; a right-aligned mono-gold slot carrying
-`stage_progress / objective_quantity` when `objective_quantity` is greater than one and the
-row's `+reward_copper` when `objective_quantity` is one and `reward_copper` is non-null, and
-carrying nothing otherwise; and, when `deadline_line` is non-null, a trailing muted line with
-that text. The tracker is display-only: it SHALL render no accept, abandon, turn-in, or tracking
-control and SHALL dispatch no action. It SHALL present no objective prose the panel does not
-carry and no invented optional or previous-stage rows.
+The HUD SHALL carry the objective tracker as one line in the stage's `map` anchor, directly beneath
+the minimap island, while the committed mode is exploration and the committed `objectives` panel is
+available with a non-empty `rows` list; it SHALL be hidden with `display:none` in combat and dialogue
+mode and SHALL render nothing when `rows` is empty, when the panel is unavailable, or in creation mode.
+The line SHALL have one fixed row height whatever the payload holds and SHALL carry, in order: a
+`目標` label; a stage box for the first row of `objectives.rows` showing a completion check when that
+row's `stage_progress >= objective_quantity` and an empty box otherwise; that first row's
+`objective_line`, truncated on one line with an overflow indicator while its full text stays the line's
+accessible text and tooltip; a mono-gold slot carrying `stage_progress / objective_quantity` when the
+first row's `objective_quantity` is greater than one and its `+reward_copper` when `objective_quantity`
+is one and `reward_copper` is non-null, and carrying nothing otherwise; and, when more than one row is
+committed, a mono-gold `+N` count where `N` is the number of further rows. Rows after the first, and
+every row's `deadline_line`, SHALL NOT be rendered on the stage; the quest drawer presents them. The
+tracker is display-only: it SHALL render no accept, abandon, turn-in, or tracking control and SHALL
+dispatch no action. It SHALL present no objective prose the panel does not carry and no invented
+optional or previous-stage rows.
 
 #### Scenario: Active objectives list in payload order
-- **WHEN** a snapshot commits two objective rows, the first with progress 2 of quantity 5 and the
+- **WHEN** a snapshot commits two objective rows in exploration mode, the first with progress 2 of quantity 5 and the
   second a single-count quest with an 80-copper reward
-- **THEN** the island reads `目標 2 追蹤` and renders the first row's `2/5` progress tag and the
-  second row's `+80` tag with their describe-seam objective lines, and no control is present
+- **THEN** the line renders `目標`, the first row's describe-seam objective line with its `2/5` tag, and
+  a `+1` count, the second row's objective line and `+80` tag are not rendered on the stage, the line's
+  height equals its single-row height, and no control is present
 
 #### Scenario: A satisfied objective shows the done box
-- **WHEN** a committed row carries `stage_progress` equal to `objective_quantity`
-- **THEN** that row's stage box renders the completion check
+- **WHEN** the first committed row carries `stage_progress` equal to `objective_quantity`
+- **THEN** the line's stage box renders the completion check
 
 #### Scenario: An empty or unavailable objective list hides the island
 - **WHEN** the committed `objectives.rows` becomes `[]` or the panel becomes unavailable
-- **THEN** no tracker island is rendered anywhere in the HUD
+- **THEN** no objective line is rendered anywhere in the HUD
 
 #### Scenario: The tracker dispatches nothing
-- **WHEN** the player interacts with the tracker island
+- **WHEN** the player interacts with the objective line
 - **THEN** no `ui_action` or text command is sent and no mutation control is present
+
+#### Scenario: A long objective line truncates in place
+- **WHEN** the first row's `objective_line` is longer than the line's width
+- **THEN** the text is truncated with an overflow indicator, the line keeps its single-row height, and the full `objective_line` is the line's accessible text
 
 ### Requirement: The feed presents the dialogue variant from the committed panel
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the
@@ -1778,7 +1807,7 @@ menu key, or the meaning of Escape.
 
 #### Scenario: An emptied right-hand stack costs nothing
 - **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
-- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
+- **THEN** the top-right `map` anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
 
 ### Requirement: The action dock fills the band's command region at a fixed size
 The action dock SHALL fill the bottom band's command region — the right third of the band, or the

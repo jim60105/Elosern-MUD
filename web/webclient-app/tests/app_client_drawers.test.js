@@ -516,7 +516,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     ]);
   });
 
-  it("renders the party quickbar on panel-left when party panel is available", async () => {
+  it("renders the party quickbar in the vitals anchor when party panel is available", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -548,8 +548,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     await wrapper.vm.$nextTick();
 
-    // PartyStrip renders in #panel-left
-    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(true);
+    // PartyStrip renders in the `vitals` anchor
+    expect(wrapper.find('[data-anchor="vitals"] [data-testid="party-strip"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="party-strip__count"]').text()).toBe("1 / 4");
 
     // Clicking the strip opens the party drawer

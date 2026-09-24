@@ -32,6 +32,7 @@ After C4a (`webclient-avg-stage-shell`) and C4b (`webclient-avg-place-card-top-b
 
   The header `同伴 N / 4` stays. Invites live in the party drawer.
 - `ParticipantFrame` stays an island in the `map` anchor (the minimap is hidden in combat). `actor-right` stays empty for C10 / C13. `TitleBallotMenu` stays in the `map` anchor, below the objective line.
+- Short viewports (`max-height: 820px`) compact the `vitals` stack so it fits its anchor at 1280x720 (design D6): a 56px place card, a new `--stage-inset-y` gutter token, one-row gauges, and smaller condition chips.
 - `styles/app-shell.css` renames every `hud-left` / `hud-right` selector to `vitals` / `map`, and drops `.obj` from the menu-open filter (the tracker is now inside an anchor, which the filter already covers). `HudFrame.vue` drops `.obj` from its own menu-open rule.
 - Spec deltas: the stage, visibility, island-stack, minimap-convention, party, objective, participant-frame, and reference-surface requirements move to the new anchors. The `webclient-local-map` minimap requirement stops naming `hud-right`.
 - No OOB schema, presenter, server, store, or persistence change. No component is added or deleted, so the manifest is unchanged.
@@ -64,9 +65,10 @@ Out of scope:
 
 - Edited components:
   - `web/webclient-app/components/HudFrame.vue`, `AppShell.vue`, `ObjectiveTracker.vue`, `PartyStrip.vue`
-  - comments only: `LocalMap.vue`, `ParticipantFrame.vue`, `StatusPanel.vue`
+  - short-viewport compaction (design D6): `VitalsTrack.vue`, `ConditionChips.vue`, `styles/tokens.css` (`--stage-inset-y`)
+  - comments only: `ParticipantFrame.vue`, `StatusPanel.vue`
   - `web/webclient-app/AppClient.vue`, `styles/app-shell.css`
-- Edited stories: `stories/Overlays/ObjectiveTracker.stories.js`, `stories/Overlays/PartyStrip.stories.js`, `stories/Core/HudFrame.stories.js`.
+- Edited stories: `stories/Overlays/ObjectiveTracker.stories.js`, `stories/Overlays/PartyStrip.stories.js`, `stories/Core/HudFrame.stories.js`, `stories/Core/AppShell.stories.js` (the new `PopulatedHud` and `CombatHud` player stories), `stories/World/MapLattice.stories.js` (comment).
 - Vitest:
   - `tests/overlays/objective_tracker.test.js`, `tests/overlays/objective_tracker_integration.test.js`, `tests/data/party_strip.test.js`
   - `tests/hud_frame.test.js`, `tests/app.test.js`, `tests/data/status_panel.test.js`

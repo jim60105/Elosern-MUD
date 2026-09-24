@@ -1,11 +1,15 @@
 <script setup>
-// ObjectiveTracker (webclient-align-09-objective-tracker-ui, design D1/D2):
-// the bottom-right `.obj` objective tracker island on the cinematic stage.
-// Renders the committed `objectives.rows` (up to 3 tracked active quests) with
-// header `目標` and mono-gold count `N 追蹤`, stage completion checkbox `.bx`
-// (SVG checkmark when `stage_progress >= objective_quantity`), objective line,
-// right-aligned mono-gold slot `.pr` (`n/m` when `objective_quantity > 1`, else
-// `+reward_copper` when non-null, else empty), and muted deadline line when present.
+// ObjectiveTracker (webclient-align-09-objective-tracker-ui, design D1/D2;
+// webclient-avg-stage-hud-anchors design D2): the one-line objective under
+// the minimap in the stage's `map` anchor. It renders the `目標` label, then
+// for the FIRST committed `objectives.rows` entry (the presenter's tracked
+// order): the stage completion box `.bx` (SVG checkmark when
+// `stage_progress >= objective_quantity`), the objective line (truncated with
+// an ellipsis, the full text kept as its text and tooltip), and the mono-gold
+// slot `.pr` (`n/m` when `objective_quantity > 1`, else `+reward_copper` when
+// non-null, else empty); then a `+N` count of the further rows. Further rows
+// and every deadline live in the quest drawer. One fixed row height; the
+// stage hides the line outside exploration (HudFrame.vue).
 // Display-only: dispatches no actions and renders no mutation controls.
 import { computed } from "vue";
 
@@ -15,6 +19,8 @@ const props = defineProps({
 });
 
 const safeRows = computed(() => (Array.isArray(props.rows) ? props.rows : []));
+const first = computed(() => safeRows.value[0] || null);
+const rest = computed(() => Math.max(0, safeRows.value.length - 1));
 
 function isDone(row) {
   return (
@@ -27,179 +33,140 @@ function isDone(row) {
 
 <template>
   <div
-    v-if="safeRows.length > 0"
+    v-if="first"
     class="obj"
     data-testid="objective-tracker"
     role="region"
     aria-label="目標"
   >
-    <div class="oh" data-testid="objective-tracker__header">
-      <span>目標</span>
-      <span class="n tracked" data-testid="objective-tracker__count" title="追蹤中">
-        {{ safeRows.length }} 追蹤
-      </span>
-    </div>
-    <div
-      v-for="row in safeRows"
-      :key="row.quest_id"
-      class="row"
-      :data-testid="`objective-tracker__row--${row.quest_id}`"
+    <span class="obj__label">目標</span>
+    <span
+      class="bx"
+      :class="{ done: isDone(first) }"
+      :data-testid="`objective-tracker__box--${first.quest_id}`"
     >
-      <span
-        class="bx"
-        :class="{ done: isDone(row) }"
-        :data-testid="`objective-tracker__box--${row.quest_id}`"
+      <svg
+        v-if="isDone(first)"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="3"
+        aria-hidden="true"
       >
-        <svg
-          v-if="isDone(row)"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-        >
-          <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </span>
-      <div class="row-content">
-        <div class="row-head">
-          <span class="txt" :data-testid="`objective-tracker__text--${row.quest_id}`">
-            {{ row.objective_line }}
-          </span>
-          <span
-            v-if="row.objective_quantity > 1"
-            class="pr"
-            :data-testid="`objective-tracker__progress--${row.quest_id}`"
-          >
-            {{ row.stage_progress }}/{{ row.objective_quantity }}
-          </span>
-          <span
-            v-else-if="row.reward_copper != null"
-            class="pr"
-            :data-testid="`objective-tracker__reward--${row.quest_id}`"
-          >
-            +{{ row.reward_copper }}
-          </span>
-        </div>
-        <div
-          v-if="row.deadline_line"
-          class="dl"
-          :data-testid="`objective-tracker__deadline--${row.quest_id}`"
-        >
-          {{ row.deadline_line }}
-        </div>
-      </div>
-    </div>
+        <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </span>
+    <span
+      class="txt"
+      :data-testid="`objective-tracker__text--${first.quest_id}`"
+      :title="first.objective_line"
+    >{{ first.objective_line }}</span>
+    <span
+      v-if="first.objective_quantity > 1"
+      class="pr"
+      :data-testid="`objective-tracker__progress--${first.quest_id}`"
+    >{{ first.stage_progress }}/{{ first.objective_quantity }}</span>
+    <span
+      v-else-if="first.reward_copper != null"
+      class="pr"
+      :data-testid="`objective-tracker__reward--${first.quest_id}`"
+    >+{{ first.reward_copper }}</span>
+    <span
+      v-if="rest > 0"
+      class="n"
+      data-testid="objective-tracker__more"
+      :title="`另有 ${rest} 項追蹤目標`"
+    >+{{ rest }}</span>
   </div>
 </template>
 
 <style scoped>
+/* One fixed-height line, right-aligned under the minimap card and sized to
+   its content up to the anchor's width (design D2). `align-self` is needed:
+   the anchor's `.elosern-root` override stretches its children. The chrome
+   is the island vocabulary, with the place card's gold wash mirrored so it
+   warms the edge the line hangs from. */
 .obj {
-  position: absolute;
-  z-index: 4;
-  bottom: calc(var(--band-h) + 12px);
-  right: 16px;
-  width: 238px;
-  background: var(--panel);
-  backdrop-filter: blur(8px);
-  border: var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 14px;
   box-sizing: border-box;
-}
-
-.obj .oh {
-  font-family: var(--f-serif);
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  color: var(--gold-400);
-  padding-bottom: 10px;
-  border-bottom: var(--line);
-  margin-bottom: 12px;
+  height: 32px;
+  align-self: flex-end;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
-}
-
-.obj .oh .n {
-  margin-left: auto;
-  font-family: var(--f-mono);
-  color: var(--gold-400);
-  font-size: 10px;
-}
-
-.obj .row {
-  display: flex;
-  gap: 9px;
-  font-size: 12px;
-  line-height: 1.65;
-  margin-bottom: 12px;
+  gap: 8px;
+  padding: 0 11px 0 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  background: linear-gradient(270deg, #bda47714, transparent 60%), var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: var(--line);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 #ffffff06, var(--shadow);
+  font-family: var(--f-serif);
   color: var(--paper-100);
 }
 
-.obj .row:last-child {
-  margin-bottom: 0;
+.obj__label {
+  flex: none;
+  padding-right: 9px;
+  border-right: 1px solid #bda47740;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  color: var(--gold-400);
 }
 
-.obj .bx {
-  width: 15px;
-  height: 15px;
+.bx {
   flex: none;
-  margin-top: 1px;
-  border-radius: 4px;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 3px;
   border: 1px solid var(--ink-600);
   display: grid;
   place-items: center;
   background: var(--ink-780);
 }
 
-.obj .bx.done {
+.bx.done {
   background: rgba(127, 191, 127, 0.2);
   border-color: rgba(127, 191, 127, 0.5);
 }
 
-.obj .bx svg {
-  width: 10px;
-  height: 10px;
+.bx svg {
+  width: 9px;
+  height: 9px;
   color: var(--buff);
 }
 
-.obj .row-content {
-  flex: 1;
+.txt {
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
 }
 
-.obj .row-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.obj .txt {
-  flex: 1;
-  min-width: 0;
-  word-break: break-word;
-}
-
-.obj .pr {
-  margin-left: auto;
+.pr {
+  flex: none;
   font-family: var(--f-mono);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--gold-400);
+}
+
+.n {
   flex: none;
-}
-
-.obj .dl {
-  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid #bda47738;
+  border-radius: 99px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  line-height: 1.2;
   color: var(--paper-300);
-  margin-top: 2px;
-  line-height: 1.3;
-}
-
-@media (max-width: 1180px) {
-  .obj {
-    width: 210px;
-  }
 }
 </style>

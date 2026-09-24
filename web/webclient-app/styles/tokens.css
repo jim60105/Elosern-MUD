@@ -142,6 +142,10 @@
     /* The place card's fixed height (design D3/D4): a 20px serif heading and
        a 12px time line inside the island padding. */
     --place-h: 68px;
+    /* The stage's vertical gutter above the top islands and below the
+       island stacks (webclient-avg-stage-hud-anchors design D6); short
+       viewports tighten it. */
+    --stage-inset-y: 16px;
     --left-column: clamp(220px, 20vw, 330px);
     --right-column: clamp(230px, 22vw, 360px);
     /* The AVG stage's bottom band (design §5.1): the message region and the

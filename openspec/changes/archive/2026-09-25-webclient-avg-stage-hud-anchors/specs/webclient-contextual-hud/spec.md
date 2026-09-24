@@ -382,7 +382,7 @@ the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachab
 
 #### Scenario: An empty party renders no island
 - **WHEN** the committed `party` panel is available with an empty `slots` list in exploration mode
-- **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the left anchor is focusable on its behalf
+- **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the `vitals` anchor is focusable on its behalf
 
 #### Scenario: The party drawer stays reachable with an empty party
 - **WHEN** the committed party is empty and the player opens the character-status drawer and activates its `同伴 · 隊伍` control

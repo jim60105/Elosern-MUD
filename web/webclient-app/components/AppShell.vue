@@ -3,8 +3,9 @@
 // full-bleed cinematic stage (design D1). `HudFrame` is a
 // `position:relative; overflow:hidden` stage with named anchors: the place
 // card (`place`, holding PlaceCard — location and world time,
-// webclient-avg-place-card-top-bar design D3), the HUD islands (`hud-left`,
-// `hud-right`), the portrait anchors (`actor-left`,
+// webclient-avg-place-card-top-bar design D3), the island anchors `vitals`
+// and `map` (webclient-avg-stage-hud-anchors design D1), the portrait
+// anchors (`actor-left`,
 // `actor-right`), the fixed-height bottom band's message and command
 // regions (`band-message` holds the narrative caption, `band-command` the
 // action dock), and the `command-line` row docked on the message region
@@ -215,12 +216,14 @@ function onWindowKeydown(event) {
 // `display:none` gate runs when the `data-elosern-mode` attribute updates,
 // so the rescue must happen in the pre-update phase of the watcher.
 const HIDDEN_BY_MODE = {
-  creation: "[data-anchor='place'], [data-anchor='band-message'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
+  creation: "[data-anchor='place'], [data-anchor='band-message'], [data-anchor='vitals'], [data-anchor='map'], [data-anchor='command-line']",
   combat: ".local-map",
   exploration: "",
   // webclient-align-08-dialogue-surface: dialogue keeps the whole cockpit
-  // visible (the matrix's dialogue column) — nothing is hidden, so a mode
-  // flip into/out of dialogue never strands focus.
+  // visible (the matrix's dialogue column). Only the objective line is
+  // hidden there (and in combat), and it has no tab stop
+  // (webclient-avg-stage-hud-anchors design D2), so a mode flip into/out of
+  // dialogue never strands focus.
   dialogue: "",
 };
 
@@ -294,11 +297,11 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #place>
         <PlaceCard :location-label="locationLabel" :time-label="timeLabel" />
       </template>
-      <template #hud-left>
-        <slot name="panel-left" />
+      <template #vitals>
+        <slot name="vitals" />
       </template>
-      <template #hud-right>
-        <slot name="panel-right" />
+      <template #map>
+        <slot name="map" />
       </template>
       <template #actor-left>
         <slot name="actor-left" />
@@ -339,9 +342,6 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @open-drawer="onOpenDrawer"
           @focus-lost="() => emit('focus-lost')"
         />
-      </template>
-      <template #objectives>
-        <slot name="objectives" />
       </template>
     </HudFrame>
 

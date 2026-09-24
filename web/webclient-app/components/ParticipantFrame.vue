@@ -1,6 +1,7 @@
 <script setup>
 // ParticipantFrame (H3 webclient-hud-03-action-dock, tasks 6.1/6.2): the
-// combat participant frame mounted in H1's `hud-left` anchor (task 6.3) —
+// combat participant frame mounted in the stage's `map` anchor (the minimap is
+// hidden in combat; webclient-avg-stage-hud-anchors design D4) —
 // 我方 / 敵方 groups from the committed `participants[]` slice. Each row
 // carries the `token`, `display_name`, the `hp_current / hp_maximum`
 // numerals, and the state as an explicit text marker (`已逃離` / `倒地` /

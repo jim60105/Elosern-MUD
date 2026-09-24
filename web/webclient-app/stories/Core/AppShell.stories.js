@@ -6,9 +6,12 @@ import { useElosernStore } from "../../stores/elosern.js";
 import { createWindowBridge } from "../../bridge.js";
 import * as protocolFixtures from "../../tests/store/protocol_fixtures.js";
 import {
+  ART_PANEL_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
   COMMAND_HISTORY_SAMPLE,
   NARRATIVE_SAMPLE,
+  OBJECTIVES_PANEL_SAMPLE,
+  PARTY_PANEL_SAMPLE,
   PROMPT_SAMPLE,
   STATUS_SLICE_SAMPLE,
   SERVICES_PANEL_SAMPLE,
@@ -100,9 +103,23 @@ const renderPlayer = (args) => ({
       store.setConnected(true);
       store.setLoggedIn(true);
       const snapshot = protocolFixtures.snapshot({
-        mode: args.dialogue ? "dialogue" : "exploration",
+        mode: args.dialogue ? "dialogue" : args.combat ? "combat" : "exploration",
         panels: {
-          status: protocolFixtures.statusPanel(),
+          status: protocolFixtures.statusPanel(args.populated || args.combat ? {
+            conditions: [
+              { code: "poisoned", label: "中毒", severity: "harmful", remaining_seconds: 40 },
+              { code: "blessed", label: "祝福", severity: "beneficial" },
+            ],
+          } : undefined),
+          // The populated island stacks (webclient-avg-stage-hud-anchors):
+          // a two-slot party under the vitals and three tracked objectives,
+          // so the `map` anchor shows the objective line with `+2`.
+          ...(args.populated || args.combat ? {
+            // party v1 carries no bound portrait (`portrait_ref` null).
+            party: { ...PARTY_PANEL_SAMPLE, slots: PARTY_PANEL_SAMPLE.slots.map((s) => ({ ...s, portrait_ref: null })) },
+            objectives: OBJECTIVES_PANEL_SAMPLE,
+            art: ART_PANEL_SAMPLE,
+          } : {}),
           exploration: protocolFixtures.explorationPanel({
             interact: [
               { identity: 7, display_name: "店長", portrait_ref: null, affordances: [
@@ -114,7 +131,7 @@ const renderPlayer = (args) => ({
               ] },
             ],
           }),
-          context_actions: protocolFixtures.explorationActions({
+          context_actions: args.combat ? protocolFixtures.combatActions() : protocolFixtures.explorationActions({
             suggestions: { status: "ready", cards: [
               { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
               { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
@@ -164,7 +181,7 @@ const renderPlayer = (args) => ({
         },
       });
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
-      if (!result.accepted || store.lastPanelRejection) throw new Error("Player layout fixture was rejected");
+      if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
       if (args.practice) {
         store.openHudDrawer("skill");
@@ -186,3 +203,10 @@ export const InteractionSelector = { render: renderPlayer, args: { pane: "intera
 export const DialogueSelector = { render: renderPlayer, args: { dialogue: true } };
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
 export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
+// The island anchors populated (webclient-avg-stage-hud-anchors): vitals,
+// a harmful condition, and the compact party under the place card; the
+// minimap and the one-line objective at the top-right.
+export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
+// Combat: the minimap and the objective line are hidden, and the participant
+// frame takes the `map` anchor.
+export const CombatHud = { render: renderPlayer, args: { combat: true } };

@@ -187,29 +187,37 @@ body {
   font: 12px var(--f-serif);
   letter-spacing: .12em;
 }
-/* The island stacks at the column widths. hud-left begins below the place
-   card (webclient-avg-place-card-top-bar design D4); these offsets repeat
+/* The island stacks at the column widths (webclient-avg-stage-hud-anchors
+   design D1). vitals begins below the place card
+   (webclient-avg-place-card-top-bar design D4); these offsets repeat
    HudFrame.vue's own rules, which govern where no `.elosern-root` wraps the
    stage — keep the two in step. */
-.elosern-root .elosern-stage [data-anchor="hud-left"] {
-  top: calc(var(--header-h) + 16px + var(--place-h) + 12px);
+.elosern-root .elosern-stage [data-anchor="vitals"] {
+  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px);
   left: 16px;
   width: calc(var(--left-column) - 32px);
-  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 44px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px - 2 * var(--stage-inset-y));
   gap: 12px;
 }
-.elosern-root .elosern-stage [data-anchor="hud-right"] {
-  top: calc(var(--header-h) + 16px);
+.elosern-root .elosern-stage [data-anchor="map"] {
+  top: calc(var(--header-h) + var(--stage-inset-y));
   right: 16px;
   width: calc(var(--right-column) - 28px);
-  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px);
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   align-items: stretch;
   gap: 14px;
 }
-.elosern-root [data-anchor="hud-left"] > *,
-.elosern-root [data-anchor="hud-right"] > * { flex-shrink: 0; }
-.elosern-root [data-anchor="hud-left"],
-.elosern-root [data-anchor="hud-right"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
+.elosern-root [data-anchor="vitals"] > *,
+.elosern-root [data-anchor="map"] > * { flex-shrink: 0; }
+.elosern-root [data-anchor="vitals"],
+.elosern-root [data-anchor="map"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
+/* Short viewports (webclient-avg-stage-hud-anchors design D6): at 720px the
+   vitals anchor has about 300px, so the place card and the island gaps
+   tighten; the islands compact themselves under the same query. */
+@media (max-height: 820px) {
+  :root { --place-h: 56px; --stage-inset-y: 10px; }
+  .elosern-root .elosern-stage [data-anchor="vitals"] { gap: 8px; }
+}
 /* The bottom band (webclient-avg-stage-shell design D1/D6). The narrative
    caption fills the message region; the region's own padding is the gutter,
    so the old left hairline rule is off. */
@@ -428,8 +436,7 @@ body {
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
 .elosern-root .cmdutil__btn { border: 1px solid #5d594e; min-width: 32px; min-height: 32px; }
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
-.elosern-root .elosern-stage[data-menu-open="true"] .stage-band,
-.elosern-root .elosern-stage[data-menu-open="true"] .obj { filter: brightness(.45); }
+.elosern-root .elosern-stage[data-menu-open="true"] .stage-band { filter: brightness(.45); }
 .elosern-root .hud-drawer-scrim { background: #080a0c78; backdrop-filter: none; }
 .elosern-root .hud-drawer {
   inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom) 16px;
@@ -500,7 +507,9 @@ body {
 .elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: 8px 20px; border-radius: 5px; }
 
 @media (max-width: 1350px) {
-  :root { --left-column: 216px; --right-column: 244px; }
+  /* 246px keeps the map anchor (right column - 28px) exactly as wide as the
+     218px minimap card (webclient-avg-stage-hud-anchors design D1). */
+  :root { --left-column: 216px; --right-column: 246px; }
   /* The brand row fits the 216px column (design D1). */
   .topbar-wordmark { font-size: 16px; letter-spacing: .2em; }
   .elosern-root .topbar-brand { padding-inline: 16px; gap: 10px; }

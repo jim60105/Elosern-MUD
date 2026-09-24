@@ -9,7 +9,7 @@ import {
 } from "../../stories/fixtures.js";
 
 // StatusPanel (H2, webclient-hud-02-status-islands, design D1): the
-// `hud-left` island stack. It composes two separately-chromed islands —
+// `vitals` anchor's island stack. It composes two separately-chromed islands —
 // VitalsTrack and ConditionChips — and keeps the preserved
 // `data-testid="status-panel"` root and the three
 // `status-panel__gauge-value--{hp,mp,sp}` hooks (now carried by the

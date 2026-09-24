@@ -289,4 +289,48 @@ watch(
 .vital.low .fill {
   animation: elosern-hp-pulse var(--motion-hp-pulse) ease-in-out infinite;
 }
+
+/* Short viewports (webclient-avg-stage-hud-anchors design D6): the stack
+   shares at most 300px with the conditions and the party at 1280x720, so
+   each gauge collapses to one row — label, bar, numerals. */
+@media (max-height: 820px) {
+  .vitals {
+    gap: 5px;
+    padding: 7px 12px;
+  }
+
+  .vital {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .vital .vh {
+    display: contents;
+  }
+
+  .vital .vh .lbl {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 11px;
+  }
+
+  .vital .track {
+    grid-column: 2;
+    grid-row: 1;
+    height: 7px;
+  }
+
+  .vital .vh .num {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 10.5px;
+  }
+
+  .low-mark {
+    grid-column: 4;
+    grid-row: 1;
+  }
+}
 </style>

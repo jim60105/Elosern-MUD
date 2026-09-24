@@ -9,12 +9,14 @@ import {
   ART_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
-// webclient-align-05-party-hud: the left-HUD companion quickbar (.comps).
-// Renders the committed party slots, HP hairline bars, bond stages,
-// combat token prefix by identity join, missing-portrait glyph fallback,
-// and dashed invite slot padding up to four.
+// webclient-align-05-party-hud; webclient-avg-stage-hud-anchors design D3:
+// the compact companion quickbar (.comps) in the `vitals` anchor. Renders
+// one compact cell per committed party slot (avatar, HP hairline, combat
+// token badge by identity join, missing-portrait glyph fallback); the name,
+// HP numerals, and bond stage are the cell's accessible name and tooltip.
+// No invite padding.
 
-describe("PartyStrip (left-HUD companion quickbar)", () => {
+describe("PartyStrip (compact companion quickbar)", () => {
   let wrapper;
 
   afterEach(() => {
@@ -35,7 +37,7 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     return wrapper;
   }
 
-  it("mirrors the committed party slots with count N / 4 and invite padding", () => {
+  it("mirrors the committed party slots with count N / 4 and no invite padding", () => {
     const w = mountStrip();
     expect(w.get('[data-testid="party-strip__header"]').text()).toContain("同伴");
     expect(w.get('[data-testid="party-strip__count"]').text()).toBe("2 / 4");
@@ -43,20 +45,25 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     const slots = w.findAll('[data-testid^="party-strip__slot-"]');
     expect(slots).toHaveLength(2);
 
-    const emptySlots = w.findAll('[data-testid="party-strip__empty-slot"]');
-    expect(emptySlots).toHaveLength(2);
+    expect(w.findAll('[data-testid="party-strip__empty-slot"]')).toHaveLength(0);
+    expect(w.text()).not.toContain("邀請");
 
-    // Verify first slot (蕾娜)
-    const s1 = w.get('[data-testid="party-strip__slot-101"]');
-    expect(s1.get('[data-testid="party-strip__name"]').text()).toBe("蕾娜");
-    expect(s1.get('[data-testid="party-strip__state"]').text()).toContain("180/220");
-    expect(s1.get('[data-testid="party-strip__state"]').text()).toContain("親睦");
-
-    // Verify second slot (幽)
-    const s2 = w.get('[data-testid="party-strip__slot-102"]');
-    expect(s2.get('[data-testid="party-strip__name"]').text()).toBe("幽");
-    expect(s2.get('[data-testid="party-strip__state"]').text()).toContain("144/160");
-    expect(s2.get('[data-testid="party-strip__state"]').text()).toContain("信賴");
+    // Each compact cell states name, numerals, and bond as its accessible
+    // name and tooltip; none of them is visible text on the stage.
+    const cases = [
+      ["101", "蕾娜 HP 180/220 羈絆 親睦"],
+      ["102", "幽 HP 144/160 羈絆 信賴"],
+    ];
+    for (const [id, label] of cases) {
+      const cell = w.get(`[data-testid="party-strip__slot-${id}"]`);
+      expect(cell.attributes("aria-label")).toBe(label);
+      expect(cell.attributes("title")).toBe(label);
+      expect(cell.find('[data-testid="party-strip__avatar"]').exists()).toBe(true);
+      expect(cell.find('[data-testid="party-strip__hp-bar"]').exists()).toBe(true);
+    }
+    expect(w.find('[data-testid="party-strip__name"]').exists()).toBe(false);
+    expect(w.find('[data-testid="party-strip__state"]').exists()).toBe(false);
+    expect(w.text()).not.toMatch(/180\/220|親睦|信賴/);
 
     // No numeric affinity appears anywhere in the output
     expect(w.text()).not.toMatch(/70|affinity|數值/);
@@ -72,7 +79,8 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     });
 
     const s1 = w.get('[data-testid="party-strip__slot-101"]');
-    expect(s1.find('[data-testid="party-strip__token"]').exists()).toBe(true);
+    // The token is a badge on the avatar.
+    expect(s1.find('[data-testid="party-strip__avatar"] [data-testid="party-strip__token"]').exists()).toBe(true);
     expect(s1.get('[data-testid="party-strip__token"]').text()).toBe("a2");
 
     const s2 = w.get('[data-testid="party-strip__slot-102"]');
@@ -143,7 +151,7 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     expect(w.find('[data-testid="party-strip"]').exists()).toBe(false);
   });
 
-  it("renders zero dashed invite cells and 4 / 4 for a full party", () => {
+  it("renders four compact cells and 4 / 4 for a full party", () => {
     const w = mountStrip({
       slots: PARTY_PANEL_FULL_SAMPLE.slots,
     });
@@ -180,13 +188,8 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
     await w.get('[data-testid="party-strip__slot-101"]').trigger("click");
     expect(w.emitted("open-drawer")).toHaveLength(2);
 
-    // Click empty slot
-    const emptySlots = w.findAll('[data-testid="party-strip__empty-slot"]');
-    await emptySlots[0].trigger("click");
-    expect(w.emitted("open-drawer")).toHaveLength(3);
-
     // Keyboard trigger (Enter on strip)
     await w.get('[data-testid="party-strip"]').trigger("keydown.enter");
-    expect(w.emitted("open-drawer")).toHaveLength(4);
+    expect(w.emitted("open-drawer")).toHaveLength(3);
   });
 });

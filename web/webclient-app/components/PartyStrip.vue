@@ -1,9 +1,12 @@
 <script setup>
-// PartyStrip (webclient-align-05-party-hud, design D1/D2/D3):
-// the left-HUD companion quickbar (.comps). Renders the committed `party.slots`
-// with avatar initial fallback, display name, HP hairline bar, state row with
-// joined combat token prefix `a2`, padded with dashed `+ 邀請` cells up to 4.
-// When empty, renders nothing.
+// PartyStrip (webclient-align-05-party-hud, design D1/D2/D3;
+// webclient-avg-stage-hud-anchors design D3): the compact companion quickbar
+// (.comps) under the vitals in the stage's `vitals` anchor. One compact cell
+// per committed `party.slots` row: the avatar (portrait, or the initial glyph),
+// the HP hairline beneath it, and the joined combat token (`a2`) as a badge
+// on the avatar. The name, HP numerals, and bond stage are the cell's
+// accessible name and tooltip; the party drawer shows them as text. No invite
+// padding: inviting lives in the drawer. When empty, renders nothing.
 // Activating the island or any cell opens the 同伴 · 隊伍 drawer and dispatches nothing.
 import { computed } from "vue";
 import {
@@ -29,13 +32,16 @@ const MAX_PARTY_SLOTS = 4;
 
 const safeSlots = computed(() => (Array.isArray(props.slots) ? props.slots : []));
 const countLabel = computed(() => `${safeSlots.value.length} / ${MAX_PARTY_SLOTS}`);
-const emptyCount = computed(() => Math.max(0, MAX_PARTY_SLOTS - safeSlots.value.length));
 
 const tokenById = computed(() => buildCombatTokenMap(props.combatParticipants));
 
 function combatToken(slot) {
   if (!slot || slot.identity == null) return null;
   return tokenById.value.get(String(slot.identity)) || null;
+}
+
+function cellLabel(slot) {
+  return `${slot.display_name} HP ${slot.hp_current}/${slot.hp_maximum} 羈絆 ${slot.bond_stage}`;
 }
 
 function portraitEntry(slot) {
@@ -70,7 +76,8 @@ function onActivate() {
         :data-testid="`party-strip__slot-${slot.identity}`"
         role="button"
         tabindex="0"
-        :aria-label="`${slot.display_name} HP ${slot.hp_current}/${slot.hp_maximum} 羈絆 ${slot.bond_stage}`"
+        :aria-label="cellLabel(slot)"
+        :title="cellLabel(slot)"
         @click.stop="onActivate"
         @keydown.enter.stop.prevent="onActivate"
         @keydown.space.stop.prevent="onActivate"
@@ -80,41 +87,20 @@ function onActivate() {
             v-if="portraitEntry(slot)"
             class="av-img"
             :src="portraitEntry(slot).url"
-            :alt="slot.display_name"
+            alt=""
             :style="{ objectPosition: faceObjectPosition(portraitEntry(slot).face_rect) }"
           />
-          <span v-else class="mono av-glyph">{{ portraitGlyph(slot.display_name) }}</span>
-        </div>
-        <div class="nm" data-testid="party-strip__name" :title="slot.display_name">
-          {{ slot.display_name }}
-        </div>
-        <div class="cbar" data-testid="party-strip__hp-bar">
-          <div class="f" :style="{ width: `${hpFillRatio(slot.hp_current, slot.hp_maximum)}%` }"></div>
-        </div>
-        <div class="st" data-testid="party-strip__state">
+          <span v-else class="av-glyph" aria-hidden="true">{{ portraitGlyph(slot.display_name) }}</span>
           <span
             v-if="combatToken(slot)"
             class="tk"
             data-testid="party-strip__token"
+            aria-hidden="true"
           >{{ combatToken(slot) }}</span>
-          <span class="hp-num">{{ slot.hp_current }}/{{ slot.hp_maximum }}</span>
-          <span class="bond">{{ slot.bond_stage }}</span>
         </div>
-      </div>
-
-      <div
-        v-for="i in emptyCount"
-        :key="`empty-${i}`"
-        class="comp empty"
-        data-testid="party-strip__empty-slot"
-        role="button"
-        tabindex="0"
-        aria-label="邀請同伴"
-        @click.stop="onActivate"
-        @keydown.enter.stop.prevent="onActivate"
-        @keydown.space.stop.prevent="onActivate"
-      >
-        + 邀請
+        <div class="cbar" data-testid="party-strip__hp-bar">
+          <div class="f" :style="{ width: `${hpFillRatio(slot.hp_current, slot.hp_maximum)}%` }"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -147,7 +133,7 @@ function onActivate() {
   font-size: 10px;
   letter-spacing: 0.14em;
   color: var(--paper-500);
-  margin-bottom: 7px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
 }
@@ -158,50 +144,57 @@ function onActivate() {
   color: var(--paper-500);
 }
 
+/* Four tracks of at most 40px that shrink together, so a full party fits
+   one row even in the 184px anchor at 1280x720 (design D3). */
 .comprow {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 40px));
+  gap: 6px;
 }
 
 .comp {
-  flex: 1;
   min-width: 0;
-  border: 1px solid var(--ink-600);
-  border-radius: 9px;
-  padding: 7px;
-  background: rgba(34, 29, 41, 0.5);
-  position: relative;
-  transition: border-color var(--motion-base, 150ms) var(--ease-standard, ease);
-}
-
-.comp:hover {
-  border-color: var(--gold-500);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 8px;
 }
 
 .comp:focus-visible {
-  outline: 2px solid var(--gold-500);
-  outline-offset: 1px;
+  outline: none;
 }
 
 .comp .av {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ink-600);
+  border-radius: 8px;
+  background: linear-gradient(160deg, #2a2431, #16131b);
   font-family: var(--f-display);
-  font-size: 19px;
-  color: var(--gold-400);
+  font-size: 17px;
   line-height: 1;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 6px;
+  color: var(--gold-400);
+  transition: border-color var(--motion-base, 150ms) var(--ease-standard, ease);
+}
+
+.comp:hover .av {
+  border-color: var(--gold-500);
+}
+
+.comp:focus-visible .av {
+  border-color: var(--gold-500);
+  box-shadow: var(--focus);
 }
 
 .av-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: inherit;
+  border-radius: 7px;
 }
 
 .av-glyph {
@@ -209,18 +202,24 @@ function onActivate() {
   line-height: 1;
 }
 
-.comp .nm {
-  font-size: 11px;
-  color: var(--paper-100);
-  margin: 3px 0 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
+/* The joined combat token as a corner badge on the avatar. */
+.comp .tk {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  padding: 1px 3px;
+  border: 1px solid var(--vit-mp);
+  border-radius: 4px;
+  background: var(--ink-950);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--vit-mp);
 }
 
 .cbar {
-  height: 5px;
+  height: 3px;
   border-radius: 99px;
   background: var(--ink-780);
   overflow: hidden;
@@ -233,44 +232,15 @@ function onActivate() {
   transition: width var(--motion-base, 150ms) var(--ease-standard, ease);
 }
 
-.comp .st {
-  font-size: 9.5px;
-  color: var(--paper-500);
-  margin-top: 5px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
+/* Short viewports (webclient-avg-stage-hud-anchors design D6). */
+@media (max-height: 820px) {
+  .comps {
+    padding: 7px 12px 9px;
+  }
 
-.comp .st .bond {
-  color: var(--gold-400);
-}
-
-.comp .st .hp-num {
-  font-family: var(--f-mono);
-}
-
-.comp .st .tk {
-  font-family: var(--f-mono);
-  color: var(--vit-mp);
-  font-weight: 700;
-}
-
-.comp.empty {
-  display: grid;
-  place-items: center;
-  border-style: dashed;
-  color: var(--paper-700);
-  font-size: 11px;
-  cursor: pointer;
-  background: transparent;
-  min-height: 64px;
-}
-
-.comp.empty:hover {
-  border-color: var(--gold-500);
-  color: var(--paper-300);
+  .comps .clab {
+    margin-bottom: 5px;
+    line-height: 1.2;
+  }
 }
 </style>

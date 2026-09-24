@@ -644,8 +644,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       const targets = {
                         dock: byId('#action-dock'),
                         caption: byId('[data-testid="narrative-feed"]'),
-                        hudLeft: byId('[data-testid="anchor-hud-left"]'),
-                        hudRight: byId('[data-testid="anchor-hud-right"]'),
+                        vitals: byId('[data-testid="anchor-vitals"]'),
+                        map: byId('[data-testid="anchor-map"]'),
                         band: byId('[data-testid="stage-band"]'),
                       };
                       const hits = [];
@@ -807,6 +807,120 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertGreaterEqual(clamp["top"] + 1, clamp["header"], "the portrait never passes under the top bar")
+
+    @covers_requirement(
+        "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-objective-tracker-island-presents-the-committed-objectives-only"
+    )
+    def test_objective_line_shows_only_in_exploration(self):
+        """webclient-avg-stage-hud-anchors (design D2): the objective line is
+        one row under the minimap in the `map` anchor, shows the first tracked
+        row plus `+N`, and is display:none in combat and dialogue while the
+        same `objectives` panel stays committed."""
+        objectives = {
+            "schema_version": 1,
+            "available": True,
+            "rows": [
+                {
+                    "quest_id": "q_1042",
+                    "display_name": "磨坊糧運",
+                    "objective_line": "抵達霧骨渡口",
+                    "stage_index": 1,
+                    "stage_total": 2,
+                    "stage_progress": 1,
+                    "objective_quantity": 3,
+                    "reward_copper": None,
+                    "deadline_line": "剩餘 2 日",
+                },
+                {
+                    "quest_id": "q_1043",
+                    "display_name": "過河商議",
+                    "objective_line": "與灰婆婆議價過河",
+                    "stage_index": 2,
+                    "stage_total": 2,
+                    "stage_progress": 0,
+                    "objective_quantity": 1,
+                    "reward_copper": 80,
+                    "deadline_line": None,
+                },
+            ],
+        }
+        exploration = _exploration_panel([_selectable_target(11, "小販")])
+        explore_panels = {
+            "exploration": exploration,
+            "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+            "local_map": valid_local_map_panel(),
+            "objectives": objectives,
+        }
+        line_state = """() => {
+          const el = document.querySelector('[data-testid="objective-tracker"]');
+          if (!el) return { mounted: false };
+          const map = document.querySelector('[data-anchor="map"]');
+          const minimap = document.querySelector('[data-testid="local-map"]');
+          const r = el.getBoundingClientRect();
+          const m = minimap && minimap.getBoundingClientRect();
+          return {
+            mounted: true,
+            visible: el.offsetParent !== null && r.height > 0,
+            inMap: !!(map && map.contains(el)),
+            belowMinimap: !!(m && m.height > 0 && r.top >= m.bottom),
+            height: r.height,
+            text: el.textContent.replace(/\\s+/g, " ").trim(),
+            more: (el.querySelector('[data-testid="objective-tracker__more"]') || {}).textContent,
+          };
+        }"""
+        page = self.logged_in_page((1920, 1080))
+        _inject_snapshot(page, explore_panels, mode="exploration")
+        _wait_mode(page, "exploration")
+        page.wait_for_selector('[data-testid="objective-tracker"]', timeout=15000)
+        state = page.evaluate(line_state)
+        self.assertTrue(state["visible"], "the objective line shows in exploration")
+        self.assertTrue(state["inMap"], "the objective line lives in the map anchor")
+        self.assertTrue(state["belowMinimap"], "the objective line sits under the minimap")
+        self.assertLessEqual(state["height"], 34, "the objective line is one row tall")
+        self.assertEqual((state["more"] or "").strip(), "+1")
+        self.assertIn("抵達霧骨渡口", state["text"])
+        self.assertIn("1/3", state["text"])
+        self.assertNotIn("與灰婆婆議價過河", state["text"], "later rows stay in the quest drawer")
+        self.assertNotIn("剩餘 2 日", state["text"], "deadlines stay in the quest drawer")
+
+        _inject_snapshot(
+            page,
+            {"context_actions": _combat_panel(), "objectives": objectives},
+            mode="combat",
+        )
+        _wait_mode(page, "combat")
+        state = page.evaluate(line_state)
+        self.assertTrue(state["mounted"], "the line stays mounted while its panel is committed")
+        self.assertFalse(state["visible"], "the objective line is display:none in combat")
+
+        _inject_snapshot(
+            page,
+            {
+                **explore_panels,
+                "dialogue": {
+                    "schema_version": 1,
+                    "available": True,
+                    "kind": "dialogue",
+                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                    "bond_stage": None,
+                    "line": "歡迎光臨，要看看今天的貨嗎？",
+                    "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+                },
+            },
+            mode="dialogue",
+        )
+        _wait_mode(page, "dialogue")
+        state = page.evaluate(line_state)
+        self.assertTrue(state["mounted"])
+        self.assertFalse(state["visible"], "the objective line is display:none in dialogue")
+
+        _inject_snapshot(page, explore_panels, mode="exploration")
+        _wait_mode(page, "exploration")
+        state = page.evaluate(line_state)
+        self.assertTrue(state["visible"], "the objective line returns in exploration")
 
     @covers_requirement(
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",

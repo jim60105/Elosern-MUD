@@ -25,25 +25,37 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     return wrapper;
   }
 
-  it("renders the tracker header with the row count", () => {
+  it("renders the 目標 label and a +N count for further rows", () => {
     const w = mountTracker();
-    const header = w.get('[data-testid="objective-tracker__header"]');
-    expect(header.text()).toContain("目標");
-    const count = w.get('[data-testid="objective-tracker__count"]');
-    expect(count.text()).toBe("3 追蹤");
+    expect(w.get(".obj__label").text()).toBe("目標");
+    expect(w.get('[data-testid="objective-tracker__more"]').text()).toBe("+2");
+    expect(w.find('[data-testid="objective-tracker__count"]').exists()).toBe(false);
+
+    const single = mountTracker({ rows: [OBJECTIVES_PANEL_SAMPLE.rows[0]] });
+    expect(single.find('[data-testid="objective-tracker__more"]').exists()).toBe(false);
   });
 
-  it("renders rows in payload order", () => {
+  it("renders only the first row", () => {
     const w = mountTracker();
-    const rows = w.findAll('[data-testid^="objective-tracker__row--"]');
-    expect(rows).toHaveLength(3);
-    expect(rows[0].attributes("data-testid")).toBe("objective-tracker__row--q_1042");
-    expect(rows[1].attributes("data-testid")).toBe("objective-tracker__row--q_1043");
-    expect(rows[2].attributes("data-testid")).toBe("objective-tracker__row--q_1044");
-
     expect(w.get('[data-testid="objective-tracker__text--q_1042"]').text()).toBe("抵達霧骨渡口");
-    expect(w.get('[data-testid="objective-tracker__text--q_1043"]').text()).toBe("與灰婆婆議價過河");
-    expect(w.get('[data-testid="objective-tracker__text--q_1044"]').text()).toBe("討伐渡口水妖");
+    expect(w.find('[data-testid="objective-tracker__box--q_1042"]').exists()).toBe(true);
+    for (const id of ["q_1043", "q_1044"]) {
+      expect(w.find(`[data-testid="objective-tracker__text--${id}"]`).exists()).toBe(false);
+      expect(w.find(`[data-testid="objective-tracker__box--${id}"]`).exists()).toBe(false);
+    }
+    expect(w.findAll('[data-testid^="objective-tracker__row--"]')).toHaveLength(0);
+    expect(w.text()).not.toContain("與灰婆婆議價過河");
+  });
+
+  it("keeps a long objective line's full text as its text and tooltip", () => {
+    const line = "在第三個滿月之前，把灰婆婆託付的封蠟信件交給北岸燈塔的守望人";
+    const w = mountTracker({
+      rows: [{ ...OBJECTIVES_PANEL_SAMPLE.rows[0], quest_id: "q_long", objective_line: line }],
+    });
+    const text = w.get('[data-testid="objective-tracker__text--q_long"]');
+    expect(text.text()).toBe(line);
+    expect(text.attributes("title")).toBe(line);
+    expect(text.classes()).toContain("txt");
   });
 
   it("renders a completion checkmark when stage_progress >= objective_quantity and empty box otherwise", () => {
@@ -76,7 +88,8 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     expect(doneBox.classes()).toContain("done");
     expect(doneBox.find("svg").exists()).toBe(true);
 
-    const notDoneBox = w.get('[data-testid="objective-tracker__box--q_not_done"]');
+    const pending = mountTracker({ rows: [rows[1]] });
+    const notDoneBox = pending.get('[data-testid="objective-tracker__box--q_not_done"]');
     expect(notDoneBox.classes()).not.toContain("done");
     expect(notDoneBox.find("svg").exists()).toBe(false);
   });
@@ -117,23 +130,26 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
         deadline_line: null,
       },
     ];
-    const w = mountTracker({ rows });
-
-    const progressEl = w.find('[data-testid="objective-tracker__progress--q_multi"]');
+    // The slot matrix is evaluated against the first row, so each case
+    // mounts its own first row.
+    const multi = mountTracker({ rows: [rows[0]] });
+    const progressEl = multi.find('[data-testid="objective-tracker__progress--q_multi"]');
     expect(progressEl.exists()).toBe(true);
     expect(progressEl.text()).toBe("2/5");
-    expect(w.find('[data-testid="objective-tracker__reward--q_multi"]').exists()).toBe(false);
+    expect(multi.find('[data-testid="objective-tracker__reward--q_multi"]').exists()).toBe(false);
 
-    const rewardEl = w.find('[data-testid="objective-tracker__reward--q_single_reward"]');
+    const reward = mountTracker({ rows: [rows[1]] });
+    const rewardEl = reward.find('[data-testid="objective-tracker__reward--q_single_reward"]');
     expect(rewardEl.exists()).toBe(true);
     expect(rewardEl.text()).toBe("+80");
-    expect(w.find('[data-testid="objective-tracker__progress--q_single_reward"]').exists()).toBe(false);
+    expect(reward.find('[data-testid="objective-tracker__progress--q_single_reward"]').exists()).toBe(false);
 
-    expect(w.find('[data-testid="objective-tracker__progress--q_single_no_reward"]').exists()).toBe(false);
-    expect(w.find('[data-testid="objective-tracker__reward--q_single_no_reward"]').exists()).toBe(false);
+    const none = mountTracker({ rows: [rows[2]] });
+    expect(none.find('[data-testid="objective-tracker__progress--q_single_no_reward"]').exists()).toBe(false);
+    expect(none.find('[data-testid="objective-tracker__reward--q_single_no_reward"]').exists()).toBe(false);
   });
 
-  it("renders a deadline line when non-null and omits it when null", () => {
+  it("renders no deadline line on the stage", () => {
     const rows = [
       {
         quest_id: "q_deadline",
@@ -159,12 +175,8 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
       },
     ];
     const w = mountTracker({ rows });
-
-    const deadlineEl = w.find('[data-testid="objective-tracker__deadline--q_deadline"]');
-    expect(deadlineEl.exists()).toBe(true);
-    expect(deadlineEl.text()).toBe("剩餘 2 日");
-
-    expect(w.find('[data-testid="objective-tracker__deadline--q_no_deadline"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid^="objective-tracker__deadline--"]')).toHaveLength(0);
+    expect(w.text()).not.toContain("剩餘 2 日");
   });
 
   it("renders nothing when rows is empty", () => {

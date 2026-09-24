@@ -142,7 +142,10 @@ const {
         <template #actor-left>
           <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" />
         </template>
-        <template #panel-left>
+        <!-- The `vitals` anchor (webclient-avg-stage-hud-anchors design D1),
+             under the place card: the vitals and conditions islands, then
+             the compact party quickbar. -->
+        <template #vitals>
         <StatusPanel
           v-if="panelAvailable('status')"
           :status="panel('status') || {}"
@@ -159,18 +162,29 @@ const {
           @open-drawer="() => store.openHudDrawer('party')"
         />
       </template>
-      <template #panel-right>
-        <!-- The minimap island (H2, design D9): the stage's right anchor,
-             beneath H1's top-meta pill. The `@move` wiring and `explore.move`
-             submission are untouched. -->
+      <!-- The `map` anchor (webclient-avg-stage-hud-anchors design D1/D4),
+           at the stage's top-right, in this order: the minimap island, the
+           one-line objective (exploration only), the combat participant
+           frame, and the title ballot. No reference panel lives here; they
+           are drawers. -->
+      <template #map>
+        <!-- The minimap island (H2, design D9); hidden in combat. The
+             `@move` wiring and `explore.move` submission are untouched. -->
         <LocalMap
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
           @move="onMapMove"
           @open-map="onMapExpand"
         />
-        <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame renders in
-             the stage's right anchor, combat-only. -->
+        <!-- The objective line (design D2): the first tracked objective and
+             a `+N` count, directly under the minimap. -->
+        <ObjectiveTracker
+          v-if="showObjectiveTracker"
+          :rows="store.objectivesRows"
+        />
+        <!-- The combat participant frame (H3, design D4): the minimap is
+             hidden in combat, so the frame takes the top-right; it never
+             stands on a portrait anchor. -->
         <ParticipantFrame
           v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
           :participants="contextActionsPanel.participants"
@@ -185,17 +199,6 @@ const {
           :ballot="titleBallotPanel"
           @accept="onTitleBallotAction"
           @decline="onTitleBallotAction"
-        />
-        <!-- H4 (task 7.4): the six reference panels moved into the drawer
-             layer; the `#panel-right` anchor keeps only the minimap island
-             and the combat participant frame. The `hud-right` anchor's
-             geometry and the caption's width reservation are untouched
-             (task 7.5) — H2 re-tenants that anchor. -->
-      </template>
-      <template #objectives>
-        <ObjectiveTracker
-          v-if="showObjectiveTracker"
-          :rows="store.objectivesRows"
         />
       </template>
       <template #action-dock>

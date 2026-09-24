@@ -6,8 +6,8 @@ import HudFrame from "../../components/HudFrame.vue";
 // args: each committed mode renders its stage gradient; the mode × surface
 // visibility matrix gates surfaces with `display:none`; the open-surface
 // registry drives the stage recession. Sample blocks fill every slot so the
-// place card, the band split, the portrait anchor, and the command-line row
-// are visible.
+// place card, the island anchors, the band split, the portrait anchor, and
+// the command-line row are visible.
 
 const sample = (label, extra = "") =>
   h(
@@ -27,8 +27,11 @@ const renderFrame = (args) => ({
       "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
       "actor-right": () => sample("actor-right（保留）"),
       place: () => sample("place · 地點卡"),
-      "hud-left": () => sample("hud-left", "height:120px;"),
-      "hud-right": () => sample("hud-right", "height:200px;"),
+      vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
+      map: () => [
+        sample("map · 小地圖", "width:218px;height:200px;align-self:flex-end;"),
+        sample("map · 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
+      ],
       "band-message": () => sample("band-message · 訊息視窗（2/3）"),
       "band-command": () => sample("band-command · 指令面板（1/3）"),
       "command-line": () => sample("command-line · 指令列"),
@@ -45,13 +48,16 @@ export default {
         component:
           "The full-bleed stage: a `position:relative; overflow:hidden` root " +
           "with named anchors — the place card (`place`, top-left, fixed " +
-          "`--place-h`), the HUD islands (`hud-left` below it, `hud-right`), the " +
+          "`--place-h`), the island anchors (`vitals` below it; `map` at the " +
+          "top-right: the minimap, then the one-line objective), the " +
           "portrait anchors (`actor-left`, `actor-right`) standing on the band, " +
           "the fixed-height bottom band (`--band-h`) split into `band-message` " +
           "(left 2/3) and `band-command` (right 1/3), and the `command-line` " +
           "row docked on the message region's top edge. Mode gating is " +
           "CSS-only on `data-elosern-mode` (display:none): creation hides the " +
-          "place card and the message region, and the command region spans the whole band. The " +
+          "place card, the message region, and both island anchors, and the " +
+          "command region spans the whole band; the objective line shows only " +
+          "in exploration. The " +
           "open-surface registry drives the stage recession behind open " +
           "drawers and overlays.",
       },

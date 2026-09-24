@@ -5,9 +5,13 @@ import {
   OBJECTIVES_PANEL_EMPTY_SAMPLE,
 } from "../fixtures.js";
 
-// ObjectiveTracker (webclient-align-09-objective-tracker-ui):
-// the bottom-right `.obj` objective tracker island stories — active objectives,
-// single completed objective, progress counter, reward tag, and deadline line.
+// ObjectiveTracker (webclient-align-09-objective-tracker-ui;
+// webclient-avg-stage-hud-anchors design D2): the one-line objective under the
+// minimap. Stories: three tracked (`ActiveObjectives`: the first row plus `+2`), a completed
+// objective, a progress counter, a reward tag, a row whose deadline stays in
+// the quest drawer, a long line that truncates, and empty rows (renders
+// nothing). The frame mimics the `map` anchor at 1920x1080: a 332px
+// right-aligned column under a 218px minimap-sized card.
 
 export default {
   title: "Overlays/ObjectiveTracker",
@@ -20,9 +24,26 @@ const renderTracker = (args) => ({
       "div",
       {
         style:
-          "position: relative; width: 320px; min-height: 200px; padding: 20px; background: var(--ink-950, #0d0a12);",
+          "padding: 20px; background: linear-gradient(135deg, #2b3440, #151920);",
       },
-      [h(ObjectiveTracker, args)],
+      [
+        h(
+          "div",
+          {
+            style:
+              "width: 332px; display: flex; flex-direction: column; align-items: stretch; gap: 14px;",
+          },
+          [
+            h("div", {
+              "aria-hidden": "true",
+              style:
+                "align-self: flex-end; width: 218px; height: 120px; box-sizing: border-box; " +
+                "border: 1px dashed #bda47766; border-radius: var(--radius);",
+            }),
+            h(ObjectiveTracker, args),
+          ],
+        ),
+      ],
     ),
 });
 
@@ -30,6 +51,26 @@ export const ActiveObjectives = {
   render: renderTracker,
   args: {
     rows: OBJECTIVES_PANEL_SAMPLE.rows,
+  },
+};
+
+export const LongLine = {
+  render: renderTracker,
+  args: {
+    rows: [
+      {
+        quest_id: "q_long",
+        display_name: "北岸的委託",
+        objective_line: "在第三個滿月之前，把灰婆婆託付的封蠟信件交給北岸燈塔的守望人",
+        stage_index: 2,
+        stage_total: 3,
+        stage_progress: 0,
+        objective_quantity: 1,
+        reward_copper: 120,
+        deadline_line: "剩餘 4 日",
+      },
+      OBJECTIVES_PANEL_SAMPLE.rows[1],
+    ],
   },
 };
 
