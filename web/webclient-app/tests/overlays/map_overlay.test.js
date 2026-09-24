@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import MapOverlay from "../../components/MapOverlay.vue";
 import {
   LOCAL_MAP_SAMPLE,
+  LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
@@ -35,8 +36,25 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     expect(wrapper.find('[data-testid="local-map__legend"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="local-map__expand"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="map-overlay-remembered"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="local-map-detail"]').exists()).toBe(false);
+
+    // D5 contract: map-overlay-remembered is present on graph payload with remembered nodes
+    const graphPayloadWithRem = {
+      ...LOCAL_MAP_INTERIOR_SAMPLE,
+      nodes: [
+        ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
+        { id: "room:rem1", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
+      ],
+    };
+    const wGraph = mount(MapOverlay, { props: { localMap: localMapModelFor(graphPayloadWithRem) } });
+    const remList = wGraph.find('[data-testid="map-overlay-remembered"]');
+    expect(remList.exists()).toBe(true);
+    const remEntries = remList.findAll("li");
+    expect(remEntries).toHaveLength(1);
+    expect(remEntries[0].text()).toContain("公會倉庫");
+    expect(remEntries[0].attributes("tabindex")).toBeUndefined();
+    expect(remEntries[0].attributes("role")).toBeUndefined();
   });
 
   it("forwards the move event when an actionable adjacent node is clicked", async () => {

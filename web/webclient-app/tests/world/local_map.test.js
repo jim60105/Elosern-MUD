@@ -122,7 +122,7 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("Task 3.1 & 3.2: scopes remembered list to graph variant and provides text mirror for edge markers", async () => {
-    // Wilderness/grid payload: no remembered list in DOM, mirror is present
+    // Wilderness/grid payload: no remembered list in DOM, edge markers mirror is present
     const wLattice = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     expect(wLattice.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
     const mirror = wLattice.find('[data-testid="local-map-edge-markers-mirror"]');
@@ -133,7 +133,7 @@ describe("LocalMap (B4 world family)", () => {
     expect(mirrorItems[0].text()).toContain("遠處山徑");
     expect(mirrorItems[0].attributes("tabindex")).toBeUndefined();
 
-    // Interior payload with remembered: remembered list present, non-focusable items, no mirror
+    // Interior payload with remembered: no local-map-remembered, local-map-remembered-mirror present
     const interiorPayload = {
       ...LOCAL_MAP_INTERIOR_SAMPLE,
       nodes: [
@@ -142,9 +142,11 @@ describe("LocalMap (B4 world family)", () => {
       ],
     };
     const wInterior = mountMap({ localMap: localMapModelFor(interiorPayload) });
-    const remList = wInterior.find('[data-testid="local-map-remembered"]');
-    expect(remList.exists()).toBe(true);
-    const remItems = remList.findAll("li");
+    expect(wInterior.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
+    const remMirror = wInterior.find('[data-testid="local-map-remembered-mirror"]');
+    expect(remMirror.exists()).toBe(true);
+    expect(remMirror.attributes("aria-label")).toBe("記得的地點");
+    const remItems = remMirror.findAll("li");
     expect(remItems).toHaveLength(1);
     expect(remItems[0].text()).toContain("公會倉庫");
     expect(remItems[0].attributes("tabindex")).toBeUndefined();
@@ -330,17 +332,11 @@ describe("LocalMap (B4 world family)", () => {
     await w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]').trigger("click");
     expect(w.emitted("open-map")).toHaveLength(1);
 
-    // On a graph payload, clicking a remembered list item falls through and emits open-map.
-    const interiorPayload = {
-      ...LOCAL_MAP_INTERIOR_SAMPLE,
-      nodes: [
-        ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
-        { id: "room:rem", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
-      ],
-    };
-    const wInterior = mountMap({ localMap: localMapModelFor(interiorPayload) });
-    await wInterior.get('[data-testid="local-map-remembered"] li').trigger("click");
-    expect(wInterior.emitted("open-map")).toHaveLength(1);
+    // An edge marker click on a wilderness sample also emits open-map without move.
+    const wWild = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    await wWild.get('[data-testid^="local-map__edge-marker--"]').trigger("click");
+    expect(wWild.emitted("open-map")).toHaveLength(1);
+    expect(wWild.emitted("move")).toBeUndefined();
   });
 
   it("keeps the island root non-interactive (no role, no tabindex)", () => {
@@ -371,16 +367,12 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
     expect(svg.exists()).toBe(true);
-    // Design D5 row 6: 2 × 40px column core padded symmetrically to 206px width cap,
-    // 64 × 40px row pitch + 14px label band = 2574px tall, zero vertical margin.
-    expect(svg.attributes("width")).toBe("206");
-    expect(svg.attributes("height")).toBe("2574");
-    expect(svg.attributes("viewBox")).toBe("0 0 206 2574");
-    // Single width bound: 296 * 206 / 2574 = 23.68px
+    expect(svg.attributes("width")).toBe("208");
+    expect(svg.attributes("height")).toBe("208");
+    expect(svg.attributes("viewBox")).toBe("0 0 2574 2574");
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: 100%");
-    expect(style).toContain("max-width: 23.68px");
-    expect(style).toContain("max-height: 296px");
+    expect(style).toContain("width: 208px");
+    expect(style).toContain("height: 208px");
   });
 
   // ---------------------------------------------------------------------
@@ -392,16 +384,22 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap();
     const svg = w.get("svg.local-map__lattice");
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: 100%");
-    expect(style).toContain("max-width: 206px");
+    expect(style).toContain("width: 208px");
+    expect(style).toContain("height: 208px");
+    expect(Number(svg.attributes("width"))).toBe(208);
+    expect(Number(svg.attributes("height"))).toBe(208);
   });
 
   it("spends width fill as coordinate margin rather than magnification (maxUpscale retired)", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE) });
+    const svg = w.get("svg.local-map__lattice");
     const style = w.get("svg.local-map__lattice").attributes("style") ?? "";
-    expect(style).toContain("width: 100%");
-    // Design D5 row 3: single node canvas is padded to 206px with scale 1.0
-    expect(style).toContain("max-width: 206px");
+    expect(style).toContain("width: 208px");
+    expect(style).toContain("height: 208px");
+    expect(Number(svg.attributes("width"))).toBe(208);
+    expect(Number(svg.attributes("height"))).toBe(208);
+    const pattern = w.find("defs pattern");
+    expect(Number(pattern.attributes("width"))).toBe(60);
   });
 
   it("keeps the header on one row: an elastic title, fixed marks, and no trailing control", () => {
@@ -460,8 +458,10 @@ describe("LocalMap (B4 world family)", () => {
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(Number(svg.attributes("width"))).toBeCloseTo(206, 5);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(2022.911688, 4);
+    expect(Number(svg.attributes("width"))).toBe(208);
+    expect(Number(svg.attributes("height"))).toBe(208);
+    const vb = svg.attributes("viewBox").split(" ").map(Number);
+    expect(vb[2]).toBeCloseTo(2022.911688, 4);
     expect(w.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(16);
   });
@@ -470,12 +470,12 @@ describe("LocalMap (B4 world family)", () => {
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
 
-    // Distinct adjacent labels trigger pitch 48 on both axes. Margin = 31 on both axes.
+    // With canvasSize 208: pitch fits to 60.
     const centers = {
-      "grid:altoria:1:1": { x: 103, y: 103 },
-      "grid:altoria:2:1": { x: 151, y: 103 },
-      "grid:altoria:1:2": { x: 103, y: 55 },
-      "grid:altoria:0:1": { x: 55, y: 103 },
+      "grid:altoria:1:1": { x: 104, y: 127 },
+      "grid:altoria:2:1": { x: 164, y: 127 },
+      "grid:altoria:1:2": { x: 104, y: 67 },
+      "grid:altoria:0:1": { x: 44, y: 127 },
     };
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
@@ -489,18 +489,18 @@ describe("LocalMap (B4 world family)", () => {
     }
 
     const markerBoxes = {
-      "grid:altoria:1:1": { x1: 94, y1: 94, x2: 112, y2: 112 },
-      "grid:altoria:2:1": { x1: 145.5, y1: 97.5, x2: 156.5, y2: 108.5 },
-      "grid:altoria:1:2": { x1: 97.5, y1: 49.5, x2: 108.5, y2: 60.5 },
-      "grid:altoria:0:1": { x1: 49.5, y1: 97.5, x2: 60.5, y2: 108.5 },
+      "grid:altoria:1:1": { x1: 95, y1: 118, x2: 113, y2: 136 },
+      "grid:altoria:2:1": { x1: 158.5, y1: 121.5, x2: 169.5, y2: 132.5 },
+      "grid:altoria:1:2": { x1: 98.5, y1: 61.5, x2: 109.5, y2: 72.5 },
+      "grid:altoria:0:1": { x1: 38.5, y1: 121.5, x2: 49.5, y2: 132.5 },
     };
 
     // Label boxes: font 9, 5 full-width glyphs (45 wide), ascent 8.55, descent 4.05 around y=22
     const labelBoxes = {
-      "grid:altoria:1:1": { x1: 80.5, y1: 116.45, x2: 125.5, y2: 129.05 },
-      "grid:altoria:2:1": { x1: 128.5, y1: 116.45, x2: 173.5, y2: 129.05 },
-      "grid:altoria:1:2": { x1: 80.5, y1: 68.45, x2: 125.5, y2: 81.05 },
-      "grid:altoria:0:1": { x1: 32.5, y1: 116.45, x2: 77.5, y2: 129.05 },
+      "grid:altoria:1:1": { x1: 81.5, y1: 140.45, x2: 126.5, y2: 153.05 },
+      "grid:altoria:2:1": { x1: 141.5, y1: 140.45, x2: 186.5, y2: 153.05 },
+      "grid:altoria:1:2": { x1: 81.5, y1: 80.45, x2: 126.5, y2: 93.05 },
+      "grid:altoria:0:1": { x1: 21.5, y1: 140.45, x2: 66.5, y2: 153.05 },
     };
 
     function separated(a, b) {
@@ -533,232 +533,29 @@ describe("LocalMap (B4 world family)", () => {
     everyPair(markerBoxes);
 
     const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(e0.attributes("x1")).toBe("103");
-    expect(e0.attributes("y1")).toBe("103");
-    expect(e0.attributes("x2")).toBe("151");
-    expect(e0.attributes("y2")).toBe("103");
-    expect(48 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e0.attributes("x1")).toBe("104");
+    expect(e0.attributes("y1")).toBe("127");
+    expect(e0.attributes("x2")).toBe("164");
+    expect(e0.attributes("y2")).toBe("127");
+    expect(60 - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
-    expect(e1.attributes("x1")).toBe("103");
-    expect(e1.attributes("y1")).toBe("103");
-    expect(e1.attributes("x2")).toBe("103");
-    expect(e1.attributes("y2")).toBe("55");
-    expect(48 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e1.attributes("x1")).toBe("104");
+    expect(e1.attributes("y1")).toBe("127");
+    expect(e1.attributes("x2")).toBe("104");
+    expect(e1.attributes("y2")).toBe("67");
+    expect(60 - 9 - 5.5).toBeGreaterThan(0);
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {
     const model = localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    // Design D5 row 3: canvas fills maxWidth 206px as coordinate margin, height 220px
-    expect(svg.attributes("width")).toBe("206");
-    expect(svg.attributes("height")).toBe("220");
+    expect(svg.attributes("width")).toBe("208");
+    expect(svg.attributes("height")).toBe("208");
     expect(
       w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
-    ).toBe("translate(103, 103)");
+    ).toBe("translate(104, 97)");
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
-  });
-
-  it("budgets the canvas from the reduced island sections, not a legend", async () => {
-    const host = document.createElement("div");
-    host.setAttribute("data-anchor", "hud-right");
-    Object.defineProperty(host, "clientHeight", { value: 200, configurable: true });
-    document.body.appendChild(host);
-    const realRect = Element.prototype.getBoundingClientRect;
-    const sectionHeights = {
-      "local-map__meta": 24,
-      "local-map__remembered": 40,
-      "local-map__detail": 18,
-    };
-    Element.prototype.getBoundingClientRect = function () {
-      for (const [cls, height] of Object.entries(sectionHeights)) {
-        if (this.classList?.contains(cls)) return { height };
-      }
-      return realRect.call(this);
-    };
-    try {
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) },
-        attachTo: host,
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 117px",
-      );
-      wrapper.unmount();
-      wrapper = null;
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
-        attachTo: host,
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 117px",
-      );
-    } finally {
-      Element.prototype.getBoundingClientRect = realRect;
-      host.remove();
-    }
-  });
-
-  it("Task 4.1: derives canvas height budget from laid out sections on 1280x720 fixture", async () => {
-    const stage = document.createElement("div");
-    const hudRight = document.createElement("div");
-    hudRight.setAttribute("data-anchor", "hud-right");
-    const dock = document.createElement("div");
-    dock.setAttribute("data-anchor", "dock");
-    stage.appendChild(hudRight);
-    stage.appendChild(dock);
-    document.body.appendChild(stage);
-
-    const realRect = Element.prototype.getBoundingClientRect;
-    Element.prototype.getBoundingClientRect = function () {
-      if (this === hudRight) return { top: 64 };
-      if (this === dock) return { top: 500 };
-      if (this.classList?.contains("local-map__meta")) return { height: 15 };
-      if (this.classList?.contains("local-map__detail")) {
-        return { height: this.classList?.contains("local-map__detail--empty") ? 0 : 16 };
-      }
-      if (this.classList?.contains("local-map__remembered")) return { height: 224 };
-      return realRect.call(this);
-    };
-
-    try {
-      // 1. Lattice variant: meta (15) + detail (16) = 31, 2 gaps = 16. 424 - 31 - 16 - 25 = 352 -> clamped 296
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
-        attachTo: hudRight,
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 296px",
-      );
-      wrapper.unmount();
-      wrapper = null;
-
-      // 2. Graph variant with no remembered: meta (15), no detail (0), 1 gap = 8. 424 - 15 - 8 - 25 = 376 -> clamped 296
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE) },
-        attachTo: hudRight,
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 296px",
-      );
-      wrapper.unmount();
-      wrapper = null;
-
-      // 3. Graph variant with 16 remembered: meta (15) + remembered (224) = 239, 2 gaps = 16. 424 - 239 - 16 - 25 = 144
-      const graphWith16 = {
-        ...LOCAL_MAP_INTERIOR_SAMPLE,
-        nodes: [
-          ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
-          ...Array.from({ length: 16 }, (_, i) => ({
-            id: `room:rem:${i}`,
-            label: `倉庫${i}`,
-            x: 0,
-            y: i + 2,
-            visibility: "remembered",
-          })),
-        ],
-      };
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(graphWith16) },
-        attachTo: hudRight,
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 144px",
-      );
-    } finally {
-      Element.prototype.getBoundingClientRect = realRect;
-      stage.remove();
-    }
-  });
-
-  it("Task 4.2: gutter enlargement cannot breach canvas height cap and re-measures to same cap", async () => {
-    const stage = document.createElement("div");
-    const hudRight = document.createElement("div");
-    hudRight.setAttribute("data-anchor", "hud-right");
-    const dock = document.createElement("div");
-    dock.setAttribute("data-anchor", "dock");
-    stage.appendChild(hudRight);
-    stage.appendChild(dock);
-    document.body.appendChild(stage);
-
-    const realRect = Element.prototype.getBoundingClientRect;
-    Element.prototype.getBoundingClientRect = function () {
-      if (this === hudRight) return { top: 64 };
-      if (this === dock) return { top: 500 };
-      if (this.classList?.contains("local-map__meta")) return { height: 15 };
-      if (this.classList?.contains("local-map__detail")) return { height: 16 };
-      return realRect.call(this);
-    };
-
-    const crowdedModel = localMapModelFor(LOCAL_MAP_TALL_REMEMBERED_SAMPLE);
-    try {
-      wrapper = mount(LocalMap, {
-        props: { localMap: crowdedModel },
-        attachTo: hudRight,
-      });
-      await wrapper.vm.$nextTick();
-      const svg = wrapper.find("svg.local-map__lattice");
-      expect(svg.attributes("style")).toContain("max-height: 296px");
-      // Width bound spends the height budget proportionally: 296 * (206 / 2022.91) = 30.14px
-      expect(svg.attributes("style")).toContain("max-width: 30.14px");
-    } finally {
-      Element.prototype.getBoundingClientRect = realRect;
-      stage.remove();
-    }
-  });
-  it("budgets against the anchor's room, not the island's own height", async () => {
-    const stage = document.createElement("div");
-    const host = document.createElement("div");
-    host.setAttribute("data-anchor", "hud-right");
-    const dock = document.createElement("div");
-    dock.setAttribute("data-anchor", "dock");
-    stage.append(host, dock);
-    document.body.appendChild(stage);
-
-    const sectionHeights = {
-      "local-map__meta": 24,
-      "local-map__detail": 18,
-    };
-    const realRect = Element.prototype.getBoundingClientRect;
-    Element.prototype.getBoundingClientRect = function () {
-      for (const [cls, height] of Object.entries(sectionHeights)) {
-        if (this.classList?.contains(cls)) return { height };
-      }
-      if (this === host) return { top: 64, height: host.clientHeight };
-      if (this === dock) return { top: 500, height: 158 };
-      return realRect.call(this);
-    };
-    Object.defineProperty(host, "clientHeight", {
-      configurable: true,
-      get() {
-        const svg = host.querySelector("svg.local-map__lattice");
-        const cap = /max-height:\s*([\d.]+)px/.exec(svg?.getAttribute("style") ?? "");
-        const canvas = Math.min(154.91, cap ? parseFloat(cap[1]) : 296);
-        return 2 + 18 + 24 + 4 + 8 + canvas + 8 + 18;
-      },
-    });
-
-    try {
-      wrapper = mount(LocalMap, {
-        props: { localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) },
-        attachTo: host,
-      });
-      for (let pass = 0; pass < 8; pass += 1) {
-        await wrapper.vm.$nextTick();
-        expect(
-          wrapper.find("svg.local-map__lattice").attributes("style"),
-          `pass ${pass} must not ratchet the canvas down`,
-        ).toContain("max-height: 296px");
-      }
-    } finally {
-      Element.prototype.getBoundingClientRect = realRect;
-      stage.remove();
-    }
   });
 
   it("MapOverlay renders the shared LocalMap and forwards the move intent", async () => {
@@ -783,7 +580,7 @@ describe("LocalMap (B4 world family)", () => {
     expect(lattice.props("colPitch")).toBe(40);
     expect(lattice.props("rowPitch")).toBe(40);
     expect(lattice.props("labelFont")).toBe(9);
-    expect(lattice.props("fieldFill")).toBe(true);
+    expect(lattice.props("canvasSize")).toBe(208);
     expect(lattice.props("showAxis")).toBe(true);
     expect(lattice.props("fogVignette")).toBe(true);
     expect(lattice.props("maxUpscale")).toBeUndefined();
@@ -823,29 +620,5 @@ describe("LocalMap (B4 world family)", () => {
     const chromeStep = 10;
     expect(lattice.props("labelFont")).toBeLessThanOrEqual(chromeStep);
     expect(lattice.props("markerNameFont")).toBeLessThanOrEqual(chromeStep);
-  });
-
-  it("keeps the assistive-technology mirror out of the island's flex flow", () => {
-    // The z-index raising rule outranks `.visually-hidden` on specificity, so
-    // without an explicit exclusion it re-positions the mirror to `relative`:
-    // `clip` then stops applying (it only affects absolutely positioned boxes)
-    // and the mirror becomes an in-flow flex item worth its own box plus a full
-    // gap — height that `measureCanvasBudget()` never reserves, because it
-    // counts only the meta row, the canvas, and at most one of the graph list
-    // and the readout.
-    const raising = ISLAND_SOURCE.match(
-      /\.local-map > \*:not\(\.local-map__affordance\)([^{]*)\{/,
-    );
-    expect(raising, "the raising rule must stay a :not() rule").not.toBeNull();
-    expect(raising[1]).toContain(":not(.visually-hidden)");
-    expect(ruleBody(ISLAND_SOURCE, ".visually-hidden")).toContain("position: absolute");
-
-    // The mirror is still rendered, still unfocusable, and still the only
-    // island section the budget does not count.
-    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
-    const mirror = w.find('[data-testid="local-map-edge-markers-mirror"]');
-    expect(mirror.exists()).toBe(true);
-    expect(mirror.classes()).toContain("visually-hidden");
-    expect(mirror.attributes("tabindex")).toBeUndefined();
   });
 });

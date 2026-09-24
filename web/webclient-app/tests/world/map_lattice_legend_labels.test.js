@@ -52,7 +52,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // self-overlap).
     expect(rings[0].classes()).not.toContain("local-map__marker");
     // The current landmark keeps exactly one ring; the remembered landmark
-    // (遠處山徑) stays in the list with no ring on the canvas.
+    // (遠處山徑) stays in the mirror/edge marker presentation with no ring on the canvas.
     expect(w.findAll('[data-testid="local-map__node--wild:plains:3:1"] .local-map__landmark')).toHaveLength(1);
     expect(w.findAll('[data-testid="local-map__node--wild:plains:7:5"]').length).toBe(0);
     expect(w.findAll(".local-map__landmark")).toHaveLength(2);

@@ -55,14 +55,14 @@
 
 ## 4. Vitest updates
 
-- [ ] 4.1 `web/webclient-app/tests/world/local_map.test.js`:
+- [x] 4.1 `web/webclient-app/tests/world/local_map.test.js`:
   - Delete the budget cases: "budgets the canvas from the reduced island sections, not a legend", "Task 4.1: derives canvas height budget…", "Task 4.2: gutter enlargement cannot breach canvas height cap…", "budgets against the anchor's room…", and "keeps the assistive-technology mirror out of the island's flex flow" (its premise was the budget's section count).
   - Rewrite "Task 3.1 & 3.2" to assert that the graph variant renders `local-map-remembered-mirror` with one entry per remembered node and no `local-map-remembered`.
   - Rewrite the remembered-item click case (around line 342) to click an edge marker instead.
   - Rewrite "fills the island's width…" and "spends width fill as coordinate margin…" to assert `canvasSize` 208, an SVG width and height of 208, and the fitted pitch.
   - Rewrite "Task 2.5: declares island geometry…" to expect `canvasSize` 208 instead of `fieldFill`.
   - Run `pnpm exec vitest run web/webclient-app/tests/world/local_map.test.js` green.
-- [ ] 4.2 `tests/world/map_layout_variants.test.js`: the island case at about line 198 asserts the mirror instead of the absence of the island list. `tests/overlays/map_overlay.test.js`: replace the "no `local-map-remembered`" assertion with the D5 contract. `map-overlay-remembered` is present with one non-focusable entry per remembered node on a graph payload and absent on a lattice payload. `tests/world/map_lattice_legend_labels.test.js`: reword the line 86 comment that mentions the island list. Stories:
+- [x] 4.2 `tests/world/map_layout_variants.test.js`: the island case at about line 198 asserts the mirror instead of the absence of the island list. `tests/overlays/map_overlay.test.js`: replace the "no `local-map-remembered`" assertion with the D5 contract. `map-overlay-remembered` is present with one non-focusable entry per remembered node on a graph payload and absent on a lattice payload. `tests/world/map_lattice_legend_labels.test.js`: reword the line 86 comment that mentions the island list. Stories:
   - `web/webclient-app/stories/World/LocalMap.stories.js`: the `Interior` story shows the list gone.
   - `web/webclient-app/stories/World/MapLattice.stories.js`: the island-scale stories pass `canvasSize: 208` instead of `fieldFill` and the 206 / 296 caps, and the "five-cell" sparse comment is updated.
   - Run `pnpm test`, `pnpm run build-storybook`, and `pnpm run showcase-coverage` green. `component-manifest.json` needs no change, because no component is added or removed.
