@@ -69,21 +69,21 @@
 
 ## 5. Browser tests and traceability
 
-- [ ] 5.1 `web/tests/browser/test_browser_local_map_geometry.py`:
+- [x] 5.1 `web/tests/browser/test_browser_local_map_geometry.py`:
   - `test_minimap_content_stays_inside_its_island` asserts that the lattice SVG box is 208 × 208 and that the island box is identical before and after injecting a graph payload with remembered rooms.
   - `test_island_type_ladder_stays_under_its_own_chrome_step` keeps its ladder, with the node label ≤ 9 px, and re-derives any pinned scale from design D3.
   - Replace `test_marker_mirror_is_out_of_the_island_height_budget` with a test that both mirrors are clipped, non-focusable, and do not change the island box.
   - Run `uv run --locked python -m unittest web.tests.browser.test_browser_local_map_geometry` green.
-- [ ] 5.2 `web/tests/browser/test_browser_local_map_lattice.py`: rename `test_tall_lattice_with_long_remembered_list_stays_within_the_island` to `test_long_remembered_list_never_resizes_the_island`, keeping its annotation. The test asserts:
+- [x] 5.2 `web/tests/browser/test_browser_local_map_lattice.py`: rename `test_tall_lattice_with_long_remembered_list_stays_within_the_island` to `test_long_remembered_list_never_resizes_the_island`, keeping its annotation. The test asserts:
   - no `local-map-remembered`
   - a mirror entry count equal to the remembered count
   - a 208 × 208 canvas
   - an island box equal to that of the same payload without remembered nodes
 
   `test_densely_populated_lattice_scales_down_without_reintroducing_overlap` asserts the 208 canvas and a scale below 1. Run `uv run --locked python -m unittest web.tests.browser.test_browser_local_map_lattice` green.
-- [ ] 5.3 `web/tests/browser/test_browser_local_map_rendering.py` (around lines 152 and 233) and `test_browser_contextual_hud_stage.py` (around line 503): wait for `local-map-remembered-mirror` instead of `local-map-remembered`, and assert the list is absent. In the rendering test, open the full map and assert that `map-overlay-remembered` lists the room. Run both modules green.
-- [ ] 5.4 In `test_browser_contextual_hud_stage.py`, add `test_full_log_opens_at_latest_line`, decorated `@covers_requirement("webclient-input-narrative::the-full-log-surface-opens-at-its-latest-line")`. It appends 80 `out` lines through `window.__elosernBridge.store.appendText`, opens the log through `narrative-fulllog-control`, and asserts `scrollTop + clientHeight >= scrollHeight - 1` and that the last line's box is inside the overlay box. It then scrolls to the top, appends a line, and asserts `scrollTop` is unchanged. Finally it closes the log, reopens it, and asserts the log is back at the bottom. Run `uv run --locked python -m unittest web.tests.browser.test_browser_contextual_hud_stage` green.
-- [ ] 5.5 Sync this change's deltas into the main specs, then run `uv run --locked python -m tools.spec_traceability check` green. No requirement title changes, so no existing annotation is re-anchored. Only the new input-narrative ID needs the 5.4 test.
+- [x] 5.3 `web/tests/browser/test_browser_local_map_rendering.py` (around lines 152 and 233) and `test_browser_contextual_hud_stage.py` (around line 503): wait for `local-map-remembered-mirror` instead of `local-map-remembered`, and assert the list is absent. In the rendering test, open the full map and assert that `map-overlay-remembered` lists the room. Run both modules green.
+- [x] 5.4 In `test_browser_contextual_hud_stage.py`, add `test_full_log_opens_at_latest_line`, decorated `@covers_requirement("webclient-input-narrative::the-full-log-surface-opens-at-its-latest-line")`. It appends 80 `out` lines through `window.__elosernBridge.store.appendText`, opens the log through `narrative-fulllog-control`, and asserts `scrollTop + clientHeight >= scrollHeight - 1` and that the last line's box is inside the overlay box. It then scrolls to the top, appends a line, and asserts `scrollTop` is unchanged. Finally it closes the log, reopens it, and asserts the log is back at the bottom. Run `uv run --locked python -m unittest web.tests.browser.test_browser_contextual_hud_stage` green.
+- [x] 5.5 Sync this change's deltas into the main specs, then run `uv run --locked python -m tools.spec_traceability check` green. No requirement title changes, so no existing annotation is re-anchored. Only the new input-narrative ID needs the 5.4 test.
 
 ## 6. Validation
 

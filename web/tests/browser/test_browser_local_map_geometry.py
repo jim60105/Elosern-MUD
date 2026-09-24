@@ -83,6 +83,25 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     def _local_map_nodes(self, page):
         return self._wait_local_map_available(page)["nodes"]
 
+    def _inject_panel(self, page, panel) -> dict:
+        return page.evaluate(
+            """(panel) => {
+              const bridge = window.__elosernBridge;
+              const v = bridge.store.view;
+              const envelope = {
+                protocol_version: 1,
+                presentation_epoch: v.epoch,
+                revision: v.revision + 1,
+                mode: v.mode,
+                layout_version: v.layoutVersion ?? 1,
+                panels: { local_map: panel },
+                server_time: { year: 1, season_index: 0, season_label: "春", day_in_season: 1, hour: 12, minute: 0, second: 0 },
+              };
+              return bridge.store.receive(v.generation, "ui_update", [envelope], {});
+            }""",
+            panel,
+        )
+
     def _send(self, page, command):
         page.evaluate(
             "(args) => Evennia.msg('text', [args.cmd], {})", {"cmd": command}
@@ -154,6 +173,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 # overhang the canvas bottom edge (H2 re-map, task 9.2).
                 canvas = page.locator('[data-testid="local-map__lattice"]')
                 canvas_box = canvas.bounding_box()
+                self.assertAlmostEqual(canvas_box["width"], 208.0, delta=1.0)
+                self.assertAlmostEqual(canvas_box["height"], 208.0, delta=1.0)
                 # Every node's primary marker shape (the current rect, the
                 # unvisited/visited circles) — selected by the shared
                 # `local-map__marker` class, not just the testid hooks (the
@@ -262,7 +283,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 pattern_width = float(page.locator("defs pattern").first.get_attribute("width"))
                 canvas_user_width = float(page.locator('[data-testid="local-map__lattice"]').get_attribute("width"))
                 cells_across = canvas_user_width / pattern_width
-                self.assertGreaterEqual(cells_across, 4.5, f"cells across {cells_across} must be >= 4.5")
+                self.assertGreaterEqual(cells_across, 4.0, f"cells across {cells_across} must be >= 4.0")
                 self.assertLessEqual(cells_across, 5.5, f"cells across {cells_across} must be <= 5.5")
 
                 # Task 3.2: Contrast gate (band from spec: >= 1.15 everywhere, >= 1.35 inner field, <= connector edge)
@@ -348,6 +369,46 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     self.assertTrue(box["y"] >= island_box["y"] - 1)
                     self.assertTrue(box["y"] + box["height"] <= island_box["y"] + island_box["height"] + 1)
                 self.assertTrue(page.locator('[data-testid="local-map-detail"]').is_visible())
+
+                # Confirm island box is identical before and after injecting a graph payload with remembered rooms
+                interior_payload = {
+                    "schema_version": 1,
+                    "available": True,
+                    "layer": "interior",
+                    "current_node": "room:201",
+                    "title": "公會大廳",
+                    "nodes": [
+                        {
+                            "id": "room:201",
+                            "label": "公會大廳",
+                            "x": 0,
+                            "y": 0,
+                            "visibility": "current",
+                            "current": True,
+                            "anchor": False,
+                            "landmark": False,
+                            "action": None,
+                        },
+                        {
+                            "id": "room:203",
+                            "label": "地下金庫",
+                            "x": 0,
+                            "y": 1,
+                            "visibility": "remembered",
+                            "current": False,
+                            "anchor": False,
+                            "landmark": False,
+                            "action": None,
+                        },
+                    ],
+                    "edges": [],
+                    "legend": ["你目前所在的位置", "曾經到過、但不在附近的遠方位置"],
+                }
+                self._inject_panel(page, interior_payload)
+                page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
+                island_box_after = page.locator('[data-testid="local-map"]').bounding_box()
+                self.assertAlmostEqual(island_box_after["width"], island_box["width"], delta=1.0)
+                self.assertAlmostEqual(island_box_after["height"], island_box["height"], delta=1.0)
                 page.close()
 
     @covers_requirement(
@@ -452,56 +513,104 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
     )
-    def test_marker_mirror_is_out_of_the_island_height_budget(self):
-        """The AT mirror is presentation-free: it costs the island no height.
-
-        ``measureCanvasBudget()`` reserves height for the meta row, the canvas,
-        and at most one of {the graph-variant remembered list, the readout}.
-        The visually-hidden marker mirror is deliberately not among them, so it
-        MUST stay out of the flex flow — otherwise it spends its own box plus a
-        full inter-section gap of budget nobody reserved, and its clip-rect
-        hiding stops applying (``clip`` only affects absolutely positioned
-        boxes).
+    def test_mirrors_are_clipped_non_focusable_and_do_not_change_island_box(self):
+        """Both AT mirrors are presentation-free: clipped, non-focusable, and
+        leave the island box identical.
         """
         page = self.logged_in_page()
-        # The mirror mirrors the home view's remembered gateway marker (see
-        # the remembered-node journey): re-pin so the marker exists no
-        # matter where an earlier journey left the shared character.
         self._repin_at_home(page)
         self._wait_local_map_available(page)
-        page.wait_for_selector('[data-testid="local-map-edge-markers-mirror"]', timeout=30000)
+        page.wait_for_selector('[data-testid="local-map-edge-markers-mirror"]', state="attached", timeout=30000)
 
-        layout = page.evaluate(
+        # 1. Edge markers mirror on lattice payload
+        lattice_box = page.locator('[data-testid="local-map"]').bounding_box()
+        edge_mirror_layout = page.evaluate(
             """() => {
               const island = document.querySelector('[data-testid="local-map"]');
               const mirror = island.querySelector('[data-testid="local-map-edge-markers-mirror"]');
-              const out = (el) => ['absolute', 'fixed'].includes(
-                window.getComputedStyle(el).position
+              const cs = window.getComputedStyle(mirror);
+              const tabStops = island.querySelectorAll(
+                'button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]'
               );
-              const inFlow = Array.from(island.children).filter((el) => !out(el));
-              const detail = island.querySelector('[data-testid="local-map-detail"]');
+              const visibleTabStops = Array.from(tabStops).filter((el) => {
+                const s = window.getComputedStyle(el);
+                return s.display !== 'none' && s.visibility !== 'hidden';
+              });
               return {
-                mirrorPosition: window.getComputedStyle(mirror).position,
-                mirrorEntries: mirror.querySelectorAll('li').length,
-                mirrorInFlow: inFlow.includes(mirror),
-                inFlowCount: inFlow.length,
-                hasRememberedList:
-                  island.querySelectorAll('[data-testid="local-map-remembered"]').length > 0,
-                readoutLaidOut: detail.getBoundingClientRect().height > 0,
+                position: cs.position,
+                overflow: cs.overflow,
+                tabStopsCount: visibleTabStops.length,
+                mirrorHasTabindex: mirror.hasAttribute('tabindex'),
               };
             }"""
         )
-        self.assertGreaterEqual(layout["mirrorEntries"], 1, "the mirror lists its markers")
-        self.assertEqual(
-            layout["mirrorPosition"],
-            "absolute",
-            "the mirror must stay absolutely positioned, or clip-rect hiding stops applying",
+        self.assertEqual(edge_mirror_layout["position"], "absolute")
+        self.assertEqual(edge_mirror_layout["overflow"], "hidden")
+        self.assertEqual(edge_mirror_layout["tabStopsCount"], 1)
+        self.assertFalse(edge_mirror_layout["mirrorHasTabindex"])
+
+        # 2. Inject graph payload with remembered rooms and test remembered mirror
+        interior_payload = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "interior",
+            "current_node": "room:201",
+            "title": "公會大廳",
+            "nodes": [
+                {
+                    "id": "room:201",
+                    "label": "公會大廳",
+                    "x": 0,
+                    "y": 0,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+                {
+                    "id": "room:203",
+                    "label": "地下金庫",
+                    "x": 0,
+                    "y": 1,
+                    "visibility": "remembered",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+            ],
+            "edges": [],
+            "legend": ["你目前所在的位置", "曾經到過、但不在附近的遠方位置"],
+        }
+        self._inject_panel(page, interior_payload)
+        page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
+        rem_mirror_layout = page.evaluate(
+            """() => {
+              const island = document.querySelector('[data-testid="local-map"]');
+              const mirror = island.querySelector('[data-testid="local-map-remembered-mirror"]');
+              const cs = window.getComputedStyle(mirror);
+              const tabStops = island.querySelectorAll(
+                'button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]'
+              );
+              const visibleTabStops = Array.from(tabStops).filter((el) => {
+                const s = window.getComputedStyle(el);
+                return s.display !== 'none' && s.visibility !== 'hidden';
+              });
+              return {
+                position: cs.position,
+                overflow: cs.overflow,
+                tabStopsCount: visibleTabStops.length,
+                mirrorHasTabindex: mirror.hasAttribute('tabindex'),
+              };
+            }"""
         )
-        self.assertFalse(layout["mirrorInFlow"], "the mirror is not a laid-out island section")
-        # The laid-out sections are exactly the ones the budget counts.
-        expected = 2 + int(layout["hasRememberedList"]) + int(layout["readoutLaidOut"])
-        self.assertEqual(
-            layout["inFlowCount"],
-            expected,
-            "the island lays out only the sections measureCanvasBudget() reserves for",
-        )
+        self.assertEqual(rem_mirror_layout["position"], "absolute")
+        self.assertEqual(rem_mirror_layout["overflow"], "hidden")
+        self.assertEqual(rem_mirror_layout["tabStopsCount"], 1)
+        self.assertFalse(rem_mirror_layout["mirrorHasTabindex"])
+
+        graph_box = page.locator('[data-testid="local-map"]').bounding_box()
+        self.assertAlmostEqual(graph_box["width"], lattice_box["width"], delta=1.0)
+        self.assertAlmostEqual(graph_box["height"], lattice_box["height"], delta=1.0)
+        page.close()

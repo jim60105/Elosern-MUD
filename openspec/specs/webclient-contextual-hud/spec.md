@@ -429,10 +429,11 @@ and nothing else. The readout SHALL NOT restate the current node's place name, i
 or a movement destination: the place name belongs to the shell's own top-meta location surface, and a
 minimap shows the current position by definition. The readout SHALL NOT be driven by hover or by
 selection, and the island SHALL keep no hovered-node or selected-node state; a node's own name stays
-available as its on-canvas accessible name and, for a remembered node, as the visible text of the
-presentation its layout variant gives it — the name drawn beside its edge direction marker on the
-coordinate lattice, its list entry on the radial graph — with the untruncated name always available
-to assistive technology, so no remembered place is readable by sight alone. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
+available as its on-canvas accessible name and, for a remembered node, as visible text on the surface
+its layout variant presents it on — the name drawn beside the island's edge direction marker on the
+coordinate lattice, and its entry in the full-map surface's remembered list on the radial graph, where
+the island draws no visible remembered-node list at all — with the untruncated name always available
+to assistive technology on the island, so no remembered place is readable by sight alone. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
 angle, a distance, or any other coordinate figure: coordinate readouts for non-current nodes,
 differences between node coordinates, and every spatial figure on the graph variant remain forbidden,
 because on coordinate-bearing layers node coordinates are validated world coordinates whose only
@@ -533,20 +534,22 @@ existing per-node movement submission SHALL be unchanged.
   the surface restores focus to that same still-present element
 
 #### Scenario: Clicking an interactive descendant does not open the map
-- **WHEN** the player activates an actionable lattice node, an edge direction marker, a
-  graph-variant remembered-list item, or the full-map affordance itself
+- **WHEN** the player activates an actionable lattice node, an edge direction marker, or the
+  full-map affordance itself
 - **THEN** only that control's own behavior runs — the node submits its move and no additional
-  map-open is emitted, the affordance opens the map exactly once, and the marker and the remembered
-  item, which carry no behaviour and no tab stop, let the click fall through to the island body so the
+  map-open is emitted, the affordance opens the map exactly once, and the marker, which carries no
+  behaviour and no tab stop, lets the click fall through to the island body so the
   map opens exactly once from there
 
 #### Scenario: A remembered place is readable on the island without a tab stop
 - **WHEN** the island renders a coordinate-bearing payload carrying remembered gateways and, in turn,
   a coordinate-free payload carrying remembered rooms
-- **THEN** the first draws each place's name beside its edge direction marker and the second lists each
-  place's name beneath the canvas, both expose every such place's untruncated name to assistive
-  technology with the marker's octant direction word on the lattice variant, and in neither case does
-  the island offer a second tab stop beyond its full-map affordance
+- **THEN** the first draws each place's name beside its edge direction marker, the second draws no
+  remembered place's name as visible text on the island and the full-map surface it opens lists each
+  place's name as visible text, both islands expose every such place's untruncated name to assistive
+  technology — with the marker's octant direction word on the lattice variant and no direction on the
+  graph variant — and in neither case does the island offer a second tab stop beyond its full-map
+  affordance
 
 ### Requirement: The action dock renders as a floating panel in the stage's dock anchor
 The action dock SHALL occupy the stage's bounded central `dock` anchor, drawn with a charcoal

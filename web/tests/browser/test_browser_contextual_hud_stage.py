@@ -500,7 +500,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "legend": ["你目前所在的位置", "已經探索過的相鄰位置", "曾經到過、但不在附近的遠方位置"],
         }
         _inject_snapshot(page, {"local_map": interior_payload}, mode="exploration")
-        page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
+        page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
+        self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="local-map-remembered-mirror"] li').count(), 1)
         # On coordinate-free layer (radial graph variant), orientation marks and axis are absent
         self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
         self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 0)
@@ -569,3 +571,73 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         ", ".join(overlaps), viewport[0], viewport[1], scale,
                     ),
                 )
+
+    @covers_requirement(
+        "webclient-input-narrative::the-full-log-surface-opens-at-its-latest-line"
+    )
+    def test_full_log_opens_at_latest_line(self):
+        page = self.logged_in_page()
+        # Append 80 lines through window.__elosernBridge.store.appendText
+        page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              for (let i = 1; i <= 80; i++) {
+                store.appendText("out", `第 ${i} 行測試敘事內容。`);
+              }
+            }"""
+        )
+        # Open full log via narrative-fulllog-control
+        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+
+        # Assert scrollTop + clientHeight >= scrollHeight - 1
+        scroll_status = page.evaluate(
+            """() => {
+              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              const lines = el.querySelectorAll('.narrative-line');
+              const lastLine = lines[lines.length - 1];
+              const overlayBox = el.getBoundingClientRect();
+              const lastBox = lastLine ? lastLine.getBoundingClientRect() : null;
+              const lastInside = lastBox && lastBox.top >= overlayBox.top && lastBox.bottom <= overlayBox.bottom + 5;
+              return {
+                atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
+                lastInside,
+                scrollTop: el.scrollTop,
+              };
+            }"""
+        )
+        self.assertTrue(scroll_status["atBottom"], "full log must open scrolled to the bottom")
+        self.assertTrue(scroll_status["lastInside"], "last line must be inside visible overlay box")
+
+        # Scroll to top
+        page.evaluate(
+            """() => {
+              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              el.scrollTop = 0;
+            }"""
+        )
+        # Append a line while open
+        page.evaluate(
+            """() => {
+              window.__elosernBridge.store.appendText("out", "第 81 行即時到達的敘事內容。");
+            }"""
+        )
+        # Assert scrollTop is unchanged
+        st = page.evaluate("() => document.querySelector('[data-testid=\"fulllog-overlay\"]').scrollTop")
+        self.assertEqual(st, 0, "appending a line while open must leave scroll position unchanged")
+
+        # Close log
+        page.locator('[data-testid="fulllog-close"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', state="detached", timeout=15000)
+
+        # Reopen log and assert it is back at the bottom
+        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        at_bottom_again = page.evaluate(
+            """() => {
+              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              return el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            }"""
+        )
+        self.assertTrue(at_bottom_again, "reopening full log must open at the latest line again")
+        page.close()

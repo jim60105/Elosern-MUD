@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
       </button>
     </header>
     <div class="overlay-host__body" data-testid="overlay-host-body">
-      <slot :overlay="overlay" :map-model="mapModel"></slot>
+      <slot :overlay="overlay" :map-model="mapModel" :mapModel="mapModel"></slot>
     </div>
   </section>
 </template>

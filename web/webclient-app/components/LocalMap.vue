@@ -405,6 +405,7 @@ function onIslandClick(event) {
   /* Coordinates remain secondary to the map and its larger title. */
   font-size: 10px;
   line-height: 1.45;
+  min-height: 1.45em;
   text-align: center;
   overflow-wrap: anywhere;
 }
