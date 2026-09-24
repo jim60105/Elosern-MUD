@@ -72,7 +72,7 @@
 
 ## 4. Overlay: fitted layout, toolbar, legend popover (design D2, D3, D5, D7)
 
-- [ ] 4.1 `web/webclient-app/components/MapOverlay.vue` script:
+- [x] 4.1 `web/webclient-app/components/MapOverlay.vue` script:
   - Delete `revealCurrentNode`, the `body` ref, `onMounted` / `watch` / `currentNodeId`, and their comment and imports.
   - Add a `latticeRef`, the `legendOpen` ref, and `legendState(index)`, moved from `use-map-lattice-render.js` with its comment.
   - Add `onKeydown(event)` on the root:
@@ -81,7 +81,7 @@
     - `-`, `_`, and `Subtract` call `zoomOut()`.
   - Add `onPointerDownOutside`, which closes the popover when the target is outside the popover and its toggle and does not stop the event.
   - Update the header comment, which currently says "reused MapLattice at the overlay's own larger scale".
-- [ ] 4.2 Same file, template and style:
+- [x] 4.2 Same file, template and style:
   - The root is `.map-overlay-body` with `@keydown` and `@pointerdown.capture`.
   - `.map-overlay__content` is a grid with `grid-template-rows: auto minmax(240px, 1fr) auto` at `height: 100%`.
   - The guide row keeps the hint `點選可通行的相鄰節點，繼續探索。` and the span `Tab 切換路徑 · Enter 確認移動 · 滾輪或 +／− 縮放 · 拖曳平移`, and adds `<div class="map-overlay__toolbar" role="group" aria-label="地圖檢視">` with four `<button type="button">`s:
@@ -94,7 +94,7 @@
   - C1's `map-overlay-remembered` list is the third row.
   - Move the `.local-map__legend*` chip rules from `map-lattice.css` into this file's scoped style, token-only. Delete `:deep(.local-map__viewport--canvas)`, `:deep(.local-map__legend)`, and every `max-width: 848px`.
   - Check with `grep -n "848\|scrollIntoView\|revealCurrentNode" web/webclient-app/components/MapOverlay.vue`, which returns nothing, and verify with `pnpm run build`.
-- [ ] 4.3 Stories:
+- [x] 4.3 Stories:
   - `web/webclient-app/stories/Overlays/MapOverlay.stories.js`: add a `TallLattice` story bound to `LOCAL_MAP_GEOMETRY_STRESS_SAMPLE` through `localMapModelFor`, and update the header comment to say that the overlay opens fitted inside its stage.
   - `web/webclient-app/stories/World/MapLattice.stories.js`: `renderOverlayScale` drops `maxWidth` / `maxHeight` / `fillWidth`, passes `fitView: true` inside an `848 × 560` box, and says in its comment that the island-scale stories no longer set caps (C1 passes `canvasSize`).
   - Run `pnpm run build-storybook` and `pnpm run showcase-coverage` green. No story title changes, so `component-manifest.json` stays as it is.

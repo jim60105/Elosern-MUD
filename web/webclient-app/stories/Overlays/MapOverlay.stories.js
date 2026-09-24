@@ -1,6 +1,7 @@
 import { h } from "vue";
 import MapOverlay from "../../components/MapOverlay.vue";
 import {
+  LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
@@ -8,13 +9,13 @@ import {
   localMapModelFor,
 } from "../fixtures.js";
 
-// MapOverlay (B5 overlays family): the full-viewport dialog frame hosting
-// the B4 LocalMap panel. Each story stages one committed payload form —
-// the full lattice, the minimal lattice, and the registry-owned unavailable
-// reason — inside a dark 900x600 stage with a bordered container, so the
-// absolutely-positioned overlay stays visible against the ink background.
-// Nothing is invented: the unavailable story shows only the payload's
-// reason.message.
+// MapOverlay (webclient-full-map-fit-view D1/D7): the full-map body content.
+// Each story stages one committed payload form — the full lattice, the
+// minimal lattice, a tall street, and the registry-owned unavailable reason —
+// inside a dark 900x600 stage with a bordered container, so the overlay's
+// fitted view opens the WHOLE drawing inside the stage (no body scrollbar)
+// and the reader zooms instead of scrolling. Nothing is invented: the
+// unavailable story shows only the payload's reason.message.
 //
 // Wave 0 (webclient-map-00-story-fidelity): every `localMap` arg binds
 // through the shared `localMapModelFor` helper — the EXACT derived shape the
@@ -80,5 +81,15 @@ export const RadialGraph = {
   render: renderOverlay,
   args: {
     localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE),
+  },
+};
+
+// The fitted view's reason to exist (webclient-full-map-fit-view): the tall
+// geometry-stress street payload opens wholly inside the stage at its fitted
+// scale instead of running down a scrolling body.
+export const TallLattice = {
+  render: renderOverlay,
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
   },
 };
