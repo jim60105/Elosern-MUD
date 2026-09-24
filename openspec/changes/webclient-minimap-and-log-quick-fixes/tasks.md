@@ -1,15 +1,15 @@
 ## 1. Renderer: fixed square canvas (design D1, D3, D4)
 
-- [ ] 1.1 `web/webclient-app/components/MapLattice.vue`: delete the `fieldFill` prop and its comment, and add `canvasSize: { type: Number, default: null }` with a comment citing design D1. Update the header comment and the `maxWidth` / `maxHeight` / `fillWidth` prop comments so none of them mentions the island's measured height budget. Check with `grep -n "fieldFill\|height budget" web/webclient-app/components/MapLattice.vue`, which returns nothing.
-- [ ] 1.2 `web/webclient-app/composables/use-map-lattice-geometry.js`, lattice branch of `layoutGeometry`: when `props.canvasSize != null`, compute the pitch as design D3 specifies.
+- [x] 1.1 `web/webclient-app/components/MapLattice.vue`: delete the `fieldFill` prop and its comment, and add `canvasSize: { type: Number, default: null }` with a comment citing design D1. Update the header comment and the `maxWidth` / `maxHeight` / `fillWidth` prop comments so none of them mentions the island's measured height budget. Check with `grep -n "fieldFill\|height budget" web/webclient-app/components/MapLattice.vue`, which returns nothing.
+- [x] 1.2 `web/webclient-app/composables/use-map-lattice-geometry.js`, lattice branch of `layoutGeometry`: when `props.canvasSize != null`, compute the pitch as design D3 specifies.
   - `pMin` is today's `max(colPitch, labelClearancePitch)`. `avail = canvasSize − 2 × (gutter > 0 ? gutter : 8)`. `pFit = floor(min(avail / cols, (avail − LABEL_BAND) / rows))`. `p = max(pMin, min(pFit, 1.5 × colPitch))`.
   - Iterate inside the existing gutter fixed-point loop.
   - Pad the field symmetrically on both axes up to the square `S = max(canvasSize, required side)`, and return `canvasWidth = canvasHeight = S`.
   - Route `effectiveColPitch` / `effectiveRowPitch`, `latticePos`, `dotCx` / `dotCy`, and the `edgeMarkersFor` call through the fitted pitch, so the dot field stays registered.
   - Delete the old `fieldFill` / `maxWidth` padding branches, including the `mY = min(mX, verticalSlack)` rule.
-- [ ] 1.3 Same file, graph branch: when `props.canvasSize != null`, use a square viewBox centred on `(L/2, L/2)` with side `S = max(canvasSize, L − 2 × LocalMap.RADIAL_GEOMETRY.PAD + 16)`, where `L` is the radial side × `markerScale`. Expose the viewBox origin (for example, `viewBoxX` / `viewBoxY`) and have `MapLattice.vue` bind `:viewBox` from it. The lattice origin stays `0 0`.
-- [ ] 1.4 Same file, `latticeStyle`: when `canvasSize` is set, return `{ width: canvasSize + "px", height: canvasSize + "px" }` and skip `widthCaps()`. Leave the no-`canvasSize` path (the overlay and bare mounts) unchanged. Bind the SVG `width` / `height` attributes to `canvasSize` when it is set.
-- [ ] 1.5 Rewrite the geometry cases of `web/webclient-app/tests/world/map_lattice_fidelity.test.js` for design D3 / D4.
+ [x] 1.3 Same file, graph branch: when `props.canvasSize != null`, use a square viewBox centred on `(L/2, L/2)` with side `S = max(canvasSize, L − 2 × LocalMap.RADIAL_GEOMETRY.PAD + 16)`, where `L` is the radial side × `markerScale`. Expose the viewBox origin (for example, `viewBoxX` / `viewBoxY`) and have `MapLattice.vue` bind `:viewBox` from it. The lattice origin stays `0 0`.
+ [x] 1.4 Same file, `latticeStyle`: when `canvasSize` is set, return `{ width: canvasSize + "px", height: canvasSize + "px" }` and skip `widthCaps()`. Leave the no-`canvasSize` path (the overlay and bare mounts) unchanged. Bind the SVG `width` / `height` attributes to `canvasSize` when it is set.
+ [x] 1.5 Rewrite the geometry cases of `web/webclient-app/tests/world/map_lattice_fidelity.test.js` for design D3 / D4.
   - "Task 2.3 … Design D5 Table" and "Task 2.4 … bounds scale <= 1" become `canvasSize: 208` fixtures that assert:
     - a 3×3 core with no gateways at pitch 59 and scale 1
     - a single node at pitch 60 and scale 1
@@ -19,7 +19,7 @@
   - Replace every `fieldFill: true` with `canvasSize: 208`.
   - "Task 2.6 overlay geometry is identical" stays unchanged.
   - Run `pnpm exec vitest run web/webclient-app/tests/world/map_lattice_fidelity.test.js` green.
-- [ ] 1.6 `tests/world/map_lattice_name_fit.test.js`: the island-baseline cases ("Task 1.2", "Task 4.5") mount with `canvasSize: 208` instead of `maxHeight: 296` plus field fill. Re-derive the pinned island gutter, drawn names, and stacked tspans from the new square, keeping every overlay-side figure unchanged. Run `pnpm exec vitest run web/webclient-app/tests/world/map_lattice_name_fit.test.js` green.
+- [x] 1.6 `tests/world/map_lattice_name_fit.test.js`: the island-baseline cases ("Task 1.2", "Task 4.5") mount with `canvasSize: 208` instead of `maxHeight: 296` plus field fill. Re-derive the pinned island gutter, drawn names, and stacked tspans from the new square, keeping every overlay-side figure unchanged. Run `pnpm exec vitest run web/webclient-app/tests/world/map_lattice_name_fit.test.js` green.
 
 ## 2. Island: delete the list and the budget, fix the chrome (design D1, D2, D5)
 

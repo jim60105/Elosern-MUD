@@ -92,14 +92,6 @@ export function useMapLatticeGeometry(props) {
     adjacentDrawnLabelPair.value ? (props.labelMax + 1) * props.labelFont + 3 : 0,
   );
   const isSquarePitch = computed(() => props.colPitch === props.rowPitch);
-  const effectiveColPitch = computed(() =>
-    Math.max(props.colPitch, labelClearancePitch.value),
-  );
-  const effectiveRowPitch = computed(() =>
-    isSquarePitch.value
-      ? Math.max(props.rowPitch, labelClearancePitch.value)
-      : props.rowPitch,
-  );
   // Placement sourcing (map-02 D2): the lattice variant draws the model's
   // rank-compressed `col`/`row` grid; the graph variant draws the model's
   // radial placement (design D1) at `markerScale`, so the D1 geometry
@@ -137,8 +129,6 @@ export function useMapLatticeGeometry(props) {
       y: (Math.max(1, rows.value) - 1 - node.row) * effectiveRowPitch.value + effectiveRowPitch.value / 2,
     };
   }
-  const coreW = computed(() => Math.max(1, cols.value) * effectiveColPitch.value);
-  const coreH = computed(() => Math.max(1, rows.value) * effectiveRowPitch.value);
 
   const outwardNameBox = computed(() =>
     props.overlayChrome ? (props.labelMax + 1) * props.markerNameFont : 0,
@@ -146,108 +136,229 @@ export function useMapLatticeGeometry(props) {
 
   const layoutGeometry = computed(() => {
     if (isGraph.value) {
+      const L = graphCanvasWidth.value;
+      if (props.canvasSize != null) {
+        const PAD = LocalMap.RADIAL_GEOMETRY ? LocalMap.RADIAL_GEOMETRY.PAD : 24;
+        const S = Math.max(Number(props.canvasSize), L - 2 * PAD + 16);
+        const vx = L / 2 - S / 2;
+        const vy = L / 2 - S / 2;
+        return {
+          fieldW: S,
+          fieldH: S,
+          marginX: 0,
+          marginY: 0,
+          gutter: 0,
+          canvasWidth: S,
+          canvasHeight: S,
+          viewBoxX: vx,
+          viewBoxY: vy,
+          viewBoxWidth: S,
+          viewBoxHeight: S,
+          viewBox: `${vx} ${vy} ${S} ${S}`,
+          markers: [],
+          colPitch: props.colPitch,
+          rowPitch: props.rowPitch,
+        };
+      }
       return {
-        fieldW: graphCanvasWidth.value,
+        fieldW: L,
         fieldH: graphCanvasHeight.value,
         marginX: 0,
         marginY: 0,
         gutter: 0,
         canvasWidth: graphCanvasWidth.value,
         canvasHeight: graphCanvasHeight.value,
+        viewBoxX: 0,
+        viewBoxY: 0,
+        viewBoxWidth: graphCanvasWidth.value,
+        viewBoxHeight: graphCanvasHeight.value,
+        viewBox: `0 0 ${graphCanvasWidth.value} ${graphCanvasHeight.value}`,
         markers: [],
+        colPitch: props.colPitch,
+        rowPitch: props.rowPitch,
       };
     }
 
     const current = nodes.value.find((node) => node.visibility === "current");
-    const cW = coreW.value;
-    const cH = coreH.value;
+    const colsVal = Math.max(1, cols.value);
+    const rowsVal = Math.max(1, rows.value);
+    const hasRemembered = rememberedList.value.length > 0 && !!current;
 
-    if (rememberedList.value.length === 0 || !current) {
+    if (props.canvasSize != null) {
+      const canvasSize = Number(props.canvasSize);
+      const pMin = Math.max(props.colPitch, labelClearancePitch.value);
+      const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
+      const nameWidth = outwardNameBox.value;
+      const nameHeight = props.markerNames ? 16 : 0;
+
+      if (!hasRemembered) {
+        const avail = canvasSize - 16;
+        const pFit = Math.floor(Math.min(avail / colsVal, (avail - LABEL_BAND) / rowsVal));
+        const p = Math.max(pMin, Math.min(pFit, Math.floor(1.5 * props.colPitch)));
+        const cW = colsVal * p;
+        const cH = rowsVal * p;
+        const reqSide = Math.max(cW, cH + LABEL_BAND);
+        const S = Math.max(canvasSize, reqSide);
+        const fW = S;
+        const fH = S;
+        const mX = (fW - cW) / 2;
+        const mY = (fH - (cH + LABEL_BAND)) / 2;
+        return {
+          fieldW: fW,
+          fieldH: fH,
+          marginX: mX,
+          marginY: mY,
+          gutter: 0,
+          canvasWidth: S,
+          canvasHeight: S,
+          viewBoxX: 0,
+          viewBoxY: 0,
+          viewBoxWidth: S,
+          viewBoxHeight: S,
+          viewBox: `0 0 ${S} ${S}`,
+          markers: [],
+          colPitch: p,
+          rowPitch: p,
+        };
+      }
+
+      let g = 0;
+      let p = pMin;
+      let cW = colsVal * p;
+      let cH = rowsVal * p;
+      let S = canvasSize;
+      let fW = S;
+      let fH = S;
       let mX = 0;
       let mY = 0;
-      let fW = cW;
-      let fH = cH + LABEL_BAND;
+      let markersResult = null;
 
-      if (props.fieldFill && props.maxWidth != null) {
-        fW = Math.max(cW, Number(props.maxWidth));
+      for (let iter = 0; iter < 5; iter++) {
+        const insetOrGutter = g > 0 ? g : 8;
+        const avail = canvasSize - 2 * insetOrGutter;
+        const pFit = Math.floor(Math.min(avail / colsVal, (avail - LABEL_BAND) / rowsVal));
+        p = Math.max(pMin, Math.min(pFit, Math.floor(1.5 * props.colPitch)));
+        cW = colsVal * p;
+        cH = rowsVal * p;
+        const reqSide = Math.max(cW + 2 * g, cH + LABEL_BAND + 2 * g);
+        S = Math.max(canvasSize, reqSide);
+        fW = S - 2 * g;
+        fH = S - 2 * g;
         mX = (fW - cW) / 2;
-        const verticalSlack =
-          props.maxHeight != null
-            ? Math.max(0, (Number(props.maxHeight) - cH - LABEL_BAND) / 2)
-            : mX;
-        mY = Math.min(mX, verticalSlack);
-        fH = cH + LABEL_BAND + 2 * mY;
+        mY = (fH - (cH + LABEL_BAND)) / 2;
+
+        const curX = current.col * p + p / 2 + mX;
+        const curY = (rowsVal - 1 - current.row) * p + p / 2 + mY;
+
+        markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
+          canvasWidth: fW,
+          canvasHeight: fH,
+          current: { x: curX, y: curY },
+          markerHalf,
+          nameWidth,
+          nameHeight,
+        });
+
+        const newG = markersResult.gutter;
+        if (newG === g && iter > 0) {
+          break;
+        }
+        g = newG;
       }
+
+      const reqSide = Math.max(cW + 2 * g, cH + LABEL_BAND + 2 * g);
+      S = Math.max(canvasSize, reqSide);
+      fW = S - 2 * g;
+      fH = S - 2 * g;
+      mX = (fW - cW) / 2;
+      mY = (fH - (cH + LABEL_BAND)) / 2;
 
       return {
         fieldW: fW,
         fieldH: fH,
         marginX: mX,
         marginY: mY,
+        gutter: g,
+        canvasWidth: S,
+        canvasHeight: S,
+        viewBoxX: 0,
+        viewBoxY: 0,
+        viewBoxWidth: S,
+        viewBoxHeight: S,
+        viewBox: `0 0 ${S} ${S}`,
+        markers: markersResult ? markersResult.markers : [],
+        colPitch: p,
+        rowPitch: p,
+      };
+    }
+
+    // canvasSize == null (overlay and bare mounts)
+    const pCol = Math.max(props.colPitch, labelClearancePitch.value);
+    const pRow = isSquarePitch.value
+      ? Math.max(props.rowPitch, labelClearancePitch.value)
+      : props.rowPitch;
+    const cW = colsVal * pCol;
+    const cH = rowsVal * pRow;
+
+    if (!hasRemembered) {
+      const fW = cW;
+      const fH = cH + LABEL_BAND;
+      return {
+        fieldW: fW,
+        fieldH: fH,
+        marginX: 0,
+        marginY: 0,
         gutter: 0,
         canvasWidth: fW,
         canvasHeight: fH,
+        viewBoxX: 0,
+        viewBoxY: 0,
+        viewBoxWidth: fW,
+        viewBoxHeight: fH,
+        viewBox: `0 0 ${fW} ${fH}`,
         markers: [],
+        colPitch: pCol,
+        rowPitch: pRow,
       };
     }
 
     const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
     const nameWidth = outwardNameBox.value;
     const nameHeight = props.markerNames ? 16 : 0;
-
-    let g = 0;
     let fW = cW;
     let fH = cH + LABEL_BAND;
-    let mX = 0;
-    let mY = 0;
-    let markersResult = null;
+    const curX = current.col * pCol + pCol / 2;
+    const curY = (rowsVal - 1 - current.row) * pRow + pRow / 2;
 
-    // Fixed-point convergence loop (converges in 1-3 iterations since gutter is non-increasing)
-    for (let iter = 0; iter < 5; iter++) {
-      const curX = current.col * effectiveColPitch.value + effectiveColPitch.value / 2 + mX;
-      const curY =
-        (Math.max(1, rows.value) - 1 - current.row) * effectiveRowPitch.value +
-        effectiveRowPitch.value / 2 +
-        mY;
+    const markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
+      canvasWidth: fW,
+      canvasHeight: fH,
+      current: { x: curX, y: curY },
+      markerHalf,
+      nameWidth,
+      nameHeight,
+    });
 
-      markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
-        canvasWidth: fW,
-        canvasHeight: fH,
-        current: { x: curX, y: curY },
-        markerHalf,
-        nameWidth,
-        nameHeight,
-      });
-
-      const newG = markersResult.gutter;
-      if (newG === g && iter > 0) {
-        break;
-      }
-      g = newG;
-
-      if (props.fieldFill && props.maxWidth != null) {
-        fW = Math.max(cW, Number(props.maxWidth) - 2 * g);
-        mX = (fW - cW) / 2;
-        const verticalSlack =
-          props.maxHeight != null
-            ? Math.max(0, (Number(props.maxHeight) - cH - LABEL_BAND - 2 * g) / 2)
-            : mX;
-        mY = Math.min(mX, verticalSlack);
-        fH = cH + LABEL_BAND + 2 * mY;
-      } else {
-        break;
-      }
-    }
+    const g = markersResult.gutter;
+    const cWidth = fW + 2 * g;
+    const cHeight = fH + 2 * g;
 
     return {
       fieldW: fW,
       fieldH: fH,
-      marginX: mX,
-      marginY: mY,
+      marginX: 0,
+      marginY: 0,
       gutter: g,
-      canvasWidth: fW + 2 * g,
-      canvasHeight: fH + 2 * g,
-      markers: markersResult ? markersResult.markers : [],
+      canvasWidth: cWidth,
+      canvasHeight: cHeight,
+      viewBoxX: 0,
+      viewBoxY: 0,
+      viewBoxWidth: cWidth,
+      viewBoxHeight: cHeight,
+      viewBox: `0 0 ${cWidth} ${cHeight}`,
+      markers: markersResult.markers,
+      colPitch: pCol,
+      rowPitch: pRow,
     };
   });
 
@@ -284,6 +395,11 @@ export function useMapLatticeGeometry(props) {
   // already lets the gutter content paint outside the node canvas.
   const canvasWidth = computed(() => layoutGeometry.value.canvasWidth);
   const canvasHeight = computed(() => layoutGeometry.value.canvasHeight);
+  const viewBox = computed(() => layoutGeometry.value.viewBox);
+  const viewBoxX = computed(() => layoutGeometry.value.viewBoxX);
+  const viewBoxY = computed(() => layoutGeometry.value.viewBoxY);
+  const effectiveColPitch = computed(() => layoutGeometry.value.colPitch);
+  const effectiveRowPitch = computed(() => layoutGeometry.value.rowPitch);
   // The crowding fix decouples column pitch and row pitch: the row pitch
   // clears the marker height, the label line, and a strictly-positive gap
   // before the next row's marker; the column pitch clears two truncated
@@ -373,6 +489,12 @@ export function useMapLatticeGeometry(props) {
   }
 
   const latticeStyle = computed(() => {
+    if (props.canvasSize != null) {
+      return {
+        width: props.canvasSize + "px",
+        height: props.canvasSize + "px",
+      };
+    }
     const style = {};
     if (props.fillWidth) style.width = "100%";
     const caps = widthCaps();
@@ -390,6 +512,9 @@ export function useMapLatticeGeometry(props) {
     edgeGeoms,
     canvasWidth,
     canvasHeight,
+    viewBox,
+    viewBoxX,
+    viewBoxY,
     effectiveColPitch,
     effectiveRowPitch,
     dotCx,

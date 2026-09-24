@@ -38,19 +38,13 @@ const props = defineProps({
   // visibility states scale together and inherit the crowding fix's
   // non-collision spacing at any scale.
   markerScale: { type: Number, default: 1 },
-  // Canvas caps. `null` disables a cap (the overlay relies on its host's
-  // `overflow-y: auto` fallback); the island passes its dynamically
-  // measured height budget down from `LocalMap.vue`.
+  // Canvas caps for surfaces without a fixed square canvas. `null` disables
+  // a cap (the overlay relies on its host's `overflow-y: auto` fallback).
   maxWidth: { default: 206 },
   maxHeight: { default: 296 },
   // Fill-width layout variant: the canvas claims the caller's content width
-  // instead of drawing at its natural pixel size. Both surfaces pass it —
-  // the overlay to fill the overlay body, the minimap island to honour the
-  // draft's `.mini svg { display:block; width:100%; max-width:172px }` rule
-  // (REDESIGN §7: the lattice's geometry is its claim, so it must not be
-  // invisible). Drawing at natural size left a sparse payload rendering a
-  // ~111px canvas inside a ~210px island — the map was the smallest thing in
-  // the island whose whole reason to exist is the map.
+  // instead of drawing at its natural pixel size (used by the overlay to fill
+  // the overlay body).
   fillWidth: { type: Boolean, default: false },
   // Type size for node labels (SVG user units). Defaults to 11 for the overlay
   // and bare mounts; the island passes 9 to respect the type proportion and
@@ -68,9 +62,10 @@ const props = defineProps({
   // disagreed with the drawn size would either overflow the marker's slot or
   // truncate names that had room to spare.
   markerNameFont: { type: Number, default: 10 },
-  // Coordinate-field padding (island-only opt-in): pads coordinate space
-  // symmetrically around the node core up to maxWidth rather than magnifying.
-  fieldFill: { type: Boolean, default: false },
+  // Fixed square canvas size (CSS px, design D1): when set, the canvas
+  // renders as a fixed square of exactly this size and its viewBox side is at
+  // least this size so scale never exceeds 1.
+  canvasSize: { type: Number, default: null },
   // Knowledge-edge vignette (island-only opt-in): radial gradient wash.
   fogVignette: { type: Boolean, default: false },
   // Axis cross (island-only opt-in): drawn through current node.
@@ -112,6 +107,7 @@ const {
   edgeGeoms,
   canvasWidth,
   canvasHeight,
+  viewBox,
   effectiveColPitch,
   effectiveRowPitch,
   dotCx,
@@ -146,9 +142,9 @@ const {
   <svg
     class="local-map__lattice"
     :class="{ 'local-map__lattice--canvas': overlayChrome }"
-    :width="canvasWidth"
-    :height="canvasHeight"
-    :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
+    :width="canvasSize ?? canvasWidth"
+    :height="canvasSize ?? canvasHeight"
+    :viewBox="viewBox"
     :style="latticeStyle"
     :role="overlayChrome ? 'group' : 'img'"
     :aria-label="overlayChrome ? '區域地圖' : '區域地圖縮圖'"
@@ -249,8 +245,8 @@ const {
          deliberately NOT the `local-map__marker` class (the browser geometry
          audit pairs every `.local-map__marker` box; these are not node
          placements), no activation, pointer-events none. The island keeps
-         its focusable remembered list as the canonical reading path and
-         renders the layer aria-hidden without names; at the overlay scale
+         its assistive-technology mirror as the canonical reading path and
+         renders the layer with names in its gutter; at the overlay scale
          each marker shows its (truncated) place name and carries it as the
          accessible name. -->
     <g

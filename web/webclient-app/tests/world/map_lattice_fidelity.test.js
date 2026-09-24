@@ -32,7 +32,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
     colPitch: 40,
     rowPitch: 40,
     labelFont: 9,
-    fieldFill: true,
+    canvasSize: 208,
     showAxis: true,
     fogVignette: true,
     markerNames: true,
@@ -174,8 +174,9 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       const curY = Number(match[2]);
 
       const svg = wOn.get("svg.local-map__lattice");
-      const canvasW = Number(svg.attributes("width"));
-      const canvasH = Number(svg.attributes("height"));
+      const vb = svg.attributes("viewBox").split(" ").map(Number);
+      const canvasW = vb[2];
+      const canvasH = vb[3];
 
       expect(Number(lines[0].attributes("x1"))).toBe(0);
       expect(Number(lines[0].attributes("y1"))).toBe(curY);
@@ -341,129 +342,137 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
     });
 
     it("Task 2.3: verifies all 6 rows of Design D5 Table and scale <= 1 invariant", () => {
-      // Row 1: 3x3, remembered present (UNIFORM_WILDERNESS_PAYLOAD)
-      const wRow1 = mountLattice({
-        localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
-        ...ISLAND_PROPS,
-      });
-      const svg1 = wRow1.get("svg.local-map__lattice");
-      expect(Number(svg1.attributes("width"))).toBeCloseTo(208.91, 1);
-      expect(Number(svg1.attributes("height"))).toBeCloseTo(222.91, 1);
-      const style1 = svg1.attributes("style");
-      expect(style1).toContain("max-width: 206px");
-      const scale1 = 206 / 208.911688;
-      expect(scale1).toBeLessThanOrEqual(1.0);
-      expect(scale1).toBeCloseTo(0.986, 3);
-      expect(scale1 * 9).toBeCloseTo(8.87, 2);
-
-      // Row 2: 3x3, no remembered
-      const row2Payload = {
+      // 1. 3x3 core with no gateways: pitch 59 and scale 1
+      const noGatewaysPayload = {
         ...UNIFORM_WILDERNESS_PAYLOAD,
         nodes: UNIFORM_WILDERNESS_PAYLOAD.nodes.filter((n) => n.visibility !== "remembered"),
       };
-      const wRow2 = mountLattice({
-        localMap: localMapModelFor(row2Payload),
+      const wNoGateways = mountLattice({
+        localMap: localMapModelFor(noGatewaysPayload),
         ...ISLAND_PROPS,
       });
-      const svg2 = wRow2.get("svg.local-map__lattice");
-      expect(Number(svg2.attributes("width"))).toBe(206);
-      expect(Number(svg2.attributes("height"))).toBe(220);
-      const style2 = svg2.attributes("style");
-      expect(style2).toContain("max-width: 206px");
-      expect(206 / 206).toBeLessThanOrEqual(1.0);
+      const svg1 = wNoGateways.get("svg.local-map__lattice");
+      expect(Number(svg1.attributes("width"))).toBe(208);
+      expect(Number(svg1.attributes("height"))).toBe(208);
+      expect(svg1.attributes("viewBox")).toBe("0 0 208 208");
+      expect(svg1.attributes("style")).toContain("width: 208px");
+      expect(svg1.attributes("style")).toContain("height: 208px");
+      const pattern1 = wNoGateways.find("defs pattern");
+      expect(Number(pattern1.attributes("width"))).toBe(59);
+      expect(Number(pattern1.attributes("height"))).toBe(59);
 
-      // Row 3: 1 node, no remembered
-      const wRow3 = mountLattice({
+      // 2. Single node: pitch 60 (1.5x cap) and scale 1
+      const wSingle = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE),
         ...ISLAND_PROPS,
       });
-      const svg3 = wRow3.get("svg.local-map__lattice");
-      expect(Number(svg3.attributes("width"))).toBe(206);
-      expect(Number(svg3.attributes("height"))).toBe(220);
-      const style3 = svg3.attributes("style");
-      expect(style3).toContain("max-width: 206px");
+      const svg2 = wSingle.get("svg.local-map__lattice");
+      expect(Number(svg2.attributes("width"))).toBe(208);
+      expect(Number(svg2.attributes("height"))).toBe(208);
+      expect(svg2.attributes("viewBox")).toBe("0 0 208 208");
+      expect(svg2.attributes("style")).toContain("width: 208px");
+      expect(svg2.attributes("style")).toContain("height: 208px");
+      const pattern2 = wSingle.find("defs pattern");
+      expect(Number(pattern2.attributes("width"))).toBe(60);
+      expect(Number(pattern2.attributes("height"))).toBe(60);
 
-      // Row 4: 1 node, remembered present
-      const row4Payload = {
-        schema_version: 1,
-        available: true,
-        layer: "wilderness",
-        title: "孤單節點",
-        current_node: "w:0:0",
-        nodes: [{ id: "w:0:0", label: "起點", x: 0, y: 0, visibility: "current" }],
-        remembered: [{ id: "r:rem", label: "遠方城池", x: 10, y: 10, visibility: "remembered" }],
-        edges: [],
-      };
-      const wRow4 = mountLattice({
-        localMap: localMapModelFor(row4Payload),
+      // 3. Reported wilderness shape with gateways: pitch 40, side ≈ 222.91, scale ≈ 0.933, label ≈ 8.40 px
+      const wWild = mountLattice({
+        localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
         ...ISLAND_PROPS,
       });
-      const svg4 = wRow4.get("svg.local-map__lattice");
-      expect(Number(svg4.attributes("width"))).toBeCloseTo(206, 1);
-      expect(Number(svg4.attributes("height"))).toBeCloseTo(220, 1);
-      const style4 = svg4.attributes("style");
-      expect(style4).toContain("max-width: 206px");
+      const svg3 = wWild.get("svg.local-map__lattice");
+      expect(Number(svg3.attributes("width"))).toBe(208);
+      expect(Number(svg3.attributes("height"))).toBe(208);
+      const pattern3 = wWild.find("defs pattern");
+      expect(Number(pattern3.attributes("width"))).toBe(40);
+      expect(Number(pattern3.attributes("height"))).toBe(40);
+      const vbParts = svg3.attributes("viewBox").split(" ").map(Number);
+      expect(vbParts[2]).toBeCloseTo(222.91, 1);
+      expect(vbParts[3]).toBeCloseTo(222.91, 1);
+      const scale3 = 208 / vbParts[2];
+      expect(scale3).toBeCloseTo(0.933, 3);
+      expect(scale3 * 9).toBeCloseTo(8.40, 2);
 
-      // Row 5: adjacent labelled pair (pitch 48, cols 3, rows 3, remembered present)
-      const row5Payload = {
-        schema_version: 1,
-        available: true,
-        layer: "grid",
-        title: "繁華市區",
-        current_node: "g:1:1",
-        nodes: [
-          { id: "g:0:0", label: "西巷", x: 0, y: 0, visibility: "visible_visited" },
-          { id: "g:1:0", label: "東巷", x: 1, y: 0, visibility: "visible_visited" },
-          { id: "g:2:0", label: "南路", x: 2, y: 0, visibility: "visible_visited" },
-          { id: "g:0:1", label: "北路", x: 0, y: 1, visibility: "visible_visited" },
-          { id: "g:1:1", label: "廣場", x: 1, y: 1, visibility: "current" },
-          { id: "g:2:1", label: "市集", x: 2, y: 1, visibility: "visible_visited" },
-          { id: "g:0:2", label: "橋頭", x: 0, y: 2, visibility: "visible_visited" },
-          { id: "g:1:2", label: "碼頭", x: 1, y: 2, visibility: "visible_visited" },
-          { id: "g:2:2", label: "城門", x: 2, y: 2, visibility: "visible_visited" },
-          { id: "r:gate", label: "關口", x: 15, y: 15, visibility: "remembered", landmark: true },
-        ],
-        edges: [],
-      };
-      const wRow5 = mountLattice({
-        localMap: localMapModelFor(row5Payload),
-        ...ISLAND_PROPS,
-      });
-      const svg5 = wRow5.get("svg.local-map__lattice");
-      expect(Number(svg5.attributes("width"))).toBeCloseTo(232.91, 1);
-      expect(Number(svg5.attributes("height"))).toBeCloseTo(246.91, 1);
-      const scale5 = 206 / 232.911688;
-      expect(scale5).toBeCloseTo(0.885, 2);
-      expect(scale5 * 9).toBeCloseTo(7.96, 2);
-
-      // Row 6: 2x64 tall lattice
-      const wRow6 = mountLattice({
+      // 4. 2x64 lattice scaled down with no overlap
+      const wTall = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE),
         ...ISLAND_PROPS,
       });
-      const svg6 = wRow6.get("svg.local-map__lattice");
-      expect(Number(svg6.attributes("width"))).toBe(206);
-      expect(Number(svg6.attributes("height"))).toBe(2574);
-      const style6 = svg6.attributes("style");
-      expect(style6).toContain("max-width: 23.68px");
-      const scale6 = 23.68 / 206;
-      expect(scale6).toBeCloseTo(0.115, 3);
-      expect(scale6 * 9).toBeCloseTo(1.04, 1);
+      const svg4 = wTall.get("svg.local-map__lattice");
+      expect(Number(svg4.attributes("width"))).toBe(208);
+      expect(Number(svg4.attributes("height"))).toBe(208);
+      const vbTall = svg4.attributes("viewBox").split(" ").map(Number);
+      expect(vbTall[2]).toBe(2574);
+      expect(vbTall[3]).toBe(2574);
+      const scale4 = 208 / 2574;
+      expect(scale4).toBeLessThan(1.0);
+      expect(scale4).toBeCloseTo(0.0808, 4);
+
+      // 5. Graph cases:
+      // a. One-ring interior: side 212, scale ≈ 0.98
+      const wInterior = mountLattice({
+        localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE),
+        variant: "graph",
+        ...ISLAND_PROPS,
+      });
+      const svg5 = wInterior.get("svg.local-map__lattice");
+      expect(Number(svg5.attributes("width"))).toBe(208);
+      expect(Number(svg5.attributes("height"))).toBe(208);
+      const vb5 = svg5.attributes("viewBox").split(" ").map(Number);
+      expect(vb5[0]).toBe(16);
+      expect(vb5[1]).toBe(16);
+      expect(vb5[2]).toBe(212);
+      expect(vb5[3]).toBe(212);
+      const scale5 = 208 / 212;
+      expect(scale5).toBeCloseTo(0.98, 2);
+
+      // b. Current-only interior: side 208 with scale 1 and current node at centre
+      const singleInteriorPayload = {
+        schema_version: 1,
+        available: true,
+        layer: "interior",
+        title: "公會密室",
+        current_node: "room:current",
+        nodes: [
+          { id: "room:current", label: "密室", x: 0, y: 0, visibility: "current" },
+        ],
+        edges: [],
+      };
+      const wSingleInterior = mountLattice({
+        localMap: localMapModelFor(singleInteriorPayload),
+        variant: "graph",
+        ...ISLAND_PROPS,
+      });
+      const svg6 = wSingleInterior.get("svg.local-map__lattice");
+      expect(Number(svg6.attributes("width"))).toBe(208);
+      expect(Number(svg6.attributes("height"))).toBe(208);
+      const vb6 = svg6.attributes("viewBox").split(" ").map(Number);
+      expect(vb6[0]).toBe(-54);
+      expect(vb6[1]).toBe(-54);
+      expect(vb6[2]).toBe(208);
+      expect(vb6[3]).toBe(208);
+      const scale6 = 208 / 208;
+      expect(scale6).toBe(1.0);
+      const currentNodeEl = wSingleInterior.get('[data-testid="local-map__node--room:current"]');
+      expect(currentNodeEl.attributes("transform")).toBe("translate(50, 50)");
+      expect(vb6[0] + vb6[2] / 2).toBe(50);
+      expect(vb6[1] + vb6[3] / 2).toBe(50);
     });
 
-    it("Task 2.4: deletes maxUpscale prop and bounds scale <= 1 on all fixtures", () => {
+    it("Task 2.4: deletes maxUpscale and fieldFill props, bounds scale <= 1 on all fixtures", () => {
       const w = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE),
         colPitch: 40,
         rowPitch: 40,
-        fieldFill: true,
-        maxWidth: 206,
-        maxHeight: 296,
+        canvasSize: 208,
       });
       expect(w.props("maxUpscale")).toBeUndefined();
+      expect(w.props("fieldFill")).toBeUndefined();
       const style = w.get("svg.local-map__lattice").attributes("style");
-      expect(style).toContain("max-width: 206px");
-      expect(style).not.toContain("116px");
+      expect(style).toContain("width: 208px");
+      expect(style).toContain("height: 208px");
+      expect(style).not.toContain("max-width");
     });
 
     it("Task 2.6: overlay geometry is identical to pre-change baseline and gains dot field", () => {
