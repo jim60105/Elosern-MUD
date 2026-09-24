@@ -721,8 +721,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (band && Math.abs(cmd.bottom - band.top) > 1) {
                         hits.push("not-on-band-top");
                       }
-                      const brand = byId('.topbar-brand');
-                      const leftCol = brand ? brand.right : null;
+                      // The left HUD island column's right edge (`place` is
+                      // inset 16px on each side of `--left-column`).
+                      const place = byId('[data-testid="anchor-place"]');
+                      const leftCol = place ? place.right + 16 : null;
                       return {
                         hits,
                         height: cmd.height,

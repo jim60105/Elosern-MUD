@@ -39,6 +39,9 @@ const renderShell = (args) => ({
     const shell = ref(null);
     onMounted(() => {
       mountedShell = shell.value;
+      if (shell.value?.$el) {
+        shell.value.$el.__elosernShell = shell.value;
+      }
     });
     return () => h(AppShell, { ...args, ref: shell });
   },
@@ -71,8 +74,9 @@ export const CommandLineExpanded = {
     prompt: PROMPT_SAMPLE,
     commandHistory: COMMAND_HISTORY_SAMPLE,
   },
-  play: async () => {
-    await mountedShell?.focusCommandField();
+  play: async ({ canvasElement }) => {
+    const root = canvasElement?.querySelector('[data-testid="elosern-vue-root"]');
+    await (root?.__elosernShell || mountedShell)?.focusCommandField();
   },
 };
 
