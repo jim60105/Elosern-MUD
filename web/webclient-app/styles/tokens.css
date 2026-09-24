@@ -152,9 +152,10 @@
        command region share this one fixed height. It scales with the
        viewport height only and never depends on content, frame, or mode. */
     --band-h: clamp(260px, 27.8vh, 400px);
-    /* The persistent command line's own height (HudFrame's
-       [data-anchor="command-line"] rule consumes it). */
-    --command-line-h: 64px;
+    /* The collapsible command line's expanded height (AVG stage design §5.5;
+       webclient-collapsible-command-line design D4). HudFrame's
+       [data-anchor="command-line"] rule and the stage clearance consume it. */
+    --command-line-h: 44px;
     /* The edge every stage surface above the band clears: the band plus the
        command-line row docked on its top edge. Every surface positioned
        above the band derives its offset from this single token, never

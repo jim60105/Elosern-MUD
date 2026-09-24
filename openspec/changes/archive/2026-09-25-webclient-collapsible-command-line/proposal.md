@@ -87,7 +87,7 @@ Out of scope:
 - Python evidence: `web/webclient/tests/test_node_suite_evidence.py` (annotations only).
 - Browser tests:
   - `web/tests/browser/browser_helpers.py`: a new `open_command_line(page)` helper, and `REQUIRED_SURFACES` names the toggle
-  - `test_browser_shell_command_line.py`, `test_browser_input_narrative.py`, `test_browser_layout.py`, `test_browser_contextual_hud_stage.py`, `test_browser_shell_surfaces.py`, `test_browser_shell_narrative.py`, `test_browser_actions.py`, `test_browser_exploration_dialogue.py`, `test_vue_foundation.py`, `test_browser_contextual_hud_drawers.py`, `test_browser_title_codex.py`, `test_browser_lineage.py`
+  - `test_browser_shell_command_line.py`, `test_browser_input_narrative.py`, `test_browser_layout.py`, `test_browser_contextual_hud_stage.py`, `test_browser_shell_surfaces.py`, `test_browser_shell_narrative.py`, `test_browser_actions.py`, `test_browser_art.py`, `test_browser_exploration_dialogue.py`, `test_vue_foundation.py`, `test_browser_contextual_hud_drawers.py`, `test_browser_title_codex.py`, `test_browser_lineage.py`
   - `.github/browser-shards.json`
 - Spec traceability: four requirement IDs are replaced, and their annotations are re-anchored (design D9). One new ID is covered by a new Vitest evidence case and a browser test.
 - Dependencies:

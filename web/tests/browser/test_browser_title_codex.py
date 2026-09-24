@@ -70,7 +70,7 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             lambda s: _codex_panel(s).get("available") is True,
         )
-        page.locator('[data-testid="command-line-codex"]').click()
+        page.locator('[data-testid="nav-tool-codex"]').click()
         page.wait_for_selector('[data-testid="title-codex-panel"]', timeout=15000)
         return page
 
@@ -91,7 +91,7 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_codex(
             page, lambda p: p.get("available") is True and p.get("epithet_rows")
         )
-        page.locator('[data-testid="command-line-codex"]').click()
+        page.locator('[data-testid="nav-tool-codex"]').click()
         page.wait_for_selector('[data-testid="title-codex-panel"]', timeout=15000)
         # Header preview + counters come straight from the committed view.
         self.assertEqual(
@@ -168,7 +168,7 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         _wait_mode(page, "exploration")
         self._wait_codex(page, lambda p: p.get("available") is True)
         install_outbound_recorder(page)
-        page.locator('[data-testid="command-line-codex"]').click()
+        page.locator('[data-testid="nav-tool-codex"]').click()
         page.wait_for_selector('[data-testid="title-codex-panel"]', timeout=15000)
 
         # Fixed path: the card click dispatches exactly one title.equip and

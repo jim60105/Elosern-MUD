@@ -18,6 +18,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    open_command_line,
     sent_action_count,
     snapshot_envelope,
     store_state,
@@ -457,6 +458,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 self._wait_mode(page, "exploration")
+                open_command_line(page)
                 # All four stage anchors must be present with non-zero boxes; a
                 # deleted anchor would otherwise make the non-overlap check trivial.
                 rects = self._stage_anchor_rects(page)
@@ -489,7 +491,8 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 self._inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
                 self._wait_mode(page, "exploration")
 
-                # Exploration: the minimap island and the command field are visible.
+                # Exploration: the minimap island and the command-line toggle are
+                # visible; the command line starts collapsed until opened.
                 self.assertEqual(
                     page.locator('[data-testid="local-map"]').count(), 1,
                     "the minimap island renders in exploration",
@@ -498,7 +501,10 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                     page.locator('[data-testid="local-map"]').is_visible(),
                     "the minimap is visible in exploration",
                 )
+                self.assertTrue(page.locator('[data-testid="command-line-toggle"]').is_visible())
                 self.assertEqual(page.locator("#inputfield").count(), 1, "the command field is present in exploration")
+                self.assertFalse(page.locator("#inputfield").is_visible(), "the command field starts collapsed in exploration")
+                open_command_line(page)
                 self.assertTrue(page.locator("#inputfield").is_visible(), "the command field is visible in exploration")
 
                 # Combat: the minimap is display:none (leaves the a11y tree + tab
@@ -561,13 +567,18 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 )
 
                 # Return to exploration: the hidden surfaces are present again.
+                # Entering creation collapsed the command line, so it starts
+                # collapsed on the return and opens on `open_command_line`.
                 self._inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
                 self._wait_mode(page, "exploration")
                 self.assertTrue(
                     page.locator('[data-testid="local-map"]').is_visible(),
                     "the minimap is visible again in exploration",
                 )
+                self.assertTrue(page.locator('[data-testid="command-line-toggle"]').is_visible())
                 self.assertEqual(page.locator("#inputfield").count(), 1)
+                self.assertFalse(page.locator("#inputfield").is_visible())
+                open_command_line(page)
                 self.assertTrue(
                     page.locator("#inputfield").is_visible(),
                     "the command field is visible again in exploration",

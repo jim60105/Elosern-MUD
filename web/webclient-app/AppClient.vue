@@ -98,7 +98,6 @@ const {
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
         :vitals-visible="store.view.vitals.visible"
-        :gallery-available="panelAvailable('gallery')"
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
         :completion-candidates="completionCandidates"
@@ -115,8 +114,6 @@ const {
         @dialogue-pick="onDialoguePick"
         @dialogue-freeform="onDialogueFreeform"
         @dialogue-leave="onDialogueLeave"
-        @open-overlay="onOpenOverlay"
-        @open-drawer="onOpenDrawer"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
@@ -125,8 +122,10 @@ const {
             :mode="store.view.mode"
             :items="navigationItems"
             :drawer="store.view.hudDrawer"
+            :gallery-available="panelAvailable('gallery')"
             @navigate="onTabClick"
             @overlay="onOpenOverlay"
+            @drawer="onOpenDrawer"
           />
         </template>
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):

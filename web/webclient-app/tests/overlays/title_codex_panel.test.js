@@ -275,14 +275,16 @@ describe("AppClient title codex overlay wiring (title-codex-removal)", () => {
     expect(store.view.hudOverlay).toBe("codex");
   });
 
-  it("the opener button opens the window with the committed panel", async () => {
+  it("the top-bar tool button opens the window with the committed panel and restores focus on close", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     store.beginTransport(1);
     store.setConnected(true);
     commitCodex(AVAILABLE_SAMPLE);
     await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="command-line-codex"]').trigger("click");
+    const opener = wrapper.get('[data-testid="nav-tool-codex"]');
+    opener.element.focus();
+    await opener.trigger("click");
     expect(store.view.hudOverlay).toBe("codex");
     expect(
       wrapper.vm.$el
@@ -294,6 +296,9 @@ describe("AppClient title codex overlay wiring (title-codex-removal)", () => {
         .querySelector('[data-testid="overlay-host"]')
         .getAttribute("data-elosern-overlay"),
     ).toBe("codex");
+    await wrapper.get('[data-testid="overlay-host-close"]').trigger("click");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(document.activeElement).toBe(opener.element);
   });
 
   it("a codex equip click dispatches exactly one title.equip ui_action", async () => {

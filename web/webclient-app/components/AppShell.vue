@@ -21,16 +21,20 @@
 // (inside the command line), `#narrative-unread` (inside the narrative caption), and the
 // `action-*` / `target-*` item keys all remain.
 //
-// Shell-owned view behavior (H5, webclient-hud-05-overlays-and-command-line):
-// the command line is a permanently present bar — `/` moves focus into the
-// field (no literal slash, design D2); Escape from the field returns focus
-// to `#action-dock` (the field's own handler owns the key, design D3's
+// Shell-owned view behavior (H5, webclient-hud-05-overlays-and-command-line;
+// webclient-collapsible-command-line design D1/D2/D5/D7):
+// the command line is collapsed by default (`commandLineExpanded = false`).
+// `/` outside an editable control, the ⌨ toggle in `#band-message`, or the
+// free-form dialogue borrow expands the line and focuses `#inputfield` after
+// the DOM update (no literal slash). Escape from the field or an accepted
+// send restores focus to `#action-dock` and collapses the line (design D3's
 // ladder: open overlay → open drawer → focused command field → dock menu
 // level). The mount retires the replaced text fallback (hidden, not removed).
 // A mode change that hides the surface holding focus moves focus to the
 // action dock *before* the CSS hides it (design D2; the side-effect-free
-// `restoreDockFocus` path — no second focus path).
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+// `restoreDockFocus` path — no second focus path), and entering creation mode
+// collapses the command line.
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
@@ -85,8 +89,6 @@ const props = defineProps({
   // Vitals island visibility derived client-side (design D1/D2/D3).
   // Focus is rescued before the island hides with display:none.
   vitalsVisible: { type: Boolean, default: true },
-  // Whether the gallery panel is available (forwarded to CommandLine).
-  galleryAvailable: { type: Boolean, default: false },
   // The client-local text-to-HTML narrative preference (H5): forwarded to
   // the command line's prompt line — when off, the prompt renders as literal
   // text (the preference chooses whether the markup pipeline runs, never
@@ -113,8 +115,6 @@ const props = defineProps({
 const emit = defineEmits([
   "submit-command",
   "open-full-log",
-  "open-overlay",
-  "open-drawer",
   "focus-lost",
   "dialogue-pick",
   "dialogue-freeform",
@@ -124,12 +124,12 @@ const emit = defineEmits([
 ]);
 
 const commandLine = ref(null);
+const commandLineExpanded = ref(false);
 const feed = ref(null);
 
 // The open-surface registry (design D9): AppClient computes the set of open
-// surfaces (full-log, creation, and H4's `hudDrawer`). The command line
-// has no open/closed state (design D1), so the registry passes through
-// unchanged.
+// surfaces (full-log, creation, and H4's `hudDrawer`). Expanding the command
+// line does not recess the stage, so the registry passes through unchanged.
 const frameOpenSurfaces = computed(() => props.openSurfaces);
 
 function isEditable(target) {
@@ -152,21 +152,38 @@ function restoreDockFocus() {
   }
 }
 
-// The persistent command line has no open/closed state (design D1): the
-// field is always in the DOM. The shell's single focus API: `/` and the
-// dock's free-form borrow (design D6) both route through `focusCommandField`.
-function focusCommandField() {
+// The shell's single command-line expand-and-focus API
+// (webclient-collapsible-command-line design D2): `/`, the ⌨ toggle, and the
+// dock's free-form borrow all route through `focusCommandField`. Render the
+// row first (`commandLineExpanded = true`), then focus `#inputfield` after
+// the DOM update so focus never lands on a `display:none` field. Ignored in
+// creation mode so returning from creation starts collapsed (design D7).
+async function focusCommandField() {
+  if (props.mode === "creation") {
+    return;
+  }
+  commandLineExpanded.value = true;
+  await nextTick();
   commandLine.value?.focusField();
 }
 
-// Escape from the focused field (the field's own handler emits
-// `focus-parent`): nothing is sent and focus is returned to `#action-dock`
-// — the only key that leaves the field (design D2). The `restoreDockFocus`
-// path stays the single focus-rescue path.
+// Collapse path (design D2): Escape from the focused field (`focus-parent`),
+// an accepted send (`sent`), and the store's `drawerCloseRequest` watcher
+// restore focus to `#action-dock` first (so `blur` fires `focus-lost` and
+// releases any borrow) and then collapse the command line.
 function releaseCommandField(restoreFocus) {
   if (restoreFocus) {
     restoreDockFocus();
   }
+  commandLineExpanded.value = false;
+}
+
+function onToggleCommandLine() {
+  if (commandLineExpanded.value) {
+    commandLineExpanded.value = false;
+    return;
+  }
+  focusCommandField();
 }
 
 function onSubmit(text) {
@@ -175,23 +192,10 @@ function onSubmit(text) {
   emit("submit-command", text);
 }
 
-function onOpenOverlay(name) {
-  // The command line's 設定/說明 utility controls (H5, design D10): open the
-  // settings/help overlays through the parent's overlay slice.
-  emit("open-overlay", name);
-}
-
-function onOpenDrawer(name) {
-  // The command line's 圖鑑 utility control (webclient-lore-codex-drawer):
-  // open the codex reference drawer through the parent's drawer slice —
-  // the same single open-drawer entry point every drawer opener uses.
-  emit("open-drawer", name);
-}
-
 // Shell-wide key claims (H5, design D2/D3): outside any editable control,
-// `/` moves focus into the field — the claim is unconditional for key
-// repeat (a repeated `/` still prevents a literal slash and re-focuses the
-// always-present field, idempotently). Escape is NOT claimed here: the
+// `/` expands the command line and moves focus into the field — the claim is
+// unconditional for key repeat (a repeated `/` still prevents a literal
+// slash and focuses the field, idempotently). Escape is NOT claimed here: the
 // topmost open full-screen overlay, the open drawer (H4), the focused
 // command field (its own `focus-parent` emit), and the dock's menu level
 // (the router) each own that key at their rung of the precedence ladder.
@@ -242,9 +246,11 @@ watch(
     if (nextMode === "creation" && active && active.closest && active.closest(".overlay-host")) {
       restoreDockFocus();
     }
-    // The command line is now permanent (design D1 — no drawer to close): a
-    // mode change into creation only runs the pre-hide focus rescue; the CSS
-    // then hides the `command-line` anchor itself (H1's matrix).
+    // Entering creation collapses the command line after the pre-hide focus
+    // rescue so returning to exploration starts collapsed (design D7).
+    if (nextMode === "creation") {
+      commandLineExpanded.value = false;
+    }
   },
 );
 
@@ -290,6 +296,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       :mode="mode"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
+      :command-line-expanded="commandLineExpanded"
     >
       <template #backdrop>
         <slot name="backdrop" />
@@ -321,6 +328,18 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @dialogue-freeform="() => emit('dialogue-freeform')"
           @dialogue-leave="() => emit('dialogue-leave')"
         />
+        <button
+          type="button"
+          class="command-line-toggle"
+          data-testid="command-line-toggle"
+          aria-label="指令列"
+          title="指令列 (/)"
+          aria-controls="command-line-bar"
+          :aria-expanded="commandLineExpanded ? 'true' : 'false'"
+          @click="onToggleCommandLine"
+          @keydown.enter.stop
+          @keydown.space.stop
+        >⌨</button>
       </template>
       <template #band-command>
         <slot name="action-dock" />
@@ -328,7 +347,6 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #command-line>
         <CommandLine
           ref="commandLine"
-          :gallery-available="props.galleryAvailable"
           :prompt="props.prompt"
           :history="props.commandHistory"
           :connected="props.connected"
@@ -337,9 +355,8 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           :text-to-html="props.textToHtml"
           :completion-candidates="props.completionCandidates"
           @submit="onSubmit"
+          @sent="releaseCommandField(true)"
           @focus-parent="releaseCommandField(true)"
-          @open-overlay="onOpenOverlay"
-          @open-drawer="onOpenDrawer"
           @focus-lost="() => emit('focus-lost')"
         />
       </template>
@@ -402,6 +419,32 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
 .elosern-app-shell .elosern-stage {
   position: absolute;
   inset: 0;
+}
+
+.elosern-app-shell .command-line-toggle {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  width: 30px;
+  height: 30px;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-solid);
+  color: var(--paper-300);
+  font: 14px/1 var(--f-mono);
+  cursor: pointer;
+}
+
+.elosern-app-shell .command-line-toggle:hover,
+.elosern-app-shell .command-line-toggle[aria-expanded="true"] {
+  color: var(--gold-400);
+  border-color: var(--gold-500);
+  background: var(--ink-780);
 }
 
 .elosern-app-shell .elosern-live {

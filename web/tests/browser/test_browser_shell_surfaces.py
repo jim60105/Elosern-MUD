@@ -9,6 +9,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    open_command_line,
     sent_action_count,
     store_state,
     valid_art_panel,
@@ -23,7 +24,7 @@ from .browser_helpers import (
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
-    '[data-testid="command-line"]',
+    '[data-testid="command-line-toggle"]',
 )
 
 
@@ -90,13 +91,19 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             locator = page.locator(selector)
             self.assertEqual(locator.count(), 1, f"missing surface {selector}")
             self.assertTrue(locator.is_visible(), f"{selector} is not visible")
-        # H5 (task 8.6): the command line is permanently present — the input
-        # field is in the DOM, visible and focusable with no opening action:
-        # no entry control, no `aria-expanded` state, no closed state.
+        # webclient-collapsible-command-line: the ⌨ toggle is visible with
+        # `aria-expanded="false"`, `#inputfield` is in the DOM but hidden
+        # while collapsed, and `open_command_line` makes it visible.
+        toggle = page.locator('[data-testid="command-line-toggle"]')
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertEqual(page.locator('#inputfield').count(), 1)
-        self.assertTrue(page.locator('#inputfield').is_visible(), "the command field is visible")
+        self.assertFalse(page.locator('#inputfield').is_visible(), "the command field starts collapsed")
         self.assertEqual(page.locator('.drawer-entry').count(), 0, "no entry control")
-        self.assertEqual(page.locator('[aria-expanded]').count(), 0, "no element reports aria-expanded")
+        open_command_line(page)
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        self.assertTrue(page.locator('#inputfield').is_visible(), "the command field is visible once expanded")
+        page.keyboard.press("Escape")
+        page.wait_for_function("() => document.querySelector('[data-anchor=\"command-line\"]').getAttribute('data-expanded') === 'false'", timeout=10000)
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"

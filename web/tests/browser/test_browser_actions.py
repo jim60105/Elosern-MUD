@@ -16,6 +16,7 @@ from .browser_helpers import (
     focus_action_dock,
     fresh_epoch,
     install_outbound_recorder,
+    open_command_line,
     sent_action_count,
     snapshot_envelope,
     store_state,
@@ -93,20 +94,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
         # H5 (webclient-hud-05-overlays-and-command-line): the command line
         # (the retired drawer's successor) sends ordinary text, never a
         # ui_action.
-        page.keyboard.press("/")
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": "#inputfield",
-                "predicate": (
-                    "() => document.activeElement === "
-                    "document.getElementById('inputfield')"
-                ),
-                "description": "#inputfield focused",
-            },
-            timeout=30000,
-        )
+        open_command_line(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_timeout(500)

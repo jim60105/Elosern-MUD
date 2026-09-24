@@ -2,7 +2,8 @@
 // HudDrawer (H4, webclient-hud-04-reference-drawers, design D1): the
 // right-anchored drawer chrome shared by the six reference drawers. Fixed
 // to the stage's right edge, its top edge inset one `--command-line-h`
-// below the stage top (the reference's `.draw{top:46px}` clearance) and its
+// (44px, webclient-collapsible-command-line design D4) below the stage top
+// and its
 // bottom at the stage bottom, bounded to a width that
 // never exceeds the viewport (`min(560px, 94vw)`), drawn on the solid panel
 // background with a left border and a left-cast shadow so it reads as a
@@ -182,7 +183,7 @@ function onScrimClick() {
 
 /* The right-anchored drawer (the draft's `.draw` chrome). The top edge is
    inset one command-line strip height from the stage top, reproducing the
-   reference's `top:46px` clearance (index.html:404) through the shared 46px
+   reference's top clearance (index.html:404) through the shared 44px
    token; the scrim keeps covering the whole stage. */
 .hud-drawer {
   position: fixed;

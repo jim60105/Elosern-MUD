@@ -22,12 +22,11 @@ function read(rel) {
 }
 
 test("the command line sends ordinary text, never a ui_action envelope", () => {
-  // H5 (webclient-hud-05-overlays-and-command-line): the command drawer was
-  // retired for the permanently-present command line; its single send intent
-  // (`submit(text)`) still routes through the store's text transport
-  // (Evennia.msg("text", ...)), never a ui_action envelope.
+  // webclient-collapsible-command-line: the collapsible command line's single
+  // send intent (`submit(text)`) still routes through the store's text
+  // transport (Evennia.msg("text", ...)), never a ui_action envelope.
   const line = read("web/webclient-app/components/CommandLine.vue");
-  assert.match(line, /defineEmits\(\["submit", "focus-parent", "open-overlay", "open-drawer", "focus-lost"\]\)/);
+  assert.match(line, /defineEmits\(\["submit", "sent", "focus-parent", "focus-lost"\]\)/);
   assert.match(line, /emit\("submit", text\)/);
   assert.strictEqual(
     /ui_action/.test(line),

@@ -28,15 +28,15 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
 
   it("the field is present and focusable with no opening action (task 2.6)", () => {
     const w = mountLine();
+    expect(w.attributes("id")).toBe("command-line-bar");
     const input = w.get("textarea#inputfield");
     expect(input.element.closest(".inputfieldwrapper")).not.toBeNull();
     w.vm.focusField();
     expect(document.activeElement).toBe(input.element);
-    // No entry control, no aria-expanded anywhere in the bar (task 2.6).
     expect(w.findAll("[aria-expanded]").length).toBe(0);
   });
 
-  it("sends exactly one command on Enter and clears the field", async () => {
+  it("sends exactly one command on Enter, emits sent, and clears the field", async () => {
     const w = mountLine();
     const input = w.get("textarea#inputfield");
     input.element.value = "  look  ";
@@ -45,6 +45,7 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     await w.vm.$nextTick();
     expect(w.emitted("submit")).toHaveLength(1);
     expect(w.emitted("submit")[0]).toEqual(["  look  "]);
+    expect(w.emitted("sent")).toHaveLength(1);
     expect(input.element.value).toBe("");
   });
 
@@ -69,15 +70,22 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(input.element.value).toBe("line one");
   });
 
-  it("a rejected send preserves the typed speech (offline or locked)", async () => {
-    const w = mountLine({ connected: false, mutationsLocked: true });
+  it.each([
+    ["offline", { connected: false, mutationsLocked: false, inFlight: false }],
+    ["mutationsLocked", { connected: true, mutationsLocked: true, inFlight: false }],
+    ["inFlight", { connected: true, mutationsLocked: false, inFlight: true }],
+  ])("a rejected send (%s) preserves the typed speech and does not emit sent", async (_label, props) => {
+    const w = mountLine(props);
     const input = w.get("textarea#inputfield");
     input.element.value = "talk 老周";
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
     pressKey(input.element, "Enter");
     await w.vm.$nextTick();
     expect(w.emitted("submit")).toHaveLength(1);
+    expect(w.emitted("sent")).toBeUndefined();
     expect(input.element.value).toBe("talk 老周", "rejected send keeps the speech");
+    w.unmount();
+    wrapper = null;
   });
 
   it("walks the command history with keys and buttons, preserving the draft (task 2.6)", async () => {
@@ -262,38 +270,14 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     w2.unmount();
   });
 
-  it("the utility strip renders five controls in order and the codex control opens a drawer", async () => {
+  it("renders no utility-cluster or overlay/drawer opener controls in the bar", () => {
     const w = mountLine();
-    const strip = w.get(".cmdutil");
-    const buttons = strip.findAll(".cmdutil__btn");
-    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual([
-      "技能系譜",
-      "圖鑑",
-      "稱號冊",
-      "設定",
-      "說明",
-    ]);
-    // The 圖鑑 control opens the codex reference drawer (a drawer, not an
-    // overlay): a distinct emit the app host routes to openHudDrawer.
-    await buttons[1].trigger("click");
-    expect(w.emitted("open-drawer")).toEqual([["lore"]]);
-    // The overlay controls keep their own emit.
-    await buttons[3].trigger("click");
-    expect(w.emitted("open-overlay")).toEqual([["settings"]]);
-  });
-
-  it("the two codex controls carry distinct labels and distinct glyphs", () => {
-    const w = mountLine();
-    const lore = w.get('[data-testid="command-line-lore"]');
-    const codex = w.get('[data-testid="command-line-codex"]');
-    expect(lore.attributes("aria-label")).not.toBe(codex.attributes("aria-label"));
-    const lorePaths = lore.findAll("path, circle, ellipse").map((n) => n.attributes("d") ?? n.attributes("r") + n.attributes("rx"));
-    const codexPaths = codex.findAll("path, circle, ellipse").map((n) => n.attributes("d") ?? n.attributes("r") + n.attributes("rx"));
-    // The world codex (globe) shares no path data with the title codex
-    // (star book): the two systems sit side by side in the strip.
-    expect(lorePaths).not.toEqual(codexPaths);
-    for (const segment of lorePaths) {
-      expect(codexPaths).not.toContain(segment);
-    }
+    expect(w.find(".cmdutil").exists()).toBe(false);
+    expect(w.find('[data-testid="gallery-opener"]').exists()).toBe(false);
+    expect(w.find('[data-testid="command-line-lineage"]').exists()).toBe(false);
+    expect(w.find('[data-testid="command-line-lore"]').exists()).toBe(false);
+    expect(w.find('[data-testid="command-line-codex"]').exists()).toBe(false);
+    expect(w.find('[data-testid="command-line-settings"]').exists()).toBe(false);
+    expect(w.find('[data-testid="command-line-help"]').exists()).toBe(false);
   });
 });

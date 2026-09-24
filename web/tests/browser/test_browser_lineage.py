@@ -131,8 +131,8 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"lineage": _available_lineage_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        # The 技能系譜 icon on the command line opens the big window.
-        page.locator('[data-testid="command-line-lineage"]').click()
+        # The 技能系譜 icon in the top navigation bar's tool group opens the big window.
+        page.locator('[data-testid="nav-tool-lineage"]').click()
         page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
 
         # Header counts come straight from the payload.
@@ -193,7 +193,7 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"lineage": _unavailable_lineage_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        page.locator('[data-testid="command-line-lineage"]').click()
+        page.locator('[data-testid="nav-tool-lineage"]').click()
         page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="lineage-panel-unavailable"]').inner_text(),

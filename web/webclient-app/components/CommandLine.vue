@@ -1,25 +1,28 @@
 <script setup>
-// Command line (H5, webclient-hud-05-overlays-and-command-line, design
-// D1/D2/D4/D5/D13): the persistent command line — a single always-rendered
-// bar filling H1's 46px `command-line` anchor. No open/closed state: the
-// input field is present in the DOM, visible and focusable without any
-// opening action (design D1). The bar renders, in this order: a `›` prompt
-// chevron, the `#inputfield` inside its
-// preserved `.inputfieldwrapper`, the hint cluster (`↑↓ 歷史 · Tab 補全` —
+// Command line (H5, webclient-hud-05-overlays-and-command-line;
+// webclient-collapsible-command-line design D1/D3/D4): the collapsible
+// command-line bar filling HudFrame's 44px `command-line` anchor on the
+// message region's top edge. The component stays mounted so `#inputfield`
+// stays in the DOM inside `.inputfieldwrapper` (preserving the unsent draft,
+// history-walk backup, and Tab-completion cycle while the anchor is
+// collapsed with `display:none`). The bar renders, in this order: a `›`
+// prompt chevron, `#inputfield` with its send control inside `.inputfieldwrapper`,
+// the hint cluster (`↑↓ 歷史 · Tab 補全` —
 // both affordances implemented, webclient-align-02-quickbar-shortcuts: Tab
 // completes the draft before the caret over session history and the committed
 // exploration panel's exit/target names; unique → full completion, many → longest-common-prefix then
-// Tab/Shift+Tab cycle, none → untouched), the 上一筆/下一筆 history controls (the pointer
-// path to the same walk state the ArrowUp/ArrowDown keys drive, design D5),
-// and the utility controls that open the settings and help overlays (design
-// D10).
+// Tab/Shift+Tab cycle, none → untouched), and the 上一筆/下一筆 history controls
+// (the pointer path to the same walk state the ArrowUp/ArrowDown keys drive).
+// Overlay and drawer openers live in the top navigation bar's tool group.
 //
 // Preserved contract: the `#inputfield` field inside its `.inputfieldwrapper`
 // wrapper does not move. The single send implementation is preserved
 // byte-for-byte in behaviour: Enter without Shift sends exactly one command
 // (regardless of how focus arrived), Shift+Enter inserts a newline, a
-// successful send clears the field and keeps focus, and a rejected send
-// (offline or mutations locked) preserves the typed text.
+// send the field accepts clears the draft and emits `sent` (so the shell
+// collapses the line and returns focus to `#action-dock`), and a rejected
+// send (offline, mutations locked, or a mutation in flight) preserves the
+// typed text and leaves the line open.
 import { computed, nextTick, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 
@@ -34,8 +37,6 @@ const props = defineProps({
   // The store's mutation-lock flag: a rejected send preserves the typed
   // speech (webclient-desktop-shell).
   mutationsLocked: { type: Boolean, default: false },
-  // Whether the gallery panel is available (webclient-retire-redundant-hud design D5).
-  galleryAvailable: { type: Boolean, default: false },
   // The action client's in-flight mutation flag (webclient-input-narrative):
   // a free-form send blocked by an in-flight mutation keeps the typed speech.
   inFlight: { type: Boolean, default: false },
@@ -50,7 +51,7 @@ const props = defineProps({
   completionCandidates: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(["submit", "focus-parent", "open-overlay", "open-drawer", "focus-lost"]);
+const emit = defineEmits(["submit", "sent", "focus-parent", "focus-lost"]);
 
 const field = ref(null);
 const draft = ref("");
@@ -238,10 +239,11 @@ function submit() {
   emit("submit", text);
   // Preserve the typed speech when the send is rejected (disconnected,
   // mutations locked, or another mutation in flight); clear the draft only
-  // when the send is actually dispatched (webclient-input-narrative: a blocked
-  // borrowed send keeps the speech, never loses it).
+  // when the send is actually dispatched and emit `sent` so the shell
+  // collapses the line and returns focus to `#action-dock` (design D3).
   if (props.connected && !props.mutationsLocked && !props.inFlight) {
     draft.value = "";
+    emit("sent");
   }
   resetHistoryWalk();
   resetCompletion();
@@ -327,20 +329,6 @@ function onHistoryDown() {
   walkHistory("down");
 }
 
-function onOpenOverlay(name) {
-  // The utility controls (design D10): 設定/說明 open the overlays through
-  // the store's overlay slice (design D8).
-  emit("open-overlay", name);
-}
-
-function onOpenDrawer(name) {
-  // The utility strip's world-codex control (webclient-lore-codex-drawer):
-  // the strip's first drawer-opening control — the codex is a reference
-  // drawer, not an overlay, and opens through the store's single
-  // open-drawer entry point (openHudDrawer) in the app host.
-  emit("open-drawer", name);
-}
-
 // The borrowed free-form dialogue release rule (design D6): the borrow is
 // released whenever focus leaves the field for any reason other than that
 // dock's own successful send — the parent clears the pending freeform
@@ -353,7 +341,7 @@ defineExpose({ focusField });
 </script>
 
 <template>
-  <div class="cmdline" aria-label="指令列" data-testid="command-line">
+  <div id="command-line-bar" class="cmdline" aria-label="指令列" data-testid="command-line">
     <div class="cmdfield" data-testid="command-line-input">
       <span v-if="!prompt" class="pt cmdfield__prompt" data-testid="command-line-prompt">›</span>
       <span v-else class="pt cmdfield__prompt" data-testid="command-line-prompt">
@@ -406,86 +394,6 @@ defineExpose({ focusField });
           </svg>
         </button>
       </span>
-      <span class="cmdutil">
-        <button
-          v-if="galleryAvailable"
-          type="button"
-          class="cmdutil__btn"
-          aria-label="角色肖像圖庫"
-          data-testid="gallery-opener"
-          @click="onOpenOverlay('gallery')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="cmdutil__btn"
-          aria-label="技能系譜"
-          data-testid="command-line-lineage"
-          @click="onOpenOverlay('lineage')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <circle cx="12" cy="5" r="2.2" />
-            <circle cx="5.5" cy="18.5" r="2.2" />
-            <circle cx="18.5" cy="18.5" r="2.2" />
-            <path d="M12 7.2v4.3M12 11.5 6.6 16.6M12 11.5l5.4 5.1" stroke-linecap="round" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="cmdutil__btn"
-          aria-label="圖鑑"
-          data-testid="command-line-lore"
-          @click="onOpenDrawer('lore')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <circle cx="12" cy="12" r="8.5" />
-            <ellipse cx="12" cy="12" rx="3.8" ry="8.5" />
-            <path d="M3.5 12h17" stroke-linecap="round" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="cmdutil__btn"
-          aria-label="稱號冊"
-          data-testid="command-line-codex"
-          @click="onOpenOverlay('codex')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M5 17h14" stroke-linecap="round" />
-            <path d="m12 7 .9 1.9 2.1.3-1.5 1.5.4 2-1.9-1-1.9 1 .4-2L9 9.2l2.1-.3z" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="cmdutil__btn"
-          aria-label="設定"
-          data-testid="command-line-settings"
-          @click="onOpenOverlay('settings')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke-linecap="round" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="cmdutil__btn"
-          aria-label="說明"
-          data-testid="command-line-help"
-          @click="onOpenOverlay('help')"
-        >
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-.7 1.3-.7 2.3M12 16h.01" stroke-linecap="round" />
-          </svg>
-        </button>
-      </span>
     </div>
   </div>
 </template>
@@ -493,7 +401,7 @@ defineExpose({ focusField });
 <style scoped>
 .cmdline {
   box-sizing: border-box;
-  height: 46px;
+  height: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -587,7 +495,7 @@ defineExpose({ focusField });
 }
 
 /* Constrained width (design D5): the hint cluster is the first element dropped;
-   the field, the history controls and the utility controls are never dropped.
+   the field, the send control, and the history controls are never dropped.
    Implemented as always-on flexbox degradation (no mobile breakpoint is
    shipped, design D1/D5). */
 .cmdline .hint {
@@ -623,36 +531,5 @@ defineExpose({ focusField });
 .hist .ic {
   width: 16px;
   height: 16px;
-}
-
-.cmdutil {
-  flex: none;
-  display: flex;
-  gap: 4px;
-}
-
-.cmdutil__btn {
-  /* The draft `.hist button` treatment (webclient-align-01-dock-chrome):
-     transparent ground, 26×26, 6px radius, hover `--ink-700`. Positions,
-     functions, labels, and accessibility attributes are unchanged. */
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  color: var(--paper-500);
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.cmdutil__btn:hover {
-  background: var(--ink-700);
-  color: var(--paper-100);
-}
-
-.cmdutil__btn .ic {
-  width: 15px;
-  height: 15px;
 }
 </style>

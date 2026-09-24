@@ -21,6 +21,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    open_command_line,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -264,6 +265,7 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
                 self.assertTrue(seeded, "the bridge's backdrop hook was available")
                 # The pending notice renders above the dock.
                 page.wait_for_selector('[data-testid="scene-backdrop-generating"]', timeout=15000)
+                open_command_line(page)
                 notice = _rect(page, '[data-testid="scene-backdrop-generating"]')
                 dock = _rect(page, '[data-testid="action-dock"]')
                 cmd_line = _rect(page, '[data-testid="command-line"]')
@@ -420,6 +422,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                         "description": "single visible scene placeholder inside the scene frame",
                     },
                 )
+                open_command_line(page)
                 dock = _rect(page, '[data-testid="action-dock"]')
                 cmd_line = _rect(page, '[data-testid="command-line"]')
                 self.assertIsNotNone(dock, "the action dock panel is rendered")

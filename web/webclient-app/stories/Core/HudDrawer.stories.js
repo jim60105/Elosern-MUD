@@ -60,7 +60,7 @@ export default {
       description: {
         component:
           "The right-anchored drawer chrome (fixed to the stage's right edge, top edge inset " +
-          "one --command-line-h below the stage top per the reference's .draw{top:46px}, " +
+          "one --command-line-h (44px) below the stage top, " +
           "bottom at the stage bottom, width min(560px,94vw), solid panel background, left " +
           "border + left-cast shadow). " +
           "Slides in over a blurred scrim, traps focus, closes on Escape/close-control/scrim " +

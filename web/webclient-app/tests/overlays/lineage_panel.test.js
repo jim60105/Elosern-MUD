@@ -190,7 +190,7 @@ describe("AppClient lineage overlay wiring (skill-lineage-panel task 2.3)", () =
     expect(store.view.hudOverlay).toBe("lineage");
   });
 
-  it("the command-line icon opens the overlay with the committed panel", async () => {
+  it("the top-bar tool icon opens the overlay with the committed panel and restores focus on close", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     store.beginTransport(1);
@@ -201,7 +201,9 @@ describe("AppClient lineage overlay wiring (skill-lineage-panel task 2.3)", () =
       [fx.snapshot({ panels: { lineage: AVAILABLE_SAMPLE } })],
     );
     await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="command-line-lineage"]').trigger("click");
+    const opener = wrapper.get('[data-testid="nav-tool-lineage"]');
+    opener.element.focus();
+    await opener.trigger("click");
     expect(store.view.hudOverlay).toBe("lineage");
     const header = wrapper.get('[data-testid="lineage-panel-header"]');
     expect(header.text()).toBe("已完成 1 / 2 樹");
@@ -209,6 +211,9 @@ describe("AppClient lineage overlay wiring (skill-lineage-panel task 2.3)", () =
     expect(wrapper.get('[data-testid="overlay-host"]').attributes("data-elosern-overlay")).toBe(
       "lineage",
     );
+    await wrapper.get('[data-testid="overlay-host-close"]').trigger("click");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(document.activeElement).toBe(opener.element);
   });
 
   it("an unavailable committed panel renders the reason inside the window", async () => {

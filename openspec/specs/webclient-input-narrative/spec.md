@@ -105,7 +105,8 @@ confirmation items), fields read verbatim from committed state at dispatch
 time (shop row display names, the uniquely matching local-map edge label or
 the destination node label, NPC display names, the committed creation
 confirmation descriptor), or the payload itself — so a deliberate activation
-from any surface (backpack row, shop drawer row, minimap move, combat row with or without a non-default magnitude, services row,
+from any surface (backpack row, shop drawer row, minimap
+move, combat row with or without a non-default magnitude, services row,
 creation activate/reset confirmation) produces its line instead of silently
 resolving to `null`; an ambiguous local-map edge match MUST NOT pick an
 arbitrary edge and instead degrades to the destination-node label. A surface
@@ -117,9 +118,11 @@ path: the command field's borrowed branch SHALL not append its own line, so a
 single free-form send yields exactly one line (`talk <NPC> <speech>`), and when
 submission is blocked the typed speech SHALL remain in the field and the field
 SHALL keep focus (the borrowed interaction is not complete and nothing is
-lost). Because the command field is permanently present, the completion of a
-borrowed dialogue SHALL be signalled by returning focus to the action dock
-rather than by closing a surface. Text written into the command field without sending (typing, a history walk, or Tab completion) SHALL NOT echo: it dispatches nothing, so no line exists to append until the player sends. The echo line SHALL be inserted as literal text via the same
+lost), and the command line SHALL stay expanded. The completion of a borrowed
+dialogue SHALL be signalled by collapsing the command line and returning focus
+to the action dock. Text written into the command field without
+sending (typing, a history walk, or Tab completion) SHALL NOT echo: it dispatches
+nothing, so no line exists to append until the player sends. The echo line SHALL be inserted as literal text via the same
 narrative append path (scroll-keep + polite unread marker) used by server
 output, SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a
 submitted command, and SHALL have no effect on the validated action payload
@@ -140,15 +143,15 @@ acted.
   mutation is in flight
 - **THEN** a menu activation does not dispatch, no input line appears, and a
   borrowed free-form send keeps its typed speech in the field with focus
-  retained in the field
+  retained in the field and the command line still expanded
 
 #### Scenario: Free-form dialogue echoes exactly one line
 
 - **WHEN** a player sends free-form speech to a present NPC and the
   `explore.talk_freeform` request dispatches
 - **THEN** exactly one `talk <NPC> <speech>` line is appended at dispatch, the
-  field clears and returns focus to the action dock, and no second raw-text
-  echo appears
+  field clears, the command line collapses and returns focus to the action
+  dock, and no second raw-text echo appears
 
 #### Scenario: Preparing a command in the field echoes nothing
 

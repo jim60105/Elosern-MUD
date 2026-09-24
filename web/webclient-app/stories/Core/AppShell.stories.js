@@ -27,12 +27,25 @@ import {
 // offline (offline-overlay slice), prompt, commandHistory (drawer slices).
 // Events: submit-command(text) — one deliberate send from the drawer.
 //
-// Shell key contract: `/` toggles the drawer and focuses the field (slash
-// stays literal text inside editables); Escape releases an open drawer back
-// to the narrative pane. The mount retires the replaced text fallback
+// Shell key contract: `/` or the ⌨ toggle expands the collapsed command line
+// and focuses `#inputfield` (slash stays literal text inside editables);
+// Escape or an accepted send collapses the line and returns focus to
+// `#action-dock`. The mount retires the replaced text fallback
 // (hidden, not removed).
 
-const renderShell = (args) => ({ render: () => h(AppShell, args) });
+let mountedShell = null;
+const renderShell = (args) => ({
+  setup() {
+    const shell = ref(null);
+    onMounted(() => {
+      mountedShell = shell.value;
+      if (shell.value?.$el) {
+        shell.value.$el.__elosernShell = shell.value;
+      }
+    });
+    return () => h(AppShell, { ...args, ref: shell });
+  },
+});
 
 export default {
   title: "Core/AppShell",
@@ -42,11 +55,28 @@ export default {
       description: {
         component:
           "The offline desktop shell composing TopBar, NarrativeFeed, " +
-          "UnreadIndicator (inside the feed), CommandDrawer, ConnectOverlay, " +
+          "UnreadIndicator (inside the feed), the ⌨ command-line toggle, " +
+          "the collapsible CommandLine, ConnectOverlay, " +
           "the preserved `#elosern-action-live` live region and the " +
           "`#elosern-offline-overlay` hook.",
       },
     },
+  },
+};
+
+export const CommandLineExpanded = {
+  render: renderShell,
+  args: {
+    ...STATUS_SLICE_SAMPLE,
+    connectionStatus: "ready",
+    mode: "exploration",
+    narrative: NARRATIVE_SAMPLE,
+    prompt: PROMPT_SAMPLE,
+    commandHistory: COMMAND_HISTORY_SAMPLE,
+  },
+  play: async ({ canvasElement }) => {
+    const root = canvasElement?.querySelector('[data-testid="elosern-vue-root"]');
+    await (root?.__elosernShell || mountedShell)?.focusCommandField();
   },
 };
 

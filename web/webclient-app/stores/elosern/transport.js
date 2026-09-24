@@ -284,9 +284,9 @@ export function applyTransport(ctx) {
         }
       }
       const sent = ctx.dispatchAction("explore.talk_freeform", { npc_id: ctx.freeformTarget, speech: value }, { npcLabel });
-      // A successful dock-borrowed send closes the drawer and restores
-      // action-dock focus (webclient-desktop-shell: the borrowed-drawer send
-      // returns focus to the dock); a rejected send keeps the drawer open.
+      // A successful dock-borrowed send collapses the command line and
+      // restores action-dock focus (webclient-desktop-shell; design D2/D3);
+      // a rejected send leaves the command line expanded with its text.
       if (sent !== null) {
         ctx.drawerCloseRequest += 1;
       }

@@ -2,14 +2,15 @@ import { h } from "vue";
 import CommandLine from "../../components/CommandLine.vue";
 import { COMMAND_HISTORY_SAMPLE, PROMPT_SAMPLE } from "../fixtures.js";
 
-// CommandLine (H5, webclient-hud-05-overlays-and-command-line, tasks 2.6/8.1):
-// the persistent command line — always rendered, no open/closed state. The
-// stories below cover ordinary command entry and a locked client (a rejected send
-// preserves the typed speech).
+// CommandLine (H5, webclient-hud-05-overlays-and-command-line;
+// webclient-collapsible-command-line design D1/D3/D4): the 44px command-line
+// bar (prompt chevron, `#inputfield` + send control, hint cluster, and
+// history controls — no utility openers). The stories below cover ordinary
+// command entry and a locked client (a rejected send preserves the typed speech).
 
 const renderLine = (args) => ({
   render: () =>
-    h("div", { style: "border-top: 1px solid var(--ink-700);" }, [h(CommandLine, args)]),
+    h("div", { style: "height: 44px; border-top: 1px solid var(--ink-700);" }, [h(CommandLine, args)]),
 });
 
 export default {
@@ -25,7 +26,6 @@ export const Exploration = {
     connected: true,
     mutationsLocked: false,
     textToHtml: true,
-    galleryAvailable: true,
   },
 };
 

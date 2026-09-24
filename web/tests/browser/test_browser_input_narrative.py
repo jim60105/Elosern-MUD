@@ -1,10 +1,9 @@
 """Input echo and command-line browser acceptance (webclient-input-narrative).
 
-These journeys verify the narrative input line contract: the command line is
-permanently present (H5, webclient-hud-05-overlays-and-command-line, design
-D1 — no open/closed state), `/` focuses the always-present field without
-firing inside an editable control, typed command-line commands and
-button-triggered mutations echo exactly one `.inp` line with a preceding
+These journeys verify the narrative input line contract: the command line starts
+collapsed and expands on `/` or the ⌨ toggle (webclient-collapsible-command-line),
+`/` expands and focuses the field without firing inside an editable control,
+typed command-line commands and button-triggered mutations echo exactly one `.inp` line with a preceding
 `.narrative-divider`, locked submissions never echo, and the display catalog
 never alters the `ui_action` envelope.
 
@@ -49,8 +48,9 @@ def _wait_field_focused(page, timeout=30000):
         dom_readiness={
             "selector": "#inputfield",
             "predicate": (
-                "() => document.activeElement === "
-                "document.getElementById('inputfield')"
+                "() => { const f = document.getElementById('inputfield');"
+                " const a = document.querySelector('[data-anchor=\"command-line\"]');"
+                " return !!f && !!a && a.getAttribute('data-expanded') === 'true' && document.activeElement === f; }"
             ),
             "description": "#inputfield focused",
         },
@@ -123,33 +123,43 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         _wait_field_focused(page)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     @covers_requirement(
-        "webclient-contextual-hud::the-command-line-is-a-permanently-present-bar-in-the-stage-s-command-line-anchor"
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge"
     )
     def test_command_line_is_permanently_present_and_focusable(self):
         page = self.logged_in_page()
-        # H5 (webclient-hud-05-overlays-and-command-line, design D1): the
-        # command line is permanently present — the field is in the DOM,
-        # visible and focusable without any opening action. No entry control,
-        # no open/closed state.
+        # webclient-collapsible-command-line (design D1/D2): the command line
+        # stays mounted in the DOM (`#inputfield` inside `.inputfieldwrapper`),
+        # collapsed by default (`data-expanded="false"`), with the ⌨ toggle
+        # rendered in `#band-message` (`aria-expanded="false"`), and `/`
+        # expands the row and focuses `#inputfield`.
         self.assertEqual(
             page.locator('[data-testid="command-line"]').count(), 1,
-            "the command line surface is present",
+            "the command line surface stays mounted in the DOM",
         )
         self.assertEqual(page.locator(".drawer-entry").count(), 0, "no drawer entry control")
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "false",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="command-line-toggle"]').get_attribute("aria-expanded"),
+            "false",
+        )
+        self.assertFalse(
+            page.locator(".inputfieldwrapper").is_visible(),
+            "the input row is collapsed (display:none) by default",
+        )
+        self._open_command_line(page)
         self.assertTrue(
             page.locator(".inputfieldwrapper").is_visible(),
-            "the input row is visible by default",
+            "the input row is visible once expanded",
         )
         self.assertTrue(
             page.locator('[data-testid="command-line-prompt"]').is_visible(),
-            "the prompt chevron is visible by default",
-        )
-        self.assertTrue(
-            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
-            "the command line must be present",
+            "the prompt chevron is visible once expanded",
         )
 
     @covers_requirement(
@@ -162,6 +172,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         drive the same walk state the keys drive, and neither submits."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        self._open_command_line(page)
         # The hint cluster names the history recall keys AND the completion
         # affordance — the draft wording, both implemented.
         self.assertEqual(
@@ -170,17 +181,20 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "the hint states the history recall keys and the completion affordance",
         )
         # Seed the command history deterministically by sending two distinct text
-        # commands through the client's single send path (the field's send).
-        self._open_command_line(page)
+        # commands through the client's single send path (each accepted send
+        # collapses the line).
         page.keyboard.type("look")
         page.keyboard.press("Enter")
+        wait_command_field_released(page)
         self._open_command_line(page)
         page.keyboard.type("take sword")
         page.keyboard.press("Enter")
+        wait_command_field_released(page)
         page.wait_for_function(
             "() => window.__elosernBridge.store.commandHistory.length >= 2",
             timeout=15000,
         )
+        self._open_command_line(page)
         # The two seeded sends are already on the wire; capture that baseline so
         # the walk is proven to add no new message.
         baseline = len(outbound_messages(page))
@@ -248,8 +262,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         and no `ui_action` is dispatched for the change."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # Open the settings overlay through the command line's utility control.
-        page.locator('[data-testid="command-line-settings"]').click()
+        # Open the settings overlay through the top navigation bar's 設定 control.
+        page.locator('[data-testid="nav-settings"]').click()
         page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
         # The three-step prose-scale selector renders; the current step is marked
         # by a non-colour indicator (aria-pressed / the `on` class).
@@ -297,18 +311,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_field_is_focusable_without_an_opening_action(self):
         page = self.logged_in_page()
-        # H5 (design D1/D2): the always-present field is focusable directly —
-        # a pointer click on the field focuses it; no entry button, no open
-        # state.
-        page.locator("#inputfield").click()
+        # webclient-collapsible-command-line: the field is one pointer action
+        # away through the ⌨ toggle in `#band-message`.
+        self.assertFalse(page.locator("#inputfield").is_visible())
+        page.locator('[data-testid="command-line-toggle"]').click()
         _wait_field_focused(page)
-        self.assertTrue(
-            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
-            "the command line is present",
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "true",
         )
         self.assertTrue(page.locator(".inputfieldwrapper").is_visible())
 
@@ -317,14 +331,14 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     )
     def test_slash_focuses_the_always_present_field(self):
         page = self.logged_in_page()
-        # H5 (design D2): `/` outside an editable control moves focus into
-        # the always-present command-line field; the claim is unconditional
-        # (a repeated `/` still prevents a literal slash and re-focuses the
-        # field, idempotently).
+        # `/` outside an editable control expands the collapsed command line
+        # and moves focus into `#inputfield` without inserting a literal `/`.
+        anchor = page.locator('[data-testid="anchor-command-line"]')
+        self.assertEqual(anchor.get_attribute("data-expanded"), "false")
         focus_action_dock(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
         # A second `/` while the field is focused types the slash (the shell's
         # claim is not made over an editable control).
         page.keyboard.press("/")
@@ -334,11 +348,13 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "/",
             "a repeated / while the field is focused types a literal slash",
         )
-        # Returning to the dock and pressing `/` re-focuses the field.
-        focus_action_dock(page)
+        # Escape collapses the line and returns focus to the dock; pressing `/`
+        # expands and focuses the field again.
+        page.keyboard.press("Escape")
+        wait_command_field_released(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
+        self.assertEqual(anchor.get_attribute("data-expanded"), "true")
 
     @covers_requirement(
         "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe"
@@ -384,8 +400,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         else:
             raise AssertionError("the wait tab never reached focus")
         _press(page, "Enter")  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至正午
-        _press(page, "ArrowDown")  # 休息一段時間
+        _press(page, "ArrowRight")  # 睡眠至完全恢復
+        _press(page, "ArrowRight")  # 休息 N 小時 (opens the rest form)
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -398,16 +414,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                 "description": "rest form rendered",
             },
         )
-        # H5: the command line is permanently present — its presence is
-        # unaffected by the rest form.
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "false",
+        )
         # A slash while the rest form owns the keyboard is claimed: the command
-        # line is never toggled (it has no open/closed state).
+        # line stays collapsed.
         page.keyboard.press("/")
         page.wait_for_timeout(150)
-        self.assertTrue(
-            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
-            "the command line stays present while the rest form owns the keyboard",
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "false",
+            "the command line stays collapsed while the rest form owns the keyboard",
         )
         self.assertTrue(
             page.evaluate("document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null")
@@ -436,13 +454,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                 "}"
             )
         )
-        # The ordinary send keeps the always-present command line present,
-        # the field cleared, and focus in it; the echoed line is display-only
-        # (the command also travelled as text).
-        self.assertTrue(
-            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
-            "the command line is present after an ordinary send (H5, design D1)",
-        )
+        # The accepted ordinary send clears the field, collapses the command
+        # line, and restores focus to the action dock.
+        wait_command_field_released(page)
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
         )
@@ -831,7 +845,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     @covers_requirement(
-        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
     )
     def test_locked_borrowed_send_keeps_the_speech_and_never_echoes(self):
         page = self.logged_in_page()
@@ -866,9 +880,14 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             inp_before,
             "a locked borrowed send must never echo",
         )
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"),
+            "true",
+            "a locked borrowed send keeps the command line expanded",
+        )
         self.assertTrue(
-            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
-            "the command line is present while the borrowed field holds the speech",
+            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
+            "a locked borrowed send keeps focus in the field",
         )
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"),
