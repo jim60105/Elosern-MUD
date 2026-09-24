@@ -74,9 +74,10 @@ function handleMove(payload) {
         <p>點選可通行的相鄰節點，繼續探索。</p>
         <span>Tab 切換路徑 · Enter 確認移動</span>
       </div>
-      <!-- Both model-selected layouts use the same renderer. Tall city
-           streets and dense interior graphs stay scrollable at a readable
-           scale instead of shrinking the whole diagram to viewport height. -->
+      <!-- Both model-selected layouts use the same renderer, opened through
+           its fitted view (webclient-full-map-fit-view D1): the whole drawing
+           fits the space the guide row and remembered list leave, and the
+           reader zooms rather than scrolls. -->
       <MapLattice
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
@@ -85,9 +86,7 @@ function handleMove(payload) {
         :label-max="10"
         :label-font="14"
         :marker-scale="2.2"
-        :max-width="848"
-        :max-height="null"
-        :fill-width="true"
+        :fit-view="true"
         :overlay-chrome="true"
         :marker-names="true"
         :marker-name-font="11"
@@ -146,7 +145,7 @@ function handleMove(payload) {
   height: 100%;
 }
 
-.map-overlay__content :deep(.local-map__viewport--canvas) {
+.map-overlay__content :deep(.local-map__viewport--fit) {
   flex: 1;
   min-height: 160px;
 }

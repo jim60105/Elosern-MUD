@@ -36,7 +36,7 @@
 
 ## 3. Renderer: fitted view, no caps, no legend (design D1, D3, D5, D6)
 
-- [ ] 3.1 Create `web/webclient-app/composables/use-map-view.js`, exporting `useMapView({ enabled, canvasWidth, canvasHeight, currentPos, nodePos, currentNodeId, viewportEl, markerScale, labelFont })`.
+- [x] 3.1 Create `web/webclient-app/composables/use-map-view.js`, exporting `useMapView({ enabled, canvasWidth, canvasHeight, currentPos, nodePos, currentNodeId, viewportEl, markerScale, labelFont })`.
   - It owns a `view` ref (`null` until the viewport has a non-zero box) and a ResizeObserver on `viewportEl`, guarded where `ResizeObserver` is undefined as in jsdom.
   - It returns `viewBox` (the whole canvas `0 0 W H` while `view` is null), `canZoomIn`, `canZoomOut`, `canRecentre`, `zoomIn()`, `zoomOut()`, `recentre()`, and the handlers `onWheel`, `onPointerDown`, `onPointerMove`, `onPointerUp`, `onPointerCancel`, `onClickCapture`, and `onFocusIn`, all as design D3 specifies:
     - the wheel factor is `exp(−deltaY × 0.0015)`, normalised by `deltaMode` and clamped to [0.5, 2]
@@ -46,7 +46,7 @@
     - `onFocusIn` reveals a `[data-node]` target's box with a 24px margin
   - It watches `[canvasWidth, canvasHeight, currentNodeId]` for the payload rules in design D4: refit when fitted, `centreOn` the new current node when the current id changed on a touched view, and clamp otherwise.
   - Remove the observer in `onBeforeUnmount`.
-- [ ] 3.2 `web/webclient-app/components/MapLattice.vue`:
+- [x] 3.2 `web/webclient-app/components/MapLattice.vue`:
   - Add `fitView: { type: Boolean, default: false }`, with a comment citing design D1.
   - When it is on:
     - the viewport div gets the class `local-map__viewport--fit` and a `ref`, and binds `@wheel.prevent`, `@pointerdown`, `@pointermove`, `@pointerup`, `@pointercancel`, `@click.capture`, and `@focusin` from `useMapView`
@@ -59,16 +59,16 @@
     - the `local-map__viewport--canvas` class binding
     - the stale "overlay scrolls the diagram" template comment
   - Update the header comment.
-- [ ] 3.3 `web/webclient-app/composables/use-map-lattice-geometry.js`:
+- [x] 3.3 `web/webclient-app/composables/use-map-lattice-geometry.js`:
   - Delete `widthCaps()` and the `fillWidth` / cap lines of `latticeStyle`. `latticeStyle` returns C1's `canvasSize` square style, or `{ width: "100%", height: "100%" }` when `props.fitView`, or `{}`.
   - Delete the long cap comment above `widthCaps`, and remove `legend` from the returned object if nothing else reads it.
   - `web/webclient-app/composables/use-map-lattice-render.js`: delete `LEGEND_STATES` / `legendState` and their return entry.
   - Check: `grep -rn "widthCaps\|fillWidth\|fill-width\|maxHeight\|max-height=\|showLegend\|show-legend\|legendState" web/webclient-app --include='*.vue' --include='*.js'` (excluding `dist/`) finds only the `legendState` that section 4 moves into `MapOverlay.vue`.
-- [ ] 3.4 `web/webclient-app/components/map-lattice.css`:
+- [x] 3.4 `web/webclient-app/components/map-lattice.css`:
   - Delete `.local-map__viewport--canvas` and `.local-map__viewport--canvas > svg`, and delete every `.local-map__legend*` rule. Those rules move in task 4.2.
   - Add `.local-map__viewport--fit { display: block; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; cursor: grab; touch-action: none; }`, plus a `--dragging` modifier with `cursor: grabbing`. Use no transition property.
   - Update the `.local-map__lattice` comment that mentions caps.
-- [ ] 3.5 `web/webclient-app/components/LocalMap.vue`: delete the `:show-legend="false"` binding and its comment. Check with `grep -n "show-legend" web/webclient-app/components/LocalMap.vue`, which returns nothing.
+- [x] 3.5 `web/webclient-app/components/LocalMap.vue`: delete the `:show-legend="false"` binding and its comment. Check with `grep -n "show-legend" web/webclient-app/components/LocalMap.vue`, which returns nothing.
 
 ## 4. Overlay: fitted layout, toolbar, legend popover (design D2, D3, D5, D7)
 

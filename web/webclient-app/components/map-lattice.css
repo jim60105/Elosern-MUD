@@ -2,19 +2,19 @@
   display: contents;
 }
 
-.local-map__viewport--canvas {
+.local-map__viewport--fit {
   display: block;
+  position: relative;
   width: 100%;
+  height: 100%;
   min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scroll-padding: 12px;
-  scrollbar-color: var(--gold-500) transparent;
-  scrollbar-width: thin;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
 }
 
-.local-map__viewport--canvas > svg {
-  margin: 0 auto;
+.local-map__viewport--fit--dragging {
+  cursor: grabbing;
 }
 
 .local-map__dot-field {
@@ -30,13 +30,11 @@
 }
 
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
-   cells) and scales proportionally under caller-supplied caps or renders as
-   the fixed square canvasSize (the overlay
-   passes no height cap and fills the body width). */
+   cells) or renders as the fixed square canvasSize or fitted view. */
 .local-map__lattice {
   display: block;
-  /* `align-self: center` centres the canvas whenever a cap makes it narrower
-     than the surface. */
+  /* `align-self: center` centres the natural-size canvas whenever the surface
+     is wider than it; a fitted canvas fills the surface instead. */
   align-self: center;
   width: auto;
   height: auto;
@@ -208,61 +206,4 @@
   stroke-width: 1.5;
   stroke-opacity: 0.45;
   stroke-dasharray: 2 5;
-}
-
-/* The draft dot-chip legend (D6): an 11px radius-3 chip + 11px text label,
-   14px gap, no bordered pill. The text labels stay the non-colour
-   indicator; remembered (dashed) vs visited (solid) chip borders add a
-   non-colour distinction between those two entries. */
-.local-map__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.local-map__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--paper-500);
-  font-size: 11px;
-}
-
-.local-map__legend-chip {
-  flex: none;
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-}
-
-.local-map__legend-chip--current {
-  background: var(--seal-deep);
-}
-
-.local-map__legend-chip--visible_unvisited {
-  background: transparent;
-  border: 1px solid var(--ink-edge);
-}
-
-.local-map__legend-chip--visible_visited {
-  background: var(--map-canvas-hi);
-  border: 1px solid var(--gold-500);
-}
-
-.local-map__legend-chip--remembered {
-  background: var(--map-canvas-hi);
-  border: 1px dashed var(--gold-500);
-}
-
-/* Beyond-state note entries (webclient-map-scale-legend D3): a neutral
-   design-token chip whose dotted border is a shape distinction no state
-   chip uses (current: solid fill, unvisited: solid border, visited: solid
-   border, remembered: dashed border), so the info entry never relies on
-   colour alone and can never be mistaken for a visibility state. */
-.local-map__legend-chip--info {
-  background: transparent;
-  border: 1px dotted var(--ink-edge);
 }
