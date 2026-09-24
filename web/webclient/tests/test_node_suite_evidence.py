@@ -50,6 +50,31 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention",
+    )
+    def test_vitals_visibility_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/vitals_visibility.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/status_panel.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "vitals-visibility Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe"
     )
     def test_keyboard_router_node_suite_passes(self):

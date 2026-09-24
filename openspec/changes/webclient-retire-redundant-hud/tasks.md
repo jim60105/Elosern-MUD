@@ -105,7 +105,7 @@
   - `lowHp` (true)
   - a missing gauge and a string `current` (neither counts)
   - the store slice through a fixture snapshot (`tests/store/protocol_fixtures.js` `statusPanel()`)
-- [ ] 4.2 `AppClient.vue`:
+- [x] 4.2 `AppClient.vue`:
   - mount `StatusPanel` on `panelAvailable('status')` alone
   - drop its `:character` binding
   - bind `:visible="store.view.vitals.visible"`
@@ -124,7 +124,7 @@
   `stories/Data/StatusPanel.stories.js`: drop `character` args and add `visible: true` (plus one `HiddenAtFullHealth` story). Keep the existing story IDs `full-payload`, `combat-rounds`, and `minimal`. If the `data-statuspanel--*` story-ID list in `web/webclient/tests/test_vue_showcase_data_evidence.py` is exhaustive, add `data-statuspanel--hidden-at-full-health` to it.
 
   Run `pnpm exec vitest run web/webclient-app/tests/data web/webclient-app/tests/store`; green.
-- [ ] 4.3 `web/webclient/tests/test_node_suite_evidence.py`: add `test_vitals_visibility_node_suite_passes`, running `web/webclient-app/tests/data/vitals_visibility.test.js` and `tests/data/status_panel.test.js` in the same shape as `test_party_strip_node_suite_passes`, annotated `webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention` (confirm the ID with `uv run --locked python -m tools.spec_traceability list` after 7.1).
+- [x] 4.3 `web/webclient/tests/test_node_suite_evidence.py`: add `test_vitals_visibility_node_suite_passes`, running `web/webclient-app/tests/data/vitals_visibility.test.js` and `tests/data/status_panel.test.js` in the same shape as `test_party_strip_node_suite_passes`, annotated `webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention` (confirm the ID with `uv run --locked python -m tools.spec_traceability list` after 7.1).
 
 ## 5. Party strip, party opener, gallery opener
 

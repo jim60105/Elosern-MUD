@@ -59,6 +59,7 @@ DATA_FAMILY_STORY_IDS = {
     "data-skillbook--search-filtered",
     "data-statuspanel--combat-rounds",
     "data-statuspanel--full-payload",
+    "data-statuspanel--hidden-at-full-health",
     "data-statuspanel--minimal",
 }
 

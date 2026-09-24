@@ -97,6 +97,7 @@ const {
         :mutations-locked="store.view.mutationsLocked"
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
+        :vitals-visible="store.view.vitals.visible"
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
         :completion-candidates="completionCandidates"
@@ -143,10 +144,10 @@ const {
         </template>
         <template #panel-left>
         <StatusPanel
-          v-if="panelAvailable('status') || panelAvailable('character')"
+          v-if="panelAvailable('status')"
           :status="panel('status') || {}"
-          :character="panel('character') || {}"
           :low-hp="store.view.vitals.lowHp"
+          :visible="store.view.vitals.visible"
           :revision="store.view.revision"
           :epoch="store.view.epoch"
         />

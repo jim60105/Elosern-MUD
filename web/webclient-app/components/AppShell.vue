@@ -74,6 +74,9 @@ const props = defineProps({
   // attribute binding, no structural edit to the frame. The stage then
   // renders its red vignette and the HP fill renders its pulse.
   lowHp: { type: Boolean, default: false },
+  // Vitals island visibility derived client-side (design D1/D2/D3).
+  // Focus is rescued before the island hides with display:none.
+  vitalsVisible: { type: Boolean, default: true },
   // The client-local text-to-HTML narrative preference (H5): forwarded to
   // the command line's prompt line — when off, the prompt renders as literal
   // text (the preference chooses whether the markup pipeline runs, never
@@ -230,6 +233,21 @@ watch(
     // The command line is now permanent (design D1 — no drawer to close): a
     // mode change into creation only runs the pre-hide focus rescue; the CSS
     // then hides the `command-line` anchor itself (H1's matrix).
+  },
+);
+
+// Pre-flush focus rescue for data-driven vitals island hide (design D3):
+// when the island hides outside combat (all vitals full and conditions cleared),
+// any focus held inside the island is restored to the action dock before display:none.
+watch(
+  () => props.vitalsVisible,
+  (nextVisible, prevVisible) => {
+    if (prevVisible && !nextVisible) {
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('[data-testid="status-panel"]')) {
+        restoreDockFocus();
+      }
+    }
   },
 );
 
