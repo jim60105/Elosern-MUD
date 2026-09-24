@@ -352,7 +352,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         generation = store_state(page)["generation"]
         accepted = page.evaluate(
             """(args) => window.__elosernBridge.store.receive(
-              args.generation, 'ui_error', [{
+              args.generation, 'ui_protocol_error', [{
                 protocol_version: 1,
                 code: 'unsupported_version',
                 message: '不支援的協定版本',

@@ -400,8 +400,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         else:
             raise AssertionError("the wait tab never reached focus")
         _press(page, "Enter")  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至正午
-        _press(page, "ArrowDown")  # 休息一段時間
+        _press(page, "ArrowRight")  # 睡眠至完全恢復
+        _press(page, "ArrowRight")  # 休息 N 小時 (opens the rest form)
         _press(page, "Enter")
         wait_for_store_state(
             page,

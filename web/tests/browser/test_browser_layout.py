@@ -458,6 +458,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 self._wait_mode(page, "exploration")
+                open_command_line(page)
                 # All four stage anchors must be present with non-zero boxes; a
                 # deleted anchor would otherwise make the non-overlap check trivial.
                 rects = self._stage_anchor_rects(page)

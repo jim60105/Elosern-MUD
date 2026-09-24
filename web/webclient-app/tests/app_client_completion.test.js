@@ -58,9 +58,12 @@ describe("Tab completion candidates through AppClient (align-02 wiring)", () => 
     // the freshly committed panel, then expand the command line before typing.
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="command-line-toggle"]').trigger("click");
-    await wrapper.vm.$nextTick();
-    expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("true");
+    const anchor = wrapper.get('[data-testid="anchor-command-line"]');
+    if (anchor.attributes("data-expanded") !== "true") {
+      await wrapper.get('[data-testid="command-line-toggle"]').trigger("click");
+      await wrapper.vm.$nextTick();
+    }
+    expect(anchor.attributes("data-expanded")).toBe("true");
     const input = wrapper.get("textarea#inputfield");
     input.element.value = prefix;
     input.trigger("input");

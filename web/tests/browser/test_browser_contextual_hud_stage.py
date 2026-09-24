@@ -721,7 +721,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (band && Math.abs(cmd.bottom - band.top) > 1) {
                         hits.push("not-on-band-top");
                       }
-                      const leftCol = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-column'));
+                      const brand = byId('.topbar-brand');
+                      const leftCol = brand ? brand.right : null;
                       return {
                         hits,
                         height: cmd.height,
@@ -1263,7 +1264,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page.keyboard.press("Escape")
             page.wait_for_function(
                 "(sel) => document.querySelector(sel) === null",
-                surface_sel,
+                arg=surface_sel,
                 timeout=15000,
             )
             self.assertEqual(
