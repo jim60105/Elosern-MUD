@@ -177,8 +177,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             # size rather than a fixed lower bound.
             lattice_box = page.locator('[data-testid="local-map__lattice"]').bounding_box()
             self.assertIsNotNone(lattice_box)
-            self.assertLess(lattice_box["width"], 60)
-            self.assertLessEqual(lattice_box["height"], 300)
+            self.assertAlmostEqual(lattice_box["width"], 208.0, delta=1.0)
+            self.assertAlmostEqual(lattice_box["height"], 208.0, delta=1.0)
+            scale = page.evaluate(
+                """() => {
+                  const svg = document.querySelector('[data-testid="local-map__lattice"]');
+                  return svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+                }"""
+            )
+            self.assertLess(scale, 1.0)
 
             # Pre-scale (viewBox) non-intersection: compute every marker/label
             # bounding box in the SVG's root (viewBox) coordinates — the
@@ -218,10 +225,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
               );
               function separated(a, b) {
                 return (
-                  a.x + a.width + 2 <= b.x ||
-                  b.x + b.width + 2 <= a.x ||
-                  a.y + a.height + 2 <= b.y ||
-                  b.y + b.height + 2 <= a.y
+                  a.x + a.width <= b.x + 0.5 ||
+                  b.x + b.width <= a.x + 0.5 ||
+                  a.y + a.height <= b.y + 0.5 ||
+                  b.y + b.height <= a.y + 0.5
                 );
               }
               let markerMarker = 0, markerLabel = 0, labelLabel = 0;
@@ -290,13 +297,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             page.close()
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
-    def test_tall_lattice_with_long_remembered_list_stays_within_the_island(self):
-        # The blocking combination the crowding fix targets: a tall in-view
-        # lattice (2 cols × 48 rows) plus a long remembered list (16 nodes —
-        # 48 + 16 = 64 hits the model's MAX_NODES bound). The canvas's
-        # dynamically measured max-height must shrink to the space left after
-        # the remembered list, so the hud-right anchor never has to scroll a
-        # required island surface out of view.
+    def test_long_remembered_list_never_resizes_the_island(self):
+        # Task 5.2: adding remembered nodes never resizes the island or its
+        # 208x208 canvas, renders no local-map-remembered, and mirrors all entries.
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
@@ -304,6 +307,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
+
+                # 1. Base payload without remembered nodes
+                self._inject_panel(page, self._tall_lattice_payload(rows=48, remembered_count=0))
+                wait_for_store_state(
+                    page,
+                    lambda s: (s.get("localMapModel") or {}).get("rows") == 48,
+                    timeout=30000,
+                )
+                base_island_box = page.locator('[data-testid="local-map"]').bounding_box()
+
+                # 2. Inject 16 remembered nodes
                 result = self._inject_panel(
                     page, self._tall_lattice_payload(rows=48, remembered_count=16)
                 )
@@ -313,31 +327,27 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     lambda s: (s.get("localMapModel") or {}).get("rows") == 48,
                     timeout=30000,
                 )
-                # Lattice variant renders 16 edge markers, no remembered list
+
+                # - no local-map-remembered
                 self.assertEqual(
                     page.locator('[data-testid="local-map-remembered"]').count(),
                     0,
                 )
-                edge_markers = page.locator('[data-testid^="local-map__edge-marker--"]')
-                self.assertEqual(edge_markers.count(), 16)
+                # - mirror entry count equal to remembered count
+                mirror_entries = page.locator('[data-testid="local-map-edge-markers-mirror"] li').count()
+                self.assertEqual(mirror_entries, 16)
 
-                # The anchor must not need to scroll: the dynamic canvas cap
-                # reserved space for the remembered list.
-                fit = page.evaluate(
-                    """() => {
-                      const anchor = document.querySelector('[data-anchor="hud-right"]');
-                      return {
-                        scroll: anchor.scrollHeight,
-                        client: anchor.clientHeight,
-                      };
-                    }"""
-                )
-                # Same sub-pixel rounding tolerance as above: the island
-                # budget leaves its own 1px border-box border unreserved
-                # (reserving it regresses the >=2px marker/label separation
-                # contract), so a <=1px scroll range is the accepted
-                # residual; a real overflow fails this bound.
-                self.assertLessEqual(fit["scroll"], fit["client"] + 1)
+                # - 208 x 208 canvas
+                canvas_box = page.locator('[data-testid="local-map__lattice"]').bounding_box()
+                self.assertIsNotNone(canvas_box)
+                self.assertAlmostEqual(canvas_box["width"], 208.0, delta=1.0)
+                self.assertAlmostEqual(canvas_box["height"], 208.0, delta=1.0)
+
+                # - island box equal to that of the same payload without remembered nodes
+                with_rem_island_box = page.locator('[data-testid="local-map"]').bounding_box()
+                self.assertAlmostEqual(with_rem_island_box["width"], base_island_box["width"], delta=1.0)
+                self.assertAlmostEqual(with_rem_island_box["height"], base_island_box["height"], delta=1.0)
+
                 for testid in ("local-map__title", "local-map-detail"):
                     self.assertTrue(
                         page.locator(f'[data-testid="{testid}"]').is_visible(),

@@ -68,9 +68,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         rowPitch: 40,
         labelMax: 4,
         markerScale: 1,
-        maxWidth: 206,
-        maxHeight: 296,
-        fillWidth: false,
+        canvasSize: 208,
         overlayChrome: false,
         markerNames: true,
       },
@@ -83,13 +81,15 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     // 3 cols × 58 = 174; 3 rows × 58 = 174 + 14 = 188.
     // Gutter for island with nameHeight: 16 -> namePad: 18 -> gutter: 2 * sqrt(2) * 9 + 1 + 18 ≈ 44.4558
     const expectedGutter = 2 * Math.SQRT2 * 9 + 1 + 18;
-    expect(svgWidth).toBeCloseTo(174 + 2 * expectedGutter, 5);
-    expect(svgHeight).toBeCloseTo(188 + 2 * expectedGutter, 5);
+    expect(svgWidth).toBe(208);
+    expect(svgHeight).toBe(208);
+    const vb = svg.attributes("viewBox").split(" ").map(Number);
+    expect(vb[2]).toBeCloseTo(188 + 2 * expectedGutter, 5);
+    expect(vb[3]).toBeCloseTo(188 + 2 * expectedGutter, 5);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
-    // Span on left edge: (188 + 2 * 44.4558) - 2 * 44.4558 = 188.
-    // budget = floor(188 / 10) = 18. Label is 11 chars -> fits whole!
+    // Span on left edge: 188. budget = floor(188 / 10) = 18. Label is 11 chars -> fits whole!
     expect(westText.text()).toBe("西部丘陵與谷地（南門）");
     const tspans = westText.findAll("tspan");
     expect(tspans).toHaveLength(11);
@@ -217,9 +217,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         rowPitch: 40,
         labelMax: 4,
         markerScale: 1,
-        maxWidth: 206,
-        maxHeight: 296,
-        fillWidth: false,
+        canvasSize: 208,
         overlayChrome: false,
         markerNames: true,
       },

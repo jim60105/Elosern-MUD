@@ -27,6 +27,8 @@ const emit = defineEmits(["move", "open-map"]);
 const available = computed(() => props.localMap.available === true);
 const reasonMessage = computed(() => props.localMap.reason?.message ?? "");
 const body = ref(null);
+const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
+const isGraph = computed(() => (props.localMap.layoutVariant || "lattice") === "graph");
 const currentNodeId = computed(() =>
   props.localMap.nodes?.find((node) => node.visibility === "current")?.id,
 );
@@ -91,6 +93,30 @@ function handleMove(payload) {
         :marker-name-font="11"
         @move="handleMove"
       />
+      <!-- Graph variant remembered nodes list (design D5) -->
+      <ul
+        v-if="isGraph && remembered.length"
+        class="map-overlay__remembered"
+        data-testid="map-overlay-remembered"
+        aria-label="記得的地點"
+      >
+        <li
+          v-for="node in remembered"
+          :key="node.id"
+          class="map-overlay__remembered-item"
+        >
+          <svg
+            class="map-overlay__remembered-marker"
+            viewBox="-16 -16 32 32"
+            width="14"
+            height="14"
+            aria-hidden="true"
+          >
+            <rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
+          </svg>
+          <span class="map-overlay__remembered-label">{{ node.label }}</span>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
@@ -164,5 +190,39 @@ function handleMove(payload) {
 .map-overlay__content :deep(.local-map__lattice--canvas) {
   border-color: var(--gold-500);
   box-shadow: inset 0 0 60px #0005;
+}
+
+.map-overlay__remembered {
+  flex: none;
+  width: 100%;
+  max-width: 848px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-sizing: border-box;
+}
+
+.map-overlay__remembered-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--paper-300);
+  font-size: var(--text-sm);
+}
+
+.map-overlay__remembered-marker rect {
+  fill: var(--paper-500);
+}
+
+.map-overlay__remembered-label {
+  color: var(--paper-300);
+  font-family: var(--f-mono);
+  font-size: 11px;
 }
 </style>

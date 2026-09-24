@@ -14,13 +14,12 @@
 // The island chrome (webclient-minimap-04-island-single-affordance):
 // - The single full-map affordance is a full-bleed transparent <button>
 //   layered beneath the island's visual content. It is the island's first
-//   DOM child so keyboard Tab reaches the primary action before the
-//   remembered list's focusable items.
+//   DOM child so keyboard Tab reaches the primary action.
 // - No hover or selection state is tracked; the readout is a pure function
 //   of the committed payload's current node (design D3/D6).
 // - The readout states only `座標 x,y` on coordinate-bearing layers
 //   (grid/wilderness); nothing on coordinate-free layers.
-import { computed, onMounted, onUpdated, ref } from "vue";
+import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
 import MapLattice from "./MapLattice.vue";
 
@@ -49,9 +48,6 @@ const showsOrientation = computed(
 );
 const isGraph = computed(
   () => (props.localMap.layoutVariant || "lattice") === "graph",
-);
-const showsRememberedList = computed(
-  () => isGraph.value && remembered.value.length > 0,
 );
 
 const OCTANT_WORDS = ["北", "東北", "東", "東南", "南", "西南", "西", "西北"];
@@ -113,103 +109,11 @@ const detail = computed(() => {
   return "";
 });
 
-// Dynamic canvas height budget (the crowding fix): a fixed 296px cap would
-// ignore the rendered height of the island's other sections, so a tall
-// lattice combined with a long remembered list would push required content
-// into the anchor's overflow-y scroll fallback. Instead the canvas's
-// max-height shrinks to the space the hud-right anchor's height budget
-// leaves after the meta row, remembered list, and readout line; the computed
-// cap is passed down to MapLattice as its `maxHeight` prop, which resolves it
-// into the canvas's single width bound. (Since slim-minimap-island the legend
-// is overlay-only, so it left both the section list and the gap count.) The
-// budget's SOURCE is the fix documented on `anchorHeightBudget` below — the
-// formula itself is unchanged, and stays ResizeObserver-driven: nothing here
-// runs per frame.
-const rootEl = ref(null);
-const metaEl = ref(null);
-const rememberedEl = ref(null);
-const detailEl = ref(null);
-const canvasMaxHeight = ref(0);
-
-function sectionHeight(el) {
-  return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
-}
-
-// The clearance the island keeps between its own bottom edge and the dock
-// anchor's top edge. It is what makes the measured budget strictly smaller
-// than the anchor's CSS cap (`max-height: calc(100% - var(--dock-h) - 110px)`
-// leaves 46px there, of which the 46px command line claims all), so the
-// island can never grow into the anchor's `overflow-y` fallback.
-const ANCHOR_BOTTOM_CLEARANCE = 12;
-
-// The anchor's height budget: the room the anchor is ALLOWED to occupy, NOT
-// the room it currently occupies. Reading `anchor.clientHeight` measured the
-// latter and made the whole formula degenerate: `[data-anchor="hud-right"]`
-// is an absolutely positioned box with `top` + `max-height` and no `height`,
-// so while its content fits it is sized BY the island — and the island's
-// height is dominated by the very canvas this budget caps. Substituting the
-// island's own box back into the formula collapses it to
-// `available = renderedCanvasHeight - 1`, a strictly decreasing map: every
-// ResizeObserver pass shrank the canvas by a pixel, which shrank the anchor,
-// which re-fired the observer, ratcheting the minimap down onto the 40px
-// floor. Measuring from the island's top edge to the dock anchor's top edge
-// reads only positions that do not move with the canvas, so the measurement
-// is a fixed point instead of a ratchet.
-function anchorHeightBudget(anchor) {
-  const dock = anchor.parentElement?.querySelector('[data-anchor="dock"]');
-  if (dock) {
-    const room = Math.floor(
-      dock.getBoundingClientRect().top -
-        anchor.getBoundingClientRect().top -
-        ANCHOR_BOTTOM_CLEARANCE,
-    );
-    if (room > 0) return room;
-  }
-  // Bare mount outside the shell (component tests, Storybook): fall back to
-  // the anchor's own box, which in that context is authored, not island-fed.
-  return anchor.clientHeight;
-}
-
-function measureCanvasBudget() {
-  const root = rootEl.value;
-  if (!root) return;
-  // Island context only: the full-map overlay renders the lattice outside
-  // the hud-right anchor, so it keeps the prop caps.
-  const anchor = root.closest('[data-anchor="hud-right"]');
-  if (!anchor) return;
-  const budget = anchorHeightBudget(anchor);
-  if (!budget) return;
-  // Sections actually laid out (design D6): meta and canvas are always laid
-  // out; at most one of {graph-variant remembered list, coordinate readout}
-  // is laid out.
-  let laidOutSections = 2;
-  if (showsRememberedList.value) laidOutSections += 1;
-  if (detail.value !== "") laidOutSections += 1;
-  const gapCount = laidOutSections - 1;
-  const others =
-    sectionHeight(metaEl.value) +
-    sectionHeight(rememberedEl.value) +
-    sectionHeight(detailEl.value);
-  const available = budget - others - gapCount * 8 - 18 - 2 - 4 - 1;
-  canvasMaxHeight.value = Math.max(40, Math.min(296, available));
-}
-
-onMounted(() => {
-  measureCanvasBudget();
-  const anchor = rootEl.value?.closest('[data-anchor="hud-right"]');
-  if (anchor && typeof ResizeObserver !== "undefined") {
-    new ResizeObserver(() => measureCanvasBudget()).observe(anchor);
-  }
-});
-onUpdated(() => {
-  measureCanvasBudget();
-});
-
 // Pointer-click convenience (webclient-map-01-draft-chrome D5): clicking the
 // island's non-interactive body opens the full map. A click that originated
-// in an interactive descendant — the full-bleed affordance button (a <button>),
-// a lattice node group (carrying `data-node`), its actionable halo, or a
-// remembered-list item (`[tabindex]`) — runs only that control's own behavior.
+// in an interactive descendant — the full-bleed affordance button (a <button>)
+// or a lattice node group (carrying `data-node`) — runs only that control's own
+// behavior.
 // The root deliberately gains no role or tabindex: the full-bleed button is
 // the only keyboard path, and the focus-restore contract captures it as the
 // opener (design D2).
@@ -221,7 +125,7 @@ function onIslandClick(event) {
 </script>
 
 <template>
-  <aside class="local-map" data-testid="local-map" ref="rootEl" @click="onIslandClick">
+  <aside class="local-map" data-testid="local-map" @click="onIslandClick">
     <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
       {{ reason }}
     </p>
@@ -231,9 +135,7 @@ function onIslandClick(event) {
            transparent and layered beneath the island's visual content so the
            button element itself contains no focusable descendant. It is a real
            <button> (Enter/Space via the platform, never a key handler on a
-           div), carries 展開全地圖 as its accessible name, and is the island's
-           FIRST DOM child so Tab reaches the primary action before the
-           remembered list's focusable items.
+           div), carries 展開全地圖 as its accessible name.
 
            Pointer behaviour is unchanged and stays single-emit: content sits
            above this button, so a click on visible content targets that
@@ -243,8 +145,7 @@ function onIslandClick(event) {
            click, skips it because event.target.closest("button, …") matches
            this button. Keyboard activation produces the same bubbling click
            and is skipped by the same guard. So every path emits exactly one
-           open-map, and a click originating in a lattice node group
-           ([data-node]) or a remembered item ([tabindex]) still emits none. -->
+           open-map, and a click originating in a lattice node group still emits none. -->
       <button
         type="button"
         class="local-map__affordance"
@@ -264,7 +165,7 @@ function onIslandClick(event) {
            carries no full-map control of its own — the single full-bleed
            affordance above is the island's only full-map affordance (D1),
            so the elastic title now owns the space the control occupied. -->
-      <div class="local-map__meta" data-testid="local-map__title" ref="metaEl">
+      <div class="local-map__meta" data-testid="local-map__title">
         <span class="local-map__meta-title" :title="title">{{ title }}</span>
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑ 東→
@@ -275,18 +176,9 @@ function onIslandClick(event) {
       </div>
 
       <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
-           minimap composes MapLattice at its default (post-crowding-fix)
-           scale; the dynamically measured height budget (the crowding fix)
-           is passed down as the canvas cap.
-
-           `fill-width` is the draft's `.mini svg { width: 100% }` rule: the
-           canvas claims the island's whole content width instead of drawing
-           at natural pixel size (REDESIGN §7 — the lattice's geometry IS its
-           claim, so it must not be the smallest thing in the island). The
-           scale is uniform through the viewBox, so the crowding fix's marker,
-           label and gutter geometry stays proportional; coordinate-margin
-           padding (`field-fill`) spends the width slack on coordinate space
-           rather than magnification, keeping uniform scale <= 1.
+           minimap composes MapLattice with a fixed square 208px canvasSize
+           (design D1), pitch-fit (D3), and footprint crop (D4).
+           Scale never exceeds 1.
 
            The island no longer listens to select/hover/leave (D3): the shared
            renderer keeps its event surface for the overlay and future changes
@@ -294,13 +186,11 @@ function onIslandClick(event) {
       <MapLattice
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
-        :max-height="canvasMaxHeight || 296"
-        :fill-width="true"
+        :canvas-size="208"
         :col-pitch="40"
         :row-pitch="40"
         :label-font="9"
         :marker-name-font="10"
-        :field-fill="true"
         :show-axis="true"
         :fog-vignette="true"
         :show-legend="false"
@@ -322,26 +212,16 @@ function onIslandClick(event) {
         </li>
       </ul>
 
-      <!-- The graph variant's bounded remembered list (design D4): scoped to
-           coordinate-free layers (interior/instance), plain non-focusable text,
-           no tabindex, no activation. Clicks bubble to onIslandClick. -->
-      <ul v-if="showsRememberedList" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
-        <li
-          v-for="node in remembered"
-          :key="node.id"
-          class="local-map__node local-map__node--remembered"
-          :data-testid="`local-map__node--${node.id}`"
-        >
-          <svg
-            class="local-map__marker local-map__marker--remembered"
-            viewBox="-16 -16 32 32"
-            width="14"
-            height="14"
-            aria-hidden="true"
-          >
-            <rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
-          </svg>
-          <span class="local-map__node-label">{{ node.label }}</span>
+      <!-- Assistive technology mirror for graph variant remembered nodes (design D5):
+           visually-hidden, non-focusable list in payload order. -->
+      <ul
+        v-if="isGraph && remembered.length"
+        class="visually-hidden"
+        aria-label="記得的地點"
+        data-testid="local-map-remembered-mirror"
+      >
+        <li v-for="node in remembered" :key="node.id">
+          {{ node.label }}
         </li>
       </ul>
 
@@ -357,7 +237,6 @@ function onIslandClick(event) {
         class="local-map__detail"
         :class="{ 'local-map__detail--empty': detail === '' }"
         data-testid="local-map-detail"
-        ref="detailEl"
       >
         {{ detail }}
       </p>
@@ -379,22 +258,13 @@ function onIslandClick(event) {
   flex-direction: column;
   gap: var(--sp-2);
   box-sizing: border-box;
-  /* The island keeps its natural content height (design D9/D10): a flex item
-     with min-height:0 + flex-shrink:1 let the capped hud-right anchor
-     compress it to the meta row, pushing the canvas/remembered/detail below the
-     island's box. min-height:auto makes the island size to its content; when
-     the content outgrows the anchor's height budget, the anchor scrolls
-     (overflow-y:auto) instead of the island being crushed. */
+  /* The island renders at a constant size (design D1/D2): a fixed 208px square
+     canvas, 1px hairline border, and --sp-1 padding. It is right-aligned in
+     the anchor and does not stretch to the column width. */
   min-height: auto;
-  /* The island claims the anchor's full 230px column. The hud-right anchor is
-     `align-items: flex-end`, so without this the island is shrink-to-fit and
-     its width is decided by whichever row happens to be widest — the map card
-     changed width with the authored title's length, and a short title left the
-     canvas even less room to fill. A minimap is a fixed station in the HUD
-     (hud-systems: anchor to the corner, keep positions stable), so its card
-     width is a constant, not a function of the payload. */
-  width: 100%;
-  padding: 9px;
+  width: auto;
+  align-self: flex-end;
+  padding: var(--sp-1);
   background: var(--panel);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -449,9 +319,7 @@ function onIslandClick(event) {
    assistive-technology mirror to `relative` — and (a) `clip` only applies to
    absolutely positioned boxes, so the clip-rect hiding pattern silently stops
    working, and (b) the mirror becomes an in-flow flex item, adding its 1px box
-   plus a full `--sp-2` gap to the island while `measureCanvasBudget()` — which
-   counts only the meta row, the canvas, and at most one of the graph-variant
-   list and the readout — reserves nothing for it. The mirror has nothing to
+   plus a full `--sp-2` gap to the island. The mirror has nothing to
    raise: it is clipped to nothing and never paints. */
 .local-map > *:not(.local-map__affordance):not(.visually-hidden) {
   position: relative;
@@ -534,51 +402,16 @@ function onIslandClick(event) {
   /* Coordinates remain secondary to the map and its larger title. */
   font-size: 10px;
   line-height: 1.45;
+  min-height: 1.45em;
   text-align: center;
   overflow-wrap: anywhere;
 }
 
 /* An island with no coordinate figure on the current layer states nothing
-   rather than reserving a blank line (and, with it, a blank slot in the
-   height budget — `sectionHeight` reads 0 for a display:none section). */
+   and paints no box, while reserving its single line height so the card height
+   does not change with the layer (design D2). */
 .local-map__detail--empty {
-  display: none;
-}
-
-.local-map__remembered {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.local-map__remembered .local-map__node {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: 2px var(--sp-2);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-300);
-  font-size: var(--text-sm);
-}
-
-.local-map__remembered .local-map__marker--remembered rect {
-  fill: var(--paper-500);
-}
-
-/* The remembered list's plain-text label spans keep the lattice label
-   metrics (the extraction moved this rule into MapLattice's scoped CSS,
-   which no longer reaches the island's own list items): without it the
-   spans inherit the item's 13px font and grow every list row by 3px,
-   breaking the crowding fix's no-scroll guarantee at small viewports. */
-.local-map__node-label {
-  fill: var(--paper-300);
-  font-family: var(--f-mono);
-  font-size: 11px;
-  pointer-events: none;
+  visibility: hidden;
 }
 
 .visually-hidden {
@@ -599,6 +432,7 @@ function onIslandClick(event) {
   position: relative;
   z-index: 1;
   pointer-events: none;
+  border: 0;
 }
 
 .local-map :deep(.local-map__node) {

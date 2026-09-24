@@ -426,7 +426,7 @@ const {
       <template #default="{ overlay: openName, mapModel }">
         <MapOverlay
           v-if="openName === 'map'"
-          :local-map="mapModel || {}"
+          :local-map="mapModel || store.view.localMapModel || {}"
           @move="onMapMove"
           @open-map="onMapExpand"
         />

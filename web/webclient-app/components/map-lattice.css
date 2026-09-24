@@ -30,20 +30,13 @@
 }
 
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
-   cells) and scales proportionally under the caller-supplied caps, which
-   both callers resolve into the single `max-width` bound computed in
-   `latticeStyle` (the island passes its measured height budget; the overlay
+   cells) and scales proportionally under caller-supplied caps or renders as
+   the fixed square canvasSize (the overlay
    passes no height cap and fills the body width). */
 .local-map__lattice {
   display: block;
   /* `align-self: center` centres the canvas whenever a cap makes it narrower
-     than the surface (a tall payload trades width for the island's height
-     budget). It no longer defends a natural-size rendering: an earlier
-     revision used it plus `width: auto` to stop the flex column from
-     *enlarging* small lattices, which is exactly what the draft's
-     `.mini svg { width: 100% }` asks for and what `fillWidth` now does —
-     uniformly, through the viewBox, so every marker/label/gutter offset in
-     the geometry contract stays proportional and scale-invariant. */
+     than the surface. */
   align-self: center;
   width: auto;
   height: auto;

@@ -195,17 +195,17 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(wrapper.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(0);
   });
 
-  it("exposes marker names only at the overlay scale (island keeps the list canonical)", () => {
+  it("exposes marker names only at the overlay scale (island keeps the mirror canonical)", () => {
     const model = localMapModelFor(LOCAL_MAP_SAMPLE);
     // Island scale (no overlay chrome): the marker is aria-hidden, name-free.
     const island = mountLattice({ localMap: model, variant: "lattice" });
     const islandMarker = island.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
     expect(islandMarker.attributes("aria-hidden")).toBe("true");
     expect(islandMarker.find("text").exists()).toBe(false);
-    // The island's canonical reading path: the remembered list item.
+    // The island's canonical reading path: the assistive-technology mirror.
     expect(
-      island.find('[data-testid="local-map-remembered"]').exists(),
-    ).toBe(false, "MapLattice alone has no list — LocalMap owns it");
+      island.find('[data-testid="local-map-remembered-mirror"]').exists(),
+    ).toBe(false, "MapLattice alone has no mirror — LocalMap owns it");
     island.unmount();
     wrapper = null;
     // Overlay scale: visible name + accessible name on the decoration.

@@ -2,7 +2,12 @@
 // FullLogOverlay (H1, webclient-hud-01-shell-and-scene, design D4): the
 // full-screen, scrollable view of the complete retained narrative. It
 // renders the same line stream through the preserved
-// `narrative-renderer.js` — never a second markup path — and carries the
+// `narrative-renderer.js` — never a second markup path.
+//
+// Open-at-latest-line rule (design D6): the full log opens scrolled to the
+// bottom of its scrollable content. Lines that arrive while open do not move
+// the reader's scroll position.
+//
 // focus contract: focus-trapped while open, Escape closes, and focus is
 // restored to the control that opened it. The caption card's `完整日誌`
 // control is the single one-action escape hatch (MODIFIED
@@ -36,6 +41,9 @@ export default {
         openerEl: preFocus.value,
       });
       trap.enter();
+      if (overlayEl.value) {
+        overlayEl.value.scrollTop = overlayEl.value.scrollHeight;
+      }
     }
 
     function restoreOpenerFocus() {

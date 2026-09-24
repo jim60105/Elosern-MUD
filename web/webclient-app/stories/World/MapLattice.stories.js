@@ -24,7 +24,7 @@ import {
 // draws rather than a natural-size one.
 const renderLattice = (args) => ({
   render: () =>
-    h("div", { style: "width: 210px;" }, [h(MapLattice, args)]),
+    h("div", { style: "width: 208px;" }, [h(MapLattice, args)]),
 });
 
 const renderOverlayScale = (args) => ({
@@ -59,11 +59,10 @@ const latticeOf = (fixture) => {
     localMap: model,
     variant: model.layoutVariant,
     showLegend: false,
-    fillWidth: true,
+    canvasSize: 208,
     colPitch: 40,
     rowPitch: 40,
     labelFont: 9,
-    fieldFill: true,
     showAxis: true,
     fogVignette: true,
     markerNames: true,
@@ -137,7 +136,7 @@ export const OverlayScaleRadial = {
 
 // Task 3.6: Draft lattice fidelity stories (webclient-minimap-06-draft-lattice-fidelity)
 
-// Sparse payload: one marker centered in a five-cell coordinate dot field
+// Sparse payload: one marker centered in roughly three and a half coordinate cells of dot field (pitch 60)
 export const IslandScaleSparse = {
   render: renderLattice,
   args: latticeOf(LOCAL_MAP_SINGLE_NODE_SAMPLE),

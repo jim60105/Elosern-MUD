@@ -230,9 +230,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "legend": ["你目前所在的位置", "已經探索過的相鄰位置", "曾經到過、但不在附近的遠方位置"],
         }
         self._inject_panel(page, interior_payload)
-        page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
-        self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 1)
+        page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
+        self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="local-map-remembered-mirror"] li').count(), 1)
         self.assertEqual(page.locator('[data-testid="local-map-edge-markers-mirror"]').count(), 0)
+        # Open full map and assert map-overlay-remembered lists the room
+        page.locator('[data-testid="local-map__title"]').click()
+        page.wait_for_selector('[data-testid="map-overlay-remembered"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="map-overlay-remembered"] li').count(), 1)
+        self.assertIn("地下金庫", page.locator('[data-testid="map-overlay-remembered"]').inner_text())
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_unknown_nodes_never_appear_in_the_dom(self):
