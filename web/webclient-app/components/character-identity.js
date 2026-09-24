@@ -1,10 +1,6 @@
-// Character identity derivations (H2, webclient-hud-02-status-islands,
-// design D2/D3/D11): display-only helpers for the character head card.
+// Character identity derivations: display-only helpers for character identity presentation.
 //
-// The duplicated magic-rank band table and ``magicRankTitle()`` are deleted
-// (magic-power-static-rename): the retired magic-rank ladder names the XP
-// system being removed, so the head card's rank line is guild-rank-only
-// until the title-system change line owns title presentation. Wallet values
+// Wallet values
 // are integer copper, thousands-separated for display only (no
 // floating-point money).
 

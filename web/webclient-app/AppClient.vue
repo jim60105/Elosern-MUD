@@ -10,7 +10,6 @@ import { useElosernStore } from "./stores/elosern.js";
 import { useAppClient } from "./composables/use-app-client.js";
 import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
-import ArtPanel from "./components/ArtPanel.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
@@ -157,13 +156,6 @@ const {
           :combat-participants="store.combatParticipants"
           :art-panel="panel('art')"
           @open-drawer="() => store.openHudDrawer('party')"
-        />
-        <!-- H3 (task 6.3): the art catalog strip is absent while the
-             participant frame is mounted (combat mode); the frame owns the
-             catalog there. -->
-        <ArtPanel
-          v-if="panelAvailable('art') && store.view.mode !== 'combat'"
-          :art="panel('art')"
         />
         <button
           v-if="panelAvailable('gallery')"

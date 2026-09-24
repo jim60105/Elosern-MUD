@@ -1,15 +1,15 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm the consumers this change relies on (stop and report if any grep disagrees):
+- [x] 1.1 Confirm the consumers this change relies on (stop and report if any grep disagrees):
   - `grep -rn "CharacterHead\|ArtPanel\|QuickWordChips\|quick_chips" web/webclient-app --include='*.js' --include='*.vue'` (excluding `dist/` and `node_modules/`) lists only `AppClient.vue`, `StatusPanel.vue`, `CommandLine.vue`, `AppShell.vue`, the three components themselves, their stories, and the tests named in sections 2–5.
   - `grep -rn "insertText" web/webclient-app --include='*.js' --include='*.vue'` shows only the chip paths in `CommandLine.vue` and `AppShell.vue`.
   - `grep -rn "openHudDrawer('party')\|openHudDrawer(\"party\")" web/webclient-app --include='*.vue' --include='*.js'` shows only the `PartyStrip` binding in `AppClient.vue`.
   - `grep -n '"severity"' web/webclient/presentation/status.py` shows the `severity` key on every `status.conditions` entry, and `grep -n "_SEVERITIES" world/rules/status_display.py` lists `beneficial`, `informational`, `warning`, `harmful`, `critical`.
-- [ ] 1.2 Confirm C1 (`webclient-minimap-and-log-quick-fixes`) and C2 (`webclient-full-map-fit-view`) are archived, or will be archived before this change (archive order C1 → C2 → C3). If C2's MODIFIED text of "The map, settings, and help surfaces are reachable from the live client" changed after this change was written, re-sync this change's block to it, keeping only the help-paragraph edit.
+- [x] 1.2 Confirm C1 (`webclient-minimap-and-log-quick-fixes`) and C2 (`webclient-full-map-fit-view`) are archived, or will be archived before this change (archive order C1 → C2 → C3). If C2's MODIFIED text of "The map, settings, and help surfaces are reachable from the live client" changed after this change was written, re-sync this change's block to it, keeping only the help-paragraph edit.
 
 ## 2. Head card and art strip
 
-- [ ] 2.1 Delete these files:
+- [x] 2.1 Delete these files:
   - `web/webclient-app/components/CharacterHead.vue`
   - `stories/Data/CharacterHead.stories.js`
   - `tests/data/character_head.test.js`
@@ -24,7 +24,7 @@
   `components/character-identity.js`: rewrite the header comment only, so it no longer describes a head card; its exports stay.
 
   Delete the three `.elosern-root .character-head…` rules in `styles/app-shell.css`.
-- [ ] 2.2 Delete these files:
+- [x] 2.2 Delete these files:
   - `web/webclient-app/components/ArtPanel.vue`
   - `stories/World/ArtPanel.stories.js`
   - `tests/world/art_panel.test.js`
@@ -35,7 +35,7 @@
   - in `AppClient.vue`, delete the `ArtPanel` import, its element, and its H3 comment
 
   `grep -rn "art-panel\b\|art-panel__\|ArtPanel.vue" web/webclient-app --include='*.js' --include='*.vue' --include='*.css'` (excluding `dist/`) returns nothing. The `artPanel` prop names on other components are unrelated and stay.
-- [ ] 2.3 `web/webclient-app/component-manifest.json`: remove `Core/QuickWordChips`, `Data/CharacterHead`, and `World/ArtPanel` (keep `"frozen": true`).
+- [x] 2.3 `web/webclient-app/component-manifest.json`: remove `Core/QuickWordChips`, `Data/CharacterHead`, and `World/ArtPanel` (keep `"frozen": true`).
 
   Update the manifest snapshots that list them:
   - `tests/overlays/deferred_surfaces_absent.test.js`

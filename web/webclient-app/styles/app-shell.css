@@ -432,11 +432,7 @@ body {
 }
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }
-.elosern-root .character-head { padding: 14px 12px; }
-.elosern-root .character-head .portrait { border-radius: 4px; border-color: #bda47780; }
-.elosern-root .character-head .name { font-family: var(--f-serif); font-size: 19px; }
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 4px 10px #0003; }
-.elosern-root .art-panel { max-height: 22vh; overflow: auto; }
 .elosern-root .cmdline { padding: 9px 16px; gap: 12px; background: #0b0d10ed; border-top: 1px solid #bda47730; }
 .elosern-root .cmdfield { min-height: 44px; border: 1px solid #c5a76f; border-radius: 6px; box-shadow: 0 0 8px #cfa45c25, inset 0 0 8px #cfa45c10; }
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
