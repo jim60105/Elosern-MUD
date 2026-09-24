@@ -1,7 +1,9 @@
 ## Purpose
 
 The desktop Vue SPA shell surfaces, client state reduction, keyboard focus model, command drawer, layout migration, theme, accessibility, and text fallback.
+
 ## Requirements
+
 ### Requirement: The WebClient loads a local Vue SPA desktop shell
 The project WebClient SHALL load Evennia's existing transport together with a locally built,
 self-contained Vue 3 single-page application. It SHALL make no remote request for a runtime UI
@@ -32,7 +34,7 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 
 ### Requirement: Required desktop surfaces remain visible and usable
 The narrative SHALL occupy the bottom band's message region as a bounded caption whose complete log is
-reachable in one action, with the brand, the top-meta pill, the action dock and the command line visible at 1920x1080, 1440x900, and
+reachable in one action, with the brand, the top-meta pill, the place card, the action dock and the command line visible at 1920x1080, 1440x900, and
 1280x720, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
 island in combat or while a vital or a `warning`, `harmful`, or `critical` condition needs attention, the party island while the party is
 non-empty). The action dock, the narrative caption, and the
@@ -46,22 +48,17 @@ root frame, and SHALL be closable in one action that returns focus to the contro
 a labelled control for each navigation-presented entry of the current mode's home surface - the character
 status, quest, and inventory entries - and a labelled control for the map, settings, and help surfaces;
 activating a bar control SHALL open its surface in one action and SHALL NOT push a keyboard menu frame.
+The bar SHALL carry no entry that names the screen the player is already on - no 探索 or 戰鬥 home
+entry - because the stage itself is that screen; returning the dock to its root stays on Escape and
+the dock's back controls.
 The map and settings controls on the bar are additional entry points; the
 map, settings and help surfaces SHALL each remain reachable from the running client by a labelled control and SHALL be closable in
 one action that returns focus to that control. The foundation
-SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as
-its brand and SHALL show the current location, the world date/time, and the connection state in a
-top-meta surface, with the connected state marked by an ok-green dot paired with a label — never a raw
-mode label in place of location. The top-meta location SHALL state the best server-authored place name
-the client already holds, resolved in a fixed order: the committed `local_map` panel's `current_node`
-label when that panel is available, names a current node, that node is present in the panel's nodes,
-and its label is a non-empty string; otherwise the committed status panel's actor location label;
-otherwise the surface's own unavailable placeholder. The shell SHALL NOT compose a third string from
-the two candidates, SHALL NOT derive a name from any node or room identifier, and SHALL NOT render a
-raw room key while a committed panel carries the authored place name for the same room — the raw
-wilderness room key is one string for the whole continent, while the map panel names the region the
-player is standing in. Neither payload contract changes: the shell chooses between two labels the
-server already committed at the same revision. The action dock SHALL render as the approved command surface: a
+SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as its brand and the connection state in the top bar's top-meta
+surface, with the connected state marked by an ok-green dot paired with a label, and SHALL show the
+current location and the world date/time only in the stage's place card, resolved as the
+contextual-HUD place-card requirement states - never in the top bar, and never a raw mode label in
+place of location. The top bar SHALL be 48px tall. The action dock SHALL render as the approved command surface: a
 panel filling the bottom band's command region (the band's right third), whose root menu
 frame renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold fill, and
 whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
@@ -85,7 +82,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
-- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar, every HUD island its own rule renders, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
+- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar, the place card, every HUD island its own rule renders, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
@@ -105,7 +102,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: The top navigation bar carries the persistent surface entry points
 - **WHEN** the shell renders in exploration mode at either supported viewport
-- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's root tab bar
+- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's root tab bar
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
 - **WHEN** the narrative holds more lines than the bounded caption can display
@@ -117,15 +114,15 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: The shell identifies brand, location, time, and connection without a mode label
 - **WHEN** the shell is connected in exploration mode
-- **THEN** the brand shows the game name, the top-meta surface shows the current location label resolved from the committed panels, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
+- **THEN** the brand shows the game name, the top-meta surface shows an ok-green "● 已連線" indicator and no location or time, the place card shows the current location label resolved from the committed panels and the world date/time, and no raw mode label is rendered
 
 #### Scenario: The top-meta location names the region, not the raw room key
 - **WHEN** the player stands in a wilderness cell whose status panel location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
-- **THEN** the top-meta location reads 西部丘陵與谷地, the raw room key is not rendered anywhere in the top-meta surface, and no composed string pairing the two appears
+- **THEN** the place card's location reads 西部丘陵與谷地, the raw room key is rendered neither in the place card nor anywhere in the top bar, and no composed string pairing the two appears
 
 #### Scenario: The location falls back when the map panel cannot supply a name
 - **WHEN** the `local_map` panel is absent, unavailable, or names a current node that its own nodes do not carry or that carries an empty label
-- **THEN** the top-meta location states the committed status panel's actor location label, and states the surface's unavailable placeholder only when neither panel supplies a label
+- **THEN** the place card's location states the committed status panel's actor location label, and states the card's unavailable placeholder only when neither panel supplies a label
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
@@ -490,4 +487,3 @@ the only host of the dock's row region: no reference drawer body renders it.
 - **WHEN** any reference drawer is open in exploration or combat mode
 - **THEN** the page contains no dock-menu row region and no dock detail pane
   outside the action dock's pane host
-
