@@ -4,7 +4,9 @@ The read-only version-1 `local_map` panel payload, the grid/anchor, wilderness, 
 instance/interior layer adapters, the visibility states and legend, the bounded serialization the
 server and browser validators share, and the minimap renderer that replaces the desktop-shell
 placeholder.
+
 ## Requirements
+
 ### Requirement: local_map is a read-only version-1 presentation panel
 The production presentation registry SHALL register panel name `local_map` at schema version 1. Its
 available payload SHALL contain exactly `schema_version`, `available`, `layer`, `current_node`,
@@ -502,7 +504,7 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 
 #### Scenario: The name gutter never hands the anchor a scrollbar
 - **WHEN** a lattice payload's remembered markers crowd one canvas edge so the model grows the marker gutter, enlarging the drawing's required side well beyond the placement's own size
-- **THEN** the island's rendered canvas is still exactly 208 × 208 CSS px, the enlarged side is absorbed as a uniform scale below 1, the island's total size is unchanged, and the hud-right anchor shows no scrollbar because of it
+- **THEN** the island's rendered canvas is still exactly 208 × 208 CSS px, the enlarged side is absorbed as a uniform scale below 1, the island's total size is unchanged, and the `map` anchor shows no scrollbar because of it
 
 #### Scenario: A single-node room states orientation without any collision risk
 - **WHEN** the in-view lattice contains exactly one node
@@ -575,7 +577,7 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 - **AND** the conditional label term of the pitch derivation never binds there, because `(labelMax + 1)` glyphs at the overlay's label type size is smaller than either of its declared pitches
 
 #### Scenario: Repeated budget measurements do not ratchet the canvas down
-- **WHEN** the island re-renders across many successive payload commits and hud-right anchor resizes
+- **WHEN** the island re-renders across many successive payload commits and `map` anchor resizes
 - **THEN** every render draws the canvas at exactly 208 × 208 CSS px, because the island measures nothing to size itself — no anchor height, no section height, and no resize observation feeds its canvas — so no sequence of renders can walk the canvas down toward a floor
 
 #### Scenario: The island's size never depends on the payload
@@ -673,7 +675,6 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 #### Scenario: The lattice colours resolve to existing tokens with no draft literal
 - **WHEN** the coordinate field, the vignette, and the axis render on either surface
 - **THEN** each layer's colour resolves to a design token already defined for the map surfaces, no new token is required, and no draft hex value and no draft-canvas pixel literal is hardcoded for any of them
-
 
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
 The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity. A node with `action: null`, a remembered remote node, or a node whose `visibility` is not a current-field-of-view state SHALL NOT submit any travel action and SHALL remain inert or focus-only exactly as before. The component SHALL derive the submitted `exit_ref` and `current_node` only from the validated `local_map` payload, SHALL NOT construct an exit reference, destination, or room identity from entity data or prose, and SHALL leave the `local_map` panel payload contract, the `未探索` unvisited-node rule, and the remembered-node no-travel rule unchanged. On a successful or rejected submission the refreshed `local_map` payload at the newer revision SHALL replace the rendered minimap; the component SHALL NOT keep a client-side canonical map cache. The corrected node-pitch geometry (this change) SHALL NOT alter which node an activation targets: the enlarged marker's clickable/focusable area SHALL remain centered on the same lattice coordinate the payload assigned it. This activation behavior SHALL be identical whether the lattice renders inside the minimap island or inside the full-map overlay, since both consume the same shared lattice-rendering logic.
