@@ -439,9 +439,6 @@ class ReconnectTest(BrowserAcceptanceTest):
             ("scene-full-view",
              '[data-testid="scene-backdrop-control"]',
              '[data-testid="scene-backdrop-fullview"]'),
-            ("portrait-full-view",
-             '[data-testid^="art-panel__portrait-fullview"]',
-             '[data-testid="art-panel__fullview"]'),
         ]
         for name, open_selector, open_wait in surfaces:
             with self.subTest(surface=name):

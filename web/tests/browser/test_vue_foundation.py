@@ -92,7 +92,6 @@ CORE_SURFACE_TESTIDS = (
     "topbar",
     "narrative-feed",
     "command-line",
-    "quick-word-chips",
 )
 
 

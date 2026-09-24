@@ -161,24 +161,24 @@
 
 ## 6. Browser tests
 
-- [ ] 6.1 `web/tests/browser/test_browser_shell_surfaces.py`:
+- [x] 6.1 `web/tests/browser/test_browser_shell_surfaces.py`:
   - delete `test_character_head_card_renders_only_backed_identity`
   - in `test_unavailable_placeholders_and_numeric_status`, delete the `.art-panel` block and assert that no `[data-testid="art-panel"]` exists
   - in `test_populated_island_stack_fits_its_anchor_at_both_viewports`, lower the injected `hp.current` below maximum so the island is visible before measuring, and delete the `ArtPanel present` assertion and its comments
   - add `test_vitals_island_hides_at_full_health_outside_combat`, annotated with the new vitals ID: inject full vitals with no conditions and assert `status-panel` is attached but not visible; inject full vitals with only a `beneficial` condition and assert it is still not visible; inject full vitals with one `harmful` condition and assert it is visible with that chip; inject `mp` below max with no condition and assert it is visible
 
   `.github/browser-shards.json`: replace the deleted test label with the new one.
-- [ ] 6.2 `web/tests/browser/test_browser_input_narrative.py`: delete `test_quick_word_chip_prepares_a_command_without_sending` and `test_bound_letter_outside_the_field_inserts_like_a_chip`, and drop both labels from `.github/browser-shards.json`.
+- [x] 6.2 `web/tests/browser/test_browser_input_narrative.py`: delete `test_quick_word_chip_prepares_a_command_without_sending` and `test_bound_letter_outside_the_field_inserts_like_a_chip`, and drop both labels from `.github/browser-shards.json`.
 
   Re-anchor every `webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch` annotation to `…::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch`: `test_browser_input_narrative.py` (3) and `test_browser_inventory_actions.py` (1).
 
   `web/tests/browser/test_vue_foundation.py`: remove `"quick-word-chips"` from `CORE_SURFACE_TESTIDS`.
-- [ ] 6.3 Art browser tests:
+- [x] 6.3 Art browser tests:
   - `test_browser_art.py`: delete `test_exploration_portrait_tiles_match_the_catalog` and the now-unused `ART_PANEL_DOM` / `_art_panel_available`, and drop its shard label if listed. The combat portrait tests keep covering "Contextual portrait focus is client-local and verified".
   - `test_browser_reconnect.py::test_offline_overlay_outranks_open_full_views_and_full_log`: delete the `portrait-full-view` subtest entry.
   - `web/tests/browser/seed/art_fixture.py`: reword the two ArtPanel comments.
   - `test_browser_contextual_hud_combat.py`: keep the `art-panel` count-0 assertion (it still pins "no separate portrait strip").
-- [ ] 6.4 Classify every browser selector on `status-panel` and fix the ones that need the island visible:
+- [x] 6.4 Classify every browser selector on `status-panel` and fix the ones that need the island visible:
   - `grep -rn 'status-panel"' web/tests/browser/*.py`
   - `test_browser_local_map_interaction.py::test_minimap_visible_and_keyboard_usable_at_both_viewports`: inject a below-max `status` before `is_visible()`, or drop `status-panel` from that visibility list.
   - `test_browser_layout.py` readiness waits only need the node in the DOM, and `v-show` keeps it there, so leave them unchanged.

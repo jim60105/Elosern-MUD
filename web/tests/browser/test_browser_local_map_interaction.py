@@ -108,7 +108,6 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self._wait_local_map_available(page)
                 for selector in (
                     '[data-testid="narrative-feed"]',
-                    '[data-testid="status-panel"]',
                     '[data-testid="local-map"]',
                 ):
                     self.assertTrue(

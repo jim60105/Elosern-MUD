@@ -153,44 +153,6 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::quick-word-chips-prepare-a-command-without-submitting-it"
-    )
-    def test_quick_word_chip_prepares_a_command_without_sending(self):
-        """A quick-word chip renders the draft's label + letter-badge structure
-        and writes its badge letter plus a trailing space into the field, moving
-        focus to the field; it prepares, it does not send (exactly one send path
-        — the field's send). webclient-align-02-quickbar-shortcuts: the badge
-        letter is the installed command word the chip inserts."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        # The committed mode is exploration: the exploration chip set renders.
-        chip = page.locator('[data-testid="quick-word-chip-看"]')
-        self.assertEqual(chip.count(), 1, "the 看 chip renders in exploration")
-        # The draft structure: visible zh-TW label + letter badge, and the
-        # badge letter is the chip's data-letter (badge ⇔ insert ⇔ binding).
-        self.assertEqual(chip.locator(".qwc__chip-label").inner_text(), "看")
-        self.assertEqual(chip.locator(".qwc__chip-badge").inner_text(), "l")
-        self.assertEqual(chip.get_attribute("data-letter"), "l")
-        chip.click()
-        self.assertEqual(
-            page.evaluate("() => document.getElementById('inputfield').value"),
-            "l ",
-            "the chip wrote its badge letter plus a trailing space into the field",
-        )
-        self.assertTrue(
-            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
-            "focus moved to the field",
-        )
-        # The chip prepares, it does not send: no client->server message crosses
-        # the wire (the prepared command still travels through the field's single
-        # send path only).
-        self.assertEqual(
-            outbound_messages(page),
-            [],
-            "the chip sent no client->server message (it prepares, it does not send)",
-        )
-
-    @covers_requirement(
         "webclient-contextual-hud::the-command-line-advertises-only-affordances-this-client-implements"
     )
     def test_command_line_hint_names_history_and_completion_and_controls_share_the_walk(self):
@@ -275,29 +237,6 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(
             page.evaluate("document.activeElement === document.getElementById('inputfield')"),
             "Tab never moved focus out of the field",
-        )
-
-    @covers_requirement(
-        "webclient-contextual-hud::quick-word-chips-prepare-a-command-without-submitting-it"
-    )
-    def test_bound_letter_outside_the_field_inserts_like_a_chip(self):
-        """webclient-align-02-quickbar-shortcuts: with focus on the dock (no
-        text-entry surface), the bound letter `g` is equivalent to activating
-        its chip — the badge letter plus a trailing space lands in the field,
-        focus moves there, and nothing is submitted."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        focus_action_dock(page)
-        page.keyboard.press("g")
-        page.wait_for_function(
-            "() => document.getElementById('inputfield').value === 'g ' && "
-            "document.activeElement === document.getElementById('inputfield')",
-            timeout=10000,
-        )
-        self.assertEqual(
-            outbound_messages(page),
-            [],
-            "the bound letter prepared the command without any client->server message",
         )
 
     @covers_requirement(
@@ -663,7 +602,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
+        "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     def test_catalog_echo_never_alters_the_ui_action_envelope(self):
         page = self.logged_in_page()
@@ -840,7 +779,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertEqual(page.locator('[data-testid="narrative-feed"] .narrative-divider').count(), 1)
 
     @covers_requirement(
-        "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
+        "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     def test_freeform_dialogue_echoes_exactly_one_line_at_dispatch(self):
         page = self.logged_in_page()
@@ -889,7 +828,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         )
 
     @covers_requirement(
-        "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
+        "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"

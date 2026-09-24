@@ -235,7 +235,7 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
         self._wait_row(page, weapon, lambda row: row["equipped"] is False)
 
     @covers_requirement(
-        "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
+        "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     def test_backpack_row_actions_echo_their_typed_commands(self):
         """Each deliberate backpack activation echoes exactly one typed line."""
