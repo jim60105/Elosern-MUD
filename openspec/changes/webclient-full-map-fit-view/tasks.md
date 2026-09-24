@@ -128,12 +128,12 @@
   - `local_map.test.js` (C1's rewritten cases)
   
   Check with `grep -rn "maxWidth\|maxHeight\|fillWidth\|showLegend" web/webclient-app/tests web/webclient-app/stories`, which returns nothing. Run `pnpm test` green.
-- [ ] 5.4 Browser tests:
+- [x] 5.4 Browser tests:
   - `web/tests/browser/test_browser_local_map_rendering.py` (around line 104): click `map-overlay-legend-toggle` before reading `local-map__legend`.
   - `web/tests/browser/test_browser_local_map_interaction.py`, `test_overlay_renders_scale_note_as_neutral_info_entry`: click the toggle before collecting `local-map__legend-item--*`.
   - `web/tests/browser/test_browser_local_map_lattice.py`: re-run `test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas`. If it pins an absolute pixel box, scale that figure by the SVG's `getScreenCTM().a` rather than restoring width caps.
   - Run the three modules with `uv run --locked python -m unittest web.tests.browser.<module>` green.
-- [ ] 5.5 Add `test_full_map_opens_fitted_zooms_pans_and_recentres` to `web/tests/browser/test_browser_local_map_interaction.py`, decorated `@covers_requirement("webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre")`. Use `logged_in_page(viewport=(1920, 1080))`, inject a two-column, five-row grid payload through `_inject_panel`, and open the map with `store.openOverlay('map')`. The test asserts:
+- [x] 5.5 Add `test_full_map_opens_fitted_zooms_pans_and_recentres` to `web/tests/browser/test_browser_local_map_interaction.py`, decorated `@covers_requirement("webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre")`. Use `logged_in_page(viewport=(1920, 1080))`, inject a two-column, five-row grid payload through `_inject_panel`, and open the map with `store.openOverlay('map')`. The test asserts:
   - Every `[data-node]` box and every `.local-map__edge-marker` box is inside the `.local-map__viewport--fit` box, and `overlay-host-body` has `scrollHeight <= clientHeight + 1`.
   - `page.mouse.wheel(0, -400)` over the current node grows its box and keeps its centre within 2px of the pointer.
   - Pressing `-` until `map-overlay-zoom-out` has `aria-disabled="true"` returns every node inside the viewport.
@@ -144,19 +144,19 @@
   - Reopening the map shows the fitted view with the popover closed.
   
   Run the module green.
-- [ ] 5.6 In `web/tests/browser/test_browser_contextual_hud_stage.py`, `test_h5_overlay_triggers_exclusion_and_focus_restoration`, which is already annotated for the overlay requirement: add the two-Escape precedence check with the map overlay's legend popover open. The test is also annotated `webclient-contextual-hud::the-map-settings-and-help-surfaces-are-reachable-from-the-live-client`, so in its map-overlay step also assert that the open map surface's only view controls are `map-overlay-zoom-out`, `map-overlay-zoom-in`, `map-overlay-recentre`, and `map-overlay-legend-toggle`, each with its accessible name, that the guide row names the gestures, and that no text on the surface matches a zoom-level or scale figure (`/\d+\s*%|×\s*\d/`). Both IDs are unchanged, so no annotation is re-anchored. Run the module green.
-- [ ] 5.7 `web/webclient-app/tests/overlays/deferred_surfaces_absent.test.js`: map zoom and pan are no longer deferred.
+- [x] 5.6 In `web/tests/browser/test_browser_contextual_hud_stage.py`, `test_h5_overlay_triggers_exclusion_and_focus_restoration`, which is already annotated for the overlay requirement: add the two-Escape precedence check with the map overlay's legend popover open. The test is also annotated `webclient-contextual-hud::the-map-settings-and-help-surfaces-are-reachable-from-the-live-client`, so in its map-overlay step also assert that the open map surface's only view controls are `map-overlay-zoom-out`, `map-overlay-zoom-in`, `map-overlay-recentre`, and `map-overlay-legend-toggle`, each with its accessible name, that the guide row names the gestures, and that no text on the surface matches a zoom-level or scale figure (`/\d+\s*%|×\s*\d/`). Both IDs are unchanged, so no annotation is re-anchored. Run the module green.
+- [x] 5.7 `web/webclient-app/tests/overlays/deferred_surfaces_absent.test.js`: map zoom and pan are no longer deferred.
   - Delete the `/\bZoom\b/i` and `/\bPan\b/i` entries from `DEFERRED_TITLE_PATTERNS`, and delete the comment line "map zoom/pan (the map surface ships no zoom or pan affordance)".
   - Add a one-line note, in the style of the retired `\bBag\b` case, saying that `webclient-full-map-fit-view` retired the map zoom/pan deferral.
   - Run `pnpm exec vitest run web/webclient-app/tests/overlays/deferred_surfaces_absent.test.js` green.
 
 ## 6. Spec sync and validation
 
-- [ ] 6.1 After C1 has been archived, sync this change's deltas into `openspec/specs/webclient-local-map/spec.md` and `openspec/specs/webclient-contextual-hud/spec.md`. Then run `uv run --locked python -m tools.spec_traceability check` green. The only new ID is the fit-view requirement, which task 5.5 covers, and every modified title is unchanged.
-- [ ] 6.2 Run these gates, all green:
+- [x] 6.1 After C1 has been archived, sync this change's deltas into `openspec/specs/webclient-local-map/spec.md` and `openspec/specs/webclient-contextual-hud/spec.md`. Then run `uv run --locked python -m tools.spec_traceability check` green. The only new ID is the fit-view requirement, which task 5.5 covers, and every modified title is unchanged.
+- [x] 6.2 Run these gates, all green:
   - `node --test web/static/webclient/js/tests/*.test.js` (no model change is expected)
   - `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root)
   - `uv run --locked python -m tools.test_data_lint check`
   - `uv run --locked python -m tools.spec_traceability check`
   - the browser modules `test_browser_local_map_interaction`, `test_browser_local_map_rendering`, `test_browser_local_map_lattice`, `test_browser_local_map_layout_variants`, `test_browser_local_map_geometry`, `test_browser_contextual_hud_stage`, and `test_browser_contextual_hud_anchors` via `uv run --locked python -m unittest web.tests.browser.<module>`
-- [ ] 6.3 Take 1920 × 1080 screenshots of the full map on the guild hall (interior, with remembered rooms), a two-column, five-row street, and a wilderness cell with named edge markers. In each, confirm that the whole map is visible on open with no body scrollbar and that the legend shows only in the `?` popover. Then run `openspec validate webclient-full-map-fit-view --strict` and `git diff --check`, both clean.
+- [x] 6.3 Take 1920 × 1080 screenshots of the full map on the guild hall (interior, with remembered rooms), a two-column, five-row street, and a wilderness cell with named edge markers. In each, confirm that the whole map is visible on open with no body scrollbar and that the legend shows only in the `?` popover. Then run `openspec validate webclient-full-map-fit-view --strict` and `git diff --check`, both clean.

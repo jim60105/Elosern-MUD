@@ -129,16 +129,15 @@ const DEFERRED_TITLE_PATTERNS = [
   //   client only as narrative text; no committed panel carries it);
   // - the audio-volume rows (no audio subsystem in this client);
   // - the `HUD 縮放` slider and the 重映射 control;
-  // - map zoom/pan (the map surface ships no zoom or pan affordance).
   /\bHelpBrowser\b/i,
   /\bGameHelp\b/i,
   /\bAudio\b/i,
   /\bVolume\b/i,
   /\bHudScale\b/i,
   /\bRemap(ping)?\b/i,
-   /\bZoom\b/i,
-   /\bPan\b/i,
  ];
+// webclient-full-map-fit-view retired the map zoom/pan deferral above: the
+// full-map surface ships the fitted view's zoom, pan, and recentre controls.
 
 // H6 (webclient-hud-06-remap-and-finalize, task 4.3): the complete unbacked
 // list. Each deferred surface is named with the OOB read model it waits on,
