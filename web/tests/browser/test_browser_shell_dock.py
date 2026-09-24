@@ -31,9 +31,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())
-            # webclient-align-01-dock-chrome: the painted band (the draft's
-            # `.dockwrap` chrome) lives on the full-width dock anchor — the
-            # `--line` top border (`1px solid var(--ink-700)`) is drawn there.
+            # webclient-avg-stage-shell (design D1): the painted band (the
+            # draft's `.dockwrap` chrome) lives on the full-width bottom band
+            # (`.stage-band`) — the `--line` top border
+            # (`1px solid var(--ink-700)`) is drawn there.
             # The obsidian-gold wave re-pointed the ink tokens (tokens.css:
             # --ink-700 = #363638); assert against the resolved token instead
             # of a pinned rgb literal so the pin follows the token, not a
@@ -49,7 +50,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                   return { line: rgb('--ink-700'), ground: rgb('--ink-780') };
                 }"""
             )
-            frame = page.locator('[data-testid="anchor-dock"]').evaluate(
+            frame = page.locator('[data-testid="stage-band"]').evaluate(
                 """el => {
                   const style = getComputedStyle(el);
                   return { borderTop: style.borderTopColor,

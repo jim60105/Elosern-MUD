@@ -50,8 +50,15 @@ describe("AppShell root (B1 core family)", () => {
     // and the named anchors; the top band carries the brand + meta pill.
     expect(w.get('[data-testid="elosern-stage"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-hud-left"]').exists()).toBe(true);
-    expect(w.get('[data-testid="anchor-feed"]').exists()).toBe(true);
-    expect(w.get('[data-testid="anchor-dock"]').exists()).toBe(true);
+    expect(w.get('[data-testid="stage-band"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-band-message"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-band-command"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-actor-left"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-actor-right"]').exists()).toBe(true);
+    expect(w.find('[data-testid="anchor-feed"]').exists()).toBe(false);
+    expect(w.find('[data-testid="anchor-dock"]').exists()).toBe(false);
+    // The narrative caption lives in the band's message region.
+    expect(w.get('[data-testid="anchor-band-message"] [data-testid="narrative-feed"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-command-line"]').exists()).toBe(true);
   });
 

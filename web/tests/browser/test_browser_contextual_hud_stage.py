@@ -23,11 +23,25 @@ from ._journey_support import (
     _exploration_panel,
     _exploration_context_actions_panel,
     _art_panel,
+    _combat_panel,
     _SCENE_PNG_BYTES,
     _inject_snapshot,
     _wait_mode,
     _press,
 )
+
+
+def _selectable_target(identity: int, name: str) -> dict:
+    """An interact target carrying one affordance, so the workspace can select it."""
+    target = _interact_target(identity, name)
+    target["affordances"] = [{
+        "kind": "action",
+        "action_id": "explore.talk_freeform",
+        "label": "自由對話",
+        "enabled": True,
+        "disabled_reason": None,
+    }]
+    return target
 
 
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
@@ -207,6 +221,37 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             geometry["stageHeight"],
             "the caption card is bounded, not filling the stage",
         )
+
+        # webclient-avg-stage-shell (design D6): the caption fills the bottom
+        # band's message region (its content box) and keeps that box however
+        # many lines arrive.
+        region_measure = """() => {
+          // The caption card (the feed's scroll viewport sits inside it).
+          const f = document.querySelector('[data-testid="narrative-feed"]')
+            .closest('.elosern-narrative').getBoundingClientRect();
+          const region = document.querySelector('[data-testid="anchor-band-message"]');
+          const r = region.getBoundingClientRect();
+          const cs = getComputedStyle(region);
+          return {
+            feed: [f.left, f.top, f.right, f.bottom],
+            content: [
+              r.left + parseFloat(cs.paddingLeft), r.top + parseFloat(cs.paddingTop),
+              r.right - parseFloat(cs.paddingRight), r.bottom - parseFloat(cs.paddingBottom),
+            ],
+          };
+        }"""
+        before = page.evaluate(region_measure)
+        for got, want in zip(before["feed"], before["content"]):
+            self.assertAlmostEqual(got, want, delta=1.0, msg="the caption fills the message region")
+        for index in range(40):
+            page.evaluate(
+                "(text) => window.__elosernBridge.store.appendText('out', text)",
+                f"第 {index + 1} 行敘述。",
+            )
+        page.wait_for_timeout(120)
+        after = page.evaluate(region_measure)
+        for got, want in zip(after["feed"], before["feed"]):
+            self.assertAlmostEqual(got, want, delta=1.0, msg="40 more lines leave the caption's box unchanged")
 
         # One action opens the complete log, rendered through the same renderer.
         page.locator('[data-testid="narrative-fulllog-control"]').click()
@@ -559,14 +604,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
+        "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-command-line-is-a-permanently-present-bar-in-the-stage-s-command-line-anchor"
     )
     def test_command_line_never_overlaps_dock_caption_or_hud(self):
-        """H5 (task 8.8): at both supported viewports and at each of the
+        """H5 (task 8.8): at every supported viewport and at each of the
         three prose-scale steps, the command line does not overlap the action
-        dock, the narrative caption, or the HUD island anchors.
+        dock, the narrative caption, the bottom band, or the HUD island
+        anchors, and it sits on the band's top edge (webclient-avg-stage-shell
+        design D3).
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_interact_target(11, "小販")])
             _inject_snapshot(
@@ -596,6 +646,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         caption: byId('[data-testid="narrative-feed"]'),
                         hudLeft: byId('[data-testid="anchor-hud-left"]'),
                         hudRight: byId('[data-testid="anchor-hud-right"]'),
+                        band: byId('[data-testid="stage-band"]'),
                       };
                       const hits = [];
                       for (const key of Object.keys(targets)) {
@@ -607,6 +658,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         );
                         if (overlap) { hits.push(key); }
                       }
+                      const band = targets.band;
+                      if (band && Math.abs(cmd.bottom - band.top) > 1) {
+                        hits.push("not-on-band-top");
+                      }
                       return hits;
                     }"""
                 )
@@ -617,6 +672,141 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         ", ".join(overlaps), viewport[0], viewport[1], scale,
                     ),
                 )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces"
+    )
+    def test_band_height_is_fixed_across_frames_and_modes(self):
+        """webclient-avg-stage-shell (design D1/D4): the bottom band keeps one
+        height and both regions keep one box through every frame and mode, and
+        the player portrait stands on the band's top edge.
+        """
+        measure = """() => {
+          const rect = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return [r.left, r.top, r.right, r.bottom];
+          };
+          return {
+            band: rect('[data-testid="stage-band"]'),
+            message: rect('[data-testid="anchor-band-message"]'),
+            command: rect('[data-testid="anchor-band-command"]'),
+          };
+        }"""
+        page = self.logged_in_page((1920, 1080))
+        exploration = _exploration_panel([_selectable_target(11, "小販")])
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+        store = "window.__elosernBridge.store"
+        states = {"root": page.evaluate(measure)}
+
+        page.evaluate(f"() => {store}.tabToRootAndConfirm('interact', 'pointer')")
+        page.wait_for_selector(".interaction-workspace", timeout=15000)
+        page.locator(".interaction-workspace .dock-menu__nav-row").first.click()
+        page.wait_for_selector(".interaction-workspace--selected", timeout=15000)
+        states["interact"] = page.evaluate(measure)
+
+        page.evaluate(f"() => {store}.tabToRootAndConfirm('wait', 'pointer')")
+        page.wait_for_selector(".waiting-screen", timeout=15000)
+        states["wait"] = page.evaluate(measure)
+
+        page.evaluate(f"() => {store}.focusPress('Escape')")
+        page.evaluate(f"() => {store}.focusPress('Escape')")
+        _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
+        _wait_mode(page, "combat")
+        states["combat-root"] = page.evaluate(measure)
+        # The deepest combat frame: descend with Enter until the depth stops growing.
+        focus_action_dock(page)
+        depth = page.evaluate(f"() => {store}.view.dockDepth")
+        for _ in range(6):
+            _press(page, "Enter", wait_ms=120)
+            now = page.evaluate(f"() => {store}.view.dockDepth")
+            if now <= depth:
+                break
+            depth = now
+        states["combat-deep"] = page.evaluate(measure)
+
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "dialogue": {
+                    "schema_version": 1,
+                    "available": True,
+                    "kind": "dialogue",
+                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                    "bond_stage": None,
+                    "line": "歡迎光臨，要看看今天的貨嗎？",
+                    "choices": [
+                        {"keyword_id": "goods", "label": "有什麼貨？"},
+                        {"keyword_id": "price", "label": "價錢怎麼算？"},
+                        {"keyword_id": "town", "label": "最近鎮上如何？"},
+                        {"keyword_id": "road", "label": "路上安全嗎？"},
+                    ],
+                },
+            },
+            mode="dialogue",
+        )
+        _wait_mode(page, "dialogue")
+        page.wait_for_selector('[data-testid="dialogue-exit"]', timeout=15000)
+        states["dialogue"] = page.evaluate(measure)
+
+        baseline = states["root"]
+        self.assertAlmostEqual(baseline["band"][3] - baseline["band"][1], 300.24, delta=1.0)
+        for label, state in states.items():
+            for key in ("band", "message", "command"):
+                for got, want in zip(state[key], baseline[key]):
+                    self.assertAlmostEqual(
+                        got, want, delta=1.0,
+                        msg=f"the {key} box moved or resized in the {label} state",
+                    )
+
+        # The portrait stands on the band (exploration, 1920x1080).
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+        portrait = page.evaluate(
+            """() => {
+              const a = document.querySelector('[data-testid="anchor-actor-left"]').getBoundingClientRect();
+              const b = document.querySelector('[data-testid="stage-band"]').getBoundingClientRect();
+              const holds = !!document.querySelector('[data-testid="anchor-actor-left"] [data-testid="reference-artwork"]');
+              const focusable = document.querySelectorAll(
+                '[data-testid="anchor-actor-left"] :is(button, a, input, textarea, select, [tabindex])').length;
+              return { left: a.left, bottom: a.bottom, height: a.height, bandTop: b.top, holds, focusable };
+            }"""
+        )
+        self.assertTrue(portrait["holds"], "actor-left holds the player portrait")
+        self.assertEqual(portrait["focusable"], 0, "the portrait anchor holds no focusable element")
+        self.assertAlmostEqual(portrait["bottom"], portrait["bandTop"], delta=1.0)
+        self.assertAlmostEqual(portrait["height"], min(0.62 * 1080, 680), delta=1.0)
+        self.assertAlmostEqual(portrait["left"], 0.06 * 1920, delta=1.0)
+
+        # At 1280x720 the portrait is clamped to the stage box.
+        small = self.logged_in_page((1280, 720))
+        clamp = small.evaluate(
+            """() => {
+              const a = document.querySelector('[data-testid="anchor-actor-left"]').getBoundingClientRect();
+              const header = getComputedStyle(document.documentElement).getPropertyValue('--header-h');
+              return { top: a.top, header: parseFloat(header) };
+            }"""
+        )
+        self.assertGreaterEqual(clamp["top"] + 1, clamp["header"], "the portrait never passes under the top bar")
 
     @covers_requirement(
         "webclient-input-narrative::the-full-log-surface-opens-at-its-latest-line"

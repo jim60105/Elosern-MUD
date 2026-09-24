@@ -17,7 +17,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-hud-left", "anchor-hud-right", "anchor-feed", "anchor-dock"];
+              const ids = ["anchor-hud-left", "anchor-hud-right", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
               return ids.map((id) => {
                 const el = document.getElementById(id);
                 if (!el) return { id, rect: null };
