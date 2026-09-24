@@ -195,7 +195,7 @@
 
 ## 8. Validation
 
-- [ ] 8.1 Run every gate from the repository root, all green:
+- [x] 8.1 Run every gate from the repository root, all green:
   - `node --test web/static/webclient/js/tests/*.test.js`
   - `pnpm test`
   - `pnpm run build`
@@ -204,11 +204,11 @@
   - `uv run --locked python -m tools.test_data_lint check`
   - `uv run --locked python -m tools.spec_traceability check`
   - `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence web.webclient.tests.test_node_suite_evidence commands.tests.test_localized`
-- [ ] 8.2 Run `agent-browser` against the running client at 1920×1080:
+- [x] 8.2 Run `agent-browser` against the running client at 1920×1080:
   - At full health in exploration, the left column shows no vitals, no party strip, no head card, and no 美術展示 strip, and the command line shows no chips.
   - After taking damage (or entering combat), the vitals appear.
   - The 角色肖像圖庫 control in the command line opens the gallery.
   - Pressing `g` with the dock focused inserts nothing.
 
   Close the browser when done.
-- [ ] 8.3 Run `openspec validate webclient-retire-redundant-hud --strict` and `git diff --check`; both clean.
+- [x] 8.3 Run `openspec validate webclient-retire-redundant-hud --strict` and `git diff --check`; both clean.
