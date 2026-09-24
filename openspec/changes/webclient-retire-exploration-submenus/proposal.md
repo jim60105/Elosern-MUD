@@ -14,6 +14,8 @@ Keeping them leaves contracts no player can reach (the outlet grid rules, the mo
 
 The design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` §7) also binds digits 1–9 to the first nine chips in reading order. Today only 1–4 are bound. This change widens the digit rule for every dock frame and for the dialogue picks, and updates the legend in the same change, as the legend requirement demands. The project is unreleased, so the dead path is deleted, not kept for compatibility.
 
+**Implementation profile:** logic — dead-code deletion and digit-binding widening; tests define done.
+
 ## What Changes
 
 - **BREAKING (internal)**: `web/static/webclient/js/elosern/exploration_menu.js`:
@@ -44,7 +46,7 @@ The design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-desi
 - No player-visible change other than digits 5–9 and the legend text. No server, OOB schema, or persistence change. No component is added or deleted.
 
 Out of scope:
-- The 交談 affordance's `explore.talk_open` mapping: `explore-talk-open-action` (C9).
+- The 交談 affordance's `explore.talk_open` mapping: `explore-talk-open-action` (C9a).
 - The dialogue stage's own digit rows: `webclient-dialogue-stage` (C10). This change only widens the existing dialogue-pick digit range.
 
 ## Capabilities

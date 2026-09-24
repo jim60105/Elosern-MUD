@@ -9,6 +9,8 @@ After `webclient-message-pages` (C6a) and `webclient-message-window-component` (
 
 The project is unreleased, so the replaced components, their tests, stories, manifest entries, preserved-contract id, and requirements are deleted outright.
 
+**Implementation profile:** logic — wiring and deletion of the old feed plus test re-pointing; no new look is designed here.
+
 ## What Changes
 
 - `web/webclient-app/components/AppShell.vue`:

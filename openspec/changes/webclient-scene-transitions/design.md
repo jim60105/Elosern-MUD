@@ -132,7 +132,7 @@ The coordinator approved clearing on every new response, not only on a location 
 
 The leaving copy is `position: absolute; inset: 0`. Enter and leave both run `opacity` over `--motion-portrait` with `--ease-standard`.
 
-The root gains `transition: filter var(--motion-fast) var(--ease-standard)`, so the speaking dim eases at `full` and switches instantly at `reduced` and `off` (C11a D3: `--motion-fast` is 0ms there). A same-URL catalog refresh keeps the key, so it never fades.
+The component root gains `transition: filter var(--motion-fast) var(--ease-standard)`. The rule is written against `[data-testid="stage-actor"]`, because `HudFrame.vue`'s portrait anchors also carry the class `stage-actor`. This way the speaking dim eases at `full` and switches instantly at `reduced` and `off` (C11a D3: `--motion-fast` is 0ms there). A same-URL catalog refresh keeps the key, so it never fades.
 
 ### D6. Vitals reveal inside `StatusPanel`
 `StatusPanel`'s template root becomes `<Transition name="vitals-reveal" v-bind="inertWhileLeaving">` around the existing root element that carries `v-show="visible"`. Keeping the `v-show` inside the component keeps C3 D1's trailing-bar memory and its tests.
@@ -176,7 +176,7 @@ The root gains `transition: filter var(--motion-fast) var(--ease-standard)`, so 
 ### D8. Spec strategy, traceability, and archive order
 | Requirement | Written on |
 |---|---|
-| contextual-hud "The vitals island is shown only in combat or while a vital or a condition needs attention" | C3 `webclient-retire-redundant-hud` (ADDED there, no later series change) |
+| contextual-hud "The vitals island is shown only in combat or while a vital or a condition needs attention" | main spec (C3 `webclient-retire-redundant-hud` added it and is archived; no later series change touches it) |
 | contextual-hud "The message window presents the current response one page at a time in the band's message region" | C10c `webclient-dialogue-choices-overlay` |
 
 - Every scenario title is kept, so no annotation moves.

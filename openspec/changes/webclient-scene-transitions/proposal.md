@@ -59,7 +59,7 @@ Out of scope:
 - `webclient-contextual-hud`:
   - ADDED "Location, appearance, and vitals changes transition at the motion level"
   - ADDED "A leaving element is out of reach while it animates out"
-  - MODIFIED "The vitals island is shown only in combat or while a vital or a condition needs attention" (C3 text). The island leaves the accessibility tree at commit and reaches `display:none` when its exit transition ends.
+  - MODIFIED "The vitals island is shown only in combat or while a vital or a condition needs attention" (main spec, from the archived C3). The island leaves the accessibility tree at commit and reaches `display:none` when its exit transition ends.
   - MODIFIED "The message window presents the current response one page at a time in the band's message region" (C10c text). The previous page may remain only as the clear transition's fading, inert layer.
 
 ## Impact

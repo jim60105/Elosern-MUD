@@ -8,6 +8,8 @@ After `webclient-message-window-swap` (C6c), the band's `MessageWindow` shows ea
 
 The existing reduced-motion preference must still make pages appear at once. This change (C7 in the series) adds the typewriter reveal to the paged window, the two reading preferences, and their settings controls. The layout store's version is bumped for them.
 
+**Implementation profile:** visual — the reveal technique is specified, but reading speed and zero-reflow typing must be checked by eye.
+
 ## What Changes
 
 - New pure module `web/webclient-app/lib/message_reveal.js` (no Vue, no DOM). It works on C6a's page and fragment shapes:

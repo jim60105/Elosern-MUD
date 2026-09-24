@@ -11,6 +11,8 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
 
 `webclient-message-pages` (C6a) provides the pure segmentation and paging functions and the store's response marks. This change (C6b) builds the component that measures real layout and holds the reader's state, together with its story, tests, and manifest entry. It does not mount the component. The component-showcase governance ("a component SHALL NOT be wired into the live application before its story exists") makes build-then-mount the intended order, and it keeps the swap (`webclient-message-window-swap`, C6c) small.
 
+**Implementation profile:** visual — the AVG message box itself — type size, line measure, markers, and control strip — must be judged on screen.
+
 ## What Changes
 
 - New governed component `web/webclient-app/components/MessageWindow.vue`. It is a band-message surface that fills its host.

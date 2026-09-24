@@ -1,6 +1,7 @@
 # WebClient AVG Stage Redesign — Design
 
-Date: 2026-09-23
+Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
+the OpenSpec proposals, §15)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -8,7 +9,7 @@ design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
 `openspec/specs/webclient-local-map/spec.md`,
 `openspec/specs/webclient-combat-menu/spec.md`,
 `docs/design/elosern-redesign/REDESIGN.md` (the previous visual reference).
-Pending changes that must land first: `make-shop-drawer-frameless`,
+Prerequisites (landed): `make-shop-drawer-frameless`,
 `make-quest-drawer-frameless`, `retire-service-keyboard-frames`.
 
 ## 1. Problem
@@ -25,8 +26,8 @@ permanent region, so every context shows every region. Observed defects
   without purpose.
 - **The minimap wastes its column.** It claims the whole right column, but the
   lattice uses roughly the centre quarter of its own box behind a thick frame.
-  Its legend grows with every visited place and eventually pushes the map out
-  of view entirely. The bottom-right of the screen is empty.
+  Its remembered-place list grows with every visited place and eventually
+  pushes the map out of view entirely. The bottom-right of the screen is empty.
 - **Reading is hard.** The narrative caption is a small box in the centre; the
   backdrop is almost entirely covered; the full log opens scrolled to the top
   although the player wants the last one or two replies.
@@ -55,7 +56,9 @@ needs, and reference information lives behind a menu.
    command panel (1/3 width, bottom-right). The previous "narrative column +
    side minimap" idea was rejected because it left too little width for art.
 2. **Desktop 16:9 only.** 1920×1080 is the reference; 2560×1440 scales
-   proportionally. No narrow, portrait, or mobile layout.
+   proportionally. No narrow, portrait, or mobile layout is designed. The
+   existing 1440×900 and 1280×720 acceptance viewports stay as non-overlap
+   checks; they are not retired.
 3. **The player's portrait stands on stage at all times** (exploration,
    dialogue, combat). The character is player-authored and the stage is where
    it is shown. An appearance change crossfades.
@@ -72,20 +75,27 @@ needs, and reference information lives behind a menu.
    The player may act while pages remain; a new action flushes the unread
    pages to the log.
 9. **A motion layer** adds scene and mode transitions, typewriter text, and a
-   reduced/off setting that honours `prefers-reduced-motion`.
+   three-level motion setting (full / reduced / off) that follows
+   `prefers-reduced-motion` until the player chooses.
 10. **Combat is choreographed beat by beat** from structured, server-authored
     combat beats. The requester accepts the server protocol change.
-11. **Quick fixes:** the minimap loses its legend and thick frame; the full map
-    opens fitted to the viewport; the full log opens scrolled to the bottom.
+11. **Quick fixes:** the minimap loses its remembered-place list and thick
+    frame; the full map opens fitted to the viewport; the full log opens
+    scrolled to the bottom.
 12. **No standalone prototype.** The real client differs too much from any
     throwaway page; work goes straight into OpenSpec changes.
+13. **Implementation profiles.** Every OpenSpec change is labelled `visual`
+    (needs aesthetic judgement) or `logic` (tests define done), so the
+    requester can route visual work to a stronger implementer (§15).
 
 ## 3. Goals and non-goals
 
 Goals:
 
 - Each game mode shows exactly the surfaces its context needs (§4).
-- At least 65% of the viewport height is unobstructed stage art in every mode.
+- At least 65% of the viewport height is stage art in every mode, measured at
+  1920×1080 as the box between the top bar's bottom edge and the band's top
+  edge (48px bar + 300px band → 732 / 1080 = 67.8%).
 - Text is read one page at a time at a comfortable measure (≤ 42 CJK
   characters per line).
 - One action reaches the people in a room; one action opens a conversation.
@@ -96,143 +106,191 @@ Goals:
 
 Non-goals:
 
-- Mobile, tablet, portrait, or sub-1600px layouts.
+- Mobile, tablet, portrait, or new sub-1600px layouts.
 - A save/load/auto/skip AVG system menu (the game is a persistent MUD).
 - Voice, sound, or music.
 - Changing how drawers present their content (bag, quests, shop, status,
   party, codex, gallery). Only where their openers live changes (§5.4).
 - A redesigned combat menu hierarchy. The existing combat choice tree moves
   into the command panel unchanged.
-- Parsing narrative prose to derive any state (still forbidden; §9 adds
+- Parsing narrative prose to derive any state (still forbidden; §10 adds
   structured data instead).
 
 ## 4. Principles and per-mode visibility
 
 Principle: **show when meaningful, hide completely otherwise** (hidden surfaces
-use `display:none` and leave the accessibility tree, as today). Reference data
-is one click away in a drawer, never permanently on screen.
+leave the accessibility tree and the tab order). Reference data is one click
+away in a drawer, never permanently on screen.
 
 | Surface | Exploration | Dialogue | Combat | Creation |
 |---|---|---|---|---|
-| Slim top bar (nav, switcher, connection) | ✓ | ✓ | ✓ | ✓ |
+| Slim top bar (nav, tool group, switcher, connection) | ✓ | ✓ | ✓ | ✓ |
 | Place card (location + game time) | ✓ | ✓ | ✓ | — |
-| Vitals | only when not full / any condition | same as exploration | always | — |
-| Minimap (top-right) | ✓ | ✓ | — | — |
-| Objective tracker (one line) | ✓ | — | — | — |
-| Player standing portrait (left) | ✓ | ✓ (dimmed when not speaking) | ✓ | — |
-| Opposite portrait (right) | — | dialogue host | foes (existing participant catalog) | — |
-| Party mini-portraits | only when party size > 0 | — | ✓ (in participant frame) | — |
+| Vitals + condition chips | only when a vital is below max or a `warning`+ condition is active | same as exploration | always | — |
+| Minimap (top-right `map` anchor) | ✓ | ✓ | — | — |
+| Objective tracker (one line under the minimap) | ✓ | — | — | — |
+| Combat participant frame (numbers) | — | — | ✓ (in the `map` anchor) | — |
+| Player standing portrait (`actor-left`) | ✓ | ✓ (dimmed when not speaking) | ✓ | — |
+| Opposite portrait (`actor-right`) | — | dialogue host | foes | — |
+| Party mini-portraits | only when party size > 0 | only when party size > 0 | ✓ | — |
 | Message window | 2/3 width | full width, with name plate | 2/3 width | — |
-| Command panel | scene overview | collapsed | combat choice tree | — |
+| Command panel | scene overview | collapsed | combat choice tree | full band |
 | Dialogue choices | — | centred over the stage | — | — |
-| Command line | collapsed; expands on `/` or ⌨ | same | same | — |
+| Command line | collapsed; expands on `/` or ⌨ | same | same | closed |
 
 Removed outright: the head card (`CharacterHead`), the art showcase panel
 (`ArtPanel` in the left column), the quick-word chips (`QuickWordChips`)
 together with their quickbar letter bindings (`l g s t w`, `c` in combat —
-every one duplicates a command-panel entry), and the top-bar `探索` tab (it
-names the screen the player is already on). Typed commands remain available
-through the command line.
+every one duplicates a command-panel entry; the server's single-letter typed
+aliases stay), the unread indicator (`UnreadIndicator`, replaced by the page
+markers), and the top-bar `探索` home tab (it names the screen the player is
+already on). Every field the head card showed stays reachable: title, guild
+rank and merit in the character-status drawer, the wallet in the bag drawer,
+the name in the switcher.
 
 ## 5. Layout
 
 ### 5.1 Geometry (1920×1080 reference)
 
 ```
-┌ top bar 48px ─ ELOSERN │ 角色 任務 背包 地圖 設定 │ switcher · ● ──────────┐
+┌ top bar 48px ─ ELOSERN 伊洛瑟恩 │ 角色 任務 背包 地圖 設定 │ 工具 │ switcher · ● ┐
 │ ┌ place card ─────┐                                   ┌ minimap 208px ┐ │
 │ │ 冒險者公會大廳    │                                   │               │ │
 │ │ 春季 1 日 11:25  │                                   └───────────────┘ │
 │ └─────────────────┘                                   objective (1 line)│
-│ [vitals: only when not full]                                            │
+│ [vitals: only when needed]                                              │
 │    ┌─────────┐                                         ┌─────────┐      │
 │    │ player  │            stage: backdrop full-bleed    │ NPC /   │      │
 │    │ portrait│            (≈ 732px tall)               │ foes    │      │
 │    │         │                                         │         │      │
 ├────┴─────────┴──────────────────────┬──────────────────┴─────────┴──────┤
 │ message window  1280 × 300          │ command panel  640 × 300          │
-│ [name plate]                        │                                   │
-│ page text, typewriter            ▼  │                                   │
-│                     [日誌] [⌨]      │                                   │
+│ [name plate]                        │  (legend strip)                   │
+│ page text, typewriter               │                                   │
+│ ▼                   [日誌] [⌨]      │                                   │
 └─────────────────────────────────────┴───────────────────────────────────┘
 ```
 
-- The stage anchor `hud-left` and `hud-right` islands, the centred `feed`
-  caption, and the floating `dock` panel are replaced by five anchors:
-  `place` (top-left), `vitals` (under `place`), `map` (top-right, with the
-  objective line under it), `band-message`, and `band-command`. Two portrait
-  anchors, `actor-left` and `actor-right`, sit on the stage above the
-  backdrop and below the band.
-- The band height is `--band-h: 300px` at the reference size and scales with
-  the viewport height (`clamp(260px, 27.8vh, 400px)`). It never depends on
-  content.
+- Anchors (`HudFrame`): `place` (top-left), `vitals` (under `place`: the
+  status island and the party strip), `map` (top-right: minimap, one-line
+  objective, the combat participant frame, the title ballot), `band-message`
+  and `band-command` (the band), `actor-left` and `actor-right` (portraits,
+  above the backdrop and below the band), `choices` (dialogue only, centred),
+  and `command-line`. The old `hud-left` / `hud-right` / `feed` / `dock` /
+  `objectives` anchors are gone.
+- The band height is `--band-h: clamp(260px, 27.8vh, 400px)` (300px at the
+  reference size). It never depends on content, frame, or mode. `--dock-h`,
+  `--stage-content-bottom`, and every frame-adaptive band rule are deleted.
 - The message window is `66.667%` of the band width; the command panel takes
-  the rest. Page text is 28px at the default `fontScale`, which keeps the
-  measure at ≤ 42 CJK characters per line inside the window's padding. In dialogue mode the command panel collapses to zero width and
-  the message window takes the full width (§8).
-- Portraits are bottom-aligned to the band's top edge, height `min(62vh,
-  680px)`, horizontally inset 6% from their side. They never cover the band.
+  the rest. In creation mode the command region spans the whole band. In
+  dialogue mode the command panel collapses and the message window takes the
+  full width (§8.2).
+- Portraits are bottom-aligned to the band's top edge, height
+  `min(62vh, 680px, stage box)`, inset 6% from their side. The stage-box clamp
+  keeps the portrait under the top bar at 1280×720.
 - The command line, when expanded, is a single 44px row docked to the top edge
-  of the message window. It overlays the stage, not the text.
+  of the message region, running from the island column's edge to the message
+  region's right edge. It keeps that geometry in every mode, so in dialogue it
+  never covers the host.
+- The narrow command panel reflows its frames: the waiting screen becomes one
+  column; the combat skill detail pane uses `min(220px, 45%)`.
 
 ### 5.2 Components
 
 | Component | Fate |
 |---|---|
-| `HudFrame` | Rewritten: new anchors (§5.1), the band, the two portrait anchors. Mode gating by `data-elosern-mode` is kept. |
-| `AppShell` | Slots rewired to the new anchors; the always-visible command line becomes collapsible. |
-| `TopBar` / `DesktopNavigation` | Height 48px; the `探索` entry removed; location and time move to the place card. |
-| `CharacterHead`, `ArtPanel` (left-column showcase), `QuickWordChips` | Deleted, with their tests and spec requirements. |
-| `VitalsTrack` | Kept; wrapped by a new `VitalsBadge` visibility rule (§5.3). |
-| `PartyStrip` | Renders nothing when the party is empty; otherwise compact avatars under the vitals slot. |
-| `ReferenceArtwork` (`.stage-portrait`) | Becomes `StageActor`, used for both portrait anchors. Source for the player: the roster's current character portrait (unchanged). Source for the opposite side: the `art` panel's `portrait_catalog` entry for the dialogue host or foes (unchanged data). |
-| `LocalMap` | Minimap mode: thin 1px frame, no legend, fit-to-content (§10). |
-| `NarrativeFeed` | Replaced by `MessageWindow` (§6). The full-log surface stays, fed by the same narrative log. |
-| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size; exploration root replaced by the scene overview (§7). |
+| `HudFrame` | Rewritten: the anchors of §5.1. Mode gating by `data-elosern-mode` is kept; a live mode change also sets `data-mode-change` for transitions (§9.3). |
+| `AppShell` | Slots rewired to the new anchors; owns the collapsible command line, the ⌨ and 日誌 buttons, and the mode focus-rescue. |
+| `TopBar` / `DesktopNavigation` | 48px, one-row brand `ELOSERN 伊洛瑟恩`; the `探索` home button and `onNavigateHome` removed; location and time moved to `PlaceCard`; the tool group added (§5.4). |
+| `PlaceCard` (new) | Location + world time in the `place` anchor, taking over the top-meta location-resolution rule. `.scene-heading` is deleted. |
+| `CharacterHead`, left-column `ArtPanel`, `QuickWordChips`, `NarrativeFeed`, `UnreadIndicator` | Deleted, with their tests, stories, manifest titles, and spec requirements. |
+| `StatusPanel` | Now only `VitalsTrack` + `ConditionChips`; carries the visibility rule itself (no separate `VitalsBadge`). |
+| `PartyStrip` | Renders nothing when the party is empty; otherwise compact cells (avatar, HP hairline, combat token badge; name and numbers in `aria-label`). The `+ 邀請` padding cells are gone. |
+| `ObjectiveTracker` | One 32px line: the first objective plus a `+N` count; exploration only. Details stay in the quest drawer. |
+| `ReferenceArtwork` | Kept for the drawer art slot; wrapped by the new `StageActor`. |
+| `StageActor` (new) | The standing portrait in `actor-left` / `actor-right`, with a truthful placeholder and a static speaking dim. |
+| `LocalMap` | Fixed square island (§11). |
+| `MessageWindow` (new) | Replaces `NarrativeFeed` in `band-message` (§6). |
+| `SceneOverview`, `DockVerbPopover` (new) | The exploration root of the command panel (§7). |
+| `DockTabBar` | Kept for the combat root only. |
+| `DialogueChoices` (new) | The centred dialogue choice list (§8.2). |
+| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip. |
 | `CommandLine` | Collapsible (§5.5). |
+
+This series is a governed redesign wave: every component added or deleted
+updates `component-manifest.json`, its Storybook story, and the
+`webclient-component-showcase` spec in the same change.
 
 ### 5.3 Vitals visibility
 
 `vitalsVisible = mode === "combat" || lowHp || anyVitalBelowMax || anyAbnormalCondition`,
-derived client-side from the committed `status` panel (the same panel
-`VitalsTrack` already reads). A condition is abnormal when its `severity`
+a pure `isVitalsVisible()` in `components/vitals.js`, derived client-side from
+the committed `status` panel. A condition is abnormal when its `severity`
 (vocabulary in `world/rules/status_display.py`) is `warning`, `harmful`, or
 `critical`. `beneficial` and `informational` conditions — including passive
 skill-owned combat-modifier rows — never force the vitals visible; they would
 otherwise keep the vitals on screen permanently for characters owning such
-skills. The low-HP vignette rule is unchanged. The badge
-fades in and out through the motion layer (§9).
+skills. Missing or unknown severities count as not abnormal. While the island
+is visible its chips show every condition, whatever the severity.
+
+The island hides with `v-show` (`display:none`), not `v-if`, so `VitalsTrack`
+keeps its trailing-bar memory and the first hit at full health still shows a
+damage gap. Hiding the island while it holds focus rescues focus to the
+command panel first. The low-HP vignette rule is unchanged. The island fades
+and slides through the motion layer (§9.3).
 
 ### 5.4 Top bar and reference drawers
 
-The top bar keeps 角色 / 任務 / 背包 / 地圖 / 設定 and the character switcher.
-Drawers and overlays open exactly as today. The location label and time move
-out of the top bar into the place card, so the switcher is no longer
-truncated.
+The top bar keeps 角色 / 任務 / 背包 / 地圖 / 設定 and the character switcher,
+and gains a 工具 icon group after 設定: 技能系譜, 圖鑑, 稱號冊, 角色肖像圖庫
+(only while the `gallery` panel is available), and 說明. These moved there from
+the command line's utility strip (§5.5); the command line's duplicate 設定
+button is deleted. Every tool is one click, or one Tab stop plus Enter, away.
+The party drawer stays reachable with an empty party through a
+`同伴 · 隊伍` control in the character-status drawer. Drawers and overlays
+open exactly as before.
 
 ### 5.5 Command line
 
-Collapsed by default. `/` (outside an editable control) or the ⌨ button at the
-message window's bottom-right expands it and focuses the field. Escape or a
-successful send collapses it and returns focus to the command panel. The
-freeform-dialogue row (§8) expands it the same way. History and Tab completion
-are unchanged.
+Collapsed by default on every mount; the expanded state lives only in
+`AppShell` and is never persisted. Collapsed means the `command-line` anchor
+is `display:none` while `CommandLine` stays mounted, so the preserved
+`#inputfield` stays in the DOM and an unsent draft and the history walk
+survive a collapse.
+
+- **Open:** `/` outside an editable control (the existing bridge → router →
+  `focusCommandField` route), the ⌨ button at the message window's
+  bottom-right, or the dialogue free-form row. Clicking ⌨ while open closes it.
+- **Close:** Escape (the draft is kept for the next opening), a send the field
+  accepts (`CommandLine` emits `sent`), or entering creation. Focus returns to
+  the command panel, or to the focus home of the current mode (§8.2).
+- **Stays open:** on a rejected send (text and focus kept), on blur, and while
+  drawers or overlays open. The open state carries across combat and dialogue.
+- The field's accept rule is one store predicate:
+  `connected && !mutationsLocked && phase === "active" && !inFlight`. A
+  refused borrowed dialogue send keeps its dialogue target (§8.2).
+- History and Tab completion are unchanged.
 
 ## 6. Message window and the message sequencer
 
 ### 6.1 Responses
 
 The narrative log stays the single store of text (`ctx.narrative`, lines of
-kind `in` / `out` / `sys` / `err`). The sequencer is a pure view over it:
+kind `in` / `out` / `sys` / `err`, each with a monotonic `seq`; `out`, `sys`,
+and `err` are tokenized once at append). The sequencer is a pure view over it
+(`lib/message_pages.js`):
 
-- A **response** starts at each `in` line (the typed-command echo or the
-  dispatched-action echo, both already appended today) and collects every
-  following `out` / `sys` / `err` line until the next `in` line.
-- Lines that arrive with no preceding `in` (connection notices, a late
-  asynchronous freeform reply) append to the current response. Because the
-  game is single-player, this only happens right after the player's own
-  action.
-- The `in` line itself is not paged; it appears only in the full log.
+- A **response** starts at each `in` line **or** at a dispatch-time response
+  mark, whichever comes first. The mark is recorded in `dispatchAction`,
+  because declared silent actions (`explore.dialogue_leave`,
+  `account.character.switch`, the `gallery.*` actions, and others in
+  `SILENT_PRESENTATION_CONTROLS`) append no `in` line. A mark and its echo form
+  one response. A blocked or failed dispatch records no mark.
+- Lines that arrive with no new boundary (connection notices, a late
+  asynchronous freeform reply) join the current response. Lines before any
+  action form a leading response.
+- The `in` line heads its response and is never paged; it appears only in the
+  full log.
 
 ### 6.2 Paging
 
@@ -240,49 +298,74 @@ Each response is cut into pages that exactly fit the message window:
 
 1. **Blocks.** Each line is a block. An `err` or `sys` block always starts a
    new page.
-2. **Measure.** A hidden measuring element with the window's exact width,
-   font, and `fontScale` lays out blocks in order. A page holds as many whole
-   blocks as fit `floor(textAreaHeight / lineHeight)` lines (6 lines at the
-   reference size and default scale).
-3. **Split.** A block taller than the remaining room is split at the last
-   sentence end that fits (`。！？…」』`, followed by any closing quote), then
-   at a clause mark (`，、；：`), and only then at a character boundary.
+2. **Measure.** A hidden twin of the text area (same width, font, and
+   `fontScale`; `composables/use-message-measure.js`) decides through an
+   injected `fits(candidateBlocks)` whether a page still fits. Capacity is
+   measured pixel height, not a line count, because `sys` and map lines use
+   other line heights. Page text is `--message-text: clamp(20px, 2.593vh,
+   38px) × prose scale` (28px at 1080) with a `max-width: 42em` cap: 6 lines at
+   1080, 7 at 720. A 36px control strip under the text holds the marker, 日誌,
+   and ⌨.
+3. **Split.** A block taller than the remaining room is cut at a hard break or
+   the last sentence end that fits (`。！？…」』` with closing quotes kept;
+   ASCII `.!?` followed by whitespace also counts), then at a clause mark
+   (`，、；：`, ASCII `,;:` + whitespace), and only then at a character
+   boundary, never inside a surrogate pair.
 4. **Markup.** Paging runs on the `NarrativeMarkup` token stream, never on
-   rendered HTML. A split inside a styled span yields two spans with the same
-   class. The allowlist pipeline is unchanged and runs exactly once per line.
+   rendered HTML. A cut inside a styled span closes it and re-opens a copy with
+   the same classes. Box-drawing map blocks are never split; a block that fits
+   no empty page gets its own `oversize` page with internal scrolling.
 5. **Re-measure.** A resize or a `fontScale` change re-pages the current
-   response and keeps the reader on the page containing the first character
-   they had not yet seen.
+   response and keeps the reader at the typing position (the next character
+   while typing, the last shown character once complete).
 
-Paging is a presentation-only function of `(response lines, box metrics)`.
-It never mutates the log and never reaches the server.
+Paging is a presentation-only function of `(response lines, box metrics)`. It
+never mutates the log and never reaches the server.
 
 ### 6.3 Reading controls
 
-- Click on the message window, Enter, or Space (when focus is on the message
-  window or the stage): if the page is still typing, show it in full;
-  otherwise advance to the next page.
-- The end-of-page marker is a blinking `▼`; the last page of a response shows
-  `■`.
-- Scrolling up over the message window, or the `日誌` button, opens the full
-  log. The full log opens scrolled to the bottom.
-- **Acting while reading:** any action (command panel, map node, command line,
-  dialogue choice) is accepted immediately. When its `in` line arrives, the
-  remaining pages of the previous response are marked read and the new
-  response starts on page 1. Nothing is lost; everything remains in the log.
+- **Advance:** a click on the message window (except on buttons or with a text
+  selection, so players can copy text), or Enter / Space **only while the page
+  surface itself has focus**. The handler stops propagation and ignores key
+  repeat, so the document-level bridge never turns the key into a dock
+  confirm. If the page is still typing, the press shows it in full; otherwise
+  it advances.
+- **Markers:** a blinking `▼` when more pages follow, `■` on the last page,
+  rendered only once the page is fully shown. There is no head row: the mode
+  label and the old `完整日誌` capsule are dropped in favour of the `日誌`
+  button in the control strip.
+- **Log:** the `日誌` button, or scrolling up when the page has nothing left to
+  scroll, opens the full log, which opens scrolled to its latest line. New lines
+  arriving while the log is open do not move the reader.
+- **Acting while reading:** any action is accepted immediately. As soon as the
+  action is out (its mark), typing stops and the previous response's last page
+  shows complete; the new response starts on page 1 when its lines arrive.
+  Nothing is lost; everything remains in the log.
+- **Mount / reconnect:** the window opens on the last page of the last
+  response, fully shown.
 - The polite live region announces each page's full text once, when the page
-  is shown, not per typed character.
+  starts, never per character and never on a re-page or a mount.
 
-### 6.4 Settings
+### 6.4 Reading preferences
 
-The settings overlay gains three client-local preferences, stored through the
-existing versioned layout store:
+Client-local, stored through the versioned layout store, edited in the
+settings overlay's 閱讀設定 section:
 
-- `textSpeed`: slow / normal / fast / instant (default normal, ≈ 45
-  characters per second).
-- `autoAdvance`: off / on (default off). When on, a finished page advances
-  after `1.2s + 60ms × characters`.
-- The existing `reducedMotion` preference forces `instant` typing (§9.1).
+- `textSpeed`: slow 20 / normal 45 (default) / fast 90 characters per second,
+  or instant. A change applies from the next page; switching to instant
+  completes the page on screen.
+- `autoAdvance`: off (default) / on. A finished page advances after
+  `1.2s + 60ms × characters`. It stops at the last page of a response, never
+  advances past an oversize or map page, and pauses while any drawer, overlay,
+  or the full log is open.
+- Typing is instant whenever the motion level is not `full` (§9.1).
+
+Reveal technique: the page is always rendered in full; the unrevealed tail is
+hidden with `visibility: hidden` and `aria-hidden` (whole later lines get an
+`unrevealed` class, and the line being typed is split with the span-preserving
+cut). Layout therefore never re-wraps while typing. One `requestAnimationFrame`
+clock with a 100ms per-frame clamp drives typing and the auto-advance wait;
+time in a hidden tab does not count.
 
 ## 7. Command panel: scene overview
 
@@ -297,23 +380,35 @@ built from the committed `exploration` panel (no new server data):
 查看房間 · 等待／休息 · 建議 (5)
 ```
 
-- **出口** lists `move` rows; disabled rows stay visible with their reason.
-  Activating one dispatches `explore.move` as today.
-- **人物** lists `interact` targets. Activating one opens a verb popover inside
-  the panel listing that target's `affordances` in payload order (交談, 邀請,
-  交付, 交易, 戰鬥, …) plus 查看. Navigation affordances open their drawer as
-  they do after the pending frameless changes.
+- **出口** lists `move` chips; disabled chips stay visible, focusable, and
+  dimmed, with their reason, and never submit.
+- **人物** lists `interact` targets, then look-only chips for present
+  characters that have no interact descriptor. Activating a target opens a
+  verb popover: its affordances in payload order, then 查看, then a back row.
+  A target with no affordances opens with 查看 only. Navigation affordances
+  open their drawer.
 - **物件** lists `look.objects`; activating one looks at it.
-- The footer row holds 查看房間, 等待／休息, and 建議.
-- After any movement settles, the panel returns to the overview.
-- Keyboard: arrow keys move across chips, Enter activates, Escape closes the
-  popover, digits 1–9 address the first nine chips in reading order. The
-  keyboard router's frame model is kept; the overview is its new root frame
-  and the popover is one child frame.
-- The panel has a fixed size; the overview scrolls inside it.
-
-The tab bar (`移動 / 查看 / 互動 / 等待 / 建議`) is removed; its content is
-now all on the root.
+- The footer always renders: 查看房間, 等待／休息, and `建議 (N)` (only while the
+  suggestions panel is not unavailable). 等待／休息 and 建議 open child frames
+  that replace the overview inside the panel.
+- Rows with no chips are omitted, label included. Chips wrap; the panel scrolls
+  internally and keeps the focused chip in view.
+- The popover is a card anchored to the bottom of the command region, with the
+  overview inert behind it; a click outside it closes it like the back row.
+- The dock returns to the overview whenever the committed room identity
+  changes (dock, minimap, or typed movement) and when the mode turns
+  `dialogue`.
+- **Keyboard:** the router gains a `sections` geometry — Left/Right move in
+  reading order and wrap; Up/Down keep the chip's position within the next row,
+  clamped to its length. Enter activates, Escape closes the popover or child
+  frame and restores the chip that opened it (or the nearest survivor). Digits
+  1–9 address the first nine chips in reading order (exits, people, objects,
+  footer) in every dock frame. DOM focus stays on `#action-dock`.
+- The shortcut legend moves out of the tab bar into one strip owned by
+  `ActionDock` (`數字鍵 1–9 · Enter 執行 · Esc 返回`). The exploration tab bar
+  (`移動 / 查看 / 互動 / 等待 / 建議`), the move/look/interact submenus, the
+  interaction workspace, and the exit-outlet pane are deleted. `DockTabBar`
+  remains only for the combat root.
 
 ## 8. Dialogue stage
 
@@ -322,24 +417,34 @@ now all on the root.
 New action `explore.talk_open` with payload exactly `{npc_id}`:
 
 - The adapter re-resolves the NPC from the actor's current location exactly
-  like `explore.talk_scripted` does, and re-verifies presence and that the
-  NPC is a dialogue host (a scripted dialogue component or an `LLMNPC`).
-- The session line is `world.rules.dialogue.greeting_for(npc)`. When it
-  returns `None`, the line is a fixed server-authored fallback from
-  `world/rules/player_messages.py` (`「{name}看向你，等你開口。」`).
-- It records the session through the deterministic dialogue-session seam (a
-  new writer, added to the seam's writer list) and publishes at one newer
-  revision, so the mode becomes `dialogue` together with the panel.
-- It calls no LLM, advances no clock, and changes no affinity or memory.
-- Rejections reuse the stable codes of `explore.talk_scripted`.
+  like `explore.talk_scripted` does and rejects in the same order with the same
+  codes (possessed actor, `no_npc`, `schedule_blocked`, `not_dialogue_host`).
+- One predicate, `world.rules.dialogue.opens_dialogue(npc)`, decides who is a
+  host (an `LLMNPC`, or a `ScriptedDialogue` host whose table resolves). The
+  adapter and the exploration presenter share it; a scripted host whose table
+  does not resolve shows a disabled 交談 (`dialogue_unavailable`).
+- The session line is `world.rules.dialogue.greeting_for(npc)`; when it returns
+  `None`, the line is `dialogue_open_fallback_line(npc.key)` from
+  `world/rules/player_messages.py`: `{name}看向你，等你開口。` (narration, no
+  corner brackets).
+- It records the session through `open_or_refresh_dialogue` (a new writer in
+  the dialogue-session writer list) and publishes a full snapshot at one
+  newer revision, so mode `dialogue` and the panel arrive together.
+- It calls no LLM, advances no clock, changes no affinity or memory, and
+  triggers no action-options generation. The echo catalog renders it as
+  `talk <NPC>`. The typed `talk <npc>` command is unchanged.
 
-`explore.talk_open` joins the shared `ACTION_CODE_ALLOWLIST`. In the
-exploration panel, every dialogue host's target descriptor carries exactly one
-`交談` affordance, `explore.talk_open`; the target-level `talk_scripted`
-keyword rows and the `talk_freeform` affordance no longer appear in the
-exploration root, because both now live inside the dialogue stage.
+The exploration panel moves to schema v3: each dialogue host carries exactly
+one `交談` affordance, `explore.talk_open`; the target-level `keywords` field
+and the `talk_scripted` / `talk_freeform` affordances are removed, because the
+dialogue panel's `choices` already carry the keywords once a session is open.
+`explore.talk_open` joins `ACTION_CODE_ALLOWLIST` but is never suggested.
 `explore.talk_scripted` (the choice rows) and `explore.talk_freeform` (the
-freeform row) keep their adapters and contracts unchanged.
+free-form row) keep their adapters and contracts.
+
+The dialogue panel moves to schema v2: `host.portrait_ref` is the art-catalog
+key of the host (computed on the server through `build_art_view`), or `null`
+when the host is not in the catalog. The client never constructs a catalog key.
 
 ### 8.2 Layout
 
@@ -348,75 +453,108 @@ freeform row) keep their adapters and contracts unchanged.
 │   │ player  │         ① 關於註冊                       │  NPC    │     │
 │   │ (dimmed)│         ② 任務板的事                     │(speaking)│    │
 │   │         │         ⌨ 自由對話                       │         │     │
+│   │         │         ↦ 移動…                          │         │     │
 │   │         │         ✕ 結束對話                       │         │     │
 ├───┴─────────┴────────────────────────────────────────┴─────────┴─────┤
-│ ┌ 葛里安·衛登 · 羈絆 初識 ┐                                           │
-│ 「先在櫃檯註冊成為冒險者……」                                     ▼   │
+│ 葛里安·衛登 · 羈絆 初識                                                  │
+│ 葛里安·衛登說：「先在櫃檯註冊成為冒險者……」                         ▼   │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- The command panel collapses; the message window spans the full band and
-  shows a name plate (`display_name`, plus `· 羈絆 <stage>` only when
-  `bond_stage` is non-null).
-- The session line is paged like any response (§6).
-- The choice list appears centred over the stage **after the last page of the
-  current line is fully shown**. Rows are the committed `dialogue.choices`,
-  then `⌨ 自由對話`, then `↦ 移動…`, then `✕ 結束對話`. Digits 1–N, Enter, and pointer work as
-  in the current dialogue variant, and dispatch the same actions.
-- The speaking side is at full brightness; the other side is dimmed to 60%.
-  After a player choice or freeform line, the player is lit until the reply
-  commits.
-- Movement stays reachable: minimap nodes stay actionable, and the choice
-  list ends with a `↦ 移動…` row that swaps the list for the exits list
-  (Escape returns to the choices). Movement clears the session through the
-  existing seam.
-- Drawers stay openable from the top bar.
-
-This replaces the contextual-HUD requirement "The dock keeps its regular
-exploration form in dialogue mode".
+- **Collapse:** the band becomes one column; the command region becomes inert
+  at once and leaves the accessibility tree (`#action-dock` stays mounted). The
+  router claims only `/` in dialogue, so no key drives the hidden dock. The
+  focus home in dialogue is the message window's page surface instead of
+  `#action-dock`.
+- **Name plate:** a header row inside the message window: `display_name`, plus
+  ` · 羈絆 <stage>` only when `bond_stage` is non-null. It sits inside the
+  window because the expanded command-line row would cover a plate straddling
+  the edge. The text keeps its 42em cap.
+- **Line:** the session line is paged and typed like any response. It is paged
+  verbatim, so the host name may appear both in the plate and in the `X說：`
+  prefix (stripping it would mean parsing prose).
+- **Choices:** `DialogueChoices` in the `choices` anchor (`min(560px, 40%)`
+  wide) appears only in dialogue mode with an available panel, once the last
+  page is fully shown and no dispatch is in flight. Rows: the committed
+  `dialogue.choices` with badges 1–N, `⌨ 自由對話`, `↦ 移動…`, `✕ 結束對話`. It
+  is one tab stop (a menu with `aria-activedescendant`), takes focus when it
+  appears, and consumes arrows (wrapping), Home/End, Enter/Space, digits, and
+  Escape; `/` passes through. `↦ 移動…` swaps in the exit chips of the
+  committed overview; Escape or the back row returns. Each row dispatches the
+  same action as before.
+- **Speaking state:** `view.dialogueSpeaker` is `"player"` while an
+  `explore.talk_scripted` or `explore.talk_freeform` action is in flight,
+  otherwise `"host"`. The non-speaking `StageActor` is dimmed with
+  `--actor-dim: 0.6`.
+- **Portraits:** `actor-left` holds the player; `actor-right` holds the host's
+  catalog entry looked up by `host.portrait_ref`. A still-generating portrait
+  shows its own placeholder; a missing one shows the name's initial and the
+  name.
+- **Free-form borrow:** the free row expands the command line; a refused send
+  keeps the dialogue target; a successful send returns focus to the choice
+  list.
+- Movement stays reachable through `↦ 移動…` and the minimap. Drawers stay
+  openable from the top bar.
 
 ## 9. Motion layer
 
 ### 9.1 Motion levels
 
-`motionLevel`: full / reduced / off. Default: `full`, or `reduced` when the
-OS reports `prefers-reduced-motion: reduce`. The existing `reducedMotion`
-preference maps to `reduced`. Rules:
+`motionLevel`: full / reduced / off replaces the old reduced-motion boolean
+everywhere. The store is the only resolver: a stored level, or — while
+nothing is stored — the OS `prefers-reduced-motion` followed live. It writes
+the effective level to `<html data-motion>`. The settings overlay shows three
+buttons, 動態效果 `完整` / `減少` / `關閉`, with the effective level pressed.
 
 - `full`: every animation below.
-- `reduced`: fades only (≤ 150ms), no translation, no shake, typing is
-  instant, combat beats keep their order and pauses but skip the motion.
-- `off`: all state changes are instant; combat beats render as text only.
+- `reduced`: stage-transition tokens cap at 150ms fades; the general
+  `--motion-fast/base/slow` tokens go to 0 (drawers and control feedback
+  become instant); `--motion-travel` goes to 0 (no translation or shake);
+  looping animations (pulses, blink, spinners) stop; the white flash is
+  dropped; typing is instant.
+- `off`: every duration is 0ms (Vue ends transitions at once, which keeps the
+  browser suite deterministic).
 
-All durations come from `--motion-*` tokens in `styles/tokens.css`; no
-component hard-codes a duration.
+All durations come from `--motion-*` tokens in `styles/tokens.css`; a Vitest
+guard fails on any literal duration in a component. An OS fallback media block
+covers Storybook and the frames before the store loads. The layout store is
+at version 3 (`textSpeed`, `autoAdvance`, `motionLevel`); older wrappers reset
+to defaults (no migration; the project is unreleased). The browser suite runs
+at `off` by default.
 
-### 9.2 Presentation queue
+### 9.2 Presentation contract
 
-The store keeps committing the server's state immediately (the source of
-truth, unchanged). A new client-local **presentation queue** decides *when*
-the view shows each change. It owns three kinds of steps: page steps (§6),
-transition steps (§9.3), and combat beat steps (§10). Rules:
+There is no general presentation-queue module: pages are sequenced by the
+message window's reader state, and transitions are declarative CSS / Vue
+transitions driven by committed state. Every presentation step obeys one
+contract:
 
-- Steps play in arrival order; a step never reorders or drops committed data.
-- A player click skips the current step to its end state.
-- A new player action flushes all queued non-combat steps to their end state
-  before the new response starts.
-- Input locking rules are unchanged except as §10 states for combat.
+- Committed state is never gated by presentation, and input is never held
+  longer than a transition's duration.
+- Steps play in commit order; a click shows the current step's end state.
+- A new player action flushes non-combat steps to their end state.
+- An element that is leaving is inert from the moment its state commits
+  (`inertWhileLeaving`); focus may land on an entering element, never on a
+  leaving one.
+- Only a live mode change animates; mounting, reconnect, and same-mode resync
+  play nothing.
+
+Combat beats have their own queue beside the reader state (§10.2).
 
 ### 9.3 Transitions
 
 | Trigger | Full motion |
 |---|---|
-| Location change (a new `art.scene`) | backdrop crossfade 500ms; place card slides in from the left; minimap pans to the new node; the message window clears with a 150ms fade |
-| Exploration → dialogue | command panel slides out right (250ms); message window widens; NPC portrait slides in from the right and fades in (350ms); name plate appears; the greeting types |
+| Location change (a new `art.scene`) | backdrop crossfade 500ms, started only after the next image is decoded (until then the previous image stays dimmed); place card slides in from the left (a time-only change does not animate); minimap pans with a FLIP transform anchored on the previous current node |
+| Every new response | the previous content leaves as an opaque inert layer fading over 150ms while the new page mounts and types at once |
+| Exploration → dialogue | message window widens at once (animating the grid would re-page every frame); command panel slides and fades out over it in 250ms, then goes `visibility:hidden`; NPC portrait slides in from the right and fades in (350ms); name plate fades in |
 | Dialogue → exploration | reverse of the above |
-| Exploration → combat | 120ms white flash, veil fades in, foes slide in from the right, command panel flips to the combat root |
-| Combat → exploration | foes fade out, veil fades out, command panel flips back |
-| Player appearance change | portrait crossfade 400ms |
+| Exploration → combat | 120ms white flash (dropped under reduced), veil fades in, command panel flips to the combat root; foes enter per §10.2 |
+| Combat → exploration | veil fades out, command panel flips back, foes leave |
+| Player appearance change | portrait crossfade 400ms; the speaking dim eases |
 | Vitals appear / disappear | fade and a 12px slide |
-| Dialogue choices appear | 40ms stagger per row |
-| Drawer / overlay open | kept as today; drawers slide from the right |
+| Dialogue choices appear | 40ms stagger per row; keys work from the first frame; leaving rows are removed at once |
+| Drawer / overlay open | as before, obeying the motion level |
 
 ## 10. Combat choreography
 
@@ -426,135 +564,231 @@ Today a round emits every `EventLog` as text and then publishes `status`,
 `context_actions`, and `art` at one newer revision. The view cannot tell which
 hit caused which HP loss, and must not parse prose to find out.
 
-Change: the combat result publishes a new read-only presentation panel
-`combat_beats` at the same revision as `status`. Its payload is a bounded list
-(at most 64) of beats in `EventLog` order, derived only from `EventEntry`
-records:
+Change: a new read-only presentation panel `combat_beats` (new capability
+`webclient-combat-beats`), published at the same revision as `status`. Its
+payload is `round` (`"<session_id>/<rounds_elapsed>"`) plus at most 64 beats in
+`EventLog` order, derived only from the settled round's `EventEntry` records
+(the defeat-aftermath logs are excluded):
 
 | Field | Source |
 |---|---|
 | `seq` | ordinal within the round |
-| `kind` | a closed presentation set built from the kinds combat settlement emits today: `skill`, `roll`, `damage`, `target_defeated`; every other entry kind maps to `other`. A new kind joins the set only through a spec change |
-| `actor` / `target` | the same opaque participant identities the `art` portrait catalog and combat panel already use |
-| `amount` | integer from `data.amount` when the kind is `damage`, else null |
-| `hp_after` | target HP after this beat, computed **on the server** by applying the round's ordered `damage` amounts to the pre-round HP snapshot, clamped at 0. The presenter asserts the last `hp_after` per target equals the committed `status` HP; on mismatch the panel is unavailable for that round (the client then uses the fallback below) |
-| `text` | the already-rendered, escaped line for this entry (`render_plain_text` per entry) |
+| `action` | 0-based ordinal of the source `EventLog` (the actor's gesture plays on the first beat of each group) |
+| `kind` | closed set `roll`, `damage`, `target_defeated`; every other entry kind (including `target_knocked_out`) maps to `other`. There is no `skill` entry kind in combat settlement |
+| `actor` / `target` | art-catalog keys of the participants (`portrait_catalog_key`), or `null` when the entry names no participant |
+| `amount` | integer from `data.amount` for `damage`, else `null` |
+| `hp_after` | target HP after this beat, projected on the server from the damage amounts, clamped at 0 (or at 1 when the round knocks that target out, matching the damage floor) |
+| `text` | `strip_ansi(render_entry_text(entry))`, at most 256 code points |
 
-The panel is available only in combat mode, uses the common unavailable form
-elsewhere, and carries a `round` id so a replay after reconnect is never
-choreographed twice. It never carries hidden rolls or data the combat panel
-does not already disclose (the disguised-stats boundary applies).
+- **HP source:** the round records every roster participant's stored HP before
+  `run_round` and again inside the round transaction, before terminal
+  settlement, and passes that record to the presenter through an internal
+  result slot that never reaches the wire. The presenter checks each damaged
+  target's last `hp_after` against the recorded end-of-round HP; on a
+  mismatch, an over-bound, or an unknown damage target it returns the common
+  unavailable form and logs a warning. Rounds with heals, drains,
+  `damage_divert`, or silent upkeep ticks are therefore unavailable and use
+  the fallback.
+- **Availability:** only on the publication that completes `combat.cast`,
+  `combat.flee`, or `inventory.use` in combat — **including a terminal round**,
+  whose snapshot mode is already `exploration`. Reconnect snapshots, forfeits,
+  typed commands, pushes, rejected actions, the overwhelm opening, and fights
+  opened by the typed `cast` command carry the unavailable form, so nothing is
+  replayed.
+- **Disclosure:** `hp_after` is a number for foes too, because the combat panel
+  already ships every participant's true HP from the same source; nothing reads
+  the disguise layer.
+- **Bounds reject rather than truncate:** 64 beats, `round` ≤ 160 code points,
+  panel JSON ≤ 12,288 bytes.
 
 ### 10.2 Client: beat playback
 
-For each new `round` id, the presentation queue plays one step per beat:
+Foes stand in `actor-right` as `StageActor`s during combat; the participant
+frame stays in the `map` anchor as the numbers panel. For each new `round` id a
+beat queue beside the message window's reader state plays one step per beat:
 
-1. The beat's `text` types into the message window (one beat per page).
-2. `skill`: the actor portrait steps 24px toward the centre and back.
-3. `damage`: the target portrait shakes (6px, 180ms) and flashes; a floating
-   number rises from it; that target's HP bar animates to `hp_after`, with the
-   existing trailing damage bar following 300ms later.
+1. The beat's `text` is one page, typed.
+2. On the first beat of each `action` group, the actor portrait steps 24px
+   toward the centre and back.
+3. `damage`: the target shakes (6px, 180ms) and flashes; a floating number
+   rises; that target's HP display animates to `hp_after`, with the trailing
+   damage bar following 300ms later.
 4. `target_defeated`: the portrait fades and drops out.
 5. `roll` and `other`: text only.
-6. A 400ms pause (`--motion-beat`) separates beats.
+6. `--motion-beat` (400ms) separates beats.
 
 The displayed HP values come from `hp_after` during playback and snap to the
-committed `status` values when playback ends. The command panel unlocks when
-playback ends **and** the declared revision is accepted (the existing rule).
-Clicking skips to the end of the round. With `motionLevel=off`, beats render
-as sequential text pages only.
+committed values when playback ends. The command panel unlocks when playback
+ends **and** the declared revision is accepted. A click skips to the end of the
+round. A **terminal round's beats play before the combat → exploration
+transition**: committed state is not gated, so the presentation holds the
+combat stage until the beats finish or are skipped. `reduced` keeps the order
+and the pauses without motion; `off` renders the beats as sequential text
+pages only. Without an available `combat_beats` panel, the client pages the
+round's text and animates the vitals once to the committed values. Script-side
+durations are read from the `--motion-*` tokens and are 0 at `off`.
 
-Without a `combat_beats` panel (old server, panel unavailable), the client
-falls back to paging the round's text and animating vitals once to the
-committed values.
+**Foe line-up (`FoeLineup`, C13a).** At most three foes stand in `actor-right`,
+in presenter order, in a row that grows leftward: each later foe is offset by
+65% of a slot and stands behind the one before, scaled 1 / 0.9 / 0.8 for one /
+two / three foes, staying right of the stage centre and clear of the player at
+1920 and 1280. Further foes appear only in the participant frame, which stays
+the complete numbers panel (no "+N" plate). Foes slide in on a live change into
+combat and fade out on leaving it; a reload plays nothing. Each slot carries
+`data-portrait-ref` so beats can address it. During a round, a committed
+defeated foe stays on stage until its own defeat beat, and each foe shows a
+decorative HP gauge with a trailing bar (hidden from assistive technology).
+
+**Beat queue (C13b).** `lib/motion_tokens.js` (`readMotionMs`) is the
+script-side token reader; `--motion-beat` is 400ms at full and reduced, 0 at
+off. `lib/beat_queue.js` is a pure planner and reducer (text → act → pause →
+done). The store slice `stores/elosern/beats.js` starts a round only for a new
+`round` id in the epoch while `combat.cast`, `combat.flee`, or `inventory.use`
+is in flight, bound to that dispatch's response mark. Pre-round roster and HP
+come from the previous view (a terminal snapshot is already the exploration
+kind); the player's key is `status.actor.identity`. The round's own event lines
+(`max(action) + 1` output lines) are replaced by one page per beat, then the
+response's remaining lines page normally. HP displays (`VitalsTrack`,
+`StatusPanel`, `ParticipantFrame`) take a `displayHp` value that steps with the
+beats and snaps to committed values; the low-HP marker and vignette stay on
+committed values. The lock joins `dispatchAction` and the router gates; a typed
+command flushes the round; a generation change or detach resets it. At `off`
+the beats are ordinary pages and nothing locks.
+
+**Choreography and terminal hold (C13c).** Gesture tokens
+`--motion-beat-step` 240ms, `-hit` 180ms, `-float` 600ms, `-defeat` 350ms
+(150ms at reduced), with distances scaled by `--motion-travel`; the hit flash
+is scaled by `--motion-flash-peak`; `--motion-trail-delay` is 300ms. The `act`
+phase lasts the longest gesture of the step; `StageActor` takes `gesture`,
+`gestureKey`, and `floatAmount`, and the player never plays `defeat`. While a
+fight-ending round still plays, `data-beat-hold="combat"` keeps the veil and
+the (inert) line-up on stage until the round ends or is skipped; the mode
+attribute, minimap, dock, focus, and accessibility tree still change at
+commit. At `off` nothing is held.
 
 ## 11. Quick fixes
 
-- **Minimap legend removed.** The minimap renders no legend and no beyond-state
-  info chips. The legend content moves into a `?` popover on the full-map
-  overlay. The frame becomes a 1px border; the lattice fits the bounding box
-  of the visible nodes with 8px padding and keeps the current node centred
-  when the box exceeds the minimap.
-- **Full map fits the viewport.** `MapOverlay` opens with a zoom that fits the
-  whole known lattice inside the overlay body, and offers zoom (wheel, `+` /
-  `-`) and drag-pan, plus a `置中` control.
-- **Full log opens at the bottom.** `FullLogOverlay` scrolls to its last line
-  on open; the reader scrolls up for older text.
+- **Minimap island.** A fixed card (1px frame, 4px padding, a 208 × 208 px
+  canvas, a readout row that always keeps its height), right-aligned in the
+  `map` anchor. The graph-variant remembered-place list and the whole
+  height-budget measurement machinery are deleted. Fill rules:
+  - lattice: the cell pitch grows up to 1.5× to fill the square, leftover room
+    becomes dotted coordinate margin, and the drawing scales down only when the
+    minimum pitch does not fit (no crop around the current node — a crop would
+    cut the outer ring of `map_visual_range: 2` maps);
+  - graph: the view is cropped to the drawn footprint plus 8px and centred on
+    the current node, never magnified.
+  Remembered rooms stay readable: a visually-hidden list on the island for
+  assistive technology, and a visible non-focusable list under the graph
+  variant on the full-map overlay.
+- **Full map fits the viewport.** The overlay opens at
+  `min(1, (vw−24)/W, (vh−24)/H)` so the whole known map (including the
+  edge-marker gutter) fits, never magnified. Zoom by `viewBox` (range: fit to
+  2×) with the wheel about the pointer, `+`/`=`/`-` keys, and 放大 / 縮小
+  buttons in 1.25× steps; primary-button drag pans past a 4px threshold (the
+  click after a drag never submits a move); `置中` recentres at the current
+  zoom; Tab focus on an off-screen node pans it into view. The view refits on
+  resize and travel until the reader zooms or pans; nothing is persisted. The
+  state legend moves into a `?` (圖例) popover; Escape closes the popover
+  before the overlay. No zoom-level figure is shown.
+- **Full log opens at the bottom** (§6.3).
 
 ## 12. Edge cases and error handling
 
-- **Font or layout not ready:** paging waits for `document.fonts.ready` before
-  measuring; until then the page shows the first block unpaged.
+- **Font or layout not ready:** paging waits for `document.fonts.ready`; until
+  then the window shows the first block unpaged.
 - **A single block larger than a page** after all split points (for example,
-  box-drawing map art): it gets its own page with internal scrolling, never
-  truncated.
-- **Reconnect / resync:** the sequencer rebuilds from the log and shows the
-  last response's last page, fully typed. No transition or combat beat
-  replays.
+  box-drawing map art): it gets its own `oversize` page with internal
+  scrolling, never truncated.
+- **Reconnect / resync:** the window rebuilds from the log and shows the last
+  response's last page, fully shown. No transition or combat beat replays.
 - **Dialogue host leaves mid-conversation:** the existing clear seam ends the
-  session; the NPC portrait slides out and the command panel returns.
-- **Portrait missing:** `StageActor` shows the existing truthful placeholder
-  (initial glyph and label), never a stock image.
-- **`combat_beats` out of order or with an unknown participant:** the client
-  plays the beats it can map and ends at the committed status; the beat panel
-  never overrides committed state.
+  session; the NPC portrait leaves and the command panel returns.
+- **Portrait missing:** `StageActor` shows the truthful placeholder, never a
+  stock image.
+- **`combat_beats` unavailable or inconsistent:** the server refuses to publish
+  an inconsistent round; the client falls back (§10.2). The beat panel never
+  overrides committed state.
 - **Offline / mutation locked:** reading, paging, and the log keep working;
-  actions are rejected exactly as today.
+  actions are rejected exactly as before.
 
 ## 13. Testing
 
-- **Unit (Vitest):** the paging function (block packing, sentence / clause /
-  character splits, markup spans across a split, re-page on resize); response
-  segmentation (`in` boundaries, late lines); vitals visibility; the
-  presentation queue (ordering, skip, flush on new action); beat playback
-  state (`hp_after` display, snap to status, fallback without beats).
+- **Unit (Vitest / Node):** paging (block packing, sentence / clause /
+  character splits, markup spans across a cut, re-page anchor); response
+  segmentation (`in` lines, dispatch marks, late lines); vitals visibility
+  including severities; typewriter reveal; motion-level resolution and the
+  literal-duration guard; the `sections` router geometry; the beat queue
+  (ordering, skip, flush, `hp_after` display, snap, fallback).
 - **Component tests:** `HudFrame` anchors per mode against the §4 matrix;
-  `MessageWindow` controls; scene overview and verb popover keyboard paths;
-  dialogue stage (choices appear only after the last page; dimming); command
-  line collapse and focus return.
-- **Server (Python):** `explore.talk_open` (greeting, fallback line, stale NPC,
-  non-host, no clock or memory change, session writer list); `combat_beats`
-  presenter (schema, bound, closed kind set, `hp_after` equals settlement
-  state, unavailable outside combat, no disguised data).
-- **Browser verification:** keyboard-only journeys at 1920×1080 for move →
-  scene overview → talk_open → choice → leave, and for one combat round with
-  beats; screenshots checked for the §3 stage-height goal and a fixed band
-  height across all three modes; a reduced-motion run.
+  `MessageWindow` controls; `SceneOverview` / `DockVerbPopover` keyboard paths;
+  `DialogueChoices` (appears only after the last page; key ownership);
+  `StageActor` dimming; command-line collapse and focus return.
+- **Server (Python):** `explore.talk_open` (greeting, fallback, stale NPC,
+  non-host, no clock or memory change, session writer list); exploration panel
+  v3; dialogue panel v2 `portrait_ref`; `combat_beats` (schema, bounds, closed
+  kind set, round record, `hp_after` check, availability, no replay, no hidden
+  data).
+- **Browser:** the suite runs with motion `off`; keyboard-only journeys at
+  1920×1080 for move → scene overview → talk_open → choice → leave and for a
+  combat round with beats; the 65% stage and fixed-band checks; paging and
+  re-paging; a reduced-motion run and full-motion computed-style checks.
 
 ## 14. Spec impact
 
 | Capability | Change |
 |---|---|
-| `webclient-contextual-hud` | Largely rewritten: stage anchors, band, per-mode visibility, head card / art showcase / quick chips removed, message window replaces the caption, dialogue-mode dock rule replaced, motion levels |
-| `webclient-desktop-shell` | Direct-child and anchor rules follow the new anchors |
-| `webclient-input-narrative` | Paging, response segmentation, reading controls, full log opens at bottom |
-| `webclient-exploration-menu` | Dock root becomes the scene overview; `交談` affordance maps to `explore.talk_open`; new `explore.talk_open` requirement |
-| `webclient-dialogue-session` | `explore.talk_open` added as a session writer |
-| `webclient-local-map` | Legend requirements move from the minimap to the full-map popover; fit rules for minimap and full map |
-| `webclient-combat-menu` | Combat panel hosted in `band-command`; beat playback and unlock rule |
-| `webclient-oob-protocol` | New `combat_beats` panel |
-| `webclient-options-surface` | `textSpeed`, `autoAdvance`, `motionLevel` |
-| `webclient-art-panel` | Unchanged data; consumers change |
+| `webclient-contextual-hud` | Largely rewritten: stage anchors, band, place card, per-mode visibility, vitals rule, head card / art showcase / quick chips removed, message window replaces the caption, scene overview and combat-only tab bar, dialogue collapse, stage actors, choices, reading and motion preferences, transitions |
+| `webclient-desktop-shell` | Anchors and direct children, collapsible command line, top-bar tool group, paged narrative output, layout store v3 |
+| `webclient-input-narrative` | Response segmentation, paging, reading controls, typing, full log opens at its latest line, echo heads its response |
+| `webclient-exploration-menu` | Exploration panel v3, `explore.talk_open`, dock rooted at the scene overview |
+| `webclient-dialogue-session` | Dialogue panel v2 (`portrait_ref`), `explore.talk_open` as a session writer |
+| `webclient-local-map` | Fixed square island, remembered-room readability, full-map fit/zoom/pan, legend popover |
+| `webclient-combat-menu` | Combat results carry the beats at the status revision; beat playback and the unlock rule |
+| `webclient-combat-beats` (new) | The `combat_beats` panel |
+| `webclient-oob-protocol` | `combat_beats` registration; the round record reaches only the completing publication |
+| `webclient-component-showcase` | The AVG series as a governed wave; manifest additions and deletions |
+| `webclient-pointer-activation`, `webclient-options-surface`, `webclient-context-actions-suggestions`, `webclient-action-dispatch`, `exploration-affordances`, `webclient-context-actions`, `webclient-lore-codex-panel`, `webclient-art-panel`, `webclient-browser-verification`, `webclient-narrative-markup` | Restated where they named retired surfaces, keys, or the reduced-motion boolean |
 
-## 15. OpenSpec change breakdown
+## 15. OpenSpec change series
 
-| # | Change | Depends on | Server change |
+Each change fits one engineer-day. Changes run one at a time in archive order
+because most share `AppClient.vue`, `AppShell.vue`, `HudFrame.vue`,
+`MessageWindow.vue`, `app-shell.css`, or the store; later changes write their
+MODIFIED requirement blocks on top of earlier changes' text. Only the pure
+server changes (C10a, C12) can run in parallel with the client chain.
+
+| # | Change | Profile | Status |
 |---|---|---|---|
-| 0 | `webclient-map-and-log-quick-fixes` (§11) | — | no |
-| 1 | `webclient-avg-stage-layout` (§4, §5) | the three pending drawer changes | no |
-| 2 | `webclient-message-sequencer` (§6) | 1 | no |
-| 3 | `webclient-scene-overview-dock` (§7) | 1 | no |
-| 4 | `webclient-dialogue-stage` (§8) | 2, 3 | yes (`explore.talk_open`) |
-| 5 | `webclient-motion-layer` (§9) | 2 | no |
-| 6 | `webclient-combat-choreography` (§10) | 5 | yes (`combat_beats`) |
+| C1 | `webclient-minimap-and-log-quick-fixes` | visual | archived |
+| C2 | `webclient-full-map-fit-view` | visual | archived |
+| C3 | `webclient-retire-redundant-hud` | logic | archived |
+| C4a | `webclient-avg-stage-shell` | visual | archived |
+| C4b | `webclient-avg-place-card-top-bar` | visual | archived |
+| C4c | `webclient-avg-stage-hud-anchors` | visual | archived |
+| C5 | `webclient-collapsible-command-line` | logic | archived |
+| C6a | `webclient-message-pages` | logic | implementing |
+| C6b | `webclient-message-window-component` | visual | proposed |
+| C6c | `webclient-message-window-swap` | logic | proposed |
+| C7 | `webclient-typewriter-reading-prefs` | visual | proposed |
+| C8a | `webclient-scene-overview-component` | visual | proposed |
+| C8b | `webclient-scene-overview-swap` | logic | proposed |
+| C8c | `webclient-retire-exploration-submenus` | logic | proposed |
+| C9a | `explore-talk-open-action` | logic | proposed |
+| C9b | `webclient-talk-open-dock` | logic | proposed |
+| C10a | `dialogue-panel-host-portrait` | logic | proposed (server; parallel-safe) |
+| C10b | `webclient-dialogue-stage-actors` | visual | proposed |
+| C10c | `webclient-dialogue-choices-overlay` | visual | proposed |
+| C11a | `webclient-motion-level` | logic | proposed |
+| C11b | `webclient-scene-transitions` | visual | proposed |
+| C11c | `webclient-mode-transitions` | visual | proposed |
+| C12 | `combat-beats-panel` | logic | proposed (server; parallel-safe) |
+| C13a | `webclient-combat-foes-on-stage` | visual | proposed |
+| C13b | `webclient-combat-beat-queue` | logic | proposed |
+| C13c | `webclient-combat-beat-choreography` | visual | proposed |
 
-Order: 0 can start now (it touches only map and log files). The three pending
-drawer changes land next, because they delete dock and drawer-hosting code
-that change 1 would otherwise have to carry. Change 1 and change 2 are
-designed together: the band's fixed metrics are the paging function's input.
-Changes 3 and 5 may run in parallel after 2. Change 4 needs the sequencer and
-the overview; change 6 needs the presentation queue from 5.
-
-File-conflict hot spots: `AppClient.vue`, `AppShell.vue`, `HudFrame.vue`, and
-`stores/elosern/view.js` are touched by 1, 2, 3, and 4. Run those
-sequentially, never in parallel worktrees.
+Archive order: C1 → C2 → C3 → C4a → C4b → C4c → C5 → C6a → C6b → C6c → C7 →
+C8a → C8b → C8c → C9a → C9b → C10a → C10b → C10c → C11a → C11b → C11c → C12 → C13a → C13b → C13c.
+The "component first, swap second" pairs (C6b/C6c, C8a/C8b) follow the
+showcase rule that a component is never wired into the live application
+before its story exists.

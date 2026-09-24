@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md (Why). The state below comes from the code and from the earlier series changes, assuming C1 to C9, C10a, and C10b (`webclient-dialogue-stage-actors`) are archived.
+See proposal.md (Why). The state below comes from the code and from the earlier series changes, assuming C1 to C9b, C10a, and C10b (`webclient-dialogue-stage-actors`) are archived.
 
 - **`MessageWindow.vue`** (C6b, C6c, C7, C10b):
   - Paged variant:
@@ -23,7 +23,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
   - `restoreFocusHome()` focuses `#action-dock`, or in dialogue `messageWindow.focusHome()`.
   - The mode watcher rescues focus on entering and leaving dialogue.
 - **Keyboard** (C10b D6): in dialogue, `focusPress` claims digits through `handleCaptionDialoguePick` / `captionDialoguePresented()`, claims `/` through the router, and leaves every other key unclaimed.
-- **Scene overview** (C8a, C8b, C9): in dialogue the router's only frame is the overview (C9 D6). `store.view.rootMenu` holds it, with `sections` naming `exits` items. Each exit item carries `actionId: "explore.move"`, a `payload` (with `current_node`), `commandDisplay`, `enabled`, and `disabledReason`. `components/dock-exits.js` (C8a) resolves the direction glyph and the destination display name that `SceneOverview` renders.
+- **Scene overview** (C8a, C8b, C9a, C9b): in dialogue the router's only frame is the overview (C9b D1). `store.view.rootMenu` holds it, with `sections` naming `exits` items. Each exit item carries `actionId: "explore.move"`, a `payload` (with `current_node`), `commandDisplay`, `enabled`, and `disabledReason`. `components/dock-exits.js` (C8a) resolves the direction glyph and the destination display name that `SceneOverview` renders.
 - **Command line** (C5):
   - `CommandLine.vue` `submit()` emits `submit`, then clears the field and emits `sent` only when `connected && !mutationsLocked && !inFlight`.
   - `sendText` (`stores/elosern/transport.js`) routes a bound `freeformTarget` to `dispatchAction("explore.talk_freeform", …)`. It bumps `drawerCloseRequest` only when the dispatch returns a request, and then sets `ctx.freeformTarget = null` in every case (line 293).
@@ -56,7 +56,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 `data-variant` always reads `paged`. The window's `dialogue` and `artPanel` props shrink to what the plate needs (`dialogue` for the view model). The plate (C10b D7) stays as the header row. The typing, marker, flush, re-page, and announcement rules (C6b, C7) now apply to the session line with no special case, which is what C7 D9 anticipated.
 
 ### D2. The narrative line is paged verbatim
-The session line reaches the narrative through the adapters: `{npc}說：{line}` for a greeting or scripted reply, and the fallback line verbatim for `talk_open` (C9 D3). The page shows exactly that. The name plate also names the host, so the name can appear twice.
+The session line reaches the narrative through the adapters: `{npc}說：{line}` for a greeting or scripted reply, and the fallback line verbatim for `talk_open` (C9a D3). The page shows exactly that. The name plate also names the host, so the name can appear twice.
 
 *Why not strip the prefix:* the stripping was the variant's anchored echo match, a prose-shape rule. The design forbids deriving state from prose, and the page must equal the log (the full log shows the same line). The duplication is accepted, and a later server change could send the reply without the prefix.
 
@@ -133,7 +133,7 @@ Geometry check:
 - **Leaving dialogue:** C10b's post-flush rescue selector adds `[data-anchor='choices']`.
 
 ### D8. The `↦ 移動…` exits come from the committed overview
-`AppClient` computes `dialogueExits = store.view.rootMenu?.items.filter(i => i.section === "exits") ?? []`. That is the overview C9 D6 keeps as the router root in dialogue, built from the committed `exploration` panel by `overviewMenu`.
+`AppClient` computes `dialogueExits = store.view.rootMenu?.items.filter(i => i.section === "exits") ?? []`. That is the overview C9b D1 keeps as the router root in dialogue, built from the committed `exploration` panel by `overviewMenu`.
 - `move(item)` calls `store.dispatchAction(item.actionId, item.payload, item.commandDisplay)`. This is the same payload and echo descriptor the overview chip's confirm path submits, but without pushing through the router, which is hidden.
 - The movement settlement clears the session through the existing seam, and C8b's room-change reset keeps the dock at the new overview.
 
@@ -186,6 +186,7 @@ The field and the dispatch path now share one predicate, so the field clears exa
 | contextual-hud "The feed presents the dialogue variant…" (REMOVED) | C10b |
 | input-narrative "A page types in at the reader's text speed and auto-advance is opt-in" | C7 `webclient-typewriter-reading-prefs` |
 | desktop-shell "Keyboard routing is menu-first and submission-safe" | C10b |
+| desktop-shell "Required desktop surfaces remain visible and usable" (dialogue paragraph and "The dialogue caption stays bounded at the minimum viewport": choices live in the choice list, not the window) | C10b |
 | desktop-shell "The collapsible command line preserves ordinary text control" (REMOVED) | C5 `webclient-collapsible-command-line` (ADDED there) |
 | browser-verification "Browser acceptance covers foundation recovery and layout behavior" | C5 |
 | component-showcase "Every required UI component…" | C10b |
@@ -195,7 +196,7 @@ The field and the dispatch path now share one predicate, so the field clears exa
 - **The browser-verification block drops "bounded caption"**, as the C6 note asks. It also drops the minimap legend clause that C1 made false (coordinator note 1). If C5's block is amended for the legend first, re-sync this block and keep only this change's edits.
 - The new choices ID is covered by the `test_node_suite_evidence.py` dialogue evidence (the file list gains `dialogue_choices.test.js`) and by the browser journey. The replaced variant ID's annotations (the dialogue evidence test and `test_browser_exploration_dialogue.py`) re-anchor to it.
 
-**Archive order: C9 (`explore-talk-open-action`) → C10a (`dialogue-panel-host-portrait`) → C10b (`webclient-dialogue-stage-actors`) → C10c (this change) → C11 (`webclient-motion-layer`).** C11's choice stagger and dialogue transitions build on this change's list and anchor.
+**Archive order: C9a (`explore-talk-open-action`) → C9b (`webclient-talk-open-dock`) → C10a (`dialogue-panel-host-portrait`) → C10b (`webclient-dialogue-stage-actors`) → C10c (this change) → C11 (`webclient-motion-layer`).** C11's choice stagger and dialogue transitions build on this change's list and anchor.
 
 ## Risks / Trade-offs
 

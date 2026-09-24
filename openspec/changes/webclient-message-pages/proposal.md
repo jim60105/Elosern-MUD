@@ -7,6 +7,8 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
 
 This change is the first of three slices of design §6 (C6a in the series). It adds the pure lib and the store seams, and decouples the browser suite from the feed's DOM text. Nothing the player sees changes. `webclient-message-window-component` (C6b) builds the window on these seams, and `webclient-message-window-swap` (C6c) mounts it.
 
+**Implementation profile:** logic — a pure paging library and store seams with no visible change; unit tests define done.
+
 ## What Changes
 
 - New pure module `web/webclient-app/lib/message_pages.js` (no Vue, no DOM). It imports only `lib/narrative_markup.js` and exports:

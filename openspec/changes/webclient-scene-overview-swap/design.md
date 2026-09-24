@@ -152,4 +152,4 @@ The keyboard-only acceptance journeys keep pure arrows and Enter. They navigate 
 
 None. The client is unreleased.
 
-Archive order: **C7 → C8a (`webclient-scene-overview-component`) → C8b (this change) → C8c (`webclient-retire-exploration-submenus`)**. This change is written on C4a, C4c, and C5 texts and must be archived after them. C8c modifies this change's legend requirement again. C9 (`explore-talk-open-action`) depends on this change's popover.
+Archive order: **C7 → C8a (`webclient-scene-overview-component`) → C8b (this change) → C8c (`webclient-retire-exploration-submenus`)**. This change is written on C4a, C4c, and C5 texts and must be archived after them. C8c modifies this change's legend requirement again. C9a (`explore-talk-open-action`) depends on this change's popover, and C9b (`webclient-talk-open-dock`) removes and restates its dock requirement.

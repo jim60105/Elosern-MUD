@@ -17,6 +17,8 @@ This is the first of three changes. It builds the pieces the swap needs without 
 
 The component-showcase governance ("a component SHALL NOT be wired into the live application before its story exists") makes build-then-mount the intended order, the same order C6b/C6c used. It also keeps `webclient-scene-overview-swap` (C8b) inside one day.
 
+**Implementation profile:** visual — new chip rows and verb popover components whose look and density in the narrow command panel need visual judgement.
+
 ## What Changes
 
 - `web/static/webclient/js/elosern/exploration_menu.js` gains two builders. Neither is called by any resolver or store yet.
@@ -54,7 +56,7 @@ The component-showcase governance ("a component SHALL NOT be wired into the live
 Out of scope:
 - Mounting the overview as the exploration root, the popover as the `exploration.target` frame, the return-to-overview after movement, the combat-only tab bar, and relocating the shortcut legend: `webclient-scene-overview-swap` (C8b).
 - Deleting the move / look / interact frames, the interaction workspace, and the exploration badges; digits 1–9 and the legend wording: `webclient-retire-exploration-submenus` (C8c).
-- Swapping the 交談 affordance to `explore.talk_open`: `explore-talk-open-action` (C9).
+- Swapping the 交談 affordance to `explore.talk_open`: `explore-talk-open-action` (C9a).
 
 ## Capabilities
 

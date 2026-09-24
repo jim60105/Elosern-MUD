@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md (Why). The state below was checked in code, assuming C1 to C9 are archived (none of them touches the dialogue panel's schema; C9 only adds a session writer).
+See proposal.md (Why). The state below was checked in code, assuming C1 to C9b are archived (none of them touches the dialogue panel's schema; C9a only adds a session writer).
 
 - `web/webclient/presentation/dialogue.py`:
   - `DIALOGUE_SCHEMA_VERSION = 1`, registered through `registry.py` (`name="dialogue", schema_version=DIALOGUE_SCHEMA_VERSION`).
@@ -48,9 +48,9 @@ The field's allowed values widen, and the requirement pins the version, so the s
 The key is stable for a given NPC. Only the entry behind it changes when a portrait finishes generating, and that change travels in the `art` panel's own push (`art_push.py`). The dialogue push after an NPC departure (`dialogue_push.py`) renders the unavailable form, which carries no host. No new push path is needed.
 
 ### D5. Spec strategy and archive order
-The requirement's title names the version, so it is REMOVED and ADDED (version-2), keeping every scenario title and adding two. The single annotation in `test_dialogue_panel.py` re-anchors. No other series change modifies `webclient-dialogue-session` "The dialogue panel is…"; C9 modifies "The dialogue session is deterministic-core-only character state" only.
+The requirement's title names the version, so it is REMOVED and ADDED (version-2), keeping every scenario title and adding two. The single annotation in `test_dialogue_panel.py` re-anchors. No other series change modifies `webclient-dialogue-session` "The dialogue panel is…"; C9a (`explore-talk-open-action`) modifies "The dialogue session is deterministic-core-only character state" only.
 
-**Archive order: C9 (`explore-talk-open-action`) → C10a (this change) → C10b (`webclient-dialogue-stage-actors`) → C10c (`webclient-dialogue-choices-overlay`).** C10b consumes the key. The implementation touches no hot-spot client file, so it may be built in parallel with earlier client changes.
+**Archive order: C9a (`explore-talk-open-action`) → C9b (`webclient-talk-open-dock`) → C10a (this change) → C10b (`webclient-dialogue-stage-actors`) → C10c (`webclient-dialogue-choices-overlay`).** C10b consumes the key. The implementation touches no hot-spot client file, so it may be built in parallel with earlier client changes.
 
 ## Risks / Trade-offs
 

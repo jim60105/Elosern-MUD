@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md (Why). The state below comes from the code and from the earlier series changes, assuming C1 to C9 and C10a (`dialogue-panel-host-portrait`) are archived.
+See proposal.md (Why). The state below comes from the code and from the earlier series changes, assuming C1 to C9b and C10a (`dialogue-panel-host-portrait`) are archived.
 
 - **Stage anchors** (C4a D1/D4, C4b, C4c):
   - `HudFrame.vue` renders `.stage-band` (a two-column grid, `minmax(0, 2fr) minmax(0, 1fr)`) with `[data-anchor="band-message"]` and `[data-anchor="band-command"]`.
@@ -21,7 +21,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 - **Keyboard**:
   - `bridge.js` `onDocumentKeydown` sends every non-editable, non-modified key to `store.focusPress`.
   - `stores/elosern/interaction.js` `focusPress` claims digits `1`–`9` (C8c), first through the caption retarget `handleCaptionDialoguePick` while `captionDialoguePresented()`, and passes every other key to `ctx.router.press`.
-  - C9 D6 resets the router to the overview when the mode turns `dialogue`.
+  - C9b D1 resets the router to the overview when the mode turns `dialogue`.
 - **Dispatch**:
   - `stores/elosern/transport.js` `dispatchAction` stores `ctx.inFlight = { requestId, actionId, presentationRevision, handledResult }`, which is cleared once the result is handled and the declared revision is accepted, or on rejection.
   - `view.js` publishes `dispatch.inFlight` without `actionId`.
@@ -73,7 +73,7 @@ In `HudFrame.vue`:
 - `[data-elosern-mode="dialogue"] .stage-band { grid-template-columns: minmax(0, 1fr); }`
 - `[data-elosern-mode="dialogue"] [data-anchor="band-command"] { display: none; }`
 
-This is the mode-gating mechanism C4a already uses for creation. `#action-dock` stays in the DOM, so the "never remounted" rule holds, and C9 D6 has already reset its router to the overview.
+This is the mode-gating mechanism C4a already uses for creation. `#action-dock` stays in the DOM, so the "never remounted" rule holds, and C9b D1 has already reset its router to the overview.
 
 In `AppShell.vue`:
 - `HIDDEN_BY_MODE.dialogue = "[data-anchor='band-command']"`.
@@ -155,7 +155,7 @@ Each MODIFIED block is written on the latest series text, keeping every scenario
 | contextual-hud "The feed presents the dialogue variant from the committed panel" | C6c |
 | contextual-hud "The message window presents the current response one page at a time…" | C7 `webclient-typewriter-reading-prefs` |
 | contextual-hud "The command line is a collapsible row docked on the message region's top edge" | C5 `webclient-collapsible-command-line` (ADDED there) |
-| exploration-menu "The keyboard-first exploration dock roots at the scene overview and opens dialogue directly" | C9 `explore-talk-open-action` (ADDED there) |
+| exploration-menu "The keyboard-first exploration dock roots at the scene overview and opens dialogue directly" | C9b `webclient-talk-open-dock` (ADDED there) |
 | desktop-shell "Required desktop surfaces remain visible and usable", "Keyboard routing is menu-first and submission-safe" | C8b |
 | component-showcase "Every required UI component…" | C8a `webclient-scene-overview-component` |
 
@@ -164,7 +164,7 @@ Each MODIFIED block is written on the latest series text, keeping every scenario
 - The desktop-shell required-surface block drops "bounded caption", as the C6 coordinator note asks. The browser-verification "bounded caption" text is restated in C10c.
 - `openspec validate` reports that archive would refuse blocks whose base is an unarchived series change. That is expected.
 
-**Archive order: C9 (`explore-talk-open-action`) → C10a (`dialogue-panel-host-portrait`) → C10b (this change) → C10c (`webclient-dialogue-choices-overlay`).** C10c modifies this change's legend, dialogue-variant (removed there), message-window, and collapse texts. If any base block changes before archive, re-sync this change's block, keeping only its own edits.
+**Archive order: C9a (`explore-talk-open-action`) → C9b (`webclient-talk-open-dock`) → C10a (`dialogue-panel-host-portrait`) → C10b (this change) → C10c (`webclient-dialogue-choices-overlay`).** C10c modifies this change's legend, dialogue-variant (removed there), message-window, and collapse texts. If any base block changes before archive, re-sync this change's block, keeping only its own edits.
 
 ## Risks / Trade-offs
 

@@ -66,7 +66,7 @@ See proposal.md (Why). The current state was checked in code. C1 to C7 are assum
 
 It carries no `grid` / `gridCols`, so the popover is a vertical list, which the router already supports.
 
-The 交談 seam stays `targetMenuFor`'s `explore.talk_scripted` branch, the one branch C9 changes.
+The 交談 seam stays `targetMenuFor`'s `explore.talk_scripted` branch, the one branch C9a (`explore-talk-open-action`) changes.
 
 The possession pair stays unmapped, exactly as today. Surfacing it is not part of the design's §7.
 

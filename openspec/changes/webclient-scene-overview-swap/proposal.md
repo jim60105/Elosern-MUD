@@ -8,6 +8,8 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
 
 Today the player picks a tab (`移動 / 查看 / 互動 / 等待/休息 / 建議`), and then, for people, walks a two-step "1 選擇互動對象 / 2 選擇對話或行動" workspace. `webclient-scene-overview-component` (C8a) built the model, the router geometry, and the two components without mounting them. This change mounts them and deletes the interaction workspace. That workspace keys on the `exploration.target` frame, which becomes the popover, so it cannot outlive the swap. The project is unreleased, so the old root is replaced, not kept as an option.
 
+**Implementation profile:** logic — resolver wiring, frame reset, and test re-pointing onto components designed in C8a.
+
 ## What Changes
 
 - **BREAKING (internal)**: the `exploration.root` resolver in `web/webclient-app/stores/frame-resolvers.js` returns `ExplorationMenu.overviewMenu(...)` (C8a), and the `exploration.target` resolver returns `ExplorationMenu.verbMenuFor(...)`.
@@ -36,7 +38,7 @@ Today the player picks a tab (`移動 / 查看 / 互動 / 等待/休息 / 建議
 
 Out of scope:
 - Deleting the unreachable `moveItems` / `lookItems` / `interactItems` / `rootItems` builders, the `exploration.move/look/interact` resolvers and push entries, the move outlet pane, and the exploration badge branches; digits 1–9 and the legend wording: `webclient-retire-exploration-submenus` (C8c).
-- 交談 opening the dialogue stage (`explore.talk_open`): `explore-talk-open-action` (C9). Here 交談 keeps today's scripted-keyword frame and freeform borrow.
+- 交談 opening the dialogue stage (`explore.talk_open`): `explore-talk-open-action` (C9a). Here 交談 keeps today's scripted-keyword frame and freeform borrow.
 - The dialogue-mode dock collapse: `webclient-dialogue-stage` (C10).
 - Combat: its root and choice tree are unchanged.
 
@@ -97,5 +99,5 @@ Out of scope:
     - C4a (the exploration dock, the command region)
     - C4c (the stage requirement)
     - C5 (both desktop-shell requirements)
-  - C9 (`explore-talk-open-action`) changes the popover's 交談 row and depends on this change.
+  - C9a (`explore-talk-open-action`) changes the popover's 交談 row and depends on this change; C9b (`webclient-talk-open-dock`) removes and restates this change's dock requirement.
   - The hot-spot files are `AppClient.vue` and `app-shell.css`, so the series runs these changes sequentially.

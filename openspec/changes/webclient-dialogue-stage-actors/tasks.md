@@ -1,6 +1,6 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm C9 (`explore-talk-open-action`) and C10a (`dialogue-panel-host-portrait`) are archived:
+- [ ] 1.1 Confirm C9a (`explore-talk-open-action`), C9b (`webclient-talk-open-dock`), and C10a (`dialogue-panel-host-portrait`) are archived:
   - `grep -n "DIALOGUE_SCHEMA_VERSION = 2" web/webclient/presentation/dialogue.py` matches
   - `ls web/webclient-app/components/MessageWindow.vue` succeeds and `grep -n "NarrativeFeed" web/webclient-app/components/AppShell.vue` returns nothing
   - `grep -n "actor-left" web/webclient-app/AppClient.vue` shows the `ReferenceArtwork` mount

@@ -1,10 +1,9 @@
 ## 1. Preconditions
 
 - [ ] 1.1 Confirm that C8c (`webclient-retire-exploration-submenus`) is archived and that its seams exist:
-  - `openspec/specs/webclient-exploration-menu/spec.md` contains "The exploration dock is keyboard-first and roots at the scene overview".
-  - `openspec/specs/webclient-contextual-hud/spec.md` contains "A fixed-column dock pane sizes its columns to content".
-  - `grep -n "verbMenuFor\|keywordMenuFor" web/static/webclient/js/elosern/exploration_menu.js` matches both.
-  - `grep -n "exploration.keywords" web/webclient-app/stores/frame-resolvers.js` matches.
+  - `openspec/specs/webclient-exploration-menu/spec.md` contains "The exploration panel is an exact read-only version-2 presentation panel" and "The exploration dock is keyboard-first and roots at the scene overview".
+  - `grep -n "verbMenuFor\|targetMenuFor" web/static/webclient/js/elosern/exploration_menu.js` matches both, and `grep -n "explore.talk_scripted\|explore.talk_freeform" web/static/webclient/js/elosern/exploration_menu.js` matches the two `targetMenuFor` branches.
+  - `grep -n "EXPLORATION_SCHEMA_VERSION = 2" web/webclient/presentation/exploration.py` matches.
 
   Stop and report if any of these is missing.
 
@@ -41,7 +40,7 @@
   - `test_exploration_actions/test_dialogue_session_recording.py`: add a talk_open writer case annotated `webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state`.
   - `test_dispatcher/test_registry.py`: the pinned id list gains `explore.talk_open`.
   - `test_dispatcher/test_dialogue_trigger.py`: add "a successful talk_open schedules nothing".
-  - `web/static/webclient/js/tests/command_echo_coverage_manifest.json`: `registeredMutationActionIds` gains `explore.talk_open`.
+  - `web/static/webclient/js/tests/command_echo_coverage_manifest.json`: `registeredMutationActionIds` gains `explore.talk_open` (pinned by `web/webclient/actions/tests/test_action_catalog_coverage.py`; the Node and Vitest halves of this lockstep are tasks 4.2 and 5.1).
 
   Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.actions.tests world.rules.tests.test_dialogue world.rules.tests.test_dialogue_session`. It must pass.
 
@@ -77,7 +76,7 @@
   Re-anchor the 8 `webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel` annotations in `test_presenter.py` to the version-3 ID, and annotate the new affordance cases `webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose`. Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests`. It must pass.
 - [ ] 3.4 `tests/test_exploration_parity_contract.py`: delete the `MAX_SCRIPTED_KEYWORDS`, `MAX_KEYWORD_ID_CHARS`, and `MAX_KEYWORD_LABEL_CODE_POINTS` pairs from `_AFFORDANCE_CONSTANTS`. Run `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_exploration_parity_contract`. It must pass.
 
-## 4. Client protocol mirror and exploration menu (Node)
+## 4. Client protocol mirror, echo resolver, and the 交談 branch (Node)
 
 - [ ] 4.1 `web/static/webclient/js/elosern/protocol/panels/exploration.js`:
   - The version check becomes `!== 3`.
@@ -86,13 +85,9 @@
   - Update the header comment.
 
   `web/static/webclient/js/elosern/protocol.js`: drop the three constant exports. `protocol/constants.js`: `CONTEXT_ACTIONS_ACTION_CODES` gains `"explore.talk_open"` after `"explore.look"`. `protocol/panels/skill_descriptor.js` `validateContextActionsAffordanceParams`: add an `explore.talk_open` branch accepting exactly `{npc_id}`.
-- [ ] 4.2 `web/static/webclient/js/elosern/exploration_menu.js` (design D7):
-  - `targetMenuFor`: one `explore.talk_open` branch (`talk-open`) replaces the `talk_scripted` and `talk_freeform` branches.
-  - Delete `keywordMenuFor`, `scriptedAffordanceFor`, and their exports.
-  - Rewrite the header comment.
-
-  `web/static/webclient/js/elosern/command_echo.js`: add the `explore.talk_open` resolver (`talk <NPC>`, `null` without `npcLabel`).
-- [ ] 4.3 Node tests under `web/static/webclient/js/tests/`:
+- [ ] 4.2 `web/static/webclient/js/elosern/command_echo.js`: add the `explore.talk_open` resolver (`talk <NPC>` from `npcLabel`, `null` without it), design D5.
+- [ ] 4.3 `web/static/webclient/js/elosern/exploration_menu.js` `targetMenuFor` (design D6): one `explore.talk_open` branch (`talk-open`, `actionId`/`payload` only while enabled, `commandDisplay: {npcLabel: target.display_name}`, the disabled reason as the other rows) replaces the `talk_scripted` and `talk_freeform` branches. Change nothing else in this file: `keywordMenuFor`, `scriptedAffordanceFor`, and their exports stay for C9b to delete.
+- [ ] 4.4 Node tests under `web/static/webclient/js/tests/`:
   - `protocol_fixtures.js`: v3 exploration fixtures without `keywords`, with 交談 as `explore.talk_open`.
   - `protocol_exploration_a.test.js`, `protocol_exploration_b.test.js`:
     - version 3
@@ -100,66 +95,50 @@
     - the pinned `EXPECTED_ACTION_CODES` (twelve) and `EXPECTED_EXPLORATION_ACTION_IDS` lists
     - the talk_open params vectors
   - `protocol_context_actions_a.test.js`: the code-list pin gains talk_open.
-  - `exploration_menu.test.js`: delete the `keywordMenuFor` / `scriptedAffordanceFor` cases. Add `targetMenuFor` cases: enabled 交談 → `{actionId: "explore.talk_open", payload: {npc_id}, commandDisplay: {npcLabel}}`, and disabled 交談 → no action and the reason.
+  - `exploration_menu.test.js`: add `targetMenuFor` cases: enabled 交談 → `{actionId: "explore.talk_open", payload: {npc_id}, commandDisplay: {npcLabel}}`, and disabled 交談 → no action and the reason. Replace any `targetMenuFor` case that asserted the `talk-scripted` or `talk-freeform` row. Leave the `keywordMenuFor` / `scriptedAffordanceFor` cases (C9b deletes them with their functions).
   - `hud_dock_menus.test.js`: follow if it builds a talk row.
-  - `command_echo.test.js`: the resolver, its null case, and the coverage fixture entry.
-  - `keyboard_router_declarative.test.js`: rename the synthetic `exploration.keywords` source to `exploration.wait`.
+  - `command_echo.test.js`: the resolver, its null case, and the `REGISTERED_MUTATION_ACTIONS` coverage fixture entry (`{payload: {npc_id: 7}, display: {npcLabel: …}}`).
 
   Run `node --test web/static/webclient/js/tests/*.test.js`. It must pass.
 
-## 5. Client store, panes, and Vitest
+## 5. Vitest and story fixtures the wire change turns red
 
-- [ ] 5.1 `web/webclient-app/stores/frame-resolvers.js`: delete the `exploration.keywords` source and update the header comment. `web/webclient-app/stores/elosern/frames.js`:
-  - Drop `"exploration.keywords"` from the `gridCols = 1` list.
-  - Add the design-D6 rule to `settleFrameStack`: track `ctx.lastMode`, and reset to `EXPLORATION_ROOT_DESCRIPTOR` inside `inStackMutation` when the mode changes from `exploration` to `dialogue` at depth > 1. Initialize `ctx.lastMode = null` beside `ctx.lastRoomIdentity`.
+- [ ] 5.1 Under `web/webclient-app/tests/` (design D7):
+  - `store/protocol_fixtures.js`: v3 exploration panel, 交談 as `explore.talk_open`, no `keywords`.
+  - `store/command_echo_surfaces.test.js`: add one behavioral table row "exploration popover 交談 (row descriptor forwarded)" with `ids: ["explore.talk_open"]`, dispatching `explore.talk_open` with `{npc_id: 7}` and `{npcLabel: "店長"}` and expecting `talk 店長`. The "exercises every registered mutation id" test must pass.
+  - `frame-resolvers.test.js`: the `exploration.target` cases assert the `talk-open` row (`actionId: "explore.talk_open"`, payload `{npc_id}`). Leave the `exploration.keywords` cases for C9b.
+  - `dialogue_store.test.js`, `dialogue_dock.test.js`: open conversations by activating the popover's `talk-open` row and committing a `dialogue` panel, instead of the keyword frame. Assert that the free row still borrows the command line through `borrowDialogueCommand`. Assert nothing about the popover's depth (C9b adds the reset).
+  - `store/declarative_frames.test.js`: the room-change case that opened a keywords frame through 交談 opens the popover instead.
 
-  `stores/elosern/interaction.js`: delete the `openKeywords` and `freeform` branches of `handleExplorationItem`, and update the `borrowDialogueCommand` and `actionId` comments. `stores/elosern/combat.js` `fillDisplayFor`: add `explore.talk_open` to the `npcLabel` family. `stores/dialogue-view.js`: fix the header comment (no `keywordMenuFor`).
-- [ ] 5.2 `web/webclient-app/components/dock-panes.js`: delete the `nav` kind and its clauses, and the `explore.talk_freeform` clause of the affordance test. Update the kind-list comment. `web/webclient-app/components/DockMenu.vue`:
-  - Delete the nav template branch (`dock-menu__nav*`), its CSS, the `nav` `sizeFn` branch, and the `openKeywords` chevron clause.
-  - Update the header comment's pane-kind list.
-
-  `stories/Action/DockMenu.stories.js`: re-point any story whose rows classify as `nav`. Check with `git grep -n "dock-menu__nav\|\"nav\"\|'nav'\|openKeywords\|keywordMenuFor\|scriptedAffordanceFor\|exploration\.keywords" web/webclient-app web/static/webclient/js -- ':!dist'`, which must return nothing after 5.3.
-- [ ] 5.3 Vitest under `web/webclient-app/tests/`:
-  - `frame-resolvers.test.js`: the keyword cases become one "`exploration.keywords` resolves to the unregistered marker" case, and the `exploration.target` cases assert the `talk-open` row.
-  - `components/dock_panes.test.js`, `action/dock_menu_panes.test.js`, `action/dock_menu.test.js`: delete the nav and `kw-*` cases.
-  - `store/protocol_fixtures.js`: v3 exploration panel.
-  - `store/declarative_frames.test.js`: the room-change case that opened a keywords frame opens the popover instead. Add D6 cases:
-    - a popover open when the commit changes the mode to `dialogue` resets to the root
-    - a dialogue → exploration commit and a dialogue → dialogue commit never reset
-    - the first commit never resets
-  - `store/command_echo_surfaces.test.js`: add the popover 交談 row (echo `talk <NPC>`), and add a talk_open row to the per-surface table.
-  - `dialogue_store.test.js`, `dialogue_dock.test.js`: open conversations by activating the popover's `talk-open` row and committing a `dialogue` panel, instead of the keyword frame. Assert that the popover closed and that the free row still borrows the command line through `borrowDialogueCommand`.
-
-  Run `pnpm test`. It must pass.
-- [ ] 5.4 Stories and fixtures:
-  - `web/webclient-app/stories/Core/AppShell.stories.js` exploration fixtures use v3, 交談 as `explore.talk_open`, and no `keywords` or 自由對話 affordance.
+  Find every remaining v2 exploration fixture with `git grep -n "schema_version: 2" web/webclient-app/tests web/webclient-app/stories` and check whether it is an exploration panel. Run `pnpm test`. It must pass.
+- [ ] 5.2 Story fixtures fed through `store.receive`:
+  - `web/webclient-app/stories/Core/AppShell.stories.js`: the exploration fixtures use v3, 交談 as `explore.talk_open`, and no `keywords` or `talk_scripted` / `talk_freeform` affordance.
   - `stories/fixtures/scene_overview.js` (C8a): `explorationPanelFixture` emits v3 targets.
 
   `pnpm run build-storybook` and `pnpm run showcase-coverage` (repository root) must pass.
 
-## 6. Browser journeys
+## 6. Browser journeys the wire change turns red
 
 - [ ] 6.1 `web/tests/browser/_journey_support.py` and `browser_helpers.py`: every hand-built exploration panel is v3, with no `keywords` and 交談 as `explore.talk_open`. Locate them with `git grep -n "keywords\|talk_scripted\|talk_freeform\|schema_version" web/tests/browser/_journey_support.py web/tests/browser/browser_helpers.py`.
 - [ ] 6.2 `web/tests/browser/test_browser_exploration_dialogue.py`:
-  - `test_scripted_keyword_dialogue_completes` and `test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary`: overview chip → 交談 sends exactly one `explore.talk_open`. The dialogue variant shows the host's greeting (`_shipped_greeting()`) and its picks, the dock is back at the overview, and then digit `1` sends `explore.talk_scripted`.
+  - `test_scripted_keyword_dialogue_completes` and `test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary`: overview chip → 交談 sends exactly one `explore.talk_open`. The dialogue variant shows the host's greeting (`_shipped_greeting()`) and its picks, and then digit `1` sends `explore.talk_scripted`. Do not assert the dock depth (C9b).
   - `test_freeform_dialogue_degrades_offline_through_the_command_line` and `test_cancelled_freeform_dialogue_cannot_capture_a_later_command`: bard chip → 交談 → the dialogue variant's `dialogue-freeform` row → command line. The offline assertion waits for the `explore.talk_freeform` result instead of the greeting text, which `talk_open` already shows.
-  - Add `test_talk_open_enters_the_dialogue_in_one_step`, a keyboard-only journey at 1920x1080 annotated with the new talk_open ID. One Enter on 交談 sends one `explore.talk_open` and no `explore.talk_scripted`. The next commit has mode `dialogue` and a `dialogue` panel whose line is the greeting, `router.depth()` is 1, and `✕ 結束對話` sends `explore.dialogue_leave`.
 - [ ] 6.3 `test_browser_input_narrative.py`: the two freeform tests find the bard through the fixture's `LLMNPC` identity (the panel no longer marks freeform), open it with 交談, and borrow from the dialogue free row. The echo assertions expect `talk <bard>` for the open, followed by exactly one `talk <bard> <speech>` for the send. The locked-send test disconnects after the open.
-- [ ] 6.4 `test_browser_exploration_nav.py`: the intermediate-depth test (C8b: popover → keyword frame) becomes popover → Escape at depth 2, and the `talk-scripted` key assertions read `talk-open`. `test_browser_services_base.py`: fix the `_open_surface` docstring (no per-keyword talk rows). `test_browser_exploration_state.py`: add `explore.talk_open` to the zero-count assertions. `test_browser_exploration_tiles.py`: C8c's fixed-column nav-pane case (a keyword frame) has no frame left, so move it into `test_browser_combat_skills.py` as a skill-frame column-width assertion at 1280x720, keeping its `webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content` annotation. `test_browser_contextual_hud_dock.py`: drop any nav-row assertion. `git grep -n "talk-scripted\|talk-freeform\|exploration\.keywords\|dock-menu__nav\|自由交談" web/tests/browser` returns nothing.
+- [ ] 6.4 `test_browser_exploration_nav.py`: the intermediate-depth test (C8b: popover → keyword frame) becomes popover → Escape at depth 2, and the `talk-scripted` key assertions read `talk-open`. `test_browser_exploration_state.py`: add `explore.talk_open` to the zero-count assertions. `test_browser_exploration_tiles.py`: C8c's fixed-column nav-pane case (a keyword frame) has no reachable frame left, so move it into `test_browser_combat_skills.py` as a skill-frame case at 1280x720 with the same assertions (every row inside the pane's right edge, and ArrowRight reaching the second column of the fixed two-column mapping), keeping its `webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content` annotation.
+
+  `git grep -n "talk-scripted\|talk-freeform\|自由交談" web/tests/browser` returns nothing. (`exploration.keywords` and `dock-menu__nav` references are C9b's to clear.)
 
 ## 7. Specs and traceability
 
 - [ ] 7.1 Sync this change's deltas into the main specs. Edit the `webclient-exploration-menu` Purpose paragraph: "version-2 `exploration` panel" becomes "version-3", and "the thirteen exact allowlisted exploration adapters" becomes "fourteen". Edit the `exploration-affordances` Purpose only if it names the allowlist size. It currently says "the eight emitted action codes", which stays true.
-- [ ] 7.2 Re-anchor:
-  - `webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview` moves to `webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly`. The anchors are in `web/tests/browser/test_browser_exploration_actions.py`, `test_browser_exploration_nav.py` (every occurrence), `test_browser_exploration_state.py`, `test_browser_exploration_tiles.py` (the C8c chip-wrap test), and `web/webclient/tests/test_node_suite_evidence.py`. List them with `git grep -n "the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview"`.
-  - The version-2 panel ID moves to version-3 (task 3.3).
+- [ ] 7.2 Re-anchor the version-2 panel ID to the version-3 ID (task 3.3). Leave `webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview` in place: that requirement survives until C9b.
 
-  Confirm every ID with `uv run --locked python -m tools.spec_traceability list`, then run `uv run --locked python -m tools.spec_traceability check`. It must pass, and the new talk_open requirement must be covered by 2.3 and 6.2.
+  Confirm every ID with `uv run --locked python -m tools.spec_traceability list`, then run `uv run --locked python -m tools.spec_traceability check`. It must pass, and the new talk_open requirement must be covered by 2.3.
 
 ## 8. Validation
 
 - [ ] 8.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, and `uv run --locked python -m tools.spec_traceability check`. All must pass.
 - [ ] 8.2 Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.actions.tests web.webclient.presentation.tests world.rules.tests.test_dialogue world.rules.tests.test_dialogue_session tests.test_exploration_parity_contract web.webclient.tests.test_node_suite_evidence commands.tests.test_talk_turnin_commands`. It must pass, and the last module confirms typed `talk` is unchanged.
-- [ ] 8.3 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_exploration_dialogue web.tests.browser.test_browser_exploration_nav web.tests.browser.test_browser_exploration_state web.tests.browser.test_browser_exploration_tiles web.tests.browser.test_browser_exploration_actions web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_services_base web.tests.browser.test_browser_contextual_hud_dock web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_options_surface`. It must pass.
-- [ ] 8.4 Check the live client at 1920x1080 with `agent-browser`: 交談 on a scripted host shows the greeting and its choices in the message window in one press, and the dock shows the overview. Close the browser afterwards.
+- [ ] 8.3 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_exploration_dialogue web.tests.browser.test_browser_exploration_nav web.tests.browser.test_browser_exploration_state web.tests.browser.test_browser_exploration_tiles web.tests.browser.test_browser_exploration_actions web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_services_base web.tests.browser.test_browser_contextual_hud_dock web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_options_surface`. It must pass. If `test_browser_contextual_hud_dock.py` or `test_browser_services_base.py` reached a keyword frame or a 自由交談 row through the popover, re-point that step here the same way as 6.2.
+- [ ] 8.4 Check the live client at 1920x1080 with `agent-browser`: 交談 on a scripted host shows the greeting and its choices in the message window in one press. Close the browser afterwards.
 - [ ] 8.5 Run `openspec validate explore-talk-open-action --strict` and `git diff --check`. Both must be clean.

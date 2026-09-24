@@ -1,6 +1,6 @@
 ## Why
 
-The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` §2 item 5, §4, §5.2, §8.2) turns a conversation into a scene. The player stands on the left, the NPC stands on the right, the speaker is lit and the listener dimmed, and the command panel collapses so the message window spans the band under a name plate. Today, after C9, 交談 opens a conversation, but it shows only as a variant inside the two-thirds message window. The command region keeps showing the exploration overview beside it, and `actor-right` stays empty. C10a (`dialogue-panel-host-portrait`) now ships the host's art catalog key. This change (C10b) builds the stage half of the dialogue screen: `StageActor` on both sides with the speaking state, the collapsed command region, and the name plate. C10c then pages the line and moves the choices over the stage.
+The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` §2 item 5, §4, §5.2, §8.2) turns a conversation into a scene. The player stands on the left, the NPC stands on the right, the speaker is lit and the listener dimmed, and the command panel collapses so the message window spans the band under a name plate. Today, after C9a and C9b, 交談 opens a conversation, but it shows only as a variant inside the two-thirds message window. The command region keeps showing the exploration overview beside it, and `actor-right` stays empty. C10a (`dialogue-panel-host-portrait`) now ships the host's art catalog key. This change (C10b) builds the stage half of the dialogue screen: `StageActor` on both sides with the speaking state, the collapsed command region, and the name plate. C10c then pages the line and moves the choices over the stage.
 
 **Implementation profile:** visual. Portrait placement, the dim treatment, the full-width band, and the name plate's look need layout and look-and-feel judgement at the reference viewport.
 
@@ -18,7 +18,7 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
   - Speaking state: in dialogue mode the player is dimmed while `store.view.dialogueSpeaker === "host"`, and the host is dimmed while it is `"player"`. Outside dialogue nothing is dimmed.
 - `web/webclient-app/stores/elosern/view.js` publishes `dialogueSpeaker`. It is `"player"` while `ctx.inFlight.actionId` is `explore.talk_scripted` or `explore.talk_freeform`, and `"host"` otherwise. The in-flight record lasts until the declared revision is accepted or the action is rejected. The freeform adapter settles only after the LLM reply, so the player stays lit until the reply commits.
 - **Collapse in dialogue mode:**
-  - `components/HudFrame.vue`: in dialogue mode `.stage-band` becomes one column and `[data-anchor="band-command"]` is `display:none`. `#action-dock` stays mounted, not remounted, and its router keeps the overview (C9 D6 already resets to it).
+  - `components/HudFrame.vue`: in dialogue mode `.stage-band` becomes one column and `[data-anchor="band-command"]` is `display:none`. `#action-dock` stays mounted, not remounted, and its router keeps the overview (C9b D1 already resets to it).
   - `components/AppShell.vue`:
     - `HIDDEN_BY_MODE.dialogue` names `[data-anchor='band-command']`.
     - `restoreDockFocus` becomes `restoreFocusHome`, which focuses the action dock, or in dialogue mode the message window's focus target. Every caller follows, including `composables/use-dock.js` `onNavigateHome` and the exposed API.
@@ -64,7 +64,7 @@ Out of scope:
   - REMOVED "The dock keeps its regular exploration form in dialogue mode" (C8b).
   - ADDED "The command region collapses in dialogue mode and the message window spans the band".
   - ADDED "Stage actors present the player and the dialogue host with a speaking state".
-- `webclient-exploration-menu`: MODIFIED "The keyboard-first exploration dock roots at the scene overview and opens dialogue directly" (C9). The dock owns the surface in exploration mode, and its root stays the overview while collapsed in dialogue.
+- `webclient-exploration-menu`: MODIFIED "The keyboard-first exploration dock roots at the scene overview and opens dialogue directly" (C9b `webclient-talk-open-dock`). The dock owns the surface in exploration mode, and its root stays the overview while collapsed in dialogue.
 - `webclient-desktop-shell`: MODIFIED "Required desktop surfaces remain visible and usable" and "Keyboard routing is menu-first and submission-safe" (both C8b).
 - `webclient-component-showcase`: MODIFIED "Every required UI component is a Vue SFC with a documented Storybook story" (C8a): adds the stage actor.
 
@@ -85,5 +85,5 @@ Out of scope:
 - Browser: `web/tests/browser/test_browser_exploration_dialogue.py`, `test_browser_contextual_hud_stage.py`, `test_browser_contextual_hud_anchors.py`, `test_browser_layout.py`, `browser_helpers.py`.
 - Spec traceability: `webclient-contextual-hud::the-dock-keeps-its-regular-exploration-form-in-dialogue-mode` (`test_node_suite_evidence.py`) re-anchors to `…::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band`. The two new IDs are covered by new tests.
 - Dependencies:
-  - Archive order: C9 → C10a (`dialogue-panel-host-portrait`) → C10b (this change) → C10c (`webclient-dialogue-choices-overlay`).
+  - Archive order: C9a → C9b → C10a (`dialogue-panel-host-portrait`) → C10b (this change) → C10c (`webclient-dialogue-choices-overlay`).
   - Hot-spot files shared with every earlier stage change and with C10c: `AppClient.vue`, `AppShell.vue`, `HudFrame.vue`, `MessageWindow.vue`, `app-shell.css`. Run the series sequentially.

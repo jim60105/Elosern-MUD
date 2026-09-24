@@ -1,6 +1,6 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm C9 (`explore-talk-open-action`) is archived (`ls openspec/changes/archive | grep explore-talk-open-action`), and confirm the starting state: `grep -n "portrait_ref must be null" web/webclient/presentation/dialogue.py web/static/webclient/js/elosern/protocol/panels/misc.js` matches the dialogue host validators, and `grep -n "DIALOGUE_SCHEMA_VERSION = 1" web/webclient/presentation/dialogue.py web/static/webclient/js/elosern/protocol/constants.js` matches both. Stop and report if either differs.
+- [ ] 1.1 Confirm C9a (`explore-talk-open-action`) and C9b (`webclient-talk-open-dock`) are archived (`ls openspec/changes/archive | grep -e explore-talk-open-action -e webclient-talk-open-dock` lists both), and confirm the starting state: `grep -n "portrait_ref must be null" web/webclient/presentation/dialogue.py web/static/webclient/js/elosern/protocol/panels/misc.js` matches the dialogue host validators, and `grep -n "DIALOGUE_SCHEMA_VERSION = 1" web/webclient/presentation/dialogue.py web/static/webclient/js/elosern/protocol/constants.js` matches both. Stop and report if either differs.
 
 ## 2. Server
 
