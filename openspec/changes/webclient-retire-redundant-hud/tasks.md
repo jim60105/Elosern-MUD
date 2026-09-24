@@ -90,7 +90,7 @@
 
 ## 4. Vitals visibility
 
-- [ ] 4.1 `components/vitals.js`: add `isVitalsVisible({ mode, resources, conditions, lowHp })` per design D2 (numeric-only comparison, missing gauges ignored).
+- [x] 4.1 `components/vitals.js`: add `isVitalsVisible({ mode, resources, conditions, lowHp })` per design D2 (numeric-only comparison, missing gauges ignored).
 
   `stores/elosern/view.js`: add `visible` to both branches of the `vitals` slice. The unavailable branch is `visible: false`; the available branch passes the committed mode, `statusPanel.resources`, `statusPanel.conditions`, and the derived `lowHp`.
 

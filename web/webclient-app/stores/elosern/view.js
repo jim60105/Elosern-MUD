@@ -8,7 +8,7 @@
 import { computed } from "vue";
 import OptionCards from "../../lib/option_cards.js";
 import LocalMap from "../../lib/local_map.js";
-import { gaugeRatio, isLowHp } from "../../components/vitals.js";
+import { gaugeRatio, isLowHp, isVitalsVisible } from "../../components/vitals.js";
 import {
   NAVIGATION_ITEM_KEYS,
   resolveLocationLabel,
@@ -48,15 +48,24 @@ export function applyView(ctx) {
     // default); the state is non-load-bearing, so the numerals and the 危險
     // marker carry the same information at every value.
     const statusPanel = panels.status;
-    const vitals =
-      statusPanel && statusPanel.available !== false && statusPanel.resources
-        ? {
-            hp: gaugeRatio(statusPanel.resources.hp),
-            mp: gaugeRatio(statusPanel.resources.mp),
-            sp: gaugeRatio(statusPanel.resources.sp),
-            lowHp: isLowHp(statusPanel.resources),
-          }
-        : { hp: null, mp: null, sp: null, lowHp: false };
+    let vitals;
+    if (statusPanel && statusPanel.available !== false && statusPanel.resources) {
+      const lowHp = isLowHp(statusPanel.resources);
+      vitals = {
+        hp: gaugeRatio(statusPanel.resources.hp),
+        mp: gaugeRatio(statusPanel.resources.mp),
+        sp: gaugeRatio(statusPanel.resources.sp),
+        lowHp,
+        visible: isVitalsVisible({
+          mode: rs.mode,
+          resources: statusPanel.resources,
+          conditions: statusPanel.conditions,
+          lowHp,
+        }),
+      };
+    } else {
+      vitals = { hp: null, mp: null, sp: null, lowHp: false, visible: false };
+    }
 
     // Party read model (webclient-align-05-party-hud): committed party slots
     // from the available `party` panel (empty array when unavailable or absent).
