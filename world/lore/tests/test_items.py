@@ -64,6 +64,7 @@ class ItemPresentationTests(unittest.TestCase):
                 "elven_traditional_robe", "royal_signet_ring",
                 "royal_heirloom_pendant", "rose_crest_rapier", "black_maid_dress",
                 "silver_feather_earring", "crescent_earring", "dark_elf_kimono",
+                "royal_traveling_robe",
                 "shadow_blade", "shadow_blade_echo", "dark_elf_ninja_garb",
                 "guild_recruit_badge",
                 "purified_pendant", "fearless_brooch", "knight_platemail",

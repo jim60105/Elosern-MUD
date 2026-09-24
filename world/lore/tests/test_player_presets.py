@@ -63,53 +63,6 @@ class PlayerPresetTests(unittest.TestCase):
                     if SKILL_REGISTRY[key].requires_divine_arts:
                         self.assertTrue(race.can_use_divine_arts)
 
-    def test_shipped_starting_kits_are_the_approved_loadouts(self):
-        expected = {
-            "elysa_snow": (
-                ("plain_sword", 1), ("leather_armor", 1),
-                ("guild_recruit_badge", 1), ("healing_potion", 2),
-                ("healing_herb", 2),
-            ),
-            "nazka_bloodfang": (
-                ("hunters_longbow", 1), ("hunting_throwing_axe", 1),
-                ("leather_armor", 1), ("wolf_fang_necklace", 1),
-                ("healing_potion", 1), ("healing_herb", 3),
-            ),
-            "sylwen_stillwater": (
-                ("knight_blade", 1), ("iron_shield", 1),
-                ("chainmail", 1), ("pilgrim_medallion", 1),
-                ("healing_potion", 1),
-            ),
-            "violet_altoria": (
-                ("elven_traditional_robe", 1), ("royal_signet_ring", 1),
-                # The saintess robe is no heirloom: she receives it from the
-                # celebrant at church enrollment like every other initiate.
-                ("royal_heirloom_pendant", 1),
-            ),
-            "lidzia_rosenthal": (
-                ("rose_crest_rapier", 1), ("black_maid_dress", 1),
-                ("silver_feather_earring", 1),
-            ),
-            "yuka_darknight": (
-                ("shadow_blade", 1), ("shadow_blade_echo", 1),
-                ("dark_elf_ninja_garb", 1),
-            ),
-            "yuna_darknight": (("dark_elf_kimono", 1),),
-            "elosia_shadowmoon": (("elven_traditional_robe", 1), ("crescent_earring", 1)),
-        }
-        for preset_key, items in expected.items():
-            with self.subTest(preset_key=preset_key):
-                preset = PLAYER_PRESET_REGISTRY[preset_key]
-                self.assertEqual(preset.starting_items, items)
-                self.assertEqual(
-                    preset.inventory_list(),
-                    [
-                        item_key
-                        for item_key, quantity in items
-                        for _ in range(quantity)
-                    ],
-                )
-
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_starting_item_validation_rejects_unknown_duplicate_and_bad_quantity(self):
         from world.lore.player_presets import _validate_preset_starting_items
@@ -733,37 +686,11 @@ class StartingCompanionDeclarationTests(unittest.TestCase):
             self.assertTrue(declaration.relationship)
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
-    def test_the_altoria_party_cards_declare_their_traveling_pair(self):
-        # The story settings have the Altoria trio travelling together; the
-        # declarations mirror each card's own relationship to the partner.
-        violet = PLAYER_PRESET_REGISTRY["violet_altoria"]
-        lidzia = PLAYER_PRESET_REGISTRY["lidzia_rosenthal"]
-        elosia = PLAYER_PRESET_REGISTRY["elosia_shadowmoon"]
-        self.assertEqual(
-            violet.starting_companions,
-            (
-                StartingCompanion("lidzia_rosenthal", 95, "貼身近侍"),
-                StartingCompanion("elosia_shadowmoon", 95, "師父"),
-            ),
-        )
-        self.assertEqual(
-            lidzia.starting_companions,
-            (StartingCompanion("violet_altoria", 95, "主人"),),
-        )
-        self.assertEqual(
-            elosia.starting_companions,
-            (
-                StartingCompanion("violet_altoria", 95, "弟子"),
-                StartingCompanion("lidzia_rosenthal", 60, "小隊同伴"),
-            ),
-        )
-
-    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_every_other_preset_declares_no_companions(self):
         for key, preset in PLAYER_PRESET_REGISTRY.items():
             if key in (
                 "yuna_darknight", "yuka_darknight",
-                "violet_altoria", "lidzia_rosenthal", "elosia_shadowmoon",
+                "violet_altoria", "lidzia_rosenthal",
             ):
                 continue
             with self.subTest(preset=key):

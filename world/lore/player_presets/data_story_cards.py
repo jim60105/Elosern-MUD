@@ -18,11 +18,13 @@ from world.lore.player_presets.vocab import (
 
 ROWS: dict[str, PlayerPreset] = {
     "lidzia_rosenthal": PlayerPreset(
-        # Reconverted from tmp/story_settings/character/LidziaRosenthal.md: age
-        # 14, story statics 8/9/7 exact under the noble modifiers; the story's
-        # MP 70 sits below the human floor, so MP stays at the floor (her
-        # weakest gauge, matching "魔法天賦極差") and the forced remainder
-        # lands on the story's strongest gauges, stamina over vitality.
+        # Pre-meeting Lidzia: still Princess Violet's travelling retainer, but
+        # the devoted-handmaid role the later story gives her never existed
+        # yet -- that came with the elven robe. age 14, story statics 8/9/7
+        # exact under the noble modifiers; the story's MP 70 sits below the
+        # human floor, so MP stays at the floor (her weakest gauge, matching
+        # "魔法天賦極差") and the forced remainder lands on the story's
+        # strongest gauges, stamina over vitality.
         "lidzia_rosenthal", "莉茲婭", 14, 14, "human", "human_noble",
         (("hp", 80), ("mp", 0), ("sp", 100), ("atk_phys", 6),
          ("agility", 8), ("defense", 7), ("magic_power", 23)),
@@ -46,9 +48,9 @@ ROWS: dict[str, PlayerPreset] = {
             personality=(
                 "任何場合都維持完美侍從的儀態與效率，把每件事做到極致，是她表達愛"
                 "的唯一合法方式。劍術與文書出類拔萃，全力以赴卻在一句稱讚面前臉紅低"
-                "頭；對同僚開朗、好人緣，唯獨薇歐蕾特是讓她連呼吸都要練習的人。主人"
+                "頭；對同僚開朗、好人緣，唯獨薇歐蕾特是讓她連呼吸都要練習的人。殿下"
                 "面臨危險的瞬間，羞澀像多餘的東西一樣剝落，殺意像死神確認名單那樣淡"
-                "定；僅與主人獨處時才露出真實笑容與撒嬌。這份愛太重，重到需要痛來平"
+                "定；僅與殿下獨處時才露出真實笑容與撒嬌。這份愛太重，重到需要痛來平"
                 "衡，但她從未想過獨佔。如果殿下的幸福需要她消失，她會消失。"
             ),
             life_story=(
@@ -57,13 +59,14 @@ ROWS: dict[str, PlayerPreset] = {
                 "入宮為初級侍女，端茶燙傷手背時由公主親自包紮，那隻手的溫度至今留在"
                 "掌心。10 歲攔截針對公主的毒殺未遂，獲授近侍職位；評估每個靠近公主"
                 "之人的威脅等級，是她的安眠藥。12 歲以護衛考核全項第一通過，拒絕近"
-                "衛隊延攬，選擇繼續做公主的影子。13 歲意識到心跳不再只因職責。14 歲"
-                "隨薇歐蕾特出行歷練。哪裡有殿下，哪裡就是家。"
+                "衛隊延攬，選擇繼續做公主的影子。13 歲意識到心跳不再只因職責，那夜"
+                "回味包紮時的觸感而初嘗自慰，高潮後哭著覺得自己褻瀆了某種神聖。14 "
+                "歲隨薇歐蕾特出行歷練。哪裡有殿下，哪裡就是家。"
             ),
             habit=(
                 "每個動作輕柔而穩定，端茶的角度、關門的音量、站立的間距皆精確如舞"
                 "步；在薇歐蕾特身邊保持半步距離，這個距離練習了數年，已是身體記憶；"
-                "每晚睡前檢查主人的裝備與行李，深夜獨處時才敢抱著沾有主人氣息的手帕"
+                "每晚睡前檢查殿下的裝備與行李，深夜獨處時才敢抱著沾有殿下氣息的手帕"
                 "入睡。"
             ),
             appearance=PresetAppearance(
@@ -82,12 +85,13 @@ ROWS: dict[str, PlayerPreset] = {
                 ),
             ),
             social_connection=(
-                ("薇歐蕾特·阿爾托利亞", "主人、她生存的中心、心臟跳動的理由，比起主人更像是她的信仰；稱呼從「殿下」改為「主人」，被賦予隨時隨地擦拭愛液的職責，這是她此生收過最珍貴的禮物"),
+                ("薇歐蕾特·阿爾托利亞", "殿下、她生存的中心、心臟跳動的理由，比起主人更像是她的信仰；稱她「殿下」，把不敢說出口的愛全數藏進侍奉裡"),
             ),
             background=(
-                "世代侍奉王室的羅森塔爾家族之女，薇歐蕾特王女的貼身近侍與「痴女與精"
-                "靈」小隊痴女侍從。輕劍術在護衛考核名列前茅，隨從武藝與護主本能使她"
-                "永遠站在主人與危險之間；基礎身體強化是她僅有的魔法天賦。"
+                "世代侍奉王室的羅森塔爾家族之女，薇歐蕾特王女的貼身近侍。輕劍術在"
+                "護衛考核名列前茅，隨從武藝與護主本能使她永遠站在殿下與危險之間；"
+                "基礎身體強化是她僅有的魔法天賦。她以完美的侍奉藏起一份不敢驚動對方"
+                "的愛，尚未意識到自己願為這個人消失。"
             ),
         ),
         sexual_baseline=PresetSexualBaseline(
@@ -96,9 +100,9 @@ ROWS: dict[str, PlayerPreset] = {
                          ("腰腹", "高"), ("大腿", "高")),
             shame="強烈",
         ),
-        # Story: Lidzia travels at Violet's side; the built Violet card names
-        # her back, matching the twins' precedent.
-        starting_companions=(StartingCompanion("violet_altoria", 95, "主人"),),
+        # Pre-meeting: she still travels at Violet's side; nothing more has
+        # begun yet.
+        starting_companions=(StartingCompanion("violet_altoria", 95, "殿下"),),
     ),
     "yuka_darknight": PlayerPreset(
         # Reconverted from tmp/story_settings/character/YukaDarknight.md: age
@@ -269,7 +273,10 @@ ROWS: dict[str, PlayerPreset] = {
         starting_companions=(StartingCompanion("yuka_darknight", 95, "雙胞胎妹妹"),),
     ),
     "elosia_shadowmoon": PlayerPreset(
-        # Reconverted from tmp/story_settings/character/ElosiaShadowmoon.md:
+        # Pre-meeting Elosia: the phantasm elf who just left the village and
+        # walked into the human world ALONE -- not yet registered at the guild,
+        # Violet not yet met, no disciple, no party name. Reconverted from
+        # tmp/story_settings/character/ElosiaShadowmoon.md:
         # species is 伊歐拉斯族 (eolas, Phantasm Elf), age 10/apparent 10 (she
         # CLAIMS 222; the persona prose carries the lie). Story statics
         # 70/70/95 exact; the story's 873 magic exceeds the creation ceiling,
@@ -306,8 +313,9 @@ ROWS: dict[str, PlayerPreset] = {
                 "興奮。8 歲起固定參與村中群交活動；10 歲身體發育完成，以「尋找命定之"
                 "人」為由離開幽月谷村，謊稱 222 歲，由於人族看不出幻童精靈的年齡而被"
                 "相信。轉生特典讓她的魔法成長是伊歐拉斯族平均的百倍，打發時間學的魔法"
-                "已達 873 級。剛離村不到一個月，在人族社會隱藏實力當普通魔法師，在公"
-                "會登記處胡謅出「痴女與精靈」隊名，並指定薇歐蕾特為隊長。"
+                "已達 873 級。剛離村不到一個月，獨自走進人類城鎮，發現人族對精靈的"
+                "尊敬讓她得以名正言順地暴露，於是盤算著隱藏實力、先當個普通魔法師"
+                "遊玩一陣。她還沒走進公會，也不知道「命定之人」就在這座城裡等她。"
             ),
             habit=(
                 "思考時無意識以指尖揉捏乳頭；交談時手自然放在衣襬邊緣，帶著暗示；公"
@@ -329,13 +337,12 @@ ROWS: dict[str, PlayerPreset] = {
                     "容易喚起他人的背德感。"
                 ),
             ),
-            social_connection=(
-                ("薇歐蕾特·阿爾托利亞", "弟子，被單方面支配；互稱「伊洛」「薇歐」。在公會登記處指定她出任「痴女與精靈」小隊隊長，享受看她報出隊名時羞恥崩潰的樣子"),
-            ),
+            social_connection=(),
             background=(
                 "自稱兩百二十二歲的幻童精靈術師，實際年齡只有十歲，精通風與光的主宰"
-                "級魔法，也掌握統御術與狀態偽裝。她離開幽月谷村走入人類王國，表面理由"
-                "是「想看看短壽者們如何過日子」。"
+                "級魔法，也掌握統御術與狀態偽裝。她剛離開幽月谷村、獨自走入人類王國，"
+                "表面理由是「想看看短壽者們如何過日子」，實則貪戀人族對精靈的尊敬所"
+                "允許的、名正言順的暴露。她還沒進公會，還沒有遇上任何人。"
             ),
         ),
         # Story's disguise layer: magic 120, physical 50, agility 50, defense 30.
@@ -346,11 +353,7 @@ ROWS: dict[str, PlayerPreset] = {
             sensitivity=(("乳房", "極高"), ("私處", "極高"), ("耳朵", "高")),
             wetness="濕潤", shame="成癮", exposure="極高",
         ),
-        # Story: Elosia travels with her disciple (and the retainer who
-        # never leaves her side); the built cards name each other back.
-        starting_companions=(
-            StartingCompanion("violet_altoria", 95, "弟子"),
-            StartingCompanion("lidzia_rosenthal", 60, "小隊同伴"),
-        ),
+        # Pre-meeting: she travels alone -- no disciple, no party yet.
+        starting_companions=(),
     ),
 }

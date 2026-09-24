@@ -375,4 +375,18 @@ ROWS: tuple[ItemDefinition, ...] = (
             equipment_slot=EquipmentSlot.ARMOR,
             modifier_key=EquipmentModifierKey.SAINTESS_VESTMENTS,
         ),
+        ItemDefinition(
+            key="royal_traveling_robe",
+            display_name_zh="王室出行長袍",
+            price_table_key="relic",
+            sellable=False,
+            presentation=ItemPresentation(
+                kind=ItemKind.ARMOR,
+                icon_key=ItemIconKey.ARMOR,
+                rarity=ItemRarity.UNCOMMON,
+                summary_zh="王國縫製工坊為首次出行的王女趕製的旅行長袍，剪裁端莊、袖口繡入王室紋章，專為長路與施法而製。",
+            ),
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.ROYAL_TRAVELING_ROBE,
+        ),
 )

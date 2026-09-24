@@ -241,10 +241,13 @@ ROWS: dict[str, PlayerPreset] = {
         ),
     ),
     "violet_altoria": PlayerPreset(
-        # Reconverted from tmp/story_settings/character/VioletAltoria.md: age
-        # 16, story gauges 150/180/150 exact, pre-buff statics 5/6/6 exact,
-        # remaining budget into magic power (story "magic level 30" reads as a
-        # moderate-high magic attribute for a prodigy).
+        # Pre-meeting Violet: the genius princess who just graduated as the
+        # academy's youngest-ever valedictorian and set out on her first
+        # journey with Lidzia -- an ordinary travelling princess, no diplomatic
+        # mission, Elosia not yet met. age 16, story gauges 150/180/150 exact,
+        # pre-buff statics 5/6/6 exact, remaining budget into magic power
+        # (story "magic level 30" reads as a moderate-high magic attribute for
+        # a prodigy).
         "violet_altoria", "薇歐蕾特", 16, 16, "human", "human_royal",
         (("hp", 50), ("mp", 60), ("sp", 50), ("atk_phys", 4),
          ("agility", 5), ("defense", 4), ("magic_power", 51)),
@@ -252,38 +255,37 @@ ROWS: dict[str, PlayerPreset] = {
         active_skills=("fire_ball", "wind_blade"),
         passive_skills=("magic_circle_comprehension", "precise_mana_control", "flight"),
         affinity_elements=("fire", "wind"),
-        starting_items=(("elven_traditional_robe", 1), ("royal_signet_ring", 1),
+        starting_items=(("royal_traveling_robe", 1), ("royal_signet_ring", 1),
                         ("royal_heirloom_pendant", 1)),
         sex="female",
-        # Story's current equipment: spirit robe worn, signet ring on the right
-        # ring finger; the heirloom pendant stays carried (her nervous habit).
-        starting_equipment=("elven_traditional_robe", "royal_signet_ring"),
+        # Travel kit: the royal traveling robe worn, the signet ring on the
+        # right ring finger; the heirloom pendant stays carried (her nervous
+        # habit).
+        starting_equipment=("royal_traveling_robe", "royal_signet_ring"),
         persona=PresetPersona(
             identity=PresetIdentity(
-                public="出行的王國王女、伊洛希雅的弟子、風之術師",
-                hidden="王室秘密外交特使，意圖將伊洛希雅·幽月納入王國盟友",
+                public="出行的王國王女、王立魔法初等學校史上最年輕的首席畢業生、風之術師",
+                hidden="其實從未離開過宮廷，對外面的世界既興奮又緊張，這件事不能讓宮裡的人知道",
             ),
             personality=(
                 "任何場合都維持得體的微笑與禮貌應對，從不失態；深知自己是天才，"
                 "也深知天才的上限，對自身能力評價準確。意志堅韌，對羞恥與不適的"
-                "耐受力遠超同齡人；對師父伊洛希雅的信任達到盲目程度。被出乎預料的"
-                "逗弄時，從容會短暫破防，越是羞恥說話越端正優雅。表面維持王女矜持，"
-                "被充分開發的身體卻早已背叛意志，不合時宜的場合自然濕潤，既羞恥"
-                "又興奮；僅在無人在場時才流露普通少女的羞恥與不安。"
+                "耐受力遠超同齡人。舉止是完美教養鍛出來的從容，骨子裡卻是個第一次"
+                "離開宮廷、對一切新鮮事物好奇到偷偷眼睛發亮的十六歲少女。僅在無人"
+                "在場時，才流露出普通少女的羞怯與自我懷疑。"
             ),
             life_story=(
                 "5 歲起接受宮廷禮儀、多國語言與政治史學的全方位教育；7 歲對四階"
                 "魔法陣一看即懂，被宮廷冠以「神童」稱號，但她比任何人都明白自己的"
-                "天花板在哪裡。13 歲時父王透露精靈族若能成為王國友方，可扭轉對帝國"
-                "的軍事劣勢。15 歲以史上最年輕首席身份從王立魔法初等學校畢業，魔法"
-                "等級由 10 級升至 30 級。16 歲出行時被伊洛希雅超越人類極限的魔法"
-                "震撼，請求拜師，接受了「穿著精靈傳統服飾一同冒險」的條件。第一次"
-                "穿上幾近全裸的服飾走上街頭，全身僵硬仍勉強維持微笑。"
+                "天花板在哪裡。15 歲以史上最年輕首席身份從王立魔法初等學校畢業，"
+                "魔法等級由 10 級升至 30 級。畢業那年反覆請求後，父王終於准她以"
+                "歷練為名出行見識世界。16 歲帶著從小一起長大的莉茲婭出發，這是她"
+                "第一次離開聖潔王都，地圖上每一個標記都讓她心動。"
             ),
             habit=(
-                "無論何種狀況都維持筆直儀態；緊張時習慣以指尖輕觸胸前吊墜。穿上"
-                "精靈傳統服飾後胸部全裸，這個習慣反而讓她頻繁觸碰自己的胸口；私下"
-                "研讀伊洛希雅給的精靈古籍，對鏡審視自己現在到底像什麼。"
+                "無論何種狀況都維持筆直儀態；緊張時習慣以指尖輕觸胸前的王室紋章"
+                "吊墜。私下把旅行指南和各地的見聞錄翻得卷了邊，每到一處新城鎮都想"
+                "把每條街走一遍。"
             ),
             appearance=PresetAppearance(
                 height="155 公分",
@@ -294,33 +296,32 @@ ROWS: dict[str, PlayerPreset] = {
                     "身形纖細修長，金色長直髮半盤，藍眸清澈沉靜，皮膚白皙，"
                     "五官精緻柔和；人族，沒有長耳朵。"
                 ),
-                attire="與伊洛希雅同款的精靈傳統服飾，白色半透明、幾近全裸的「文化服飾」。",
+                attire="合身的王室出行長袍，剪裁端莊、不露分毫，專為出行與施法而製。",
                 feature=(
                     "右手無名指佩戴嵌王室紋章的細金戒指，是唯一隨身攜帶的身份象徵；"
-                    "在精靈傳統服飾下私處完全暴露。"
+                    "胸前紋章吊墜在緊張時會被指尖反覆摩娑。"
                 ),
             ),
             social_connection=(
-                ("伊洛希雅·幽月", "師父與主要逗弄對象，被單方面支配，信任近乎盲目；互稱「伊洛」「薇歐」"),
-                ("莉茲婭·羅森塔爾", "從小一起長大的玩伴、貼身侍女兼保鏢，如今承擔痴女侍從的職責；她喚我「主人」，我喚她「莉茲」"),
+                ("莉茲婭·羅森塔爾", "從小一起長大的玩伴、貼身侍女兼保鏢，出行唯一隨行者；她喚我「殿下」，我喚她「莉茲」"),
             ),
             background=(
-                "阿爾托利亞王國第一王女，「痴女與精靈」小隊隊長。"
-                "16 歲拜入伊洛希雅門下，以穿著精靈傳統服飾一同冒險為拜師條件。天才術師的火球與風刃"
-                "遠超同齡，飛行術使她習慣從高處俯瞰世界；對外報出隊名時伴隨極度羞恥，"
-                "卻無法否認那個名字對自身狀態的描述完全準確。"
+                "阿爾托利亞王國第一王女，王立魔法初等學校史上最年輕的首席畢業生。"
+                "16 歲終於說服父王准她出行歷練，帶著貼身近侍莉茲婭第一次離開王都。"
+                "天才術師的火球與風刃遠超同齡，飛行術使她習慣從高處俯瞰世界；外表"
+                "是從容得體的王女，心裡是一個頭一回看見世界有多大、興奮得睡不著的"
+                "少女。"
             ),
         ),
         sexual_baseline=PresetSexualBaseline(
-            arousal="微興奮", virgin=True,
-            sensitivity=(("私處", "極高"), ("乳房", "高"), ("耳朵", "高")),
-            wetness="濕潤", shame="中等", exposure="高",
+            arousal="平靜", virgin=True,
+            sensitivity=(("耳朵", "高"),),
+            wetness="乾燥", shame="強烈", exposure="極低",
         ),
-        # The story's party travels together: Violet sets out with her retainer
-        # and follows her elven master.
+        # Pre-meeting: the travelling princess takes only her retainer;
+        # Elosia has not appeared yet.
         starting_companions=(
             StartingCompanion("lidzia_rosenthal", 95, "貼身近侍"),
-            StartingCompanion("elosia_shadowmoon", 95, "師父"),
         ),
     ),
 }

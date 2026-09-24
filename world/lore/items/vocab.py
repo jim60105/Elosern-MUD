@@ -126,6 +126,7 @@ class EquipmentModifierKey(StrEnum):
     ROSE_CREST_RAPIER = "rose_crest_rapier"
     ROYAL_HEIRLOOM_PENDANT = "royal_heirloom_pendant"
     ROYAL_SIGNET_RING = "royal_signet_ring"
+    ROYAL_TRAVELING_ROBE = "royal_traveling_robe"
     SAINTESS_VESTMENTS = "saintess_vestments"
     SISTER_VESTMENTS = "sister_vestments"
     SHADOW_BLADE = "shadow_blade"

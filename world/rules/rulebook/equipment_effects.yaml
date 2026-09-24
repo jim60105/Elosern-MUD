@@ -120,6 +120,9 @@ effects:
     adjustments: {defense: 4, mp_cost: "-5%"}
   royal_signet_ring:
     adjustments: {atk_phys: 3, sp_cost: "-5%"}
+  # Royal travel wear: purely decorative, no combat or social effects (D1,
+  # same stance as storage_pouch).
+  royal_traveling_robe: {}
   saintess_vestments:
     adjustments: {defense: -5, pleasure_gain: "+30%", heal_gain: "+25%"}
     exposure_bias: 2
