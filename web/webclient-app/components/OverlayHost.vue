@@ -285,6 +285,9 @@ onBeforeUnmount(() => {
   scrollbar-width: thin;
 }
 
+/* The full map is a picture, not a reading column: it takes the surface's
+   whole width so the fitted view spends the room on the drawing. */
+.overlay-host[data-elosern-overlay="map"] .overlay-host__body { max-width: none; }
 .overlay-host[data-elosern-overlay="gallery"] { left: 292px; }
 .overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
 .overlay-host[data-elosern-overlay="gallery"] .overlay-host__header { position: absolute; top: 8px; right: 8px; z-index: 1; padding: 0; border: 0; background: none; }

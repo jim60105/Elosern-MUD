@@ -392,7 +392,9 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(scale3).toBeCloseTo(0.933, 3);
       expect(scale3 * 9).toBeCloseTo(8.40, 2);
 
-      // 4. 2x64 lattice scaled down with no overlap
+      // 4. 2x64 lattice: the 2574-unit square would draw at 0.0808, below
+      // the island's legibility floor, so it is windowed at scale 0.75
+      // around the current node instead (design §11).
       const wTall = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE),
         ...ISLAND_PROPS,
@@ -401,11 +403,10 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(svg4.attributes("width"))).toBe(208);
       expect(Number(svg4.attributes("height"))).toBe(208);
       const vbTall = svg4.attributes("viewBox").split(" ").map(Number);
-      expect(vbTall[2]).toBe(2574);
-      expect(vbTall[3]).toBe(2574);
-      const scale4 = 208 / 2574;
-      expect(scale4).toBeLessThan(1.0);
-      expect(scale4).toBeCloseTo(0.0808, 4);
+      expect(vbTall[2]).toBeCloseTo(208 / 0.75, 6);
+      expect(vbTall[3]).toBeCloseTo(208 / 0.75, 6);
+      const scale4 = 208 / vbTall[2];
+      expect(scale4).toBeCloseTo(0.75, 6);
 
       // 5. Graph cases:
       // a. One-ring interior: side 212, scale ≈ 0.98

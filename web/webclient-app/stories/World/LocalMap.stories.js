@@ -128,14 +128,11 @@ export const EdgeMarkers = {
 };
 export const FocusedRemembered = EdgeMarkers;
 
-// Tall-lattice scale-down (task 3.3): the 2-col × 64-row fixture's natural
-// canvas is 116×2830px (64 × 44px row pitch + the 14px label band) against
-// the island's 206/296px caps. SVG preserves its aspect ratio, so the
-// rendered size is min(206/116, 296/2830) × natural ≈ 12.1×296 — the height
-// cap binds and the width cap is a bound, not an attained width. The canvas
-// scales down instead of the island scrolling a required surface; the
-// rendered geometry is verified in the running Storybook (the jsdom Vitest
-// case pins only the style/cap wiring).
+// Tall-lattice window (design §11): the 2-col × 64-row fixture's square
+// drawing would have to shrink to about 0.08 to fit the island's fixed 208px
+// canvas, below the island's 0.75 legibility floor. The island instead shows a
+// 208 / 0.75 window centred on the current node, clipped to the square, and
+// the full-map overlay remains the surface for the whole street.
 export const TallLatticeScaled = {
   render: renderMap,
   args: {

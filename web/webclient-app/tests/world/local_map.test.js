@@ -369,7 +369,16 @@ describe("LocalMap (B4 world family)", () => {
     expect(svg.exists()).toBe(true);
     expect(svg.attributes("width")).toBe("208");
     expect(svg.attributes("height")).toBe("208");
-    expect(svg.attributes("viewBox")).toBe("0 0 2574 2574");
+    // Below the island's legibility floor the 2574-unit square is shown
+    // through a 208 / 0.75 window centred on the current node, not shrunk to
+    // a hairline (design §11).
+    const vb = svg.attributes("viewBox").split(" ").map(Number);
+    expect(vb[2]).toBeCloseTo(208 / 0.75, 6);
+    expect(vb[3]).toBeCloseTo(208 / 0.75, 6);
+    const current = w.get('[data-visibility="current"]');
+    const [cx, cy] = current.attributes("transform").match(/-?[\d.]+/g).map(Number);
+    expect(cx).toBeCloseTo(vb[0] + vb[2] / 2, 6);
+    expect(cy).toBeCloseTo(vb[1] + vb[3] / 2, 6);
     const style = svg.attributes("style") ?? "";
     expect(style).toContain("width: 208px");
     expect(style).toContain("height: 208px");
@@ -461,7 +470,13 @@ describe("LocalMap (B4 world family)", () => {
     expect(Number(svg.attributes("width"))).toBe(208);
     expect(Number(svg.attributes("height"))).toBe(208);
     const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(2022.911688, 4);
+    // The 2022.91-unit square exceeds the legibility floor, so the island
+    // shows a 208 / 0.75 window clamped inside the drawing.
+    expect(vb[2]).toBeCloseTo(208 / 0.75, 6);
+    expect(vb[0]).toBeGreaterThanOrEqual(0);
+    expect(vb[1]).toBeGreaterThanOrEqual(0);
+    expect(vb[0] + vb[2]).toBeLessThanOrEqual(2022.911688 + 1e-6);
+    expect(vb[1] + vb[3]).toBeLessThanOrEqual(2022.911688 + 1e-6);
     expect(w.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(16);
   });
