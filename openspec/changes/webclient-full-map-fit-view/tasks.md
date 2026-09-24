@@ -1,13 +1,13 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm that `webclient-minimap-and-log-quick-fixes` (C1) is applied. Check each of the following, and stop and report if any fails, because this change edits C1's text and code:
+- [x] 1.1 Confirm that `webclient-minimap-and-log-quick-fixes` (C1) is applied. Check each of the following, and stop and report if any fails, because this change edits C1's text and code:
   - `grep -n "canvasSize" web/webclient-app/components/MapLattice.vue` finds the prop.
   - `grep -n "fieldFill" web/webclient-app/components/MapLattice.vue` finds nothing.
   - `grep -n "map-overlay-remembered" web/webclient-app/components/MapOverlay.vue` finds the list.
 
 ## 2. Pure view math (design D1–D4)
 
-- [ ] 2.1 Create `web/webclient-app/lib/map_view.js`, a dependency-free ES module.
+- [x] 2.1 Create `web/webclient-app/lib/map_view.js`, a dependency-free ES module.
   - Export `FIT_INSET = 12`, `MAX_SCALE = 2`, `ZOOM_STEP = 1.25`, and `DRAG_THRESHOLD = 4`.
   - Export the pure functions over a view `{ s, x, y, fitted }` and a frame `{ vw, vh, W, H }`, as design D2 / D3 define them:
     - `fitView(frame)`: `s = min(1, (vw − 2·FIT_INSET)/W, (vh − 2·FIT_INSET)/H)`, centred, `fitted: true`
@@ -21,7 +21,7 @@
     - `viewBoxOf(view, frame)`: returns `"x y vw/s vh/s"`
   - Every operation other than `fitView` returns `fitted: false`, except `clampView` and `resizeView`, which keep the flag.
   - The file header comment cites this change's design D1–D4.
-- [ ] 2.2 Create `web/webclient-app/tests/world/map_view.test.js` with these cases:
+- [x] 2.2 Create `web/webclient-app/tests/world/map_view.test.js` with these cases:
   - the fit of the 560 × 1074 street in a 1124 × 735 frame: `s ≈ 0.662`, and the whole canvas inside the frame less the inset
   - a 280 × 226 single node: `s = 1`, centred on both axes
   - `zoomAt` keeps the anchor's user point under the anchor
