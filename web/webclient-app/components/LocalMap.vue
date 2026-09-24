@@ -258,12 +258,9 @@ function onIslandClick(event) {
   flex-direction: column;
   gap: var(--sp-2);
   box-sizing: border-box;
-  /* The island keeps its natural content height (design D9/D10): a flex item
-     with min-height:0 + flex-shrink:1 let the capped hud-right anchor
-     compress it to the meta row, pushing the canvas/remembered/detail below the
-     island's box. min-height:auto makes the island size to its content; when
-     the content outgrows the anchor's height budget, the anchor scrolls
-     (overflow-y:auto) instead of the island being crushed. */
+  /* The island renders at a constant size (design D1/D2): a fixed 208px square
+     canvas, 1px hairline border, and --sp-1 padding. It is right-aligned in
+     the anchor and does not stretch to the column width. */
   min-height: auto;
   width: auto;
   align-self: flex-end;
@@ -411,8 +408,8 @@ function onIslandClick(event) {
 }
 
 /* An island with no coordinate figure on the current layer states nothing
-   rather than reserving a blank line (and, with it, a blank slot in the
-   height budget — `sectionHeight` reads 0 for a display:none section). */
+   and paints no box, while reserving its single line height so the card height
+   does not change with the layer (design D2). */
 .local-map__detail--empty {
   visibility: hidden;
 }
