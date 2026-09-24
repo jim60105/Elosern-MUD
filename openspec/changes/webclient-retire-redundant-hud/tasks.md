@@ -190,8 +190,8 @@
 
 ## 7. Specs and traceability
 
-- [ ] 7.1 Sync this change's deltas into the main specs (`openspec archive` at the end of the work, or `openspec-sync-specs` first to obtain the new IDs). Then run `uv run --locked python -m tools.spec_traceability list | grep -E "vitals-island|a-deliberate-mutation-echo"` and use those exact IDs in 4.3, 6.1, and 6.2.
-- [ ] 7.2 `grep -rn "the-character-head-card-renders-only-backed-identity\|quick-word-chips-prepare-a-command\|bound-quickbar-letters-are-pinned\|every-deliberate-mutation-echo" web tests commands tools --include='*.py' --include='*.js'` returns nothing. Then run `uv run --locked python -m tools.spec_traceability check`; green.
+- [x] 7.1 Sync this change's deltas into the main specs (`openspec archive` at the end of the work, or `openspec-sync-specs` first to obtain the new IDs). Then run `uv run --locked python -m tools.spec_traceability list | grep -E "vitals-island|a-deliberate-mutation-echo"` and use those exact IDs in 4.3, 6.1, and 6.2.
+- [x] 7.2 `grep -rn "the-character-head-card-renders-only-backed-identity\|quick-word-chips-prepare-a-command\|bound-quickbar-letters-are-pinned\|every-deliberate-mutation-echo" web tests commands tools --include='*.py' --include='*.js'` returns nothing. Then run `uv run --locked python -m tools.spec_traceability check`; green.
 
 ## 8. Validation
 

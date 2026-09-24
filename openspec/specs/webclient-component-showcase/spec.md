@@ -9,10 +9,9 @@ Every UI component named in the required-component manifest SHALL be implemented
 single-file component and SHALL have at least one Storybook story that documents its props, the
 events/actions it emits, and its primary states. At the completion of the contextual HUD
 redesign the required manifest SHALL enumerate at minimum: the header; the narrative feed and its
-unread indicator; the command line (with its quick-word chips); the action dock with its menu,
-submenu, and choice-card frames; the status panel with its gauges, counters,
-and conditions; the character status drawer (including the equipment doll); the skill book; the
-local map; the art panel; the shop, quest board, and lore drawer (each backed by the `services`
+unread indicator; the command line; the action dock with its menu,
+submenu, and choice-card frames; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
+local map; the scene backdrop and the reference artwork frame; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
 only data sourced from the OOB panel allowlist (art, status, context_actions, local_map, services,
 creation, exploration, character) or the transport text stream; a surface with no backing read
@@ -126,12 +125,14 @@ renders that detail on the name side of the row, with the cost cell as the row's
 label SHALL keep the pre-change 8px top spacing, so removing the group-container margin does not regress
 ungrouped content.
 
-`StatusPanel` SHALL present its share of that data as the stage's left HUD island stack rather than as
-a single boxed column card: a character head card, a vitals island, and a conditions island, composed
-from the `CharacterHead`, `VitalsTrack`, and `ConditionChips` components. The head card SHALL render
-only identity the payloads carry — the display name, the numeric magic power, the guild rank and merit, the wallet, and the disguise marker — with a glyph
-portrait rather than an image, and SHALL render no race, subrace, class, or faction line, because no
-such field exists in either payload. The wallet SHALL have exactly one persistently-visible surface.
+`StatusPanel` SHALL present its share of that data — the `status` payload's gauges and conditions —
+as the stage's left HUD island stack rather than as a single boxed column card: a vitals island and a
+conditions island, composed from the `VitalsTrack` and `ConditionChips` components, shown and hidden
+by `webclient-contextual-hud`'s vitals visibility rule. It SHALL render no identity card: the display
+name, full title, true traits, guild rank and merit, and disguise are presented by the character
+status drawer, the wallet only by the inventory drawer, and no race, subrace, class, or faction line
+is rendered anywhere, because no such field exists in either payload. No persistently visible HUD
+surface SHALL render the wallet.
 
 Status and health information SHALL never be conveyed by color alone: gauges SHALL pair an icon and a
 text label with an explicit current/maximum numeric value, each counter and static trait SHALL render
@@ -155,15 +156,15 @@ field (the intimate/adult block has no backing field and is not built).
 
 #### Scenario: Disguised stats are display-only and distinct from true traits
 - **WHEN** the character payload carries disguised statistics
-- **THEN** the drawer shows them as display values distinct from the true traits, the head card keeps the true trait value, and no disguised value alters combat resolution
+- **THEN** the drawer shows them as display values distinct from the true traits, every true trait row keeps its true value, and no disguised value alters combat resolution
 
 #### Scenario: Only backed fields render
 - **WHEN** the status, character, or skill surface renders
 - **THEN** every shown field comes from the `status`/`character`/`skill` OOB payload and no field (including any intimate/adult field, any race, subrace, class, or faction line, and any `shorthands` value on a character-panel skill row) is invented
 
 #### Scenario: The status surface renders as an island stack
-- **WHEN** the `StatusPanel` renders with the `status` and `character` panels available
-- **THEN** it renders the head card, the vitals, and the conditions as separate HUD islands composed from `CharacterHead`, `VitalsTrack`, and `ConditionChips`, and not as one boxed column card
+- **WHEN** the `StatusPanel` renders with the `status` panel available, a vital below its maximum, and one condition
+- **THEN** it renders the vitals and the conditions as separate HUD islands composed from `VitalsTrack` and `ConditionChips`, not as one boxed column card, and renders no identity card and no wallet
 
 #### Scenario: An icon-only condition chip keeps its text reachable
 - **WHEN** a condition renders as an icon-only chip with a duration badge
@@ -202,7 +203,7 @@ field (the intimate/adult block has no backing field and is not built).
 - **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
-The `LocalMap`, `ArtPanel`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 payload with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding, in the placement variant (coordinate lattice or radial connected graph) that the payload's `layer` resolves to — the showcase stories pass the renderer's explicit variant parameter and SHALL NOT present a layout control — and SHALL invent no distance, bearing, or terrain geometry in either variant. Art SHALL render the committed scene as a cover-style 16:9 image with contextual portrait overlay and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
+The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 payload with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding, in the placement variant (coordinate lattice or radial connected graph) that the payload's `layer` resolves to — the showcase stories pass the renderer's explicit variant parameter and SHALL NOT present a layout control — and SHALL invent no distance, bearing, or terrain geometry in either variant. Art SHALL render the committed scene as a cover-style 16:9 stage backdrop with its label and alternative text outside the bitmap, SHALL render portrait catalog entries only inside the framed-portrait surfaces that consume them (never as a standalone catalog strip), and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
 
 `InventoryPanel` SHALL render committed inventory display name, held count, equipped flag, nullable presentation, and nullable action descriptor together with committed character equipment rows. A non-null presentation SHALL supply only committed kind, icon key, rarity, and summary; a null presentation SHALL remain an explicit unknown-item state. The inventory SHALL use its local icon map only from committed icon keys and action behavior only from committed action descriptors. It SHALL provide keyboard-equivalent inspection and activation, confirmation for usable items, direct equipment toggle, and committed disabled-reason states without inventing an effect, recovery amount, condition, consumable flag, equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or drop behavior. Unknown rows SHALL remain visibly inspect-only. No surface SHALL invent data, including a dedicated party panel.
 
@@ -214,7 +215,7 @@ The showcase required-set manifest SHALL include deterministic offline stories a
 
 #### Scenario: Art renders validated content when available
 - **WHEN** the art payload is available
-- **THEN** the surface renders the 16:9 scene with contextual portrait overlay and external scene label and alternative text
+- **THEN** the backdrop renders the 16:9 scene with its external scene label and alternative text, and a framed-portrait surface renders a catalog entry it is given with the shared rect crop
 
 #### Scenario: Services and inventory are backed only
 - **WHEN** a services-backed panel renders
@@ -358,6 +359,8 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
 through a change that names the growth as part of its own scope: a change in the WebClient
 Contextual HUD Redesign roadmap's delivery table, or a feature change that introduces a component
+(`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md`, whose changes are a
+governed redesign wave that MAY both add and delete components), or a feature change that introduces a component
 backed by a committed presentation panel — the portrait-gallery family
 (`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
 `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) joins the frozen set under
@@ -366,6 +369,10 @@ the manifest, ship its Storybook story with deterministic offline args, and exte
 capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
 committed backing read model SHALL NOT be added under either route; it belongs on the deferred
 list instead. A component SHALL NOT be wired into the live application before its story exists.
+A governed wave change that deletes a component SHALL, in the same change, delete the component file, remove
+its title from the manifest, delete its Storybook story, delete or re-point every test that mounts it,
+and edit this capability's spec so no requirement names it — never a component deletion that leaves
+a manifest title, a story, or a spec reference behind.
 On completion of the redesign the manifest SHALL be re-frozen at the complete set then current,
 and each later growth SHALL re-freeze it at its new complete set.
 
@@ -395,6 +402,11 @@ and each later growth SHALL re-freeze it at its new complete set.
 
 - **WHEN** a story is registered whose title is absent from the manifest
 - **THEN** the component-coverage gate fails, so the frozen set cannot grow silently
+
+#### Scenario: A governed wave deletes a component in lockstep
+
+- **WHEN** a change in the AVG stage redesign series deletes a manifest-listed component
+- **THEN** the same change removes the component file, its manifest title, its Storybook story, and every spec and test reference to it, and the component-coverage gate passes on the smaller re-frozen set
 
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 
