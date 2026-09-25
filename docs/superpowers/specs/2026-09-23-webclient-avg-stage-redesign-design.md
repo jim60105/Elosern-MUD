@@ -767,8 +767,8 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C4b | `webclient-avg-place-card-top-bar` | visual | archived |
 | C4c | `webclient-avg-stage-hud-anchors` | visual | archived |
 | C5 | `webclient-collapsible-command-line` | logic | archived |
-| C6a | `webclient-message-pages` | logic | implementing |
-| C6b | `webclient-message-window-component` | visual | proposed |
+| C6a | `webclient-message-pages` | logic | archived |
+| C6b | `webclient-message-window-component` | visual | archived |
 | C6c | `webclient-message-window-swap` | logic | proposed |
 | C7 | `webclient-typewriter-reading-prefs` | visual | proposed |
 | C8a | `webclient-scene-overview-component` | visual | proposed |
