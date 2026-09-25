@@ -83,4 +83,18 @@ describe("DockMenuItem (B2 action-dock family)", () => {
     expect(w.emitted("focus")).toEqual([["target-e2"]]);
     expect(w.emitted("activate")).toBeUndefined();
   });
+
+  // webclient-scene-overview-component (task 3.2): the optional glyph.
+  it("renders an optional decorative glyph before the label, and none by default", () => {
+    const plain = mountCell();
+    expect(plain.find(".dock-menu-item__glyph").exists()).toBe(false);
+    const w = mountCell({ glyph: "↑" });
+    const glyph = w.get(".dock-menu-item__glyph");
+    expect(glyph.text()).toBe("↑");
+    expect(glyph.attributes("aria-hidden")).toBe("true");
+    const children = Array.from(w.get('[data-testid="dock-item"]').element.children);
+    expect(children.indexOf(glyph.element)).toBeLessThan(
+      children.indexOf(w.get(".dock-menu-item__label").element),
+    );
+  });
 });

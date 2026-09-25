@@ -181,6 +181,11 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The AVG message window (webclient-message-window-component),
                 # built and story-documented before C6c mounts it.
                 "Core/MessageWindow",
+                # The AVG scene overview and its verb popover
+                # (webclient-scene-overview-component), built and
+                # story-documented before C8b mounts them.
+                "Action/SceneOverview",
+                "Action/DockVerbPopover",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

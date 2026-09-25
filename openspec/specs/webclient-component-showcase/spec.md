@@ -9,7 +9,7 @@ Every UI component named in the required-component manifest SHALL be implemented
 single-file component and SHALL have at least one Storybook story that documents its props, the
 events/actions it emits, and its primary states. At the completion of the contextual HUD
 redesign the required manifest SHALL enumerate at minimum: the header; the place card; the message window; the command line; the action dock with its menu,
-submenu, and choice-card frames; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
+submenu, and choice-card frames, its scene overview, and the scene overview's verb popover; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
 local map; the scene backdrop and the reference artwork frame; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
 only data sourced from the OOB panel allowlist (art, status, context_actions, local_map, services,
@@ -29,7 +29,9 @@ every story of that component family.
 - **WHEN** the required-component manifest is enumerated
 - **THEN** every listed component has at least one registered Storybook story, including the
   message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
-  pending-action, and dialogue states
+  pending-action, and dialogue states, the scene overview's story with its full-room, empty-rows,
+  disabled-exit, and overflowing states, and the verb popover's story with its dialogue-host,
+  hostile-target, and look-only states
 
 #### Scenario: A story documents contract and primary states
 - **WHEN** a component story is rendered
@@ -74,14 +76,27 @@ non-local network requests blocked.
 - **THEN** it renders from local assets without failure
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
-The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`)
-SHALL present the `context_actions` v5 menus as a finite, framed grid with a guidance
-line and focused/disabled states, and SHALL render the option and choice cards in the exact
-server-authored shape. The action dock SHALL expose the preserved `action-` and `target-` item keys and the
-focusable action-dock target, and SHALL expose a stable `data-testid` on every interactive cell. Every card and row SHALL be
-backed only by the `context_actions` panel and SHALL emit, on activation, the exact OOB action intent — the
+The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`,
+`SceneOverview`, and `DockVerbPopover`)
+SHALL present the `context_actions` v5 menus and the `exploration` panel's scene overview as a finite
+set of framed rows or chips with a guidance line and focused/disabled states, and SHALL render the
+option and choice cards in the exact server-authored shape. The action dock SHALL expose the preserved
+`action-` and `target-` item keys and the
+focusable action-dock target, and SHALL expose a stable `data-testid` on every interactive cell. Every card, row, and chip SHALL be
+backed only by the `context_actions` or `exploration` panel and SHALL emit, on activation, the exact OOB action intent — the
 `action_id` and `payload` fields of the `ui_action` envelope (the transport-level fields are owned by the
-C1 store) — so no action or target SHALL be invented.
+C1 store) — or the local frame-opening intent its row carries, so no action or target SHALL be invented.
+
+The scene overview SHALL render its chips in the rows the overview menu names (出口, 人物, 物件, and a
+label-less footer) in the menu's reading order, SHALL render no row whose section is absent, and SHALL
+let the chips of a row wrap onto further lines inside the command panel rather than overflow it
+horizontally. An exit chip SHALL carry the exit's direction glyph and, while enabled, the destination's
+display name, under the same glyph, destination, and disabled-label rules as the move row form. A
+disabled chip SHALL stay focusable, SHALL carry its disabled marker in text, and SHALL expose its
+server-authored reason to assistive technology and, while focused, in the overview's reason strip. The
+verb popover SHALL render a head naming its target and that target's rows in the menu's order, and
+SHALL request the parent frame (emit its back intent) when the pointer presses outside the popover
+card inside its host.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell
@@ -90,6 +105,18 @@ C1 store) — so no action or target SHALL be invented.
 #### Scenario: Option and choice cards match the server shape
 - **WHEN** the `context_actions` suggestions render
 - **THEN** each option and choice card is the exact server-authored shape and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
+
+#### Scenario: The scene overview renders only its non-empty rows
+- **WHEN** the scene overview renders a menu whose sections are exits, objects, and the footer, with no people section
+- **THEN** the 出口 and 物件 rows and the footer render in that order, no 人物 row or label is present, and each chip carries its row key and row id in reading order
+
+#### Scenario: A disabled exit chip explains itself without submitting
+- **WHEN** the scene overview renders a disabled exit chip and the pointer clicks it
+- **THEN** the chip becomes the focused chip, its label carries the disabled marker, the reason strip shows the server-authored reason, and no activation intent is emitted
+
+#### Scenario: The verb popover closes on an outside press
+- **WHEN** the verb popover is open inside its host and the pointer presses inside the host but outside the popover card
+- **THEN** the popover emits its back intent once and emits no activation
 
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`

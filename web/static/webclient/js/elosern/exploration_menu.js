@@ -15,6 +15,13 @@
  * server-provided reason is readable, and every server string is display
  * text -- never parsed narrative.
  *
+ * The AVG scene overview (webclient-scene-overview-component, AVG stage
+ * design §7): `overviewMenu` flattens the exits, the people, the objects,
+ * and a footer (查看房間 · 等待／休息 · 建議) into ONE reading-order menu
+ * with a `sections` index and `geometry: "sections"` for the router, and
+ * `verbMenuFor` is a person chip's verb popover (the target's affordances
+ * plus 查看). Neither is called by a resolver until the swap change.
+ *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
  * router.
@@ -505,6 +512,38 @@
      };
    }
 
+  // -------------------------------------------------------------------------
+  // Verb popover (webclient-scene-overview-component design D2): the target's
+  // affordance rows in payload order (the same mapping as `targetMenuFor`),
+  // then 查看, then the back row. A target with no mapped affordance yields
+  // 查看 and back only. A vertical list: no grid geometry.
+  // -------------------------------------------------------------------------
+
+  function verbMenuFor(model, target) {
+    var base = targetMenuFor(model, target);
+    var items = base.items.filter(function (item) {
+      return item.key !== "target-empty" && item.key !== "back";
+    });
+    var identity = target && target.identity;
+    var name = (target && target.display_name) || "";
+    items.push({
+      key: "look-target",
+      label: "查看",
+      enabled: true,
+      actionId: "explore.look",
+      payload: { target_id: identity },
+      description: null,
+      commandDisplay: { targetLabel: name },
+    });
+    items.push(backItem());
+    return {
+      items: items,
+      focusKey: null,
+      target: target,
+      title: name || "互動",
+    };
+  }
+
   function keywordMenuFor(model, target, scriptedAffordance) {
     void scriptedAffordance;
     // Scripted keyword buttons live on the target descriptor so the interact
@@ -640,6 +679,125 @@
   }
 
   // -------------------------------------------------------------------------
+  // Scene overview (webclient-scene-overview-component design D1).
+  // -------------------------------------------------------------------------
+
+  // One flat menu in reading order — 出口, 人物, 物件, then the label-less
+  // footer — with `sections: [{key, label, count}]` naming the non-empty
+  // rows. Item shapes reuse the existing builders so payloads stay
+  // byte-identical. `geometry: "sections"` tells the router how the arrow
+  // keys cross rows; the menu carries no `grid` flag, so focus projects as a
+  // list (the focus index is the reading-order index).
+  function overviewMenu(panel, options) {
+    options = options || {};
+    var currentNode = options.currentNode || null;
+    var suggestions = options.suggestions || null;
+    var sections = [];
+    var items = [];
+
+    function addSection(key, label, rows) {
+      if (rows.length === 0) {
+        return;
+      }
+      sections.push({ key: key, label: label, count: rows.length });
+      Array.prototype.push.apply(items, rows);
+    }
+
+    // 出口: the move rows without the back row or the empty placeholder
+    // (the section is omitted instead). A chip's label is the plain server
+    // label: the chip renderer adds the disabled marker, so the
+    // `（無法通行）` suffix is not baked in.
+    var moveRows = (panel && panel.move) || [];
+    var exits = moveItems(panel, currentNode)
+      .filter(function (item) {
+        return item.key !== "back" && item.key !== "move-empty";
+      })
+      .map(function (item, index) {
+        var row = moveRows[index];
+        if (row && typeof row.label === "string") {
+          item.label = row.label;
+        }
+        return item;
+      });
+    addSection("exits", "出口", exits);
+
+    // 人物: every interact target opens its verb popover (always enabled:
+    // the popover has at least 查看), then a look chip for each present
+    // entity that has no interact descriptor.
+    var targets = (panel && panel.interact) || [];
+    var interactIds = {};
+    var people = targets.map(function (target) {
+      interactIds[target.identity] = true;
+      return {
+        key: "target-" + target.identity,
+        label: target.display_name,
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openTarget: target.identity,
+        description: null,
+      };
+    });
+    var lookRows = lookItems(panel);
+    lookRows.forEach(function (item) {
+      if (item.key.indexOf("entity-") === 0 && !interactIds[item.payload.target_id]) {
+        people.push(item);
+      }
+    });
+    addSection("people", "人物", people);
+
+    // 物件: the look rows for objects.
+    addSection(
+      "objects",
+      "物件",
+      lookRows.filter(function (item) {
+        return item.key.indexOf("object-") === 0;
+      })
+    );
+
+    // Footer: 查看房間, 等待／休息, and 建議 (N) while suggestions are not
+    // `unavailable`. The 查看房間 chip is `lookItems`' room row, which needs
+    // `look.room`: the OOB v2 schema guarantees a non-null room on every
+    // available panel (`validateExplorationLook` requires the exact room
+    // fields), and `wait` is unconditional, so the footer is never empty.
+    var footer = lookRows.filter(function (item) {
+      return item.key === "look-room";
+    });
+    footer.push({
+      key: "wait",
+      label: "等待／休息",
+      enabled: true,
+      actionId: null,
+      payload: null,
+      openSubmenu: "wait",
+    });
+    var status = suggestions && suggestions.status;
+    if (status && status !== "unavailable") {
+      var cards =
+        (status === "ready" || status === "degraded") && Array.isArray(suggestions.cards)
+          ? suggestions.cards.length
+          : 0;
+      footer.push({
+        key: "suggestions",
+        label: cards > 0 ? "建議 (" + cards + ")" : "建議",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openSubmenu: "suggestions",
+      });
+    }
+    addSection("footer", null, footer);
+
+    return {
+      items: items,
+      sections: sections,
+      geometry: "sections",
+      focusKey: null,
+      title: "場景",
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // Menu model builder.
   // -------------------------------------------------------------------------
 
@@ -729,6 +887,8 @@
      interactItems: interactItems,
      waitItems: waitItems,
      targetMenuFor: targetMenuFor,
+     verbMenuFor: verbMenuFor,
+     overviewMenu: overviewMenu,
      keywordMenuFor: keywordMenuFor,
      parentKeyFor: parentKeyFor,
      targetById: targetById,

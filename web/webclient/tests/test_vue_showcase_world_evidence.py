@@ -177,6 +177,11 @@ PREVIOUS_MANIFEST_KEYS = {
     # The AVG message window (webclient-message-window-component),
     # built and story-documented before C6c mounts it.
     "Core/MessageWindow",
+    # The AVG scene overview and its verb popover
+    # (webclient-scene-overview-component), built and story-documented
+    # before C8b mounts them.
+    "Action/SceneOverview",
+    "Action/DockVerbPopover",
 }
 
 # The World-directory story files that sit outside the B4 family: the
