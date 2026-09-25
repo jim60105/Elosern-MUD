@@ -117,14 +117,19 @@ describe("store view slices", () => {
     const projected = store.narrative.map((line) => ({ kind: line.kind, text: line.text }));
     expect(projected).toEqual(NARRATIVE_SAMPLE.map((line) => ({ kind: line.kind, text: line.text })));
 
-    // "out" lines carry a renderable token view from the preserved
-    // NarrativeMarkup pipeline; the other kinds stay literal (tokens === null).
+    // Every retained line carries a monotonic `seq`, and `out`/`sys`/`err`
+    // lines carry a renderable token view from the preserved NarrativeMarkup
+    // pipeline while `in` lines stay literal (`tokens === null`).
+    let prevSeq = 0;
     for (const line of store.narrative) {
-      if (line.kind === "out") {
+      expect(typeof line.seq).toBe("number");
+      expect(line.seq).toBeGreaterThan(prevSeq);
+      prevSeq = line.seq;
+      if (line.kind === "in") {
+        expect(line.tokens).toBe(null);
+      } else {
         expect(Array.isArray(line.tokens)).toBe(true);
         expect(line.tokens.length).toBeGreaterThan(0);
-      } else {
-        expect(line.tokens).toBe(null);
       }
     }
   });

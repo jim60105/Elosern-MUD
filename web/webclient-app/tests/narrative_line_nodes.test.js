@@ -7,8 +7,14 @@
 // `BOX_DRAWING` form (`/[\u2500-\u257f]/`) classifies exactly the same
 // text as the feed's literal-glyph spelling `/[─-╿]/`.
 
-import { describe, expect, it } from "vitest";
-import { lineText, narrativeLineNodes } from "../lib/narrative_line_nodes.js";
+import { describe, expect, it, vi } from "vitest";
+import { BOX_DRAWING, isBoxDrawing } from "../lib/box_drawing.js";
+import NarrativeMarkup from "../lib/narrative_markup.js";
+import {
+  lineText,
+  narrativeBlockNodes,
+  narrativeLineNodes,
+} from "../lib/narrative_line_nodes.js";
 
 // The feed's literal-glyph spelling of the U+2500..U+257F box-drawing range.
 const LITERAL_BOX_DRAWING = /[─-╿]/;
@@ -48,9 +54,13 @@ describe("narrativeLineNodes", () => {
     // sample classifies as prose under both.
     expect(lineText({ text: "─" })).toBe("─");
     expect(LITERAL_BOX_DRAWING.test("─")).toBe(true);
+    expect(BOX_DRAWING.test("─")).toBe(true);
+    expect(isBoxDrawing("─")).toBe(true);
     expect(faceOf({ kind: "out", text: "─" })[0].class).toContain("map-art");
 
     expect(LITERAL_BOX_DRAWING.test("標題")).toBe(false);
+    expect(BOX_DRAWING.test("標題")).toBe(false);
+    expect(isBoxDrawing("標題")).toBe(false);
     expect(faceOf({ kind: "out", text: "標題" })[0].class).not.toContain("map-art");
   });
 
@@ -71,5 +81,91 @@ describe("narrativeLineNodes pipeline path", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0].props.class).toBe("color-203");
     expect(children).toContain(" 廣場");
+  });
+
+  it("renders stored line.tokens identically to the fallback without re-tokenizing", () => {
+    const text = '<span class="color-203">石板</span> 廣場';
+    const tokens = NarrativeMarkup.tokenize(text);
+    const spy = vi.spyOn(NarrativeMarkup, "tokenize");
+    try {
+      const fromStored = narrativeLineNodes({ kind: "out", text, tokens }, 0);
+      expect(spy).not.toHaveBeenCalled();
+      const fromFallback = narrativeLineNodes({ kind: "out", text }, 0);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(fromStored).toEqual(fromFallback);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("narrativeBlockNodes", () => {
+  it("renders a fragment with its kind and map-art classes", () => {
+    const tokens = NarrativeMarkup.tokenize("│  北面出口  │");
+    const node = narrativeBlockNodes(
+      {
+        kind: "out",
+        seq: 1,
+        mapArt: true,
+        first: true,
+        tokens,
+        start: 0,
+        end: 10,
+      },
+      "frag-0",
+    );
+    expect(node.props.key).toBe("frag-0");
+    expect(node.props.class).toBe("narrative-line out map-art");
+    expect(node.props["data-line-kind"]).toBe("out");
+    expect(node.children).toEqual(["│  北面出口  │"]);
+  });
+
+  it("marks a sys continuation fragment with cont while keeping sys and emphasis classes", () => {
+    const firstSys = narrativeBlockNodes(
+      {
+        kind: "sys",
+        seq: 2,
+        mapArt: false,
+        first: true,
+        tokens: NarrativeMarkup.tokenize("系統前段"),
+        start: 0,
+        end: 4,
+      },
+      "sys-0",
+    );
+    const contSys = narrativeBlockNodes(
+      {
+        kind: "sys",
+        seq: 2,
+        mapArt: false,
+        first: false,
+        tokens: NarrativeMarkup.tokenize("系統後段"),
+        start: 4,
+        end: 8,
+      },
+      "sys-1",
+    );
+    expect(firstSys.props.class).toBe("narrative-line sys");
+    expect(contSys.props.class).toBe("narrative-line sys cont");
+    expect(contSys.props["data-line-kind"]).toBe("sys");
+
+    const contProse = narrativeBlockNodes(
+      {
+        kind: "out",
+        seq: 3,
+        mapArt: false,
+        first: false,
+        tokens: NarrativeMarkup.tokenize('<span class="color-220">重點</span>續句'),
+        start: 4,
+        end: 8,
+      },
+      "out-1",
+    );
+    expect(contProse.props.class).toBe("narrative-line out cont");
+    const spans = contProse.children.filter(
+      (c) => c && typeof c === "object" && c.type === "span",
+    );
+    expect(spans).toHaveLength(1);
+    expect(spans[0].props.class).toBe("color-220");
   });
 });
