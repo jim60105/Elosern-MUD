@@ -11,7 +11,7 @@ import DockMenu from "../../components/DockMenu.vue";
 import HelpOverlay from "../../components/HelpOverlay.vue";
 import LocalMap from "../../components/LocalMap.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
-import NarrativeFeed from "../../components/NarrativeFeed.vue";
+import MessageWindow from "../../components/MessageWindow.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import SkillDetailPane from "../../components/SkillDetailPane.vue";
@@ -433,14 +433,20 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
     document.body.innerHTML = "";
   });
 
-  it("the narrative feed's full-log control opens the full log", async () => {
-    const wrapper = mount(NarrativeFeed, {
-      props: { lines: [{ kind: "sys", text: "你來到了霧骨渡口。" }] },
+  it("the message window's wheel-up gesture opens the full log and mounts no deferred surface", async () => {
+    const wrapper = mount(MessageWindow, {
+      props: {
+        lines: [{ seq: 1, kind: "sys", text: "你來到了霧骨渡口。" }],
+        marks: [],
+        pageFit: () => true,
+      },
     });
-    const control = wrapper.get('[data-testid="narrative-fulllog-control"]');
-    expect(control.exists()).toBe(true);
-    await control.trigger("click");
+    const win = wrapper.get('[data-testid="message-window"]');
+    expect(win.exists()).toBe(true);
+    expect(wrapper.findAll(".option-card")).toHaveLength(0);
+    await win.trigger("wheel", { deltaY: -40 });
     expect(wrapper.emitted("open-full-log")).toBeTruthy();
+    expect(wrapper.findAll(".option-card")).toHaveLength(0);
   });
 
   it("the creation overlay renders its own testids and no dismissal control", () => {

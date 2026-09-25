@@ -7,9 +7,10 @@
 // and `map` (webclient-avg-stage-hud-anchors design D1), the portrait
 // anchors (`actor-left`,
 // `actor-right`), the fixed-height bottom band's message and command
-// regions (`band-message` holds the narrative caption, `band-command` the
-// action dock), and the `command-line` row docked on the message region
-// (webclient-avg-stage-shell design D1/D3/D6).
+// regions (`band-message` holds the paged message window and the `[日誌] [⌨]`
+// control strip, `band-command` the action dock), and the `command-line` row
+// docked on the message region (webclient-avg-stage-shell design D1/D3/D6;
+// webclient-message-window-swap design D1).
 //
 // Mode gating (design D2): the committed mode renders on the stage root as
 // `data-elosern-mode`; surface visibility is CSS-only `display:none`, so
@@ -18,7 +19,7 @@
 // Preserved DOM contract (design D6): `#action-dock` (with `data-mode`,
 // `tabindex` and the listbox composite role, rendered by the dock),
 // `#elosern-action-live`, `#elosern-offline-overlay`, `#inputfield`
-// (inside the command line), `#narrative-unread` (inside the narrative caption), and the
+// (inside the command line), and the
 // `action-*` / `target-*` item keys all remain.
 //
 // Shell-owned view behavior (H5, webclient-hud-05-overlays-and-command-line;
@@ -38,7 +39,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
-import NarrativeFeed from "./NarrativeFeed.vue";
+import MessageWindow from "./MessageWindow.vue";
 import PlaceCard from "./PlaceCard.vue";
 import TopBar from "./TopBar.vue";
 import { retireReplacedFallback } from "../fallback.js";
@@ -53,12 +54,18 @@ const props = defineProps({
   locationLabel: { type: String, default: null },
   timeLabel: { type: String, default: null },
   narrative: { type: Array, default: () => [] },
+  // The store's dispatch-time response marks (`store.responseMarks`),
+  // forwarded to MessageWindow so silent actions segment responses.
+  responseMarks: { type: Array, default: () => [] },
   // The dialogue view model (webclient-align-08-dialogue-surface): forwarded
-  // verbatim to the feed's dialogue variant (null outside the available
-  // dialogue window).
+  // verbatim to the message window's dialogue variant (null outside the
+  // available dialogue window).
   dialogue: { type: Object, default: null },
-  // The committed `art` panel — the feed variant's portrait catalog source.
+  // The committed `art` panel — the dialogue variant's portrait catalog source.
   artPanel: { type: Object, default: null },
+  // The client-local prose scale (`store.view.fontScale`), forwarded to
+  // MessageWindow so a scale change re-measures pages.
+  fontScale: { type: Number, default: 1 },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -125,7 +132,6 @@ const emit = defineEmits([
 
 const commandLine = ref(null);
 const commandLineExpanded = ref(false);
-const feed = ref(null);
 
 // The open-surface registry (design D9): AppClient computes the set of open
 // surfaces (full-log, creation, and H4's `hudDrawer`). Expanding the command
@@ -317,17 +323,28 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
         <slot name="actor-right" />
       </template>
       <template #band-message>
-        <NarrativeFeed
-          ref="feed"
-          :mode="props.mode"
+        <MessageWindow
           :lines="props.narrative"
+          :marks="props.responseMarks"
+          :mode="props.mode"
           :dialogue="props.dialogue"
           :art-panel="props.artPanel"
-          @open-full-log="() => emit('open-full-log')"
+          :font-scale="props.fontScale"
           @dialogue-pick="(pick) => emit('dialogue-pick', pick)"
           @dialogue-freeform="() => emit('dialogue-freeform')"
           @dialogue-leave="() => emit('dialogue-leave')"
+          @open-full-log="() => emit('open-full-log')"
         />
+        <button
+          type="button"
+          class="message-log-open"
+          data-testid="message-log-open"
+          aria-label="完整日誌"
+          title="完整日誌"
+          @click="emit('open-full-log')"
+          @keydown.enter.stop
+          @keydown.space.stop
+        >日誌</button>
         <button
           type="button"
           class="command-line-toggle"
@@ -419,6 +436,35 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
 .elosern-app-shell .elosern-stage {
   position: absolute;
   inset: 0;
+}
+
+/* Control-strip layout coupling in #band-message (design §5.1 / C6c D1):
+   - .command-line-toggle (⌨): right: 22px, width: 30px (occupies 22..52px)
+   - .message-log-open (日誌): right: 58px, height: 30px (occupies 58..102px)
+   - .message-window__marker: right: 104px (MessageWindow.vue) */
+.elosern-app-shell .message-log-open {
+  position: absolute;
+  right: 58px;
+  bottom: 18px;
+  height: 30px;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-radius: 99px;
+  color: var(--paper-300);
+  font: 12px/1 var(--f-sans);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.elosern-app-shell .message-log-open:hover {
+  border-color: var(--gold-500);
+  color: var(--paper-50);
 }
 
 .elosern-app-shell .command-line-toggle {

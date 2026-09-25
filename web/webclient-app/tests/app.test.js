@@ -36,8 +36,8 @@ describe("AppShell root (B1 core family)", () => {
     expect(root.attributes("data-elosern-mode")).toBe("exploration");
     expect(w.get('[data-testid="topbar"]')).toBeTruthy();
     expect(w.get('[data-testid="connection-state"]').text()).toBe("○ 未連線");
-    expect(w.get('[data-testid="narrative-feed"]')).toBeTruthy();
-    expect(w.get('[data-testid="narrative-fulllog-control"]')).toBeTruthy();
+    expect(w.get('[data-testid="message-window"]')).toBeTruthy();
+    expect(w.get('[data-testid="message-log-open"]')).toBeTruthy();
     // webclient-collapsible-command-line: the command line starts collapsed
     // (`data-expanded="false"`), its ⌨ toggle is in `#band-message` with
     // `aria-expanded="false"`, and `#inputfield` stays in the DOM.
@@ -65,8 +65,9 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get('[data-testid="anchor-actor-right"]').exists()).toBe(true);
     expect(w.find('[data-testid="anchor-feed"]').exists()).toBe(false);
     expect(w.find('[data-testid="anchor-dock"]').exists()).toBe(false);
-    // The narrative caption lives in the band's message region.
-    expect(w.get('[data-testid="anchor-band-message"] [data-testid="narrative-feed"]').exists()).toBe(true);
+    // The message window and log control live in the band's message region.
+    expect(w.get('[data-testid="anchor-band-message"] [data-testid="message-window"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-band-message"] [data-testid="message-log-open"]').exists()).toBe(true);
     expect(w.get('[data-testid="anchor-command-line"]').exists()).toBe(true);
   });
 
@@ -106,7 +107,7 @@ describe("AppShell root (B1 core family)", () => {
   it("in exploration mode, a keydown of g on a non-editable target leaves #inputfield empty and does not move focus", async () => {
     const w = mountShell({ mode: "exploration" });
     const input = w.get("textarea#inputfield");
-    const target = w.get('[data-testid="narrative-fulllog-control"]');
+    const target = w.get('[data-testid="message-log-open"]');
     target.element.focus();
     expect(document.activeElement).toBe(target.element);
 

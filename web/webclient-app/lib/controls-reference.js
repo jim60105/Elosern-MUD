@@ -15,7 +15,7 @@ export const CONTROLS_REFERENCE = [
     key: "Enter",
     label: "Send the command",
     detail:
-      "A single send path; a successful send collapses the line and returns to the dock; Shift+Enter inserts a newline without sending.",
+      "A single send path; a successful send collapses the line and returns to the dock; Shift+Enter inserts a newline without sending. Enter or Space on the focused message window advances a page.",
   },
   {
     key: "↑ / ↓",
@@ -39,6 +39,11 @@ export const CONTROLS_REFERENCE = [
     label: "Pick a dock row by position",
     detail:
       "Moves the dock focus to the first four rows of the current frame (in rendered order) and runs it like Enter; a slot beyond the row count does nothing.",
+  },
+  {
+    key: "日誌",
+    label: "Open the complete log",
+    detail: "Opens the complete log at its latest line.",
   },
 ];
 

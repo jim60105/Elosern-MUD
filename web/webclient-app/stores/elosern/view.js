@@ -275,17 +275,6 @@ export function applyView(ctx) {
     ctx.view.value = ctx.buildView(prev, rs);
   };
 
-  ctx.markNarrativeSeen = function markNarrativeSeen() {
-    ctx.seenIndex.value = ctx.narrative.value.length;
-  };
-
-  ctx.unreadCount = computed(() =>
-    ctx.narrative.value
-      .slice(ctx.seenIndex.value)
-      .filter((line) => line.kind === "out")
-      .length
-  );
-
   const partyAvailable = computed(() => !!ctx.view.value.partyAvailable);
   const partySlots = computed(() => ctx.view.value.partySlots || []);
   const objectivesAvailable = computed(() => !!ctx.view.value.objectivesAvailable);

@@ -1,6 +1,6 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm C6a (`webclient-message-pages`) and C6b (`webclient-message-window-component`) are archived:
+- [x] 1.1 Confirm C6a (`webclient-message-pages`) and C6b (`webclient-message-window-component`) are archived:
   - `ls web/webclient-app/components/MessageWindow.vue web/webclient-app/lib/message_pages.js` succeeds
   - `grep -n '"Core/MessageWindow"' web/webclient-app/component-manifest.json` matches
   - the "C6c re-points these" comment block exists in `web/tests/browser/browser_helpers.py`
@@ -9,32 +9,32 @@
 
 ## 2. Mount the window and the log control
 
-- [ ] 2.1 `web/webclient-app/components/AppShell.vue`:
+- [x] 2.1 `web/webclient-app/components/AppShell.vue`:
   - replace the `NarrativeFeed` import and mount with `MessageWindow`, passing `lines`, `marks`, `mode`, `dialogue`, `artPanel`, and `fontScale`, and forwarding `dialogue-pick`, `dialogue-freeform`, `dialogue-leave`, and `open-full-log`
   - add the `responseMarks` (Array) and `fontScale` (Number, default 1) props
   - delete the `feed` ref
   - add the `日誌` button per design D1 (`data-testid="message-log-open"`, `aria-label` / `title` `完整日誌`, `@click` emitting `open-full-log`, `@keydown.enter.stop`, `@keydown.space.stop`) between the window and the ⌨ toggle
   - rewrite the header comment (no `#narrative-unread`, no caption)
-- [ ] 2.2 `web/webclient-app/AppClient.vue`: bind `:response-marks="store.responseMarks"` and `:font-scale="store.view.fontScale"` on `AppShell`. `grep -n "open-full-log" web/webclient-app/AppClient.vue` still reaches `openFullLog`.
-- [ ] 2.3 `web/webclient-app/styles/app-shell.css`:
+- [x] 2.2 `web/webclient-app/AppClient.vue`: bind `:response-marks="store.responseMarks"` and `:font-scale="store.view.fontScale"` on `AppShell`. `grep -n "open-full-log" web/webclient-app/AppClient.vue` still reaches `openFullLog`.
+- [x] 2.3 `web/webclient-app/styles/app-shell.css`:
   - add the `.message-log-open` rule (`position: absolute; right: 58px; bottom: 18px; height: 30px; z-index: 1`, capsule treatment)
   - delete the `.elosern-root .elosern-narrative*` block, the `.m-dialogue .narrative-scroll` rules (both viewports), and C5's `[data-anchor="band-message"] .narrative-scroll` padding rule
 
   `grep -n "elosern-narrative\|narrative-scroll\|narrative-head\|narrative-fulllog" web/webclient-app/styles web/webclient-app/components web/webclient-app/AppClient.vue` returns nothing after section 3.
-- [ ] 2.4 `web/webclient-app/lib/controls-reference.js`: add Enter / Space on the focused message window advancing a page to the Enter row's detail, and add a `日誌` row ("Opens the complete log at its latest line"). Update `tests/overlays/help_overlay.test.js` if it pins row counts.
+- [x] 2.4 `web/webclient-app/lib/controls-reference.js`: add Enter / Space on the focused message window advancing a page to the Enter row's detail, and add a `日誌` row ("Opens the complete log at its latest line"). Update `tests/overlays/help_overlay.test.js` if it pins row counts.
 
 ## 3. Deletions
 
-- [ ] 3.1 Delete `web/webclient-app/components/NarrativeFeed.vue`, `components/UnreadIndicator.vue`, `stories/Core/NarrativeFeed.stories.js`, `stories/Core/UnreadIndicator.stories.js`, `tests/narrative_feed.test.js`, and `tests/unread_indicator.test.js`.
+- [x] 3.1 Delete `web/webclient-app/components/NarrativeFeed.vue`, `components/UnreadIndicator.vue`, `stories/Core/NarrativeFeed.stories.js`, `stories/Core/UnreadIndicator.stories.js`, `tests/narrative_feed.test.js`, and `tests/unread_indicator.test.js`.
   - Remove `"Core/NarrativeFeed"` and `"Core/UnreadIndicator"` from `component-manifest.json` (keep `"frozen": true`) and from the snapshots in `web/webclient/tests/test_vue_showcase_{action,data,world,overlays}_evidence.py`.
   - Update the description in `stories/Core/AppShell.stories.js`.
   - `grep -rn "NarrativeFeed\|UnreadIndicator\|narrative-unread\|narrative_feed" web/webclient-app web/webclient/tests --include='*.js' --include='*.vue' --include='*.json' --include='*.py'` (excluding `dist/`, `node_modules/`) returns nothing after section 4.
-- [ ] 3.2 Delete the store unread bookkeeping per design D2: `ctx.seenIndex` (`stores/elosern.js`), the trim adjustment (`stores/elosern/transport.js`), `markNarrativeSeen` / `unreadCount` (`stores/elosern/view.js`), their exports in `stores/elosern.js`, and the `unreadCount` case in `tests/store/store_slices.test.js`. `grep -rn "seenIndex\|unreadCount\|markNarrativeSeen" web/webclient-app` returns nothing.
+- [x] 3.2 Delete the store unread bookkeeping per design D2: `ctx.seenIndex` (`stores/elosern.js`), the trim adjustment (`stores/elosern/transport.js`), `markNarrativeSeen` / `unreadCount` (`stores/elosern/view.js`), their exports in `stores/elosern.js`, and the `unreadCount` case in `tests/store/store_slices.test.js`. `grep -rn "seenIndex\|unreadCount\|markNarrativeSeen" web/webclient-app` returns nothing.
 
 ## 4. Vitest and evidence
 
-- [ ] 4.1 Rename `tests/dialogue_feed.test.js` to `tests/message_window_dialogue.test.js` and mount `MessageWindow` with a code-point `pageFit`, per design D3. Re-point `tests/full_log_overlay.test.js`'s parity block, `tests/overlays/deferred_surfaces_absent.test.js`, `tests/app.test.js`, `tests/hud_frame.test.js`, and `tests/preserved_contract.test.js`. Fix the header comment in `tests/narrative_line_nodes.test.js`. Run `pnpm test` (repository root), which is green.
-- [ ] 4.2 `web/webclient/tests/test_node_suite_evidence.py`:
+- [x] 4.1 Rename `tests/dialogue_feed.test.js` to `tests/message_window_dialogue.test.js` and mount `MessageWindow` with a code-point `pageFit`, per design D3. Re-point `tests/full_log_overlay.test.js`'s parity block, `tests/overlays/deferred_surfaces_absent.test.js`, `tests/app.test.js`, `tests/hud_frame.test.js`, and `tests/preserved_contract.test.js`. Fix the header comment in `tests/narrative_line_nodes.test.js`. Run `pnpm test` (repository root), which is green.
+- [x] 4.2 `web/webclient/tests/test_node_suite_evidence.py`:
   - `test_dialogue_feed_vitest_evidence_passes` runs `message_window_dialogue.test.js` + `dialogue_view_model.test.js`
   - `test_choicepoint_block_node_suite_passes` drops `narrative_feed.test.js`
   - add `test_message_window_vitest_evidence_passes` (runs `tests/message_window.test.js`), annotated `webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages`

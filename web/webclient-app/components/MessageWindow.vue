@@ -50,7 +50,7 @@ import { faceObjectPosition } from "./face-rect.js";
 // holding the first character that was on screen.
 //
 // While mode is `dialogue` and the dialogue panel is available, the window
-// renders the dialogue variant ported from NarrativeFeed: unpaged, scrolling
+// renders the dialogue variant (design D6): unpaged, scrolling
 // inside the text area, with the pick, free-dialogue, and exit rows.
 export default {
   name: "MessageWindow",
@@ -376,7 +376,7 @@ export default {
       }
     }
 
-    // ---- dialogue variant (design D6, ported from NarrativeFeed) ----
+    // ---- dialogue variant (design D6) ----
 
     // Announce-once: the `.dlg` box renders the same committed line the
     // narrative stream carries, so the stream's record of that exchange is

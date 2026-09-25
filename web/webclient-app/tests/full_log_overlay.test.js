@@ -1,13 +1,14 @@
 // H1 (webclient-hud-01-shell-and-scene, design D4, task 5.6): the full-log
 // overlay renders the complete retained narrative through the preserved
 // `narrative-renderer.js` (one markup path). This suite verifies: the overlay
-// renders exactly the same line count as the store's retained narrative; the
-// caption card is bounded (max-height:30vh, width:min(880px,90vw)); Escape
+// renders exactly the same line count as the store's retained narrative; its
+// semantic line classes match MessageWindow's page fragments (design D3); Escape
 // closes the overlay and restores focus to the opener.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import { nextTick } from "vue";
 import FullLogOverlay from "../components/FullLogOverlay.vue";
-import NarrativeFeed from "../components/NarrativeFeed.vue";
+import MessageWindow from "../components/MessageWindow.vue";
 
 function sampleLines() {
   return [
@@ -59,18 +60,39 @@ describe("FullLogOverlay (H1 D4)", () => {
     expect(wrapper.emitted("close")).toHaveLength(1);
   });
 
-  it("keeps the narrative caption card bounded and rendering the same line count", () => {
-    // The caption card's geometry is owned by the `feed` anchor (design D4):
-    // `width:min(880px,90vw)` and `max-height:30vh`, so the card never grows
-    // past its bounded height. The caption renders the same lines as the
-    // overlay (one renderer).
-    const lines = sampleLines();
-    wrapper = mount(NarrativeFeed, { props: { lines } });
-    expect(wrapper.find('[data-testid="narrative-feed"]').exists()).toBe(true);
-    // The `完整日誌` control is present (the one-action full-log entry, 5.2).
-    expect(wrapper.find('[data-testid="narrative-fulllog-control"]').exists()).toBe(true);
-    // The caption renders exactly the retained line count.
-    expect(wrapper.findAll(".narrative-line").length).toBe(lines.length);
+  it("renders out and sys lines with the same classes and data-line-kind as MessageWindow page fragments", async () => {
+    const arrival = [{ seq: 1, kind: "out", text: "你來到了霧骨渡口。" }];
+    const lines = [
+      { seq: 2, kind: "in", text: "look" },
+      { seq: 3, kind: "out", text: "碼頭上空無一人，只有浪聲。" },
+      { seq: 4, kind: "sys", text: "（系統）進入探索模式" },
+    ];
+    const overlayWrapper = mount(FullLogOverlay, { props: { lines: lines.slice(1) } });
+    wrapper = mount(MessageWindow, {
+      attachTo: document.body,
+      props: { lines: arrival, marks: [], pageFit: () => true },
+    });
+    await nextTick();
+    await wrapper.setProps({ lines: [...arrival, ...lines] });
+    await nextTick();
+    await nextTick();
+    try {
+      const overlayLines = overlayWrapper.findAll(".narrative-line");
+      // `sys` starts its own page in paginate(), so page 1 has `out` and page 2 has `sys`.
+      const pageSurface = wrapper.get('[data-testid="message-page"]');
+      const page1Line = pageSurface.get(".narrative-line");
+      expect(page1Line.classes()).toEqual(overlayLines[0].classes());
+      expect(page1Line.attributes("data-line-kind")).toBe(overlayLines[0].attributes("data-line-kind"));
+      expect(page1Line.text()).toBe(overlayLines[0].text());
+
+      await wrapper.get('[data-testid="message-window"]').trigger("click");
+      const page2Line = pageSurface.get(".narrative-line");
+      expect(page2Line.classes()).toEqual(overlayLines[1].classes());
+      expect(page2Line.attributes("data-line-kind")).toBe(overlayLines[1].attributes("data-line-kind"));
+      expect(page2Line.text()).toBe(overlayLines[1].text());
+    } finally {
+      overlayWrapper.unmount();
+    }
   });
 
   it("renders sys lines with the .sys class and never mounts a choice-point in the full log", () => {

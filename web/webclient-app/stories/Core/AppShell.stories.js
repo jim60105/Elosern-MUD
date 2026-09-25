@@ -54,8 +54,8 @@ export default {
     docs: {
       description: {
         component:
-          "The offline desktop shell composing TopBar, NarrativeFeed, " +
-          "UnreadIndicator (inside the feed), the ⌨ command-line toggle, " +
+          "The offline desktop shell composing TopBar, MessageWindow, " +
+          "the 日誌 log control, the ⌨ command-line toggle, " +
           "the collapsible CommandLine, ConnectOverlay, " +
           "the preserved `#elosern-action-live` live region and the " +
           "`#elosern-offline-overlay` hook.",
