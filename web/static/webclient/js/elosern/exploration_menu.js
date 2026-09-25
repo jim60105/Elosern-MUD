@@ -151,6 +151,7 @@
   // render as a dead functional entry, so 任務 and 背包 appear only while the
   // panel reports them available.
   function navigationItems(panel) {
+    panel = panel || {};
     var items = [
       {
         key: "character",
