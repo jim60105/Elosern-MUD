@@ -26,7 +26,9 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(controlsText).toContain("Open the command line");
     expect(controlsText).toContain("Expands the collapsed line and focuses its field; no literal slash is inserted.");
     expect(controlsText).toContain("a successful send collapses the line and returns to the dock");
-    expect(controlsText).toContain("Enter or Space on the focused message window advances a page.");
+    expect(controlsText).toContain(
+      "Enter or Space on the focused message window first shows a typing page in full, then advances a page.",
+    );
     expect(controlsText).toContain("Opens the complete log at its latest line.");
     expect(controlsText).toContain("open overlay → open drawer → focused command field (collapses the line) → dock menu level");
     const gameHelp = wrapper.get('[data-testid="help-controls-gamehelp"]').text();

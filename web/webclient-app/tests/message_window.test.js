@@ -52,7 +52,8 @@ describe("MessageWindow paged presentation", () => {
   async function mountWindow(props = {}) {
     wrapper = mount(MessageWindow, {
       attachTo: document.body,
-      props: { lines: ARRIVAL, marks: [], pageFit: codePointFit(budget), ...props },
+      // C7: instant pages keep these C6b cases about paging, not typing.
+      props: { lines: ARRIVAL, marks: [], pageFit: codePointFit(budget), textSpeed: "instant", ...props },
     });
     await settle();
     return wrapper;
@@ -260,13 +261,15 @@ describe("MessageWindow paged presentation", () => {
     await w.get('[data-testid="message-window"]').trigger("click");
     expect(pageSurface(w).text()).toBe("甲乙丙丁戊己庚辛壬。");
     const spoken = live(w);
-    // Larger text: five code points per page. Offset 10 now sits on page 3.
+    // Larger text: five code points per page. The anchor of a fully shown
+    // page is its last character shown (C7 design D6), offset 19, which now
+    // sits on page 4.
     budget.value = 5;
     await w.setProps({ fontScale: 2 });
     await settle();
     expect(pageSurface(w).attributes("data-pages")).toBe("6");
-    expect(pageSurface(w).attributes("data-page")).toBe("3");
-    expect(pageSurface(w).text()).toBe("甲乙丙丁戊");
+    expect(pageSurface(w).attributes("data-page")).toBe("4");
+    expect(pageSurface(w).text()).toBe("己庚辛壬。");
     expect(live(w)).toBe(spoken);
     // Back to the normal size: the anchor did not drift.
     budget.value = 10;

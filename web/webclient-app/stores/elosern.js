@@ -257,5 +257,8 @@ export const useElosernStore = defineStore("elosern", () => {
     setTextToHtml: ctx.setTextToHtml,
     setReducedMotion: ctx.setReducedMotion,
     setColorblind: ctx.setColorblind,
+    // C7: the reading preferences (text speed, auto-advance).
+    setTextSpeed: ctx.setTextSpeed,
+    setAutoAdvance: ctx.setAutoAdvance,
   };
 });

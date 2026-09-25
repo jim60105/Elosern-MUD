@@ -422,10 +422,10 @@ and character-switcher cluster.
 - **THEN** it carries no 技能系譜, 圖鑑, 稱號冊, 設定, 說明, or 角色肖像圖庫 control
 
 ### Requirement: Browser persistence is versioned and presentation-only
-Local browser storage SHALL contain only a bounded wrapper with project layout version, safe dimensions/tab state, and harmless display preferences. It SHALL contain no transport generation, active or retired epoch, revision, panel payload, actor identifier, request result, command text, credential, or canonical game state. Known project layout versions SHALL migrate explicitly; malformed, oversized, missing, stock, or unknown versions SHALL reset to the version-1 default while preserving required components.
+Local browser storage SHALL contain only a bounded wrapper with project layout version, safe dimensions/tab state, and harmless display preferences. It SHALL contain no transport generation, active or retired epoch, revision, panel payload, actor identifier, request result, command text, credential, or canonical game state. The current project layout version SHALL be 2, the version that adds the reading preferences (text speed and auto-advance). A project layout version SHALL migrate only through an explicitly registered migration, and the client SHALL register none: version 1 has no migration. Malformed, oversized, missing, stock, or unknown versions, version 1 among them, SHALL reset to the current version's default while preserving required components.
 
 #### Scenario: Known layout version migrates
-- **WHEN** a stored project layout uses a version with a registered migration
+- **WHEN** a stored project layout uses a version with a registered migration, as supplied to the store by a caller
 - **THEN** the migration produces the current layout and retains only supported display preferences
 
 #### Scenario: Unknown layout version resets safely
@@ -434,7 +434,11 @@ Local browser storage SHALL contain only a bounded wrapper with project layout v
 
 #### Scenario: Stock layout state is not imported
 - **WHEN** a browser profile contains Evennia's pre-project GoldenLayout storage keys
-- **THEN** version 1 does not treat those values as canonical project layout state
+- **THEN** the current layout version does not treat those values as canonical project layout state
+
+#### Scenario: A version-1 wrapper resets to the current default
+- **WHEN** localStorage holds a well-formed version-1 wrapper with a stored prose scale
+- **THEN** the client loads the version-2 default with every preference at its default, text speed `normal` and auto-advance off among them, and persists that version-2 wrapper
 
 ### Requirement: Theme and controls remain accessible
 The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent retained for its semantic roles (decisive primary action, danger affordances, selection, status markers) alongside a muted-gold navigation, focus, and emphasis accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for narrative and headings with a legible UI face for controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.

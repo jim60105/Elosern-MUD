@@ -32,6 +32,8 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     wait_for_narrative_settled,
+    wait_for_page_shown,
+    wait_for_presentation_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin, wait_command_field_released
@@ -129,13 +131,19 @@ def _clear_narrative(page):
 
 
 def _append_multipage_response(page):
-    """Append a multi-page response with distinct tagged sentences and wait for page 1."""
+    """Append a multi-page response with distinct tagged sentences and wait for page 1.
+
+    These journeys assert paging, not typing, so the helper pins the reader's
+    text speed to `instant` first (webclient-typewriter-reading-prefs design
+    D11): every page is fully shown, with its marker, as soon as it shows.
+    """
     # Ensure MessageWindow has completed its initial mount pass (`initialized = true`)
     # on an earlier response before the new multi-page response arrives; otherwise
     # the mount rule (`!initialized -> setPage(last)`) opens on the last page.
     page.evaluate(
         """() => {
           const store = window.__elosernBridge.store;
+          store.setTextSpeed('instant');
           if (!store.narrative.some((l) => l && l.kind !== 'in')) {
             store.appendText('out', '初始段落。');
           }
@@ -385,6 +393,211 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             0,
             "the prose-scale change is client-local presentation state, not a ui_action",
         )
+
+    # ---- webclient-typewriter-reading-prefs (task 7.4) ----
+
+    def _settle_window_mount(self, page):
+        """Give the message window a first response so its mount pass has run
+        (a later response then opens on page 1 instead of being treated as the
+        mount's last page)."""
+        page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              if (!store.narrative.some((l) => l && l.kind !== 'in')) {
+                store.appendText('out', '初始段落。');
+              }
+            }"""
+        )
+        page.wait_for_selector('[data-testid="message-page-marker"]', state="attached", timeout=30000)
+
+    def _line_boxes(self, page):
+        """The page text's rendered line boxes, one per line (hidden text keeps its boxes)."""
+        return page.evaluate(
+            """() => {
+              const p = document.querySelector('[data-testid="message-page"]');
+              const range = document.createRange();
+              range.selectNodeContents(p);
+              // One box per rendered line: the reveal's span boundary splits a
+              // line into several rects, so rects sharing a top are unioned.
+              const lines = new Map();
+              for (const r of range.getClientRects()) {
+                const top = Math.round(r.top);
+                const box = lines.get(top) || { left: Infinity, right: -Infinity, height: 0 };
+                box.left = Math.min(box.left, Math.round(r.left));
+                box.right = Math.max(box.right, Math.round(r.right));
+                box.height = Math.max(box.height, Math.round(r.height));
+                lines.set(top, box);
+              }
+              return Array.from(lines, ([top, b]) => [b.left, top, b.right, b.height])
+                .sort((x, y) => x[1] - y[1]);
+            }"""
+        )
+
+    @covers_requirement(
+        "webclient-input-narrative::a-page-types-in-at-the-reader-s-text-speed-and-auto-advance-is-opt-in"
+    )
+    def test_message_page_types_and_completes(self):
+        page = self.logged_in_page((1920, 1080))
+        self._settle_window_mount(page)
+        sentences = "".join(
+            f"【段落{i}】霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+            for i in range(1, 16)
+        )
+        page.evaluate(
+            """(text) => {
+              const store = window.__elosernBridge.store;
+              store.appendText('in', 'look');
+              store.appendText('out', text);
+            }""",
+            sentences,
+        )
+        page.wait_for_function(
+            """() => { const w = document.querySelector('[data-testid="message-window"]');
+              const p = document.querySelector('[data-testid="message-page"]');
+              return w && p && p.getAttribute('data-page') === '1'
+                && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2
+                && w.getAttribute('data-typing') === 'true'
+                && p.querySelector('.narrative-unrevealed, .narrative-line.unrevealed') !== null; }""",
+            timeout=30000,
+        )
+        # Typing: no marker, and the page already occupies its final layout.
+        self.assertEqual(page.locator('[data-testid="message-page-marker"]').count(), 0)
+        typing_boxes = self._line_boxes(page)
+        surface = page.locator('[data-testid="message-page"]')
+        self.assertNotIn("【段落15】", surface.inner_text())
+
+        # Enter on the page surface completes the page without advancing.
+        surface.focus()
+        page.keyboard.press("Enter")
+        wait_for_page_shown(page)
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(page.locator('[data-testid="message-page-marker"]').inner_text(), "▼")
+        self.assertEqual(
+            self._line_boxes(page),
+            typing_boxes,
+            "the rendered line boxes do not change between typing and complete",
+        )
+        self.assertIn("【段落1】", surface.inner_text())
+
+        # The next Enter advances, and page 2 types in.
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            """() => document.querySelector('[data-testid="message-page"]').getAttribute('data-page') === '2'""",
+            timeout=15000,
+        )
+        self.assertEqual(sent_action_count(page), 0)
+        page.close()
+
+    @covers_requirement(
+        "webclient-input-narrative::a-page-types-in-at-the-reader-s-text-speed-and-auto-advance-is-opt-in"
+    )
+    def test_reduced_motion_pages_are_instant(self):
+        page = self.logged_in_page((1920, 1080))
+        page.emulate_media(reduced_motion="reduce")
+        self._settle_window_mount(page)
+        page.evaluate("() => window.__elosernBridge.store.setTextSpeed('slow')")
+        sentences = "".join(
+            f"第{i}句：霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+            for i in range(1, 16)
+        )
+        page.evaluate(
+            """(text) => {
+              const store = window.__elosernBridge.store;
+              store.appendText('in', 'look');
+              store.appendText('out', text);
+            }""",
+            sentences,
+        )
+        page.wait_for_function(
+            """() => { const p = document.querySelector('[data-testid="message-page"]');
+              return p && p.getAttribute('data-page') === '1'
+                && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }""",
+            timeout=30000,
+        )
+        state = page.evaluate(
+            """() => ({
+              typing: document.querySelector('[data-testid="message-window"]').getAttribute('data-typing'),
+              hidden: document.querySelectorAll(
+                '[data-testid="message-page"] .narrative-unrevealed, [data-testid="message-page"] .narrative-line.unrevealed').length,
+              marker: (document.querySelector('[data-testid="message-page-marker"]') || {}).textContent || null,
+            })"""
+        )
+        self.assertEqual(state, {"typing": "false", "hidden": 0, "marker": "▼"})
+        # An explicit reduced-motion preference of off lets pages type again.
+        page.evaluate("() => window.__elosernBridge.store.setReducedMotion('off')")
+        page.locator('[data-testid="message-window"]').click()
+        page.wait_for_function(
+            """() => { const w = document.querySelector('[data-testid="message-window"]');
+              return document.querySelector('[data-testid="message-page"]').getAttribute('data-page') === '2'
+                && w.getAttribute('data-typing') === 'true'; }""",
+            timeout=15000,
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::text-speed-and-auto-advance-are-client-local-reading-preferences-the-settings-surface-owns"
+    )
+    def test_reading_preferences_persist(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        page.locator('[data-testid="nav-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        normal = page.locator('[data-testid="settings-overlay-text-speed-normal"]')
+        fast = page.locator('[data-testid="settings-overlay-text-speed-fast"]')
+        auto = page.locator('[data-testid="settings-overlay-auto-advance"]')
+        self.assertEqual(normal.get_attribute("aria-pressed"), "true")
+        self.assertFalse(auto.is_checked(), "auto-advance is off by default")
+
+        fast.click()
+        auto.check()
+        page.wait_for_function(
+            "() => { const v = window.__elosernBridge.store.view;"
+            " return v.textSpeed === 'fast' && v.autoAdvance === true; }",
+            timeout=15000,
+        )
+        self.assertEqual(fast.get_attribute("aria-pressed"), "true")
+        self.assertIn("on", fast.get_attribute("class").split())
+        stored = page.evaluate("() => JSON.parse(localStorage.getItem('elosern.layout'))")
+        self.assertEqual(stored["layout_version"], 2)
+        self.assertEqual(stored["preferences"]["textSpeed"], "fast")
+        self.assertIs(stored["preferences"]["autoAdvance"], True)
+        self.assertEqual(sent_action_count(page), 0, "no reading preference dispatches a ui_action")
+
+        page.reload()
+        wait_for_store_state(page, lambda s: bool(s.get("connected")))
+        page.wait_for_function(
+            "() => { const v = window.__elosernBridge.store.view;"
+            " return v.textSpeed === 'fast' && v.autoAdvance === true; }",
+            timeout=15000,
+        )
+        # After the reload a fully shown page with a next page advances on its
+        # own: a short `out` page, then a `sys` line that starts page 2. The
+        # reconnect's own lines settle first so none joins this response.
+        wait_for_presentation_settled(page)
+        wait_for_narrative_settled(page, 0)
+        self._settle_window_mount(page)
+        page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              store.appendText('in', 'look');
+              store.appendText('out', '渡口。');
+              store.appendText('sys', '渡口有 1 名可互動的人物。');
+            }"""
+        )
+        page.wait_for_function(
+            """() => { const p = document.querySelector('[data-testid="message-page"]');
+              return p && p.getAttribute('data-page') === '2'; }""",
+            timeout=30000,
+        )
+        page.locator('[data-testid="nav-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertTrue(page.locator('[data-testid="settings-overlay-auto-advance"]').is_checked())
+        self.assertEqual(
+            page.locator('[data-testid="settings-overlay-text-speed-fast"]').get_attribute("aria-pressed"),
+            "true",
+        )
+        self.assertEqual(sent_action_count(page), 0)
+        page.close()
 
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"

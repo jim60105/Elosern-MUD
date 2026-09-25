@@ -17,6 +17,7 @@ from .browser_helpers import (
     valid_local_map_panel,
     valid_status_panel,
     wait_for_narrative_settled,
+    wait_for_page_shown,
     wait_for_store_state,
 )
 
@@ -67,6 +68,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate("Evennia.msg('text', ['look'], {})")
         _wait_narrative_grew(page, before_len)
         page.wait_for_timeout(300)
+        wait_for_page_shown(page)
         narrative_text = page.locator('[data-testid="message-page"]').inner_text()
         self.assertNotIn("&lt;", narrative_text)
         self.assertNotIn("&amp;", narrative_text)
@@ -99,6 +101,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             cls = colored.nth(index).get_attribute("class")
             self.assertRegex(cls, r"(?:^|\s)color-\d{3}(?:\s|$)")
         # The styled text is visible, not its source.
+        wait_for_page_shown(page)
         text = page.locator('[data-testid="message-page"]').inner_text()
         self.assertIn("南大道", text)
         self.assertNotIn("<span", text)
@@ -139,6 +142,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             },
         )
         # The full text is present (nothing clipped from the DOM).
+        wait_for_page_shown(page)
         text = page.locator('[data-testid="message-page"] .out').last.inner_text()
         self.assertIn("尾部", text)
         # The wide row did not widen the page.

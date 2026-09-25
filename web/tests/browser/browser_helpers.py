@@ -557,6 +557,22 @@ def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
     raise AssertionError("presentation revision never settled")
 
 
+def wait_for_page_shown(page: Page, timeout: int = 15000) -> None:
+    """Wait until the message window's page on screen is fully shown.
+
+    Pages type in at the reader's text speed (webclient-typewriter-reading-
+    prefs); the window carries ``data-typing="false"`` once the page on
+    screen is complete. Call this before reading a page's visible text or
+    visibility. Class and presence assertions need no wait: the unrevealed
+    text stays in the DOM.
+    """
+    page.wait_for_selector(
+        '[data-testid="message-window"][data-typing="false"]',
+        state="attached",
+        timeout=timeout,
+    )
+
+
 def narrative_log_text(page: Page) -> str:
     """Return the retained narrative log text (`store.narrative`) joined with newlines.
 

@@ -11,6 +11,7 @@
 import { h } from "vue";
 import { isBoxDrawing } from "./box_drawing.js";
 import NarrativeMarkup from "./narrative_markup.js";
+import { splitTokensAt } from "./message_pages.js";
 import { renderNarrativeTokens } from "../components/narrative-renderer.js";
 
 export function lineText(line) {
@@ -59,7 +60,17 @@ export function narrativeLineNodes(line, index) {
 // One page fragment → its `.narrative-line.<kind>` vnode (design D5,
 // webclient-message-pages). Carries `map-art` when the fragment's line is
 // box-drawing and `cont` when the fragment is a continuation after a page cut.
-export function narrativeBlockNodes(fragment, key) {
+//
+// `reveal` (webclient-typewriter-reading-prefs design D1) is the optional
+// count of revealed units while the message window types. The fragment is
+// always rendered in full so its layout never changes: with nothing
+// revealed the line gets `unrevealed` (and is hidden from assistive
+// technology); with part revealed the tokens are split with the
+// span-preserving cut, the head rendered as before and the tail rendered
+// through the same pipeline inside `span.narrative-unrevealed`. The wrapper
+// is client chrome with a fixed class. With `reveal` undefined, or at least
+// the fragment's length, the output is unchanged.
+export function narrativeBlockNodes(fragment, key, reveal) {
   const lineClass = (fragment && fragment.kind) || "out";
   const classes = ["narrative-line", lineClass];
   if (fragment && fragment.mapArt) {
@@ -69,9 +80,25 @@ export function narrativeBlockNodes(fragment, key) {
     classes.push("cont");
   }
   const tokens = fragment && Array.isArray(fragment.tokens) ? fragment.tokens : [];
-  return h(
-    "div",
-    { key, class: classes.join(" "), "data-line-kind": lineClass },
-    renderNarrativeTokens(tokens),
-  );
+  const length = fragment ? fragment.end - fragment.start : 0;
+  const props = { key, class: classes.join(" "), "data-line-kind": lineClass };
+  if (typeof reveal !== "number" || reveal >= length) {
+    return h("div", props, renderNarrativeTokens(tokens));
+  }
+  if (reveal <= 0) {
+    return h(
+      "div",
+      { ...props, class: `${props.class} unrevealed`, "aria-hidden": "true" },
+      renderNarrativeTokens(tokens),
+    );
+  }
+  const { head, tail } = splitTokensAt(tokens, reveal);
+  return h("div", props, [
+    ...renderNarrativeTokens(head),
+    h(
+      "span",
+      { class: "narrative-unrevealed", "aria-hidden": "true" },
+      renderNarrativeTokens(tail),
+    ),
+  ]);
 }

@@ -91,6 +91,9 @@ const {
         :dialogue="dialogueVM"
         :art-panel="panel('art')"
         :font-scale="store.view.fontScale"
+        :text-speed="store.view.textSpeed"
+        :auto-advance="store.view.autoAdvance"
+        :reduced-motion="store.view.reducedMotion"
         :connection-status="store.view.connectionStatus"
         :offline="!store.view.connected"
         :uncertain="store.view.dispatch.uncertain"
@@ -429,10 +432,14 @@ const {
           :text-to-html="store.view.textToHtml"
           :reduced-motion="store.view.reducedMotion"
           :colorblind="store.view.colorblind"
+          :text-speed="store.view.textSpeed"
+          :auto-advance="store.view.autoAdvance"
           @scale-change="store.setFontScale"
           @text-html-change="store.setTextToHtml"
           @reduced-motion-change="store.setReducedMotion"
           @colorblind-change="store.setColorblind"
+          @text-speed-change="store.setTextSpeed"
+          @auto-advance-change="store.setAutoAdvance"
         />
         <!-- skill-lineage-panel (task 2.3): the big-window ledger renders the
              committed `lineage` panel verbatim — expanded chains carry per-node
