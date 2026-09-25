@@ -49,6 +49,7 @@ export function responseBlocks(response) {
       if (!item || item.kind === "in") {
         continue;
       }
+      // Pass through an already-normalized block; convert a raw line object.
       if (Array.isArray(item.tokens) && typeof item.mapArt === "boolean") {
         blocks.push(item);
       } else {

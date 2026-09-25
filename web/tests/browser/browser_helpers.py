@@ -583,7 +583,12 @@ def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
 
 
 def narrative_log_text(page: Page) -> str:
-    """Return the retained narrative log text (`store.narrative`) joined with newlines."""
+    """Return the retained narrative log text (`store.narrative`) joined with newlines.
+
+    Returns ``""`` when the log is empty or when the page is mid-navigation /
+    not yet bootstrapped; store-backed waits compare against a pre-action length
+    at per-store-state-tick append granularity.
+    """
     raw = evaluate_tolerating_navigation(
         page,
         "() => { const b = window.__elosernBridge;"

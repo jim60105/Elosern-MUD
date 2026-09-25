@@ -157,6 +157,10 @@ describe("store narrative responses and responseMarks (design D1/D5)", () => {
     expect(store.responseMarks).toEqual([1, 251]);
 
     for (let i = 251; i <= 510; i += 1) {
+      if (i === 400) {
+        store.sendText("look");
+        continue;
+      }
       store.appendText("out", `行 ${i}`);
     }
 
@@ -170,11 +174,17 @@ describe("store narrative responses and responseMarks (design D1/D5)", () => {
     expect(store.responseMarks).toEqual([251]);
 
     const responses = segmentResponses(store.narrative, store.responseMarks);
-    expect(responses).toHaveLength(2);
+    expect(responses).toHaveLength(3);
     expect(responses[0].startSeq).toBe(null);
     expect(responses[0].blocks[0].seq).toBe(11);
     expect(responses[1].startSeq).toBe(251);
     expect(responses[1].blocks[0].seq).toBe(251);
+    // The headed response at seq 400 whose lines are all still retained keeps
+    // its `in` header and blocks unchanged across the trim.
+    expect(responses[2].startSeq).toBe(400);
+    expect(responses[2].header.kind).toBe("in");
+    expect(responses[2].header.text).toBe("look");
+    expect(responses[2].blocks[0].seq).toBe(401);
   });
 
   it("tokenizes out, sys, and err lines once on append and keeps tokens null on in lines", () => {

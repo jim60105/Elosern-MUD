@@ -119,6 +119,8 @@ export const useElosernStore = defineStore("elosern", () => {
 
   // The reactive view/narrative refs (the view group projects into `view`).
   ctx.view = ref(null); // assigned right after the groups are applied
+  // All narrative line appends go through `appendText` (transport.js), which
+  // assigns monotonic `seq` and tokenizes non-`in` lines once.
   ctx.narrative = ref([]);
   ctx.narrativeSeq = 0;
   ctx.responseMarks = ref([]);
