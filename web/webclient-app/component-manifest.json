@@ -9,6 +9,7 @@
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
+    "Core/MessageWindow",
     "Core/CommandLine",
     "Core/HudFrame",
     "Core/SceneBackdrop",

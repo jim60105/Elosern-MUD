@@ -90,6 +90,14 @@
       command-line prompt line — never into `--text-sm` / `--text-body` or
       any HUD, dock, drawer or overlay chrome. */
    --prose-scale: 1;
+   /* The AVG message window's page text (design §5.1/§6.2;
+      webclient-message-window-component design D1): 28px at 1080 and a
+      42em column, so a page line holds at most 42 CJK characters. The
+      window multiplies it by `--prose-scale`. The control strip under the
+      text holds the page marker, 日誌, and ⌨. */
+   --message-text: clamp(20px, 2.593vh, 38px);
+   --message-line-height: 1.4;
+   --message-controls-h: 36px;
 
   /* ---- spacing ---- */
   --sp-1: 4px;
