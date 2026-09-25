@@ -195,23 +195,25 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(tabs, "the dock tab bar must render while talking")
         self.assertNotIn("對話選項", "".join(tabs))
 
-        # The caption presents the pick grid and the trailing exit row, and
-        # the head is the sibling ABOVE the scroll viewport (the DOM contract
-        # the managed suites depend on).
+        # The message window presents the dialogue variant (pick grid and
+        # trailing exit row) with the dialogue box pinned inside the text area.
         page.wait_for_selector('[data-testid="dialogue-exit"]')
         dom_shape = page.evaluate(
             """() => {
-              const feed = document.querySelector('[data-testid="narrative-feed"]');
-              const head = document.querySelector('[data-testid="narrative-head"]');
+              const win = document.querySelector('[data-testid="message-window"]');
+              const dlgScroll = document.querySelector('[data-testid="message-dialogue"]');
+              const box = document.querySelector('[data-testid="dialogue-box"]');
+              const scrollRect = dlgScroll ? dlgScroll.getBoundingClientRect() : null;
+              const boxRect = box ? box.getBoundingClientRect() : null;
               return {
-                feedIsScroll: !!feed && feed.classList.contains("narrative-scroll"),
-                headAboveScroll: !!head && !!feed && head.nextElementSibling === feed,
+                variantIsDialogue: !!win && win.getAttribute("data-variant") === "dialogue",
+                boxInsideTextArea: !!scrollRect && !!boxRect && boxRect.top >= scrollRect.top - 1 && boxRect.top < scrollRect.bottom,
                 picks: document.querySelectorAll('[data-testid="dialogue-pick"]').length,
               };
             }"""
         )
-        self.assertTrue(dom_shape["feedIsScroll"])
-        self.assertTrue(dom_shape["headAboveScroll"])
+        self.assertTrue(dom_shape["variantIsDialogue"])
+        self.assertTrue(dom_shape["boxInsideTextArea"])
         self.assertGreater(dom_shape["picks"], 0)
 
         # Digit activation addresses the caption pick, not the dock rows.

@@ -23,7 +23,7 @@ from .browser_helpers import (
 
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
-    '[data-testid="narrative-feed"]',
+    '[data-testid="message-window"]',
     '[data-testid="command-line-toggle"]',
 )
 

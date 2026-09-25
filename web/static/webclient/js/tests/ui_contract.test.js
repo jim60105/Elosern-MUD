@@ -47,13 +47,14 @@ test("the Vue keyboard router wraps the preserved DOM-independent router", () =>
   assert.match(wrapper, /export default KeyboardRouter;/);
 });
 
-test("narrative feed keeps scrollback position with an unread count", () => {
-  const source = read("web/webclient-app/components/NarrativeFeed.vue");
-  assert.match(source, /wasAtBottom/);
-  assert.match(source, /scrollToBottom/);
-  assert.match(source, /unread/);
-  // Server-authored narrative text is rendered through Vue bindings, not HTML.
-  assert.strictEqual(/innerHTML/.test(source), false, "no innerHTML on the narrative path");
+test("message window and full log render narrative through vnode bindings, never innerHTML", () => {
+  const win = read("web/webclient-app/components/MessageWindow.vue");
+  const log = read("web/webclient-app/components/FullLogOverlay.vue");
+  assert.match(win, /segmentResponses/);
+  assert.match(win, /paginate/);
+  // Server-authored narrative text is rendered through Vue vnodes, not HTML.
+  assert.strictEqual(/innerHTML/.test(win), false, "no innerHTML on the message window path");
+  assert.strictEqual(/innerHTML/.test(log), false, "no innerHTML on the full-log path");
 });
 
 test("the narrative markup pipeline never parses HTML strings", () => {

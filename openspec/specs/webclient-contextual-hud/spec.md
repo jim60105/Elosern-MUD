@@ -1,9 +1,9 @@
 # webclient-contextual-hud Specification
 
 ## Purpose
-The full-bleed cinematic stage with its anchored HUD surfaces (scene backdrop, narrative caption,
+The full-bleed cinematic stage with its anchored HUD surfaces (scene backdrop, message window,
 HUD islands, action dock, command line), the committed-mode visibility matrix, the truthful scene
-backdrop, the bounded narrative caption, drawer/overlay stage recessing, and the action-dock
+backdrop, the paged message window, drawer/overlay stage recessing, and the action-dock
 re-chrome contract: the fixed bottom band's command region, the root tab bar with truthful count badges,
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
@@ -113,7 +113,7 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | place card (location, world time) | visible | visible | visible | hidden |
-| narrative caption (band message region) | visible | visible | visible (dialogue focus) | hidden |
+| message window (band message region) | visible | visible | visible (dialogue variant) | hidden |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
 | party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
@@ -121,6 +121,7 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | player standing portrait | visible | visible | visible | hidden |
 | action dock (band command region) | visible | visible | visible (regular exploration form) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
+| log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
 | command line (row on the message region's top edge) | while expanded | while expanded | while expanded | hidden |
 | scene backdrop | visible (exploration stage) | visible (combat stage) | visible (unchanged art) | visible |
 
@@ -151,14 +152,14 @@ SHALL also collapse the command line, so leaving creation never reveals an expan
 
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
-- **THEN** the place card, the narrative caption, the command-line toggle, the `vitals` and `map` anchors with every island in them, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
+- **THEN** the place card, the message window, the command-line toggle, the log control, the `vitals` and `map` anchors with every island in them, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the place card, narrative caption, minimap, player standing portrait, action dock, and command-line toggle all
+- **THEN** the place card, message window, minimap, player standing portrait, action dock, command-line toggle, and log control all
   remain rendered, the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals and party islands keep following the same data rules as in
   exploration, the action dock keeps its regular exploration form
-  with every ordinary root affordance present, and only the narrative presentation changes
+  with every ordinary root affordance present, and only the message window's presentation changes
 
 #### Scenario: Dialogue backdrop keeps its committed art
 - **WHEN** the committed mode is dialogue
@@ -236,59 +237,68 @@ stage anchors but are absolutely positioned within the same full-bleed stage.
 - **THEN** each one's rendered bounding box stays above the bottom band's top edge and above the
   command-line row, at 1920x1080, 1440x900, and 1280x720
 
-### Requirement: The narrative is a bounded caption whose complete log is reachable in one action
-The narrative SHALL render as a caption card that fills the bottom band's message region — the left
-two thirds of the band, at the band's fixed height — so it never grows to fill the stage and never
-changes size with its content, drawn with the reference's caption panel treatment: charcoal panel
-fill, a hairline border, shared radius and restrained shadow. The card SHALL carry a head
-row styled as the reference's caption head (small uppercase letter-spaced label): on the left, a mode
-label — `敘述` while the committed mode is exploration, `戰鬥日誌` while it is combat, and `對話`
-while it is dialogue — and on the right, a single labelled capsule control that opens a full-log surface presenting the complete
-retained narrative through the same markup renderer as the caption — never a second markup path. The
-head row SHALL be a static sibling ABOVE the card's scroll viewport, never an element inside the
-scrolled content, so no narrative line can ever render between the card's border and the head row at
-any scroll offset. Only the content region below the head SHALL scroll, and the band's fixed height
-SHALL bound that scroll region. The
-full-log surface SHALL be scrollable, SHALL trap focus while open, SHALL close on Escape, and SHALL
-restore focus to the control that opened it. While the committed mode is dialogue and the
-committed `dialogue` panel is available, the head label reads `對話` and the full-log capsule SHALL
-NOT be rendered (the reference renders no log control in the dialogue variant); the unread
-indicator, its polite live region, and its
-jump-to-latest behaviour SHALL remain on the caption card beside the head label and SHALL otherwise
-be unchanged.
+### Requirement: The message window presents the current response one page at a time in the band's message region
+The narrative SHALL render as a message window that fills the bottom band's message region — the left
+two thirds of the band, at the band's fixed height — drawn with the reference's caption panel
+treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The window
+SHALL never grow into the stage and SHALL never change size with its content. Outside the dialogue
+variant, the window SHALL present exactly one page of the current response at a time, paged as
+`webclient-input-narrative` defines, and SHALL NOT present earlier responses: they remain readable in
+the full-log surface. Page text SHALL be set in the serif reading face at 28px at the 1920x1080
+reference size and the default prose scale, SHALL scale with the viewport height and with the
+client's prose scale, and SHALL hold at most 42 CJK characters per line.
 
-#### Scenario: The caption card is bounded
-- **WHEN** the narrative holds more lines than the caption card can show
-- **THEN** the card keeps the message region's box — the band's height and two thirds of its
-  width — scrolls internally, and does not expand into the stage
+The window's lower edge SHALL keep a control strip in which no page text renders. The strip SHALL
+hold a page marker and, at its right end, a labelled `日誌` control beside the command-line toggle.
+The page marker SHALL read `▼` while the current response has further pages and `■` on its last page.
+It SHALL be decorative (hidden from assistive technology), and it SHALL blink only through the
+client's motion tokens, so reduced motion stops the blink. An oversize page SHALL scroll inside the
+window's text area; it SHALL never be truncated and SHALL never grow the window.
 
-#### Scenario: No content renders above the head row
-- **WHEN** the caption is scrolled to any offset in any mode
-- **THEN** no narrative line is visible between the card's border and the head row, and the head
-  row itself never scrolls out of the card
+The `日誌` control SHALL open the full-log surface in one action. Scrolling up over a page that has
+nothing left to scroll up SHALL also open it. The full-log surface's content, markup renderer, focus
+trap, Escape close, focus restore to the opening control, and opening at its latest line are
+unchanged. The window SHALL render no head row, no unread indicator, and no jump-to-latest control. In
+creation mode the window, its marker, and the `日誌` control are hidden with the message region.
 
-#### Scenario: The head row names the mode and owns the log control
-- **WHEN** the caption renders in exploration mode and then in combat mode
-- **THEN** the head label reads `敘述`, then `戰鬥日誌`, and the `完整日誌` capsule is the card's only
-  full-log control
+#### Scenario: The window keeps the message region's box
+- **WHEN** the current response holds more text than one page and new lines keep arriving
+- **THEN** the window keeps the message region's box — the band's height and two thirds of its
+  width — and never expands into the stage
 
-#### Scenario: The complete log opens in one action
-- **WHEN** the player activates the caption card's full-log control
-- **THEN** the full-log surface opens showing the complete retained narrative, rendered through the
-  same markup renderer as the caption
+#### Scenario: One page of the current response is shown
+- **WHEN** the log holds three responses and the latest one fills two pages
+- **THEN** the window shows only the first page of the latest response, and no line of the two
+  earlier responses is rendered in the window
 
-#### Scenario: The full-log surface returns focus on Escape
-- **WHEN** the full-log surface is open and the player presses Escape
-- **THEN** it closes and focus returns to the control that opened it
+#### Scenario: The page measure is bounded at the reference size
+- **WHEN** the stage renders at 1920x1080 with the default prose scale and a long prose response
+- **THEN** the page text's computed font size is 28px (±0.5px) and no rendered text line holds more
+  than 42 CJK characters
 
-#### Scenario: The unread indicator is unchanged
-- **WHEN** new narrative lines arrive while the caption card is scrolled away from the latest line
-- **THEN** the unread indicator states its count and jump action and is announced through its polite
-  live region exactly as before
+#### Scenario: The marker names more pages and the last page
+- **WHEN** the current response has two pages and the player advances once
+- **THEN** the marker reads `▼` on the first page and `■` on the second, and it is absent from the
+  accessibility tree
 
-#### Scenario: The dialogue head reads 對話 without the log capsule
-- **WHEN** the committed mode is dialogue and the `dialogue` panel is available
-- **THEN** the head label reads `對話` and no `完整日誌` capsule is rendered
+#### Scenario: The log control opens the complete log in one action
+- **WHEN** the player activates the `日誌` control and then presses Escape
+- **THEN** the full-log surface opens at its latest line showing every retained line, including
+  input lines and every page of earlier responses, rendered through the same markup renderer, and
+  Escape closes it with focus returned to the `日誌` control
+
+#### Scenario: Scrolling up opens the complete log
+- **WHEN** the player scrolls up with the wheel over a page that is not scrollable
+- **THEN** the full-log surface opens
+
+#### Scenario: An oversize page scrolls inside the window
+- **WHEN** the current response's page is a box-drawing map taller than the text area
+- **THEN** the map scrolls inside the text area, every row is reachable, and the window's box is
+  unchanged
+
+#### Scenario: No unread indicator is rendered
+- **WHEN** the window renders in exploration, combat, or dialogue mode while lines arrive
+- **THEN** no unread count, unread live region, or jump-to-latest control exists in the window
 
 ### Requirement: An open drawer or overlay dims the stage behind it
 When a drawer or a full-screen overlay is open, the shell SHALL mark the stage so the surfaces behind
@@ -1738,8 +1748,8 @@ optional or previous-stage rows.
 
 ### Requirement: The feed presents the dialogue variant from the committed panel
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the
-narrative caption SHALL be the ONE dialogue surface and SHALL present the reference's dialogue
-variant: a dialogue box carrying the
+message window SHALL be the ONE dialogue surface and SHALL present the reference's dialogue
+variant, unpaged: a dialogue box carrying the
 host's avatar (the bound portrait through the client's art catalog when the row's `portrait_ref`
 resolves, otherwise the display name's initial letter in the reference's gold display face), a
 gold speaker line carrying the host's `display_name` plus ` · 羈絆 <stage>` only when
@@ -1748,27 +1758,31 @@ the box, one numbered pick row per `dialogue.choices` entry in payload order wit
 digit badge and bounded label, laid out in a compact row grid (at most two pick columns),
 followed by a trailing free-dialogue row (`⌨` badge,
 `自由對話（輸入任意話語）→ 指令列`) and, after it, a trailing exit row (`✕` badge, label
-`結束對話`). The exchange SHALL keep the caption's fixed box in the band's message region: when box,
-picks, and trailing rows exceed it they SHALL scroll inside the caption's scroll region, with the
-dialogue box at the top of that region when the picks first render, and SHALL NOT grow the caption
-or the band. Activating a pick row SHALL dispatch
+`結束對話`). The box SHALL follow the current response's lines (see `webclient-input-narrative`);
+earlier responses SHALL NOT be presented and remain in the full-log surface. The exchange SHALL keep
+the window's fixed box in the band's message region: when the response's lines, the box, picks, and
+trailing rows exceed it they SHALL scroll inside the window's text area, with the dialogue box at the
+top of that area when a new reply commits, and SHALL NOT grow the window or the band. While the
+variant renders, the window SHALL show no page marker, a pointer activation on the window SHALL NOT
+advance a page, and Enter and Space SHALL keep their meaning for the focused row. Activating a pick row SHALL dispatch
 `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` under the existing dispatch
 contract; activating the free-dialogue row SHALL focus the borrowed command line through the
 existing freeform-borrow path and SHALL dispatch nothing itself; activating the exit row SHALL
 dispatch `explore.dialogue_leave` with `{npc_id: host.identity}` under the same dispatch contract
 and nothing else. The variant SHALL render the
-session line exactly once — the box replaces the caption's duplicate stream tail for that
-exchange while the polite live region announces each new committed line exactly once — and SHALL
+session line exactly once — the box replaces the current response's duplicate final line for that
+exchange, keeping any residual text of that line, while the polite live region announces each new
+committed line exactly once — and SHALL
 NOT render picks the panel does not carry, reason tags, or disabled-row states. While mode is
 `dialogue` but the panel is unavailable (the transient window between a clear seam and its
-commit), the caption SHALL fall back to its plain narrative presentation with the `對話` head
-label and no dialogue box. The dialogue variant SHALL NOT depend on any dock frame or router
+commit), the window SHALL fall back to its paged presentation of the current response with no
+dialogue box. The dialogue variant SHALL NOT depend on any dock frame or router
 descriptor: its rows derive from the committed panel alone.
 
 #### Scenario: The dialogue box mirrors the committed panel
 - **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, a line, and four
   keyword choices
-- **THEN** the caption shows the initial-letter gold avatar, the speaker line
+- **THEN** the window shows the initial-letter gold avatar, the speaker line
   `灰婆婆 · 羈絆 親睦`, the reply line, four numbered pick rows, the free-dialogue row, and the
   exit row — with the reply line visible without scrolling while the picks render
 
@@ -1788,13 +1802,13 @@ descriptor: its rows derive from the committed panel alone.
 
 #### Scenario: The session line announces once
 - **WHEN** a new reply commits while the dialogue variant renders
-- **THEN** the reply appears once in the caption and the polite live region names its text exactly
+- **THEN** the reply appears once in the window and the polite live region names its text exactly
   once
 
 #### Scenario: A transiently unavailable panel falls back plainly
 - **WHEN** mode is `dialogue` but the committed panel is the unavailable form
-- **THEN** no dialogue box, picks, or exit row render and the caption shows plain narrative with
-  the `對話` label
+- **THEN** no dialogue box, picks, or exit row render and the window shows the current response's
+  pages with their page marker
 
 ### Requirement: The dock keeps its regular exploration form in dialogue mode
 While the committed mode is `dialogue`, the action dock SHALL render its ordinary exploration

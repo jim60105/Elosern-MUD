@@ -6,31 +6,6 @@ deterministic and never invoke an LLM, image generator, or other external
 service.
 """
 
-# C6c re-points these (`webclient-message-window-swap` design D4):
-# Rendering assertions that intentionally address the mounted feed DOM
-# (`[data-testid="narrative-feed"]`, `.elosern-narrative`, `#narrative-unread`,
-# `narrative-fulllog-control`, `narrative-head`, `narrative-mode-label`) until
-# C6c mounts `MessageWindow`:
-# - `web/tests/browser/browser_helpers.py`: `REQUIRED_SURFACES`
-# - `web/tests/browser/test_browser_actions.py`: `querySelectorAll('b, script')`
-# - `web/tests/browser/test_browser_art.py`: `_rect(page, '[data-testid="narrative-feed"]')`
-# - `web/tests/browser/test_browser_combat_menu.py`: `rectOf('[data-testid="narrative-feed"]')`
-# - `web/tests/browser/test_browser_contextual_hud_anchors.py`: `getBoundingClientRect().width`
-# - `web/tests/browser/test_browser_contextual_hud_stage.py`: caption visibility/geometry and `narrative-fulllog-control`
-# - `web/tests/browser/test_browser_creation_viewport_pointer.py`: `is_visible()` in creation mode
-# - `web/tests/browser/test_browser_exploration_actions.py`: `[data-line-kind="err"]`
-# - `web/tests/browser/test_browser_exploration_dialogue.py`: `narrative-feed` / `narrative-head` scroll-pin DOM shape
-# - `web/tests/browser/test_browser_input_narrative.py`: `.inp`, `.narrative-divider`, scroll-keep geometry
-# - `web/tests/browser/test_browser_layout.py`: `COMPONENT_SELECTORS["narrative"]`, caption visibility/geometry
-# - `web/tests/browser/test_browser_local_map_interaction.py`: `is_visible()` at both viewports
-# - `web/tests/browser/test_browser_options_surface.py`: `.inp` count and `.option-card` absence
-# - `web/tests/browser/test_browser_reconnect.py`: `narrative-fulllog-control`
-# - `web/tests/browser/test_browser_shell_command_line.py`: `#narrative-unread` and scroll-keep geometry
-# - `web/tests/browser/test_browser_shell_dock.py`: `narrative-fulllog-control`
-# - `web/tests/browser/test_browser_shell_narrative.py`: markup entity/span rendering and `.out` soft-wrap
-# - `web/tests/browser/test_browser_shell_surfaces.py`: `REQUIRED_SURFACES`
-# - `web/tests/browser/test_vue_foundation.py`: `REQUIRED_TESTIDS` and Storybook `narrative-feed` mount
-
 from __future__ import annotations
 
 import json
@@ -74,18 +49,18 @@ def fixture_home_xyz_arg() -> str:
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the
-# narrative feed, and the ⌨ command-line toggle in `#band-message`
+# message window, and the ⌨ command-line toggle in `#band-message`
 # (webclient-collapsible-command-line: the command line itself starts
 # collapsed with `display:none`, while its toggle is rendered in every mode
 # that renders the message region).
 # The status panel and the action dock are conditional (rendered only when
 # their panels are available), so they are also not required here. The
-# narrative feed and the command-line toggle are addressed through the Vue
+# message window and the command-line toggle are addressed through the Vue
 # SPA's stable `data-testid` hooks; the header renders under
 # `[data-testid="topbar"]`.
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
-    '[data-testid="narrative-feed"]',
+    '[data-testid="message-window"]',
     '[data-testid="command-line-toggle"]',
 )
 

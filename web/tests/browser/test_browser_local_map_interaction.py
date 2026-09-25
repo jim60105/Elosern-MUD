@@ -107,7 +107,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
                 for selector in (
-                    '[data-testid="narrative-feed"]',
+                    '[data-testid="message-window"]',
                     '[data-testid="local-map"]',
                 ):
                     self.assertTrue(

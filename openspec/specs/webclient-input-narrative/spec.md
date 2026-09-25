@@ -123,8 +123,9 @@ dialogue SHALL be signalled by collapsing the command line and returning focus
 to the action dock. Text written into the command field without
 sending (typing, a history walk, or Tab completion) SHALL NOT echo: it dispatches
 nothing, so no line exists to append until the player sends. The echo line SHALL be inserted as literal text via the same
-narrative append path (scroll-keep + polite unread marker) used by server
-output, SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a
+narrative append path used by server output — it heads the response it begins,
+is presented in the full-log surface, and is never one of that response's
+pages — SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a
 submitted command, and SHALL have no effect on the validated action payload
 (`U9` intact: dispatch stays allowlist + exact). A later rejection of the
 action SHALL NOT remove the line, because the line records what the player
@@ -423,3 +424,92 @@ character.
 - **WHEN** a response paged for one box is paged again for a narrower box
 - **THEN** for any character offset, the function names the page of the new paging that holds
   that character
+
+### Requirement: The message window's reading controls advance pages and a new action flushes unread pages
+A pointer activation on the message window SHALL advance to the next page of the current response,
+except when it lands on a control inside the window or ends a text selection inside it. The window's
+page surface SHALL be focusable and in the tab order. Enter or Space SHALL advance only while keyboard
+focus is on that page surface. Such a key SHALL be consumed by the window and SHALL NOT reach the
+action dock's keyboard routing, and a held key's auto-repeat SHALL NOT advance. While focus is
+anywhere else (the action dock, a drawer, an overlay, the command line, or a control in the band),
+Enter and Space SHALL keep their existing meaning and SHALL NOT advance a page. Advancing on the last
+page SHALL do nothing. Pages SHALL appear in full at once.
+
+The player SHALL be able to act at any time while pages remain. When an action records its response
+mark or appends its input line, the window SHALL stop presenting the previous response's unread pages
+and SHALL show that response's last page until the new response's first line is retained. It SHALL
+then show the new response's first page. The unread pages SHALL remain in the full-log surface. Lines
+appended to the response being read SHALL NOT move the reader off the page on screen. A change of the
+window's box or of the prose scale SHALL re-page the current response, and SHALL keep the reader on
+the page that holds the first character that was on screen.
+
+Paging SHALL wait until the client's fonts have loaded. Until then the window SHALL show the current
+response's first block, scrollable. When the window mounts, including after a reconnect, it SHALL show
+the last page of the last response and SHALL NOT replay earlier pages.
+
+A polite live region SHALL announce each page's full text once, when the page is shown. It SHALL
+announce each line later appended to the page on screen once, and SHALL announce nothing on a re-page
+or on a mount. The page surface itself SHALL NOT be a live region. None of this SHALL change the
+narrative log, the dispatch path, or any request.
+
+#### Scenario: A click advances the page
+- **WHEN** the current response has three pages and the player clicks the window twice
+- **THEN** the window shows page 2 and then page 3, and the marker reads `■`
+
+#### Scenario: Enter on the page surface advances
+- **WHEN** the page surface has keyboard focus and the player presses Enter, then Space
+- **THEN** each key advances one page, and the action dock's focused item is not activated and
+  its multi-select state does not change
+
+#### Scenario: Enter on the dock does not advance
+- **WHEN** the current response has further pages and the player presses Enter with focus on the
+  action dock
+- **THEN** the dock activates its focused item exactly as before, and the window's page does not
+  change
+
+#### Scenario: A held key does not skip pages
+- **WHEN** the player holds Enter on the page surface of a four-page response
+- **THEN** the window advances exactly one page
+
+#### Scenario: Acting while reading flushes the unread pages
+- **WHEN** the player is on page 1 of a three-page response and activates a dock move whose echo
+  and room text then arrive
+- **THEN** the window shows the move's response from its first page, and pages 2 and 3 of the
+  earlier response are still present in the full-log surface
+
+#### Scenario: A silent action flushes before its reply arrives
+- **WHEN** the player is on page 1 of a two-page response and activates the dialogue exit row,
+  and no line has arrived yet
+- **THEN** the window shows the earlier response's last page with `■` until the farewell line
+  arrives, and then shows that line's page
+
+#### Scenario: New lines do not move the reader
+- **WHEN** the player is on page 1 of the current response and further lines of the same response
+  arrive and form a second page
+- **THEN** the window stays on page 1 and the marker reads `▼`
+
+#### Scenario: A resize keeps the reader's text on screen
+- **WHEN** the player is on page 2 and the viewport shrinks from 1920x1080 to 1280x720
+- **THEN** the window shows the page of the new paging that holds the first character that was on
+  screen before the resize
+
+#### Scenario: A prose-scale change keeps the reader's text on screen
+- **WHEN** the player is on page 2 and changes the prose scale in the settings surface
+- **THEN** the current response is re-paged, and the window shows the page holding the first
+  character that was on screen
+
+#### Scenario: Pages wait for fonts
+- **WHEN** the client's fonts have not finished loading and a response arrives
+- **THEN** the window shows that response's first block, scrollable, and pages it only after the
+  fonts have loaded
+
+#### Scenario: A reconnect shows the last page
+- **WHEN** the transport drops and reconnects, or the window mounts with a retained log
+- **THEN** the window shows the last page of the last response, and no earlier page is shown or
+  announced
+
+#### Scenario: Each page is announced once
+- **WHEN** a two-page response arrives, the player advances once, and the viewport is then
+  resized
+- **THEN** the polite live region has announced page 1's text once and page 2's text once, and
+  announced nothing on the resize

@@ -72,8 +72,8 @@ def _collect_story_titles() -> set[str]:
 
 # The deterministic story rendered by the offline-rendering check: the
 # narrative centerpiece bound to the fixture sample.
-STORY_ID = "core-narrativefeed--world-narrative"
-STORY_SAMPLE_LINE = "你站在測試起點的石板廣場上，夜霧低垂，遠燈明滅。"
+STORY_ID = "core-messagewindow--single-page"
+STORY_SAMPLE_LINE = "渡口有 1 名可互動的人物。"
 
 VUE_QUERY = "?__vue=1"
 
@@ -90,7 +90,7 @@ VUE_ROOT = '[data-testid="elosern-vue-root"]'
 # mount is asserted separately (proving the shell is not covered).
 CORE_SURFACE_TESTIDS = (
     "topbar",
-    "narrative-feed",
+    "message-window",
     "command-line-toggle",
 )
 
@@ -478,15 +478,16 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         page.goto(f"http://127.0.0.1:{port}/iframe.html?id={STORY_ID}&viewMode=story")
         # The Storybook story page is a pure component render with no C4 bridge
         # or store, so readiness is purely DOM-based: wait for the
-        # narrative-feed's visibility (the stable `data-testid` hook).
+        # message-window's settled page marker (the stable `data-testid` hook).
         page.wait_for_function(
-            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-            "if (!f) { return false; } "
+            "() => { const f = document.querySelector('[data-testid=\"message-window\"]'); "
+            "const m = document.querySelector('[data-testid=\"message-page-marker\"]'); "
+            "if (!f || !m) { return false; } "
             "const r = f.getBoundingClientRect(); "
             "return r.width > 0 && r.height > 0 && f.offsetParent !== null; }",
             timeout=30000,
         )
-        feed = page.locator('[data-testid="narrative-feed"]')
+        feed = page.locator('[data-testid="message-window"]')
         self.assertIn(
             STORY_SAMPLE_LINE,
             feed.inner_text(),

@@ -209,7 +209,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         ]
 
     def _narrative_inp_count(self, page):
-        return page.locator('[data-testid="narrative-feed"] .inp').count()
+        page.locator('[data-testid="message-log-open"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        count = page.locator('[data-testid="fulllog-overlay"] .inp').count()
+        page.locator('[data-testid="fulllog-close"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', state="detached", timeout=15000)
+        return count
 
     # -- journey helpers -----------------------------------------------------
 
@@ -575,7 +580,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # Degraded cards live in the dock only: the narrative stream never
         # renders suggestion cards (choice-points are the later slice).
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .option-card').count(),
+            page.locator('[data-testid="message-window"] .option-card').count(),
             0,
             "degraded rule cards must never appear in the narrative stream",
         )

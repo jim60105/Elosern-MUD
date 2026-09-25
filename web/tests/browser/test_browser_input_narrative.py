@@ -26,9 +26,12 @@ from .browser_helpers import (
     focus_action_dock,
     fixture_home_node_id,
     install_outbound_recorder,
+    narrative_log_length,
+    narrative_log_text,
     outbound_messages,
     sent_action_count,
     store_state,
+    wait_for_narrative_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin, wait_command_field_released
@@ -58,12 +61,28 @@ def _wait_field_focused(page, timeout=30000):
     )
 
 
-def _wait_inp_line(page, count, text=None, exact=False, timeout=30000):
-    """Gate on the narrative feed's player-input (``.inp``) line count (optionally matching text)."""
+def _wait_inp_line(page, count, text=None, exact=False, timeout=30000, keep_open=False):
+    """Gate on the full-log overlay's player-input (``.inp``) DOM line count (optionally matching text).
+
+    Opens ``[data-testid="fulllog-overlay"]`` via the shell's ``message-log-open``
+    control when not already open, verifies the rendered ``.inp`` elements in the
+    DOM, and closes the overlay (restoring prior focus) unless ``keep_open`` is True
+    or the caller had already opened it.
+    """
+    was_open = page.evaluate(
+        """() => {
+          if (document.querySelector('[data-testid="fulllog-overlay"]')) {
+            return true;
+          }
+          const btn = document.querySelector('[data-testid="message-log-open"]');
+          if (btn) { btn.click(); }
+          return false;
+        }"""
+    )
     if text is None:
         predicate_js = (
             "() => document.querySelectorAll("
-            "'[data-testid=\"narrative-feed\"] .inp').length === %d" % count
+            "'[data-testid=\"fulllog-overlay\"] .inp').length === %d" % count
         )
     else:
         js_text = json.dumps(text)
@@ -73,19 +92,29 @@ def _wait_inp_line(page, count, text=None, exact=False, timeout=30000):
             cmp = "lines[lines.length - 1].innerText.indexOf(%s) !== -1" % js_text
         predicate_js = (
             "() => { const lines = document.querySelectorAll("
-            "'[data-testid=\"narrative-feed\"] .inp');"
+            "'[data-testid=\"fulllog-overlay\"] .inp');"
             " return lines.length === %d && %s; }" % (count, cmp)
         )
     wait_for_store_state(
         page,
         lambda s: bool(s.get("connected")),
         dom_readiness={
-            "selector": '[data-testid="narrative-feed"]',
+            "selector": '[data-testid="fulllog-overlay"]',
             "predicate": predicate_js,
-            "description": "narrative feed input lines",
+            "description": "full-log overlay input lines",
         },
         timeout=timeout,
     )
+    if not keep_open and not was_open:
+        page.evaluate(
+            """() => {
+              const closeBtn = document.querySelector('[data-testid="fulllog-close"]');
+              if (closeBtn) { closeBtn.click(); }
+            }"""
+        )
+        page.wait_for_selector(
+            '[data-testid="fulllog-overlay"]', state="detached", timeout=15000
+        )
 
 
 def _clear_narrative(page):
@@ -97,13 +126,58 @@ def _clear_narrative(page):
     page.evaluate("() => { window.__elosernBridge.store.narrative.length = 0; }")
 
 
-def _append_narrative_fillers(page, count=80):
-    """Seed the store's narrative with server-text filler lines (the scroll-keep test needs overflow)."""
+def _append_multipage_response(page):
+    """Append a multi-page response with distinct tagged sentences and wait for page 1."""
+    # Ensure MessageWindow has completed its initial mount pass (`initialized = true`)
+    # on an earlier response before the new multi-page response arrives; otherwise
+    # the mount rule (`!initialized -> setPage(last)`) opens on the last page.
     page.evaluate(
-        "(count) => { const store = window.__elosernBridge.store;"
-        " for (let i = 0; i < count; i++) { store.appendText('out', 'filler line ' + i); } }",
-        count,
+        """() => {
+          const store = window.__elosernBridge.store;
+          if (!store.narrative.some((l) => l && l.kind !== 'in')) {
+            store.appendText('out', '初始段落。');
+          }
+        }"""
     )
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="message-page-marker"]',
+            "predicate": (
+                "() => !!document.querySelector('[data-testid=\"message-page-marker\"]')"
+            ),
+            "description": "message-window initial mount pass settled",
+        },
+        timeout=30000,
+    )
+    sentences = "".join(
+        f"【段落{i}】霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+        for i in range(1, 16)
+    )
+    page.evaluate(
+        """(text) => {
+          const store = window.__elosernBridge.store;
+          store.appendText('in', 'look');
+          store.appendText('out', text);
+        }""",
+        sentences,
+    )
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="message-page"]',
+            "predicate": (
+                "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                " return !!p && p.getAttribute('data-page') === '1'"
+                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }"
+            ),
+            "description": "message-page opened at page 1 of a multi-page response",
+        },
+        timeout=30000,
+    )
+    return sentences
 
 
 class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
@@ -440,25 +514,30 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self._open_command_line(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        _wait_inp_line(page, 1)
-        inp = page.locator('[data-testid="narrative-feed"] .inp').first
-        self.assertEqual(inp.inner_text(), "look")
-        # The echo line is preceded by exactly one divider hairline.
-        self.assertEqual(page.locator('[data-testid="narrative-feed"] .narrative-divider').count(), 1)
-        self.assertTrue(
-            page.evaluate(
-                "() => {"
-                "  const line = document.querySelector('[data-testid=\"narrative-feed\"] .inp');"
-                "  return line.previousElementSibling !== null && "
-                "    line.previousElementSibling.classList.contains('narrative-divider');"
-                "}"
-            )
-        )
         # The accepted ordinary send clears the field, collapses the command
         # line, and restores focus to the action dock.
         wait_command_field_released(page)
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
+        )
+        self.assertEqual(
+            page.locator('[data-testid="message-window"] .inp').count(),
+            0,
+            "input lines never render in the message window",
+        )
+        _wait_inp_line(page, 1, keep_open=True)
+        inp = page.locator('[data-testid="fulllog-overlay"] .inp').first
+        self.assertEqual(inp.inner_text(), "look")
+        # The echo line is preceded by exactly one divider hairline in the full log.
+        self.assertEqual(page.locator('[data-testid="fulllog-overlay"] .narrative-divider').count(), 1)
+        self.assertTrue(
+            page.evaluate(
+                "() => {"
+                "  const line = document.querySelector('[data-testid=\"fulllog-overlay\"] .inp');"
+                "  return line.previousElementSibling !== null && "
+                "    line.previousElementSibling.classList.contains('narrative-divider');"
+                "}"
+            )
         )
         sends = [
             args[0]
@@ -470,101 +549,90 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::player-input-lines-are-part-of-the-narrative-stream-with-a-divider"
     )
-    def test_scrolled_away_input_preserves_scroll_and_increments_unread_by_one(self):
+    def test_typed_command_while_reading_flushes_to_new_response_and_logs_divider(self):
         page = self.logged_in_page()
-        # Guarantee overflow so the narrative can be scrolled up.
-        _append_narrative_fillers(page, 80)
-        # Gate on the 80 fillers having rendered (overflow established) and the
-        # feed's auto-scroll having settled, so the reader position is
-        # deterministic before we scroll to the top.
+        _clear_narrative(page)
+        _append_multipage_response(page)
+        surface = page.locator('[data-testid="message-page"]')
+        marker = page.locator('[data-testid="message-page-marker"]')
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(marker.inner_text(), "▼")
+        self.assertIn("【段落1】", surface.inner_text())
+        self.assertNotIn("【段落15】", surface.inner_text())
+
+        # Sending a typed command while page 1 of the previous response is on
+        # screen flushes the unread pages to the full log and presents the
+        # command's reply from its first page, with no .inp in the window.
+        before_len = narrative_log_length(page)
+        self._open_command_line(page)
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        wait_command_field_released(page)
+        wait_for_narrative_settled(page, before_len)
+        self.assertEqual(page.locator('[data-testid="message-window"] .inp').count(), 0)
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+
+        # The full log shows the earlier response's unread text and the .inp
+        # line preceded by a .narrative-divider.
+        _wait_inp_line(page, 2, "look", exact=True, keep_open=True)
+        overlay_text = page.locator('[data-testid="fulllog-overlay"]').inner_text()
+        self.assertIn("【段落1】", overlay_text)
+        self.assertIn("【段落15】", overlay_text)
+        self.assertEqual(
+            page.locator('[data-testid="fulllog-overlay"] .narrative-divider').count(),
+            2,
+        )
+
+    @covers_requirement(
+        "webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
+    )
+    def test_message_window_repages_on_resize(self):
+        page = self.logged_in_page((1920, 1080))
+        _append_multipage_response(page)
+        surface = page.locator('[data-testid="message-page"]')
+        page.locator('[data-testid="message-window"]').click()
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
+                "selector": '[data-testid="message-page"]',
                 "predicate": (
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-                    " const lines = f ? f.querySelectorAll('.narrative-line').length : 0;"
-                    " return f && f.scrollHeight > f.clientHeight && lines >= 80; }"
+                    "() => document.querySelector('[data-testid=\"message-page\"]')"
+                    ".getAttribute('data-page') === '2'"
                 ),
-                "description": "80 fillers rendered (overflow established)",
+                "description": "advanced to page 2 at 1920x1080",
             },
-            timeout=30000,
         )
-        # Scroll to the top, then gate on the scroll actually reaching the top.
-        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
-        # `scrollTop = 0` triggers an animation that races the gate. Force an
-        # instant scroll for this single assignment (the same override pattern
-        # the feed's own `scrollToBottom` uses) so the reader is deterministically
-        # at the top before the input line is appended.
-        page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-            " const prev = f.style.scrollBehavior;"
-            " f.style.scrollBehavior = 'auto';"
-            " f.scrollTop = 0;"
-            " f.style.scrollBehavior = prev; }"
-        )
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
-                ),
-                "description": "narrative feed scrolled to the top (and not at the bottom)",
-            },
-            timeout=30000,
-        )
-        # One input event (divider + line) is exactly one unread increment and
-        # one scroll-keep event.
-        page.evaluate(
-            "() => {"
-            "  window.__unreadBefore = parseInt("
-            "    document.getElementById('narrative-unread').getAttribute('data-count') || '0');"
-            "  Elosern.narrativeInput.appendInput('probe');"
-            "}"
-        )
-        # Gate on the unread count rising past the captured baseline. The input
-        # event contributes exactly one increment; a concurrent server narrative
-        # line (the shared foundation server replies to the sent text) may add
-        # further increments, so the assertion is load-robust as "at least one"
-        # rather than a strict equality that a racing server line would break.
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": "#narrative-unread",
-                "predicate": (
-                    "() => parseInt(document.getElementById('narrative-unread')"
-                    ".getAttribute('data-count')) >= window.__unreadBefore + 1"
-                ),
-                "description": "narrative-unread count incremented (at least one)",
-            },
+        page_2_text = surface.inner_text().strip()
+        self.assertTrue(page_2_text)
+        anchor_prefix = page_2_text[:6]
+        live_before = page.locator('[data-testid="message-live"]').inner_text()
+
+        # Shrink the viewport from 1920x1080 to 1280x720 and wait for the
+        # ResizeObserver re-page pass to settle across two consecutive reads.
+        page.set_viewport_size({"width": 1280, "height": 720})
+        previous_sig = None
+        for _ in range(20):
+            page.wait_for_timeout(120)
+            sig = (surface.get_attribute("data-page"), surface.get_attribute("data-pages"))
+            if sig == previous_sig and sig[0] is not None:
+                break
+            previous_sig = sig
+        after_text = surface.inner_text()
+        self.assertIn(
+            anchor_prefix[0],
+            after_text,
+            "re-paging on resize must keep the first character that was on screen",
         )
         self.assertEqual(
-            page.evaluate(
-                "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
-            ),
-            0,
-            "an input line must never force the viewport to the bottom",
+            page.locator('[data-testid="message-live"]').inner_text(),
+            live_before,
+            "a resize re-page announces nothing new",
         )
-        self.assertEqual(page.locator(".narrative-divider").count(), 1)
-        # The marker still clears on activation.
-        page.locator(".narrative-unread-button").click()
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": "#narrative-unread",
-                "predicate": (
-                    "() => document.getElementById('narrative-unread')"
-                    ".getAttribute('data-count') === '0'"
-                ),
-                "description": "narrative-unread count cleared to zero",
-            },
-        )
+        page.close()
 
     @covers_requirement(
         "webclient-desktop-shell::player-input-lines-are-part-of-the-narrative-stream-with-a-divider"
@@ -582,9 +650,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
               Elosern.narrativeInput.appendInput('first');
             }"""
         )
-        _wait_inp_line(page, 1)
+        _wait_inp_line(page, 1, keep_open=True)
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .narrative-divider').count(),
+            page.locator('[data-testid="fulllog-overlay"] .narrative-divider').count(),
             0,
             "the first log line carries no divider",
         )
@@ -593,21 +661,21 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
+                "selector": '[data-testid="fulllog-overlay"]',
                 "predicate": (
                     "() => document.querySelectorAll("
-                    "'[data-testid=\"narrative-feed\"] .narrative-divider').length === 1"
+                    "'[data-testid=\"fulllog-overlay\"] .narrative-divider').length === 1"
                 ),
                 "description": "narrative divider rendered",
             },
         )
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .inp').count(), 2
+            page.locator('[data-testid="fulllog-overlay"] .inp').count(), 2
         )
         self.assertTrue(
             page.evaluate(
                 "() => {"
-                "  const lines = document.querySelectorAll('[data-testid=\"narrative-feed\"] .inp');"
+                "  const lines = document.querySelectorAll('[data-testid=\"fulllog-overlay\"] .inp');"
                 "  const second = lines[lines.length - 1];"
                 "  return second.previousElementSibling !== null && "
                 "    second.previousElementSibling.classList.contains('narrative-divider');"
@@ -671,11 +739,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             json.dumps(envelopes[0]["payload"], sort_keys=True),
             json.dumps(envelopes[1]["payload"], sort_keys=True),
         )
-        self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .inp').count(),
-            1,
-            "a cast without a resolvable skill label must not echo",
-        )
+        _wait_inp_line(page, 1, "cast 燼心爆=燼殼工蟲")
         # A mutation the catalog can resolve without any display descriptor
         # still echoes exactly once at dispatch (forfeit needs no label).
         page.evaluate("() => Elosern.actions.submit('combat.forfeit')")
@@ -704,18 +768,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
               { targetLabel: '<script>alert(1)</script>' });
             }"""
         )
-        _wait_inp_line(page, 1, "<script>alert(1)</script>")
+        _wait_inp_line(page, 1, "<script>alert(1)</script>", keep_open=True)
         # The line is a single literal text node: no element was created.
         self.assertEqual(
             page.evaluate(
                 "() => {"
-                "  const lines = document.querySelectorAll('[data-testid=\"narrative-feed\"] .inp');"
+                "  const lines = document.querySelectorAll('[data-testid=\"fulllog-overlay\"] .inp');"
                 "  return lines[lines.length - 1].childElementCount;"
                 "}"
             ),
             0,
         )
-        self.assertEqual(page.locator('[data-testid="narrative-feed"] .inp script').count(), 0)
+        self.assertEqual(page.locator('[data-testid="fulllog-overlay"] .inp script').count(), 0)
 
 
 class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -783,14 +847,14 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             and p["current_node"] != fixture_home_node_id(),
         )
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
-        _wait_inp_line(page, 1)
-        inp = page.locator('[data-testid="narrative-feed"] .inp').first
+        _wait_inp_line(page, 1, keep_open=True)
+        inp = page.locator('[data-testid="fulllog-overlay"] .inp').first
         self.assertEqual(
             inp.inner_text(),
             first_exit_label,
             "exit traversal echoes the server-authored exit label, never a guessed command",
         )
-        self.assertEqual(page.locator('[data-testid="narrative-feed"] .narrative-divider').count(), 1)
+        self.assertEqual(page.locator('[data-testid="fulllog-overlay"] .narrative-divider').count(), 1)
 
     @covers_requirement(
         "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
@@ -824,19 +888,19 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         speech = "你好，詩人"
         page.keyboard.type(speech)
         page.keyboard.press("Enter")
-        _wait_inp_line(page, 1)
-        inp = page.locator('[data-testid="narrative-feed"] .inp').first
+        # The interaction completed: focus back on the dock (H5, design D2)
+        # and the command line is still present (it is never closed).
+        wait_command_field_released(page)
+        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
+        _wait_inp_line(page, 1, keep_open=True)
+        inp = page.locator('[data-testid="fulllog-overlay"] .inp').first
         self.assertEqual(
             inp.inner_text(),
             "talk %s %s" % (bard["display_name"], speech),
             "the free-form send echoes exactly one resolved line",
         )
-        # The interaction completed: focus back on the dock (H5, design D2)
-        # and the command line is still present (it is never closed).
-        wait_command_field_released(page)
-        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .inp').count(),
+            page.locator('[data-testid="fulllog-overlay"] .inp').count(),
             1,
             "no second raw-text echo may appear",
         )
@@ -861,7 +925,9 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         _wait_field_focused(page)
-        inp_before = page.locator('[data-testid="narrative-feed"] .inp').count()
+        inp_before = page.evaluate(
+            "() => window.__elosernBridge.store.narrative.filter((l) => l && l.kind === 'in').length"
+        )
 
         # Disconnect: the store locks all mutations while preserving the view.
         page.evaluate("Evennia.connection.close()")
@@ -876,7 +942,9 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # Nothing dispatched, nothing echoed, and the speech is not lost.
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"] .inp').count(),
+            page.evaluate(
+                "() => window.__elosernBridge.store.narrative.filter((l) => l && l.kind === 'in').length"
+            ),
             inp_before,
             "a locked borrowed send must never echo",
         )
@@ -894,6 +962,112 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             speech,
             "the typed speech must remain in the field",
         )
+
+    @covers_requirement(
+        "webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
+    )
+    def test_message_window_pages_and_flushes(self):
+        page = self.logged_in_page((1920, 1080))
+        self._wait_exploration_available(page)
+        _append_multipage_response(page)
+
+        surface = page.locator('[data-testid="message-page"]')
+        marker = page.locator('[data-testid="message-page-marker"]')
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(marker.inner_text(), "▼")
+
+        # At 1920x1080 with default prose scale (1), computed font size is 28px (±0.5px),
+        # every line's content box is at most 42em wide, and the control strip's
+        # marker, 日誌, and ⌨ rects are pairwise disjoint left-to-right.
+        metrics = page.evaluate(
+            """() => {
+              const p = document.querySelector('[data-testid="message-page"]');
+              const cs = getComputedStyle(p);
+              const fontSize = parseFloat(cs.fontSize);
+              const contentWidth = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+              const lineWidths = Array.from(p.querySelectorAll('.narrative-line'), (el) => el.getBoundingClientRect().width);
+              const mRect = document.querySelector('[data-testid="message-page-marker"]').getBoundingClientRect();
+              const lRect = document.querySelector('[data-testid="message-log-open"]').getBoundingClientRect();
+              const tRect = document.querySelector('[data-testid="command-line-toggle"]').getBoundingClientRect();
+              return {
+                fontSize,
+                contentWidth,
+                maxLineWidth: Math.max(0, ...lineWidths),
+                markerRight: mRect.right,
+                logLeft: lRect.left,
+                logRight: lRect.right,
+                toggleLeft: tRect.left,
+              };
+            }"""
+        )
+        self.assertAlmostEqual(metrics["fontSize"], 28.0, delta=0.5)
+        self.assertLessEqual(metrics["contentWidth"], metrics["fontSize"] * 42.0 + 1.0)
+        self.assertLessEqual(metrics["maxLineWidth"], metrics["fontSize"] * 42.0 + 1.0)
+        self.assertLessEqual(metrics["markerRight"], metrics["logLeft"])
+        self.assertLessEqual(metrics["logRight"], metrics["toggleLeft"])
+
+        # Enter on the dock activates the dock and does not advance the page.
+        focus_action_dock(page)
+        _press(page, "Enter")
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        _press(page, "Escape")
+
+        # Enter on the focused page surface advances to page 2 without activating the dock.
+        surface.focus()
+        page.keyboard.press("Enter")
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="message-page"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"message-page\"]')"
+                    ".getAttribute('data-page') === '2'"
+                ),
+                "description": "message-page advanced to page 2 via Enter",
+            },
+        )
+        self.assertEqual(sent_action_count(page), 0)
+
+        # Inject a fresh multi-page response with an unread tail, then dispatch
+        # a real dock move while still on page 1: the window flushes to page 1
+        # of the move's response, and the full log retains the unread tail.
+        _append_multipage_response(page)
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertNotIn("【段落15】", surface.inner_text())
+
+        self._open_root(page, 0)  # Move
+        _press(page, "Enter")  # first exit
+        self._wait_panel(
+            page,
+            "local_map",
+            lambda p: p.get("available") is True
+            and p["current_node"] != fixture_home_node_id(),
+        )
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="message-page"]',
+                "predicate": (
+                    "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                    " return !!p && p.getAttribute('data-page') === '1'"
+                    " && !p.innerText.includes('【段落1】'); }"
+                ),
+                "description": "message-page shows page 1 of the move response",
+            },
+        )
+        page.locator('[data-testid="message-log-open"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        self.assertIn(
+            "【段落15】",
+            page.locator('[data-testid="fulllog-overlay"]').inner_text(),
+            "the full log retains the unread pages flushed by the move",
+        )
+        page.close()
 
 
 if __name__ == "__main__":

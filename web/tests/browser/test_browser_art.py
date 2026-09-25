@@ -450,18 +450,22 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                         _boxes_overlap(box, cmd_line),
                         "%s box intersects the command line at %dx%d" % (testid, viewport[0], viewport[1]),
                     )
-                # The narrative caption (the feed anchor) also clears the dock's
-                # top edge now that its offset moved up by the command line height.
-                feed = _rect(page, '[data-testid="narrative-feed"]')
+                # The message window sits in the band's left two thirds beside
+                # the action dock and below the expanded command line, intersecting neither.
+                feed = _rect(page, '[data-testid="message-window"]')
                 if feed is not None:
                     self.assertLessEqual(
-                        feed["bottom"],
-                        dock["top"],
-                        "the narrative caption intrudes into the action dock at %dx%d" % (viewport[0], viewport[1]),
+                        feed["right"],
+                        dock["left"],
+                        "the message window intrudes into the action dock at %dx%d" % (viewport[0], viewport[1]),
                     )
                     self.assertFalse(
                         _boxes_overlap(feed, dock),
-                        "the narrative caption box intersects the action dock at %dx%d" % (viewport[0], viewport[1]),
+                        "the message window box intersects the action dock at %dx%d" % (viewport[0], viewport[1]),
+                    )
+                    self.assertFalse(
+                        _boxes_overlap(feed, cmd_line),
+                        "the message window box intersects the command line at %dx%d" % (viewport[0], viewport[1]),
                     )
 
 
