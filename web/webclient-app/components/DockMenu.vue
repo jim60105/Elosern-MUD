@@ -17,6 +17,7 @@ import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-it
 import OptionCard from "./OptionCard.vue";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
 import { faceObjectPosition } from "./face-rect.js";
+import { destinationLabel as destinationLabelFor, directionGlyph } from "./dock-exits.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -72,45 +73,10 @@ const focusedRow = computed(
   () => rows.value.find((row) => row.key === props.focusedKey) ?? null,
 );
 
-// The destination label for an exit row (task 5.4): joined from the
-// committed `local_map.nodes[].label`. No sub-line when the destination is
-// not in the committed lattice.
+// The destination label for an exit row (task 5.4), read from the
+// committed `local_map` model (`dock-exits.js`).
 function destinationLabel(item) {
-  if (!item.destination || !props.view) {
-    return null;
-  }
-  const model = props.view.localMapModel;
-  if (!model || !Array.isArray(model.nodes)) {
-    return null;
-  }
-  const node = model.nodes.find((n) => n.id === item.destination);
-  return node ? node.label : null;
-}
-
-// The fixed client-side direction-glyph table (H3 design D9): a move row's
-// canonical direction resolves to a glyph; a direction string outside the
-// table (named doors, dynamic wilderness gates) resolves to no glyph, and
-// the row keeps its own label as primary text. The table is built on a
-// null prototype so an out-of-table direction can never collide with an
-// inherited `Object.prototype` property name.
-const DIRECTION_GLYPHS = Object.assign(Object.create(null), {
-  north: "↑",
-  south: "↓",
-  east: "→",
-  west: "←",
-  northeast: "↗",
-  northwest: "↖",
-  southeast: "↘",
-  southwest: "↙",
-  up: "↑",
-  down: "↓",
-});
-
-function directionGlyph(direction) {
-  if (direction === null || direction === undefined) {
-    return null;
-  }
-  return DIRECTION_GLYPHS[direction] ?? null;
+  return destinationLabelFor(item, props.view?.localMapModel);
 }
 
 function onCellFocus(key) {

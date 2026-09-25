@@ -21,6 +21,8 @@
     "Action/ChoiceCardRow",
     "Action/DockTabBar",
     "Action/DockBreadcrumb",
+    "Action/SceneOverview",
+    "Action/DockVerbPopover",
     "Action/SkillDetailPane",
     "Data/StatusPanel",
     "Data/VitalsTrack",

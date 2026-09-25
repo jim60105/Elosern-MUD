@@ -18,6 +18,9 @@ const props = defineProps({
    reason: { type: String, default: null },
    focused: { type: Boolean, default: false },
    rowId: { type: String, required: true },
+   // An optional decorative leading glyph (the scene overview's exit
+   // direction), hidden from assistive technology.
+   glyph: { type: String, default: null },
 });
 
 const emit = defineEmits(["focus", "activate"]);
@@ -57,6 +60,11 @@ function onActivate() {
       class="dock-menu-item__checked"
       aria-hidden="true"
     >✓</span>
+    <span
+      v-if="glyph"
+      class="dock-menu-item__glyph"
+      aria-hidden="true"
+    >{{ glyph }}</span>
     <span class="dock-menu-item__label">{{ label }}</span
     ><span
       v-if="!enabled"
@@ -127,6 +135,11 @@ function onActivate() {
   border-style: dashed;
   border-color: var(--ink-600);
   cursor: default;
+}
+
+.dock-menu-item__glyph {
+  color: var(--gold-400);
+  font-family: var(--f-mono);
 }
 
 .dock-menu-item__unavailable {

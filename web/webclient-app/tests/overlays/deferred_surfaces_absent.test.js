@@ -205,6 +205,10 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Feedback/ToastQueue",
       // The AVG stage series adds the stage place card.
       "Core/PlaceCard",
+      // The AVG scene overview and its verb popover
+      // (webclient-scene-overview-component).
+      "Action/SceneOverview",
+      "Action/DockVerbPopover",
     ]) {
       expect(manifest.required).toContain(title);
     }
