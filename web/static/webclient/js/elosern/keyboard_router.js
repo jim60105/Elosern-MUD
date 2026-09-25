@@ -27,6 +27,15 @@
  * introspection (0) and key presses on an unmounted stack are plain unhandled
  * keys (false) so pre-session key routing cannot crash. Zero timers: every
  * degradation is a synchronous access-time settle.
+ *
+ * Geometries: `grid` (fixed `gridCols`, row-major wrap), a list (Up/Down
+ * cycle, Left/Right no-ops), and `geometry: "sections"`
+ * (webclient-scene-overview-component design D3): a list in reading order
+ * cut into `sections: [{key, label, count}]`. Left/Right step through the
+ * reading order and wrap; Up/Down land on the same ordinal in the previous
+ * or next section (clamped to its last item) and wrap across sections, and
+ * are no-ops with one section. Section counts that disagree with the items
+ * fall back to list behaviour rather than wedging the keyboard.
  */
 (function (root, factory) {
   "use strict";
@@ -363,6 +372,68 @@
       return false;
     }
 
+    // The valid section counts of a `geometry: "sections"` menu, or null when
+    // the menu is not sectioned or its counts disagree with its items.
+    function sectionCounts(menu) {
+      if (!menu || menu.geometry !== "sections" || !Array.isArray(menu.sections)) {
+        return null;
+      }
+      var counts = [];
+      var total = 0;
+      for (var i = 0; i < menu.sections.length; i += 1) {
+        var count = menu.sections[i] && menu.sections[i].count;
+        if (typeof count !== "number" || !(count > 0) || Math.floor(count) !== count) {
+          return null;
+        }
+        counts.push(count);
+        total += count;
+      }
+      return counts.length > 0 && total === menu.items.length ? counts : null;
+    }
+
+    // Arrow geometry of a sectioned menu (design D3). Returns null when the
+    // menu is not a valid sectioned menu, so the caller falls through to the
+    // grid or list rules.
+    function sectionMove(frame, menu, direction) {
+      var counts = sectionCounts(menu);
+      if (counts === null) {
+        return null;
+      }
+      var items = menu.items;
+      var index = Math.min(Math.max(frame.focusRow || 0, 0), items.length - 1);
+      if (direction === ARROW_LEFT) {
+        index = (index - 1 + items.length) % items.length;
+      } else if (direction === ARROW_RIGHT) {
+        index = (index + 1) % items.length;
+      } else if (direction === ARROW_UP || direction === ARROW_DOWN) {
+        if (counts.length === 1) {
+          return false;
+        }
+        var section = 0;
+        var start = 0;
+        while (index >= start + counts[section]) {
+          start += counts[section];
+          section += 1;
+        }
+        var ordinal = index - start;
+        var step = direction === ARROW_UP ? -1 : 1;
+        var target = (section + step + counts.length) % counts.length;
+        var targetStart = 0;
+        for (var s = 0; s < target; s += 1) {
+          targetStart += counts[s];
+        }
+        index = targetStart + Math.min(ordinal, counts[target] - 1);
+      } else {
+        return false;
+      }
+      frame.focusRow = index;
+      frame.focusCol = 0;
+      frame.focusKey = itemKey(items[index]);
+      frame._focusIndex = index;
+      notifyFocus(frame);
+      return true;
+    }
+
     // Move focus within the current menu geometry.
     function move(direction) {
       settleGuard();
@@ -377,6 +448,10 @@
         return false;
       }
       menu = menu || { items: [] };
+      var sectioned = sectionMove(frame, menu, direction);
+      if (sectioned !== null) {
+        return sectioned;
+      }
       if (menu.grid && menu.gridCols > 0) {
         var cols = menu.gridCols;
         var rows = Math.max(1, Math.ceil(menu.items.length / cols));

@@ -359,3 +359,90 @@ test("confirm defaults to the keyboard source", () => {
   assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
   assert.strictEqual(events.filter((e) => e.name === "repeat-suppressed").length, 1);
 });
+
+// webclient-scene-overview-component (task 2.4): the `sections` geometry.
+function sectionedMenu(counts) {
+  const items = [];
+  const sections = counts.map((count, s) => {
+    for (let i = 0; i < count; i += 1) {
+      items.push({ key: `s${s}-${i}`, label: `s${s}-${i}`, enabled: true });
+    }
+    return { key: `sec${s}`, label: s === counts.length - 1 ? null : `sec${s}`, count };
+  });
+  return { items, sections, geometry: "sections", title: "場景" };
+}
+
+function focusedKey(router) {
+  return router.currentItem().key;
+}
+
+test("sections: Left/Right step through the reading order and wrap across sections", () => {
+  const { router } = makeRouter();
+  router.pushMenu(sectionedMenu([2, 3, 1]));
+  assert.strictEqual(focusedKey(router), "s0-0");
+  router.handle("ArrowRight");
+  router.handle("ArrowRight");
+  assert.strictEqual(focusedKey(router), "s1-0");
+  router.handle("ArrowLeft");
+  assert.strictEqual(focusedKey(router), "s0-1");
+  router.handle("ArrowLeft");
+  router.handle("ArrowLeft");
+  assert.strictEqual(focusedKey(router), "s2-0", "Left from the first chip wraps to the last");
+  router.handle("ArrowRight");
+  assert.strictEqual(focusedKey(router), "s0-0", "Right from the last chip wraps to the first");
+});
+
+test("sections: Up/Down keep the ordinal, clamp to a shorter section, and wrap", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu(sectionedMenu([2, 3, 1]));
+  assert.ok(router.focusItemByKey("s1-2"));
+  router.handle("ArrowDown");
+  assert.strictEqual(focusedKey(router), "s2-0", "ordinal 2 clamps to the one-chip section");
+  router.handle("ArrowDown");
+  assert.strictEqual(focusedKey(router), "s0-0", "Down from the last section wraps to the first");
+  assert.ok(router.focusItemByKey("s0-1"));
+  router.handle("ArrowDown");
+  assert.strictEqual(focusedKey(router), "s1-1");
+  router.handle("ArrowUp");
+  assert.strictEqual(focusedKey(router), "s0-1");
+  router.handle("ArrowUp");
+  assert.strictEqual(focusedKey(router), "s2-0", "Up from the first section wraps to the last");
+  const last = events[events.length - 1];
+  assert.strictEqual(last.name, "focus");
+  assert.strictEqual(last.payload.row, 5);
+  assert.strictEqual(last.payload.itemKey, "s2-0");
+});
+
+test("sections: Up/Down are no-ops with a single section", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu(sectionedMenu([3]));
+  events.length = 0;
+  assert.strictEqual(router.handle("ArrowDown"), false);
+  assert.strictEqual(router.handle("ArrowUp"), false);
+  assert.strictEqual(events.length, 0);
+  router.handle("ArrowRight");
+  assert.strictEqual(focusedKey(router), "s0-1");
+});
+
+test("sections: counts that disagree with the items fall back to list behaviour", () => {
+  const { router } = makeRouter();
+  const menu = sectionedMenu([2, 2]);
+  menu.sections[1].count = 5;
+  router.pushMenu(menu);
+  router.handle("ArrowDown");
+  assert.strictEqual(focusedKey(router), "s0-1", "Down steps to the next row as a list");
+  assert.strictEqual(router.handle("ArrowRight"), false, "Left/Right are list no-ops");
+});
+
+test("sections: focusItemByKey and re-resolution keep the focused key", () => {
+  const { router } = makeRouter();
+  const menu = sectionedMenu([2, 2]);
+  router.pushMenu(menu);
+  assert.ok(router.focusItemByKey("s1-1"));
+  // The same source re-resolves to a menu with one more chip in front.
+  menu.items.unshift({ key: "s0-x", label: "s0-x", enabled: true });
+  menu.sections[0].count = 3;
+  assert.strictEqual(focusedKey(router), "s1-1");
+  router.handle("ArrowUp");
+  assert.strictEqual(focusedKey(router), "s0-0", "ordinal 1 in the section above");
+});
