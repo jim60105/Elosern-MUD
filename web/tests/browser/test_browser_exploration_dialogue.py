@@ -12,6 +12,8 @@ from .browser_helpers import (
     focus_action_dock,
     fixture_home_node_id,
     install_outbound_recorder,
+    narrative_log_length,
+    narrative_log_text,
     sent_action_count,
     outbound_messages,
     store_state,
@@ -111,15 +113,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         wait_for_store_state(
             page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('她看著你的眼神裡帶著信賴。') !== -1; }"
-                ),
-                "description": "narrative feed shows the host's trust line",
-            },
+            lambda s: _connected_active(s)
+            and "她看著你的眼神裡帶著信賴。" in narrative_log_text(page),
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
@@ -148,15 +143,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIn("npc_id", talk[0]["payload"])
         wait_for_store_state(
             page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('先在櫃檯註冊成為冒險者') !== -1; }"
-                ),
-                "description": "narrative feed shows the registration dialogue line",
-            },
+            lambda s: _connected_active(s)
+            and "先在櫃檯註冊成為冒險者" in narrative_log_text(page),
         )
 
     @covers_requirement(
@@ -262,15 +250,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(after["mode"], "exploration")
         wait_for_store_state(
             page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('你結束了對話。') !== -1; }"
-                ),
-                "description": "the server success line lands as narrative",
-            },
+            lambda s: _connected_active(s)
+            and "你結束了對話。" in narrative_log_text(page),
         )
         # Back to the caption-free dock: no pick or exit row renders.
         self.assertEqual(
@@ -324,18 +305,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # Offline degrade reaches the authored greeting/silence.
-        greeting = json.dumps(_shipped_greeting())
+        greeting = _shipped_greeting()
         wait_for_store_state(
             page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf(" + greeting + ") !== -1; }"
-                ),
-                "description": "narrative feed shows the offline greeting",
-            },
+            lambda s: _connected_active(s)
+            and greeting in narrative_log_text(page),
         )
 
     @covers_requirement(
@@ -404,21 +378,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "description": "command-line input field is focused",
             },
         )
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        before_len = narrative_log_length(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        before_len = len(narrative_before)
         wait_for_store_state(
             page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.length > %d; }" % before_len
-                ),
-                "description": "narrative feed grew past the pre-command length",
-            },
+            lambda s: _connected_active(s)
+            and narrative_log_length(page) > before_len,
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         # The command was sent through the text path.

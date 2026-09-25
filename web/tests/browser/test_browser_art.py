@@ -21,6 +21,8 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    narrative_log_length,
+    narrative_log_text,
     open_command_line,
     sent_action_count,
     store_state,
@@ -376,23 +378,17 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
             },
         )
         # Movement through the ordinary transport still works. The narrative
-        # assertion is gated on the shared bounded store-state + DOM path
+        # assertion is gated on the shared bounded store-state + log path
         # (no fixed sleep) so it stays stable under a loaded CI runner.
-        before = len(page.locator(".elosern-narrative").inner_text())
+        before = narrative_log_length(page)
         page.evaluate("Evennia.msg('text', ['look'], {})")
         wait_for_store_state(
             page,
-            lambda s: bool(s.get("connected")) and s.get("phase") == "active",
-            dom_readiness={
-                "selector": ".elosern-narrative",
-                "predicate": (
-                    f"() => {{ const f = document.querySelector('.elosern-narrative'); "
-                    f"return f && f.innerText.trim().length > {before}; }}"
-                ),
-                "description": "narrative feed length grew past the pre-look baseline",
-            },
+            lambda s: bool(s.get("connected"))
+            and s.get("phase") == "active"
+            and narrative_log_length(page) > before,
         )
-        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative = narrative_log_text(page)
         self.assertTrue(narrative.strip())
 
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
@@ -530,7 +526,7 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         page.wait_for_timeout(800)
         self.assertEqual(len(self._art_requests), 1)
         # Play continues deterministically.
-        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative = narrative_log_text(page)
         self.assertTrue(narrative.strip())
 
 

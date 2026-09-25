@@ -9,6 +9,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    narrative_log_length,
     sent_action_count,
     store_state,
     valid_art_panel,
@@ -38,18 +39,11 @@ def _wait_field_focused(page, timeout=30000):
 
 
 def _wait_narrative_grew(page, before_len, timeout=30000):
-    """Gate on the narrative feed's text length exceeding a previous length."""
+    """Gate on the retained narrative log length exceeding a previous length."""
     wait_for_store_state(
         page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": '[data-testid="narrative-feed"]',
-            "predicate": (
-                "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]');"
-                " return n && n.innerText.length > %d; }" % before_len
-            ),
-            "description": "narrative feed text grew past the previous length",
-        },
+        lambda s: bool(s.get("connected"))
+        and narrative_log_length(page) > before_len,
         timeout=timeout,
     )
 
@@ -64,14 +58,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_narrative_renders_styled_prose_not_markup_source(self):
         page = self.logged_in_page()
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        before_len = narrative_log_length(page)
 
         # A real room look through the server; the narrative must grow with
         # the room's prose. The *visible text* must never show element or
         # entity source characters (the DOM may legitimately contain rendered
         # span elements -- that is the pipeline working).
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        _wait_narrative_grew(page, narrative_before.__len__())
+        _wait_narrative_grew(page, before_len)
         page.wait_for_timeout(300)
         narrative_text = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertNotIn("&lt;", narrative_text)

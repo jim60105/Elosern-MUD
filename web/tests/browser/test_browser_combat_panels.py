@@ -11,6 +11,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_update,
+    narrative_log_text,
     sent_action_count,
     store_state,
     wait_for_presentation_settled,
@@ -358,7 +359,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         self.assertEqual(self._dock_mode(page), "combat")
-        narrative = page.locator(".elosern-narrative").inner_text()
+        narrative = narrative_log_text(page)
         self.assertTrue(narrative.strip())
         # True numeric resources remain visible.
         for key in ("hp", "mp", "sp"):
