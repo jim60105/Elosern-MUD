@@ -12,8 +12,10 @@ import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
+import DockVerbPopover from "./components/DockVerbPopover.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
+import SceneOverview from "./components/SceneOverview.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
 import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
 import HudDrawer from "./components/HudDrawer.vue";
@@ -41,8 +43,6 @@ import PartyDrawer from "./components/PartyDrawer.vue";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
-import { portraitGlyph } from "./components/party-helpers.js";
-import { faceObjectPosition } from "./components/face-rect.js";
 
 const store = useElosernStore();
 const currentPortrait = computed(
@@ -67,10 +67,10 @@ const {
   drawerTitle, onOpenDrawer, onHudDrawerClose, questServicesPanel,
   questGuildAvailable, questServicesUnavailable, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_CAST_HINT,
-  rootItems, navigationItems, dockItems, dockPaneKind, interactionOpen,
-  interactionTarget, interactionChoices, onInteractionTarget, onTabClick,
-  onDockBack, contextActionsPanel, rowPrefix, detailTestId,
-  showDetail, focusedRowDisabled,
+  rootItems, navigationItems, dockItems, dockPaneKind,
+  overviewShown, overviewActive, overviewMenu, overviewFocusKey,
+  onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
+  showDetail,
   onAction, onDockActivate, onDockFocusChange,
   onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
@@ -210,16 +210,14 @@ const {
           v-if="rootItems.length > 0 || !!store.view.degradedRoot || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'exploration'"
           :root-items="rootItems"
+          :tab-bar="contextActionsPanel?.kind === 'combat'"
           :focused-key="store.view.focus.key"
           :view="store.view"
             @action="onAction"
           @tab-click="onTabClick"
           @back="onDockBack"
         >
-          <div
-            class="dock-pane-host"
-            :class="{ 'interaction-workspace': interactionOpen, 'interaction-workspace--selected': !!interactionTarget }"
-          >
+          <div class="dock-pane-host">
             <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
               <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
                 <h3>等待直到黎明</h3>
@@ -237,43 +235,26 @@ const {
               </article>
               <button type="button" class="waiting-back" @keydown.enter.stop @keydown.space.stop @click="onDockBack">返回上一層</button>
             </section>
-            <section v-if="interactionTarget" class="interaction-targets" aria-label="互動對象">
-              <h3 class="interaction-heading"><span>1</span>選擇互動對象</h3>
-              <div class="interaction-target-grid">
-                <button
-                  v-for="target in interactionChoices"
-                  :key="target.identity"
-                  type="button"
-                  class="interaction-target"
-                  :aria-pressed="target.identity === interactionTarget.identity"
-                  :disabled="!target.affordances.length"
-                  @keydown.enter.stop
-                  @keydown.space.stop
-                  @click="onInteractionTarget(target.identity)"
-                >
-                  <span class="interaction-avatar" aria-hidden="true">
-                    <img v-if="target.portrait" :src="target.portrait.url" :style="{ objectPosition: faceObjectPosition(target.portrait.face_rect) }" alt="" />
-                    <span v-else>{{ portraitGlyph(target.display_name) }}</span>
-                  </span>
-                  <span>{{ target.display_name }}</span>
-                </button>
-              </div>
-            </section>
-            <h3 v-if="interactionOpen" class="interaction-heading interaction-heading--active">
-              <span>{{ interactionTarget ? "2" : "1" }}</span>
-              {{ interactionTarget ? "選擇對話或行動" : "選擇互動對象" }}
-            </h3>
-            <section v-if="interactionOpen && !interactionTarget" class="interaction-prompt">
-              <h3 class="interaction-heading"><span>2</span>選擇對話或行動</h3>
-              <p>先選擇左側的對象，即可查看可用的互動。</p>
-            </section>
+            <!-- The exploration dock's root frame (webclient-scene-overview-
+                 swap D4): one scene overview — chip rows for exits, people,
+                 and objects, plus the footer. Under a target's verb popover
+                 it stays rendered as inert ancestor chrome. -->
+            <SceneOverview
+              v-if="overviewShown"
+              :menu="overviewMenu"
+              :focused-key="overviewActive ? store.view.focus.key : overviewFocusKey"
+              :local-map="store.view.localMapModel"
+              :active="overviewActive"
+              @focus-change="onDockFocusChange"
+              @activate="onDockActivate"
+            />
              <DockMenu
-               v-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot)"
+               v-else-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot)"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
-              :show-detail="showDetail && (!interactionOpen || focusedRowDisabled)"
+              :show-detail="showDetail"
               :detail-message="restFormError"
               :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
               :depth="store.view.dockDepth"
@@ -295,6 +276,18 @@ const {
             />
           </div>
           <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+          <!-- The target's verb popover (webclient-scene-overview-swap D4):
+               a card inside the command region over the inert overview. -->
+          <template #overlay>
+            <DockVerbPopover
+              v-if="store.view.dockSource === 'exploration.target'"
+              :menu="store.view.combatMenu"
+              :focused-key="store.view.focus.key"
+              @focus-change="onDockFocusChange"
+              @activate="onDockActivate"
+              @back="onDockBack"
+            />
+          </template>
         </ActionDock>
       </template>
     </AppShell>

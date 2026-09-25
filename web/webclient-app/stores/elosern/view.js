@@ -27,7 +27,20 @@ export function applyView(ctx) {
     // where frame-content reads would throw. `mounted` guards every read.
     const mounted = ctx.router.depth() > 0;
     const currentItem = mounted ? ctx.router.currentItem() : null;
-    const navigationMenu = mounted ? ctx.frameResolver.resolve(ctx.rootDescriptorFor(rs)) : null;
+    // The top navigation bar's entries (webclient-scene-overview-swap): the
+    // exploration form carries the character/quest/inventory surfaces on the
+    // BAR, not in any dock frame — the scene overview deliberately has no
+    // navigation entry — so the exploration mode resolves the bar's own
+    // `exploration.navigation` source. Every other family's root frame still
+    // carries its own navigation rows (the combat root's client-local 背包).
+    const navigationDescriptor = ctx.rootDescriptorFor(rs);
+    const navigationMenu = mounted
+      ? ctx.frameResolver.resolve(
+          navigationDescriptor && navigationDescriptor.source === "exploration.root"
+            ? { source: "exploration.navigation", params: {} }
+            : navigationDescriptor,
+        )
+      : null;
     // The combat selection reads resolve through the resolver's one model —
     // calling it here is the adoption point; outside combat form it is null.
     const combatNow = panel && panel.kind === "combat" ? ctx.frameResolver.combatModel() : null;
@@ -201,6 +214,9 @@ export function applyView(ctx) {
       // row is pane content (below), never a tab (the router keeps it out
       // of `rootMenu` for exactly this reason).
       rootMenu: mounted ? ctx.router.rootMenu() : null,
+      // The family-agnostic nav-row guard: the exploration source already
+      // emits exactly these keys, and the combat root's own rows (the
+      // client-local 背包) pass through the same filter.
       navigationItems: (navigationMenu?.items || []).filter((item) => NAVIGATION_ITEM_KEYS.has(item.key)),
       // The degraded-root presentation (webclient-frame-resolution): the
       // single disabled marker-reason row the pane host renders while the

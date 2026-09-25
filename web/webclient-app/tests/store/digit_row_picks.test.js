@@ -3,7 +3,10 @@
 // current frame (1-indexed, rendered order) and activates it through the
 // same confirm path Enter uses. A digit whose row does not exist is
 // unclaimed and falls through to the text / command-history path.
-
+//
+// webclient-scene-overview-swap: the dock's root frame is the scene overview,
+// so its chips in reading order are the root frame's rendered rows, and a
+// person chip's verb popover is the root's one child frame.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -20,17 +23,40 @@ describe("dock digit row picks (1–4)", () => {
     expect(store.receive(1, "ui_snapshot", [fx.snapshot()], {}).accepted).toBe(true);
   }
 
-  function openMoveFrame() {
-    // The exploration panel provides the move submenu; open it so the
-    // current frame has known rows: exit-east (enabled), exit-north (disabled).
+  // The exploration root: the scene overview, whose chips are the root
+  // frame's rendered rows — exit-east (enabled), exit-north (disabled),
+  // target-7, object-3, look-room, wait, suggestions.
+  function openOverview(explorationOverrides = undefined) {
     store.receive(
       1,
       "ui_update",
-      [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+      [
+        fx.update({
+          revision: 2,
+          panels: {
+            exploration: fx.explorationPanel(explorationOverrides),
+            local_map: fx.localMapPanel(),
+          },
+        }),
+      ],
       {},
     );
-    expect(store.focusConfirm("keyboard")).toBe(true); // root entry -> move frame
+    expect(store.view.dockSource).toBe("exploration.root");
+    expect(store.view.dockDepth).toBe(1);
+  }
+
+  // A person chip whose target maps to no affordance: the popover then holds
+  // exactly [查看, 返回上一層].
+  function openLookOnlyPopover() {
+    openOverview({
+      interact: [
+        { identity: 9001, display_name: "石像", portrait_ref: null, affordances: [] },
+      ],
+    });
+    expect(store.focusItemByKey("target-9001")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
     expect(store.view.dockDepth).toBe(2);
+    expect(store.view.dockSource).toBe("exploration.target");
   }
 
   beforeEach(() => {
@@ -40,9 +66,9 @@ describe("dock digit row picks (1–4)", () => {
     store.setSender(sender);
   });
 
-  it("digit 1 picks the first row and submits it exactly as Enter would", () => {
+  it("digit 1 picks the first chip and submits it exactly as Enter would", () => {
     openSession();
-    openMoveFrame();
+    openOverview();
     expect(store.focusPress("1")).toBe(true);
     expect(store.view.focus.key).toBe("exit-east");
     expect(sender.sent.actions).toHaveLength(1);
@@ -52,9 +78,9 @@ describe("dock digit row picks (1–4)", () => {
     });
   });
 
-  it("digit 2 moves focus onto a disabled row, shows its explanation, and submits nothing", () => {
+  it("digit 2 moves focus onto a disabled chip, shows its explanation, and submits nothing", () => {
     openSession();
-    openMoveFrame();
+    openOverview();
     expect(store.focusPress("2")).toBe(true);
     expect(store.view.focus.key).toBe("exit-north");
     expect(store.view.focus.enabled).toBe(false);
@@ -63,45 +89,37 @@ describe("dock digit row picks (1–4)", () => {
 
   it("a digit beyond the frame's row count is unclaimed and submits nothing", () => {
     openSession();
-    openMoveFrame();
-    // The outlet pane renders only the exit rows (the `back` cell is a
-    // navigation cell, never a rendered row), so the slots are [east,
-    // north] and `3`/`4` are unclaimed.
+    openLookOnlyPopover();
+    // The popover renders exactly two rows (查看 and 返回上一層), so `3` and
+    // `4` are unclaimed.
     expect(store.focusPress("3")).toBe(false);
     expect(store.focusPress("4")).toBe(false);
     // An untouched digit does not consume the key: focus stays where it was.
-    expect(store.view.focus.key).toBe("exit-east");
+    expect(store.view.focus.key).toBe("look-target");
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the digit slots follow the rendered rows: the outlet's back row takes no slot", () => {
+  it("the digit slots follow the rendered rows: the popover's back row takes a slot", () => {
     openSession();
-    openMoveFrame();
-    // The move frame is an outlet pane: its raw items are [east, north,
-    // back] but the rendered rows are [east, north]. `3` therefore picks
-    // nothing (unclaimed) instead of activating the breadcrumb's back cell,
-    // and the frame stays open.
-    expect(store.focusPress("3")).toBe(false);
-    expect(store.view.dockDepth).toBe(2);
-    expect(sender.sent.actions).toHaveLength(0);
-  });
-
-  it("the root grid pane slots follow item order: digit 2 opens the second tab", () => {
-    openSession();
-    store.receive(
-      1,
-      "ui_update",
-      [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
-      {},
-    );
-    // The root frame is the tab-bar grid pane: every item renders as a
-    // tab in item order, so slot 2 addresses the second root item.
-    expect(store.view.dockDepth).toBe(1);
-    const second = store.router.currentMenu().items[1];
+    openLookOnlyPopover();
+    // The popover's `back` row is a rendered row of its listbox (the exit
+    // outlet's non-rendered cell is gone with the outlet), so `2` addresses
+    // it and pops exactly one level with no dispatch.
     expect(store.focusPress("2")).toBe(true);
-    // The second root entry is a navigation row: activating it pushes its
-    // submenu (no ui_action on the wire).
-    expect(store.view.dockDepth, `activating root item ${second?.key} should open a frame`).toBe(2);
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.dockSource).toBe("exploration.root");
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("the overview's chips follow reading order: digit 3 opens the person's verb popover", () => {
+    openSession();
+    openOverview();
+    // The overview renders exits, then people, then objects, then the
+    // footer, so slot 3 is the person chip.
+    expect(store.router.currentMenu().items[2].key).toBe("target-7");
+    expect(store.focusPress("3")).toBe(true);
+    expect(store.view.dockSource).toBe("exploration.target");
+    expect(store.view.dockDepth).toBe(2);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
@@ -114,7 +132,7 @@ describe("dock digit row picks (1–4)", () => {
 
   it("held digit repeats are suppressed like held Enter, even after the lock releases", () => {
     openSession();
-    openMoveFrame();
+    openOverview();
     expect(store.focusPress("1")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
     // Release the mutation lock exactly like a committed result does

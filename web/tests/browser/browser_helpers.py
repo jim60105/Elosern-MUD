@@ -227,7 +227,14 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
         if ca.get("available"):
             kind = ca.get("kind")
             if kind == "exploration":
-                return len(ca.get("affordances") or []) > 0
+                # The exploration root is the scene overview
+                # (webclient-scene-overview-swap): its chips derive from the
+                # committed `exploration` panel, so the root menu — not the
+                # context_actions affordance list — is the readiness gate.
+                exploration = panels.get("exploration") or {}
+                if exploration.get("available") is not True:
+                    return False
+                return len((state.get("rootMenu") or {}).get("items") or []) > 0
             if kind == "combat":
                 menu = state.get("combatMenu") or {}
                 return len(menu.get("items") or []) > 0
@@ -274,6 +281,89 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
             "focus did not land on #action-dock or a focusable descendant; activeElement=%r"
             % active
         )
+
+
+def push_exploration_frame(
+    page: Page,
+    source: str,
+    params: dict | None = None,
+    depth: int = 2,
+    timeout: int = 15000,
+) -> None:
+    """Mount a retired exploration submenu frame by a direct router push.
+
+    The dock's root frame is the scene overview (webclient-scene-overview-swap),
+    so no keyboard or pointer path reaches the move, look, or interact submenus
+    any more. Until ``webclient-retire-exploration-submenus`` deletes those
+    frames together with the tests that pin their panes, the outlet assertions
+    mount one through the router's own push entry — the same seam the
+    keyboard-router Node gate uses. The stack is normalized to the committed
+    root first, so the push always lands at ``depth``.
+    """
+    focus_action_dock(page, timeout=timeout)
+    page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+    page.evaluate(
+        "(args) => window.__elosernBridge.router.pushFrame("
+        "{ source: args.source, params: args.params }, { openerKey: null })",
+        {"source": source, "params": params or {}},
+    )
+    page.wait_for_function(
+        "(expected) => window.__elosernBridge.router.depth() === expected",
+        arg=depth,
+        timeout=timeout,
+    )
+
+
+def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
+    """Activate one scene-overview chip by its keyboard key.
+
+    The exploration dock's root frame is the scene overview
+    (webclient-scene-overview-swap, design D6): exits, people, objects, and
+    the footer render as one frame of chips keyed ``exit-<exit_ref>``,
+    ``target-<identity>``, ``entity-<identity>``, ``object-<identity>``,
+    ``look-room``, ``wait``, and ``suggestions``. This helper focuses the
+    dock, moves the keyboard router's focus onto that chip, and confirms it
+    with Enter — the same path a keyboard user takes, with no pointer click
+    and no direct store call.
+    """
+    focus_action_dock(page, timeout=timeout)
+    focused = page.evaluate(
+        "(key) => window.__elosernBridge.store.focusItemByKey(key)", key
+    )
+    if not focused:
+        raise AssertionError("no scene-overview chip with key %r" % (key,))
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(80)
+
+
+def overview_target_with_affordance(page: Page, action_id: str) -> dict:
+    """The first committed interact target carrying ``action_id``.
+
+    The scene overview's 人物 row lists the committed interact targets in
+    payload order, and a target's chip key is ``target-<identity>``
+    (webclient-scene-overview-swap), so this returns the descriptor whose own
+    identity names its chip.
+    """
+    panel = ((store_state(page).get("panels") or {}).get("exploration") or {})
+    for target in panel.get("interact") or []:
+        for affordance in target.get("affordances") or []:
+            if affordance.get("action_id") == action_id:
+                return target
+    raise AssertionError("the fixture must offer a target with %r" % (action_id,))
+
+
+def activate_first_overview_exit(page: Page, timeout: int = 30000) -> None:
+    """Activate the scene overview's first exit chip.
+
+    The 出口 row leads the overview's reading order, so the root frame's first
+    chip is the room's first exit: normalizing the stack to the root and
+    pressing Enter submits ``explore.move`` for it — the dock path that
+    replaced the retired 移動 submenu (webclient-scene-overview-swap).
+    """
+    focus_action_dock(page, timeout=timeout)
+    page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(80)
 
 
 def open_command_line(page: Page, timeout: int = 30000) -> None:

@@ -119,10 +119,11 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
   it("Escape from the focused field returns focus to the dock; the menu depth is unchanged", async () => {
     const store = mountAll();
     openActiveSession(store);
-    // Navigate the router into a submenu (depth 2) so the dock's menu level
-    // state is non-trivial. H4 re-homed "character" into a reference drawer
-    // (no router push); "move" is the root entry that opens a real submenu.
-    store.focusItemByKey("move");
+    // Navigate the router into a child frame (depth 2) so the dock's menu
+    // level state is non-trivial. H4 re-homed "character" into a reference
+    // drawer (no router push); the overview's 等待／休息 chip opens a real
+    // child frame (webclient-scene-overview-swap).
+    store.focusItemByKey("wait");
     store.focusConfirm();
     await wrapper.vm.$nextTick();
     expect(store.view.dockDepth).toBe(2);
@@ -154,12 +155,9 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     const sender = fx.createFakeSender();
     store.setSender(sender);
 
-    // Open the move frame (rows: exit-east enabled, exit-north disabled,
-    // back) so a real row exists at slot 1.
-    store.focusItemByKey("move");
-    store.focusConfirm();
-    await wrapper.vm.$nextTick();
-    expect(store.view.dockDepth).toBe(2);
+    // The overview's first chip is an enabled exit, so a real row exists at
+    // slot 1 without opening any child frame.
+    expect(store.view.focus.key).toBe("exit-east");
 
     // `1` is consumed by the store's row pick -> the bridge claims it:
     // preventDefault fires and the row submits through the store.
@@ -171,7 +169,8 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
 
     // A digit with no such row is unclaimed: the bridge does not prevent the
     // default, so the key falls through to the text / command-history path.
-    for (const key of ["5", "6", "7", "8", "9", "0"]) {
+    // The overview renders seven chips, so 7 and beyond have no row.
+    for (const key of ["7", "8", "9", "0"]) {
       const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
       document.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(false);

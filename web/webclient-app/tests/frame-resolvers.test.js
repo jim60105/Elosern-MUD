@@ -97,7 +97,15 @@ describe("frame resolver — committed-state following and purity", () => {
       currentNode: state.panels.local_map.current_node,
       suggestions: state.panels.context_actions.suggestions,
     });
-    expect(second.items).toEqual(direct.menus.root.items);
+    // The root is the scene overview (webclient-scene-overview-swap D1), not
+    // the tab root: it resolves to the overview builder's own menu.
+    expect(second).toEqual(
+      ExplorationMenu.overviewMenu(state.panels.exploration, {
+        currentNode: state.panels.local_map.current_node,
+        suggestions: state.panels.context_actions.suggestions,
+      }),
+    );
+    expect(second.items).not.toEqual(direct.menus.root.items);
   });
 
   it("a resolver throwing mid-build degrades to the marker without an exception", () => {
@@ -146,16 +154,40 @@ describe("frame resolver — the finite exploration table", () => {
       currentNode: state.panels.local_map.current_node,
       suggestions: state.panels.context_actions.suggestions,
     });
-    for (const key of ["root", "move", "look", "interact", "wait"]) {
+    // The root frame is the scene overview, not the tab root
+    // (webclient-scene-overview-swap D1); the move/look/interact/wait
+    // submenus stay registered and builder-identical until C8c retires them.
+    for (const key of ["move", "look", "interact", "wait"]) {
       const resolved = resolver.resolve({ source: `exploration.${key}` });
       expect(resolved.unresolvable).toBeUndefined();
       expect(resolved).toEqual(direct.menus[key]);
     }
-    // Target/keywords resolve through the same target seam the push sites use.
-    const targetMenu = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
-    expect(targetMenu).toEqual(
-      ExplorationMenu.targetMenuFor(direct, ExplorationMenu.targetById(direct, 7)),
+    const overview = resolver.resolve({ source: "exploration.root" });
+    expect(overview.unresolvable).toBeUndefined();
+    expect(overview).toEqual(
+      ExplorationMenu.overviewMenu(state.panels.exploration, {
+        currentNode: state.panels.local_map.current_node,
+        suggestions: state.panels.context_actions.suggestions,
+      }),
     );
+    expect(overview.geometry).toBe("sections");
+    expect(overview.sections.map((section) => section.key)).toEqual([
+      "exits",
+      "people",
+      "objects",
+      "footer",
+    ]);
+    expect(overview.sections.map((section) => section.count)).toEqual([2, 1, 1, 3]);
+    // Target/keywords resolve through the same target seam the push sites use.
+    // The target frame is the verb popover (`verbMenuFor`), not the
+    // affordance grid (`targetMenuFor`).
+    const verbMenu = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
+    expect(verbMenu).toEqual(
+      ExplorationMenu.verbMenuFor(direct, ExplorationMenu.targetById(direct, 7)),
+    );
+    expect(verbMenu.items[verbMenu.items.length - 1].goBack).toBe(true);
+    expect(verbMenu.items.map((i) => i.key)).toContain("look-target");
+    expect(verbMenu.grid).toBeUndefined();
     const keywords = resolver.resolve({ source: "exploration.keywords", params: { identity: 7 } });
     expect(keywords).toEqual(
       ExplorationMenu.keywordMenuFor(
@@ -299,16 +331,62 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     expect(lockedRow.disabledReason).toEqual(locked.disabled_reason);
   });
 
-  it("the root reproduces the client-owned navigation rows the dock contract requires", () => {
+  it("the navigation source carries the bar's entries, and only while the panel is available", () => {
+    // webclient-scene-overview-swap: the top navigation bar's character /
+    // quest / inventory entries are no dock frame's rows any more — the bar
+    // resolves them from this source, whose builder outlives the tab root
+    // webclient-retire-exploration-submenus deletes.
+    const state = committedState();
+    const resolver = resolverFor(state);
+    const nav = resolver.resolve({ source: "exploration.navigation" });
+    expect(nav.unresolvable).toBeUndefined();
+    expect(nav.items.map((item) => item.key)).toEqual(["character", "quests", "inventory"]);
+    expect(nav.items.find((item) => item.key === "character").openCharacter).toBe(true);
+    expect(nav.items.find((item) => item.key === "quests").openDrawer).toBe("quest");
+    expect(nav.items.find((item) => item.key === "inventory").openDrawer).toBe("inventory");
+    // A capability surface the panel does not report available is absent (no
+    // dead functional entry), and the builder is shared with the retired tab
+    // root, so both agree.
+    state.panels.exploration = explorationPanel({ quests: { available: false } });
+    const narrowed = resolver.resolve({ source: "exploration.navigation" });
+    expect(narrowed.items.map((item) => item.key)).toEqual(["character", "inventory"]);
+    const root = ExplorationMenu.rootItems(state.panels.exploration, null);
+    expect(root.filter((item) => item.key === "quests")).toHaveLength(0);
+
+    // An unavailable exploration panel degrades to the shared marker.
+    state.panels.exploration = {
+      schema_version: 2,
+      available: false,
+      reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
+    };
+    expect(resolver.resolve({ source: "exploration.navigation" })).toEqual({
+      unresolvable: true,
+      reason: "這片區域暫時不可用。",
+    });
+  });
+
+  it("the root is the scene overview: chip rows, a footer, and no tab or navigation entry", () => {
     const resolver = resolverFor(committedState());
     const root = resolver.resolve({ source: "exploration.root" });
     const keys = root.items.map((i) => i.key);
-    expect(keys).toContain("move");
-    expect(keys).toContain("look");
-    expect(keys).toContain("interact");
+    // The reading order: exits, people, objects, then the label-less footer.
+    expect(root.sections.map((section) => section.key)).toEqual([
+      "exits",
+      "people",
+      "objects",
+      "footer",
+    ]);
+    expect(keys).toContain("exit-east");
+    expect(keys).toContain("target-7");
+    expect(keys).toContain("object-3");
+    expect(keys).toContain("look-room");
     expect(keys).toContain("wait");
-    // A generating envelope adds the suggestions root entry (builder-owned).
+    // A generating envelope adds the footer suggestions chip (builder-owned).
     expect(keys).toContain("suggestions");
+    // No tab-root entry and no navigation-carried entry survives on the root.
+    for (const gone of ["move", "look", "interact", "character", "quests", "inventory", "bag"]) {
+      expect(keys).not.toContain(gone);
+    }
   });
 });
 

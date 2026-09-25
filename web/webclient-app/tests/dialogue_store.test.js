@@ -80,11 +80,20 @@ describe("dialogue frame vocabulary", () => {
       source: "exploration.root",
       params: {},
     });
-    // The exploration root keeps its ordinary rows and carries NO dialogue
-    // form flag: the 對話選項 mirror tab is gone.
+    // The exploration root is the scene overview (webclient-scene-overview-
+    // swap) and carries NO dialogue form flag: the 對話選項 mirror tab is
+    // gone, and so is the tab root.
     expect(menu.dialogueForm).toBeUndefined();
     const keys = (menu.items || []).map((i) => i.key);
-    expect(keys).toContain("move");
+    expect(menu.sections.map((section) => section.key)).toEqual([
+      "exits",
+      "people",
+      "objects",
+      "footer",
+    ]);
+    expect(keys).toContain("exit-east");
+    expect(keys).toContain("wait");
+    expect(keys).not.toContain("move");
     expect(keys).not.toContain("dlg-options");
   });
 });
@@ -125,16 +134,20 @@ describe("dialogue store mode lifecycle", () => {
 
   it("a dialogue mode switch keeps the dock on exploration.root", () => {
     openSession();
-    // Open one exploration submenu so the switch has frames to replace.
-    expect(store.focusConfirm("keyboard")).toBe(true); // root row -> move frame
+    // Open one exploration child frame so the switch has frames to replace.
+    // The dock root is the scene overview, so its child frames are the
+    // waiting frame and the verb popover.
+    expect(store.focusItemByKey("wait")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
     expect(store.view.dockDepth).toBe(2);
     expect(store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted).toBe(true);
     expect(store.view.mode).toBe("dialogue");
     expect(store.view.dockDepth).toBe(1);
     // The root frame is the ORDINARY exploration root: no dialogue form,
-    // no 對話選項 tab, ordinary rows still activatable.
+    // no 對話選項 tab, the ordinary overview chips still activatable.
     expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
-    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("move");
+    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("exit-east");
+    expect(store.view.rootMenu.items.map((i) => i.key)).not.toContain("move");
   });
 
   it("digits 1–4 dispatch the caption's scripted picks while the caption presents", () => {
@@ -179,11 +192,12 @@ describe("dialogue store mode lifecycle", () => {
       {},
     );
     expect(store.view.mode).toBe("dialogue");
-    // No caption: digit 1 addresses the exploration root grid (focus +
-    // confirm opens the Move submenu) — the ordinary dock semantics.
+    // No caption: digit 1 addresses the overview's first chip (focus +
+    // confirm submits it) — the ordinary dock semantics.
     expect(store.focusPress("1")).toBe(true);
-    expect(store.view.dockDepth).toBe(2);
-    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.focus.key).toBe("exit-east");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0].action_id).toBe("explore.move");
   });
 
   it("a zero-choice panel releases the digits back to the dock", () => {
@@ -195,7 +209,8 @@ describe("dialogue store mode lifecycle", () => {
       {},
     );
     expect(store.focusPress("1")).toBe(true);
-    expect(store.view.dockDepth).toBe(2);
+    expect(store.view.focus.key).toBe("exit-east");
+    expect(sender.sent.actions).toHaveLength(1);
   });
 
   it("the caption free row keeps the command-line borrow", () => {
@@ -239,9 +254,9 @@ describe("dialogue store mode lifecycle", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     const before = store.view.drawerRequest;
-    // The dock's root grid walks focus columns through the ROUTER.
+    // The dock's overview walks the reading order through the ROUTER.
     expect(store.focusPress("ArrowRight")).toBe(true);
-    expect(store.view.focus.key).toBe("look");
+    expect(store.view.focus.key).toBe("exit-north");
     expect(store.view.drawerRequest).toBe(before);
     expect(sender.sent.actions).toHaveLength(0);
   });
@@ -286,7 +301,7 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.focusEscape()).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.focus.key).toBe("move");
+    expect(store.view.focus.key).toBe("exit-east");
   });
 
   it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
@@ -301,7 +316,7 @@ describe("dialogue store mode lifecycle", () => {
     // The widened non-hosted close guard (align-11 D8): the sub-dock dies
     // with the drawer and the root frame re-homes, exactly as in exploration.
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
   });
 
   it("a panel loss while talking settles the sub-dock in one access", () => {
@@ -314,8 +329,8 @@ describe("dialogue store mode lifecycle", () => {
     store.setActiveSubDock("character");
     // The genuine push route (the store's pop-policy push, driven through the
     // widened exploration-row gate — itself the align-11 D8 behavior: rows
-    // work in dialogue mode).
-    expect(store.focusItemByKey("move")).toBe(true);
+    // work in dialogue mode): the overview's person chip opens the popover.
+    expect(store.focusItemByKey("target-7")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.view.dockDepth).toBe(2);
     store.receive(
@@ -350,6 +365,6 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.depth()).toBe(1);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
   });
 });

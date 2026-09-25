@@ -1,22 +1,14 @@
 import { h } from "vue";
 import DockTabBar from "../../components/DockTabBar.vue";
 
-// DockTabBar (H3 webclient-hud-03-action-dock, task 4.9): the dock's fixed
-// bar — the root frame's items as tabs (glyph, label, count badge) with the
-// seal-red gradient fill on the open/focused tab. At depth 1 it carries the
-// listbox role, the single tab stop, `aria-activedescendant`, and
-// `data-testid="dock-menu"`.
-
-const TAB_ITEMS_EXPLORATION = [
-  { key: "move", label: "移動", enabled: true },
-  { key: "look", label: "查看", enabled: true },
-  { key: "interact", label: "互動", enabled: true },
-  { key: "character", label: "角色狀態", enabled: true },
-  { key: "quests", label: "任務", enabled: true },
-  { key: "inventory", label: "背包", enabled: true },
-  { key: "wait", label: "等待/休息", enabled: true },
-  { key: "suggestions", label: "建議", enabled: true },
-];
+// DockTabBar (H3 webclient-hud-03-action-dock, task 4.9): the COMBAT dock's
+// fixed bar — the combat root's items as tabs (glyph, label, count badge)
+// with the seal-red gradient fill on the open/focused tab. At depth 1 it
+// carries the listbox role, the single tab stop, `aria-activedescendant`, and
+// `data-testid="dock-menu"`. The exploration and dialogue root renders the
+// scene overview instead, so only the combat root is shown here
+// (webclient-scene-overview-swap D3). The shortcut legend is the dock's own
+// strip (ActionDock's `.action-dock__legend`), not a tab-bar hint.
 
 const TAB_ITEMS_COMBAT = [
   { key: "attack", label: "攻擊", enabled: true },
@@ -27,13 +19,12 @@ const TAB_ITEMS_COMBAT = [
   { key: "forfeit", label: "投降", enabled: true },
 ];
 
-// The committed view slice drives the tab badges (task 4.4): 互動 =
-// `exploration.interact.length`, 建議 = `suggestions.cards.length`,
-// 技能 = the flattened skill-descriptor count.
+// The committed view slice drives the tab badges (task 4.4): 技能 = the
+// flattened skill-descriptor count. Only the combat root renders this bar, so
+// it is the only badge this story exercises.
 function makeView(overrides) {
   const base = {
     panels: {
-      exploration: { interact: [{ identity: 5 }, { identity: 6 }], move: [] },
       context_actions: {
         kind: "combat",
         skills: [
@@ -46,10 +37,8 @@ function makeView(overrides) {
           },
         ],
       },
-      suggestions: { status: "ready", cards: [{}, {}, {}], },
     },
-    suggestions: { status: "ready", cards: [{}, {}, {}] },
-    dockTrail: ["探索"],
+    dockTrail: ["戰鬥"],
     dockDepth: 1,
   };
   return Object.assign(base, overrides || {});
@@ -67,18 +56,8 @@ export default {
   component: DockTabBar,
 };
 
-// The exploration root with the 互動 / 建議 / 技能 badges (task 4.9).
-export const ExplorationRootWithBadges = {
-  render: renderTabBar,
-  args: {
-    items: TAB_ITEMS_EXPLORATION,
-    focusedKey: "interact",
-    view: makeView(),
-    depth: 1,
-  },
-};
-
-// The combat root (attack/skills/…/forfeit), one tab focused.
+// The combat root (attack/skills/…/forfeit), one tab focused, the 技能 badge
+// equal to the committed skill count (task 4.9).
 export const CombatRoot = {
   render: renderTabBar,
   args: {
@@ -89,14 +68,14 @@ export const CombatRoot = {
   },
 };
 
-// One tab open at depth ≥ 2 (the seal-red gradient fill on the open tab,
-// task 4.9).
+// One combat tab open at depth ≥ 2 (the seal-red gradient fill on the open
+// tab, task 4.9).
 export const OneTabOpenAtDepth2 = {
   render: renderTabBar,
   args: {
-    items: TAB_ITEMS_EXPLORATION,
-    focusedKey: "look",
-    view: makeView({ dockTrail: ["探索", "查看"], dockDepth: 2 }),
+    items: TAB_ITEMS_COMBAT,
+    focusedKey: "skills",
+    view: makeView({ dockTrail: ["戰鬥", "技能"], dockDepth: 2 }),
     depth: 2,
   },
 };
@@ -112,5 +91,3 @@ export const CreationEmptyBar = {
     depth: 1,
   },
 };
-
-

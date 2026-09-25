@@ -81,7 +81,7 @@ introduced into the band this way.
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
 #### Scenario: The bottom band keeps one height whatever it holds
-- **WHEN** the shell renders at 1920x1080 and the player moves through the exploration root, the interaction workspace, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **WHEN** the shell renders at 1920x1080 and the player moves through the exploration scene overview, a target's verb popover, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
 - **THEN** the bottom band's rendered height is 300px (±1px) in every one of those states, and the message region's and the command region's boxes are unchanged between them
 
 #### Scenario: The band splits two thirds and one third
@@ -664,64 +664,66 @@ existing per-node movement submission SHALL be unchanged.
   graph variant — and in neither case does the island offer a second tab stop beyond its full-map
   affordance
 
-### Requirement: The dock's root frame renders as an icon tab bar with truthful count badges
-The current dock surface's root menu frame SHALL render as a horizontal tab bar, one tab per root
-item, each carrying a decorative glyph and its server-authored text label. The open root entry's tab
-SHALL be marked with the accent fill, and the marking SHALL NOT be the only indication of state. When
-the router is at the root frame the tab bar SHALL be the surface's row container: it SHALL carry the
+### Requirement: The combat dock's root frame renders as an icon tab bar with a truthful skills badge
+In combat mode the dock's root menu frame SHALL render as a horizontal tab bar, one tab per combat root
+item, each carrying a decorative glyph and its label. The focused or open root entry's tab SHALL be
+marked with the accent fill, and the marking SHALL NOT be the only indication of state. When the router
+is at the combat root frame the tab bar SHALL be the surface's row container: it SHALL carry the
 listbox role, be the surface's single tab stop, name the focused tab through an active-descendant
 association, and carry each root item's preserved row identity attribute and row id. When a deeper
-frame is open the tab bar SHALL become inert ancestor chrome that marks which root entry is open and
-SHALL NOT be a second tab stop.
+combat frame is open the tab bar SHALL become inert ancestor chrome that marks which root entry is open
+and SHALL NOT be a second tab stop. No other mode SHALL render a root tab bar: the exploration and
+dialogue root is the scene overview.
 
-A tab SHALL carry a count badge only when the number of rows its frame will contain is derivable
-from the committed payload before that frame is opened; the badge SHALL equal that count exactly. A
-tab whose count is zero or not derivable SHALL carry no badge. A badge SHALL NEVER be rendered from
-an estimate, from a value the panel does not carry, or for rows the frame will not list.
+The 技能 tab SHALL carry a count badge equal to the number of skill descriptors the committed combat
+panel lists across its categories and groups, and SHALL carry no badge when that number is zero; no
+other combat tab carries a badge, and a badge SHALL NEVER be rendered from an estimate or from a value
+the panel does not carry.
 
-The root menu's focus geometry SHALL match the rendered tab order: the root frame's column count
-SHALL equal its item count, so the horizontal arrow keys traverse the visible tabs and the vertical
-arrow keys are a no-op on the root.
+The combat root's focus geometry SHALL match the rendered tab order: its column count SHALL equal its
+item count, so the horizontal arrow keys traverse the visible tabs and the vertical arrow keys are a
+no-op on the root.
 
 A tab's decorative glyph SHALL match the icon `docs/design/elosern-redesign/index.html` (the binding
-visual reference) draws for that same tab concept, for every root or combat-root key the reference
-itself draws an icon for. A key with no counterpart in the reference (a client-local entry the
-reference's static draft never modelled, such as a sub-dock shortcut) SHALL carry whatever glyph best
-represents it and is never required to match a reference that does not exist.
+visual reference) draws for that same tab concept, for every combat-root key the reference draws an
+icon for. A key with no counterpart in the reference (a client-local entry such as the bag drawer row)
+SHALL carry whatever glyph best represents it.
 
-#### Scenario: The root renders as tabs and owns the listbox
-- **WHEN** the dock is at its root frame
+#### Scenario: The combat root renders as tabs and owns the listbox
+- **WHEN** the dock is at the combat root frame
 - **THEN** each root item renders as a tab with a glyph and its label, the tab bar carries the listbox role with a single tab stop and an active-descendant reference, and each tab carries its preserved row identity attribute
 
-#### Scenario: A tab glyph matches the reference design's icon for the same concept
-- **WHEN** the exploration root renders the 移動/查看/互動/建議 tabs, or the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 tabs
+#### Scenario: A combat tab glyph matches the reference design's icon for the same concept
+- **WHEN** the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 tabs
 - **THEN** each tab's glyph is the same pictogram `docs/design/elosern-redesign/index.html` draws for that tab's concept
 
-#### Scenario: Badges equal a real count
-- **WHEN** the committed exploration panel carries two interact targets and the committed suggestions payload carries four ready cards
-- **THEN** the interact tab shows the badge `2`, the suggestions tab shows the badge `4`, and the look and move tabs show no badge
+#### Scenario: The skills badge equals the committed skill count
+- **WHEN** the committed combat panel lists three skill descriptors across its categories, and later a panel with none
+- **THEN** the 技能 tab shows the badge `3`, then no badge at all, and no other combat tab shows a badge
 
-#### Scenario: A zero or unknowable count shows no badge
-- **WHEN** a tab's frame would contain no rows, or its row count cannot be derived from the committed payload
-- **THEN** that tab renders no badge at all rather than a zero or a placeholder
-
-#### Scenario: Tab focus geometry matches the rendered order
-- **WHEN** the player presses the horizontal arrow keys on the root frame
+#### Scenario: Combat tab focus geometry matches the rendered order
+- **WHEN** the player presses the horizontal arrow keys on the combat root frame
 - **THEN** focus moves through the tabs in their rendered order and wraps at the ends, and the vertical arrow keys move focus nowhere
 
-#### Scenario: An open deeper frame leaves the tab bar inert
-- **WHEN** a deeper frame is open
+#### Scenario: An open deeper combat frame leaves the tab bar inert
+- **WHEN** a deeper combat frame is open
 - **THEN** the tab bar marks which root entry is open, the deeper frame's row container is the surface's only listbox and only tab stop, and no tab is reachable by sequential keyboard navigation
 
+#### Scenario: Exploration renders no root tab bar
+- **WHEN** the dock renders in exploration or dialogue mode at any depth
+- **THEN** no tab bar is rendered, and no 移動, 查看, 互動, or 建議 tab exists anywhere in the dock
+
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
-The action dock SHALL carry a shortcut-legend element matching
+The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the
+scrolling region, in exploration, dialogue, and combat mode (never in creation mode), matching
 `docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text
 `數字鍵 1–4 · ` followed by an `<kbd>` element naming `Enter`
 and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`.
 The legend renders
 with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
 The legend SHALL render exactly once as visible content and SHALL be the only element carrying the
-legend's test hook. The dock SHALL NOT carry a dialogue-mode legend variant.
+legend's test hook; no tab bar SHALL carry a second copy. The dock SHALL NOT carry a dialogue-mode
+legend variant.
 
 The legend SHALL NOT name a key, gesture, or affordance this client does not implement or that no
 longer behaves as named, and it SHALL NOT advertise implemented affordances the reference's legend
@@ -731,45 +733,46 @@ updated in the same change that alters the behaviour.
 
 The digits the legend names SHALL be bound: while the dock owns keyboard focus (the key target is
 not editable), pressing
-`1`–`4` moves the current dock frame's focus onto the first four rows (1-indexed, rendered order)
-and activates the row through the same confirm path `Enter` uses — a disabled row shows its
-explanation and submits nothing, an in-flight row stays locked, and a held repeat is suppressed.
-The slots address the pane's rendered rows: where a pane does not render the standard `back`
-cell as a row (the exit-outlet pane), that cell takes no slot. While the narrative caption
-presents the dialogue variant with at least one pick, the slots address the caption's pick rows
-instead of the dock's pane rows — the caption's trailing free-dialogue and exit rows never take
-a digit slot — and the dock's own rows claim no digit while that hold applies.
-A digit whose row does not exist (a frame with fewer rendered rows, a caption variant with no
+`1`–`4` moves the current dock frame's focus onto its first four entries (1-indexed, rendered order —
+for the scene overview, its first four chips in reading order) and activates the entry through the
+same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an
+in-flight entry stays locked, and a held repeat is suppressed.
+The slots address the frame's rendered entries: where a pane does not render the standard `back`
+cell as a row (the exit-outlet pane), that cell takes no slot. While the message window
+presents the dialogue variant with at least one pick, the slots address the window's pick rows
+instead of the dock's entries — the trailing free-dialogue and exit rows never take
+a digit slot — and the dock's own entries claim no digit while that hold applies.
+A digit whose entry does not exist (a frame with fewer rendered entries, a dialogue variant with no
 picks, or
 the pre-session empty stack) is not claimed and falls
 through to the text / command-history path.
 
 #### Scenario: The legend renders once
-- **WHEN** the dock renders in a mode where its chrome (tab bar) is shown
-- **THEN** exactly one element carries the shortcut-legend text and test hook, and no duplicate
-  copy is rendered
+- **WHEN** the dock renders in exploration, dialogue, or combat mode, at the overview, in a child frame, or at the combat root
+- **THEN** exactly one element carries the shortcut-legend text and test hook, it is the dock's
+  legend strip, and no tab bar or pane renders a duplicate copy
 
 #### Scenario: The legend matches the reference wording and kbd structure
-- **WHEN** the dock tab bar renders in exploration, combat, or dialogue mode
+- **WHEN** the dock renders its legend strip in exploration, combat, or dialogue mode
 - **THEN** the legend reads `數字鍵 1–4 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
 
 #### Scenario: A digit picks its row
-- **WHEN** the current dock frame has at least two rows and the player presses `2` from a
-  non-editable focus
-- **THEN** the second row becomes the frame's focus and its action submits exactly as `Enter`
+- **WHEN** the scene overview's first two chips are an exit and a person, and the player presses `2`
+  from a non-editable focus
+- **THEN** the person chip becomes the frame's focus and its popover opens exactly as `Enter`
   would, once
 
 #### Scenario: A digit beyond the frame's rows is unclaimed
-- **WHEN** the current dock frame has fewer rows than the pressed digit and the command field is
-  not focused
+- **WHEN** the current dock frame has fewer rendered entries than the pressed digit and the command
+  field is not focused
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders three picks over a dock root frame and the player presses
+- **WHEN** the dialogue variant renders three picks over the dock's scene overview and the player presses
   `2` and `4` from a non-editable focus
-- **THEN** the `2` press activates caption pick two through the same dispatch entry, the `4` press
-  is unclaimed and falls through, and no dock row is focused or activated
+- **THEN** the `2` press activates pick two through the same dispatch entry, the `4` press
+  is unclaimed and falls through, and no dock chip is focused or activated
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 
@@ -1817,27 +1820,27 @@ descriptor: its rows derive from the committed panel alone.
 
 ### Requirement: The dock keeps its regular exploration form in dialogue mode
 While the committed mode is `dialogue`, the action dock SHALL render its ordinary exploration
-root — the same root items, tab bar, panes, digit bindings outside the caption-retarget rule, and
-router behaviour as exploration mode — derived from the committed `exploration` panel, which keeps
+root — the same scene overview, verb popover, child frames, digit bindings outside the caption-retarget
+rule, and router behaviour as exploration mode — derived from the committed `exploration` panel, which keeps
 shipping its ordinary payload in dialogue mode. The dock SHALL NOT present a dialogue-specific
-root, SHALL NOT duplicate the dialogue panel's pick rows in any pane, and SHALL NOT remove any
+root, SHALL NOT duplicate the dialogue panel's pick rows in the overview or any frame, and SHALL NOT remove any
 ordinary affordance while mode is `dialogue`. A mode switch into or out of `dialogue` SHALL
 re-home the router stack to the ordinary exploration root descriptor through the existing teardown
 decision point.
 
 #### Scenario: The dock stays usable during a conversation
 - **WHEN** mode commits to `dialogue` with the exploration panel's ordinary payload
-- **THEN** the dock tab bar shows the ordinary exploration root entries (move/look/interact/…)
-  with no `對話選項` tab and no pick-row pane anywhere
+- **THEN** the dock shows the ordinary scene overview (exits, people, objects, and the footer)
+  with no `對話選項` entry and no pick-row frame anywhere
 
 #### Scenario: Movement stays one action away
-- **WHEN** the player opens the move frame while a dialogue session is live and activates an exit
+- **WHEN** the player activates an exit chip in the scene overview while a dialogue session is live
 - **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the
   session through the existing seam, and the committed mode returns to `exploration`
 
 #### Scenario: Mode flips re-home the stack
-- **WHEN** a committed snapshot switches the mode from exploration to dialogue while exploration
-  submenus are open
+- **WHEN** a committed snapshot switches the mode from exploration to dialogue while a verb popover
+  or another exploration child frame is open
 - **THEN** the stack holds exactly the ordinary exploration root descriptor and no stale submenu
   row remains activatable
 
@@ -1898,12 +1901,16 @@ menu key, or the meaning of Escape.
 The action dock SHALL fill the bottom band's command region — the right third of the band, or the
 whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed
 elsewhere on the stage. Its box SHALL be the command region's box in every mode and for every frame:
-no frame (the interaction workspace, the waiting frame, the combat frames, the skill master-detail,
-the destructive confirmation, or an empty pane host) SHALL widen, heighten, shorten, or move it, and
+no frame (the scene overview, a target's verb popover, the waiting frame, the combat frames, the skill
+master-detail, the destructive confirmation, or an empty pane host) SHALL widen, heighten, shorten, or
+move it, and
 no surface outside the band SHALL be positioned from the frame the dock currently carries. The
-content column SHALL be laid out as a fixed-height tab bar, an optional breadcrumb line, and one
-remaining region that holds the current frame's rows; that region SHALL be the surface's only
-scrolling area, so no dock content is ever pushed outside the command region. A frame whose content
+content column SHALL be laid out as fixed chrome — the combat root's tab bar in combat mode and no bar
+in exploration or dialogue mode, an optional breadcrumb line, and the shortcut-legend strip at the
+bottom — around one remaining region that holds the current frame's rows or chips; that region SHALL
+be the surface's only scrolling area, so no dock content is ever pushed outside the command region.
+A target's verb popover SHALL render as a card laid over that region's visible box, inside the command
+region, and SHALL scroll inside its own card when its rows exceed it. A frame whose content
 does not fit the region's width SHALL wrap or collapse its own columns inside the region, never
 overflow it horizontally. The panel SHALL be the same single `#action-dock` element in every mode,
 carrying its existing tab index, its `data-mode` attribute and its role as the surface's documented
@@ -1918,13 +1925,13 @@ as well as their gold or warm-red emphasis.
 - **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
 
 #### Scenario: No frame resizes the command region
-- **WHEN** the dock moves at 1440x900 from the exploration root to the interaction workspace, to the waiting frame, and, in combat, to the deepest skill target frame
-- **THEN** the command region's rendered box is identical (±1px) in all four states and the band's height is unchanged
+- **WHEN** the dock moves at 1440x900 from the scene overview to a target's verb popover, to the waiting frame, and, in combat, to the deepest skill target frame
+- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and the verb popover's card lies inside the command region
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
-- **THEN** the row region scrolls internally, the tab bar and the breadcrumb stay fixed, and no
-  row is rendered outside the command region
+- **THEN** the row region scrolls internally, the dock's chrome (the combat tab bar, the breadcrumb,
+  and the legend strip) stays fixed, and no row or chip is rendered outside the command region
 
 #### Scenario: One dock element persists across a mode change
 - **WHEN** the committed mode changes between exploration, combat and creation

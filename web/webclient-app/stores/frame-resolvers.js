@@ -11,6 +11,19 @@
 // combat, and creation families. The dock push sites mount descriptors; menu
 // content exists only at resolution time.
 //
+// The exploration root is the scene overview (webclient-scene-overview-swap,
+// AVG stage design §7): `exploration.root` resolves
+// `ExplorationMenu.overviewMenu` — one reading-order menu of exits, people,
+// objects, and a footer, with the router's `sections` geometry — and
+// `exploration.target` resolves `ExplorationMenu.verbMenuFor`, the target's
+// verb popover. `exploration.navigation` is the top navigation bar's own
+// entry set (the character status, quest, and inventory surfaces, which no
+// dock frame carries any more). The move/look/interact submenus and the
+// `targetMenuFor` grid stay registered but unreachable until
+// `webclient-retire-exploration-submenus` deletes them with their tests;
+// `ExplorationMenu.navigationItems` outlives them, because the bar keeps
+// reading it.
+//
 // Purity contract: resolving twice against one committed state returns deep-
 // equal menus and mutates nothing — the builders are pure over their inputs,
 // and every resolver here only reads `getState()` and calls them.
@@ -113,7 +126,12 @@ export function createFrameResolver(deps) {
       currentNodeFromAffordances(contextActions) ||
       null;
     const suggestions = (contextActions && contextActions.suggestions) || null;
-    return { panel, model: ExplorationMenu.buildMenus(panel, { currentNode, suggestions }) };
+    return {
+      panel,
+      currentNode,
+      suggestions,
+      model: ExplorationMenu.buildMenus(panel, { currentNode, suggestions }),
+    };
   }
 
   // A source whose owning panel committed its unavailable form degrades with
@@ -132,6 +150,31 @@ export function createFrameResolver(deps) {
     if (!gate.ok) return gate.reason;
     const { model } = explorationModel();
     return isolate(model.menus[menuKey]);
+  };
+
+  // The scene overview (webclient-scene-overview-swap D1): the exploration
+  // root frame. One reading-order menu of the committed panel's exits,
+  // people, objects, and footer, carrying the router's `sections` geometry.
+  // The same `currentNode` fallback the tab root used feeds the exit
+  // payloads, so they stay byte-identical.
+  const explorationOverviewSource = () => {
+    const gate = requireExplorationPanel();
+    if (!gate.ok) return gate.reason;
+    const { panel, currentNode, suggestions } = explorationModel();
+    return isolate(ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }));
+  };
+
+  // The top navigation bar's exploration entries (webclient-scene-overview-
+  // swap): the character status, quest, and inventory surfaces. The scene
+  // overview carries no navigation entry — the bar is their sole
+  // keyboard-visible stop — so the bar derives them from the dedicated
+  // `navigationItems` builder, which the retired tab root also consumed.
+  const explorationNavigationSource = () => {
+    const gate = requireExplorationPanel();
+    if (!gate.ok) return gate.reason;
+    const state = committed();
+    const panel = (state.panels && state.panels.exploration) || null;
+    return isolate({ items: ExplorationMenu.navigationItems(panel) });
   };
 
   // --- combat family helpers -------------------------------------------------
@@ -221,7 +264,8 @@ export function createFrameResolver(deps) {
   }
 
   const table = {
-    "exploration.root": explorationMenuSource("root"),
+    "exploration.root": explorationOverviewSource,
+    "exploration.navigation": explorationNavigationSource,
     "exploration.move": explorationMenuSource("move"),
     "exploration.look": explorationMenuSource("look"),
     "exploration.interact": explorationMenuSource("interact"),
@@ -229,7 +273,7 @@ export function createFrameResolver(deps) {
     "exploration.target": (params) => {
       const found = targetForIdentity(params);
       if (!found.ok) return found.reason;
-      const menu = ExplorationMenu.targetMenuFor(found.model, found.target);
+      const menu = ExplorationMenu.verbMenuFor(found.model, found.target);
       return menu ? isolate(menu) : marker(null);
     },
     "exploration.keywords": (params) => {

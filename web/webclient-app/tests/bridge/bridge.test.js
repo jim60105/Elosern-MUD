@@ -198,8 +198,9 @@ describe("window.Elosern bridge", () => {
     const { store, facade } = installBridge();
     openActiveSession(store);
 
-    // Initial focus is the first G2 root item.
-    expect(store.view.focus.key).toBe("move");
+    // Initial focus is the scene overview's first chip
+    // (webclient-scene-overview-swap: the exploration root is the overview).
+    expect(store.view.focus.key).toBe("exit-east");
 
     // An unclaimed key (a plain letter) is not swallowed by the bridge.
     const unclaimed = press("l");
@@ -212,21 +213,25 @@ describe("window.Elosern bridge", () => {
     const slash = press("/");
     expect(slash.defaultPrevented).toBe(true);
 
-    // A consumed key (ArrowRight) moves focus along the G2 single-row root
-    // grid (7-column, one row); ArrowDown is a no-op in a single-row grid.
+    // A consumed key (ArrowRight) steps the overview's reading order: exits,
+    // then people, then objects, then the footer.
     const right = press("ArrowRight");
     expect(right.defaultPrevented).toBe(true);
-    expect(store.view.focus.key).toBe("look");
-    expect(store.view.focus.enabled).toBe(true);
+    expect(store.view.focus.key).toBe("exit-north");
+    expect(store.view.focus.enabled).toBe(false);
 
-    // A second ArrowRight reaches "interact"; a plain letter is left unclaimed.
+    // A second ArrowRight reaches the person chip; a plain letter is left
+    // unclaimed.
     press("ArrowRight");
-    expect(store.view.focus.key).toBe("interact");
+    expect(store.view.focus.key).toBe("target-7");
     const unclaimed2 = press("m");
     expect(unclaimed2.defaultPrevented).toBe(false);
 
-    // Reference entries live in the top navigation, so the next action is wait.
-    press("ArrowRight");
+    // The footer's 等待／休息 chip is the reading order's sixth entry: the
+    // reference entries live in the top navigation, so the overview walks on.
+    press("ArrowRight"); // object-3
+    press("ArrowRight"); // look-room
+    press("ArrowRight"); // wait
     expect(store.view.focus.key).toBe("wait");
     const enterWait = press("Enter");
     expect(enterWait.defaultPrevented).toBe(true);

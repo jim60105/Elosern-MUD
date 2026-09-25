@@ -24,6 +24,17 @@ const ROOT_ITEMS = [
   { key: "suggestions", label: "建議", enabled: true },
 ];
 
+// The combat root is the ONLY root that renders the tab bar
+// (webclient-scene-overview-swap D3).
+const COMBAT_ROOT_ITEMS = [
+  { key: "attack", label: "攻擊", enabled: true },
+  { key: "skills", label: "技能", enabled: true },
+  { key: "items", label: "物品", enabled: false },
+  { key: "defend", label: "防禦", enabled: false },
+  { key: "flee", label: "逃亡", enabled: true },
+  { key: "forfeit", label: "投降", enabled: true },
+];
+
 
 function normalizeItems(items) {
   return items.map((item) => {
@@ -121,14 +132,15 @@ describe("ActionDock (B2 action-dock family)", () => {
   });
 
   it("renders the draft shortcut legend as the single hook-bearing element", () => {
-    // webclient-align-01-dock-chrome: the legend is the tab bar's trailing
-    // hint (the draft's `.dock .hint`), the ONLY element carrying the
-    // `action-dock-description` hook. The hidden duplicate is gone.
+    // webclient-scene-overview-swap D3: the legend is the dock's own strip
+    // below the scrolling body (the draft's `.dock .hint`), the ONLY element
+    // carrying the `action-dock-description` hook. The hidden duplicate is
+    // gone, and no tab bar carries a second copy.
     const w = mountDock({ rootItems: ROOT_ITEMS });
     const legends = w.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);
     const legend = legends[0];
-    expect(legend.classes()).toContain("dock-tab-bar__hint");
+    expect(legend.classes()).toContain("action-dock__legend");
     expect(legend.text()).toBe("數字鍵 1–4 · Enter 執行 · Esc 返回");
     // The draft's <kbd> structure: exactly two kbd children, in order.
     const kbds = legend.findAll("kbd");
@@ -149,31 +161,70 @@ describe("ActionDock (B2 action-dock family)", () => {
 
   it("renders exactly one visible legend with the draft's kbd styling", () => {
     const w = mountDock({ rootItems: ROOT_ITEMS });
-    const hint = w.get('[data-testid="action-dock-description"]');
-    const hintStyle = getComputedStyle(hint.element);
+    const legend = w.get('[data-testid="action-dock-description"]');
+    const legendStyle = getComputedStyle(legend.element);
     // The visible legend: not clipped, not a hidden 1x1 copy.
-    expect(hintStyle.display).not.toBe("none");
-    expect(hintStyle.width).not.toBe("1px");
+    expect(legendStyle.display).not.toBe("none");
+    expect(legendStyle.width).not.toBe("1px");
     // The draft's kbd rule is owned by this component's stylesheet: mono
     // face, the `--ink-780` ground, and the 2px bottom border.
-    const kbdRule = cssRuleFor(".dock-tab-bar__hint kbd");
+    const kbdRule = cssRuleFor(".action-dock__legend kbd");
     expect(kbdRule, "the legend kbd rule ships").not.toBeNull();
     const kbdCss = kbdRule.style.cssText;
     expect(kbdCss).toContain("--ink-780");
     expect(kbdCss).toContain("var(--f-mono)");
     expect(kbdCss).toContain("border-bottom-width: 2px");
-    // The tab icon's `<path>` carries the reference's per-key stroke
-    // attributes: `move` has both cap+join, `interact` has join only,
-    // `suggestions` (the star) has neither.
-    const movePath = w.find('.dock-tab-bar__tab[data-item-key="move"] .dock-tab-bar__icon path');
-    expect(movePath.attributes("stroke-linecap")).toBe("round");
-    expect(movePath.attributes("stroke-linejoin")).toBe("round");
-    const interactPath = w.find('.dock-tab-bar__tab[data-item-key="interact"] .dock-tab-bar__icon path');
-    expect(interactPath.attributes("stroke-linejoin")).toBe("round");
-    expect(interactPath.attributes("stroke-linecap")).toBeUndefined();
-    const suggPath = w.find('.dock-tab-bar__tab[data-item-key="suggestions"] .dock-tab-bar__icon path');
-    expect(suggPath.attributes("stroke-linecap")).toBeUndefined();
-    expect(suggPath.attributes("stroke-linejoin")).toBeUndefined();
+  });
+
+  it("renders one legend in exploration, dialogue, and combat, and none in creation", () => {
+    for (const mode of ["exploration", "dialogue", "combat"]) {
+      const w = mountDock({ mode, rootItems: COMBAT_ROOT_ITEMS, tabBar: true });
+      expect(w.findAll('[data-testid="action-dock-description"]'), mode).toHaveLength(1);
+      w.unmount();
+    }
+    const creation = mountDock({ mode: "creation", rootItems: [] });
+    expect(creation.findAll('[data-testid="action-dock-description"]')).toHaveLength(0);
+  });
+
+  it("renders the tab bar only for the combat root", () => {
+    // The exploration/dialogue root is the scene overview, which renders in
+    // the pane — never as a tab bar (webclient-scene-overview-swap D3).
+    const exploration = mountDock({ rootItems: ROOT_ITEMS });
+    expect(exploration.find(".dock-tab-bar").exists()).toBe(false);
+    exploration.unmount();
+
+    const combat = mountDock({ mode: "combat", rootItems: COMBAT_ROOT_ITEMS, tabBar: true });
+    expect(combat.find(".dock-tab-bar").exists()).toBe(true);
+    // The combat tab icon's `<path>` carries the reference's per-key stroke
+    // attributes: `attack`/`flee` have cap only, `skills` (the star) neither.
+    const attackPath = combat.find('.dock-tab-bar__tab[data-item-key="attack"] .dock-tab-bar__icon path');
+    expect(attackPath.attributes("stroke-linecap")).toBe("round");
+    expect(attackPath.attributes("stroke-linejoin")).toBeUndefined();
+    const fleePath = combat.find('.dock-tab-bar__tab[data-item-key="flee"] .dock-tab-bar__icon path');
+    expect(fleePath.attributes("stroke-linecap")).toBe("round");
+    const skillsPath = combat.find('.dock-tab-bar__tab[data-item-key="skills"] .dock-tab-bar__icon path');
+    expect(skillsPath.attributes("stroke-linecap")).toBeUndefined();
+    expect(skillsPath.attributes("stroke-linejoin")).toBeUndefined();
+  });
+
+  it("renders the overlay slot inside the action-dock body, after the pane", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(ActionDock, {
+      attachTo: host,
+      props: { mode: "exploration" },
+      slots: {
+        default: () => [h("div", { "data-testid": "pane-content" })],
+        overlay: () => [h("div", { "data-testid": "overlay-content" })],
+      },
+    });
+    const body = wrapper.get(".action-dock__body");
+    expect(body.find(".action-dock__pane").exists()).toBe(true);
+    const overlay = wrapper.get('[data-testid="overlay-content"]');
+    // The overlay is the body's second child: a positioned overlay therefore
+    // covers exactly the pane's visible box.
+    expect(overlay.element.parentElement).toBe(body.element);
+    expect(overlay.element.previousElementSibling.className).toContain("action-dock__pane");
   });
 
   it("never renders suggestion content at the dock root outside the pane", () => {

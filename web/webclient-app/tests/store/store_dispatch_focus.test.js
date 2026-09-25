@@ -213,7 +213,7 @@ describe("store dispatch + focus", () => {
   });
 
   describe("the keyboard-router focus slice", () => {
-    it("loads the committed exploration frame with the G2 root keys", () => {
+    it("loads the committed scene overview with its chip keys", () => {
       openSession();
       store.receive(
         1,
@@ -222,16 +222,17 @@ describe("store dispatch + focus", () => {
         {},
       );
       const view = store.view;
-      expect(view.focus.key).toBe("move");
-      expect(view.focus.label).toBe("移動");
+      expect(view.focus.key).toBe("exit-east");
+      expect(view.focus.label).toBe("西風酒館");
       expect(view.focus.enabled).toBe(true);
-      // The G2 root is a single-row 7-column grid; navigate horizontally.
+      // The overview navigates as rows of chips in reading order
+      // (webclient-scene-overview-swap): ArrowRight steps to the next chip.
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("look");
-      expect(store.view.focus.label).toBe("查看");
+      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.enabled).toBe(false);
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("interact");
-      expect(store.view.focus.label).toBe("互動");
+      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.label).toBe("店長");
     });
 
     it("navigates the combat root grid with preserved action keys", () => {
@@ -296,9 +297,9 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("move");
+      expect(store.view.focus.key).toBe("exit-east");
       store.focusPress("ArrowRight");
-      expect(store.view.focus.key).toBe("look");
+      expect(store.view.focus.key).toBe("exit-north");
 
       // An identical update must not reset the focus position.
       store.receive(
@@ -307,12 +308,12 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 3, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("look");
+      expect(store.view.focus.key).toBe("exit-north");
 
       // Declarative frame semantics (webclient-declarative-frame-stack): a
       // changed panel RE-RESOLVES the open frame — the focus key survives
-      // whenever the re-derived rows still carry it (the inventory surface
-      // disappearing removes a different row, not the focused one). The old
+      // whenever the re-derived rows still carry it (the inventory capability
+      // disappearing removes no overview chip). The old
       // copy reset the whole frame to the first item on any content change;
       // that reset is gone by design (design D3: the frame is a descriptor,
       // focus is a key, and re-resolution preserves it).
@@ -330,7 +331,7 @@ describe("store dispatch + focus", () => {
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("look");
+      expect(store.view.focus.key).toBe("exit-north");
      });
 
     it("routes a confirmed action item through the single dispatch entry", () => {
@@ -341,8 +342,10 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      // Navigate the G2 root to the "wait" entry (col 6): ArrowRight x6 from "move".
-      for (let i = 0; i < 6; i += 1) {
+      // Navigate the overview to the footer's 等待／休息 chip: the reading
+      // order is exit-east, exit-north, target-7, object-3, look-room, wait,
+      // suggestions.
+      for (let i = 0; i < 5; i += 1) {
         store.focusPress("ArrowRight");
       }
       expect(store.view.focus.key).toBe("wait");
@@ -374,19 +377,16 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      // Confirming the "move" root entry opens the move submenu.
-      expect(store.focusConfirm("keyboard")).toBe(true);
-      // The move frame navigates as a single-column list: ArrowDown moves to
-      // the second list item (the disabled "exit-north"); a disabled item
-      // emits a `disabled` notice and never dispatches.
-      expect(store.focusPress("ArrowDown")).toBe(true);
+      // The overview's second chip is the disabled exit: it stays focusable
+      // for its explanation and never dispatches.
+      expect(store.focusItemByKey("exit-north")).toBe(true);
       expect(store.view.focus.key).toBe("exit-north");
       expect(store.view.focus.enabled).toBe(false);
       expect(store.focusConfirm("keyboard")).toBe(false);
       expect(sender.sent.actions.length).toBe(0);
 
       // Pointer activation shares the same gates (mutation-lock + enabled).
-      store.focusPress("ArrowUp"); // back to the enabled "exit-east"
+      expect(store.focusItemByKey("exit-east")).toBe(true);
        store.dispatchAction("explore.wait", { daypart: "dusk" });
        expect(store.focusConfirm("pointer")).toBe(false);
        expect(store.view.dispatch.inFlight).not.toEqual(null);
@@ -405,10 +405,11 @@ describe("store dispatch + focus", () => {
        expect(store.view.dockDepth).toBe(1);
        invariant();
 
-       // Push: confirming the focused root entry ("move") opens the move
-       // submenu — the frame stack grows to depth 2, the trail gains a level.
+       // Push: confirming the overview's 等待／休息 chip opens the waiting
+       // frame — the frame stack grows to depth 2, the trail gains a level.
        const panels2 = { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() };
        store.receive(1, "ui_update", [fx.update({ revision: 2, panels: panels2 })], {});
+       expect(store.focusItemByKey("wait")).toBe(true);
        expect(store.focusConfirm("keyboard")).toBe(true);
        expect(store.view.dockDepth).toBe(2);
        invariant();

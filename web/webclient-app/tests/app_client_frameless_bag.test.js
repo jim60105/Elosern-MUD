@@ -63,15 +63,16 @@ describe("frameless 背包 drawer (composition contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
-  it("keeps keyboard traversal on visible action tabs after moving reference entries", async () => {
+  it("keeps keyboard traversal on visible overview chips after moving reference entries", async () => {
     mountAppClient();
     commitPanels();
     await wrapper.vm.$nextTick();
     const dock = wrapper.get("#action-dock");
-    expect(dock.findAll('[role="option"]').map((item) => item.text())).toEqual([
-      "移動", "查看", "互動1", "等待/休息", "建議",
-    ]);
-    for (const key of ["move", "look", "interact", "wait", "suggestions"]) {
+    // The exploration root is the scene overview (webclient-scene-overview-
+    // swap): its chips are the dock's rendered rows in reading order.
+    const keys = ["exit-east", "exit-north", "target-7", "object-3", "look-room", "wait", "suggestions"];
+    expect(dock.findAll('[role="option"]').map((item) => item.attributes("data-item-key"))).toEqual(keys);
+    for (const key of keys.slice(0, -1)) {
       expect(store.view.focus.key).toBe(key);
       expect(dock.find(`[data-item-key="${key}"][aria-selected="true"]`).exists()).toBe(true);
       store.focusPress("ArrowRight");
@@ -122,7 +123,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
       // it was before the open.
       expect(document.activeElement, name).toBe(row.element);
       expect(store.router.depth(), name).toBe(1);
-      expect(store.router.currentMenu().title, name).toBe("探索");
+      expect(store.router.currentMenu().title, name).toBe("場景");
     }
   });
 

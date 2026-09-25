@@ -6,10 +6,12 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_overview_chip,
+    fixture_home_node_id,
     focus_action_dock,
     install_outbound_recorder,
-    sent_action_count,
     outbound_messages,
+    sent_action_count,
     store_state,
     wait_for_store_state,
 )
@@ -72,13 +74,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
 
     # --- declarative-frame-stack browser verification (task 5.1) -----------
     #
@@ -173,77 +168,69 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     def test_pointer_back_cell_returns_to_the_root_without_an_action(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Pointer: open Look, then click its final back cell.
+        # Pointer: open a person chip's verb popover, then click its final
+        # back cell (webclient-scene-overview-swap: the popover is the
+        # overview's one child frame; the retired Look submenu is gone).
+        panel = self._live_exploration_panel(page)
+        targets = panel.get("interact") or []
+        self.assertTrue(targets, "the fixture room must offer an interact target")
+        chip_key = "target-%s" % targets[0]["identity"]
         wait_for_store_state(
             page,
             lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="look"]',
+                "selector": '#action-dock [data-item-key="%s"]' % chip_key,
                 "predicate": (
-                    "() => !!document.querySelector('#action-dock [data-item-key=\"look\"]')"
+                    "() => !!document.querySelector("
+                    "'#action-dock [data-item-key=\"%s\"]')" % chip_key
                 ),
-                "description": "Look cell rendered in the exploration dock",
+                "description": "the person chip rendered in the exploration dock",
             },
         )
-        page.locator('[data-item-key="look"]').click()
+        page.locator('#action-dock [data-item-key="%s"]' % chip_key).click()
         wait_for_store_state(
             page,
-            _connected_active,
+            lambda s: s.get("dockSource") == "exploration.target",
             dom_readiness={
-                "selector": '[data-testid="exploration-detail"]',
+                "selector": '[data-testid="verb-popover"] [data-item-key="back"]',
                 "predicate": (
-                    "() => !!document.querySelector('[data-testid=\"exploration-detail\"]')"
+                    "() => !!document.querySelector("
+                    "'[data-testid=\"verb-popover\"] [data-item-key=\"back\"]')"
                 ),
-                "description": "exploration detail panel rendered",
+                "description": "the popover's back cell rendered",
             },
         )
+        page.locator('[data-testid="verb-popover"] [data-item-key="back"]').click()
         wait_for_store_state(
             page,
-            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
+            lambda s: s.get("dockSource") == "exploration.root",
             dom_readiness={
-                "selector": '#action-dock [data-item-key="back"]',
+                "selector": "#action-dock [data-testid=\"scene-overview\"]",
                 "predicate": (
-                    "() => !!document.querySelector('#action-dock [data-item-key=\"back\"]')"
+                    "() => !!document.querySelector("
+                    "'#action-dock [data-testid=\"scene-overview\"]')"
                 ),
-                "description": "back cell rendered in the detail dock",
+                "description": "the scene overview rendered in the dock",
             },
         )
-        page.locator('[data-item-key="back"]').click()
-        wait_for_store_state(
-            page,
-            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
-            dom_readiness={
-                "selector": "#action-dock",
-                "predicate": (
-                    "() => { const keys = Array.from("
-                    "document.querySelectorAll('#action-dock [data-item-key]'))"
-                    ".map((el) => el.getAttribute('data-item-key'));"
-                    "return keys.indexOf('move') !== -1 && keys.indexOf('look') !== -1; }"
-                ),
-                "description": "exploration root cells (move/look) rendered in the dock",
-            },
-        )
-        # The root cells render again, no ui_action was sent, and no
-        # command-line text was submitted.
+        # The overview's chips render again, no ui_action was sent, and the
+        # stack is back at the root frame.
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
         )
-        # H3 (design D5): the exploration root includes the 建議 (suggestions)
-        # tab; the desktop redesign (webclient-exploration-menu, synced
-        # projection scenario) omits the character, quests, and inventory
-        # entries the top navigation owns, so the root renders the
-        # capability-driven five-tab set.
-        self.assertEqual(
-            keys,
-            ["move", "look", "interact", "wait", "suggestions"],
-        )
+        self.assertIn(chip_key, keys, "the overview renders the person chip again")
+        self.assertIn("look-room", keys, "the overview renders its footer again")
+        self.assertIn("wait", keys, "the overview renders its footer again")
+        for gone in ("move", "look", "interact"):
+            self.assertNotIn(gone, keys, "the retired tab-root entry must not render")
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
             page.evaluate("window.__elosernBridge.router.depth()"),
@@ -251,35 +238,38 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the back cell pops exactly one router frame",
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     def test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Interact -> the scripted host -> 交談 (scripted keywords): two levels deep.
+        # The overview's host chip -> the verb popover -> 交談 (scripted
+        # keywords): two levels deep (webclient-scene-overview-swap).
         panel = self._live_exploration_panel(page)
         host_identity = panel["interact"][0]["identity"]
-        self._open_root(page, 2)  # Interact
-        _press(page, "Enter")  # the scripted host (first present target)
+        activate_overview_chip(page, "target-%s" % host_identity)
         _press(page, "Enter")  # 交談 (first affordance)
-        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 4)
-        _press(page, "Escape")  # back to the target-affordance menu
-        page.wait_for_timeout(80)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 3)
+        _press(page, "Escape")  # back to the target's verb popover
+        page.wait_for_timeout(80)
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
         # H3 (design D2): at depth >= 2 the dock renders both the root tab
         # bar (8 root tabs) and the scrolling pane (the active frame's rows).
         # The test's cell assertions target the pane's rows only.
         target_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'.action-dock__pane [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'[data-testid=\"verb-popover\"] [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
         )
-        # The host's affordance menu: the scripted-talk entry plus the final
-        # back cell (the exploration fixture carries no guild navigate entry).
+        # The host's verb popover: the scripted-talk entry plus 查看 and the
+        # final back cell (the exploration fixture carries no guild navigate
+        # entry). The card renders in the dock's overlay layer, over the
+        # inert overview (webclient-scene-overview-swap).
         self.assertEqual(
             target_keys,
-            ["talk-scripted", "back"],
-            "the target-affordance cells must render after one Escape",
+            ["talk-scripted", "look-target", "back"],
+            "the popover's cells must render after one Escape",
         )
         self.assertEqual(
             page.evaluate(
@@ -288,21 +278,34 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ),
             "talk-scripted",
         )
-        _press(page, "Escape")  # back to the Interact target list
+        _press(page, "Escape")  # back to the scene overview
         page.wait_for_timeout(80)
-        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
-        interact_keys = page.evaluate(
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
+        root_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'.action-dock__pane [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
         )
-        expected_interact = [
+        expected_root = [
+            "exit-" + str(row["exit_ref"]) for row in panel.get("move") or []
+        ]
+        expected_root += [
             "target-" + str(target["identity"]) for target in panel["interact"]
         ]
-        expected_interact.append("back")
+        expected_root += ["look-room", "wait"]
+        # The footer's 建議 chip renders whenever the committed envelope's
+        # status is not `unavailable`.
+        suggestions = (
+            ((store_state(page).get("panels") or {}).get("context_actions") or {})
+            .get("suggestions")
+            or {}
+        )
+        if suggestions.get("status") not in (None, "unavailable"):
+            expected_root.append("suggestions")
         self.assertEqual(
-            interact_keys,
-            expected_interact,
-            "the Interact list cells must render after the second Escape",
+            root_keys,
+            expected_root,
+            "the overview's chips must render after the second Escape",
         )
         self.assertEqual(
             page.evaluate(
@@ -313,7 +316,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), 0)
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     def test_escape_from_quests_drawer_leaves_root_clean(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -343,13 +346,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
         )
-        self.assertEqual(
-            keys,
-            ["move", "look", "interact", "wait", "suggestions"],
-            "the exploration root cells must render after Escape from Quests",
-        )
+        # The exploration root is the scene overview (webclient-scene-
+        # overview-swap): the exits lead its reading order, then the people,
+        # the objects, and the footer.
+        self.assertIn("look-room", keys, "the overview's footer renders after Escape from Quests")
+        self.assertIn("wait", keys, "the overview's footer renders after Escape from Quests")
+        for gone in ("move", "look", "interact"):
+            self.assertNotIn(gone, keys, "the retired tab-root entry must not render")
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
@@ -358,3 +364,109 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             focused_before,
             "router's focused item must be unchanged from before the open",
         )
+
+    @covers_requirement(
+        "webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview"
+    )
+    def test_keyboard_only_journey_walks_the_overview(self):
+        """A pure arrows-and-Enter journey at 1920x1080: the overview's chips
+        are reachable, an exit chip moves, a person chip opens the verb
+        popover (Escape returns with that chip focused), and a move from the
+        minimap returns the dock to the new room's overview
+        (webclient-scene-overview-swap, design D2/D6)."""
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        focus_action_dock(page)
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+        page.wait_for_timeout(60)
+
+        panel = self._live_exploration_panel(page)
+        exits = panel.get("move") or []
+        self.assertTrue(exits, "the fixture room must offer exits")
+        targets = panel.get("interact") or []
+        self.assertTrue(targets, "the fixture room must offer an interact target")
+        person = targets[0]
+
+        # Arrows reach a person chip; Enter opens the popover; Escape returns
+        # with that chip focused.
+        activate_overview_chip(page, "target-%s" % person["identity"])
+        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+        self.assertEqual(
+            store_state(page)["dockSource"],
+            "exploration.target",
+            "the person chip must open the verb popover",
+        )
+        _press(page, "Escape")
+        wait_for_store_state(page, lambda s: s.get("dockSource") == "exploration.root")
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            "target-%s" % person["identity"],
+            "Escape must restore the chip that opened the popover",
+        )
+        self.assertEqual(page.locator('[data-testid="verb-popover"]').count(), 0)
+
+        # Arrows reach an exit chip — the 出口 row leads the reading order, so
+        # walking left from the restored person chip wraps onto an exit — and
+        # Enter submits explore.move for it.
+        for _ in range(12):
+            if str(store_state(page)["focus"]["key"]).startswith("exit-"):
+                break
+            _press(page, "ArrowLeft")
+        focused = store_state(page)["focus"]["key"]
+        self.assertTrue(
+            str(focused).startswith("exit-"),
+            "arrows must reach an exit chip (focus was %r)" % (focused,),
+        )
+        _press(page, "Enter")
+        self._wait_panel(
+            page,
+            "local_map",
+            lambda p: p.get("available") is True and p["current_node"] != fixture_home_node_id(),
+        )
+        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        wait_for_store_state(page, _connected_active)
+        page.wait_for_timeout(120)
+
+        # The new room's overview is the dock's ONLY frame: the move reset the
+        # stack to the committed root, and nothing of the previous room stays
+        # activatable.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        self.assertEqual(
+            store_state(page)["dockSource"],
+            "exploration.root",
+            "the dock must be back at the overview after a move",
+        )
+        self.assertEqual(page.locator('[data-testid="verb-popover"]').count(), 0)
+
+        # Opening 等待／休息 and then moving by activating a minimap node
+        # returns the dock to the overview (design D2: a minimap move
+        # bypasses the dock's own push sites).
+        activate_overview_chip(page, "wait")
+        page.wait_for_selector(".waiting-screen", timeout=15000)
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 2)
+
+        # The minimap's own node control is the move path that bypasses the
+        # dock entirely: a click on it submits the same explore.move the
+        # overview's exit chip would.
+        node_id = page.evaluate(
+            """() => {
+              const lm = window.__elosernBridge.store.view.localMapModel;
+              if (!lm || !Array.isArray(lm.nodes)) return null;
+              const n = lm.nodes.find((n) => n.action && n.action.kind === "move");
+              return n ? n.id : null;
+            }"""
+        )
+        self.assertIsNotNone(node_id, "the minimap must offer a move-capable node")
+        node_control = page.locator(
+            '[data-testid="local-map"] [data-node="%s"]' % node_id
+        )
+        self.assertGreater(node_control.count(), 0, "the minimap node must render")
+        node_control.first.click()
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dockDepth") or 0) == 1 and s.get("dockSource") == "exploration.root",
+            timeout=30000,
+        )
+        self.assertEqual(page.locator(".waiting-screen").count(), 0)
+        self.assertEqual(page.locator('[data-testid="scene-overview"]').count(), 1)

@@ -142,11 +142,17 @@
     return key in DIRECTION_ALIASES ? DIRECTION_ALIASES[key] : null;
   }
 
-  function rootItems(panel, suggestions) {
+  // The exploration panel's navigation-presented rows (webclient-scene-
+  // overview-swap): the character status, quest, and inventory surfaces. They
+  // are NOT a dock frame any more — the scene overview deliberately carries no
+  // navigation entry — so the top navigation bar owns them as their sole
+  // keyboard-visible stop and derives them from the committed panel's own
+  // capability flags. A root whose capability surface is absent must not
+  // render as a dead functional entry, so 任務 and 背包 appear only while the
+  // panel reports them available.
+  function navigationItems(panel) {
+    panel = panel || {};
     var items = [
-      openItem("move", "移動", "move"),
-      openItem("look", "查看", "look"),
-      openItem("interact", "互動", "interact"),
       {
         key: "character",
         label: "角色狀態",
@@ -156,8 +162,6 @@
         openCharacter: true,
       },
     ];
-    // A root whose capability surface is absent must not render as a dead
-    // functional entry.
     if (panel.quests && panel.quests.available) {
       // 任務 is a client-local drawer open (the 背包 precedent):
       // activating it opens the 任務 drawer without pushing a keyboard
@@ -184,6 +188,20 @@
         openDrawer: "inventory",
       });
     }
+    return items;
+  }
+
+  function rootItems(panel, suggestions) {
+    var items = [
+      openItem("move", "移動", "move"),
+      openItem("look", "查看", "look"),
+      openItem("interact", "互動", "interact"),
+    ];
+    // The navigation-presented rows share one builder with the top
+    // navigation bar (webclient-scene-overview-swap): the retired tab root
+    // carried them in its own order, the bar derives them from the same
+    // source.
+    Array.prototype.push.apply(items, navigationItems(panel));
     items.push(openItem("wait", "等待/休息", "wait"));
     // The suggestions root entry (H3 webclient-hud-03-action-dock): present
     // whenever the committed `suggestions` envelope is not `unavailable`;
@@ -881,6 +899,7 @@
 
    return {
      buildMenus: buildMenus,
+     navigationItems: navigationItems,
      rootItems: rootItems,
      moveItems: moveItems,
      lookItems: lookItems,

@@ -23,12 +23,15 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
+    activate_first_overview_exit,
+    activate_overview_chip,
     fixture_home_node_id,
+    focus_action_dock,
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
     outbound_messages,
+    overview_target_with_affordance,
     sent_action_count,
     store_state,
     wait_for_narrative_settled,
@@ -1039,11 +1042,6 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
 
     @covers_requirement(
         "webclient-desktop-shell::player-input-lines-are-part-of-the-narrative-stream-with-a-divider"
@@ -1059,8 +1057,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertTrue(move_rows, "the fixture must offer exits")
         first_exit_label = move_rows[0]["label"]
 
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # first exit
+        activate_first_overview_exit(page)  # the overview's first exit chip
         self._wait_panel(
             page,
             "local_map",
@@ -1094,9 +1091,10 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
                 break
         self.assertIsNotNone(bard, "the fixture must offer free-form dialogue")
 
-        self._open_root(page, 2)  # Interact
-        _press(page, "ArrowRight")  # the bard (second grid column)
-        _press(page, "Enter")
+        # The overview's 人物 chip for the bard opens its verb popover
+        # (webclient-scene-overview-swap); the popover's rows are a vertical
+        # list.
+        activate_overview_chip(page, "target-%s" % bard["identity"])
         # The target affordances are the spec's single-column rows now
         # (webclient-exploration-menu: "the selected target's heading and its
         # single-column affordance rows hold the second column, keyboard
@@ -1137,9 +1135,9 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        self._open_root(page, 2)  # Interact
-        _press(page, "ArrowRight")  # the bard (second grid column)
-        _press(page, "Enter")
+        # The overview's 人物 chip for the bard opens its verb popover.
+        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        activate_overview_chip(page, "target-%s" % bard["identity"])
         # Vertical affordance navigation (webclient-exploration-menu:
         # "single-column affordance rows ... vertical affordance
         # navigation").
@@ -1260,8 +1258,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertEqual(surface.get_attribute("data-page"), "1")
         self.assertNotIn("【段落15】", surface.inner_text())
 
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # first exit
+        activate_first_overview_exit(page)  # the overview's first exit chip
         self._wait_panel(
             page,
             "local_map",

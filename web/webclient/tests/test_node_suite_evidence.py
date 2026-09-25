@@ -269,7 +269,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus"
+        "webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview"
     )
     def test_exploration_menu_node_suite_passes(self):
         result = subprocess.run(
