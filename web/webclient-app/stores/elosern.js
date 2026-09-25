@@ -116,6 +116,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // Set when the router reports a settle-driven pop during the current
   // publish window (see `settleFrameStack`).
   ctx.settlePopSeen = false;
+  // The committed exploration room identity recorded at the previous settle
+  // (see `settleFrameStack`): a change while a deeper exploration frame is
+  // open returns the dock to the scene overview
+  // (webclient-scene-overview-swap D2). Null until the first settle.
+  ctx.lastRoomIdentity = null;
 
   // The reactive view/narrative refs (the view group projects into `view`).
   ctx.view = ref(null); // assigned right after the groups are applied

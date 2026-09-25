@@ -223,18 +223,11 @@ body {
    narrow region without horizontal overflow. */
 .elosern-root [data-anchor="band-command"] .dock-detail { flex: 0 1 min(220px, 45%); min-width: 0; }
 .elosern-root [data-anchor="band-command"] .skill-detail-pane { flex: 1 1 min(220px, 45%); min-width: 0; }
-.elosern-root [data-anchor="band-command"] .dock-pane-host.interaction-workspace { gap: 10px 14px; }
-/* The target cells keep the router's column count (an inline style) and
-   compact themselves to the region instead: a smaller avatar and gap. */
-.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-row { gap: 8px; padding: 7px; min-width: 0; }
-.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-avatar { width: 34px; height: 40px; font-size: 19px; }
-.elosern-root [data-anchor="band-command"] .interaction-workspace .dock-menu__nav-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* The root tab bar shares the region's width: every tab stays on the first
-   row (equal shares, centred), and the shortcut hint takes its own
-   right-aligned row, so no tab ever wraps into the breadcrumb. */
+/* The combat root tab bar shares the region's width: every tab stays on the
+   first row (equal shares, centred), so no tab ever wraps into the
+   breadcrumb. */
 .elosern-root [data-anchor="band-command"] .dock-tab-bar { flex-wrap: wrap; row-gap: 2px; }
 .elosern-root [data-anchor="band-command"] .dock-tab-bar__tab { flex: 1 1 0; min-width: 0; justify-content: center; gap: 6px; padding-inline: 6px; white-space: nowrap; }
-.elosern-root [data-anchor="band-command"] .dock-tab-bar__hint { flex: 1 0 100%; text-align: right; }
 /* The command-line row sits on the message region's top edge (design D3):
    a tab-like strip that reads as part of the band beneath it — rounded top
    corners, a hairline gold top edge, and no seam against the band. */
@@ -248,7 +241,6 @@ body {
 }
 .elosern-root .dock-tab-bar__tab { border: 1px solid #53504a; border-radius: 5px; padding: 8px 10px; background: linear-gradient(#ffffff05, #0002); font-family: var(--f-serif); }
 .elosern-root .dock-tab-bar__tab--on { background: var(--gold-glow); border-color: var(--gold-400); color: var(--gold-400); box-shadow: inset 0 -2px var(--gold-500); }
-.elosern-root .dock-tab-bar__hint { font-size: 10px; opacity: .8; }
 /* The waiting frame renders inside the band's narrow command region: its
    three cards stack in one column (design D5). */
 .waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
@@ -268,84 +260,6 @@ body {
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-.elosern-root .dock-pane-host.interaction-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  align-items: start;
-  gap: 12px 24px;
-}
-.interaction-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 10px;
-  color: var(--gold-400);
-  font: 15px var(--f-serif);
-}
-.interaction-heading > span {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 25px;
-  height: 25px;
-  border-radius: 50%;
-  background: var(--gold-400);
-  color: var(--ink-950);
-  font: 15px var(--f-mono);
-}
-.interaction-heading--active { grid-column: 1; grid-row: 1; margin: 0; }
-.interaction-workspace > .dock-menu { grid-column: 1; grid-row: 2; }
-.interaction-prompt,
-.interaction-targets { grid-row: 1 / 3; min-width: 0; }
-.interaction-prompt {
-  grid-column: 2;
-  border-left: var(--line);
-  padding-left: 20px;
-  align-self: stretch;
-}
-.interaction-prompt p { color: var(--paper-500); font-size: 13px; line-height: 1.8; }
-.interaction-targets { grid-column: 1; }
-.interaction-workspace--selected > .interaction-heading--active,
-.interaction-workspace--selected > .dock-menu { grid-column: 2; }
-.interaction-target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 8px; }
-.interaction-target {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 9px;
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--panel-hi);
-  color: var(--paper-100);
-  font: 14px var(--f-serif);
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-.interaction-target[aria-pressed="true"] { border-color: var(--gold-400); background: var(--gold-glow); box-shadow: inset 3px 0 var(--gold-400); }
-.interaction-target:focus-visible { outline: 2px solid var(--gold-400); outline-offset: -2px; }
-.interaction-target:disabled { opacity: .55; cursor: default; }
-.interaction-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 46px;
-  height: 54px;
-  overflow: hidden;
-  border: 1px solid var(--gold-500);
-  border-radius: var(--radius-sm);
-  color: var(--gold-400);
-  background: var(--ink-820);
-  font: 26px var(--f-serif);
-}
-.interaction-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.interaction-workspace .dock-menu__nav { grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); }
-.interaction-workspace .dock-menu__aff-buttons { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
-.interaction-workspace .dock-menu__aff-btn { width: 100%; min-height: 40px; padding: 9px 12px; border-radius: var(--radius-sm); text-align: left; }
-.interaction-workspace .dock-menu__plain { display: grid; gap: 7px; }
-.interaction-workspace .dock-menu-item { min-height: 40px; padding: 9px 12px; justify-content: flex-start; text-align: left; }
 .elosern-root .m-dialogue .dlg { gap: 18px; padding: 0; border: 0; background: none; }
 .elosern-root .m-dialogue .dlg .av { width: 82px; height: 96px; border-radius: var(--radius-sm); }
 .elosern-root .m-dialogue .dlg .who { font: 19px var(--f-serif); margin-bottom: 9px; overflow-wrap: anywhere; }
@@ -355,8 +269,6 @@ body {
 .elosern-root .m-dialogue .choices .pick .k { color: var(--gold-400); border-color: var(--gold-500); }
 .elosern-root .m-dialogue .choices .pick .t { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 1000px) {
-  .elosern-root .dock-pane-host.interaction-workspace { gap: 10px 14px; }
-  .interaction-target-grid { grid-template-columns: minmax(0, 1fr); }
   .elosern-root .m-dialogue .dlg .av { width: 60px; height: 74px; }
 }
 @media (max-height: 780px) {
@@ -406,7 +318,6 @@ body {
   font-size: 15px;
 }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__icon { width: 21px; height: 21px; }
-.elosern-root [data-elosern-mode="combat"] .dock-tab-bar__hint { display: none; }
 /* In a narrow command region (1440 and 1280 wide viewports) the combat
    root's seven tabs stack icon over label, so all of them keep one row
    without touching (webclient-avg-stage-shell design D5). */

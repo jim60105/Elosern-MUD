@@ -182,6 +182,10 @@ watch(
 .scene-overview {
   display: flex;
   flex-direction: column;
+  /* The overview is the pane host's only child and fills its full width
+     (webclient-desktop-shell: the scene overview is the direct-child rule's
+     one exception for row regions). */
+  flex: 1;
   gap: 8px;
   min-width: 0;
 }

@@ -34,6 +34,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       panel,
       dispatchIntent,
       openRestForm: restWait.openRestForm,
+      shellRef,
     }),
     ...useIntentHandlers(store, dispatchIntent),
   };

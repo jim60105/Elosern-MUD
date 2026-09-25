@@ -1,13 +1,12 @@
 // The action-dock surface (H3): the committed `context_actions` frame
 // normalization shared by the keyboard router and the visible DockMenu, the
-// root/navigation tab entries, the interaction workspace, the detail-pane
+// root/navigation tab entries, the scene-overview projection, the detail-pane
 // derivation, and the dock's pointer-activation handlers. Extracted verbatim
 // from AppClient.vue so the SFC stays a passive renderer.
-import { computed } from "vue";
+import { computed, nextTick, watch } from "vue";
 import { classifyPane } from "../components/dock-panes.js";
-import { portraitFor } from "../components/party-helpers.js";
 
-export function useDock(store, { panel, dispatchIntent, openRestForm }) {
+export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }) {
   // Normalize the committed top navigation and action-root entries identically.
   function normalizeRootItems(items) {
     return items.map((item) => {
@@ -163,22 +162,51 @@ export function useDock(store, { panel, dispatchIntent, openRestForm }) {
   // dock's tab bar + pane render from one commit; the pane host (DockMenu)
   // re-derives the same kind internally for its row variants.
   const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
-  const interactionOpen = computed(() =>
-    ["exploration.interact", "exploration.target", "exploration.keywords"].includes(store.view.dockSource),
-  );
-  const interactionTarget = computed(() => interactionOpen.value ? store.view.combatMenu?.target : null);
-  const interactionChoices = computed(() => store.explorationInteract.map((target) => ({
-    ...target,
-    portrait: portraitFor(panel("art"), target.portrait_ref),
-  })));
 
-  function onInteractionTarget(identity) {
-    if (identity === interactionTarget.value?.identity) return;
-    store.tabToRootAndConfirm("interact", "pointer");
-    if (store.focusItemByKey(`target-${identity}`)) {
-      store.focusConfirm("pointer");
-    }
-  }
+  // The scene overview (webclient-scene-overview-swap D4): the exploration
+  // dock's root frame is the overview, and a target's verb popover is one
+  // child frame of it rendered over the inert overview. The overview is
+  // therefore shown at both sources; it is ACTIVE only at the root. A
+  // degraded root still renders through DockMenu's single marker row.
+  const overviewShown = computed(
+    () =>
+      !store.view.degradedRoot &&
+      (store.view.dockSource === "exploration.root" ||
+        store.view.dockSource === "exploration.target"),
+  );
+  const overviewActive = computed(() => store.view.dockSource === "exploration.root");
+  // At the root the current frame and the root frame are the same menu; under
+  // the popover the overview keeps rendering the root frame's menu.
+  const overviewMenu = computed(() =>
+    overviewActive.value ? store.view.combatMenu : store.view.rootMenu,
+  );
+  // The chip that opened the popover, read from the verb menu's own `target`
+  // (`verbMenuFor` returns it). The mark is cosmetic — the overview is inert
+  // while the popover is open.
+  const overviewFocusKey = computed(() => {
+    const identity = store.view.combatMenu?.target?.identity;
+    return identity === undefined || identity === null ? null : `target-${identity}`;
+  });
+
+  // DOM focus across the popover (webclient-scene-overview-swap D5): the
+  // overview listbox goes `inert` while the popover is open, and the popover
+  // unmounts on close, so either transition would drop DOM focus to `<body>`
+  // when it sat inside them. Re-focus the dock — the surface's documented
+  // focus target — and never steal focus from the command line or a drawer.
+  watch(
+    () => store.view.dockSource,
+    async (source, previous) => {
+      if (source !== "exploration.target" && previous !== "exploration.target") {
+        return;
+      }
+      await nextTick();
+      const active = document.activeElement;
+      const dock = document.getElementById("action-dock");
+      if (active === document.body || (dock && dock.contains(active))) {
+        shellRef?.value?.restoreDockFocus();
+      }
+    },
+  );
 
   // H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
   // tab's item, and confirms it ("pointer") — one deliberate activation, no
@@ -208,21 +236,6 @@ export function useDock(store, { panel, dispatchIntent, openRestForm }) {
     const v = store.view;
     return v.mode === "combat" || v.dockDepth > 1;
   });
-  // webclient-pointer-activation: a pointer activation on a disabled row SHALL
-  // surface that row's explanation in the detail pane. The interaction
-  // workspace normally suppresses the generic detail pane (its step prompt
-  // owns the pane region), but when the focused row of the workspace's own
-  // rendered frame is disabled, the disabled-explanation contract outranks
-  // the pane-free layout and the pane stays readable.
-  const focusedRowDisabled = computed(() => {
-    const menu = store.view.combatMenu;
-    const focused = store.view.focus && store.view.focus.key;
-    if (!menu || !Array.isArray(menu.items) || !focused) {
-      return false;
-    }
-    const row = menu.items.find((item) => item.key === focused);
-    return !!row && row.enabled === false;
-  });
 
   function onAction(intent) {
     // One dispatch intent per activation; the store is the single writer.
@@ -250,18 +263,17 @@ export function useDock(store, { panel, dispatchIntent, openRestForm }) {
     contextActionsPanel,
     dockItems,
     dockPaneKind,
-    focusedRowDisabled,
     detailTestId,
-    interactionOpen,
-    interactionTarget,
-    interactionChoices,
     navigationItems,
     onAction,
     onDockActivate,
     onDockBack,
     onDockFocusChange,
-    onInteractionTarget,
     onTabClick,
+    overviewActive,
+    overviewFocusKey,
+    overviewMenu,
+    overviewShown,
     rowPrefix,
     rootItems,
     showDetail,

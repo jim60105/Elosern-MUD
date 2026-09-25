@@ -1,11 +1,17 @@
 <script setup>
-// DockTabBar (H3 webclient-hud-03-action-dock, task 4.3): the dock's fixed
-// bar — the root frame's items rendered as tabs (glyph, label, count badge)
-// with the seal-red gradient fill on the open/focused tab. At depth 1 the
-// tab bar carries the preserved listbox composite: `role="listbox"`, a single
-// tab stop, `aria-activedescendant`, and `data-testid="dock-menu"` (the
-// active row container at depth 1 — the dock-menu testid moves to the pane
-// container at depth ≥ 2).
+// DockTabBar (H3 webclient-hud-03-action-dock, task 4.3): the combat dock's
+// fixed bar — the root frame's items rendered as tabs (glyph, label, count
+// badge) with the seal-red gradient fill on the open/focused tab. At depth 1
+// the tab bar carries the preserved listbox composite: `role="listbox"`, a
+// single tab stop, `aria-activedescendant`, and `data-testid="dock-menu"`
+// (the active row container at depth 1 — the dock-menu testid moves to the
+// pane container at depth ≥ 2).
+//
+// Only the combat root renders this bar (webclient-scene-overview-swap D3,
+// the `tabBar` prop on ActionDock): the exploration and dialogue root is the
+// scene overview. The shortcut legend is no longer the bar's trailing hint —
+// it is the dock's own strip (ActionDock's `.action-dock__legend`), so it
+// shows in every non-creation mode including combat.
 //
 // Non-current tab click (task 4.5): a click on a different tab pops the
 // router back to the root frame, focuses that tab's item, and confirms it
@@ -126,17 +132,6 @@ function onTabClick(tab) {
       <span class="dock-tab-bar__label">{{ tab.label }}</span>
       <span v-if="tab.showBadge" class="dock-tab-bar__badge">{{ tab.badgeCount }}</span>
     </button>
-    <!-- The shortcut legend (webclient-align-01-dock-chrome): the draft's
-         `.dock .hint` markup — `數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd>
-         返回` with styled `<kbd>` elements. It is the single visible legend and
-         the only element carrying the `action-dock-description` hook (the old
-         visually-hidden duplicate was deleted). The text names only
-         implemented behaviour (1–4 pick cards, Enter activates, Esc pops one
-         frame); the `/` focus binding stays implemented but the draft's legend
-         does not advertise it, and the legend stays truthful to the reference. -->
-    <span class="dock-tab-bar__hint" data-testid="action-dock-description">
-      數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
-    </span>
   </div>
 </template>
 
@@ -216,23 +211,4 @@ function onTabClick(tab) {
   color: #fff;
 }
 
-.dock-tab-bar__hint {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--paper-700);
-  font-family: var(--f-sans);
-  white-space: nowrap;
-}
-
-/* The legend's `<kbd>` treatment, verbatim from the reference draft's
-   `.dock .hint kbd` rule. */
-.dock-tab-bar__hint kbd {
-  font-family: var(--f-mono);
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 0 4px;
-  color: var(--paper-300);
-}
 </style>

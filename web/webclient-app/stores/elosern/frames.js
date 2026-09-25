@@ -16,7 +16,19 @@
 import KeyboardRouter from "../../lib/keyboard_router.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import { actionIntentForItem } from "../../components/dock-items.js";
-import { NAVIGATION_ITEM_KEYS } from "./shared.js";
+
+// The committed exploration room identity (webclient-scene-overview-swap D2):
+// the exploration panel's own stable movement key — `look.room.identity`. It
+// changes exactly on movement and needs no narrative parsing (a
+// `local_map.current_node` change would miss rooms without map knowledge).
+// Null when the panel is absent or in its unavailable form: an unavailable
+// panel never resets the stack.
+function explorationRoomIdentity(rs) {
+  const panel = (rs && rs.panels && rs.panels.exploration) || null;
+  const room = (panel && panel.look && panel.look.room) || null;
+  const identity = room ? room.identity : null;
+  return identity === undefined ? null : identity;
+}
 
 export function applyFrames(ctx) {
   // D4: the imported keyboard router owns the focus state.
@@ -28,19 +40,7 @@ export function applyFrames(ctx) {
     resolve: (descriptor) => {
       const menu = ctx.frameResolver.resolve(descriptor);
       if (
-        descriptor.source === "exploration.root" &&
-        Array.isArray(menu.items)
-      ) {
-        // Top navigation entries must not remain invisible keyboard stops.
-        // Scope: the EXPLORATION root only. The combat root's client-local
-        // 背包 row (inventory-item-actions: the combat dock root adds one
-        // client-local bag drawer row) is a keyboard stop by contract —
-        // filtering it here made the combat bag pointer-only and shifted
-        // the root's arrow geometry (acd3790 regression).
-        menu.items = menu.items.filter((item) => !NAVIGATION_ITEM_KEYS.has(item.key));
-      }
-      if (
-        ["exploration.suggestions", "exploration.target", "exploration.keywords"].includes(descriptor.source) &&
+        ["exploration.suggestions", "exploration.keywords"].includes(descriptor.source) &&
         Array.isArray(menu.items)
       ) {
         // Readable cards and action choices share a vertical keyboard list.
@@ -76,8 +76,9 @@ export function applyFrames(ctx) {
   ctx.rootDescriptorFor = function rootDescriptorFor(rs) {
     // webclient-align-11-dialogue-ux: dialogue mode has NO dock form of its
     // own. The committed `dialogue` panel renders in the narrative caption;
-    // the dock stays on the exploration root through a talk (the heuristic
-    // below serves `exploration.root` — the context_actions panel keeps its
+    // the dock stays on the exploration root — the scene overview
+    // (webclient-scene-overview-swap) — through a talk (the heuristic below
+    // serves `exploration.root`, because the context_actions panel keeps its
     // exploration kind while talking), so movement, services, and the
     // interact affordances stay reachable mid-conversation.
     // The combat family is keyed on the committed panel form (panel.kind),
@@ -438,6 +439,26 @@ export function applyFrames(ctx) {
           router.replaceFrame(want, { openerKey: null });
           descriptor = router.currentDescriptor();
         }
+      }
+      // Return to the overview on a room change (webclient-scene-overview-swap
+      // D2). The committed room identity changes exactly on movement; a move
+      // from the minimap or a typed command bypasses the dock's own push
+      // sites, so the reset lives here, after the access-time settle (a
+      // popover already popped by a departed target is not double-handled).
+      // The identity is recorded on every settle: the first settle after
+      // mount carries no previous identity and never resets, and an
+      // unavailable panel records null.
+      if (ctx.dockOnExplorationForm(rs)) {
+        const roomIdentity = explorationRoomIdentity(rs);
+        if (
+          roomIdentity !== ctx.lastRoomIdentity &&
+          ctx.lastRoomIdentity !== null &&
+          router.depth() > 1
+        ) {
+          router.resetFrame(EXPLORATION_ROOT_DESCRIPTOR, { openerKey: null });
+          descriptor = router.currentDescriptor();
+        }
+        ctx.lastRoomIdentity = roomIdentity;
       }
     } finally {
       ctx.inStackMutation = false;

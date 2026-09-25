@@ -5,16 +5,28 @@
 // third; webclient-avg-stage-shell). The band chrome (the draft's upward
 // gradient, the `--line` top border, the upward shadow) is owned by the
 // band element itself (`.stage-band`); this container keeps only
-// `max-width:1180px` centering and
-// the fixed-bar / crumb / scrolling-pane layout (the draft's `.dock`). The
-// preserved `#action-dock` element keeps its `tabindex`, `data-mode`, and the
-// listbox composite role (the row container carrying `data-testid="dock-menu"`
-// moves between the tab bar (depth 1) and the pane (depth ≥ 2).
+// `max-width:1180px` centering and the fixed-chrome / scrolling-body layout
+// (the draft's `.dock`). The preserved `#action-dock` element keeps its
+// `tabindex`, `data-mode`, and its role as the surface's documented focus
+// target. The row container carrying `data-testid="dock-menu"` is the combat
+// root's tab bar (depth 1, combat only) or the pane (every other frame).
 //
-// The `context_actions.suggestions` envelope is now a keyboard-reachable
-// router frame (task 2.3): the `建議` root row opens it, and the pane
-// renders its card rows, the `✕ 清除建議` row, and a back row. No separate
-// `suggestions-section` element (group 8 re-maps the browser assertions).
+// The chrome (webclient-scene-overview-swap D3) is, top to bottom: the
+// optional guidance line, the combat root's tab bar (only while `tabBar`),
+// the breadcrumb, the scrolling body, and the shortcut-legend strip. The
+// legend lives here, not in the tab bar, so it renders in exploration,
+// dialogue, and combat mode alike; it is the single element carrying the
+// `action-dock-description` hook.
+//
+// The body is `position: relative`, so an `overlay` child positioned
+// `absolute; inset: 0` covers exactly the visible pane box — that is how a
+// target's verb popover (DockVerbPopover) is laid over the inert scene
+// overview inside the command region.
+//
+// The `context_actions.suggestions` envelope is a keyboard-reachable router
+// frame: the overview's footer `建議` chip opens it, and the pane renders its
+// card rows, the `✕ 清除建議` row, and a back row. No separate
+// `suggestions-section` element.
 import { computed } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
 import DockTabBar from "./DockTabBar.vue";
@@ -26,6 +38,10 @@ const props = defineProps({
   // The root frame's items (the stable hierarchical root or the combat root),
   // rendered as the tab bar's tabs (task 4.3).
   rootItems: { type: Array, default: () => [] },
+  // Whether the root frame renders as the icon tab bar (webclient-scene-
+  // overview-swap D3): only the combat root does. The exploration and
+  // dialogue root is the scene overview, which renders in the pane.
+  tabBar: { type: Boolean, default: false },
   // The committed view slice: the tab bar's badges derive from the committed
   // payload only (task 4.4), and the crumb reads `dockTrail`/`dockDepth`
   // (task 3.1/3.2).
@@ -87,7 +103,7 @@ function onPaneActivate(payload) {
       {{ guidancePrefix }}
     </div>
     <DockTabBar
-      v-if="showChrome"
+      v-if="tabBar && showChrome"
       :items="rootItems"
       :focused-key="focusedKey"
       :view="view"
@@ -102,13 +118,30 @@ function onPaneActivate(payload) {
       :focused-key="focusedKey"
       @back="onBack"
     />
-    <!-- The scrolling pane: the active menu frame (a root menu, a sub-menu,
-         or a target/skill/scale/confirm frame). At depth 1 the exploration
-         root draws no pane content beyond the tab bar; combat and submenus
-         render the pane through the default slot. -->
-    <div class="action-dock__pane">
-      <slot />
+    <!-- The body: the scrolling pane plus the overlay layer. The pane holds
+         the active menu frame (the scene overview, a sub-menu, or a
+         target/skill/scale/confirm frame); the named `overlay` slot renders
+         after it and covers exactly the pane's visible box (the verb
+         popover). -->
+    <div class="action-dock__body">
+      <div class="action-dock__pane">
+        <slot />
+      </div>
+      <slot name="overlay" />
     </div>
+    <!-- The shortcut legend (webclient-align-01-dock-chrome, re-homed by
+         webclient-scene-overview-swap D3): the draft's `.dock .hint` markup —
+         `數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回` with styled
+         `<kbd>` elements. It is the single visible legend and the only
+         element carrying the `action-dock-description` hook; it renders in
+         exploration, dialogue, and combat mode (never in creation mode). -->
+    <p
+      v-if="mode !== 'creation'"
+      class="action-dock__legend"
+      data-testid="action-dock-description"
+    >
+      數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
+    </p>
     <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
          and ✕ 清除建議 from ActionDock.vue source text). The active suggestions
          surface renders exclusively in the 建議 router pane. -->
@@ -139,10 +172,19 @@ function onPaneActivate(payload) {
   outline-offset: 2px;
 }
 
-/* The scrolling pane (task 4.1): bounded height with internal scroll. */
-.action-dock__pane {
+/* The body (task 4.1): the dock's one remaining region, holding the scrolling
+   pane and the overlay layer. It is the flex child that takes the column's
+   remaining height; the overlay child is positioned against it, so it covers
+   exactly the pane's visible box whatever the pane's scroll position. */
+.action-dock__body {
+  position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* The scrolling pane (task 4.1): bounded height with internal scroll. */
+.action-dock__pane {
+  height: 100%;
   overflow-y: auto;
   padding: 6px 8px 8px;
   display: flex;
@@ -157,5 +199,29 @@ function onPaneActivate(payload) {
 .action-dock__pane::-webkit-scrollbar-thumb {
   background: var(--ink-700);
   border-radius: 3px;
+}
+
+/* The shortcut-legend strip: one line pinned below the scrolling body, so it
+   stays visible while the frame's rows scroll. */
+.action-dock__legend {
+  flex: none;
+  margin: 0;
+  padding: 2px 8px 6px;
+  font-size: 11px;
+  color: var(--paper-700);
+  font-family: var(--f-sans);
+  white-space: nowrap;
+}
+
+/* The legend's `<kbd>` treatment, verbatim from the reference draft's
+   `.dock .hint kbd` rule. */
+.action-dock__legend kbd {
+  font-family: var(--f-mono);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--paper-300);
 }
 </style>

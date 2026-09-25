@@ -116,7 +116,8 @@ export const DisconnectedSession = {
 };
 
 // Exercise the real composed shell: isolated component stories cannot expose
-// overlap between the dock, wrapped tabs, narrative and command-line anchors.
+// overlap between the dock, the wrapped overview chips, the verb popover,
+// the narrative and the command-line anchors.
 const renderPlayer = (args) => ({
   setup() {
     const host = ref(null);
@@ -229,7 +230,9 @@ const renderPlayer = (args) => ({
 });
 
 export const ActionNavigation = { render: renderPlayer, args: {} };
-export const InteractionSelector = { render: renderPlayer, args: { pane: "interact" } };
+// A person chip's verb popover (webclient-scene-overview-swap): the overview
+// stays rendered beneath it while the popover's card covers the pane.
+export const VerbPopoverSelector = { render: renderPlayer, args: { pane: "target-7" } };
 export const DialogueSelector = { render: renderPlayer, args: { dialogue: true } };
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
 export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
