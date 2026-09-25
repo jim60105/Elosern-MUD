@@ -27,7 +27,20 @@ export function applyView(ctx) {
     // where frame-content reads would throw. `mounted` guards every read.
     const mounted = ctx.router.depth() > 0;
     const currentItem = mounted ? ctx.router.currentItem() : null;
-    const navigationMenu = mounted ? ctx.frameResolver.resolve(ctx.rootDescriptorFor(rs)) : null;
+    // The top navigation bar's entries (webclient-scene-overview-swap): the
+    // exploration form carries the character/quest/inventory surfaces on the
+    // BAR, not in any dock frame — the scene overview deliberately has no
+    // navigation entry — so the exploration mode resolves them from the
+    // committed exploration panel. Every other family's root frame still
+    // carries its own navigation rows (the combat root's client-local 背包).
+    const navigationDescriptor = ctx.rootDescriptorFor(rs);
+    const navigationMenu = mounted
+      ? ctx.frameResolver.resolve(
+          navigationDescriptor && navigationDescriptor.source === "exploration.root"
+            ? { source: "exploration.navigation", params: {} }
+            : navigationDescriptor,
+        )
+      : null;
     // The combat selection reads resolve through the resolver's one model —
     // calling it here is the adoption point; outside combat form it is null.
     const combatNow = panel && panel.kind === "combat" ? ctx.frameResolver.combatModel() : null;

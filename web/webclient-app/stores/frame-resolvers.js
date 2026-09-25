@@ -39,6 +39,7 @@
 // to this registry.
 
 import ExplorationMenu from "../lib/exploration_menu.js";
+import { NAVIGATION_ITEM_KEYS } from "./elosern/shared.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 import stableStringify from "../lib/stable_stringify.js";
@@ -160,6 +161,21 @@ export function createFrameResolver(deps) {
     return isolate(ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }));
   };
 
+  // The top navigation bar's exploration entries (webclient-scene-overview-
+  // swap): the character status, quest, and inventory surfaces. The scene
+  // overview carries no navigation entry — the bar is their sole
+  // keyboard-visible stop — so the bar derives them from the same shipped
+  // builder the retired tab root used, filtered to the navigation keys.
+  const explorationNavigationSource = () => {
+    const gate = requireExplorationPanel();
+    if (!gate.ok) return gate.reason;
+    const { panel, suggestions } = explorationModel();
+    const menu = ExplorationMenu.buildMenus(panel, { currentNode: null, suggestions });
+    return isolate({
+      items: menu.menus.root.items.filter((item) => NAVIGATION_ITEM_KEYS.has(item.key)),
+    });
+  };
+
   // --- combat family helpers -------------------------------------------------
 
   // The preserved CombatMenu tree for the active combat panel (client-local
@@ -248,6 +264,7 @@ export function createFrameResolver(deps) {
 
   const table = {
     "exploration.root": explorationOverviewSource,
+    "exploration.navigation": explorationNavigationSource,
     "exploration.move": explorationMenuSource("move"),
     "exploration.look": explorationMenuSource("look"),
     "exploration.interact": explorationMenuSource("interact"),
