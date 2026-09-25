@@ -769,9 +769,9 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C5 | `webclient-collapsible-command-line` | logic | archived |
 | C6a | `webclient-message-pages` | logic | archived |
 | C6b | `webclient-message-window-component` | visual | archived |
-| C6c | `webclient-message-window-swap` | logic | proposed |
-| C7 | `webclient-typewriter-reading-prefs` | visual | proposed |
-| C8a | `webclient-scene-overview-component` | visual | proposed |
+| C6c | `webclient-message-window-swap` | logic | archived |
+| C7 | `webclient-typewriter-reading-prefs` | visual | archived  |
+| C8a | `webclient-scene-overview-component` | visual | archived  |
 | C8b | `webclient-scene-overview-swap` | logic | proposed |
 | C8c | `webclient-retire-exploration-submenus` | logic | proposed |
 | C9a | `explore-talk-open-action` | logic | proposed |
