@@ -1,4 +1,4 @@
-"""Desktop-shell acceptance: command-line field focus/send/cancel behavior and narrative scrollback/unread journeys.
+"""Desktop-shell acceptance: command-line field focus/send/cancel behavior and message-window paging journeys.
 """
 
 from __future__ import annotations
@@ -52,46 +52,53 @@ def _wait_narrative_grew(page, before_len, timeout=30000):
     )
 
 
-def _wait_unread_count_nonzero(page, timeout=30000):
-    """Gate on the unread marker's ``data-count`` becoming non-zero."""
-    wait_for_store_state(
-        page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": "#narrative-unread",
-            "predicate": (
-                "() => document.getElementById('narrative-unread')"
-                ".getAttribute('data-count') !== '0'"
-            ),
-            "description": "narrative-unread count non-zero",
-        },
-        timeout=timeout,
-    )
-
-
-def _wait_unread_count_zero(page, timeout=30000):
-    """Gate on the unread marker's ``data-count`` clearing to zero."""
-    wait_for_store_state(
-        page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": "#narrative-unread",
-            "predicate": (
-                "() => document.getElementById('narrative-unread')"
-                ".getAttribute('data-count') === '0'"
-            ),
-            "description": "narrative-unread count cleared to zero",
-        },
-        timeout=timeout,
-    )
-
-
-def _append_narrative_fillers(page, count=80):
-    """Seed the store's narrative with server-text filler lines (the scroll-keep tests need overflow)."""
+def _append_multipage_response(page):
+    """Append a multi-page response and gate on `[data-testid="message-page"]` opening at page 1 of >=2 pages."""
     page.evaluate(
-        "(count) => { const store = window.__elosernBridge.store;"
-        " for (let i = 0; i < count; i++) { store.appendText('out', 'filler line ' + i); } }",
-        count,
+        """() => {
+          const store = window.__elosernBridge.store;
+          if (!store.narrative.some((l) => l && l.kind !== 'in')) {
+            store.appendText('out', '初始段落。');
+          }
+        }"""
+    )
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="message-page-marker"]',
+            "predicate": (
+                "() => !!document.querySelector('[data-testid=\"message-page-marker\"]')"
+            ),
+            "description": "message-window initial mount pass settled",
+        },
+        timeout=30000,
+    )
+    sentences = "".join(
+        f"第{i}句：霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+        for i in range(1, 16)
+    )
+    page.evaluate(
+        """(text) => {
+          const store = window.__elosernBridge.store;
+          store.appendText('in', 'look');
+          store.appendText('out', text);
+        }""",
+        sentences,
+    )
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="message-page"]',
+            "predicate": (
+                "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                " return !!p && p.getAttribute('data-page') === '1'"
+                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }"
+            ),
+            "description": "message-page opened at page 1 of a multi-page response",
+        },
+        timeout=30000,
     )
 
 
@@ -170,138 +177,111 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface-and-is-read-page-by-page"
     )
     @covers_requirement(
-        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
-    def test_scrollback_unread_behavior(self):
+    def test_paging_marker_and_append_keep_page(self):
         page = self.logged_in_page()
-        narrative = page.locator('[data-testid="narrative-feed"]')
-
-        # The marker is absent entirely while the count is zero.
-        marker = page.locator("#narrative-unread")
-        self.assertEqual(marker.count(), 1)
-        self.assertEqual(marker.get_attribute("data-count"), "0")
-
-        # Guarantee overflow so the narrative can be scrolled up.
-        _append_narrative_fillers(page, 80)
-        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
-        # `scrollTop = 0` triggers an animation that races the gate. Force an
-        # instant scroll for this single assignment (the same override pattern
-        # the feed's own `scrollToBottom` and the scrolled-away test use) so
-        # the exact-top gate and the assertion below cannot observe a
-        # mid-flight animation frame.
-        page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-            " const prev = f.style.scrollBehavior;"
-            " f.style.scrollBehavior = 'auto';"
-            " f.scrollTop = 0;"
-            " f.style.scrollBehavior = prev; }"
-        )
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-                    " return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
-                ),
-                "description": "narrative feed scrolled to the top (and not at the bottom)",
-            },
-            timeout=30000,
-        )
-        scroll_top = page.evaluate(
-            "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
-        )
-        self.assertEqual(scroll_top, 0)
-
-        page.evaluate(
-            "() => window.__elosernBridge.store.appendText('out', 'unread probe line')"
-        )
-        _wait_unread_count_nonzero(page)
-        unread = page.locator("#narrative-unread .narrative-unread-button").inner_text()
-        self.assertRegex(unread, r"↓ \d+ 則新訊息（點擊返回最新）")
-
-        # The viewport must not have been forced to the bottom. The feed uses
-        # smooth scrolling + browser scroll-anchoring, so a line landing below
-        # the fold can nudge the scroll position by a few px (reflow). The
-        # "not forced to the bottom" contract is that it stays near the top;
-        # a small offset is legitimate browser behavior, not a scroll-to-bottom.
-        scroll_top_after = page.evaluate(
-            "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
-        )
-        self.assertLess(
-            scroll_top_after,
-            10,
-            "feed stayed near the top; not forced to the bottom",
-        )
-
-        # Clicking the marker jumps to the bottom, clears the count, and hides
-        # the marker.
-        page.locator(".narrative-unread-button").click()
-        _wait_unread_count_zero(page)
+        # No unread counter or jump-to-latest control is rendered in the window.
         self.assertEqual(
-            page.locator("#narrative-unread").get_attribute("data-count"),
-            "0",
+            page.locator('[data-testid="message-window"] [data-count]').count(),
+            0,
         )
+        _append_multipage_response(page)
+        surface = page.locator('[data-testid="message-page"]')
+        marker = page.locator('[data-testid="message-page-marker"]')
+        self.assertEqual(marker.count(), 1)
+        self.assertEqual(marker.inner_text(), "▼")
+        self.assertEqual(marker.get_attribute("aria-hidden"), "true")
+        page_1_text = surface.inner_text()
+        total_before = int(surface.get_attribute("data-pages") or "0")
+
+        # Appending another line to the same response never moves the reader
+        # off the page on screen.
+        page.evaluate(
+            "() => window.__elosernBridge.store.appendText('out', '尾聲：遠處傳來沉穩的鐘聲。')"
+        )
+        page.wait_for_timeout(120)
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(surface.inner_text(), page_1_text)
+        self.assertEqual(marker.inner_text(), "▼")
+        self.assertGreaterEqual(int(surface.get_attribute("data-pages") or "0"), total_before)
+
+        # Clicking the window advances page by page to ■ on the last page.
+        total = int(surface.get_attribute("data-pages") or "0")
+        for step in range(2, total + 1):
+            page.locator('[data-testid="message-window"]').click()
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": '[data-testid="message-page"]',
+                    "predicate": (
+                        "() => document.querySelector('[data-testid=\"message-page\"]')"
+                        f".getAttribute('data-page') === '{step}'"
+                    ),
+                    "description": f"message-page advanced to page {step}",
+                },
+            )
+        self.assertEqual(marker.inner_text(), "■")
 
     @covers_requirement(
-        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface-and-is-read-page-by-page"
     )
-    def test_unread_marker_keyboard_activation_moves_focus_to_narrative(self):
+    def test_page_surface_keyboard_advance_and_dock_isolation(self):
         page = self.logged_in_page()
-        # Guarantee overflow and scroll up so an unread count accumulates.
-        _append_narrative_fillers(page, 80)
-        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
-        # `scrollTop = 0` triggers an animation that races the gate. Force an
-        # instant scroll for this single assignment (the same override pattern
-        # the feed's own `scrollToBottom` and the scrolled-away test use).
-        page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-            " const prev = f.style.scrollBehavior;"
-            " f.style.scrollBehavior = 'auto';"
-            " f.scrollTop = 0;"
-            " f.style.scrollBehavior = prev; }"
+        _append_multipage_response(page)
+        surface = page.locator('[data-testid="message-page"]')
+        marker = page.locator('[data-testid="message-page-marker"]')
+        self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(marker.inner_text(), "▼")
+
+        # Enter while focus is on #action-dock activates the dock and does not
+        # advance the message window's page.
+        focus_action_dock(page)
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(120)
+        self.assertEqual(
+            surface.get_attribute("data-page"),
+            "1",
+            "Enter on the action dock must not advance the message window",
         )
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
-                    " return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
-                ),
-                "description": "narrative feed scrolled to the top (and not at the bottom)",
-            },
-            timeout=30000,
-        )
-        page.evaluate(
-            "() => window.__elosernBridge.store.appendText('out', 'unread probe line')"
-        )
-        _wait_unread_count_nonzero(page)
-        # Keyboard activation (Enter on the focused marker button) jumps to the
-        # bottom and parks focus on the narrative pane, never a hidden element.
-        page.locator(".narrative-unread-button").focus()
+
+        # Focusing the page surface and pressing Enter advances one page and
+        # keeps keyboard focus on the page surface.
+        surface.focus()
         page.keyboard.press("Enter")
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
+                "selector": '[data-testid="message-page"]',
                 "predicate": (
-                    "() => document.activeElement === "
-                    "document.querySelector('[data-testid=\"narrative-feed\"]')"
+                    "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                    " return !!p && p.getAttribute('data-page') === '2'"
+                    " && document.activeElement === p; }"
                 ),
-                "description": "narrative feed holds focus",
+                "description": "message-page advanced to page 2 and holds focus",
             },
         )
-        self.assertEqual(
-            page.locator("#narrative-unread").get_attribute("data-count"),
-            "0",
-        )
+        total = int(surface.get_attribute("data-pages") or "0")
+        for step in range(3, total + 1):
+            page.keyboard.press(" ")
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": '[data-testid="message-page"]',
+                    "predicate": (
+                        "() => document.querySelector('[data-testid=\"message-page\"]')"
+                        f".getAttribute('data-page') === '{step}'"
+                    ),
+                    "description": f"message-page advanced to page {step}",
+                },
+            )
+        self.assertEqual(marker.inner_text(), "■")
 
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",

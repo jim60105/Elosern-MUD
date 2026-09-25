@@ -67,7 +67,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate("Evennia.msg('text', ['look'], {})")
         _wait_narrative_grew(page, before_len)
         page.wait_for_timeout(300)
-        narrative_text = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative_text = page.locator('[data-testid="message-page"]').inner_text()
         self.assertNotIn("&lt;", narrative_text)
         self.assertNotIn("&amp;", narrative_text)
         self.assertNotIn("<span", narrative_text)
@@ -76,27 +76,30 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # A converted colored line renders with a palette class, never as
         # markup source.
         page.evaluate(
-            "() => window.__elosernBridge.store.appendText('out', '|r南大道|n|g 綠|n')"
+            "() => { const s = window.__elosernBridge.store;"
+            " s.appendText('in', 'look');"
+            " s.appendText('out', '<span class=\"color-009\">南大道</span> <span class=\"color-010\">綠</span>'); }"
         )
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
+                "selector": '[data-testid="message-page"]',
                 "predicate": (
-                    "() => document.querySelectorAll("
-                    "'[data-testid=\"narrative-feed\"] span[class*=\"color-\"]').length >= 2"
+                    "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                    " return !!p && p.innerText.includes('南大道')"
+                    " && p.querySelectorAll('span[class*=\"color-\"]').length >= 2; }"
                 ),
                 "description": "colored palette spans rendered in the narrative feed",
             },
         )
-        colored = page.locator('[data-testid="narrative-feed"] span[class*="color-"]')
+        colored = page.locator('[data-testid="message-page"] span[class*="color-"]')
         self.assertGreaterEqual(colored.count(), 2)
         for index in range(colored.count()):
             cls = colored.nth(index).get_attribute("class")
             self.assertRegex(cls, r"(?:^|\s)color-\d{3}(?:\s|$)")
         # The styled text is visible, not its source.
-        text = page.locator('[data-testid="narrative-feed"]').inner_text()
+        text = page.locator('[data-testid="message-page"]').inner_text()
         self.assertIn("南大道", text)
         self.assertNotIn("<span", text)
 
@@ -113,18 +116,22 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         # A row wider than the narrative pane's content width soft-wraps
         # inside the pane: no clipping, no additional page-level scroll.
-        wide = "X" * 400 + " 尾部"
+        # Start a fresh response with a single-sentence row that fits one page
+        # after wrapping so "尾部" is on the shown page.
+        wide = "X" * 100 + " 尾部"
         page.evaluate(
-            "(text) => window.__elosernBridge.store.appendText('out', text)", wide
+            "(text) => { const s = window.__elosernBridge.store;"
+            " s.appendText('in', 'look'); s.appendText('out', text); }",
+            wide,
         )
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
+                "selector": '[data-testid="message-page"]',
                 "predicate": (
                     "() => { const outs = document.querySelectorAll("
-                    "'[data-testid=\"narrative-feed\"] .out');"
+                    "'[data-testid=\"message-page\"] .out');"
                     " const last = outs[outs.length - 1];"
                     " return last && last.innerText.indexOf('尾部') !== -1; }"
                 ),
@@ -132,7 +139,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             },
         )
         # The full text is present (nothing clipped from the DOM).
-        text = page.locator('[data-testid="narrative-feed"] .out').last.inner_text()
+        text = page.locator('[data-testid="message-page"] .out').last.inner_text()
         self.assertIn("尾部", text)
         # The wide row did not widen the page.
         horizontal_scroll = page.evaluate(

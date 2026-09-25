@@ -153,21 +153,6 @@ describe("store view slices", () => {
     }
   });
 
-  it("counts only new narrative output lines as unread until seen", () => {
-    openActiveSession(store);
-    expect(store.unreadCount).toBe(0);
-    store.appendText("in", "look");
-    expect(store.unreadCount).toBe(0);
-    store.appendText("out", "石板廣場 夜色沉靜。");
-    store.appendText("sys", "—— 一則新的敘事 ——");
-    store.appendText("out", "霧燈 在街角閃爍。");
-    expect(store.unreadCount).toBe(2);
-    store.markNarrativeSeen();
-    expect(store.unreadCount).toBe(0);
-    store.appendText("out", "冷風颳過後頸。");
-    expect(store.unreadCount).toBe(1);
-  });
-
   it("derives the local-map model from the committed panel and nulls it when absent", () => {
     expect(store.view.localMapModel).toBe(null);
     openActiveSession(store);

@@ -388,9 +388,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-contextual-hud::narrative-lines-carry-the-reference-s-semantic-classes",
     )
     def test_choicepoint_block_node_suite_passes(self):
-        # The narrative feed semantic line styling (sys lines with seal ◈ marker,
+        # The narrative semantic line styling (sys lines with seal ◈ marker,
         # gold emphasis, plain serif lines) and full-log parity render
-        # through narrative_feed.test.js and full_log_overlay.test.js; the
+        # through full_log_overlay.test.js and narrative_line_nodes.test.js; the
         # message window renders its page fragments through the same classes
         # (message_window.test.js).
         result = subprocess.run(
@@ -399,7 +399,6 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/narrative_feed.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/full_log_overlay.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/narrative_line_nodes.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/message_window.test.js"),
@@ -607,7 +606,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/dialogue_feed.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/message_window_dialogue.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/dialogue_view_model.test.js"),
             ],
             cwd=str(REPO_ROOT),
@@ -783,6 +782,30 @@ class MessagePagesEvidenceTest(unittest.TestCase):
             result.returncode,
             0,
             "message-pages Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages",
+    )
+    def test_message_window_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/message_window.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "message-window Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

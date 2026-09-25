@@ -59,8 +59,8 @@ class ViewportCreationJourney(CreationBrowserTest):
         # H1 mode-gate: the narrative feed is display:none in creation mode
         # (HudFrame's CSS-only visibility gate), not merely dimmed.
         self.assertFalse(
-            page.locator('[data-testid="narrative-feed"]').is_visible(),
-            "the narrative feed is display:none in creation mode",
+            page.locator('[data-testid="message-window"]').is_visible(),
+            "the message window is display:none in creation mode",
         )
         placeholder_texts = page.locator(".elosern-placeholder").all_inner_texts()
         self.assertTrue(

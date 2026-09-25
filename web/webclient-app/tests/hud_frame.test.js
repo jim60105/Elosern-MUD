@@ -108,17 +108,17 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
   it("does not rescue focus when the focused surface stays visible", async () => {
     const explore = mountShell("exploration", true);
     await explore.vm.$nextTick();
-    // Focus a non-hidden element (the narrative feed is visible in both
+    // Focus a non-hidden element (the message window is visible in both
     // exploration and combat).
-    const feedEl = explore.find('[data-testid="narrative-feed"]').element;
-    feedEl.tabIndex = 0;
-    feedEl.focus();
-    expect(document.activeElement).toBe(feedEl);
+    const winEl = explore.find('[data-testid="message-window"]').element;
+    winEl.tabIndex = 0;
+    winEl.focus();
+    expect(document.activeElement).toBe(winEl);
 
     explore.setProps({ mode: "combat" });
     await explore.vm.$nextTick();
-    // The feed stays visible in combat, so focus is not rescued.
-    expect(document.activeElement).toBe(feedEl);
+    // The message window stays visible in combat, so focus is not rescued.
+    expect(document.activeElement).toBe(winEl);
   });
 
   it("keeps the backdrop's committed art unmodified across the dialogue mode flip", () => {
@@ -149,9 +149,9 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
 
   it("keeps the whole cockpit visible in dialogue mode (matrix dialogue column)", () => {
     // webclient-align-08-dialogue-surface: the dialogue column hides nothing
-    // — the narrative caption, the HUD island stack, the minimap, the dock,
+    // — the message window, the HUD island stack, the minimap, the dock,
     // and the command line all stay rendered; only the narrative
-    // presentation changes (the feed variant lives inside NarrativeFeed).
+    // presentation changes (the dialogue variant lives inside MessageWindow).
     const dialogue = mountShell("dialogue", true);
     expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
     expect(dialogue.find('[data-anchor="band-message"]').exists()).toBe(true);
@@ -176,11 +176,11 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
 
     // Flipping exploration → dialogue never strands focus: the shell's
     // focus-rescue map carries an explicit empty dialogue row (nothing is
-    // hidden, so a focused feed keeps focus).
-    const feedEl = dialogue.find('[data-testid="narrative-feed"]').element;
-    feedEl.tabIndex = 0;
-    feedEl.focus();
-    expect(document.activeElement).toBe(feedEl);
+    // hidden, so a focused message window keeps focus).
+    const winEl = dialogue.find('[data-testid="message-window"]').element;
+    winEl.tabIndex = 0;
+    winEl.focus();
+    expect(document.activeElement).toBe(winEl);
   });
 
   it("tracks commandLineExpanded on [data-anchor='command-line'] and hides the collapsed anchor in stage CSS", async () => {

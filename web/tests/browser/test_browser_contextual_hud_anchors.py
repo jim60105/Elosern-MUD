@@ -42,22 +42,22 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         return False
 
     @covers_requirement(
-        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_caption_wider_and_no_anchor_overlap(self):
         """H4 (task 9.7): with `#panel-right` emptied into drawers, the
-        narrative caption is wider at both viewports and no stage anchor
+        message window is wider at both viewports and no stage anchor
         overlaps another."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 feed_width = page.evaluate(
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                    "() => { const f = document.querySelector('[data-testid=\"message-window\"]');"
                     "return f ? f.getBoundingClientRect().width : 0; }"
                 )
                 self.assertGreater(
                     feed_width, 400,
-                    f"the narrative caption is wider than 400px at {viewport}",
+                    f"the message window is wider than 400px at {viewport}",
                 )
                 self.assertFalse(
                     self._anchors_overlap(page),

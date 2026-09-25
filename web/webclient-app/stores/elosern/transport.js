@@ -251,7 +251,6 @@ export function applyTransport(ctx) {
     ctx.narrative.value.push(line);
     while (ctx.narrative.value.length > MAX_NARRATIVE_LINES) {
       ctx.narrative.value.shift();
-      ctx.seenIndex.value = Math.max(0, ctx.seenIndex.value - 1);
     }
     if (ctx.narrative.value.length > 0 && ctx.responseMarks.value.length > 0) {
       const oldestSeq = ctx.narrative.value[0].seq;

@@ -1,13 +1,25 @@
-// webclient-align-08-dialogue-surface (tasks 2.1/2.2/4.1): the feed dialogue
-// variant. The `.dlg` box mirrors the committed panel (avatar/who/serif), the
-// numbered picks dispatch `explore.talk_scripted` payloads, the trailing free
-// row borrows the command line without dispatching, the session line renders
-// exactly once, and the head/capsule matrix holds across the visible modes.
+// webclient-align-08-dialogue-surface / webclient-message-window-swap (design
+// D3): the message window's dialogue variant. The `.dlg` box mirrors the
+// committed panel (avatar/who/serif), the numbered picks dispatch
+// `explore.talk_scripted` payloads, the trailing free row borrows the command
+// line without dispatching, the exit row dispatches `explore.dialogue_leave`,
+// the session line renders once in the current response, and a transiently
+// unavailable panel falls back to the paged presentation.
 
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import NarrativeFeed from "../components/NarrativeFeed.vue";
+import { nextTick } from "vue";
+import MessageWindow from "../components/MessageWindow.vue";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
+
+function codePointFit(budget) {
+  return (fragments) =>
+    fragments.reduce((sum, fragment) => sum + (fragment.end - fragment.start), 0) <= budget;
+}
+
+function withSeq(lines) {
+  return lines.map((line, index) => ({ seq: index + 1, ...line }));
+}
 
 const PANEL = {
   schema_version: 1,
@@ -26,7 +38,7 @@ const PANEL = {
 
 const vm = dialogueViewModel(PANEL);
 
-describe("NarrativeFeed dialogue variant", () => {
+describe("MessageWindow dialogue variant (D3)", () => {
   let wrapper;
 
   afterEach(() => {
@@ -35,20 +47,24 @@ describe("NarrativeFeed dialogue variant", () => {
     document.body.innerHTML = "";
   });
 
-  function mountFeed(props = {}) {
-    wrapper = mount(NarrativeFeed, {
+  function mountWindow(props = {}) {
+    const rawLines = props.lines || [{ kind: "out", text: "码头的水声。" }];
+    wrapper = mount(MessageWindow, {
+      attachTo: document.body,
       props: {
-        lines: [{ kind: "out", text: "码头的水声。" }],
         mode: "dialogue",
         dialogue: vm,
+        marks: [],
+        pageFit: codePointFit(60),
         ...props,
+        lines: withSeq(rawLines),
       },
     });
     return wrapper;
   }
 
   it("renders the box: gold initial avatar, speaker line with bond stage, serif reply", () => {
-    const w = mountFeed();
+    const w = mountWindow();
     const box = w.get('[data-testid="dialogue-box"]');
     expect(box.find(".av img").exists()).toBe(false);
     expect(box.get(".av").text()).toBe("灰");
@@ -59,7 +75,7 @@ describe("NarrativeFeed dialogue variant", () => {
 
   it("renders the host's catalog portrait with its face-rect crop offset", () => {
     const hostedPanel = { ...PANEL, host: { identity: 41, display_name: "灰婆婆", portrait_ref: "p41" } };
-    const w = mountFeed({
+    const w = mountWindow({
       dialogue: dialogueViewModel(hostedPanel),
       artPanel: {
         portrait_catalog: {
@@ -73,13 +89,13 @@ describe("NarrativeFeed dialogue variant", () => {
   });
 
   it("drops the bond segment when bond_stage is null", () => {
-    const w = mountFeed({ dialogue: dialogueViewModel({ ...PANEL, bond_stage: null }) });
+    const w = mountWindow({ dialogue: dialogueViewModel({ ...PANEL, bond_stage: null }) });
     expect(w.find('[data-testid="dialogue-bond"]').exists()).toBe(false);
     expect(w.get('[data-testid="dialogue-who"]').text()).toBe("灰婆婆");
   });
 
   it("renders numbered picks in payload order plus the trailing free-dialogue row", () => {
-    const w = mountFeed();
+    const w = mountWindow();
     const picks = w.findAll('[data-testid="dialogue-pick"]');
     expect(picks).toHaveLength(4);
     expect(picks.map((p) => p.get(".k").text())).toEqual(["1", "2", "3", "4"]);
@@ -90,7 +106,7 @@ describe("NarrativeFeed dialogue variant", () => {
   });
 
   it("renders the trailing exit row after the free row with no digit badge (align-11)", () => {
-    const w = mountFeed();
+    const w = mountWindow();
     const exit = w.get('[data-testid="dialogue-exit"]');
     expect(exit.classes()).toContain("pick-exit");
     expect(exit.get(".k").text()).toBe("✕");
@@ -102,7 +118,7 @@ describe("NarrativeFeed dialogue variant", () => {
   });
 
   it("the exit row emits exactly one dialogue-leave and nothing else", async () => {
-    const w = mountFeed();
+    const w = mountWindow();
     await w.get('[data-testid="dialogue-exit"]').trigger("click");
     expect(w.emitted("dialogue-leave")).toHaveLength(1);
     expect(w.emitted("dialogue-pick")).toBeUndefined();
@@ -110,7 +126,7 @@ describe("NarrativeFeed dialogue variant", () => {
   });
 
   it("a pick activation emits exactly one row payload through the shared contract", async () => {
-    const w = mountFeed();
+    const w = mountWindow();
     await w.findAll('[data-testid="dialogue-pick"]')[1].trigger("click");
     expect(w.emitted("dialogue-pick")).toHaveLength(1);
     const [row] = w.emitted("dialogue-pick")[0];
@@ -122,32 +138,35 @@ describe("NarrativeFeed dialogue variant", () => {
   });
 
   it("the free-dialogue row emits the borrow without any pick", async () => {
-    const w = mountFeed();
+    const w = mountWindow();
     await w.get('[data-testid="dialogue-freeform"]').trigger("click");
     expect(w.emitted("dialogue-freeform")).toHaveLength(1);
     expect(w.emitted("dialogue-pick")).toBeUndefined();
   });
 
   it("suppresses the verbatim duplicate tail so the session line renders once", () => {
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [{ kind: "out", text: "码头的水声。" }, { kind: "out", text: PANEL.line }],
     });
     expect(w.findAll('[data-testid="dialogue-say"]')).toHaveLength(1);
-    const streamTexts = w.findAll(".narrative-line.out").map((l) => l.text());
+    const streamTexts = w.findAll('[data-testid="message-dialogue"] .narrative-line.out').map((l) => l.text());
     expect(streamTexts).toEqual(["码头的水声。"]);
   });
 
   it("cuts the anchored 說：echo of the committed reply out of the stream", () => {
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [
-        { kind: "out", text: "码头的水声。" },
         { kind: "in", text: "talk 灰婆婆 客套" },
+        { kind: "out", text: "码头的水声。" },
         { kind: "out", text: `灰婆婆說：${PANEL.line}` },
       ],
     });
-    // The box owns the reply; the input echo stays; the echo line is gone.
-    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual(["码头的水声。"]);
-    expect(w.findAll(".narrative-line.inp")).toHaveLength(1);
+    // The box owns the reply; the input line heads the response and never
+    // renders in the window; the response's non-echo block stays.
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line.out').map((l) => l.text())).toEqual([
+      "码头的水声。",
+    ]);
+    expect(w.findAll(".narrative-line.inp")).toHaveLength(0);
   });
 
   it("keeps only the daily-affinity hint residual of a capped echo", () => {
@@ -155,86 +174,89 @@ describe("NarrativeFeed dialogue variant", () => {
     // The stored text carries the markup pipeline's shape: the newline before
     // the hint arrives as a tag the strip removes, gluing 緊接 directly after
     // the reply (the live-observed seam).
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [
         { kind: "out", text: "码头的水声。" },
         { kind: "out", text: `灰婆婆說：${PANEL.line}<br>${hint}` },
       ],
     });
-    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual([
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line.out').map((l) => l.text())).toEqual([
       "码头的水声。",
       hint,
     ]);
   });
 
-  it("never suppresses a player input echo that repeats the reply text", () => {
-    const w = mountFeed({
-      lines: [{ kind: "out", text: "码头的水声。" }, { kind: "in", text: PANEL.line }],
+  it("treats a player input line as a response header and never renders .inp in the window", () => {
+    const w = mountWindow({
+      lines: [
+        { kind: "in", text: PANEL.line },
+        { kind: "out", text: "码头的水声。" },
+      ],
     });
-    // kind "in" keeps its literal line even when the text coincides.
-    expect(w.findAll(".narrative-line")).toHaveLength(2);
-    expect(w.findAll(".narrative-line.inp").map((l) => l.text())).toEqual([PANEL.line]);
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line.out').map((l) => l.text())).toEqual([
+      "码头的水声。",
+    ]);
+    expect(w.findAll(".narrative-line.inp")).toHaveLength(0);
   });
 
   it("never removes an older identical line when the tail differs", () => {
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [
         { kind: "out", text: PANEL.line },
         { kind: "out", text: "她轉身續抽菸。" },
       ],
     });
     // The older duplicate stays; the box renders the committed line once.
-    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual([
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line.out').map((l) => l.text())).toEqual([
       PANEL.line,
       "她轉身續抽菸。",
     ]);
   });
 
   it("never swallows a sys tail whose text coincides with the reply", () => {
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [{ kind: "out", text: "码头的水声。" }, { kind: "sys", text: PANEL.line }],
     });
     // A system record is a distinct event: the box never owns its kind.
-    expect(w.findAll(".narrative-line")).toHaveLength(2);
-    expect(w.findAll(".narrative-line.sys").map((l) => l.text())).toEqual([PANEL.line]);
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line')).toHaveLength(2);
+    expect(w.findAll('[data-testid="message-dialogue"] .narrative-line.sys').map((l) => l.text())).toEqual([
+      PANEL.line,
+    ]);
   });
 
   it("keeps literal angle-bracket prose in the hint residual", () => {
     const hint = "（提示：<任務名> 要寫全名）";
-    const w = mountFeed({
+    const w = mountWindow({
       lines: [{ kind: "out", text: `灰婆婆說：${PANEL.line}<br>${hint}` }],
     });
-    const out = w.findAll(".narrative-line.out");
+    const out = w.findAll('[data-testid="message-dialogue"] .narrative-line.out');
     expect(out).toHaveLength(1);
     // The unrecognized tag survives the pipeline-normalizing strip verbatim.
     expect(out[0].text()).toBe(hint);
   });
 
-  it("the head reads 對話 without the 完整日誌 capsule while the panel is available", () => {
-    const w = mountFeed();
-    expect(w.get('[data-testid="narrative-mode-label"]').text()).toBe("對話");
-    expect(w.find('[data-testid="narrative-fulllog-control"]').exists()).toBe(false);
-  });
-
-  it("falls back plainly with the 對話 label when the panel is transiently unavailable", () => {
-    const w = mountFeed({ dialogue: null });
+  it("falls back to the paged presentation when the dialogue panel is transiently unavailable", async () => {
+    const w = mountWindow({ dialogue: null });
+    await nextTick();
+    expect(w.get('[data-testid="message-window"]').attributes("data-variant")).toBe("paged");
     expect(w.find('[data-testid="dialogue-box"]').exists()).toBe(false);
     expect(w.find('[data-testid="dialogue-pick"]').exists()).toBe(false);
-    expect(w.get('[data-testid="narrative-mode-label"]').text()).toBe("對話");
-    // The capsule rule is scoped to the available window: the fallback keeps it.
-    expect(w.find('[data-testid="narrative-fulllog-control"]').exists()).toBe(true);
-    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual(["码头的水声。"]);
+    expect(w.get('[data-testid="message-page"]').text()).toBe("码头的水声。");
+    expect(w.get('[data-testid="message-page-marker"]').text()).toBe("■");
   });
 
-  it("keeps 敘述/戰鬥日誌 labels and the capsule in the regular modes", () => {
-    const w = mountFeed({ mode: "exploration" });
-    expect(w.get('[data-testid="narrative-mode-label"]').text()).toBe("敘述");
-    expect(w.find('[data-testid="narrative-fulllog-control"]').exists()).toBe(true);
+  it("presents the paged variant in exploration and combat modes", async () => {
+    const w = mountWindow({ mode: "exploration" });
+    await nextTick();
+    expect(w.get('[data-testid="message-window"]').attributes("data-variant")).toBe("paged");
+    expect(w.find('[data-testid="dialogue-box"]').exists()).toBe(false);
+    expect(w.get('[data-testid="message-page-marker"]').text()).toBe("■");
     w.unmount();
     wrapper = w;
-    const c = mountFeed({ mode: "combat", dialogue: null });
-    expect(c.get('[data-testid="narrative-mode-label"]').text()).toBe("戰鬥日誌");
+    const c = mountWindow({ mode: "combat", dialogue: null });
+    await nextTick();
+    expect(c.get('[data-testid="message-window"]').attributes("data-variant")).toBe("paged");
     expect(c.find('[data-testid="dialogue-box"]').exists()).toBe(false);
-    expect(c.find('[data-testid="narrative-fulllog-control"]').exists()).toBe(true);
+    expect(c.get('[data-testid="message-page-marker"]').text()).toBe("■");
   });
 });

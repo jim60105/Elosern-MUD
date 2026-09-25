@@ -8,8 +8,7 @@ Establishes the component-showcase contract for the Vue migration: every UI comp
 Every UI component named in the required-component manifest SHALL be implemented as a Vue
 single-file component and SHALL have at least one Storybook story that documents its props, the
 events/actions it emits, and its primary states. At the completion of the contextual HUD
-redesign the required manifest SHALL enumerate at minimum: the header; the place card; the narrative feed and its
-unread indicator; the message window; the command line; the action dock with its menu,
+redesign the required manifest SHALL enumerate at minimum: the header; the place card; the message window; the command line; the action dock with its menu,
 submenu, and choice-card frames; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
 local map; the scene backdrop and the reference artwork frame; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render

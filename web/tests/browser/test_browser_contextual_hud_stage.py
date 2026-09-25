@@ -127,7 +127,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         self.assertTrue(hidden, "the minimap is display:none in combat, not merely dimmed")
         for selector in (
-            '[data-testid="narrative-feed"]',
+            '[data-testid="message-window"]',
             '[data-testid="command-line-toggle"]',
             "#action-dock",
         ):
@@ -251,20 +251,20 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_narrative_caption_bounded_full_log_one_action(self):
-        """The narrative caption is bounded and the full log opens in one action."""
+        """The message window is bounded and the full log opens in one action."""
         page = self.logged_in_page()
         for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
             page.evaluate("(text) => window.__elosernBridge.store.appendText('out', text)", line)
 
-        # The caption card is bounded: its rendered height never fills the stage.
-        feed = page.locator('[data-testid="narrative-feed"]')
-        self.assertTrue(feed.is_visible(), "the narrative caption card renders")
+        # The message window is bounded: its rendered height never fills the stage.
+        feed = page.locator('[data-testid="message-window"]')
+        self.assertTrue(feed.is_visible(), "the message window renders")
         geometry = page.evaluate(
             """() => {
-              const f = document.querySelector('[data-testid="narrative-feed"]');
+              const f = document.querySelector('[data-testid="message-window"]');
               const st = document.querySelector('[data-testid="elosern-stage"]');
               return {
                 feedHeight: f.getBoundingClientRect().height,
@@ -275,16 +275,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertLess(
             geometry["feedHeight"],
             geometry["stageHeight"],
-            "the caption card is bounded, not filling the stage",
+            "the message window is bounded, not filling the stage",
         )
 
-        # webclient-avg-stage-shell (design D6): the caption fills the bottom
+        # webclient-avg-stage-shell (design D6): the window fills the bottom
         # band's message region (its content box) and keeps that box however
         # many lines arrive.
         region_measure = """() => {
-          // The caption card (the feed's scroll viewport sits inside it).
-          const f = document.querySelector('[data-testid="narrative-feed"]')
-            .closest('.elosern-narrative').getBoundingClientRect();
+          const f = document.querySelector('[data-testid="message-window"]').getBoundingClientRect();
           const region = document.querySelector('[data-testid="anchor-band-message"]');
           const r = region.getBoundingClientRect();
           const cs = getComputedStyle(region);
@@ -310,7 +308,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertAlmostEqual(got, want, delta=1.0, msg="40 more lines leave the caption's box unchanged")
 
         # One action opens the complete log, rendered through the same renderer.
-        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         overlay = page.locator('[data-testid="fulllog-overlay"]')
         self.assertTrue(overlay.is_visible(), "the full log opens in one action")
@@ -337,7 +335,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the full log closes on Escape",
         )
         focus_restored = page.evaluate(
-            "() => { const c = document.querySelector('[data-testid=\"narrative-fulllog-control\"]');"
+            "() => { const c = document.querySelector('[data-testid=\"message-log-open\"]');"
             " const a = document.activeElement; return c && c === a; }"
         )
         self.assertTrue(focus_restored, "focus is restored to the control that opened the log")
@@ -362,7 +360,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
         # Open the full-log overlay: the stage behind it is recessed.
-        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
@@ -700,7 +698,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (!cmd) { return { hits: ["command-line missing"] }; }
                       const targets = {
                         dock: byId('#action-dock'),
-                        caption: byId('[data-testid="narrative-feed"]'),
+                        caption: byId('[data-testid="message-window"]'),
                         messageRegion: byId('[data-testid="anchor-band-message"]'),
                         vitals: byId('[data-testid="anchor-vitals"]'),
                         map: byId('[data-testid="anchor-map"]'),
@@ -1099,8 +1097,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
               }
             }"""
         )
-        # Open full log via narrative-fulllog-control
-        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        # Open full log via message-log-open
+        page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
 
         # Assert scrollTop + clientHeight >= scrollHeight - 1
@@ -1144,7 +1142,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector('[data-testid="fulllog-overlay"]', state="detached", timeout=15000)
 
         # Reopen log and assert it is back at the bottom
-        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         at_bottom_again = page.evaluate(
             """() => {

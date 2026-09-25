@@ -5,8 +5,8 @@
 // `#elosern-offline-overlay`, `#inputfield` inside its `.inputfieldwrapper`
 // wrapper (webclient-collapsible-command-line: CommandLine stays mounted while
 // its anchor is collapsed, so the field survives in the DOM in every mode),
-// `#narrative-unread`,
-// `data-testid="narrative-feed"`, `data-testid="action-dock"`, and the
+// `data-testid="message-window"`, `data-testid="message-log-open"`,
+// `data-testid="action-dock"`, and the
 // `action-*` / `target-*` item keys — are preserved unchanged by the stage
 // restructure. The `layout_store.js` `REQUIRED_COMPONENTS` entry
 // `command-drawer` is the one preserved layout-store identifier (the layout
@@ -40,7 +40,6 @@ const PRESERVED_IDS = [
   "elosern-action-live",
   "elosern-offline-overlay",
   "inputfield",
-  "narrative-unread",
 ];
 
 describe("H1 preserved DOM contract (design D6)", () => {
@@ -157,11 +156,12 @@ describe("H1 preserved DOM contract (design D6)", () => {
     await wrapper.vm.$nextTick();
 
     // The shell-level identifiers the restructure must not move: the live
-    // region, the offline overlay, and the feed's unread marker render always.
-    for (const id of ["elosern-action-live", "elosern-offline-overlay", "narrative-unread"]) {
+    // region, the offline overlay, and `#inputfield` render always.
+    for (const id of PRESERVED_IDS) {
       expect(wrapper.find(`#${id}`).exists(), `#${id} must survive`).toBe(true);
     }
-    expect(wrapper.find('[data-testid="narrative-feed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="message-window"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="message-log-open"]').exists()).toBe(true);
     // webclient-collapsible-command-line: the command line starts collapsed
     // (`data-expanded="false"`), and `CommandLine` stays mounted so
     // `#inputfield` inside its `.inputfieldwrapper` survives in the DOM.

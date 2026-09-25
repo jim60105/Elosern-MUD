@@ -120,8 +120,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/TopBar",
     "Core/CharacterSwitcher",
     "Core/ConnectOverlay",
-    "Core/NarrativeFeed",
-    "Core/UnreadIndicator",
     "Core/CommandLine",
     "Core/HudFrame",
     "Core/SceneBackdrop",

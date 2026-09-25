@@ -266,7 +266,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         return page.evaluate(
             """() => Array.from(
                  document.querySelectorAll(
-                   '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                   '[data-testid="message-page"] [data-line-kind="err"]'),
                  (n) => n.textContent)"""
         )
 
@@ -355,7 +355,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                  const baseline = JSON.parse(baselineJson);
                  const lines = Array.from(
                    document.querySelectorAll(
-                     '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                     '[data-testid="message-page"] [data-line-kind="err"]'),
                    (n) => n.textContent);
                  const counts = new Map();
                  for (const l of baseline) counts.set(l, (counts.get(l) || 0) + 1);
@@ -473,7 +473,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page.wait_for_function(
                 """(message) => message !== "" && Array.from(
                      document.querySelectorAll(
-                       '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                       '[data-testid="message-page"] [data-line-kind="err"]'),
                      (n) => n.textContent).some((t) => t.includes(message))""",
                 arg=stale_message,
             )

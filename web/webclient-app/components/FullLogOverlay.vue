@@ -9,7 +9,7 @@
 // the reader's scroll position.
 //
 // focus contract: focus-trapped while open, Escape closes, and focus is
-// restored to the control that opened it. The caption card's `完整日誌`
+// restored to the control that opened it. The shell's `日誌`
 // control is the single one-action escape hatch (MODIFIED
 // webclient-desktop-shell: the complete log is reachable in one action).
 import { h, ref } from "vue";

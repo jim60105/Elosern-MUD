@@ -224,10 +224,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface-and-is-read-page-by-page"
     )
     @covers_requirement(
-        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     @covers_requirement(
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
@@ -241,8 +241,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         restored to the control that opened it (design D4).
         """
         page = self.logged_in_page()
-        control = page.locator('[data-testid="narrative-fulllog-control"]')
-        self.assertEqual(control.count(), 1, "the full-log control renders in the feed head")
+        control = page.locator('[data-testid="message-log-open"]')
+        self.assertEqual(control.count(), 1, "the full-log control renders in the message region")
         # One action: click the control and the full log must open.
         control.click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
@@ -278,7 +278,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             "the stage mark clears once the last open surface closes",
         )
         focus_restored = page.evaluate(
-            "() => { const c = document.querySelector('[data-testid=\"narrative-fulllog-control\"]'); "
+            "() => { const c = document.querySelector('[data-testid=\"message-log-open\"]'); "
             "const a = document.activeElement; return c && c === a; }"
         )
         self.assertTrue(focus_restored, "focus is restored to the control that opened the full log")

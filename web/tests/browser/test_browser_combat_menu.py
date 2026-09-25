@@ -417,7 +417,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                       const mapAnchor = rectOf('[data-anchor="map"]');
                       const participantRaw = rectOf('[data-testid="participant-frame"]');
                       const participant = clampTo(participantRaw, mapAnchor);
-                      const caption = rectOf('[data-testid="narrative-feed"]');
+                      const caption = rectOf('[data-testid="message-window"]');
                       const commandLine = rectOf('[data-anchor="command-line"]');
                       const frameEl = document.querySelector('[data-testid="participant-frame"]');
                       // The focused row of the committed frame: the pane-kind

@@ -5,13 +5,17 @@
 import { computed, nextTick, ref, watch } from "vue";
 
 export function useOverlays(store, { panelAvailable }) {
-  // H1 contextual HUD (design D4/D9): the bounded caption card's `完整日誌`
-  // control opens the full-log overlay; the overlay presents the complete
-  // retained narrative through the same markup renderer (one markup path).
+  // H1 contextual HUD (design D4/D9; webclient-message-window-swap D1): the
+  // shell's `日誌` control and the message window's wheel-up gesture open the
+  // full-log overlay; the overlay presents the complete retained narrative
+  // through the same markup renderer (one markup path).
   const fullLogOpen = ref(false);
   const fullLogRef = ref(null);
 
   function openFullLog() {
+    if (fullLogOpen.value) {
+      return;
+    }
     fullLogOpen.value = true;
     void nextTick().then(() => fullLogRef.value?.focusSelf());
   }
@@ -19,7 +23,7 @@ export function useOverlays(store, { panelAvailable }) {
   function closeFullLog(restoreFocus) {
     fullLogOpen.value = false;
     if (restoreFocus) {
-      // Focus is restored to the caption card's control (the opener) by the
+      // Focus is restored to the opener control by the
       // overlay itself (it remembers the opener element internally); the
       // shell's mode watcher routes focus to the dock when a mode change hides
       // a focused surface.

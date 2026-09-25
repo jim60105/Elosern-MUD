@@ -434,7 +434,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         # start; `ELOSERN_BROWSER_ART_ROOT` is owned by the runtime env).
         surfaces = [
             ("full-log",
-             '[data-testid="narrative-fulllog-control"]',
+             '[data-testid="message-log-open"]',
              '[data-testid="fulllog-overlay"]'),
             ("scene-full-view",
              '[data-testid="scene-backdrop-control"]',

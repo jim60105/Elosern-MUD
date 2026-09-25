@@ -259,7 +259,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
     # the stale GoldenLayout `LayoutStore.createStore().load().config` walk.
     COMPONENT_SELECTORS = {
         "header": '[data-testid="topbar"]',
-        "narrative": '[data-testid="narrative-feed"]',
+        "narrative": '[data-testid="message-window"]',
         "art": '[data-testid="scene-backdrop"]',
         "status": '[data-testid="status-panel"]',
         "local-map": '[data-testid="local-map"]',
@@ -511,7 +511,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                     "the minimap is display:none in combat, not merely dimmed",
                 )
                 for selector in (
-                    '[data-testid="narrative-feed"]',
+                    '[data-testid="message-window"]',
                     '[data-testid="command-line"]',
                     "#action-dock",
                 ):
@@ -573,7 +573,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement(
-        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+        "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_complete_log_reachable_in_one_action_from_bounded_caption(self):
         """The narrative caption is bounded and the full log opens in one action;
@@ -581,11 +581,11 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
             page.evaluate("(text) => window.__elosernBridge.store.appendText('out', text)", line)
-        feed = page.locator('[data-testid="narrative-feed"]')
-        self.assertTrue(feed.is_visible(), "the narrative caption card renders")
+        feed = page.locator('[data-testid="message-window"]')
+        self.assertTrue(feed.is_visible(), "the message window renders")
         geometry = page.evaluate(
             """() => {
-              const f = document.querySelector('[data-testid="narrative-feed"]');
+              const f = document.querySelector('[data-testid="message-window"]');
               const st = document.querySelector('[data-testid="elosern-stage"]');
               return { feedHeight: f.getBoundingClientRect().height,
                        stageHeight: st.getBoundingClientRect().height };
@@ -596,7 +596,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
             geometry["stageHeight"],
             "the caption card is bounded, not filling the stage",
         )
-        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         overlay = page.locator('[data-testid="fulllog-overlay"]')
         self.assertTrue(overlay.is_visible(), "the full log opens in one action")

@@ -125,8 +125,10 @@ class ActionLockingTest(BrowserAcceptanceTest):
         narrative = narrative_log_text(page)
         self.assertIn("plain text", narrative)
         self.assertIn("<b onclick=", narrative)
+        page.locator('[data-testid="message-log-open"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         self.assertEqual(
-            page.evaluate("document.querySelector('[data-testid=\"narrative-feed\"]')"
+            page.evaluate("document.querySelector('[data-testid=\"fulllog-overlay\"]')"
                           ".querySelectorAll('b, script').length"),
             0,
             "server-authored text must be inserted as text, never HTML",
@@ -135,7 +137,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-oob-protocol::protocol-failures-degrade-without-disabling-text-play",
-        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface",
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface-and-is-read-page-by-page",
     )
     def test_ordinary_text_works_when_structured_oob_rendering_fails(self):
         page = self.logged_in_page()

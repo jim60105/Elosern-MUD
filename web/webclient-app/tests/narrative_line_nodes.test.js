@@ -1,5 +1,5 @@
 // webclient-frontend-utils: the shared line→vnode renderer extracted from
-// FullLogOverlay.vue and NarrativeFeed.vue. Pins the contract the two
+// FullLogOverlay.vue and MessageWindow.vue. Pins the contract the two
 // components share: a divider plus a literal `.inp` line for player input
 // (divider only for a non-first line), a pipeline-rendered line for
 // everything else, and the `.map-art` monospace class for box-drawing

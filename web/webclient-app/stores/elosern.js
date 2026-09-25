@@ -125,7 +125,6 @@ export const useElosernStore = defineStore("elosern", () => {
   ctx.narrativeSeq = 0;
   ctx.responseMarks = ref([]);
   ctx.commandHistory = ref([]);
-  ctx.seenIndex = ref(0);
   // C4: the last OOB `ui_snapshot` / `ui_update` receive result. A rejected
   // (malformed) presentation is the "renderer cannot render" signal that
   // triggers the one-sync-per-episode auto-resync.
@@ -173,7 +172,6 @@ export const useElosernStore = defineStore("elosern", () => {
     narrative: ctx.narrative,
     responseMarks: ctx.responseMarks,
     commandHistory: ctx.commandHistory,
-    unreadCount: ctx.unreadCount,
     receive: ctx.receive,
     beginTransport: ctx.beginTransport,
     setConnected: ctx.setConnected,
@@ -198,7 +196,6 @@ export const useElosernStore = defineStore("elosern", () => {
     // `router.reset`): post the committed mode's root descriptor as the
     // one-frame stack. Browser helpers use it to normalize the stack.
     resetFramesToRoot: ctx.resetFramesToRoot,
-    markNarrativeSeen: ctx.markNarrativeSeen,
     clearUncertain: ctx.clearUncertain,
     partyAvailable: ctx.computed.partyAvailable,
     partySlots: ctx.computed.partySlots,
