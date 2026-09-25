@@ -331,6 +331,40 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     expect(lockedRow.disabledReason).toEqual(locked.disabled_reason);
   });
 
+  it("the navigation source carries the bar's entries, and only while the panel is available", () => {
+    // webclient-scene-overview-swap: the top navigation bar's character /
+    // quest / inventory entries are no dock frame's rows any more — the bar
+    // resolves them from this source, whose builder outlives the tab root
+    // webclient-retire-exploration-submenus deletes.
+    const state = committedState();
+    const resolver = resolverFor(state);
+    const nav = resolver.resolve({ source: "exploration.navigation" });
+    expect(nav.unresolvable).toBeUndefined();
+    expect(nav.items.map((item) => item.key)).toEqual(["character", "quests", "inventory"]);
+    expect(nav.items.find((item) => item.key === "character").openCharacter).toBe(true);
+    expect(nav.items.find((item) => item.key === "quests").openDrawer).toBe("quest");
+    expect(nav.items.find((item) => item.key === "inventory").openDrawer).toBe("inventory");
+    // A capability surface the panel does not report available is absent (no
+    // dead functional entry), and the builder is shared with the retired tab
+    // root, so both agree.
+    state.panels.exploration = explorationPanel({ quests: { available: false } });
+    const narrowed = resolver.resolve({ source: "exploration.navigation" });
+    expect(narrowed.items.map((item) => item.key)).toEqual(["character", "inventory"]);
+    const root = ExplorationMenu.rootItems(state.panels.exploration, null);
+    expect(root.filter((item) => item.key === "quests")).toHaveLength(0);
+
+    // An unavailable exploration panel degrades to the shared marker.
+    state.panels.exploration = {
+      schema_version: 2,
+      available: false,
+      reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
+    };
+    expect(resolver.resolve({ source: "exploration.navigation" })).toEqual({
+      unresolvable: true,
+      reason: "這片區域暫時不可用。",
+    });
+  });
+
   it("the root is the scene overview: chip rows, a footer, and no tab or navigation entry", () => {
     const resolver = resolverFor(committedState());
     const root = resolver.resolve({ source: "exploration.root" });

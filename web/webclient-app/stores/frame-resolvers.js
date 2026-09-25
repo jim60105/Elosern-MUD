@@ -16,9 +16,13 @@
 // `ExplorationMenu.overviewMenu` — one reading-order menu of exits, people,
 // objects, and a footer, with the router's `sections` geometry — and
 // `exploration.target` resolves `ExplorationMenu.verbMenuFor`, the target's
-// verb popover. The tab root (`model.menus.root`), `targetMenuFor`, and the
-// move/look/interact submenus stay registered but unreachable until
-// `webclient-retire-exploration-submenus` deletes them with their tests.
+// verb popover. `exploration.navigation` is the top navigation bar's own
+// entry set (the character status, quest, and inventory surfaces, which no
+// dock frame carries any more). The move/look/interact submenus and the
+// `targetMenuFor` grid stay registered but unreachable until
+// `webclient-retire-exploration-submenus` deletes them with their tests;
+// `ExplorationMenu.navigationItems` outlives them, because the bar keeps
+// reading it.
 //
 // Purity contract: resolving twice against one committed state returns deep-
 // equal menus and mutates nothing — the builders are pure over their inputs,
@@ -39,7 +43,6 @@
 // to this registry.
 
 import ExplorationMenu from "../lib/exploration_menu.js";
-import { NAVIGATION_ITEM_KEYS } from "./elosern/shared.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 import stableStringify from "../lib/stable_stringify.js";
@@ -164,16 +167,14 @@ export function createFrameResolver(deps) {
   // The top navigation bar's exploration entries (webclient-scene-overview-
   // swap): the character status, quest, and inventory surfaces. The scene
   // overview carries no navigation entry — the bar is their sole
-  // keyboard-visible stop — so the bar derives them from the same shipped
-  // builder the retired tab root used, filtered to the navigation keys.
+  // keyboard-visible stop — so the bar derives them from the dedicated
+  // `navigationItems` builder, which the retired tab root also consumed.
   const explorationNavigationSource = () => {
     const gate = requireExplorationPanel();
     if (!gate.ok) return gate.reason;
-    const { panel, suggestions } = explorationModel();
-    const menu = ExplorationMenu.buildMenus(panel, { currentNode: null, suggestions });
-    return isolate({
-      items: menu.menus.root.items.filter((item) => NAVIGATION_ITEM_KEYS.has(item.key)),
-    });
+    const state = committed();
+    const panel = (state.panels && state.panels.exploration) || null;
+    return isolate({ items: ExplorationMenu.navigationItems(panel) });
   };
 
   // --- combat family helpers -------------------------------------------------
