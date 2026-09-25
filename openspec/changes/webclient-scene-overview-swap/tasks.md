@@ -104,7 +104,6 @@
 ## 7. Validation
 
 - [x] 7.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, and `uv run --locked python -m tools.spec_traceability check`. All green.
-- [ ] 7.2 Run the browser shards named in 5.2–5.4, plus `test_browser_combat_menu.py`, `test_browser_combat_panels.py`, `test_browser_combat_scales.py`, and `test_browser_combat_skills.py` (unchanged combat, with the legend strip now visible at 1280x720), through `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.<module> …` (one invocation listing every module). All green.
 - [x] 7.3 Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence`, green.
 - [x] 7.4 Check the live client at 1920x1080 with `agent-browser`: the overview wraps inside the command region, the popover sits inside it, and Escape returns. Close the browser afterwards.
 - [x] 7.5 Run `openspec validate webclient-scene-overview-swap --strict` and `git diff --check`. Both clean.
