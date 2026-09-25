@@ -160,6 +160,10 @@ The box pin is ported: on a reply change, scroll so the box's top is 8px below t
 - [28px text changes the feel of long room descriptions: 6 lines per page at 1080] → This is the design's decision. The full log (C1's bottom-opening surface) remains one control away.
 - [A click to focus the window also advances] → The first click on page 1 advances only if more pages exist. The design names click as the advance gesture.
 
+- [The log trims its oldest lines (500 max) from the front, and a trim can cut into the shown leading response and renumber its offsets] → When the shown response keeps its key but its length shrinks, the window settles like a mount: last page, watermark at the end, no announcement.
+- [The measurer is an untracked DOM node appended after the text area's two vnode slots] → The render function documents the invariant at the children array. C6c and C7 must keep exactly two slots, or move the measurer into the vnode tree.
+- [Mount announces nothing, which is right for a remount or reconnect but not for a session's very first narrative] → C6c decides the mount timing. If the window can mount before the first narrative lines exist, C6c must announce that first content.
+
 ## Migration Plan
 
 None. The component is not mounted until C6c.

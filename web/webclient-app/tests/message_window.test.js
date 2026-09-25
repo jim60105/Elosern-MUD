@@ -240,6 +240,21 @@ describe("MessageWindow paged presentation", () => {
     expect(live(w)).toBe("雨落。");
   });
 
+  it("settles on the last page, silently, when a trim cuts into the shown response", async () => {
+    const lead = seqLines(1, [["out", LONG], ["out", "尾聲。"]]);
+    const w = await mountWindow({ lines: lead });
+    await w.get('[data-testid="message-window"]').trigger("click");
+    // Nothing moved yet: the reader is on the last page after mount.
+    expect(pageSurface(w).attributes("data-page")).toBe("4");
+    const spoken = live(w);
+    // The log trims its oldest line: the leading response loses its head.
+    await w.setProps({ lines: lead.slice(1) });
+    await settle();
+    expect(pageSurface(w).attributes("data-pages")).toBe("1");
+    expect(pageSurface(w).text()).toBe("尾聲。");
+    expect(live(w)).toBe(spoken);
+  });
+
   it("re-pages on a fontScale change to the page holding the anchor, announcing nothing", async () => {
     const w = await mountThenArrive();
     await w.get('[data-testid="message-window"]').trigger("click");

@@ -132,6 +132,7 @@ export default {
     let announcedEnd = 0;
     let shownKey = null;
     let shownBlocks = null;
+    let shownLength = 0;
     let initialized = false;
     let generation = 0;
 
@@ -242,11 +243,17 @@ export default {
         return;
       }
       const last = next.length - 1;
-      if (!initialized || shown.awaiting) {
+      const length = responseLength(shown.blocks);
+      const shrank = shown.key === shownKey && length < shownLength;
+      shownLength = length;
+      // A trim of the log's oldest lines can cut into the shown (leading)
+      // response and renumber its offsets; the anchor and watermark are then
+      // meaningless, so it settles like a mount.
+      if (!initialized || shown.awaiting || shrank) {
         // Mount, resync, or the reader acted: the last page, already read.
         initialized = true;
         shownKey = shown.key;
-        announcedEnd = responseLength(shown.blocks);
+        announcedEnd = length;
         setPage(last);
         return;
       }
@@ -567,6 +574,11 @@ export default {
           onWheel,
         },
         [
+          // Exactly two vnode slots (the dialogue region or its placeholder,
+          // then the page surface): the measurer is an untracked DOM node
+          // appended after them by use-message-measure.js and must stay the
+          // last child, so never add a slot or key a fragment here without
+          // moving the measurer into the vnode tree.
           h("div", { class: "message-window__text" }, [
             variant === "dialogue"
               ? h(
