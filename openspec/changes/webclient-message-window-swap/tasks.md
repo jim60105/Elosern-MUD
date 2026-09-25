@@ -57,10 +57,10 @@
 ## 7. Validation
 
 - [x] 7.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, and `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence web.webclient.tests.test_node_suite_evidence`. All green.
-- [ ] 7.2 Drive the live client at 1920×1080 with `agent-browser`:
+- [x] 7.2 Drive the live client at 1920×1080 with `agent-browser`:
   - `look` in a long room shows `▼`, and clicking advances to `■`
   - Enter on the dock activates the dock and does not advance
   - `日誌` opens the full log at its bottom, and Escape returns focus to `日誌`
 
   Close the browser afterwards.
-- [ ] 7.3 Run `openspec validate webclient-message-window-swap --strict` and `git diff --check`. Both clean.
+- [x] 7.3 Run `openspec validate webclient-message-window-swap --strict` and `git diff --check`. Both clean.
