@@ -390,7 +390,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     def test_choicepoint_block_node_suite_passes(self):
         # The narrative feed semantic line styling (sys lines with seal ◈ marker,
         # gold emphasis, plain serif lines) and full-log parity render
-        # through narrative_feed.test.js and full_log_overlay.test.js.
+        # through narrative_feed.test.js and full_log_overlay.test.js; the
+        # message window renders its page fragments through the same classes
+        # (message_window.test.js).
         result = subprocess.run(
             [
                 "npx",
@@ -400,6 +402,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
                 str(REPO_ROOT / "web/webclient-app/tests/narrative_feed.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/full_log_overlay.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/narrative_line_nodes.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/message_window.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,

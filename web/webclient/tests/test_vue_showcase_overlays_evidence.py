@@ -172,6 +172,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The AVG stage series (a governed redesign wave) adds the
     # stage place card (webclient-avg-place-card-top-bar).
     "Core/PlaceCard",
+    # The AVG message window (webclient-message-window-component),
+    # built and story-documented before C6c mounts it.
+    "Core/MessageWindow",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
