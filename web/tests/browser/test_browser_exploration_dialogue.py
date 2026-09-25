@@ -9,13 +9,16 @@ from tools.spec_traceability import covers_requirement
 from web.browser_support.browser_fixtures_data import SHIPPED_DIALOGUE_KEY
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
+    activate_first_overview_exit,
+    activate_overview_chip,
     fixture_home_node_id,
+    focus_action_dock,
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
-    sent_action_count,
     outbound_messages,
+    overview_target_with_affordance,
+    sent_action_count,
     store_state,
     wait_for_store_state,
 )
@@ -88,18 +91,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    def _reset_root(self, page):
-        focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-        page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
 
     @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
     def test_look_at_scripted_host_shows_the_affinity_stage_line(self):
@@ -107,9 +99,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        self._open_root(page, 1)  # Look
-        _press(page, "ArrowRight")  # the scripted host (first present entity)
-        _press(page, "Enter")
+        # The overview's 人物 row carries a chip per look-only entity; the
+        # scripted host's own chip submits explore.look for it.
+        panel = self._live_exploration_panel(page)
+        entity_identity = panel["look"]["entities"][0]["identity"]
+        activate_overview_chip(page, "entity-%s" % entity_identity)
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         wait_for_store_state(
             page,
@@ -123,8 +117,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        self._open_root(page, 2)  # Interact
-        _press(page, "Enter")  # the scripted host (first present target, synced in the seed)
+        # The overview's 人物 chip for the scripted host opens its verb
+        # popover; 交談 opens the keyword frame.
+        host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
+        activate_overview_chip(page, "target-%s" % host_identity)
         _press(page, "Enter")  # 交談 (scripted affordance)
         _press(page, "Enter")  # first keyword
         self._wait_panel(
@@ -170,8 +166,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # — the panel's (already-true) availability would race the in-flight
         # lock and silently drop the next input.
         result_before = (store_state(page).get("lastActionResult") or {}).get("requestId")
-        self._open_root(page, 2)  # Interact
-        _press(page, "Enter")  # the scripted host
+        host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
+        activate_overview_chip(page, "target-%s" % host_identity)
         _press(page, "Enter")  # 交談 (scripted affordance -> keywords frame)
         _press(page, "Enter")  # first scripted keyword -> talk_scripted
         wait_for_store_state(
@@ -186,14 +182,21 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page, "dialogue", lambda p: p.get("available") is True
         )
 
-        # The dock keeps its ORDINARY form while talking: the tab bar shows
-        # the usual exploration tabs, never the retired 對話選項 mirror.
-        tabs = page.evaluate(
-            "() => Array.from(document.querySelectorAll('.dock-tab-bar__tab'))"
-            ".map((t) => t.textContent)"
+        # The dock keeps its ORDINARY form while talking: the scene overview
+        # renders (webclient-scene-overview-swap), never the retired 對話選項
+        # mirror and never a tab bar.
+        overview_labels = page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
+            ".map((el) => el.textContent)"
         )
-        self.assertTrue(tabs, "the dock tab bar must render while talking")
-        self.assertNotIn("對話選項", "".join(tabs))
+        self.assertTrue(overview_labels, "the scene overview must render while talking")
+        self.assertNotIn("對話選項", "".join(overview_labels))
+        self.assertEqual(
+            page.locator("#action-dock .dock-tab-bar").count(),
+            0,
+            "dialogue mode renders the overview, not a tab bar",
+        )
 
         # The message window presents the dialogue variant (pick grid and
         # trailing exit row) with the dialogue box pinned inside the text area.
@@ -261,8 +264,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         # The ordinary dock rows work again (movement parity after the
         # session): open the Move outlet and press its first exit row.
-        self._open_root(page, 0)  # Move -> exit-outlet frame
-        _press(page, "Enter")  # first exit -> explore.move
+        activate_first_overview_exit(page)  # the overview's first exit -> explore.move
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
         self._wait_panel(
             page,
@@ -277,12 +279,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        self._open_root(page, 2)  # Interact
-        _press(page, "ArrowRight")  # the bard (second grid column)
-        _press(page, "Enter")
-        # Vertical affordance navigation (webclient-exploration-menu:
-        # "the selected target's heading and its single-column affordance
-        # rows hold the second column ... vertical affordance navigation").
+        # The overview's 人物 chip for the bard opens its verb popover; its
+        # rows are a vertical list (the target's affordances in payload order).
+        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         wait_for_store_state(
@@ -323,12 +323,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Open free-form dialogue but cancel with Escape without sending.
-        self._open_root(page, 2)  # Interact
-        _press(page, "ArrowRight")  # the bard (second grid column)
-        _press(page, "Enter")
-        # Vertical affordance navigation (webclient-exploration-menu:
-        # "single-column affordance rows ... vertical affordance
-        # navigation").
+        # The overview's 人物 chip for the bard opens its verb popover.
+        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         wait_for_store_state(
@@ -407,9 +404,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        self._open_root(page, 2)  # Interact
-        _press(page, "ArrowDown")  # the goblin (second grid row, first column)
-        _press(page, "Enter")
+        goblin = overview_target_with_affordance(page, "explore.engage")
+        activate_overview_chip(page, "target-%s" % goblin["identity"])
         _press(page, "Enter")  # 戰鬥 (engage)
         wait_for_store_state(
             page,

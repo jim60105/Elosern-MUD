@@ -627,8 +627,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # panel degrades the root to the disabled marker row). The
                 # driven snapshot therefore carries an available exploration
                 # panel with no traversal exits — the root resolves to the
-                # tab bar, and Enter on `move` pushes the move submenu whose
-                # only row is the disabled `move-empty` item.
+                # scene overview, whose first chip is then `look-room`
+                # (webclient-scene-overview-swap).
                 "exploration": {
                     "schema_version": 2,
                     "available": True,
@@ -756,12 +756,11 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertFalse(released["stillInFlight"])
 
         # Document key events route through the bridge's key routing. The
-        # keyboard router's exploration focus frame is the G2 hierarchical
-        # root (Move / Look / Interact / Character / Quests / Inventory /
-        # Wait), rendered as a single-row grid — so ArrowDown is a no-op and
-        # focus stays on the first cell (`move`). This replaces the legacy
-        # B2 flat `action-`/`target-` affordance-list key contract. Unclaimed
-        # letter keys fall through to the text path.
+        # keyboard router's exploration focus frame is the scene overview
+        # (webclient-scene-overview-swap): its chips are the root's rows in
+        # reading order, and the overview's row-of-chips geometry claims the
+        # vertical arrow keys. Unclaimed letter keys fall through to the text
+        # path.
         keys = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
@@ -778,19 +777,20 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 };
             }"""
         )
-        self.assertEqual(keys["focusKey"], "move")
+        self.assertEqual(keys["focusKey"], "look-room")
         self.assertTrue(keys["focusEnabled"])
         self.assertTrue(keys["downClaimed"])
         self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
 
-        # Enter on the G2 exploration root's focused item (`move`) pushes its
-        # client-local move submenu (the dock depth becomes 2) without
-        # dispatching a ui_action. With no traversal exits in the committed
-        # exploration panel, the pushed move submenu's first row is the
-        # disabled `move-empty` item.
+        # Enter on the overview's 等待／休息 chip opens the waiting frame (the
+        # dock depth becomes 2) without dispatching a ui_action: a submenu
+        # opener is a local navigation cell, not an OOB action. (The retired
+        # move submenu and its `move-empty` row are unreachable from the dock
+        # now, webclient-scene-overview-swap.)
         enter_result = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
+                store.focusItemByKey("wait");
                 const enter = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
                 document.dispatchEvent(enter);
                 return {
@@ -803,8 +803,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertEqual(enter_result["dockDepth"], 2)
-        self.assertEqual(enter_result["focusKey"], "move-empty")
-        self.assertFalse(enter_result["focusEnabled"], "the pushed move submenu's first row is the disabled move-empty item")
+        self.assertEqual(enter_result["focusKey"], "wait-dawn")
+        self.assertTrue(enter_result["focusEnabled"])
         self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
         self.assertTrue(enter_result["prevented"])
 

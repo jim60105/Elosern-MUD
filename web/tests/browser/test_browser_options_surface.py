@@ -22,6 +22,8 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_first_overview_exit,
+    activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
     narrative_log_text,
@@ -107,7 +109,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def _open_suggestions_pane(self, page):
         desc = page.evaluate("() => (window.__elosernBridge && window.__elosernBridge.router.currentDescriptor()) || {}")
         if desc.get("source") != "exploration.suggestions":
-            page.evaluate("() => window.__elosernBridge.store.tabToRootAndConfirm('suggestions')")
+            activate_overview_chip(page, "suggestions")
             page.wait_for_timeout(60)
 
     def _wait_section(self, page, timeout=30000):
@@ -240,13 +242,6 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._open_suggestions_pane(page)
         return page
 
-    def _open_root(self, page, index):
-        focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-        page.wait_for_timeout(60)
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
 
     def _move_to_empty_ground(self, page):
         """Walk through the dock from the plaza to the empty-ground room (the
@@ -257,13 +252,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         Enter to select the focused destination row (前往測試空地, ``exit-44``)
         and dispatch ``explore.move`` into the empty ground.
         """
-        self._open_root(page, 0)  # opens the Move submenu, focus on 前往測試空地
-        _press(page, "Enter")     # select the focused move row -> dispatch explore.move
-        # H3 re-chrome: the legacy suggestions section renders only at the root
-        # frame (depth 1). The move leaves the router on the Move frame (depth
-        # 2), so pop exactly one level back to the root so the section (and its
-        # degraded/empty/generating renders) is visible to the assertions.
-        _press(page, "Escape")
+        # The overview's first exit chip IS 前往測試空地: activating it
+        # dispatches explore.move straight from the root frame
+        # (webclient-scene-overview-swap), so the router stays at depth 1 and
+        # the suggestions section remains visible to the assertions.
+        activate_first_overview_exit(page)
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -615,13 +608,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # dispatch the return move. The generating line is transient (~1.5s),
         # so the dispatch must happen while the Move submenu is open (before
         # the menu re-homes to the plaza).
-        self._open_root(page, 0)  # opens the empty-ground Move submenu
-        _press(page, "Enter")     # select the focused 回到廣場 row -> dispatch explore.move
-        # H3 re-chrome: the generating line lives in the legacy suggestions
-        # section, which renders only at the root frame (depth 1). The return
-        # move leaves the router on the plaza Move frame (depth 2), so pop one
-        # level to the root so the transient generating line is visible.
-        _press(page, "Escape")
+        # The overview's first exit chip is 回到廣場: activating it dispatches
+        # the return move straight from the root frame, so the transient
+        # generating line stays visible to the assertion.
+        activate_first_overview_exit(page)
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")

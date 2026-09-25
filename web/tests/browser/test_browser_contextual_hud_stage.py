@@ -6,6 +6,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
@@ -781,13 +782,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         store = "window.__elosernBridge.store"
         states = {"root": page.evaluate(measure)}
 
-        page.evaluate(f"() => {store}.tabToRootAndConfirm('interact', 'pointer')")
-        page.wait_for_selector(".interaction-workspace", timeout=15000)
-        page.locator(".interaction-workspace .dock-menu__nav-row").first.click()
-        page.wait_for_selector(".interaction-workspace--selected", timeout=15000)
-        states["interact"] = page.evaluate(measure)
+        # A target's verb popover over the inert overview (webclient-scene-
+        # overview-swap), then the waiting frame: the scenario's "a target's
+        # verb popover" state.
+        activate_overview_chip(page, "target-11")
+        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+        states["popover"] = page.evaluate(measure)
 
-        page.evaluate(f"() => {store}.tabToRootAndConfirm('wait', 'pointer')")
+        activate_overview_chip(page, "wait")
         page.wait_for_selector(".waiting-screen", timeout=15000)
         states["wait"] = page.evaluate(measure)
 

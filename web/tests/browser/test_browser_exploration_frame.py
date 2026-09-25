@@ -6,11 +6,13 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
+    activate_first_overview_exit,
     fixture_home_node_id,
+    focus_action_dock,
     install_outbound_recorder,
-    sent_action_count,
     outbound_messages,
+    push_exploration_frame,
+    sent_action_count,
     store_state,
     wait_for_store_state,
 )
@@ -68,13 +70,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
+    def _open_move_outlet(self, page):
+        """Mount the retired move-outlet frame by a direct push.
+
+        webclient-scene-overview-swap: the dock root is the scene overview, so
+        no keyboard or pointer path reaches the move submenu any more. Until
+        webclient-retire-exploration-submenus deletes the frame with its tests,
+        the outlet assertions mount it through the router's own push entry.
+        """
+        push_exploration_frame(page, "exploration.move")
 
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
     @covers_requirement("webclient-desktop-shell::the-action-dock-s-row-region-and-detail-panes-are-direct-children-of-its-pane-host")
@@ -87,7 +91,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(map_before["current_node"], home)
         time_before = store_state(page)["serverTime"]
 
-        self._open_root(page, 0)  # Move
+        self._open_move_outlet(page)  # Move
         # remove-redundant-dock-menu-layout: the exit-outlet frame shows no
         # detail pane, so the row region (`.dock-menu`) is the pane host's only
         # dock-menu child — no anonymous layout wrapper, no detail aside.
@@ -128,8 +132,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             # the move as stale (no state change). The client re-synchronizes
             # and asks the user to re-operate; the test emulates that retry
             # by re-selecting the same exit.
-            self._open_root(page, 0)
-            _press(page, "Enter")
+            activate_first_overview_exit(page)
             self._wait_panel(
                 page,
                 "local_map",
@@ -198,7 +201,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         node_before = store_state(page)["panels"]["local_map"]["current_node"]
 
-        self._open_root(page, 0)  # Move — the submenu frame is now current.
+        self._open_move_outlet(page)  # the submenu frame is now current.
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.depth()"),
             2,

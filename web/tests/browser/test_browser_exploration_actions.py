@@ -74,13 +74,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_unsafe_skip_rejects_before_any_clock_advance(self):
@@ -98,7 +91,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # 休息 N 小時] — the direct daypart wait dispatches from the first
         # column, and the safety gate rejects it while the goblin stands at
         # the gate (the daypart value is irrelevant to the rejection).
-        self._open_root(page, 3)  # Wait/休息
+        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -114,7 +107,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # 休息 N 小時 is the third card of the shipped row (stores/elosern.js
         # resolves exploration.wait with gridCols: 3): two ArrowRight steps
         # reach it.
-        self._open_root(page, 3)  # Wait/休息
+        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
         _press(page, "ArrowRight")  # 睡眠至完全恢復
         _press(page, "ArrowRight")  # 休息 N 小時
         _press(page, "Enter")
@@ -145,7 +138,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.wait"), 2)
         self.assertEqual(store_state(page)["serverTime"], time_before)
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_safe_wait_until_dawn_advances_the_clock(self):
         page = self.logged_in_page()
@@ -153,8 +146,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Move away from the goblin, then wait until dawn succeeds.
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # first exit
+        activate_first_overview_exit(page)  # the overview's first exit chip
         self._wait_panel(
             page,
             "local_map",
@@ -167,7 +159,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # 小時 (wait-rest, the third card of the gridCols: 3 row) opens the
         # custom-duration form. Confirm the form's default one-hour wait so
         # the SKIP advance moves the fixture clock off midnight.
-        self._open_root(page, 3)  # Wait/休息
+        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
         _press(page, "ArrowRight")  # 睡眠至完全恢復
         _press(page, "ArrowRight")  # 休息 N 小時
         _press(page, "Enter")

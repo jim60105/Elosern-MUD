@@ -6,11 +6,14 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
+    activate_first_overview_exit,
+    activate_overview_chip,
     fixture_home_node_id,
+    focus_action_dock,
     install_outbound_recorder,
-    sent_action_count,
     outbound_messages,
+    push_exploration_frame,
+    sent_action_count,
     store_state,
     wait_for_store_state,
 )
@@ -68,15 +71,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
+    def _open_move_outlet(self, page):
+        """Mount the retired move-outlet frame by a direct push.
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+        webclient-scene-overview-swap: the dock root is the scene overview, so
+        no keyboard or pointer path reaches the move submenu any more. Until
+        webclient-retire-exploration-submenus deletes the frame with its tests,
+        the outlet assertions mount it through the router's own push entry.
+        """
+        push_exploration_frame(page, "exploration.move")
+
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -102,8 +107,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "Escape must leave the character panel",
         )
 
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # first exit
+        activate_first_overview_exit(page)  # the overview's first exit chip
         self._wait_panel(
             page,
             "local_map",
@@ -224,7 +228,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   self._move_row("ex-c", "東門")])})
         self.assertTrue(accepted["accepted"], accepted)
 
-        self._open_root(page, 0)  # 移動 frame opens at depth 2.
+        self._open_move_outlet(page)  # the move frame opens at depth 2.
         self.assertEqual(self._depth(page), 2)
         self.assertTrue(
             page.evaluate("() => window.__elosernBridge.store.focusItemByKey('exit-ex-b')")
@@ -293,12 +297,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             interact=[self._target(9001, "哨衛士兵"), self._target(9002, "吟遊詩人")])})
         self.assertTrue(accepted["accepted"], accepted)
 
-        self._open_root(page, 2)  # 互動 frame (depth 2)
-        self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-9001')")
-        )
-        page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
-        self.assertEqual(self._depth(page), 3, "the target frame did not open")
+        # The overview's 人物 chip opens the target's verb popover
+        # (webclient-scene-overview-swap): one level, not two.
+        activate_overview_chip(page, "target-9001")
+        self.assertEqual(self._depth(page), 2, "the verb popover did not open")
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
             {"source": "exploration.target", "params": {"identity": 9001}},
@@ -309,14 +311,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             interact=[self._target(9002, "吟遊詩人")])})
         self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(self._depth(page), 2)
+        self.assertEqual(self._depth(page), 1)
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
-            {"source": "exploration.interact", "params": {}},
+            {"source": "exploration.root", "params": {}},
         )
-        # Opener focus is restored toward the vanished row: the only
-        # surviving target row carries the keyboard focus — committed view
-        # AND the rendered pane's aria-selected cell.
+        # The popover closed and the overview is current; focus lands on the
+        # nearest surviving chip — the only surviving target's chip — in the
+        # committed view AND the rendered pane's aria-selected cell.
         self.assertEqual(store_state(page)["focus"]["key"], "target-9002")
         self.assertEqual(
             page.locator(
@@ -353,12 +355,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         })
         self.assertTrue(accepted["accepted"], accepted)
 
-        self._open_root(page, 2)  # 互動 -> 對象 (depth 3)
-        self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-9001')")
-        )
-        page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
-        self.assertEqual(self._depth(page), 3)
+        activate_overview_chip(page, "target-9001")  # the person chip -> popover
+        self.assertEqual(self._depth(page), 2)
 
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {

@@ -6,10 +6,12 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
     outbound_messages,
+    push_exploration_frame,
     sent_action_count,
     store_state,
     valid_character_panel,
@@ -139,24 +141,22 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertEqual(geometry["dockBorderTopWidth"], "0px")
             self.assertEqual(geometry["dockBoxShadow"], "none")
 
-            # No frame moves or resizes the region: Interact with a target
-            # selected, then Wait.
+            # No frame moves or resizes the region: a target's verb popover
+            # over the inert overview, then the waiting frame.
             baseline = (geometry["regionLeft"], geometry["regionTop"],
                         geometry["regionRight"], geometry["regionBottom"],
                         geometry["bandHeight"])
-            page.evaluate(
-                "() => window.__elosernBridge.store.tabToRootAndConfirm('interact', 'pointer')"
-            )
-            page.wait_for_selector(".interaction-workspace", timeout=15000)
-            page.locator(".interaction-workspace .dock-menu__nav-row").first.click()
-            page.wait_for_selector(".interaction-workspace--selected", timeout=15000)
+            activate_overview_chip(page, "target-11")
+            page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
             after_interact = page.evaluate(measure)
-            page.evaluate(
-                "() => window.__elosernBridge.store.tabToRootAndConfirm('wait', 'pointer')"
-            )
+            # Escape closes the popover and returns to the overview, whose
+            # 等待／休息 chip then opens the waiting frame.
+            _press(page, "Escape")
+            wait_for_store_state(page, lambda s: s.get("dockSource") == "exploration.root")
+            activate_overview_chip(page, "wait")
             page.wait_for_selector(".waiting-screen", timeout=15000)
             after_wait = page.evaluate(measure)
-            for label, state in (("interact", after_interact), ("wait", after_wait)):
+            for label, state in (("popover", after_interact), ("wait", after_wait)):
                 box = (state["regionLeft"], state["regionTop"], state["regionRight"],
                        state["regionBottom"], state["bandHeight"])
                 for got, want in zip(box, baseline):
@@ -202,56 +202,57 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-dock-s-root-frame-renders-as-an-icon-tab-bar-with-truthful-count-badges"
+        "webclient-contextual-hud::the-combat-dock-s-root-frame-renders-as-an-icon-tab-bar-with-a-truthful-skills-badge"
     )
-    def test_dock_root_tab_bar_truthful_count_badges(self):
-        """The root frame renders as an icon tab bar with truthful count badges."""
+    def test_combat_dock_root_tab_bar_truthful_skills_badge(self):
+        """The COMBAT root renders as an icon tab bar with a truthful 技能
+        badge; exploration renders the scene overview and no tab bar at all
+        (webclient-scene-overview-swap)."""
         page = self.logged_in_page()
-        exploration = _exploration_panel(
-            [_interact_target(11, "小販"), _interact_target(12, "守門人")]
+        # The combat panel's 技能 badge equals the committed skill-descriptor
+        # count (the fixture's flattened categories/groups).
+        combat = _combat_panel()
+        skill_count = sum(
+            len(group.get("skills") or [])
+            for category in combat.get("skills") or []
+            for group in category.get("groups") or []
         )
-        context_actions = _exploration_context_actions_panel(
-            _suggestions_ready(["查看四周", "查看物品", "查看角色", "查看任務"])
-        )
+        self.assertGreater(skill_count, 0, "the combat fixture must carry skills")
         _inject_snapshot(
             page,
             {
-                "exploration": exploration,
-                "context_actions": context_actions,
+                "context_actions": combat,
                 "local_map": valid_local_map_panel(),
             },
-            mode="exploration",
+            mode="combat",
         )
-        _wait_mode(page, "exploration")
+        _wait_mode(page, "combat")
 
-        # The root tab bar (depth 1) carries the listbox composite + the
-        # dock-menu testid, a single tab stop, and the active-descendant.
+        # The combat root tab bar (depth 1) carries the listbox composite +
+        # the dock-menu testid, a single tab stop, and the active-descendant.
         tab_bar = page.locator('[data-testid="dock-menu"]')
-        self.assertEqual(tab_bar.count(), 1, "the root tab bar carries the dock-menu hook at depth 1")
+        self.assertEqual(tab_bar.count(), 1, "the combat root tab bar carries the dock-menu hook at depth 1")
         self.assertEqual(tab_bar.get_attribute("role"), "listbox")
         self.assertEqual(tab_bar.get_attribute("tabindex"), "0")
         self.assertIsNotNone(tab_bar.get_attribute("aria-activedescendant"))
-        tabs = page.locator("#action-dock [data-item-key]")
-        self.assertGreaterEqual(tabs.count(), 5, "the root frame renders one tab per root item")
+        tabs = page.locator("#action-dock .dock-tab-bar [data-item-key]")
+        self.assertGreaterEqual(tabs.count(), 5, "the combat root renders one tab per root item")
 
-        # Truthful count badges: interact tab = 2 (interact target count),
-        # suggestions tab = 4 (ready-card count); move and look carry no badge.
-        interact_badge = page.locator("#dock-tab-interact .dock-tab-bar__badge")
-        self.assertEqual(interact_badge.count(), 1, "the interact tab carries a badge")
-        self.assertEqual(interact_badge.inner_text(), "2", "the interact badge equals the target count")
-        sugg_badge = page.locator("#dock-tab-suggestions .dock-tab-bar__badge")
-        self.assertEqual(sugg_badge.count(), 1, "the suggestions tab carries a badge")
-        self.assertEqual(sugg_badge.inner_text(), "4", "the suggestions badge equals the ready-card count")
+        # The 技能 tab carries the exact committed count; no other combat tab
+        # carries a badge.
+        skills_badge = page.locator("#dock-tab-skills .dock-tab-bar__badge")
+        self.assertEqual(skills_badge.count(), 1, "the 技能 tab carries a badge")
         self.assertEqual(
-            page.locator("#dock-tab-move .dock-tab-bar__badge").count(),
-            0,
-            "the move tab carries no badge",
+            skills_badge.inner_text(),
+            str(skill_count),
+            "the 技能 badge equals the committed skill-descriptor count",
         )
-        self.assertEqual(
-            page.locator("#dock-tab-look .dock-tab-bar__badge").count(),
-            0,
-            "the look tab carries no badge",
-        )
+        for key in ("attack", "items", "defend", "flee", "forfeit", "bag"):
+            self.assertEqual(
+                page.locator("#dock-tab-%s .dock-tab-bar__badge" % key).count(),
+                0,
+                "no combat tab other than 技能 carries a badge (%s)" % key,
+            )
 
         # Each tab carries a leading glyph + its server-authored label.
         focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
@@ -259,6 +260,30 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             focused.locator("svg.dock-tab-bar__icon").count(),
             1,
             "each tab carries a decorative glyph",
+        )
+
+        # Exploration renders no root tab bar: the scene overview owns the
+        # dock's rows instead.
+        exploration = _exploration_panel([_interact_target(11, "小販")])
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+        self.assertEqual(
+            page.locator("#action-dock .dock-tab-bar").count(),
+            0,
+            "exploration renders no root tab bar",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="scene-overview"]').count(),
+            1,
+            "the exploration root is the scene overview",
         )
 
     @covers_requirement(
@@ -291,22 +316,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "no breadcrumb is rendered at the root frame",
         )
 
-        # Open the interact submenu: the breadcrumb appears naming parent + current.
-        focus_action_dock(page)
-        page.locator("#dock-tab-interact").click()
-        page.wait_for_timeout(150)
+        # Open a person chip's verb popover: the breadcrumb appears naming
+        # parent + current (webclient-scene-overview-swap: the popover is the
+        # overview's one child frame).
+        activate_overview_chip(page, "target-11")
+        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
         self.assertEqual(
             _dock_depth(page),
             2,
-            "opening a submenu puts the router at depth 2",
+            "opening the popover puts the router at depth 2",
         )
         self.assertFalse(
             crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
             "the breadcrumb is visible at depth >= 2",
         )
         crumb_text = crumb.inner_text()
-        self.assertIn("探索", crumb_text, "the breadcrumb names the parent frame")
-        self.assertIn("互動", crumb_text, "the breadcrumb names the current frame")
+        self.assertIn("場景", crumb_text, "the breadcrumb names the parent frame")
+        self.assertIn("小販", crumb_text, "the breadcrumb names the current frame")
 
         # The back control pops exactly one level and dispatches no ui_action.
         install_outbound_recorder(page)
@@ -351,12 +377,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # Open the move frame: the outlet pane renders the three exit rows
-        # (the breadcrumb back cell is navigation chrome, never a rendered
-        # row), so the digit slots are exactly [ex-a, ex-b, ex-c].
-        focus_action_dock(page)
-        page.locator("#dock-tab-move").click()
-        page.wait_for_timeout(150)
+        # Mount the retired move-outlet frame by a direct push
+        # (webclient-scene-overview-swap: the dock root is the scene overview,
+        # so no keyboard or pointer path reaches it any more): the outlet pane
+        # renders the three exit rows (the breadcrumb back cell is navigation
+        # chrome, never a rendered row), so the digit slots are exactly
+        # [ex-a, ex-b, ex-c].
+        push_exploration_frame(page, "exploration.move")
         self.assertEqual(_dock_depth(page), 2, "the move frame is at depth 2")
 
         # `2` picks the second row (a disabled row): the focus moves onto it
@@ -440,10 +467,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # Open the move frame: the first root item is "move".
-        focus_action_dock(page)
-        _press(page, "Enter")
-        page.wait_for_timeout(150)
+        # Mount the retired move-outlet frame by a direct push
+        # (webclient-scene-overview-swap: the dock root is the scene overview,
+        # so the move submenu is reachable only through the router's push
+        # entry until webclient-retire-exploration-submenus deletes it).
+        push_exploration_frame(page, "exploration.move")
         self.assertEqual(_dock_depth(page), 2)
 
         # The move frame renders the exit outlet vocabulary.
@@ -499,3 +527,66 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             0,
             "the pane renders no statistics line or portrait the payload does not carry",
         )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size"
+    )
+    def test_verb_popover_card_lies_inside_the_command_region(self):
+        """The verb popover is a card INSIDE the command region, and the
+        region's box is unchanged from the overview (webclient-scene-overview-
+        swap D3: the popover overlays the region's visible box)."""
+        measure = """() => {
+          const rect = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+          };
+          return {
+            region: rect('[data-testid="anchor-band-command"]'),
+            card: rect('[data-testid="verb-popover"]'),
+            pane: rect('#action-dock .action-dock__pane'),
+            band: rect('[data-testid="stage-band"]'),
+          };
+        }"""
+        page = self.logged_in_page((1440, 900))
+        exploration = _exploration_panel([_interact_target(11, "小販")])
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+        overview = page.evaluate(measure)
+
+        activate_overview_chip(page, "target-11")
+        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+        popover = page.evaluate(measure)
+
+        # The card lies inside the command region at every edge.
+        card, region = popover["card"], popover["region"]
+        self.assertIsNotNone(card, "the verb popover card must render")
+        self.assertGreaterEqual(card["left"], region["left"] - 1.0)
+        self.assertGreaterEqual(card["top"], region["top"] - 1.0)
+        self.assertLessEqual(card["right"], region["right"] + 1.0)
+        self.assertLessEqual(card["bottom"], region["bottom"] + 1.0)
+        # The region (and the band) keep the overview's box exactly.
+        for key in ("region", "band"):
+            for edge in ("left", "top", "right", "bottom"):
+                self.assertAlmostEqual(
+                    popover[key][edge],
+                    overview[key][edge],
+                    delta=1.0,
+                    msg="the %s box moved when the popover opened (%s)" % (key, edge),
+                )
+        # The card lies inside the pane's visible box: it is laid OVER the
+        # region (the overlay layer), never appended below the pane.
+        pane = popover["pane"]
+        self.assertGreaterEqual(card["left"], pane["left"] - 1.0)
+        self.assertGreaterEqual(card["top"], pane["top"] - 1.0)
+        self.assertLessEqual(card["right"], pane["right"] + 1.0)
+        self.assertLessEqual(card["bottom"], pane["bottom"] + 1.0)

@@ -6,10 +6,12 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
-    sent_action_count,
     outbound_messages,
+    push_exploration_frame,
+    sent_action_count,
     store_state,
     wait_for_store_state,
 )
@@ -67,13 +69,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
-    def _open_root(self, page, index):
-        self._reset_root(page)
-        # The exploration root is a single seven-column row (mockup grid), so
-        # horizontal arrows move across it; submenus are 2-column grids.
-        for _ in range(index):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
+    def _open_move_outlet(self, page):
+        """Mount the retired move-outlet frame by a direct push.
+
+        webclient-scene-overview-swap: the dock root is the scene overview, so
+        no keyboard or pointer path reaches the move submenu any more. Until
+        webclient-retire-exploration-submenus deletes the frame with its tests,
+        the outlet assertions mount it through the router's own push entry.
+        """
+        push_exploration_frame(page, "exploration.move")
 
     @covers_requirement("webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel")
     def test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport(self):
@@ -197,7 +201,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # Move: the exit tiles stretch with their tracks and fill the
         # pane's full width — no blank space on the right.
-        self._open_root(page, 0)  # Move
+        self._open_move_outlet(page)  # Move
         assert_within_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
         assert_tiles_fill_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
         assert_long_label_wraps(".dock-menu__outlet-tile", ".dock-menu__outlet", "b")
@@ -252,7 +256,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # Look: the look rows stay within the nav pane; the keyboard column
         # mapping is unchanged.
-        self._open_root(page, 1)  # Look
+        push_exploration_frame(page, "exploration.look")  # Look
         assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
         assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
         assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
@@ -276,7 +280,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_timeout(80)
 
         # Interact: same width and keyboard-mapping checks for the target rows.
-        self._open_root(page, 2)  # Interact
+        push_exploration_frame(page, "exploration.interact")  # Interact
         assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
         assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
         assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
@@ -299,7 +303,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # `.dock-menu__plain` non-grid check has no dock surface left to
         # observe. The equivalent narrow-viewport guarantee: the waiting
         # screen's card row stays inside the stage bounds.
-        self._open_root(page, 3)  # Wait
+        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
         waiting = page.locator(".waiting-screen")
         self.assertGreater(waiting.count(), 0, "the waiting screen owns the wait surface")
         # The three-operation frame: dawn / sleep / 休息 N 小時 cards.
@@ -324,7 +328,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
-        self._open_root(page, 0)  # Move
+        self._open_move_outlet(page)  # Move
         pane_box = page.locator(".dock-menu__outlet").bounding_box()
         self.assertIsNotNone(pane_box, "the outlet pane must be visible at 1280x720")
         tiles = page.locator(".dock-menu__outlet-tile")

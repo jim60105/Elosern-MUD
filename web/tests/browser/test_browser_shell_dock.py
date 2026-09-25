@@ -6,6 +6,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
@@ -66,28 +67,39 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 frame["backgroundImage"],
                 "the full-width band paints the draft's upward gradient",
             )
-            # The shortcut legend is the tab bar's trailing hint carrying the
-            # draft's markup (the single `action-dock-description` element).
+            # The shortcut legend is the dock's own strip carrying the draft's
+            # markup (the single `action-dock-description` element), rendered
+            # below the scrolling body rather than in a tab bar
+            # (webclient-scene-overview-swap D3).
             description = page.locator('[data-testid="action-dock-description"]').inner_text()
             for keyword in ("數字鍵 1–4", "Enter 執行", "Esc 返回"):
                 self.assertIn(keyword, description)
-            # The root is now the tab bar (H3): one row of tabs (the root
-            # frame's items as tabs). The tab count varies 5-8 with
-            # quest/inventory capability availability (H3 design D5 adds the
-            # 建議 tab whenever the suggestions envelope is not `unavailable`).
+            # The exploration root is the scene overview: one frame of chips
+            # (exits, people, objects, and the footer) and NO tab bar. The
+            # chip count varies with the room's exits and occupants, so only
+            # the floor is pinned.
+            self.assertEqual(
+                page.locator("#action-dock .dock-tab-bar").count(),
+                0,
+                "exploration renders the overview, never a tab bar",
+            )
+            self.assertEqual(
+                page.locator('[data-testid="scene-overview"]').count(),
+                1,
+                "the exploration root renders exactly one scene overview",
+            )
             cells = page.locator("#action-dock [data-item-key]")
-            self.assertGreaterEqual(cells.count(), 5)
-            self.assertLessEqual(cells.count(), 8)
-            # The open/focused tab carries the muted-gold fill (the `--on`
-            # class; webclient-desktop-shell: "the open entry marked by a
-            # muted-gold fill") — the obsidian-gold wave re-pointed the
-            # draft's seal-red gradient to the flat --gold-glow token
-            # (DockTabBar.vue .dock-tab-bar__tab--on). Assert the computed
-            # fill against the token resolved through a probe node inside
-            # the dock subtree (the token is declared on .elosern-root, not
-            # :root, so a documentElement read resolves to nothing; and the
-            # raw token text is not the computed color string).
-            focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
+            self.assertGreaterEqual(cells.count(), 3, "the overview renders its chips")
+            # The focused chip carries the muted-gold fill (the `--focused`
+            # class; webclient-desktop-shell: "The focused row or chip SHALL be
+            # marked by a muted-gold fill plus a leading glyph") — the
+            # obsidian-gold wave re-pointed the draft's seal-red gradient to
+            # the flat --gold-glow token. Assert the computed fill against the
+            # token resolved through a probe node inside the dock subtree (the
+            # token is declared on .elosern-root, not :root, so a
+            # documentElement read resolves to nothing; and the raw token text
+            # is not the computed color string).
+            focused = page.locator("#action-dock .dock-menu-item--focused").first
             gold_glow = page.evaluate(
                 """() => {
                     const probe = document.createElement('span');
@@ -101,39 +113,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertEqual(
                 focused.evaluate("el => getComputedStyle(el).backgroundColor"),
                 gold_glow,
-                "the focused tab carries the muted-gold --gold-glow fill",
+                "the focused chip carries the muted-gold --gold-glow fill",
             )
-            self.assertEqual(
-                focused.locator("svg.dock-tab-bar__icon").count(),
-                1,
-                "the focused tab carries a leading icon",
-            )
-            # The mockup root draws no visible detail pane; opening a submenu
-            # reveals the grid + detail split.
+            # The overview draws no visible detail pane, and its reason strip
+            # appears only while a disabled chip is focused.
             self.assertEqual(page.locator('[data-testid="exploration-detail"]').count(), 0)
-            page.keyboard.press("Enter")  # Move
-            wait_for_store_state(
-                page,
-                lambda s: bool(s.get("connected")),
-                dom_readiness={
-                    "selector": '[data-testid="exploration-detail"]',
-                    "predicate": (
-                        "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
-                    ),
-                    "description": "exploration detail pane rendered",
-                },
-            )
-            detail = page.locator('[data-testid="exploration-detail"]')
-            self.assertTrue(detail.is_visible())
-            # H3: at depth >= 2 the active row container is the pane
-            # (`[data-testid="dock-menu"]` = the `.dock-menu` div); the
-            # pane's row group (the variant container) is the CSS grid.
-            # H3: at depth >= 2 the active row container is the pane
-            # (`[data-testid="dock-menu"]` = the `.dock-menu` div); the pane's
-            # variant container lays out its rows with the CSS layout the pane
-            # kind dictates (outlet/cards = grid, plain = block, skills/targets
-            # = flex). Assert the first child's computed display is one of the
-            # pane variants' valid layouts.
+            # The footer's 等待／休息 chip opens the waiting frame inside the
+            # command region; the row region keeps its pane layout.
+            activate_overview_chip(page, "wait")
+            page.wait_for_selector(".waiting-screen", timeout=15000)
             pane_display = page.evaluate(
                 "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
                 " const v = el && el.firstElementChild;"
@@ -142,16 +130,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertIn(
                 pane_display,
                 ("grid", "block", "flex"),
-                "the submenu's variant container uses its pane kind's CSS layout",
+                "the frame's variant container uses its pane kind's CSS layout",
             )
-            # The detail pane names the focused item's next key action.
-            page.evaluate("window.__elosernBridge.router.focusItemByKey('back')")
-            page.wait_for_timeout(120)
-            self.assertIn(
-                "返回上一層",
-                detail.inner_text(),
-                "the detail pane names the back cell's next key action",
-            )
+            # Escape pops exactly one level and returns the dock to the
+            # overview with the 等待／休息 chip focused.
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(150)
+            self.assertEqual(store_state(page)["dockDepth"], 1)
+            self.assertEqual(store_state(page)["focus"]["key"], "wait")
+            self.assertEqual(page.locator(".waiting-screen").count(), 0)
  
     @covers_requirement(
         "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
@@ -163,17 +150,19 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         (webclient-align-01-dock-chrome).
 
         The old visually-hidden ``action-dock-description`` duplicate was
-        deleted: the tab bar's trailing hint IS the hook. The legend names
-        only implemented behaviour (1–4 pick cards, Enter activates, Esc pops
-        one frame); the ``/`` focus binding stays implemented but the
-        reference's legend does not advertise it, so neither does this one.
+        deleted: the dock's own legend strip IS the hook (webclient-scene-
+        overview-swap D3 re-homed it out of the tab bar, so it also shows in
+        combat). The legend names only implemented behaviour (1–4 pick rows,
+        Enter activates, Esc pops one frame); the ``/`` focus binding stays
+        implemented but the reference's legend does not advertise it, so
+        neither does this one.
         """
         page = self.logged_in_page()
         focus_action_dock(page)
-        hint = page.locator(".dock-tab-bar__hint")
+        hint = page.locator(".action-dock__legend")
         # Exactly one legend element, and it carries the test hook.
         self.assertEqual(
-            hint.count(), 1, "the tab bar carries exactly one legend"
+            hint.count(), 1, "the dock carries exactly one legend"
         )
         self.assertEqual(
             page.locator('[data-testid="action-dock-description"]').count(), 1,
@@ -193,7 +182,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertNotIn("/ 聚焦指令列", hint_text)
         self.assertNotIn("方向鍵選擇", hint_text)
         # The draft's <kbd> structure: exactly two styled kbd elements.
-        kbd = page.locator(".dock-tab-bar__hint kbd")
+        kbd = page.locator(".action-dock__legend kbd")
         self.assertEqual(kbd.count(), 2, "the legend renders two kbd elements")
         self.assertEqual(
             [kbd.nth(0).inner_text(), kbd.nth(1).inner_text()],
