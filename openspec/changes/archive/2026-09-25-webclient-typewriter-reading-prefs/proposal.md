@@ -89,7 +89,7 @@ Out of scope:
   - `web/webclient-app/lib/controls-reference.js`
   - `web/webclient-app/stories/Core/MessageWindow.stories.js`, `web/webclient-app/stories/Overlays/SettingsOverlay.stories.js`
 - Tests edited:
-  - Vitest: `tests/message_pages.test.js`, `tests/narrative_line_nodes.test.js`, `tests/message_window.test.js`, `tests/overlays/settings_overlay.test.js`, `tests/overlays/help_overlay.test.js` (only if it pins the text)
+  - Vitest: `tests/message_pages.test.js`, `tests/narrative_line_nodes.test.js`, `tests/message_window.test.js`, `tests/full_log_overlay.test.js`, `tests/overlays/settings_overlay.test.js`, `tests/overlays/help_overlay.test.js` (it pins the text)
   - node: `web/static/webclient/js/tests/layout_store.test.js`
   - Python: `web/webclient/tests/test_node_suite_evidence.py`, `web/webclient/tests/test_vue_showcase_overlays_evidence.py` (story id)
   - Browser: `web/tests/browser/browser_helpers.py` (`wait_for_page_shown`), `test_browser_input_narrative.py`, `test_browser_layout.py` (its stored-wrapper literals), and the C6c message-page assertions in `test_browser_shell_narrative.py`, `test_browser_exploration_actions.py`, and `test_browser_shell_command_line.py`
