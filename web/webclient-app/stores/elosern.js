@@ -120,6 +120,8 @@ export const useElosernStore = defineStore("elosern", () => {
   // The reactive view/narrative refs (the view group projects into `view`).
   ctx.view = ref(null); // assigned right after the groups are applied
   ctx.narrative = ref([]);
+  ctx.narrativeSeq = 0;
+  ctx.responseMarks = ref([]);
   ctx.commandHistory = ref([]);
   ctx.seenIndex = ref(0);
   // C4: the last OOB `ui_snapshot` / `ui_update` receive result. A rejected
@@ -167,6 +169,7 @@ export const useElosernStore = defineStore("elosern", () => {
   return {
     view: ctx.view,
     narrative: ctx.narrative,
+    responseMarks: ctx.responseMarks,
     commandHistory: ctx.commandHistory,
     unreadCount: ctx.unreadCount,
     receive: ctx.receive,
