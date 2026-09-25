@@ -43,7 +43,7 @@ function defaultStore(initial) {
 function wrapper(overrides) {
   return Object.assign(
     {
-      layout_version: 1,
+      layout_version: LayoutStore.CURRENT_LAYOUT_VERSION,
       dimensions: { narrative: 62 },
       tabs: {},
       preferences: { text2html: true },
@@ -80,11 +80,12 @@ function componentByName(config, name) {
 
 test("default wrapper is versioned and bounded", () => {
   const def = LayoutStore.defaultWrapper();
-  assert.equal(def.layout_version, 1);
+  assert.equal(def.layout_version, 2);
+  assert.equal(LayoutStore.CURRENT_LAYOUT_VERSION, 2);
   assert.ok(JSON.stringify(def).length <= LayoutStore.MAX_STORAGE_BYTES);
 });
 
-test("missing storage loads the version-1 default", () => {
+test("missing storage loads the current default", () => {
   const store = defaultStore();
   const result = store.load();
   assert.deepEqual(result.state, LayoutStore.defaultWrapper());
@@ -138,7 +139,7 @@ test("missing layout_version resets to the approved default", () => {
 test("oversized stored wrappers reset to the approved default", () => {
   const storage = mockStorage({
     "elosern.layout": JSON.stringify(
-      wrapper({ layout_version: 1, junk: "x".repeat(5000) })
+      wrapper({ layout_version: LayoutStore.CURRENT_LAYOUT_VERSION, junk: "x".repeat(5000) })
     ),
   });
   const store = defaultStore(storage);
@@ -163,7 +164,7 @@ test("canonical state, identity, request, command, epoch, revision, and panel fi
   ];
   forbiddenTopLevel.forEach((field) => {
     const storage = mockStorage({
-      "elosern.layout": JSON.stringify(wrapper({ layout_version: 1, [field]: "anything" })),
+      "elosern.layout": JSON.stringify(wrapper({ layout_version: LayoutStore.CURRENT_LAYOUT_VERSION, [field]: "anything" })),
     });
     const store = defaultStore(storage);
     const result = store.load();
@@ -173,7 +174,7 @@ test("canonical state, identity, request, command, epoch, revision, and panel fi
       `field ${field} must be rejected`
     );
     assert.equal(
-      LayoutStore.validateWrapper(wrapper({ layout_version: 1, [field]: "anything" })),
+      LayoutStore.validateWrapper(wrapper({ layout_version: LayoutStore.CURRENT_LAYOUT_VERSION, [field]: "anything" })),
       null,
       `validateWrapper must reject field ${field}`
     );
@@ -194,7 +195,7 @@ test("stock Evennia GoldenLayout keys are never imported", () => {
 test("save persists only bounded dimensions and harmless preferences", () => {
   const store = defaultStore();
   const saved = store.save({
-    layout_version: 1,
+    layout_version: LayoutStore.CURRENT_LAYOUT_VERSION,
     dimensions: { narrative: 62, epoch: 999, "action-dock": 11 },
     tabs: { status: true, evil: true },
     preferences: { text2html: false, fontScale: 1.1, evil: 1 },
@@ -210,11 +211,11 @@ test("save rejects wrappers carrying canonical state", () => {
   const storage = mockStorage({});
   const store = defaultStore(storage);
   assert.equal(
-    store.save({ layout_version: 1, panels: { status: { available: true } } }),
+    store.save({ layout_version: LayoutStore.CURRENT_LAYOUT_VERSION, panels: { status: { available: true } } }),
     false
   );
   assert.equal(
-    store.save({ layout_version: 1, revision: 3 }),
+    store.save({ layout_version: LayoutStore.CURRENT_LAYOUT_VERSION, revision: 3 }),
     false
   );
   assert.equal(storage.getItem(LayoutStore.STORAGE_KEY), null, "nothing persisted");
@@ -237,20 +238,50 @@ test("fontScale preference is bounded", () => {
   assert.deepEqual(stored.preferences, { text2html: true }, "out-of-range fontScale dropped");
 });
 
-// H5 (webclient-hud-05-overlays-and-command-line, task 9.2): the two added
-// PREFERENCE_TYPES keys (reducedMotion, colorblind) — a version-1 wrapper
-// lacking the keys still normalizes and no version bump occurs.
-test("a version-1 wrapper lacking the H5 preference keys still normalizes without a version bump", () => {
-  const validated = LayoutStore.validateWrapper(
-    wrapper({ preferences: { text2html: true, fontScale: 1.12 } })
+// webclient-typewriter-reading-prefs (task 5.2): version 2 registers no
+// migration, so a well-formed version-1 wrapper resets to the version-2
+// default with every preference at its default.
+test("a version-1 wrapper resets to the version-2 default", () => {
+  const storage = mockStorage({
+    "elosern.layout": JSON.stringify(
+      wrapper({ layout_version: 1, preferences: { text2html: true, fontScale: 1.12 } })
+    ),
+  });
+  const store = defaultStore(storage);
+  const result = store.load();
+  assert.deepEqual(result.state, LayoutStore.defaultWrapper());
+  assert.equal(result.state.layout_version, 2);
+  assert.equal(result.state.preferences.textSpeed, "normal");
+  assert.equal(result.state.preferences.autoAdvance, false);
+  const stored = JSON.parse(storage.getItem("elosern.layout"));
+  assert.equal(stored.layout_version, 2, "the reset version-2 wrapper is persisted");
+  assert.equal(stored.preferences.fontScale, 1);
+});
+
+test("textSpeed validates against its enum and autoAdvance as a boolean", () => {
+  const store = defaultStore();
+  assert.equal(
+    store.save(
+      wrapper({
+        preferences: { text2html: true, fontScale: 1.12, textSpeed: "warp", autoAdvance: "yes" },
+      })
+    ),
+    true
   );
-  assert.ok(validated, "the old wrapper is valid");
-  assert.equal(validated.layout_version, 1, "no version bump");
+  let stored = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
   assert.deepEqual(
-    validated.preferences,
+    stored.preferences,
     { text2html: true, fontScale: 1.12 },
-    "unknown preference keys are dropped, known keys kept"
+    "an invalid textSpeed and a non-boolean autoAdvance are dropped, the other keys kept"
   );
+  store.save(wrapper({ preferences: { textSpeed: "fast", autoAdvance: true } }));
+  stored = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
+  assert.deepEqual(stored.preferences, { textSpeed: "fast", autoAdvance: true });
+});
+
+test("the textSpeed enum equals TEXT_SPEEDS of the reveal lib", async () => {
+  const { TEXT_SPEEDS } = await import("../../../../webclient-app/lib/message_reveal.js");
+  assert.deepEqual(LayoutStore.PREFERENCE_ENUMS.textSpeed, TEXT_SPEEDS);
 });
 
 test("the H5 preference keys (reducedMotion, colorblind) validate as booleans", () => {

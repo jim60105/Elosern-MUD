@@ -265,15 +265,17 @@ function makeTextToken(value, degraded) {
 }
 
 // Split `tokens` after `cutCount` code-point/break units (D4).
-// Also strips leading `break` tokens and leading `\n` characters from the
-// remainder, returning `{ prefixTokens, remainderTokens, droppedBreaks }`.
-function splitTokenStream(tokens, cutCount) {
+// A page cut (the default) also strips leading `break` tokens and leading
+// `\n` characters from the remainder; `stripLeadingBreaks: false` keeps
+// them (the typewriter's hidden tail must lay out exactly like the page that
+// was measured). Returns `{ prefixTokens, remainderTokens, droppedBreaks }`.
+function splitTokenStream(tokens, cutCount, { stripLeadingBreaks = true } = {}) {
   const prefixTokens = [];
   const remainderTokens = [];
   const openStack = [];
   let remaining = cutCount;
   let inRemainder = remaining <= 0;
-  let strippingLeadingBreaks = inRemainder;
+  let strippingLeadingBreaks = inRemainder && stripLeadingBreaks;
   let droppedBreaks = 0;
 
   function openRemainderSpans() {
@@ -319,7 +321,7 @@ function splitTokenStream(tokens, cutCount) {
           closePrefixSpans();
           openRemainderSpans();
           inRemainder = true;
-          strippingLeadingBreaks = true;
+          strippingLeadingBreaks = stripLeadingBreaks;
         }
       } else if (tok.kind === "text") {
         const cps = Array.from(tok.value == null ? "" : String(tok.value));
@@ -335,7 +337,7 @@ function splitTokenStream(tokens, cutCount) {
           closePrefixSpans();
           openRemainderSpans();
           inRemainder = true;
-          strippingLeadingBreaks = true;
+          strippingLeadingBreaks = stripLeadingBreaks;
         } else {
           // Split inside this text token.
           const head = cps.slice(0, remaining).join("");
@@ -347,7 +349,7 @@ function splitTokenStream(tokens, cutCount) {
           closePrefixSpans();
           openRemainderSpans();
           inRemainder = true;
-          strippingLeadingBreaks = true;
+          strippingLeadingBreaks = stripLeadingBreaks;
 
           while (strippingLeadingBreaks && tailCps.length > 0 && tailCps[0] === "\n") {
             tailCps.shift();
@@ -397,6 +399,22 @@ function splitTokenStream(tokens, cutCount) {
     remainderTokens: pruneEmptySpans(remainderTokens),
     droppedBreaks,
   };
+}
+
+// The span-preserving cut (C6a design D4), exposed for the typewriter reveal
+// (webclient-typewriter-reading-prefs design D1): split `tokens` after `n`
+// code-point/break units into `{ head, tail }`. The head closes the spans
+// open at the cut; the tail re-opens shallow copies with the same classes
+// and style; `degraded` text stays degraded on both halves. Unlike a page
+// cut, no leading break is dropped from the tail.
+export function splitTokensAt(tokens, n) {
+  const count = typeof n === "number" && n > 0 ? Math.floor(n) : 0;
+  const { prefixTokens, remainderTokens } = splitTokenStream(
+    Array.isArray(tokens) ? tokens : [],
+    count,
+    { stripLeadingBreaks: false },
+  );
+  return { head: prefixTokens, tail: remainderTokens };
 }
 
 // Drop `<span ...></span>` pairs that hold no text or break tokens so cutting

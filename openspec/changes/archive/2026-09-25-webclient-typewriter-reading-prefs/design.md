@@ -70,7 +70,7 @@ The lib counts reveal units exactly as C6a counts offsets: one per code point, a
 ### D3. One clock: `use-typewriter.js`
 `useTypewriter({ units, snap, cps, held })` runs one `requestAnimationFrame` loop while it has work.
 - `elapsed += min(frameDelta, 100)`. A hidden tab gets no frames, and the clamp stops a long gap from counting on return.
-- The typed count is `snap(min(units, start + floor(elapsed × cps / 1000)))`. With `cps = Infinity` (instant), it is `units` on the first call, with no frame.
+- The typed count is `snap(min(units, start + floor(elapsed × rate / 1000)))`, where `rate` is `cps()` sampled once at `start()`. Re-reading `cps` every frame would rescale the whole elapsed time on a mid-page speed change and could hide characters already shown. With `rate = Infinity` (instant), the count is `units` on the first call, with no frame.
 - The composable exposes:
   - `typed` (a ref) and `typing` (a computed)
   - `start(fromUnits)`, `complete()`, and `stop()`
@@ -104,7 +104,7 @@ Every transition from C6b D3 keeps its trigger. What it does to the typewriter:
 | Lines appended to the page on screen | The page's `units` grow. If it was complete, `start(oldUnits)` resumes. C6b's appended-fragment announcement is unchanged |
 | Re-page (box, `fontScale`, fonts ready) | Anchor = typing position (D6) |
 | Click / Enter / Space | If `typing`, `complete()`. Otherwise advance (C6b) |
-| Fonts not ready | The unpaged first block is shown whole. Typing starts when paging does, from page 1 unit 0 |
+| Fonts not ready | The unpaged first block is shown whole. Typing starts when paging does, from page 1 unit 0, for a response that arrived after the window mounted. The window remembers the response on screen at its first fonts-not-ready pass; when paging first runs, a different response opens on page 1 and types, and the mount's own response settles on its last page as a mount does |
 
 The marker's `v-if` adds `!typing`. The root gains `data-typing`. The hidden `第 N／M 頁` description is unchanged.
 
@@ -115,7 +115,7 @@ C6b anchored to the first character on screen, because instant pages show everyt
 - While typing: `anchor = offsetAtUnits(page, typed)`, the next character to reveal.
 - When complete: `anchor = offsetAtUnits(page, units) − 1`, the last character shown. The page end is exclusive, and anchoring there would land on the next page and skip what the reader was reading.
 
-After re-paging, `pageIndex = pageIndexForOffset(pages, anchor)`, and the window `start`s at `unitsAtOffset(newPage, anchor)` (plus 1 when complete). Text before the anchor on the new page shows at once, and the rest types. This implements design §6.2's "the first character they had not yet seen". Text before the anchor that falls onto an earlier page is not shown again. The window has no back step, so it stays readable in the full log. That is the same trade C6b made.
+The anchor is read from the page on screen at the start of each re-page, before the new pages replace it. It is a local value of that pass, not a variable updated only when a page is set. After re-paging, `pageIndex = pageIndexForOffset(pages, anchor)`, and the window `start`s at `unitsAtOffset(newPage, anchor)` while typing, or `unitsAtOffset(newPage, anchor + 1)` when complete (so an anchor on a break dropped at the new cut resumes at the next page's start). The complete-page rule also covers lines appended to the page on screen: the resume point is the old unit count, so the new lines type. Text before the anchor on the new page shows at once, and the rest types. This implements design §6.2's "the first character they had not yet seen". Text before the anchor that falls onto an earlier page is not shown again. The window has no back step, so it stays readable in the full log. That is the same trade C6b made.
 
 ### D7. Auto-advance
 - The window arms `armAdvance(autoAdvanceDelayMs(page), advance)` whenever all of these hold:
@@ -177,11 +177,12 @@ C10 pages the dialogue line and moves the choices so that they appear after the 
     - reduced motion through an override, and through a mocked `matchMedia` with `null`
     - auto-advance timing, stopping at the last page, pausing on `held`, and skipping map and oversize pages
     - the dialogue variant not typing
-  - The existing `tests/message_window.test.js` (C6b) mounts with `textSpeed: "instant"` in its shared helper, so its instant-page assertions stay valid.
+  - The existing `tests/message_window.test.js` (C6b) mounts with `textSpeed: "instant"` in its shared helper, so its instant-page assertions stay valid. Its prose-scale case now expects the page holding the last character shown (D6), not the first character on screen. `tests/full_log_overlay.test.js` mounts the window with `textSpeed: "instant"` too, because it reads page 2's text right after a click.
   - `tests/store/reading_preferences.test.js` covers the preference slice.
   - `tests/overlays/settings_overlay.test.js` covers the new controls.
 - **Browser.** Default-speed typing would make DOM text assertions depend on timing. `browser_helpers.wait_for_page_shown(page)` waits for `[data-testid="message-window"][data-typing="false"]`.
-  - Every C6c assertion that reads `inner_text()` or visibility on `message-page` calls the helper first, or presses Enter on the surface to complete the page, as the paging journeys already do. The files are `test_browser_shell_narrative.py`, `test_browser_exploration_actions.py`, `test_browser_input_narrative.py`, and `test_browser_shell_command_line.py`.
+  - Every C6c assertion that reads `inner_text()` or visibility on `message-page` calls the helper first (`test_browser_shell_narrative.py`). Chromium's `innerText` skips `visibility: hidden` text, while `textContent` keeps it, so the `textContent`-based err-line reads in `test_browser_exploration_actions.py` need nothing.
+  - The C6c paging journeys (the shared `_append_multipage_response` helpers of `test_browser_input_narrative.py` and `test_browser_shell_command_line.py`) assert paging, not typing, so the helper pins the text speed to `instant` through the store before it appends, as the "A click advances the page" scenario does. Typing is covered by the new journeys below.
   - Assertions on classes and element presence need nothing, because hidden text stays in the DOM.
   - New journeys in `test_browser_input_narrative.py`:
     - `test_message_page_types_and_completes` at 1920×1080: marker absent while typing, Enter completes, Enter advances, rendered line boxes unchanged between typing and complete

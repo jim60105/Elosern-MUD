@@ -41,8 +41,9 @@ const bridge = createWindowBridge(store);
 
 // Versioned browser persistence (webclient-desktop-shell:
 // browser-persistence-is-versioned-and-presentation-only): on mount, read the
-// stored `elosern.layout` wrapper, migrate a known prior version, and reset a
-// malformed, oversized, missing, stock, or unknown version to the version-1
+// stored `elosern.layout` wrapper, migrate a prior version that has a
+// registered migration (none is registered), and reset a malformed,
+// oversized, missing, stock, or unknown version to the current version's
 // default while preserving every required component. `load()` re-persists a
 // migrated or reset wrapper so the next load starts from the current version.
 const layoutStore = LayoutStore.createStore({ storage: window.localStorage });

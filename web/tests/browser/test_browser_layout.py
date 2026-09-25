@@ -62,7 +62,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
     def test_known_layout_version_persists_across_reload(self):
         page = self.logged_in_page()
         wrapper = {
-            "layout_version": 1,
+            "layout_version": 2,
             "dimensions": {"narrative": 55},
             "tabs": {"status": True},
             "preferences": {"text2html": True},
@@ -89,7 +89,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
                 count, 1, f"required component {component} missing after reload"
             )
         saved = self._layout(page)
-        self.assertEqual(saved["layout_version"], 1)
+        self.assertEqual(saved["layout_version"], 2)
         # The reload re-persists the full dimension set from the live layout;
         # the stored narrative dimension and tab state must survive it.
         self.assertEqual(saved["dimensions"]["narrative"], 55)
@@ -221,13 +221,44 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         )
         self.assert_surfaces_after_reload(page)
         stored = self._layout(page)
-        self.assertEqual(stored["layout_version"], 1, "unknown version resets")
+        self.assertEqual(stored["layout_version"], 2, "unknown version resets")
+
+        # A well-formed version-1 wrapper has no registered migration and
+        # resets to the version-2 default (webclient-typewriter-reading-prefs).
+        self._set_layout(
+            page,
+            {
+                "layout_version": 1,
+                "dimensions": {},
+                "tabs": {},
+                "preferences": {"fontScale": 1.12},
+            },
+        )
+        page.reload()
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="status-panel"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                    "return el !== null; }"
+                ),
+                "description": "status panel mounted after reload",
+            },
+        )
+        self.assert_surfaces_after_reload(page)
+        stored = self._layout(page)
+        self.assertEqual(stored["layout_version"], 2, "a version-1 wrapper resets")
+        self.assertEqual(stored["preferences"].get("fontScale"), 1)
+        self.assertEqual(stored["preferences"].get("textSpeed"), "normal")
+        self.assertIs(stored["preferences"].get("autoAdvance"), False)
 
         # An oversized wrapper resets regardless of content.
         self._set_layout(
             page,
             {
-                "layout_version": 1,
+                "layout_version": 2,
                 "dimensions": {"narrative": 50},
                 "tabs": {},
                 "preferences": {},

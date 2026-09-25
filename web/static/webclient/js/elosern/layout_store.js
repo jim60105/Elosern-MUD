@@ -22,9 +22,12 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var CURRENT_LAYOUT_VERSION = 1;
+  // Version 2 adds the reading preferences (text speed and auto-advance;
+  // OpenSpec change webclient-typewriter-reading-prefs). No migration is
+  // registered: a version-1 wrapper resets to the version-2 default.
+  var CURRENT_LAYOUT_VERSION = 2;
   var STORAGE_KEY = "elosern.layout";
-  // Stock Evennia pre-project keys are never imported by version 1.
+  // Stock Evennia pre-project keys are never imported by any version.
   var STOCK_KEYS = [
     "evenniaGoldenLayoutSavedState",
     "evenniaGoldenLayoutSavedStateName",
@@ -46,15 +49,24 @@
     "command-drawer",
   ];
 
-  // Only harmless display preferences may be persisted. H5 adds the
-  // optional reduced-motion override and the colorblind palette — additive
-  // only, no layout-version bump: a version-1 wrapper lacking the new keys
-  // normalizes cleanly.
+  // Only harmless display preferences may be persisted: the prose scale,
+  // the text-to-HTML toggle, the optional reduced-motion override, the
+  // colorblind palette, and (version 2) the reading preferences.
   var PREFERENCE_TYPES = {
     text2html: "boolean",
     fontScale: "number",
     reducedMotion: "boolean",
     colorblind: "boolean",
+    textSpeed: "enum",
+    autoAdvance: "boolean",
+  };
+
+  // The allowed values of each "enum" preference. This UMD module cannot
+  // import ESM, so it carries its own copy of `TEXT_SPEEDS` from
+  // web/webclient-app/lib/message_reveal.js; a node test asserts the two
+  // lists are equal.
+  var PREFERENCE_ENUMS = {
+    textSpeed: ["slow", "normal", "fast", "instant"],
   };
 
   var REQUIRED_SET = {};
@@ -62,7 +74,7 @@
     REQUIRED_SET[name] = true;
   });
 
-  // The approved version-1 desktop layout. Required components and the action
+  // The approved desktop layout. Required components and the action
   // dock are non-closable; narrative is the primary, largest surface.
   var DEFAULT_LAYOUT_CONFIG = {
     settings: {
@@ -133,15 +145,20 @@
   }
 
   function defaultWrapper() {
-    // H5 (task 7.5): the default wrapper's preferences carry the prose
-    // scale and colorblind default; the `reducedMotion` key is absent
-    // (optional — its absence means "no override", the OS preference
-    // applies).
+    // The default wrapper's preferences carry every default; the
+    // `reducedMotion` key is absent (optional — its absence means "no
+    // override", the OS preference applies).
     return {
       layout_version: CURRENT_LAYOUT_VERSION,
       dimensions: {},
       tabs: {},
-      preferences: { text2html: true, fontScale: 1, colorblind: false },
+      preferences: {
+        text2html: true,
+        fontScale: 1,
+        colorblind: false,
+        textSpeed: "normal",
+        autoAdvance: false,
+      },
     };
   }
 
@@ -154,6 +171,12 @@
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
         var value = raw[key];
         if (PREFERENCE_TYPES[key] === "boolean" && typeof value === "boolean") {
+          cleaned[key] = value;
+        } else if (
+          PREFERENCE_TYPES[key] === "enum" &&
+          typeof value === "string" &&
+          PREFERENCE_ENUMS[key].indexOf(value) !== -1
+        ) {
           cleaned[key] = value;
         } else if (
           PREFERENCE_TYPES[key] === "number" &&
@@ -350,7 +373,8 @@
     options = options || {};
     var storage = options.storage;
     var key = options.key || STORAGE_KEY;
-    var migrations = options.migrations || { 1: function (raw) { return raw; } };
+    // No migration is registered by default: an earlier version resets.
+    var migrations = options.migrations || {};
     var currentVersion = options.currentVersion || CURRENT_LAYOUT_VERSION;
 
     function migrate(wrapper) {
@@ -429,7 +453,7 @@
     }
 
     return {
-      // Load the stored wrapper, resetting to the version-1 default when the
+      // Load the stored wrapper, resetting to the current default when the
       // stored value is missing, malformed, oversized, stock, or unknown.
       load: function () {
         var result = read();
@@ -470,6 +494,7 @@
     MAX_STORAGE_BYTES: MAX_STORAGE_BYTES,
     REQUIRED_COMPONENTS: REQUIRED_COMPONENTS.slice(),
     PREFERENCE_TYPES: Object.assign({}, PREFERENCE_TYPES),
+    PREFERENCE_ENUMS: { textSpeed: PREFERENCE_ENUMS.textSpeed.slice() },
     DEFAULT_LAYOUT_CONFIG: clone(DEFAULT_LAYOUT_CONFIG),
     defaultWrapper: defaultWrapper,
     validateWrapper: validateWrapper,

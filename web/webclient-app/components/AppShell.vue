@@ -66,6 +66,12 @@ const props = defineProps({
   // The client-local prose scale (`store.view.fontScale`), forwarded to
   // MessageWindow so a scale change re-measures pages.
   fontScale: { type: Number, default: 1 },
+  // The reading preferences (webclient-typewriter-reading-prefs):
+  // `store.view.textSpeed`, `store.view.autoAdvance`, and the reduced-motion
+  // override `store.view.reducedMotion`, forwarded to MessageWindow.
+  textSpeed: { type: String, default: "normal" },
+  autoAdvance: { type: Boolean, default: false },
+  reducedMotion: { type: [String, null], default: null },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -330,6 +336,10 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           :dialogue="props.dialogue"
           :art-panel="props.artPanel"
           :font-scale="props.fontScale"
+          :text-speed="props.textSpeed"
+          :auto-advance="props.autoAdvance"
+          :reduced-motion="props.reducedMotion"
+          :held="props.openSurfaces.length > 0"
           @dialogue-pick="(pick) => emit('dialogue-pick', pick)"
           @dialogue-freeform="() => emit('dialogue-freeform')"
           @dialogue-leave="() => emit('dialogue-leave')"

@@ -20,7 +20,20 @@ import {
   segmentResponses,
 } from "../lib/message_pages.js";
 import { lineText, narrativeBlockNodes } from "../lib/narrative_line_nodes.js";
+import {
+  TEXT_SPEEDS,
+  autoAdvanceAllowed,
+  autoAdvanceDelayMs,
+  cpsFor,
+  fragmentReveal,
+  offsetAtUnits,
+  pageUnits,
+  snapUnits,
+  unitsAtOffset,
+} from "../lib/message_reveal.js";
 import { useMessageMeasure } from "../composables/use-message-measure.js";
+import { useReducedMotion } from "../composables/use-reduced-motion.js";
+import { useTypewriter } from "../composables/use-typewriter.js";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
 import { faceObjectPosition } from "./face-rect.js";
 
@@ -47,7 +60,23 @@ import { faceObjectPosition } from "./face-rect.js";
 // a new response opens on page 1; an action whose reply has not arrived yet
 // (a pending mark, or an echo line with no reply) flushes the shown response
 // to its last page; appended lines keep the page; a re-page keeps the page
-// holding the first character that was on screen.
+// holding the reader's typing position.
+//
+// Typewriter (OpenSpec change webclient-typewriter-reading-prefs): each page
+// the window starts to show types in at the reader's `textSpeed`, driven by
+// the rAF clock of `use-typewriter.js`. The page is always rendered in full
+// and the unrevealed tail is hidden with `visibility: hidden` and
+// `aria-hidden` (`narrativeBlockNodes`' `reveal`), so nothing re-wraps while
+// typing. The typing position is the re-page anchor: the next character to
+// reveal while typing, the last character shown once complete. A click or
+// Enter / Space while typing completes the page instead of advancing; the
+// marker renders only on a fully shown page. Mount and a flush show the page
+// complete; the live region still announces a page once, when it starts.
+// Effective reduced motion (the override, else the OS query) makes every
+// page instant. Opt-in auto-advance arms on a fully shown page with a next
+// page (never past the last page, never on an oversize or map page) and
+// pauses while `held` (an open drawer, overlay, or the full log). The
+// dialogue variant does not type.
 //
 // While mode is `dialogue` and the dialogue panel is available, the window
 // renders the dialogue variant (design D6): unpaged, scrolling
@@ -70,6 +99,19 @@ export default {
     fontScale: { type: Number, default: 1 },
     // Test seam: an injected `fits(fragments) -> boolean`.
     pageFit: { type: Function, default: null },
+    // The reader's typing speed (`store.view.textSpeed`).
+    textSpeed: {
+      type: String,
+      default: "normal",
+      validator: (value) => TEXT_SPEEDS.includes(value),
+    },
+    // Opt-in auto-advance (`store.view.autoAdvance`).
+    autoAdvance: { type: Boolean, default: false },
+    // The reduced-motion override: "on" | "off" | null (the OS applies).
+    reducedMotion: { type: [String, null], default: null },
+    // True while a drawer, overlay, or the full log is open: the
+    // auto-advance wait pauses.
+    held: { type: Boolean, default: false },
   },
   emits: ["dialogue-pick", "dialogue-freeform", "dialogue-leave", "open-full-log"],
   setup(props, { emit, expose }) {
@@ -125,15 +167,29 @@ export default {
     const pageIndex = ref(0);
     const provisional = ref(false);
     const liveText = ref("");
-    // The response offset of the first character on screen: the re-page
-    // anchor (C7 moves it to the typing position).
-    let anchorOffset = 0;
+
+    const currentPage = () => pages.value[pageIndex.value] || null;
+    const reduced = useReducedMotion(() => props.reducedMotion);
+    const effectiveCps = computed(() =>
+      reduced.value ? Infinity : cpsFor(TEXT_SPEEDS.includes(props.textSpeed) ? props.textSpeed : "normal"),
+    );
+    const typewriter = useTypewriter({
+      units: () => pageUnits(currentPage()),
+      snap: (n) => snapUnits(currentPage(), n),
+      cps: () => effectiveCps.value,
+      held: () => props.held,
+    });
+    const typing = typewriter.typing;
+
     // The response offset up to which the live region has spoken.
     let announcedEnd = 0;
     let shownKey = null;
     let shownBlocks = null;
     let shownLength = 0;
     let initialized = false;
+    // The response on screen when a fonts-not-ready pass first ran before
+    // the mount pass; `undefined` when no such pass ran.
+    let provisionalKey;
     let generation = 0;
 
     function fragmentText(fragment) {
@@ -181,8 +237,19 @@ export default {
 
     function setPage(index) {
       pageIndex.value = index;
-      const page = pages.value[index];
-      anchorOffset = page && page.blocks.length > 0 ? page.blocks[0].start : 0;
+    }
+
+    // The reader's typing position on the page on screen (design D6): the
+    // next character to reveal while typing, else the last character shown.
+    function readerAnchor() {
+      const page = currentPage();
+      if (!page) {
+        return { offset: 0, complete: true };
+      }
+      if (typing.value) {
+        return { offset: offsetAtUnits(page, typewriter.typed.value), complete: false };
+      }
+      return { offset: Math.max(0, offsetAtUnits(page, pageUnits(page)) - 1), complete: true };
     }
 
     function measurePages(blocks) {
@@ -204,13 +271,20 @@ export default {
       if (dialogueVariant.value) {
         // Leaving the variant reopens like a mount: on the last page.
         initialized = false;
+        provisionalKey = undefined;
         pages.value = [];
+        typewriter.stop();
         return;
       }
       const shown = display.value;
+      // Read before the pages are replaced: the anchor is on the old page.
+      const anchor = readerAnchor();
       if (!measure.ready.value) {
         // Fonts not ready: the first block, unpaged, scrolling inside.
         provisional.value = true;
+        if (!initialized && provisionalKey === undefined) {
+          provisionalKey = shown.key;
+        }
         const first = shown.blocks[0];
         pages.value = first
           ? [
@@ -231,6 +305,7 @@ export default {
             ]
           : [];
         pageIndex.value = 0;
+        typewriter.complete();
         return;
       }
       provisional.value = false;
@@ -240,34 +315,53 @@ export default {
       pages.value = next;
       if (next.length === 0) {
         pageIndex.value = 0;
+        typewriter.complete();
         return;
       }
       const last = next.length - 1;
       const length = responseLength(shown.blocks);
       const shrank = shown.key === shownKey && length < shownLength;
       shownLength = length;
+      // A response that arrived while the fonts were loading was never read:
+      // the first paging pass opens it on page 1 and types it (design D5),
+      // instead of settling it like the mount's retained log.
+      const arrivedWhileProvisional =
+        !initialized && provisionalKey !== undefined && shown.key !== provisionalKey;
+      if (arrivedWhileProvisional && !shown.awaiting && !shrank) {
+        initialized = true;
+        shownKey = null;
+      }
       // A trim of the log's oldest lines can cut into the shown (leading)
       // response and renumber its offsets; the anchor and watermark are then
       // meaningless, so it settles like a mount.
       if (!initialized || shown.awaiting || shrank) {
         // Mount, resync, or the reader acted: the last page, already read.
+        // A flush stops typing and shows the page complete.
         initialized = true;
         shownKey = shown.key;
         announcedEnd = length;
         setPage(last);
+        typewriter.complete();
+        typewriter.disarmAdvance();
         return;
       }
       if (shown.key !== shownKey) {
-        // A new response opens on page 1.
+        // A new response opens on page 1 and types from its start.
         shownKey = shown.key;
         announcedEnd = 0;
         setPage(0);
         announceCurrentPage({ whole: true });
+        typewriter.start(0);
         return;
       }
       // Same response: appended lines or a new box / scale / font. The page
-      // holding the anchor stays; only appended text is announced.
-      pageIndex.value = Math.min(pageIndexForOffset(next, anchorOffset), last);
+      // holding the typing position stays; the text before it shows at once
+      // and the rest types (design D6). On a complete page the resume point
+      // is just past the last character shown, which also resumes typing
+      // into lines appended to that page. Only appended text is announced.
+      const index = Math.min(pageIndexForOffset(next, anchor.offset), last);
+      setPage(index);
+      typewriter.start(unitsAtOffset(next[index], anchor.complete ? anchor.offset + 1 : anchor.offset));
       if (blocksChanged) {
         announceCurrentPage({ whole: false });
       }
@@ -277,13 +371,52 @@ export default {
       if (dialogueVariant.value || provisional.value) {
         return false;
       }
+      if (typing.value) {
+        // A press while typing shows the page in full.
+        typewriter.complete();
+        return true;
+      }
       if (pageIndex.value >= pages.value.length - 1) {
         return false;
       }
       setPage(pageIndex.value + 1);
       announceCurrentPage({ whole: true });
+      typewriter.start(0);
       return true;
     }
+
+    // A switch to `instant` or into reduced motion completes the typing
+    // page; any other speed change applies from the next page.
+    watch(effectiveCps, (cps) => {
+      if (cps === Infinity) {
+        typewriter.complete();
+      }
+    });
+
+    // Auto-advance (design D7): armed on a fully shown page with a next page
+    // that is neither oversize nor a map; any change re-evaluates it, so the
+    // wait counts from the later of "fully shown" and "a next page exists".
+    watch(
+      () => [
+        props.autoAdvance,
+        dialogueVariant.value,
+        provisional.value,
+        typing.value,
+        pageIndex.value,
+        pages.value,
+      ],
+      // An awaiting flush always parks on the last page, so `index` then
+      // fails the next-page test and nothing arms.
+      ([auto, dialogue, unpaged, isTyping, index, list]) => {
+        const page = list[index];
+        if (auto && !dialogue && !unpaged && !isTyping && index < list.length - 1 && autoAdvanceAllowed(page)) {
+          typewriter.armAdvance(autoAdvanceDelayMs(page), () => advance());
+        } else {
+          typewriter.disarmAdvance();
+        }
+      },
+      { flush: "post" },
+    );
 
     watch(
       () => [
@@ -561,7 +694,9 @@ export default {
       const page = pages.value[pageIndex.value] || null;
       const total = pages.value.length;
       const onLast = pageIndex.value >= total - 1;
-      const showMarker = variant === "paged" && !provisional.value && total > 0;
+      const isTyping = variant === "paged" && typing.value;
+      const showMarker = variant === "paged" && !provisional.value && total > 0 && !isTyping;
+      const reveals = isTyping && page ? fragmentReveal(page, typewriter.typed.value) : null;
       return h(
         "section",
         {
@@ -570,6 +705,7 @@ export default {
           "data-testid": "message-window",
           "data-mode": props.mode,
           "data-variant": variant,
+          "data-typing": isTyping ? "true" : "false",
           onClick,
           onWheel,
         },
@@ -615,7 +751,11 @@ export default {
                   "aria-describedby": pageLabelId,
                   onKeydown: onSurfaceKeydown,
                 },
-                page ? page.blocks.map((fragment, index) => narrativeBlockNodes(fragment, `f${index}`)) : [],
+                page
+                  ? page.blocks.map((fragment, index) =>
+                      narrativeBlockNodes(fragment, `f${index}`, reveals ? reveals[index] : undefined),
+                    )
+                  : [],
               ),
               [[vShow, variant === "paged"]],
             ),
@@ -779,6 +919,15 @@ export default {
 .message-window .narrative-line.err {
   color: var(--seal-400);
   font-style: italic;
+}
+
+/* The typewriter reveal (webclient-typewriter-reading-prefs design D1): the
+   unrevealed tail keeps its place invisibly, so nothing re-wraps while a
+   page types. A `sys` line's ◈ marker is a ::before, so it stays hidden
+   with its unrevealed line. */
+.message-window .narrative-unrevealed,
+.message-window .narrative-line.unrevealed {
+  visibility: hidden;
 }
 
 /* Box-drawing maps: atomic mono blocks with a tight leading so vertical

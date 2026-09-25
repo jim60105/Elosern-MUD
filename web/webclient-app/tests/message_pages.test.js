@@ -8,6 +8,7 @@ import {
   responseBlocks,
   responseLength,
   segmentResponses,
+  splitTokensAt,
 } from "../lib/message_pages.js";
 
 function makeLine(kind, text, seq) {
@@ -523,5 +524,72 @@ describe("paginate", () => {
     const pages = paginate(blocks, nonMonotonicFits);
     const joined = pages.flatMap((p) => p.blocks.map(fragmentPlainText)).join("");
     expect(joined).toBe(text);
+  });
+});
+
+// webclient-typewriter-reading-prefs (task 2.1): the span-preserving cut
+// exposed for the typewriter reveal.
+describe("splitTokensAt", () => {
+  it("closes nested spans on the head and re-opens shallow copies on the tail", () => {
+    const tokens = NarrativeMarkup.tokenize(
+      '<span class="color-203" style="color: #ff5555;"><span class="underline">紅底線前段</span></span>',
+    );
+    const { head, tail } = splitTokensAt(tokens, 2);
+    expect(head).toEqual([
+      { kind: "open", tag: "span", classes: ["color-203"], style: { color: "#ff5555" } },
+      { kind: "open", tag: "span", classes: ["underline"] },
+      { kind: "text", value: "紅底" },
+      { kind: "close", tag: "span" },
+      { kind: "close", tag: "span" },
+    ]);
+    expect(tail).toEqual([
+      { kind: "open", tag: "span", classes: ["color-203"], style: { color: "#ff5555" } },
+      { kind: "open", tag: "span", classes: ["underline"] },
+      { kind: "text", value: "線前段" },
+      { kind: "close", tag: "span" },
+      { kind: "close", tag: "span" },
+    ]);
+    // Shallow copies: mutating the tail never touches the source tokens.
+    tail[0].classes.push("x");
+    expect(tokens[0].classes).toEqual(["color-203"]);
+  });
+
+  it("cuts at a break and keeps every break on the tail", () => {
+    const tokens = [
+      { kind: "text", value: "甲乙" },
+      { kind: "break" },
+      { kind: "break" },
+      { kind: "text", value: "丙" },
+    ];
+    // The first break is unit 3: it ends the head; the second stays on the tail.
+    expect(splitTokensAt(tokens, 3)).toEqual({
+      head: [{ kind: "text", value: "甲乙" }, { kind: "break" }],
+      tail: [{ kind: "break" }, { kind: "text", value: "丙" }],
+    });
+    // A cut before the breaks keeps both on the tail (a page cut would drop them).
+    expect(splitTokensAt(tokens, 2).tail).toEqual([
+      { kind: "break" },
+      { kind: "break" },
+      { kind: "text", value: "丙" },
+    ]);
+    // Leading newline characters inside a text token are kept too.
+    expect(splitTokensAt([{ kind: "text", value: "甲\n\n乙" }], 1).tail).toEqual([
+      { kind: "text", value: "\n\n乙" },
+    ]);
+  });
+
+  it("never splits a surrogate pair and keeps the degraded flag on both halves", () => {
+    const { head, tail } = splitTokensAt([{ kind: "text", value: "𠀀𠀁𠀂", degraded: true }], 2);
+    expect(head).toEqual([{ kind: "text", value: "𠀀𠀁", degraded: true }]);
+    expect(tail).toEqual([{ kind: "text", value: "𠀂", degraded: true }]);
+  });
+
+  it("puts everything on the tail at 0 and on the head past the end", () => {
+    const tokens = [{ kind: "text", value: "甲乙" }];
+    expect(splitTokensAt(tokens, 0)).toEqual({ head: [], tail: tokens });
+    // A cut at 0 keeps a leading break on the tail.
+    const leading = [{ kind: "break" }, { kind: "text", value: "甲" }];
+    expect(splitTokensAt(leading, 0)).toEqual({ head: [], tail: leading });
+    expect(splitTokensAt(tokens, 9)).toEqual({ head: tokens, tail: [] });
   });
 });

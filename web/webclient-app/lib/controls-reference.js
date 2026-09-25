@@ -15,7 +15,7 @@ export const CONTROLS_REFERENCE = [
     key: "Enter",
     label: "Send the command",
     detail:
-      "A single send path; a successful send collapses the line and returns to the dock; Shift+Enter inserts a newline without sending. Enter or Space on the focused message window advances a page.",
+      "A single send path; a successful send collapses the line and returns to the dock; Shift+Enter inserts a newline without sending. Enter or Space on the focused message window first shows a typing page in full, then advances a page.",
   },
   {
     key: "↑ / ↓",

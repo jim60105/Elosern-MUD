@@ -97,4 +97,40 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted("colorblind-change")).toEqual([[true]]);
   });
+
+  // webclient-typewriter-reading-prefs (task 5.4): the reading section's
+  // text-speed segment and auto-advance toggle.
+  it("renders the four text-speed steps and the auto-advance toggle in the reading section", () => {
+    wrapper = mount(SettingsOverlay);
+    const reading = wrapper.get('section[aria-label="閱讀設定"]');
+    const labels = ["slow", "normal", "fast", "instant"].map((value) =>
+      reading.get(`[data-testid="settings-overlay-text-speed-${value}"]`).text(),
+    );
+    expect(labels).toEqual(["慢", "標準", "快", "瞬間"]);
+    expect(reading.find('[data-testid="settings-overlay-auto-advance"]').exists()).toBe(true);
+    expect(reading.text()).toContain("減少動態效果開啟時一律立即顯示");
+  });
+
+  it("marks the current text speed with a non-colour indicator and the pressed state", () => {
+    wrapper = mount(SettingsOverlay, { props: { textSpeed: "fast", autoAdvance: true } });
+    const fast = wrapper.get('[data-testid="settings-overlay-text-speed-fast"]');
+    expect(fast.classes()).toContain("on");
+    expect(fast.attributes("aria-pressed")).toBe("true");
+    const normal = wrapper.get('[data-testid="settings-overlay-text-speed-normal"]');
+    expect(normal.classes()).not.toContain("on");
+    expect(normal.attributes("aria-pressed")).toBe("false");
+    expect(wrapper.get('[data-testid="settings-overlay-auto-advance"]').element.checked).toBe(true);
+  });
+
+  it("emits text-speed-change and auto-advance-change", async () => {
+    wrapper = mount(SettingsOverlay);
+    wrapper.get('[data-testid="settings-overlay-text-speed-instant"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("text-speed-change")).toEqual([["instant"]]);
+    const toggle = wrapper.get('[data-testid="settings-overlay-auto-advance"]');
+    toggle.element.checked = true;
+    toggle.trigger("change");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("auto-advance-change")).toEqual([[true]]);
+  });
 });

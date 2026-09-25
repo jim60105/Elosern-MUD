@@ -173,6 +173,11 @@ export function applyView(ctx) {
       textToHtml: ctx.prefs.text2html,
       reducedMotion: ctx.prefs.reducedMotion,
       colorblind: ctx.prefs.colorblind,
+      // C7 (webclient-typewriter-reading-prefs): the reading preferences the
+      // message window reads as props — the typing speed and the opt-in
+      // auto-advance.
+      textSpeed: ctx.prefs.textSpeed,
+      autoAdvance: ctx.prefs.autoAdvance,
 
       contextActions: panel,
       suggestions,

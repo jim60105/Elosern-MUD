@@ -809,6 +809,31 @@ class MessagePagesEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-input-narrative::a-page-types-in-at-the-reader-s-text-speed-and-auto-advance-is-opt-in",
+    )
+    def test_message_window_typing_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/message_window_typing.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/message_reveal.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "message-window typing Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

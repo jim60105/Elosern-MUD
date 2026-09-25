@@ -8,6 +8,7 @@
 // text as the feed's literal-glyph spelling `/[─-╿]/`.
 
 import { describe, expect, it, vi } from "vitest";
+import { render } from "vue";
 import { BOX_DRAWING, isBoxDrawing } from "../lib/box_drawing.js";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import {
@@ -167,5 +168,93 @@ describe("narrativeBlockNodes", () => {
     );
     expect(spans).toHaveLength(1);
     expect(spans[0].props.class).toBe("color-220");
+  });
+});
+
+// webclient-typewriter-reading-prefs (task 2.4): the typewriter reveal.
+describe("narrativeBlockNodes reveal", () => {
+  const SOURCE =
+    '甲乙<span class="color-203" style="color: #ff5555;">丙丁<span class="underline">戊己</span>庚</span>辛<badtag>';
+
+  function fragmentOf(text, extra = {}) {
+    const tokens = NarrativeMarkup.tokenize(text);
+    let units = 0;
+    for (const token of tokens) {
+      if (token.kind === "text") units += Array.from(token.value).length;
+      if (token.kind === "break") units += 1;
+    }
+    return { kind: "out", seq: 1, mapArt: false, first: true, tokens, start: 0, end: units, ...extra };
+  }
+
+  function mountNode(vnode) {
+    const host = document.createElement("div");
+    render(vnode, host);
+    return host.firstElementChild;
+  }
+
+  // Each character with the class/style chain of its ancestors inside the
+  // line, skipping the reveal wrapper: equal chains mean equal markup.
+  function charChains(line) {
+    const out = [];
+    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const chain = [];
+      for (let el = node.parentElement; el && el !== line; el = el.parentElement) {
+        if (!el.classList.contains("narrative-unrevealed")) {
+          chain.unshift(`${el.tagName}.${el.className}|${el.getAttribute("style") || ""}`);
+        }
+      }
+      for (const ch of Array.from(node.textContent)) out.push(`${ch}@${chain.join(">")}`);
+    }
+    return out;
+  }
+
+  function revealedText(line) {
+    const clone = line.cloneNode(true);
+    clone.querySelectorAll(".narrative-unrevealed").forEach((el) => el.remove());
+    return clone.textContent;
+  }
+
+  it("leaves the output unchanged with no reveal or a complete reveal", () => {
+    const fragment = fragmentOf(SOURCE);
+    const plain = mountNode(narrativeBlockNodes(fragment, "k")).outerHTML;
+    expect(mountNode(narrativeBlockNodes(fragment, "k", fragment.end)).outerHTML).toBe(plain);
+    expect(mountNode(narrativeBlockNodes(fragment, "k", fragment.end + 5)).outerHTML).toBe(plain);
+    expect(plain).not.toContain("unrevealed");
+  });
+
+  it("hides a fragment with nothing revealed as a whole unrevealed line", () => {
+    const line = mountNode(narrativeBlockNodes(fragmentOf(SOURCE, { kind: "sys" }), "k", 0));
+    expect(line.classList.contains("unrevealed")).toBe(true);
+    expect(line.classList.contains("sys")).toBe(true);
+    expect(line.getAttribute("aria-hidden")).toBe("true");
+    expect(line.querySelector(".narrative-unrevealed")).toBeNull();
+  });
+
+  it("splits at every typing position with head + tail markup equal to the unsplit markup", () => {
+    const fragment = fragmentOf(SOURCE);
+    const whole = mountNode(narrativeBlockNodes(fragment, "k"));
+    const expected = charChains(whole);
+    const text = whole.textContent;
+    for (let n = 1; n < fragment.end; n += 1) {
+      const line = mountNode(narrativeBlockNodes(fragment, "k", n));
+      expect(line.classList.contains("unrevealed")).toBe(false);
+      const wrapper = line.querySelector(":scope > .narrative-unrevealed");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper.getAttribute("aria-hidden")).toBe("true");
+      expect(line.textContent).toBe(text);
+      expect(charChains(line)).toEqual(expected);
+      expect(revealedText(line)).toBe(Array.from(text).slice(0, n).join(""));
+    }
+  });
+
+  it("keeps the degraded literal text and hard breaks through a split", () => {
+    const fragment = fragmentOf("甲<br>乙<nope>");
+    const whole = mountNode(narrativeBlockNodes(fragment, "k"));
+    const line = mountNode(narrativeBlockNodes(fragment, "k", 1));
+    expect(line.querySelectorAll("br")).toHaveLength(whole.querySelectorAll("br").length);
+    expect(line.querySelector(".narrative-unrevealed br")).not.toBeNull();
+    expect(line.textContent).toBe(whole.textContent);
+    expect(line.textContent).toContain("<nope>");
   });
 });

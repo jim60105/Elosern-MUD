@@ -6,7 +6,10 @@
 // (`fontScale`), the text-to-HTML narrative toggle (`text2html`), the
 // optional reduced-motion override (`reducedMotion` — `null` means no
 // override, the OS `prefers-reduced-motion` applies) and the colorblind
-// status palette (`colorblind`). No settings control dispatches a
+// status palette (`colorblind`). C7 (webclient-typewriter-reading-prefs,
+// design D10) adds the reading preferences the message window reads as
+// props: the typing speed (`textSpeed`, one of `TEXT_SPEEDS`) and the
+// opt-in auto-advance (`autoAdvance`). No settings control dispatches a
 // `ui_action`; each preference is applied to the document's presentation
 // tokens immediately, is persisted through the versioned,
 // presentation-only layout store, and is re-applied at load. The store's
@@ -15,6 +18,7 @@
 // before writing, so the caller's `dimensions` and `tabs` are preserved.
 
 import LayoutStore from "../../lib/layout_store.js";
+import { TEXT_SPEEDS } from "../../lib/message_reveal.js";
 
 export function applyPreferences(ctx) {
   const layoutPersistence = LayoutStore.createStore({ storage: window.localStorage });
@@ -24,13 +28,15 @@ export function applyPreferences(ctx) {
     // Optional key: absent in the stored wrapper = no override (task 7.5).
     reducedMotion: null,
     colorblind: false,
+    textSpeed: "normal",
+    autoAdvance: false,
   };
   ctx.prefs = prefs;
 
   function applyPresentationPreferences() {
     const root = document.documentElement;
-    // The three prose-scale targets (design D13): the narrative caption's
-    // lines, the full-log surface's lines and the prompt line read this
+    // The three prose-scale targets (design D13): the message window's page
+    // text, the full-log surface's lines and the prompt line read this
     // token; no HUD/dock/drawer/overlay chrome reads it.
     root.style.setProperty("--prose-scale", String(prefs.fontScale));
     if (prefs.reducedMotion) {
@@ -47,16 +53,17 @@ export function applyPreferences(ctx) {
   }
 
   function persistPresentationPreferences() {
-    // Reload the latest validated wrapper before writing (task 7.8): a
-    // version-1 wrapper lacking the new keys normalizes cleanly (no
-    // version bump, task 7.5); an unknown stored version resets to the
-    // default with every preference re-applied rather than half-applied.
+    // Reload the latest validated wrapper before writing (task 7.8): an
+    // unknown or earlier stored version resets to the default with every
+    // preference re-applied rather than half-applied.
     const current = layoutPersistence.load();
     const wrapper = current.state;
     wrapper.preferences = {
       text2html: prefs.text2html,
       fontScale: prefs.fontScale,
       colorblind: prefs.colorblind,
+      textSpeed: prefs.textSpeed,
+      autoAdvance: prefs.autoAdvance,
     };
     // The reducedMotion key is optional (task 7.5): only write it when the
     // override is explicit. The layout store validates it as a boolean —
@@ -92,6 +99,12 @@ export function applyPreferences(ctx) {
     if (typeof stored.colorblind === "boolean") {
       prefs.colorblind = stored.colorblind;
     }
+    if (TEXT_SPEEDS.includes(stored.textSpeed)) {
+      prefs.textSpeed = stored.textSpeed;
+    }
+    if (typeof stored.autoAdvance === "boolean") {
+      prefs.autoAdvance = stored.autoAdvance;
+    }
     applyPresentationPreferences();
   };
 
@@ -124,6 +137,24 @@ export function applyPreferences(ctx) {
 
   ctx.setColorblind = function setColorblind(on) {
     prefs.colorblind = !!on;
+    applyPresentationPreferences();
+    persistPresentationPreferences();
+  };
+
+  // C7 (design D10): the reading preferences are read by the message window
+  // as props, so they write no document attribute; applying them publishes
+  // the view.
+  ctx.setTextSpeed = function setTextSpeed(value) {
+    if (!TEXT_SPEEDS.includes(value)) {
+      return;
+    }
+    prefs.textSpeed = value;
+    applyPresentationPreferences();
+    persistPresentationPreferences();
+  };
+
+  ctx.setAutoAdvance = function setAutoAdvance(on) {
+    prefs.autoAdvance = !!on;
     applyPresentationPreferences();
     persistPresentationPreferences();
   };

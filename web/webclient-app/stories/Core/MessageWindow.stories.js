@@ -105,6 +105,12 @@ export default {
   title: "Core/MessageWindow",
   component: MessageWindow,
   decorators: [bandRegion],
+  argTypes: {
+    textSpeed: { control: "inline-radio", options: ["slow", "normal", "fast", "instant"] },
+    autoAdvance: { control: "boolean" },
+    reducedMotion: { control: "inline-radio", options: [null, "on", "off"] },
+    held: { control: "boolean" },
+  },
   parameters: {
     docs: {
       description: {
@@ -116,7 +122,12 @@ export default {
           "only while the page surface has focus and never reach the dock. " +
           "Scrolling up over the page emits `open-full-log`. A polite live " +
           "region announces each page once. In dialogue mode the window shows " +
-          "the dialogue box and its pick rows, unpaged.",
+          "the dialogue box and its pick rows, unpaged. Pages type in at the " +
+          "reader's `textSpeed` (the unrevealed tail keeps its place " +
+          "invisibly); a click or Enter while typing shows the page in full. " +
+          "Opt-in `autoAdvance` turns a fully shown page after 1.2s + 60ms per " +
+          "character, never past the last page; `held` pauses the wait; " +
+          "reduced motion shows pages at once.",
       },
     },
   },
@@ -125,7 +136,7 @@ export default {
 // A short response: one page, already read (■).
 export const SinglePage = {
   render: renderWindow,
-  args: { lines: ARRIVAL, marks: [] },
+  args: { lines: ARRIVAL, marks: [], textSpeed: "instant" },
 };
 
 // A long response that has just arrived: page 1 of several (▼). The window
@@ -146,7 +157,22 @@ export const MorePages = {
       return () => h(MessageWindow, { ...args, lines: lines.value, marks: marks.value });
     },
   }),
-  args: { lines: ARRIVAL, marks: [] },
+  args: { lines: ARRIVAL, marks: [], textSpeed: "instant" },
+};
+
+// A long reply arriving as a live one does and typing in at the normal
+// speed: no marker until a page is fully shown; click to complete, click
+// again to advance.
+export const Typing = {
+  render: MorePages.render,
+  args: { lines: ARRIVAL, marks: [], textSpeed: "normal" },
+};
+
+// The same reply with auto-advance on at the fast speed: each fully shown
+// page turns on its own and the window stops on the last page (■).
+export const AutoAdvance = {
+  render: MorePages.render,
+  args: { lines: ARRIVAL, marks: [], textSpeed: "fast", autoAdvance: true },
 };
 
 // The same long response opened by a mount: the last page, fully read (■).
@@ -155,6 +181,7 @@ export const LastPage = {
   args: {
     lines: [...ARRIVAL, ...seqLines(3, LOOK_ECHO), ...seqLines(4, LONG_LOOK)],
     marks: [],
+    textSpeed: "instant",
   },
 };
 
@@ -168,6 +195,7 @@ export const ErrorPage = {
       ...seqLines(4, [["err", "北邊的門鎖著，你推不開。"]]),
     ],
     marks: [],
+    textSpeed: "instant",
   },
 };
 
@@ -178,6 +206,7 @@ export const OversizeMap = {
   args: {
     lines: [...seqLines(1, [["in", "map"]]), ...seqLines(2, [["out", MAP_LINES]])],
     marks: [],
+    textSpeed: "instant",
   },
 };
 
@@ -189,6 +218,7 @@ export const PendingAction = {
   args: {
     lines: [...ARRIVAL, ...seqLines(3, LOOK_ECHO), ...seqLines(4, LONG_LOOK)],
     marks: [7],
+    textSpeed: "instant",
   },
 };
 
@@ -221,5 +251,6 @@ export const Dialogue = {
       ...seqLines(4, [["out", `灰婆婆說：${DIALOGUE_PANEL.line}`]]),
     ],
     marks: [],
+    textSpeed: "instant",
   },
 };

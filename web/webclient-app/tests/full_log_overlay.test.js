@@ -70,7 +70,7 @@ describe("FullLogOverlay (H1 D4)", () => {
     const overlayWrapper = mount(FullLogOverlay, { props: { lines: lines.slice(1) } });
     wrapper = mount(MessageWindow, {
       attachTo: document.body,
-      props: { lines: arrival, marks: [], pageFit: () => true },
+      props: { lines: arrival, marks: [], pageFit: () => true, textSpeed: "instant" },
     });
     await nextTick();
     await wrapper.setProps({ lines: [...arrival, ...lines] });

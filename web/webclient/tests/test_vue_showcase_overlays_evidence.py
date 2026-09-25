@@ -68,6 +68,7 @@ OVERLAYS_STORY_IDS = {
     "overlays-settingsoverlay--reduced-motion-on",
     "overlays-settingsoverlay--html-narrative",
     "overlays-settingsoverlay--colorblind",
+    "overlays-settingsoverlay--reading-preferences",
     "overlays-helpoverlay--default",
     "overlays-creationoverlay--default",
     "overlays-creationoverlay--preset-draft",

@@ -14,7 +14,13 @@
 // colorblind-safe status palette. The invented font-family select is
 // removed: the design system's three self-hosted faces are role-assigned and
 // the binding design reference has no typeface control.
+//
+// C7 (webclient-typewriter-reading-prefs, design D10): the 閱讀設定 section
+// adds the text-speed segment (慢 / 標準 / 快 / 瞬間) and the auto-advance
+// toggle. The message window reads both as props; reduced motion always
+// shows pages at once, whatever the chosen speed.
 import { computed } from "vue";
+import { TEXT_SPEEDS } from "../lib/message_reveal.js";
 
 // The draft's three prose-scale steps (index.html :1297 fsScale): A− = 0.92,
 // A = 1, A+ = 1.12. The current step is marked by a non-colour indicator
@@ -24,6 +30,10 @@ const SCALE_STEPS = [
   { label: "A", value: 1 },
   { label: "A+", value: 1.12 },
 ];
+
+// The four text-speed steps, in `TEXT_SPEEDS` order.
+const SPEED_LABELS = { slow: "慢", normal: "標準", fast: "快", instant: "瞬間" };
+const SPEED_STEPS = TEXT_SPEEDS.map((value) => ({ value, label: SPEED_LABELS[value] }));
 
 const props = defineProps({
   // The client-local presentation preferences, owned by the store's
@@ -35,6 +45,10 @@ const props = defineProps({
   textToHtml: { type: Boolean, default: true },
   reducedMotion: { type: [String, null], default: null },
   colorblind: { type: Boolean, default: false },
+  // C7: the reading preferences — the typing speed (one of `TEXT_SPEEDS`)
+  // and the opt-in auto-advance.
+  textSpeed: { type: String, default: "normal" },
+  autoAdvance: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -42,6 +56,8 @@ const emit = defineEmits([
   "text-html-change",
   "reduced-motion-change",
   "colorblind-change",
+  "text-speed-change",
+  "auto-advance-change",
 ]);
 
 const currentScaleStep = computed(
@@ -68,6 +84,14 @@ function selectReducedMotion(value) {
 
 function onColorblindChange(event) {
   emit("colorblind-change", event.target.checked);
+}
+
+function selectTextSpeed(value) {
+  emit("text-speed-change", value);
+}
+
+function onAutoAdvanceChange(event) {
+  emit("auto-advance-change", event.target.checked);
 }
 </script>
 
@@ -111,6 +135,40 @@ function onColorblindChange(event) {
           data-testid="settings-overlay-text-to-html"
           :checked="textToHtml"
           @change="onTextHtmlChange"
+        />
+      </label>
+      <div class="settings-row">
+        <div class="settings-row__copy">
+          <span id="opt-text-speed" class="settings-row__label">文字速度</span>
+          <p class="settings-row__description">逐字顯示訊息的速度；減少動態效果開啟時一律立即顯示。</p>
+        </div>
+        <span class="settings-row__control" role="group" aria-labelledby="opt-text-speed">
+        <button
+          v-for="step in SPEED_STEPS"
+          :key="step.value"
+          type="button"
+          class="affbtn"
+          :class="{ on: step.value === textSpeed }"
+          :data-testid="`settings-overlay-text-speed-${step.value}`"
+          :aria-pressed="step.value === textSpeed"
+          @click="selectTextSpeed(step.value)"
+        >
+          {{ step.label }}
+        </button>
+        </span>
+      </div>
+      <label class="settings-row settings-row--toggle">
+        <span class="settings-row__copy">
+          <span class="settings-row__label">自動翻頁</span>
+          <span class="settings-row__description">每頁顯示完畢後稍候自動翻頁；回應的最後一頁不會自動翻過。</span>
+        </span>
+        <input
+          type="checkbox"
+          class="settings-toggle"
+          aria-label="自動翻頁"
+          data-testid="settings-overlay-auto-advance"
+          :checked="autoAdvance"
+          @change="onAutoAdvanceChange"
         />
       </label>
     </section>
@@ -256,7 +314,7 @@ function onColorblindChange(event) {
   gap: var(--sp-2);
 }
 
-/* The A−/A/A+ and reduced-motion segmented controls: the current step is
+/* The A−/A/A+, text-speed, and reduced-motion segmented controls: the current step is
    marked by a gold border and underline — a non-colour indicator, not a
    fill alone (the delta's "marked by a non-colour indicator" scenario). */
 .affbtn {

@@ -53,10 +53,16 @@ def _wait_narrative_grew(page, before_len, timeout=30000):
 
 
 def _append_multipage_response(page):
-    """Append a multi-page response and gate on `[data-testid="message-page"]` opening at page 1 of >=2 pages."""
+    """Append a multi-page response and gate on `[data-testid="message-page"]` opening at page 1 of >=2 pages.
+
+    These journeys assert paging, not typing, so the helper pins the reader's
+    text speed to `instant` first (webclient-typewriter-reading-prefs design
+    D11): every page is fully shown, with its marker, as soon as it shows.
+    """
     page.evaluate(
         """() => {
           const store = window.__elosernBridge.store;
+          store.setTextSpeed('instant');
           if (!store.narrative.some((l) => l && l.kind !== 'in')) {
             store.appendText('out', '初始段落。');
           }
