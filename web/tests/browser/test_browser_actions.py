@@ -16,6 +16,8 @@ from .browser_helpers import (
     focus_action_dock,
     fresh_epoch,
     install_outbound_recorder,
+    narrative_log_length,
+    narrative_log_text,
     open_command_line,
     sent_action_count,
     snapshot_envelope,
@@ -120,7 +122,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
         page.evaluate(
             "(text) => window.__elosernBridge.store.appendText('in', text)", payload
         )
-        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative = narrative_log_text(page)
         self.assertIn("plain text", narrative)
         self.assertIn("<b onclick=", narrative)
         self.assertEqual(
@@ -189,23 +191,16 @@ class ActionLockingTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(syncs), 1)
 
         # Ordinary text still works when structured rendering fails.
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative_before = narrative_log_length(page)
         page.evaluate("Evennia.msg('text', ['look'], {})")
         wait_for_store_state(
             page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!n && n.innerText.length > %d; }" % len(narrative_before)
-                ),
-                "description": "narrative feed grew past the pre-look length",
-            },
+            lambda s: bool(s.get("connected"))
+            and narrative_log_length(page) > narrative_before,
             timeout=30000,
         )
-        narrative_after = page.locator('[data-testid="narrative-feed"]').inner_text()
-        self.assertGreater(len(narrative_after), len(narrative_before))
+        narrative_after = narrative_log_length(page)
+        self.assertGreater(narrative_after, narrative_before)
 
 
 if __name__ == "__main__":

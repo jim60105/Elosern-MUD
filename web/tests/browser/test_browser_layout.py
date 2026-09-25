@@ -18,6 +18,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    narrative_log_length,
     open_command_line,
     sent_action_count,
     snapshot_envelope,
@@ -307,19 +308,12 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self.assertFalse(second)
 
         # Ordinary text play continues.
-        narrative_before = len(page.locator('[data-testid="narrative-feed"]').inner_text())
+        narrative_before = narrative_log_length(page)
         page.evaluate("Evennia.msg('text', ['look'], {})")
         wait_for_store_state(
             page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return el && el.innerText.length > %d; }"
-                    ) % narrative_before,
-                "description": "narrative feed grew past the pre-command length",
-            },
+            lambda s: bool(s.get("connected"))
+            and narrative_log_length(page) > narrative_before,
         )
 
 
@@ -377,22 +371,15 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
 
         # Ordinary text input remains fully operational.
-        narrative_before = len(page.locator('[data-testid="narrative-feed"]').inner_text())
+        narrative_before = narrative_log_length(page)
         page.evaluate("Evennia.msg('text', ['look'], {})")
         wait_for_store_state(
             page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return el && el.innerText.length > %d; }"
-                    ) % narrative_before,
-                "description": "narrative feed grew past the pre-command length",
-            },
+            lambda s: bool(s.get("connected"))
+            and narrative_log_length(page) > narrative_before,
         )
         self.assertGreater(
-            len(page.locator('[data-testid="narrative-feed"]').inner_text()), narrative_before
+            narrative_log_length(page), narrative_before
         )
 
 

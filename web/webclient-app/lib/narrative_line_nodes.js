@@ -7,12 +7,11 @@
 // this module — one renderer, no second markup path.
 //
 // A box-drawing line is one whose text carries any U+2500..U+257F code
-// point (the `─`..`╿` range); the escaped form is the single copy.
+// point (the `─`..`╿` range); `lib/box_drawing.js` owns the single copy.
 import { h } from "vue";
+import { isBoxDrawing } from "./box_drawing.js";
 import NarrativeMarkup from "./narrative_markup.js";
 import { renderNarrativeTokens } from "../components/narrative-renderer.js";
-
-const BOX_DRAWING = /[\u2500-\u257f]/;
 
 export function lineText(line) {
   return line && line.text == null ? "" : String(line.text);
@@ -42,15 +41,37 @@ export function narrativeLineNodes(line, index) {
   }
   const lineClass = kind || "out";
   const classes = ["narrative-line", lineClass];
-  if (BOX_DRAWING.test(text)) {
+  if (isBoxDrawing(text)) {
     classes.push("map-art");
   }
+  const tokens =
+    line && Array.isArray(line.tokens) ? line.tokens : NarrativeMarkup.tokenize(text);
   nodes.push(
     h(
       "div",
       { key: index, class: classes.join(" "), "data-line-kind": lineClass },
-      renderNarrativeTokens(NarrativeMarkup.tokenize(text)),
+      renderNarrativeTokens(tokens),
     ),
   );
   return nodes;
+}
+
+// One page fragment → its `.narrative-line.<kind>` vnode (design D5,
+// webclient-message-pages). Carries `map-art` when the fragment's line is
+// box-drawing and `cont` when the fragment is a continuation after a page cut.
+export function narrativeBlockNodes(fragment, key) {
+  const lineClass = (fragment && fragment.kind) || "out";
+  const classes = ["narrative-line", lineClass];
+  if (fragment && fragment.mapArt) {
+    classes.push("map-art");
+  }
+  if (fragment && fragment.first === false) {
+    classes.push("cont");
+  }
+  const tokens = fragment && Array.isArray(fragment.tokens) ? fragment.tokens : [];
+  return h(
+    "div",
+    { key, class: classes.join(" "), "data-line-kind": lineClass },
+    renderNarrativeTokens(tokens),
+  );
 }

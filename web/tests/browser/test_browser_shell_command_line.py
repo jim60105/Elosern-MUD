@@ -9,6 +9,8 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    narrative_log_length,
+    narrative_log_text,
     open_command_line,
     sent_action_count,
     store_state,
@@ -41,18 +43,11 @@ def _wait_field_focused(page, timeout=30000):
 
 
 def _wait_narrative_grew(page, before_len, timeout=30000):
-    """Gate on the narrative feed's text length exceeding a previous length."""
+    """Gate on the retained narrative log length exceeding a previous length."""
     wait_for_store_state(
         page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": '[data-testid="narrative-feed"]',
-            "predicate": (
-                "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]');"
-                " return n && n.innerText.length > %d; }" % before_len
-            ),
-            "description": "narrative feed text grew past the previous length",
-        },
+        lambda s: bool(s.get("connected"))
+        and narrative_log_length(page) > before_len,
         timeout=timeout,
     )
 
@@ -108,7 +103,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_keyboard_field_focus_send_cancel_and_focus_restoration(self):
         page = self.logged_in_page()
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        before_len = narrative_log_length(page)
+        narrative_before = narrative_log_text(page)
         anchor = page.locator('[data-testid="anchor-command-line"]')
         toggle = page.locator('[data-testid="command-line-toggle"]')
 
@@ -129,14 +125,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        wait_for_narrative_settled(page, narrative_before.__len__())
+        wait_for_narrative_settled(page, before_len)
         # Accepted send clears the field, collapses the line, and restores focus to #action-dock.
         wait_command_field_released(page)
         self.assertEqual(anchor.get_attribute("data-expanded"), "false")
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
         )
-        narrative_after = page.locator('[data-testid="narrative-feed"]').inner_text()
+        after_len = narrative_log_length(page)
+        narrative_after = narrative_log_text(page)
         self.assertNotEqual(
             narrative_after, narrative_before, "command-line send produced no narrative"
         )
@@ -147,7 +144,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        wait_for_narrative_settled(page, narrative_after.__len__())
+        wait_for_narrative_settled(page, after_len)
         wait_command_field_released(page)
 
         # Cancel path: Escape from the focused field sends nothing and
@@ -156,11 +153,11 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.keyboard.press("/")
         _wait_field_focused(page)
         page.keyboard.type("unsent draft")
-        narrative_before_cancel = page.locator('[data-testid="narrative-feed"]').inner_text()
+        narrative_before_cancel = narrative_log_text(page)
         page.keyboard.press("Escape")
         wait_command_field_released(page)
         self.assertEqual(
-            page.locator('[data-testid="narrative-feed"]').inner_text(),
+            narrative_log_text(page),
             narrative_before_cancel,
             "Escape must not send command-line text",
         )
@@ -313,7 +310,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_pointer_focused_field_sends_on_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        before_len = narrative_log_length(page)
         anchor = page.locator('[data-testid="anchor-command-line"]')
         toggle = page.locator('[data-testid="command-line-toggle"]')
         self.assertEqual(anchor.get_attribute("data-expanded"), "false")
@@ -325,7 +322,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        _wait_narrative_grew(page, narrative_before.__len__())
+        _wait_narrative_grew(page, before_len)
         wait_command_field_released(page)
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"),
@@ -408,13 +405,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_shift_enter_in_field_inserts_newline_without_sending(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
+        before_len = narrative_log_length(page)
         open_command_line(page)
         page.keyboard.type("first line")
         page.keyboard.press("Shift+Enter")
         page.keyboard.type("second line")
         page.keyboard.press("Enter")
-        _wait_narrative_grew(page, narrative_before.__len__())
+        _wait_narrative_grew(page, before_len)
         sends = [
             args[0]
             for cmd, args, _kw in page.evaluate("window.__elosernSent || []")

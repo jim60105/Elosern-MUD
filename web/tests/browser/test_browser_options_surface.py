@@ -24,6 +24,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    narrative_log_text,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -373,15 +374,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         wait_for_store_state(
             page,
-            _looked_result,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const feed = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return feed && feed.innerText.indexOf('燈籠') !== -1; }"
-                ),
-                "description": "the look result has settled into the narrative feed",
-            },
+            lambda s: _looked_result(s) and "燈籠" in narrative_log_text(page),
         )
         self.assertEqual(
             self._narrative_inp_count(page),

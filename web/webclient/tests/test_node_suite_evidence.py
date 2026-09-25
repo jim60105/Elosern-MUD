@@ -399,6 +399,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/narrative_feed.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/full_log_overlay.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/narrative_line_nodes.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -748,6 +749,37 @@ class GalleryArtConsumptionEvidenceTest(unittest.TestCase):
             result.returncode,
             0,
             "reference-artwork-frame Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
+class MessagePagesEvidenceTest(unittest.TestCase):
+    """webclient-message-pages: the pure response-segmentation and
+    token-stream pagination contracts are verified in Vitest."""
+
+    @covers_requirement(
+        "webclient-input-narrative::the-narrative-log-is-segmented-into-responses-at-each-player-action",
+        "webclient-input-narrative::a-response-is-cut-into-pages-that-fit-a-measured-box-and-never-mid-sentence",
+    )
+    def test_message_pages_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/message_pages.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/narrative_responses.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "message-pages Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

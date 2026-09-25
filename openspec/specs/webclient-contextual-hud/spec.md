@@ -1569,7 +1569,12 @@ emphasis inside prose lines SHALL render in the reference's gold accent; plain p
 render in the serif reading face. The classes SHALL be mounted by the existing markup pipeline at
 render time from committed line kinds only — the tokenizer, the player-echo divider lines, and the
 box-drawing art path SHALL be unchanged, and no markup class SHALL be mounted for a kind the store
-does not carry.
+does not carry. The markup pipeline SHALL run exactly once for each retained server, system, or error
+line, when the line is retained. Every surface that renders the line SHALL render from that one token
+stream, never from a second tokenization or a second markup path. A player input line SHALL never
+enter the pipeline. A fragment of a line that paging has split SHALL render with the same kind class,
+and the same box-drawing class where it applies, as the whole line would. Only the first fragment
+of a `sys` line SHALL show the leading `◈` marker.
 
 #### Scenario: A sys line renders with the seal marker
 - **WHEN** a committed narrative line of kind `sys` renders
@@ -1585,6 +1590,19 @@ does not carry.
 #### Scenario: Unknown kinds do not gain semantic classes
 - **WHEN** a committed line carries no semantic kind beyond plain output
 - **THEN** it renders as plain serif prose without the sys marker
+
+#### Scenario: Each line is tokenized once
+- **WHEN** a server line is retained and is then rendered by the narrative surface and by the
+  full-log surface, each more than once
+- **THEN** the markup pipeline has run for that line exactly once, and both surfaces render the
+  same token stream
+
+#### Scenario: A split line's fragments keep the line's classes
+- **WHEN** a `sys` line, and separately a prose line carrying emphasis, are each split into two
+  fragments
+- **THEN** both fragments of the `sys` line carry the sys face and colour, only the first shows the
+  `◈` marker, and both fragments of the prose
+  line render in the serif reading face with the emphasis still gold in whichever fragment holds it
 
 ### Requirement: The party quickbar island presents the committed party only
 The `vitals` anchor SHALL carry a compact party island, beneath the vitals and conditions islands, while

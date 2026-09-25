@@ -237,15 +237,27 @@ export function applyTransport(ctx) {
     if (NARRATIVE_KINDS.indexOf(kind) === -1) {
       throw new TypeError("narrative kind must be one of in/out/sys/err");
     }
+    const normalized = String(text == null ? "" : text);
+    // D1/D5 (webclient-message-pages): every retained line carries a monotonic
+    // ordinal (`seq`) that survives retention trimming, and the allowlist
+    // markup pipeline runs once at retain time for `out`, `sys`, and `err`
+    // lines (`in` stays literal text with `tokens: null`).
     const line = {
       kind,
-      text: String(text == null ? "" : text),
-      tokens: kind === "out" ? NarrativeMarkup.tokenize(String(text == null ? "" : text)) : null,
+      seq: ++ctx.narrativeSeq,
+      text: normalized,
+      tokens: kind === "in" ? null : NarrativeMarkup.tokenize(normalized),
     };
     ctx.narrative.value.push(line);
     while (ctx.narrative.value.length > MAX_NARRATIVE_LINES) {
       ctx.narrative.value.shift();
       ctx.seenIndex.value = Math.max(0, ctx.seenIndex.value - 1);
+    }
+    if (ctx.narrative.value.length > 0 && ctx.responseMarks.value.length > 0) {
+      const oldestSeq = ctx.narrative.value[0].seq;
+      while (ctx.responseMarks.value.length > 0 && ctx.responseMarks.value[0] < oldestSeq) {
+        ctx.responseMarks.value.shift();
+      }
     }
     return line;
   };
@@ -342,6 +354,13 @@ export function applyTransport(ctx) {
     try {
       if (ctx.sender && typeof ctx.sender.sendAction === "function") {
         ctx.sender.sendAction(envelope);
+        // D1 (webclient-message-pages): record the response boundary at the
+        // ordinal the next retained line will receive, right after the
+        // transport send returns and before the optional echo line appends.
+        // An echoing dispatch's `in` line receives this same ordinal (one
+        // response, not two); a silent dispatch marks its first following
+        // reply or error line as the start of a new response.
+        ctx.responseMarks.value.push(ctx.narrativeSeq + 1);
         // The display command line (webclient-input-narrative): resolve exactly
         // one bounded echo line from the pure catalog and append it as a literal
         // text line; a rejected result leaves the line in place. Intent

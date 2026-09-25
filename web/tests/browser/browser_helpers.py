@@ -6,6 +6,31 @@ deterministic and never invoke an LLM, image generator, or other external
 service.
 """
 
+# C6c re-points these (`webclient-message-window-swap` design D4):
+# Rendering assertions that intentionally address the mounted feed DOM
+# (`[data-testid="narrative-feed"]`, `.elosern-narrative`, `#narrative-unread`,
+# `narrative-fulllog-control`, `narrative-head`, `narrative-mode-label`) until
+# C6c mounts `MessageWindow`:
+# - `web/tests/browser/browser_helpers.py`: `REQUIRED_SURFACES`
+# - `web/tests/browser/test_browser_actions.py`: `querySelectorAll('b, script')`
+# - `web/tests/browser/test_browser_art.py`: `_rect(page, '[data-testid="narrative-feed"]')`
+# - `web/tests/browser/test_browser_combat_menu.py`: `rectOf('[data-testid="narrative-feed"]')`
+# - `web/tests/browser/test_browser_contextual_hud_anchors.py`: `getBoundingClientRect().width`
+# - `web/tests/browser/test_browser_contextual_hud_stage.py`: caption visibility/geometry and `narrative-fulllog-control`
+# - `web/tests/browser/test_browser_creation_viewport_pointer.py`: `is_visible()` in creation mode
+# - `web/tests/browser/test_browser_exploration_actions.py`: `[data-line-kind="err"]`
+# - `web/tests/browser/test_browser_exploration_dialogue.py`: `narrative-feed` / `narrative-head` scroll-pin DOM shape
+# - `web/tests/browser/test_browser_input_narrative.py`: `.inp`, `.narrative-divider`, scroll-keep geometry
+# - `web/tests/browser/test_browser_layout.py`: `COMPONENT_SELECTORS["narrative"]`, caption visibility/geometry
+# - `web/tests/browser/test_browser_local_map_interaction.py`: `is_visible()` at both viewports
+# - `web/tests/browser/test_browser_options_surface.py`: `.inp` count and `.option-card` absence
+# - `web/tests/browser/test_browser_reconnect.py`: `narrative-fulllog-control`
+# - `web/tests/browser/test_browser_shell_command_line.py`: `#narrative-unread` and scroll-keep geometry
+# - `web/tests/browser/test_browser_shell_dock.py`: `narrative-fulllog-control`
+# - `web/tests/browser/test_browser_shell_narrative.py`: markup entity/span rendering and `.out` soft-wrap
+# - `web/tests/browser/test_browser_shell_surfaces.py`: `REQUIRED_SURFACES`
+# - `web/tests/browser/test_vue_foundation.py`: `REQUIRED_TESTIDS` and Storybook `narrative-feed` mount
+
 from __future__ import annotations
 
 import json
@@ -557,27 +582,49 @@ def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
     raise AssertionError("presentation revision never settled")
 
 
+def narrative_log_text(page: Page) -> str:
+    """Return the retained narrative log text (`store.narrative`) joined with newlines.
+
+    Returns ``""`` when the log is empty or when the page is mid-navigation /
+    not yet bootstrapped; store-backed waits compare against a pre-action length
+    at per-store-state-tick append granularity.
+    """
+    raw = evaluate_tolerating_navigation(
+        page,
+        "() => { const b = window.__elosernBridge;"
+        " const lines = b && b.store && Array.isArray(b.store.narrative) ? b.store.narrative : null;"
+        " return lines ? lines.map((l) => (l && l.text != null ? String(l.text) : '')).join('\\n') : null; }",
+    )
+    return raw if isinstance(raw, str) else ""
+
+
+def narrative_log_length(page: Page) -> int:
+    """Return the character length of ``narrative_log_text(page)``."""
+    return len(narrative_log_text(page))
+
+
 def wait_for_narrative_settled(page: Page, before: int, timeout: int = 30000) -> None:
-    """Wait until the narrative exceeds ``before`` characters and stops growing.
+    """Wait until ``narrative_log_length(page)`` exceeds ``before`` and stops growing.
 
     A plain length-exceeds wait races with the tail of a previous server
     response on a loaded runner: a later assertion can observe a partially
-    settled narrative and misattribute the growth. This helper polls until two
-    consecutive reads agree (a quiet gap after the last append), then falls
-    back to the length-exceeds wait so a genuinely missing response still
-    fails loudly with a timeout.
+    settled narrative and misattribute the growth. This helper polls
+    ``narrative_log_length`` until two consecutive reads agree (a quiet gap
+    after the last append), then falls back to the length-exceeds wait so a
+    genuinely missing response still fails loudly with a timeout.
     """
     deadline = time.monotonic() + timeout / 1000
     previous = None
     while time.monotonic() < deadline:
-        current = len(page.locator(".elosern-narrative").inner_text())
+        current = narrative_log_length(page)
         if current > before and current == previous:
             return
         previous = current
         page.wait_for_timeout(200)
     page.wait_for_function(
-        "(before) => document.querySelector('.elosern-narrative')"
-        ".innerText.length > before",
+        "(before) => { const b = window.__elosernBridge;"
+        " const lines = b && b.store && Array.isArray(b.store.narrative) ? b.store.narrative : [];"
+        " return lines.map((l) => (l && l.text != null ? String(l.text) : '')).join('\\n').length > before; }",
         arg=before,
         timeout=timeout,
     )
