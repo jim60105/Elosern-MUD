@@ -157,8 +157,9 @@ Activating a pane card SHALL dispatch exactly the same `ui_action` envelope the 
 component dispatches (`action_code` + params for `known_action`; `explore.talk_freeform` with
 `speech: label` for `freeform`), with the existing rejection/stale/busy toast surface and the
 existing input-line echo behavior applying unchanged. The pane SHALL carry the `✕ 清除建議`
-control dispatching `options.dismiss` under the existing confirmation contract, and the tab's
-count badge SHALL equal the committed card count. A transport generation reset
+control dispatching `options.dismiss` under the existing confirmation contract, and the scene
+overview's 建議 footer chip SHALL name the committed card count (`建議 (N)`) whenever that count is
+positive. A transport generation reset
 (`beginTransport`) SHALL retire the pane's card presentation with the epoch: no card from a
 retired epoch remains clickable before the first new snapshot arrives.
 

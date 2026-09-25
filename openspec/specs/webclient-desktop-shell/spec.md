@@ -45,7 +45,7 @@ surfaces — the skill book, the bag and equipment, the shop, the quest board, t
 the character status — SHALL NOT be permanently visible: each SHALL render in a drawer anchored to the
 right edge of the stage, SHALL be absent from the layout and from the tab order while that drawer is
 closed, SHALL be reachable in at most two actions from the top navigation bar or from the action dock's
-root frame, and SHALL be closable in one action that returns focus to the control that opened it. The shell SHALL render a top navigation bar carrying
+scene overview, and SHALL be closable in one action that returns focus to the control that opened it. The shell SHALL render a top navigation bar carrying
 a labelled control for each navigation-presented entry of the current mode's home surface - the character
 status, quest, and inventory entries - a labelled control for the map and settings surfaces, and the
 tool group that the top-navigation tool-group requirement defines, which carries the help control;
@@ -61,23 +61,26 @@ surface, with the connected state marked by an ok-green dot paired with a label,
 current location and the world date/time only in the stage's place card, resolved as the
 contextual-HUD place-card requirement states - never in the top bar, and never a raw mode label in
 place of location. The top bar SHALL be 48px tall. The action dock SHALL render as the approved command surface: a
-panel filling the bottom band's command region (the band's right third), whose root menu
-frame renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold fill, and
-whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
-naming the shortcuts (direction keys to choose, Enter to confirm, Escape to return, `/` to open the
-command input). The focused row SHALL be marked by a muted-gold fill plus a leading glyph, unfocused
-rows bordered, and disabled rows dimmed but focusable for their explanation. Below the root frame the
+panel filling the bottom band's command region (the band's right third), whose exploration root
+renders as the scene overview (chip rows for exits, people, and objects, and a footer) and whose
+combat root renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold
+fill, and whose remaining region renders the current frame's rows or chips. The dock SHALL carry the
+shortcut legend the contextual-HUD legend requirement defines. The focused row or chip SHALL be marked
+by a muted-gold fill plus a leading glyph, unfocused rows bordered, and disabled rows dimmed
+but focusable for their explanation. Below the root frame the
 dock SHALL render a breadcrumb naming the parent and current frames with a back control, and SHALL
-render each frame's rows in the form that frame calls for — an exit outlet, navigation rows, a
-target's affordance rows under its name, suggestion cards, or the combat forms — beside a detail pane
-that names the focused item, its availability, and the next key action wherever the frame carries one.
+render each frame's rows in the form that frame calls for — a target's verb popover over the inert
+overview, navigation rows, the waiting cards, suggestion cards, or the combat forms — beside a detail
+pane that names the focused item, its availability, and the next key action wherever the frame
+carries one.
 The stage SHALL give the narrative caption and the action dock one fixed-height bottom band - the
 message region on the left two thirds and the command region on the right third - whose height comes
 from one shared band-height token and never depends on the frame the dock carries, on the mode, or on
-the narrative: the interaction workspace, the waiting frame, the combat frames, and an empty pane host
-all render inside the same command-region box, so the narrative caption and the action dock never
+the narrative: the scene overview, a target's verb popover, the waiting frame, the combat frames, and an empty
+pane host all render inside the same command-region box, so the narrative caption and the action dock never
 overlap and neither clips the other at a supported viewport. A frame whose rows exceed the region
-SHALL scroll inside the pane host while the tab bar and breadcrumb stay fixed above it. In dialogue
+SHALL scroll inside the pane host while the dock's chrome (the combat tab bar, the breadcrumb, and
+the legend strip) stays fixed around it. In dialogue
 mode the narrative caption SHALL keep the message region's fixed box, and the host, the latest line,
 the choice rows, the free-form input and the exit control SHALL all stay reachable at 1280x720 by
 scrolling inside the caption, never by growing it.
@@ -104,7 +107,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: The top navigation bar carries the persistent surface entry points
 - **WHEN** the shell renders in exploration mode at either supported viewport
-- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's root tab bar
+- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's scene overview
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
 - **WHEN** the narrative holds more lines than the bounded caption can display
@@ -128,15 +131,15 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a muted-gold fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
+- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a tab bar with the open tab in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame
 
 #### Scenario: A tall frame grows the band without touching the narrative
-- **WHEN** the dock carries a taller frame (the interaction workspace or the waiting frame) at 1440x900 or 1280x720
+- **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1440x900 or 1280x720
 - **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the narrative caption's box is unchanged, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
 - **WHEN** the active frame's rows exceed the command region's height
-- **THEN** the rows scroll within the pane host, the tab bar and breadcrumb remain visible and fixed above the scrolling region, and the last row becomes reachable by scrolling
+- **THEN** the rows scroll within the pane host, the dock's chrome (the combat tab bar, the breadcrumb, and the legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1280x720
@@ -214,16 +217,14 @@ focus, disabled-explanation, and submission-gating path as Enter, as specified b
 explanation but SHALL NOT submit. Held or repeated Enter and all mutation submissions while
 one is in flight or awaiting its declared presentation revision SHALL be suppressed, and no
 combination of key and pointer input SHALL emit more than one request per deliberate
-activation. The exploration keyboard root SHALL be the G2 hierarchical root (Move / Look /
-Interact / Character / Quests / Inventory / Wait, plus Suggestions whenever the committed
-`suggestions` envelope is not `unavailable`), whose items carry the bare keys
-`move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`, `suggestions`, rendered as a
-single-row grid whose column count equals its item count; the root projection presented to both the
-tab bar and the keyboard router SHALL omit the `character`, `quests`, and `inventory` entries - the
-top navigation bar carries them as the sole keyboard-visible stop - and SHALL NOT reorder the
-remaining entries. The combat root SHALL likewise declare a
-column count equal to its item count, so both roots' horizontal arrow geometry matches their rendered
-tab order. This root replaces the legacy B2 flat `context_actions` affordance list,
+activation. The exploration keyboard root SHALL be the scene overview frame, whose items carry
+the bare keys `exit-<exit_ref>` for exits, `target-<identity>` for interact targets,
+`entity-<identity>` and `object-<identity>` for look-only people and objects, and `look-room`,
+`wait`, and — whenever the committed `suggestions` envelope is not `unavailable` — `suggestions` for
+the footer, in the overview's reading order and navigated by its row-of-chips geometry; it SHALL
+carry no `character`, `quests`, or `inventory` entry - the top navigation bar carries them as the sole
+keyboard-visible stop. The combat root SHALL declare a column count equal to its item count, so its
+horizontal arrow geometry matches its rendered tab order. This root replaces the legacy B2 flat `context_actions` affordance list,
 whose items were keyed `action-<action_id>` / `action-<surface>` (e.g. `action-guild`). The
 B2 key-derivation contract is preserved only as the isolated Node gate
 (`web/webclient-app/tests/action/dock_items.test.js`), not as the live exploration focus frame.
@@ -261,27 +262,24 @@ B2 key-derivation contract is preserved only as the isolated Node gate
 
 #### Scenario: The suggestions root entry appears only when the envelope carries one
 - **WHEN** the committed `suggestions` envelope's status is `unavailable`
-- **THEN** the exploration root carries no `suggestions` item at all
+- **THEN** the scene overview carries no `suggestions` chip at all
 - **WHEN** the status is `generating`, `ready`, or `degraded`
-- **THEN** the exploration root carries the `suggestions` item and opening it pushes the suggestions frame without dispatching a `ui_action`
+- **THEN** the overview's footer carries the `suggestions` chip and activating it pushes the suggestions frame without dispatching a `ui_action`
 
 #### Scenario: Exploration root exposes the G2 hierarchical keys
-- **WHEN** the client is in exploration mode and the player presses ArrowDown on the single-row
-  exploration root (the navigation-projected projection of Move / Look / Interact / Wait - plus
-  Suggestions when available)
-- **THEN** the keyboard router's focus key is the bare G2 key (`move` at the first cell, a no-op
-  on the single-row grid), not the legacy B2 `action-guild`-style `action-<id>`/`action-<surface>`
-  key, and Enter on the focused root item pushes its client-local submenu (the dock depth becomes
-  2) without dispatching a `ui_action`; focus then lands on the pushed submenu's first item (for an
-  empty exploration panel, the disabled `move-empty` row), so `store.view.focus.key` is `move-empty`
-  and `store.view.focus.enabled` is false
+- **WHEN** the client is in exploration mode on a scene overview whose first two chips are an exit
+  and an interact target, and the player presses ArrowRight
+- **THEN** the keyboard router's focus key is the bare overview key `target-<identity>`, not the
+  legacy B2 `action-guild`-style `action-<id>`/`action-<surface>` key, and Enter on it pushes the
+  target's verb popover (the dock depth becomes 2) without dispatching a `ui_action`; focus then
+  lands on the popover's first row; for an exploration panel with no exits, people, or objects the
+  overview's first chip is `look-room`
 
 #### Scenario: The dock root omits the navigation-carried entries
 - **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces
   available and the dock renders its root
-- **THEN** neither the tab bar nor the keyboard root carries a 角色狀態, 任務, or 背包 entry - those
-  surfaces are opened from the top navigation bar - and the remaining root entries keep their
-  authored order
+- **THEN** the scene overview carries no 角色狀態, 任務, or 背包 entry - those surfaces are opened
+  from the top navigation bar - and the overview's chips keep the panel's order
 
 ### Requirement: The collapsible command line preserves ordinary text control
 
@@ -543,7 +541,12 @@ when shown, the detail pane itself. A frame that displays no detail pane SHALL
 have the row region as the host's only dock-menu child, filling the host's
 full width. When the combat skill detail pane replaces the generic detail, it
 SHALL be a sibling of the row region under the same host, and the row region
-SHALL NOT gain a wrapper for either case. The action dock's pane host SHALL be
+SHALL NOT gain a wrapper for either case. The scene overview is the one exception to the
+direct-child rule for row regions: it SHALL render as a single component that is a direct child of the
+pane host and that holds its labelled chip rows and its reason strip, it SHALL display no detail
+pane, and it SHALL fill the host's full width. A target's verb popover SHALL render in the dock's
+overlay layer over the pane region, not inside the pane host, so the pane host's children are the
+same while it is open. The action dock's pane host SHALL be
 the only host of the dock's row region: no reference drawer body renders it.
 
 #### Scenario: A frame with a detail pane pairs direct children under the host
@@ -563,3 +566,9 @@ the only host of the dock's row region: no reference drawer body renders it.
 - **WHEN** any reference drawer is open in exploration or combat mode
 - **THEN** the page contains no dock-menu row region and no dock detail pane
   outside the action dock's pane host
+
+#### Scenario: The scene overview is the host's only child
+- **WHEN** the dock is at the exploration root, and then a target's verb popover opens over it
+- **THEN** the scene overview component is the pane host's only child, fills its width, and renders
+  no detail pane, and the popover's card renders in the dock's overlay layer while the pane host's
+  children stay unchanged

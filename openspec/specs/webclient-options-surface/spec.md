@@ -14,19 +14,19 @@ capability pins the dock's read-side render contract.
 
 In exploration mode the action-dock surface SHALL render the `suggestions` content derived from the
 `context_actions` panel the store already validated (mirror-accepted at commit time) as its own dock
-pane, reached from a root entry labelled 建議 that carries a count badge equal to the number of cards
-the pane will list. The pane SHALL be a menu frame of the keyboard router like every other dock
+pane, reached from the scene overview's footer chip, labelled `建議 (N)` with N the number of cards the
+pane will list when N is positive and `建議` otherwise. The pane SHALL be a menu frame of the keyboard router like every other dock
 frame, so its cards are focusable rows reachable by arrow keys and by pointer through the identical
-gate, and Escape or the breadcrumb's back control returns to the root. The four renders are exactly:
+gate, and Escape or the breadcrumb's back control returns to the overview with the 建議 chip focused. The four renders are exactly:
 
-- `status = "generating"`: the 建議 root entry is present with no badge, and its pane holds one
+- `status = "generating"`: the footer chip is present labelled `建議` with no count, and its pane holds one
   muted, focusable, non-submitting row reading "AI 正在構思建議…", no cards, no dismiss control.
 - `status = "ready"`: the pane SHALL show between 3 and 5 clickable suggestion cards (the
   bound the server validator enforces for ready sets), each with its label and optional hint, and
   a "✕ 清除建議" dismiss row.
 - `status = "degraded"`: the pane SHALL show rule cards (0–5; the v1 exploration derivation
   always yields ≥ 1) plus one muted "AI 建議目前不可用" note and the same dismiss row.
-- `status = "unavailable"`: no 建議 root entry SHALL be presented and no pane SHALL exist, so the
+- `status = "unavailable"`: no 建議 footer chip SHALL be presented and no pane SHALL exist, so the
   surface renders nothing at all for suggestions.
 
 The dismiss control SHALL dispatch the same envelope it dispatches today and SHALL be rendered as a
@@ -47,8 +47,8 @@ text SHALL be rendered as literal text nodes — never through an HTML/markup pi
 - **WHEN** a puppeted WebClient in exploration mode presents `suggestions` with status
   `generating`, then `ready` (3–5 cards), then `degraded` (rule cards), then `unavailable`
 - **THEN** the 建議 pane first shows the muted generating row, then the ready card set with the
-  dismiss row and a badge equal to the card count, then the degraded rule cards with the muted note
-  and dismiss row, and finally the 建議 root entry is absent altogether
+  dismiss row and the footer chip labelled `建議 (N)` with N the card count, then the degraded rule
+  cards with the muted note and dismiss row, and finally the 建議 footer chip is absent altogether
 
 #### Scenario: A suggestions-only update re-renders without a dock rebuild
 - **WHEN** the exploration panel is unchanged but `suggestions.status` flips `generating` →
@@ -64,16 +64,15 @@ text SHALL be rendered as literal text nodes — never through an HTML/markup pi
   another frame
 
 #### Scenario: Cards are reachable by keyboard
-- **WHEN** the player opens the 建議 root entry with the keyboard and arrows through the pane
+- **WHEN** the player activates the 建議 footer chip with the keyboard and arrows through the pane
 - **THEN** each card is a focusable row of the dock's active row container, activating one emits its
   exact envelope, and activating the dismiss row emits the dismiss envelope
 
 #### Scenario: The pane never appears in combat or creation mode
 - **WHEN** the active mode is combat or character creation while the same `context_actions`
   panel streams `suggestions`
-- **THEN** the dock surface presents no 建議 root entry and no suggestions pane, and returning to
+- **THEN** the dock surface presents no 建議 chip and no suggestions pane, and returning to
   exploration mode without an available panel also presents none
-
 ### Requirement: One shared card component renders every suggestion card
 
 A single card component SHALL build every suggestion card as native `<button>` elements from the

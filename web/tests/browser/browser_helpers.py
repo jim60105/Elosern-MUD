@@ -227,7 +227,14 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
         if ca.get("available"):
             kind = ca.get("kind")
             if kind == "exploration":
-                return len(ca.get("affordances") or []) > 0
+                # The exploration root is the scene overview
+                # (webclient-scene-overview-swap): its chips derive from the
+                # committed `exploration` panel, so the root menu — not the
+                # context_actions affordance list — is the readiness gate.
+                exploration = panels.get("exploration") or {}
+                if exploration.get("available") is not True:
+                    return False
+                return len((state.get("rootMenu") or {}).get("items") or []) > 0
             if kind == "combat":
                 menu = state.get("combatMenu") or {}
                 return len(menu.get("items") or []) > 0
@@ -274,6 +281,28 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
             "focus did not land on #action-dock or a focusable descendant; activeElement=%r"
             % active
         )
+
+
+def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
+    """Activate one scene-overview chip by its keyboard key.
+
+    The exploration dock's root frame is the scene overview
+    (webclient-scene-overview-swap, design D6): exits, people, objects, and
+    the footer render as one frame of chips keyed ``exit-<exit_ref>``,
+    ``target-<identity>``, ``entity-<identity>``, ``object-<identity>``,
+    ``look-room``, ``wait``, and ``suggestions``. This helper focuses the
+    dock, moves the keyboard router's focus onto that chip, and confirms it
+    with Enter — the same path a keyboard user takes, with no pointer click
+    and no direct store call.
+    """
+    focus_action_dock(page, timeout=timeout)
+    focused = page.evaluate(
+        "(key) => window.__elosernBridge.store.focusItemByKey(key)", key
+    )
+    if not focused:
+        raise AssertionError("no scene-overview chip with key %r" % (key,))
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(80)
 
 
 def open_command_line(page: Page, timeout: int = 30000) -> None:
