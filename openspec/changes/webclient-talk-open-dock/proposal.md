@@ -33,7 +33,7 @@ This change (C9b) deletes the dead code and both pane kinds, returns the dock to
 Out of scope:
 - The server action, exploration panel v3, the client protocol mirror, the echo resolver, and the `targetMenuFor` talk branch: `explore-talk-open-action` (C9a).
 - The dialogue stage layout, the dock collapse in dialogue mode, and paging the dialogue line: C10b (`webclient-dialogue-stage-actors`) and C10c (`webclient-dialogue-choices-overlay`).
-- The fixed-column sizing of the combat panes (see design Risks).
+- How the combat panes use their width, for example whether the scale chips keep sharing the pane width equally. That is a visual decision for a later visual change (see design D4 and Risks).
 
 ## Capabilities
 
@@ -46,9 +46,10 @@ Out of scope:
 - `webclient-exploration-menu`:
   - REMOVED "The exploration dock is keyboard-first and roots at the scene overview" (C8b's text).
   - ADDED "The keyboard-first exploration dock roots at the scene overview and opens dialogue directly".
-- `webclient-contextual-hud`, both on C8c's text:
+- `webclient-contextual-hud`, on C8c's text:
   - MODIFIED "Dock panes render a per-kind vocabulary from backed fields only": no keyword navigation rows.
-  - MODIFIED "A fixed-column dock pane sizes its columns to content": the scenario names the combat panes instead of a nav pane.
+  - REMOVED "A fixed-column dock pane sizes its columns to content": its content-sized track rule applied only to the nav pane, which this change deletes.
+  - ADDED "A fixed-column dock pane stays inside the command region": the no-overflow rule and the fixed cell mapping for the combat panes, with no track-sizing rule.
 - `webclient-pointer-activation`: MODIFIED, on C8c's text, "Every action-dock surface renders exactly the keyboard router's current menu frame". The form list loses the navigation row and the affordance row.
 
 ## Impact
@@ -61,5 +62,7 @@ Out of scope:
 - Node tests: `web/static/webclient/js/tests/{exploration_menu,keyboard_router_declarative}.test.js`.
 - Vitest (under `web/webclient-app/`): `tests/frame-resolvers.test.js`, `tests/components/dock_panes.test.js`, `tests/action/{dock_menu,dock_menu_panes}.test.js`, `tests/store/{declarative_frames,command_echo_surfaces}.test.js`, `tests/{dialogue_store,dialogue_dock}.test.js`.
 - Browser: `web/tests/browser/test_browser_exploration_dialogue.py`, `test_browser_exploration_nav.py`, `test_browser_exploration_state.py`, `test_browser_exploration_tiles.py`, `test_browser_exploration_actions.py` (re-anchor only), `test_browser_services_base.py`, `test_browser_contextual_hud_dock.py`.
-- Spec traceability: the C8b exploration-dock ID moves to the new dock ID in the files C8b, C8c, and C9a anchored to it (including `web/webclient/tests/test_node_suite_evidence.py`).
+- Spec traceability:
+  - the C8b exploration-dock ID moves to the new dock ID in the files C8b, C8c, and C9a anchored to it (including `web/webclient/tests/test_node_suite_evidence.py`)
+  - `webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content` (the combat skill-frame case C9a moved into `test_browser_combat_skills.py`) moves to `webclient-contextual-hud::a-fixed-column-dock-pane-stays-inside-the-command-region`
 - Dependencies: archive order C8c (`webclient-retire-exploration-submenus`) → C9a (`explore-talk-open-action`) → C9b (this change) → C10a (`dialogue-panel-host-portrait`). The contextual-hud and pointer-activation blocks are written on C8c's text, and the dock requirement replaces C8b's.

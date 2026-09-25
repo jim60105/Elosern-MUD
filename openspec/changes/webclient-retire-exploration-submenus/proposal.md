@@ -42,7 +42,7 @@ The design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-desi
   - The digit tests (`tests/store/digit_row_picks.test.js`) cover `5`–`9`.
 - Spec deltas:
   - restate the legend, the pane vocabulary (exit chips instead of the outlet), the breadcrumb, the pointer current-frame form list, and the direct-children scenario
-  - replace the fixed-column requirement with one that has no outlet exemption
+  - replace the fixed-column requirement with one that has no outlet exemption and scopes its content-sized track rule to the nav pane (the combat panes are flex forms that never followed it)
 - No player-visible change other than digits 5–9 and the legend text. No server, OOB schema, or persistence change. No component is added or deleted.
 
 Out of scope:
@@ -63,7 +63,7 @@ Out of scope:
     - "Dock panes render a per-kind vocabulary from backed fields only": exit chips replace the move outlet.
     - "A breadcrumb derived from the router names the player's position at depth": no outlet `back` focus carrier.
   - REMOVED "A fixed-column-count dock pane sizes its columns to content, never stretching to fill the panel".
-  - ADDED "A fixed-column dock pane sizes its columns to content".
+  - ADDED "A fixed-column dock pane sizes its columns to content", scoped to the nav pane.
 - `webclient-pointer-activation`: MODIFIED, on C8b's text, "Every action-dock surface renders exactly the keyboard router's current menu frame". The form list loses the exit outlet cell.
 - `webclient-desktop-shell`: MODIFIED, on C8b's text, "The action dock's row region and detail panes are direct children of its pane host". The full-width example is no longer the exit outlet.
 

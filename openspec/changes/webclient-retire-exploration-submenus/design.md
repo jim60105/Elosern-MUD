@@ -58,6 +58,7 @@ The dialogue variant's picks: `webclient-dialogue-session` allows up to 16 scrip
 - `test_browser_exploration_tiles.py`:
   - `test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport` becomes an overview chip-wrap test (12 exits in a 1280x720 command region, no horizontal overflow, the last chip reachable by scrolling), annotated to the C8b exploration-dock ID.
   - Its nav-pane half (a keyword frame with a fixed column count) keeps the new fixed-column ID.
+  - The new fixed-column requirement scopes its content-sized track rule to the nav pane. The old text's no-stretch scenario named combat panes too, but they never followed it: `paneGridStyle` gave them `repeat(n, 1fr)`, and their containers (`.dock-menu__skills`, `__targets`, `__scales`) are flex boxes, so the inline grid template has no effect on them. The skill rows fill the pane width, the target tokens are fixed 38px squares, and the scale chips are `flex: 1` and share the width equally. Restating that as a rule, or changing it, is a visual decision outside this logic change.
   - `test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport` is deleted with the rule it pinned.
 - `test_browser_contextual_hud_dock.py`: the pane-vocabulary test's direct outlet push becomes overview assertions (glyph + destination, disabled label + marker, reason strip).
 

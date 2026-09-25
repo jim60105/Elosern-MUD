@@ -78,22 +78,29 @@ server-authored explanation, and SHALL submit nothing.
 - **WHEN** a disabled row or chip is focused in any form, by arrow key or by pointer
 - **THEN** it keeps focus, exposes its accessible disabled state and its server-authored explanation, and no action is submitted
 
-### Requirement: A fixed-column dock pane sizes its columns to content
+## ADDED Requirements
+
+### Requirement: A fixed-column dock pane stays inside the command region
 When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count
-SHALL govern only which cell each row occupies, never the rendered width of a column. A column's
-rendered width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows
-are fewer or narrower than the panel's available width SHALL leave the remaining width empty rather
-than stretching every column to consume it. When the pane's available width is narrower than the
-combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink
-toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns
-the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies
-which cell. No dock pane SHALL be exempt from this rule; the scene overview is not a fixed-column pane
-(its chips wrap by width under the section geometry the exploration dock requirement defines).
+SHALL govern only which cell each row occupies. This requirement SHALL NOT prescribe how wide a column
+or row renders: each pane form (the combat skill list, the target tokens, the scale chips) lays out its
+rows with its own styles, and whether a form fills the pane's width or leaves width empty is a visual
+decision of that form. Whatever the form, every row SHALL render inside the pane's box without
+horizontal overflow: when the pane's available width is narrower than the rows' natural width, the rows
+SHALL wrap or compress, and long content SHALL wrap within its row. Changing a row's rendered width
+SHALL NOT change which row occupies which cell. The scene overview is not a fixed-column pane (its chips
+wrap by width under the section geometry the exploration dock requirement defines).
 
-#### Scenario: Column-count-driven layout never invents equal-width stretching
-- **WHEN** a fixed-column dock pane (a combat skill, target, or scale pane) applies a fixed column count for its keyboard geometry
-- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width
+#### Scenario: A narrow command region keeps every row inside the pane
+- **WHEN** a combat skill, target, or scale pane renders in the command region at the minimum supported 1280x720 viewport
+- **THEN** every row lies inside the pane's right edge, the pane shows no horizontal overflow, and a long label wraps within its row
 
-#### Scenario: A narrow pane compresses the fixed columns instead of overflowing
-- **WHEN** the pane's available width (e.g. the command region at the minimum supported 1280x720 viewport) is narrower than the combined natural width of the fixed columns
-- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width
+#### Scenario: Rendered width never changes the keyboard cell mapping
+- **WHEN** the player presses ArrowRight in a pane whose keyboard geometry fixes two columns
+- **THEN** focus reaches the row that the fixed column count places in the second column, whatever width each row renders at
+
+## REMOVED Requirements
+
+### Requirement: A fixed-column dock pane sizes its columns to content
+**Reason**: Its content-sized track rule applied only to the nav pane, and this change deletes the nav pane with the keyword frame. The combat panes never followed the rule: they are flex forms on which the inline `repeat(n, 1fr)` template has no effect (the skill rows fill the pane, the target tokens are fixed squares, the scale chips share the width equally). Keeping the rule would direct a later implementer to change the combat layout under a logic change. How the combat panes use their width is a visual decision.
+**Migration**: "A fixed-column dock pane stays inside the command region" keeps the no-overflow rule and the fixed cell mapping for the remaining fixed-column panes, without prescribing track sizing. Test annotations re-anchor to it.

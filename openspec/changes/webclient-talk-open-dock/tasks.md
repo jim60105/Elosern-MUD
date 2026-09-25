@@ -3,6 +3,7 @@
 - [ ] 1.1 Confirm that C8c (`webclient-retire-exploration-submenus`) and C9a (`explore-talk-open-action`) are archived and that their seams exist:
   - `openspec/specs/webclient-exploration-menu/spec.md` contains "The exploration dock is keyboard-first and roots at the scene overview" and "The exploration panel is an exact read-only version-3 presentation panel".
   - `openspec/specs/webclient-contextual-hud/spec.md` contains "A fixed-column dock pane sizes its columns to content".
+  - `git grep -n "a-fixed-column-dock-pane-sizes-its-columns-to-content" web/tests/browser` matches `test_browser_combat_skills.py` (the case C9a moved there).
   - `grep -n "explore.talk_open" web/static/webclient/js/elosern/exploration_menu.js web/static/webclient/js/elosern/command_echo.js` matches both files.
   - `grep -n "keywordMenuFor\|scriptedAffordanceFor" web/static/webclient/js/elosern/exploration_menu.js` and `grep -n "exploration.keywords" web/webclient-app/stores/frame-resolvers.js` match.
   - `grep -n "\"affordance\"\|\"nav\"" web/webclient-app/components/dock-panes.js` matches both kinds.
@@ -38,7 +39,7 @@
 - [ ] 4.2 Vitest under `web/webclient-app/tests/`:
   - `frame-resolvers.test.js`: the keyword cases become one "`exploration.keywords` resolves to the unregistered marker" case.
   - `components/dock_panes.test.js`: delete the nav cases (`kw-*`, all-look, `target-*`) and any affordance case; add one case where rows carrying `explore.engage` and `explore.party_invite` classify as `plain`.
-  - `action/dock_menu_panes.test.js`: delete `navItems`, `affordanceItems`, the affordance row-order test, and the `nav` / `affordance` entries of `PANE_SELECTORS`. The track test becomes "every kind with `gridCols` emits `repeat(n, 1fr)`; no `gridCols` emits none".
+  - `action/dock_menu_panes.test.js`: delete `navItems`, `affordanceItems`, the affordance row-order test, and the `nav` / `affordance` entries of `PANE_SELECTORS`. The track test becomes "every kind with `gridCols` emits `repeat(n, 1fr)`; no `gridCols` emits none". Its title and comment say it pins the inline template only: the combat panes are flex boxes on which that template has no effect, so the test makes no claim about equal-width columns.
   - `action/dock_menu.test.js`: delete the nav, `kw-*`, and `targetName` / affordance-head cases.
   - `store/declarative_frames.test.js`: add D1 cases:
     - a popover open when the commit changes the mode to `dialogue` resets to the root
@@ -60,8 +61,9 @@
 
 - [ ] 6.1 Sync this change's deltas into the main specs.
 - [ ] 6.2 Re-anchor `webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview` to `webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly`. The anchors are in `web/tests/browser/test_browser_exploration_actions.py`, `test_browser_exploration_nav.py` (every occurrence), `test_browser_exploration_state.py`, `test_browser_exploration_tiles.py` (the C8c chip-wrap test), `test_browser_exploration_dialogue.py` (if C9a's re-pointed journeys carry it), and `web/webclient/tests/test_node_suite_evidence.py`. List them with `git grep -n "the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview"`.
+- [ ] 6.3 Re-anchor `webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content` to `webclient-contextual-hud::a-fixed-column-dock-pane-stays-inside-the-command-region` on the combat skill-frame case in `web/tests/browser/test_browser_combat_skills.py` (moved there by C9a). Keep its assertions (every row inside the pane's right edge at 1280x720, and ArrowRight reaching the second column of the fixed two-column mapping). `git grep -n "sizes-its-columns-to-content" web` returns nothing.
 
-  Confirm every ID with `uv run --locked python -m tools.spec_traceability list`, then run `uv run --locked python -m tools.spec_traceability check`. It must pass, and the new dock requirement must be covered by 5.1.
+  For 6.2 and 6.3, confirm every ID with `uv run --locked python -m tools.spec_traceability list`, then run `uv run --locked python -m tools.spec_traceability check`. It must pass, the new dock requirement must be covered by 5.1, and the new fixed-column requirement by the 6.3 case.
 
 ## 7. Validation
 

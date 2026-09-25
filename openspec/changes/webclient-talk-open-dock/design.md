@@ -50,13 +50,14 @@ C9a added the `talk <NPC>` resolver and the popover row carries `commandDisplay.
 
 ### D4. Spec strategy
 - C8b's dock requirement has a scenario, "交談 keeps the scripted keyword frame", that became false with C9a, and a MODIFIED block cannot drop it. That requirement is REMOVED and ADDED ("The keyboard-first exploration dock roots at the scene overview and opens dialogue directly"), and every annotation C8b, C8c, and C9a anchored to it is re-anchored.
-- The contextual-hud blocks are MODIFIED on C8c's text, with all scenario titles kept.
+- The contextual-hud pane-vocabulary block is MODIFIED on C8c's text, with all scenario titles kept.
+- C8c's fixed-column requirement is REMOVED and replaced by ADDED "A fixed-column dock pane stays inside the command region". Its content-sized track rule was scoped to the nav pane, which this change deletes, so no pane would follow it. The combat panes (`.dock-menu__skills`, `__targets`, `__scales`) are flex boxes: `paneGridStyle`'s inline `repeat(n, 1fr)` has no effect on them. Today the skill rows fill the pane, the target tokens are fixed 38px squares, and the scale chips are `flex: 1`. A MODIFIED block would keep the old name, which promises content-sized columns. The new requirement keeps only what holds for every form and what tests can decide: no horizontal overflow at 1280x720, long labels wrap, and rendered width never changes the keyboard cell mapping. How wide each form renders is left to a visual change.
 - The pointer-activation block is MODIFIED on C8c's text. Its form list loses "a navigation row" (the `nav` pane) and "an affordance row" (the `affordance` pane), so the list names only forms that a frame still produces.
 
 ## Risks / Trade-offs
 
 - [A frame shape that used to classify as `nav` or `affordance` appears later] → It renders as `plain` through the shared row renderer, with the same rows, focus, and disabled contract. A later change that wants a dedicated form adds it with a producer.
-- [Deleting the `nav` `sizeFn` branch leaves no pane on a content-sized track] → The fixed-column requirement's no-stretch rule (C8c's text, kept here) names combat panes, which have used `repeat(n, 1fr)` since before this series. That pre-existing gap is not widened by this change: the moved C9a journey asserts in-pane bounds and the fixed two-column mapping, which `1fr` satisfies. Whether combat panes should switch to `minmax(0, max-content)` is a visual decision left to the coordinator.
+- [Deleting the `nav` `sizeFn` branch leaves no pane on a content-sized track] → D4 retires the content-sized rule with the nav pane instead of extending it to the combat panes. Switching `sizeFn` to `minmax(0, max-content)` would not change the combat layout anyway, because those panes are flex boxes. The moved C9a journey asserts in-pane bounds and the fixed two-column mapping, which is exactly the new requirement. Whether the scale chips should stop sharing the width equally is a visual decision for a later visual change, such as C13a (`webclient-combat-foes-on-stage`).
 - [Browser journeys already rewritten by C8b, C6c, and C9a are edited again] → The edits only add the dock-at-overview assertions and remove nav-pane assertions. Section 6 of tasks.md lists the files from `git grep`.
 
 ## Migration Plan

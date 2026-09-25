@@ -193,11 +193,15 @@ than stretching every column to consume it. When the pane's available width is n
 combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink
 toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns
 the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies
-which cell. No dock pane SHALL be exempt from this rule; the scene overview is not a fixed-column pane
-(its chips wrap by width under the section geometry the exploration dock requirement defines).
+which cell. The content-sized track rule SHALL apply to the nav pane, the only pane that lays out its
+row region as a grid on the fixed column count. The combat skill, target, and scale panes lay out their
+rows with their own flex forms, which the fixed column count does not size; they SHALL be bound by the
+no-overflow rule above and the keyboard cell mapping, not by the content-sized track rule. The scene
+overview is not a fixed-column pane (its chips wrap by width under the section geometry the exploration
+dock requirement defines).
 
 #### Scenario: Column-count-driven layout never invents equal-width stretching
-- **WHEN** a fixed-column dock pane (a nav or combat pane) applies a fixed column count for its keyboard geometry
+- **WHEN** a fixed-column dock pane (a nav pane) applies a fixed column count for its keyboard geometry
 - **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width
 
 #### Scenario: A narrow pane compresses the fixed columns instead of overflowing
