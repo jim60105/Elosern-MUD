@@ -71,9 +71,9 @@ describe("frameless 商店 drawer (composition contract)", () => {
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    // Open shop drawer from 店長 navigate row
-    expect(store.focusItemByKey("interact")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // Open shop drawer from 店長 navigate row: the dock root is the scene
+    // overview (webclient-scene-overview-swap), so the person chip is one
+    // activation away.
     expect(store.focusItemByKey("target-7")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("service-shop")).toBe(true);

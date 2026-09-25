@@ -55,7 +55,8 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("keeps top navigation subject to both submission and revision locks", () => {
     openSession();
-    store.tabToRootAndConfirm("look", "pointer");
+    expect(store.focusItemByKey("target-7")).toBe(true);
+    expect(store.focusConfirm("pointer")).toBe(true);
     expect(store.router.depth()).toBe(2);
     store.router.setMutationInFlight(true);
     store.tabToRootAndConfirm("character", "pointer");
@@ -101,9 +102,8 @@ describe("frameless 背包 drawer (store contract)", () => {
     store.setConnected(true);
     expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
 
-    // Navigate to 店長 affordance frame
-    expect(store.focusItemByKey("interact")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // The overview's 店長 chip opens the verb popover (the dock root is the
+    // scene overview, webclient-scene-overview-swap).
     expect(store.focusItemByKey("target-7")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
 
@@ -153,9 +153,7 @@ describe("frameless 背包 drawer (store contract)", () => {
    store.setConnected(true);
    expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
 
-   // Navigate to 店長 affordance frame
-   expect(store.focusItemByKey("interact")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The overview's 店長 chip opens the verb popover.
    expect(store.focusItemByKey("target-7")).toBe(true);
    expect(store.focusConfirm()).toBe(true);
 
@@ -198,14 +196,14 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(depthBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
     expect(store.view.activeSubDock).toBe(null);
   });
   it("the scoped exemption does not regress the other drawers' close teardown", () => {
     openSession();
     // 任務 (frameless): tabToRootAndConfirm from depth > 1 pops to root and opens
     // the quest drawer with depth 1 and nothing pushed; closing it pops nothing.
-    expect(store.focusItemByKey("look")).toBe(true);
+    expect(store.focusItemByKey("wait")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.router.depth()).toBe(2);
 
@@ -213,13 +211,13 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe("quest");
     expect(store.router.depth()).toBe(1);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
 
     expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.router.depth()).toBe(1);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
   });
 
   it("opening an overlay over the bag closes the bag without touching the router or dock", () => {
@@ -249,6 +247,6 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.depth()).toBe(1);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentMenu().title).toBe("場景");
   });
 });

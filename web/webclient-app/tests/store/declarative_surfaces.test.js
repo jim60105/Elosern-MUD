@@ -105,10 +105,10 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(store.view.hudDrawer).toBe("quest");
   }
 
-  // Open the quest drawer via the 店長's navigate affordance.
+  // Open the quest drawer via the 店長's navigate affordance. The dock root
+  // is the scene overview (webclient-scene-overview-swap), so the person chip
+  // is one activation away.
   function enterGuildSurface() {
-    expect(store.focusItemByKey("interact")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("target-7")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("service-guild")).toBe(true);
@@ -127,8 +127,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   describe("frameless quest drawer", () => {
     it("activating service-guild opens quest drawer leaving frame stack and depth unchanged", () => {
       openSession();
-      expect(store.focusItemByKey("interact")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
       expect(store.focusItemByKey("target-7")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
 
@@ -158,7 +156,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
 
     it("tabToRootAndConfirm('quests') from depth > 1 pops to root and opens quest drawer with depth 1", () => {
       openSession();
-      expect(store.focusItemByKey("interact")).toBe(true);
+      expect(store.focusItemByKey("target-7")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
       expect(store.router.depth()).toBe(2);
 
@@ -295,7 +293,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   describe("teardown posts one root descriptor per mode", () => {
     it("transport loss under an open submenu re-posts the exploration root", () => {
       openSession();
-      expect(store.focusItemByKey("move")).toBe(true);
+      expect(store.focusItemByKey("wait")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
       expect(store.router.depth()).toBe(2);
       store.setConnected(false);
@@ -340,8 +338,6 @@ describe("declarative service/combat/creation surfaces (store)", () => {
  describe("frameless shop drawer", () => {
    it("activating service-shop opens shop drawer leaving frame stack and depth unchanged", () => {
      openSession();
-     expect(store.focusItemByKey("interact")).toBe(true);
-     expect(store.focusConfirm()).toBe(true);
      expect(store.focusItemByKey("target-7")).toBe(true);
      expect(store.focusConfirm()).toBe(true);
 

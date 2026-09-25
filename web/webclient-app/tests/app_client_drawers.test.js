@@ -708,9 +708,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    );
    await wrapper.vm.$nextTick();
 
-   // Navigate to 店長 affordances
-   expect(store.focusItemByKey("interact")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The overview's 店長 chip opens the verb popover (the dock root is the
+   // scene overview, webclient-scene-overview-swap).
    expect(store.focusItemByKey("target-7")).toBe(true);
    expect(store.focusConfirm()).toBe(true);
    await wrapper.vm.$nextTick();
@@ -790,9 +789,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    );
    await wrapper.vm.$nextTick();
 
-   // Navigate to 店長 affordances
-   expect(store.focusItemByKey("interact")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The overview's 店長 chip opens the verb popover (the dock root is the
+   // scene overview, webclient-scene-overview-swap).
    expect(store.focusItemByKey("target-7")).toBe(true);
    expect(store.focusConfirm()).toBe(true);
    await wrapper.vm.$nextTick();
