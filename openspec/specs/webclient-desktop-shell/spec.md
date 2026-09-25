@@ -491,6 +491,7 @@ On WebSocket loss after a successful connection, the shell SHALL preserve the la
 - **THEN** the offline overlay is the topmost visible surface, painted above that surface
 
 ### Requirement: Player input lines are part of the narrative stream with a divider
+
 The narrative log SHALL retain, in addition to server text, one input line per deliberate player
 action: a typed command send echoes the exact raw text the player sent, and a button-triggered
 mutation echoes its resolved command line (see the `webclient-input-narrative` capability). Input
