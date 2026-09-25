@@ -95,26 +95,28 @@ def _wait_inp_line(page, count, text=None, exact=False, timeout=30000, keep_open
             "'[data-testid=\"fulllog-overlay\"] .inp');"
             " return lines.length === %d && %s; }" % (count, cmp)
         )
-    wait_for_store_state(
-        page,
-        lambda s: bool(s.get("connected")),
-        dom_readiness={
-            "selector": '[data-testid="fulllog-overlay"]',
-            "predicate": predicate_js,
-            "description": "full-log overlay input lines",
-        },
-        timeout=timeout,
-    )
-    if not keep_open and not was_open:
-        page.evaluate(
-            """() => {
-              const closeBtn = document.querySelector('[data-testid="fulllog-close"]');
-              if (closeBtn) { closeBtn.click(); }
-            }"""
+    try:
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="fulllog-overlay"]',
+                "predicate": predicate_js,
+                "description": "full-log overlay input lines",
+            },
+            timeout=timeout,
         )
-        page.wait_for_selector(
-            '[data-testid="fulllog-overlay"]', state="detached", timeout=15000
-        )
+    finally:
+        if not keep_open and not was_open:
+            page.evaluate(
+                """() => {
+                  const closeBtn = document.querySelector('[data-testid="fulllog-close"]');
+                  if (closeBtn) { closeBtn.click(); }
+                }"""
+            )
+            page.wait_for_selector(
+                '[data-testid="fulllog-overlay"]', state="detached", timeout=15000
+            )
 
 
 def _clear_narrative(page):
@@ -609,11 +611,17 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page_2_text = surface.inner_text().strip()
         self.assertTrue(page_2_text)
         anchor_prefix = page_2_text[:6]
+        self.assertNotIn(
+            anchor_prefix,
+            "【段落1】",
+            "page 2's leading tag must be distinct from page 1's leading tag",
+        )
         live_before = page.locator('[data-testid="message-live"]').inner_text()
 
         # Shrink the viewport from 1920x1080 to 1280x720 and wait for the
         # ResizeObserver re-page pass to settle across two consecutive reads.
         page.set_viewport_size({"width": 1280, "height": 720})
+        page.wait_for_timeout(150)
         previous_sig = None
         for _ in range(20):
             page.wait_for_timeout(120)
@@ -623,9 +631,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             previous_sig = sig
         after_text = surface.inner_text()
         self.assertIn(
-            anchor_prefix[0],
+            anchor_prefix,
             after_text,
-            "re-paging on resize must keep the first character that was on screen",
+            "re-paging on resize must keep the page-2 anchor substring on screen",
         )
         self.assertEqual(
             page.locator('[data-testid="message-live"]').inner_text(),
