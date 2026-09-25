@@ -9,7 +9,7 @@ Every UI component named in the required-component manifest SHALL be implemented
 single-file component and SHALL have at least one Storybook story that documents its props, the
 events/actions it emits, and its primary states. At the completion of the contextual HUD
 redesign the required manifest SHALL enumerate at minimum: the header; the place card; the narrative feed and its
-unread indicator; the command line; the action dock with its menu,
+unread indicator; the message window; the command line; the action dock with its menu,
 submenu, and choice-card frames; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
 local map; the scene backdrop and the reference artwork frame; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
@@ -28,7 +28,9 @@ every story of that component family.
 
 #### Scenario: A required component always has a story
 - **WHEN** the required-component manifest is enumerated
-- **THEN** every listed component has at least one registered Storybook story
+- **THEN** every listed component has at least one registered Storybook story, including the
+  message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
+  pending-action, and dialogue states
 
 #### Scenario: A story documents contract and primary states
 - **WHEN** a component story is rendered

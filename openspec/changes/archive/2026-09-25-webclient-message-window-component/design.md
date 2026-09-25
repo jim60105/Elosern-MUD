@@ -43,38 +43,46 @@ The root `section.message-window` (`data-testid="message-window"`, `data-mode`, 
 - The text area `div.message-window__text` takes `flex: 1; min-height: 0`.
 - A bottom strip of `var(--message-controls-h)` (36px) is left empty. The page marker sits in it, and C6c's 日誌 and C5's ⌨ occupy its right end (`right: 22px` … about 96px).
 - The marker `span.message-window__marker` is absolutely placed at `right: 104px; bottom: 12px` and `aria-hidden="true"`. It never takes part in measurement.
+  - `▼` (`data-state="more"`) is gold with a soft glow. It bobs 3px and dims on a period of `calc(var(--motion-pulse) / 3)` (about 1.07s), a token-derived duration that the reduced-motion blocks shorten.
+  - `■` (`data-state="end"`) is smaller, static, and a darker gold.
+- The window draws no card of its own. The band behind it is the frame: its gradient and hairline top edge already run under both regions, and a second card inside the band would double the frame. A 1px ink rule runs down the window's left edge and turns into a 2px gold rule while the page surface has keyboard focus (`:has(.message-window__page:focus-visible)`). This is the surface's focus indicator.
 - There is no head row. The mode label moves out of the band, as the design's reference geometry shows no caption head. The dialogue box carries its own speaker line.
 
 Page text inside the text area:
-- `font-size: calc(var(--message-text) * var(--prose-scale))`, `line-height: var(--message-line-height)`, the serif reading face, and `max-width: 42em`.
+- `font-size: calc(var(--message-text) * var(--prose-scale))`, `line-height: var(--message-line-height)`, and the serif reading face.
+- The page surface is a centred column, `max-width: calc(42em + 48px)`, with `padding: 0 24px` and no vertical padding. The 42em text measure holds, and every vertical pixel goes to the line budget. The line's own half-leading (0.2em) plus the region's 10px padding give the top breathing room.
+- Consecutive lines are separated by `0.2em`. The measurer sees the same margin.
 - In CJK one character is one em, so the measure is at most 42 characters whatever the width.
 - `--message-text` is `clamp(20px, 2.593vh, 38px)`: 28.0px at 1080, 23.3px at 900, 20px at 720, and 37.3px at 1440.
 - `.narrative-line.sys` uses `0.75em` sans with the `◈` marker; `.sys.cont` hides the marker.
-- `.narrative-line.map-art` uses the mono stack at `0.6em`, `white-space: pre`.
+- `.narrative-line.map-art` uses the mono stack at `0.6em`, `white-space: pre`, and `line-height: 1.15`, so vertical box strokes join.
 - `.err` keeps the seal colour and italic.
 
 Resulting capacity at the default scale:
-- 1920×1080: the region is 1280px wide, 1250px after padding, and the 42em cap makes the text 1176px wide. Height is 300 − 22 − 36 = 242px, and 242 ÷ 39.2 gives 6 lines.
+- 1920×1080: the region is 1280px wide, 1250px after padding, and the 42em cap makes the text 1176px wide. Height is 300 − 22 − 36 = 242px, and 242 ÷ 39.2 gives 6 lines. Measured in the story at 1920×1080, the surface is 241px tall and a 6-line block fits.
 - 1280×720: about 823px wide (41 characters), and 260 − 22 − 36 = 202px ÷ 28 gives 7 lines.
 
 *Alternative:* keep today's 14px feed size. Rejected, because the design fixes 28px at the reference size and the ≤42 measure.
 
 ### D2. Measurement: a hidden twin of the text area and Vue's `render()`
-`use-message-measure(textAreaRef, { fontScale })` creates one `div.message-window__measure` inside the text area:
-- `position: absolute; inset: 0 auto auto 0; visibility: hidden; pointer-events: none; aria-hidden="true"`
-- the same width (`textArea.clientWidth`) and the same classes, so the same font rules apply
+`useMessageMeasure(surfaceRef)` creates one measurer on mount, next to the page surface inside the text area:
+- The measurer is `div.message-window__page.message-window__measure`. It carries the page's own class, so it gets the same font, width cap, and padding.
+- The compound selector `.message-window__page.message-window__measure` overrides the page's `height: 100%` with `position: absolute; top: 0; left: 0; right: 0; height: auto; overflow: visible; visibility: hidden; pointer-events: none`. The measurer is `aria-hidden="true"`.
+- The measurer nests the fragments one level deeper than the live page, inside an unstyled `div.message-window__measure-flow`. The window's CSS therefore uses no child combinators.
 
 `fits(fragments)`:
-1. calls `render(h("div", { class: "message-window__page" }, fragments.flatMap(narrativeBlockNodes)), measurer)`, which is synchronous
-2. returns `measurer.scrollHeight <= textArea.clientHeight`
-3. `render(null, measurer)` clears it after each paging pass
+1. calls `render(h("div", { class: "message-window__measure-flow" }, fragments.map(narrativeBlockNodes)), measurer)`, which is synchronous
+2. returns `measurer.getBoundingClientRect().height <= surface.getBoundingClientRect().height + 0.5`. Both are fractional layout heights; the 0.5px slack absorbs sub-pixel rounding.
+3. `clear()` (`render(null, measurer)`) empties it after each paging pass
+
+The composable is called before the window registers its own `onMounted`, so the measurer exists before the first paging pass.
 
 The composable exposes:
 - `ready`: false until `document.fonts.ready` resolves, or immediately true when `document.fonts` is absent
-- `boxKey`: `${clientWidth}x${clientHeight}`, updated by a `ResizeObserver` on the text area
+- `boxKey`: the surface's rounded `${width}x${height}`, updated by a `ResizeObserver` on the surface (disconnected on unmount)
 - `fits`
 
-`MessageWindow` re-pages when any of `boxKey`, `fontScale`, `ready`, or the current response's blocks change.
+`MessageWindow` re-pages when any of `boxKey`, `ready`, the variant, or the displayed response's key, blocks, or awaiting state change (one post-flush watcher). A `fontScale` change re-pages one tick later, so the new `--prose-scale` on `<html>` is in effect. A generation counter drops that deferred pass when a newer pass has already run.
 
 *Why render real vnodes:* the fit must see exactly the markup the page will render, including span classes, `<br>`, sys sizing, and map-art `pre`. A string-width estimate would drift from the renderer.
 
@@ -84,14 +92,18 @@ The composable exposes:
 
 ### D3. Reader state
 The state is:
-- `responseKey`: the current response's `startSeq`, or `"lead"` for the headerless leading response
+- `responseKey`: the displayed response's `s<startSeq>`, or `i<index>` when it has no numeric `startSeq` (the headerless leading response, and fixtures without `seq`)
 - `pageIndex`
 - `anchorOffset`: the response offset of the first character of the page on screen
 
 Transitions:
 - **Mount:** open the last response on its last page. Nothing is announced: that text was already read or announced before the component mounted. This is also the resync rule in design §12. The log survives a reconnect in the store, so a remount shows the last page, fully shown.
 - **New response** (`responseKey` changes to a newer start): `pageIndex = 0`. The earlier response's unread pages are simply no longer presented and remain in the full log. This is the flush in design §6.3.
-- **Pending action:** the store's last mark is greater than the last line's `seq`, so a dispatch is out and no line has arrived. Keep the previous response and jump to its last page. The reader acted, so the unread pages are flushed at once, not only when the reply's first line lands.
+- **Awaiting a reply** (the reader acted, and nothing of the reply is on the log yet). This covers two cases:
+  - A pending mark: the store's last mark is greater than the last line's `seq`, so a dispatch is out and no line has arrived.
+  - A header-only response: the action's `in` echo has landed, which starts a response with no blocks, but no reply line has arrived yet. The echo's `seq` equals the mark, so the pending test alone would already be false here.
+
+  In both cases the displayed response is the latest response that has blocks, and it jumps to its last page. The unread pages are flushed at once, and the window never blanks between an action and its reply. The first reply line gives the new response its blocks, and it opens on page 1.
 - **Lines appended to the current response:** keep `pageIndex`. New pages appear behind it and the marker turns `▼`.
 - **Re-page** (box, scale, or fonts change): `pageIndex = pageIndexForOffset(pages, anchorOffset)`.
 
@@ -102,9 +114,9 @@ Transitions:
 
 ### D4. Reading controls and key scope
 - **Pointer.** `@click` on the root advances, except when `event.target.closest("button, a, [role=button]")` matches (the dialogue rows, C6c's controls), or when `window.getSelection()` holds a non-collapsed range inside the window. The second rule lets players copy text. After advancing, the page surface takes focus with `preventScroll`.
-- **Keyboard.** The page surface `div.message-window__page` has `tabindex="0"`, `aria-label="訊息"`, and `aria-describedby` pointing at a hidden `第 N／M 頁` label. Its `@keydown` acts only when `event.target === surface`, the key is Enter or Space, no modifier is held, and `!event.repeat`. It then calls `preventDefault()` and `stopPropagation()`, and advances.
+- **Keyboard.** The page surface `div.message-window__page` has `tabindex="0"`, `aria-label="訊息"`, and `aria-describedby` pointing at a hidden `第 N／M 頁` label. Its `@keydown` acts only when `event.target === surface`, the key is Enter or Space, and no modifier is held. It then calls `preventDefault()` and `stopPropagation()`, and advances unless `event.repeat` is set.
   - Component listeners fire in bubble order before the document listener, so the bridge never routes the key to the dock.
-  - A key repeat never skips pages.
+  - A key repeat never skips pages. It is still claimed, so a held key never leaks through to the dock.
   - When focus is on `#action-dock` or anywhere else, Enter and Space keep their dock meaning, so a dock Enter never also advances a page.
 - **Wheel.** `@wheel` with `deltaY < 0` emits `open-full-log` when the page is not scrollable, or is an oversize page already at `scrollTop === 0`. It does not fire in the dialogue variant.
 
@@ -113,7 +125,12 @@ Transitions:
 ### D5. The live region announces each page once
 A visually hidden `div` (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`, `data-testid="message-live"`) receives plain text.
 - When a page is shown (mount excluded), the region is set to the page's text with the `◈` markers excluded.
-- A set of announced fragment keys (`${seq}:${start}`) records what has been spoken. Lines appended to the page on screen announce only their own fragments. A re-page announces nothing, because the fragments' text was already spoken.
+- A watermark, `announcedEnd`, holds the response offset up to which the region has spoken. A page shown by a new response or an advance announces all its fragments and raises the watermark to the page's end.
+- Lines appended to the page on screen announce only the fragments whose `start` is at or after the watermark.
+  - Paging is greedy, so an append never re-cuts a fragment that was already on screen. Whole-fragment filtering is therefore exact, and nothing is sliced.
+- Mount and flush set the watermark to the response's length and announce nothing. A re-page announces nothing.
+  - *Why offsets, not fragment keys (`${seq}:${start}`):* a re-page at another width moves every cut and produces new keys. Response offsets do not depend on where the cuts fall.
+- Announcing the same text twice in a row clears the region first, then sets the text on the next tick, so the repeat is still heard.
 - The page surface itself is not a live region. It changes on advance, and announcing it too would double-speak.
 
 ### D6. The dialogue variant is ported, unpaged
@@ -142,6 +159,10 @@ The box pin is ported: on a reply change, scroll so the box's top is 8px below t
 - [jsdom has no layout, so the DOM `fits` itself is untested in Vitest] → The DOM path is exercised by the story build (`pnpm run build-storybook`) here and by C6c's browser tests. Vitest pins the state machine through `pageFit`.
 - [28px text changes the feel of long room descriptions: 6 lines per page at 1080] → This is the design's decision. The full log (C1's bottom-opening surface) remains one control away.
 - [A click to focus the window also advances] → The first click on page 1 advances only if more pages exist. The design names click as the advance gesture.
+
+- [The log trims its oldest lines (500 max) from the front, and a trim can cut into the shown leading response and renumber its offsets] → When the shown response keeps its key but its length shrinks, the window settles like a mount: last page, watermark at the end, no announcement.
+- [The measurer is an untracked DOM node appended after the text area's two vnode slots] → The render function documents the invariant at the children array. C6c and C7 must keep exactly two slots, or move the measurer into the vnode tree.
+- [Mount announces nothing, which is right for a remount or reconnect but not for a session's very first narrative] → C6c decides the mount timing. If the window can mount before the first narrative lines exist, C6c must announce that first content.
 
 ## Migration Plan
 
