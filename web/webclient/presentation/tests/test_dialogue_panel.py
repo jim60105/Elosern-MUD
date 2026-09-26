@@ -227,10 +227,13 @@ class DialoguePresenterTests(EvenniaTest):
         portrait_ref = dialogue["host"]["portrait_ref"]
         self.assertEqual(portrait_ref, portrait_catalog_key(self.host.pk))
         self.assertIn(portrait_ref, art["portrait_catalog"])
-        self.assertEqual(
-            art["portrait_catalog"][portrait_ref]["context"]["name"],
-            npc_display_name(self.host),
-        )
+        entry = art["portrait_catalog"][portrait_ref]
+        self.assertEqual(entry["context"]["name"], npc_display_name(self.host))
+        # Membership, never resolution success, gates the key: the entry behind
+        # it is the placeholder card while the portrait is unresolved, and the
+        # panel ships the key anyway.
+        self.assertIsNone(entry["url"])
+        self.assertIsNotNone(entry["placeholder"])
 
     @covers_requirement(
         "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
@@ -280,6 +283,9 @@ class DialoguePresenterTests(EvenniaTest):
     def test_unbuildable_art_view_carries_a_null_reference(self):
         # A combat actor with no session record is the reachable ArtViewError:
         # the presenter catches it, ships null, and keeps the panel available.
+        # The handler is pinned by a mock because that raise site is reachable
+        # only through a combat branch this presenter's own gates preclude; the
+        # mock keeps the degrade path honest if art_view grows another raise.
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
         with mock.patch.object(
             dialogue_module,
