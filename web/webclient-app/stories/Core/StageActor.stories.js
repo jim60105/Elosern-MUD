@@ -85,7 +85,7 @@ export const HostPendingPlaceholder = {
 // No catalog entry (`portrait_ref` null): the name's initial and the name.
 export const HostMissingEntry = {
   render: renderActor,
-  args: { portrait: null, name: "葛里安·衛登", side: "right", dimmed: false },
+  args: { portrait: null, name: "合成·旅人", side: "right", dimmed: false },
 };
 
 // The speaker: full brightness, `data-speaking="true"`.

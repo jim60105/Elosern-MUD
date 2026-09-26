@@ -216,7 +216,7 @@ const renderPlayer = (args) => ({
           } } : {}),
           ...(args.dialogue ? { dialogue: {
             schema_version: 2, available: true, kind: "dialogue",
-            host: { identity: 7, display_name: args.dialogue === "missing" ? "葛里安·衛登" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
+            host: { identity: 7, display_name: args.dialogue === "missing" ? "合成·旅人" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
             bond_stage: "熟識",
             line: "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。",
             choices: [

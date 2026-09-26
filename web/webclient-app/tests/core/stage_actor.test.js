@@ -56,10 +56,10 @@ describe("StageActor", () => {
   });
 
   it("draws the name's initial and the name when no entry exists", () => {
-    wrapper = mount(StageActor, { props: { portrait: null, name: "葛里安·衛登", side: "right" } });
+    wrapper = mount(StageActor, { props: { portrait: null, name: "合成·旅人", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
-    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("葛");
-    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("葛里安·衛登");
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("合");
+    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("合成·旅人");
   });
 
   it("keeps the whole astral-plane initial of a name", () => {

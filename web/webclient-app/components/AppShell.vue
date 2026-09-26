@@ -252,15 +252,15 @@ const HIDDEN_BY_MODE = {
 };
 
 // Focus fell out of the rendered layout: the body, a removed element, or an
-// element that just lost its box to `display:none` before the browser
-// blurred it.
-function focusIsLost(active) {
+// element inside a surface the committed mode hides (`hiddenSelector`), which
+// a browser may not have blurred yet.
+function focusIsLost(active, hiddenSelector = "") {
   return (
     !active ||
     active === document.body ||
     active === document.documentElement ||
     !active.isConnected ||
-    (typeof active.getClientRects === "function" && active.getClientRects().length === 0)
+    (!!hiddenSelector && typeof active.closest === "function" && !!active.closest(hiddenSelector))
   );
 }
 
@@ -311,7 +311,7 @@ watch(
       // the body) returns to the now-rendered dock.
       await nextTick();
       const now = document.activeElement;
-      if (focusIsLost(now) || now?.closest?.("[data-anchor='band-message']")) {
+      if (focusIsLost(now, hiddenSelector) || now?.closest?.("[data-anchor='band-message']")) {
         restoreFocusHome();
       }
     }

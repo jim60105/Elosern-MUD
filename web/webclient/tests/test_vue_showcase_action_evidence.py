@@ -62,7 +62,6 @@ ACTION_FAMILY_STORY_IDS = {
     "action-actiondock--generating-suggestions",
     "action-actiondock--unavailable-suggestions",
     "action-choicecardrow--ready-row",
-    "action-dockmenu--exploration-frame",
     "action-dockmenu--fixed-grid-frame",
     "action-dockmenu--target-frame",
     "action-dockmenuitem--default",
