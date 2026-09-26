@@ -228,6 +228,14 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "description": "frameless quest drawer rendered",
                 },
             )
+        # Reaching the navigate row needed the host's verb popover, which is a
+        # pushed frame; the drawer's own open pushes nothing. Restore the
+        # committed root before returning so the helper's postcondition is the
+        # one the journeys assert — opening a frameless surface leaves the
+        # router's frame and trail untouched (resetFramesToRoot is the
+        # browser-helper stack normalizer; it never closes a drawer).
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+        page.wait_for_timeout(80)
         return self._services_panel(page)
 
     def _tab_until_focused(self, page, selector, max_presses=30):
