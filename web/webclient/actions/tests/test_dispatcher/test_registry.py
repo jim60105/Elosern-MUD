@@ -73,6 +73,7 @@ class RegistryTests(unittest.TestCase):
                     "creation.reset",
                     "explore.move",
                     "explore.look",
+                    "explore.talk_open",
                     "explore.talk_scripted",
                     "explore.talk_freeform",
                     "explore.dialogue_leave",

@@ -26,6 +26,7 @@ from web.webclient.actions.exploration_actions import (
     validate_party_leave_payload,
     validate_possess_payload,
     validate_possess_release_payload,
+    validate_talk_open_payload,
     validate_talk_scripted_payload,
     validate_wait_payload,
     validate_deliver_payload,
@@ -64,6 +65,7 @@ _ROOM_SURVEY_PARAMS = {"room": True}
 _ACTION_PAYLOAD_VALIDATORS = {
     "explore.move": validate_move_payload,
     "explore.look": validate_look_payload,
+    "explore.talk_open": validate_talk_open_payload,
     "explore.talk_scripted": validate_talk_scripted_payload,
     "explore.party_invite": validate_party_invite_payload,
     "explore.party_leave": validate_party_leave_payload,

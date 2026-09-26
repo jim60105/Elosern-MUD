@@ -1,7 +1,8 @@
 """Exact exploration action payload validators and narrow adapters.
 
 The production exploration actions are ``explore.move``, ``explore.look``,
-``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.dialogue_leave``,
+``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
+``explore.dialogue_leave``,
 ``explore.party_invite``, ``explore.party_leave``, ``explore.engage``,
 ``explore.wait``, ``explore.practice``, ``explore.possess``, ``explore.possess_release``, and
 ``explore.deliver``. Each
@@ -28,9 +29,11 @@ from world.rules.dialogue import (
     DIALOGUE_TABLE,
     clear_dialogue_session,
     dialogue_key_for,
+    greeting_for,
     is_dialogue_host,
     live_dialogue_session,
     open_or_refresh_dialogue,
+    opens_dialogue,
     run_scripted_talk,
 )
 from world.rules.map_knowledge import KnowledgeError, decode_node
@@ -48,6 +51,7 @@ from world.rules.party import (
     join_party,
     party_size,
 )
+from world.rules.player_messages import dialogue_open_fallback_line
 from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
@@ -140,6 +144,15 @@ def validate_look_payload(payload: Any) -> dict[str, Any]:
     if set(payload) == {"target_id"}:
         return {"target_id": _require_positive_int(payload["target_id"], "target_id")}
     raise ExplorationActionError("explore.look requires exactly room or target_id")
+
+
+def validate_talk_open_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.talk_open`` payload (one host identity)."""
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.talk_open payload must be an object")
+    if set(payload) != {"npc_id"}:
+        raise ExplorationActionError("explore.talk_open requires exactly npc_id")
+    return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
 
 
 def validate_talk_scripted_payload(payload: Any) -> dict[str, Any]:
@@ -482,6 +495,47 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     message = f"{npc.key}說：{result.response}{hint}"
     actor.msg(message)
     return _success("talked", message, AFFECTED_FULL)
+
+
+def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Open a conversation with the host's greeting (design D1).
+
+    Mirrors ``_talk_scripted_adapter``'s gates (possession, presence, talk
+    schedule, conversable host) and then records the session through the sole
+    writer with the authored greeting, or the fixed server-authored fallback
+    line when the host has none. It calls no LLM, advances no clock, and
+    changes no affinity or memory: the session write is the only state change.
+    """
+    del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+
+    npc = _resolve_npc(actor, payload["npc_id"])
+    if npc is None:
+        return _rejected("no_npc", "這裡沒有這個對象。")
+    reason = interaction_reason(npc, "talk")
+    if reason is not None:
+        return _rejected("schedule_blocked", reason)
+    if not opens_dialogue(npc):
+        return _rejected("not_dialogue_host", "對方無法交談。")
+
+    line = greeting_for(npc)
+    if line is None:
+        # A greetingless host (an LLMNPC, or a table row with greeting=None)
+        # opens on the fixed narration line instead of a quoted greeting.
+        line = dialogue_open_fallback_line(npc.key)
+        message = line
+    else:
+        message = f"{npc.key}說：{line}"
+    open_or_refresh_dialogue(actor, npc, line)
+    actor.msg(message)
+    return _success("dialogue_opened", message, AFFECTED_FULL)
 
 
 def _dialogue_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
@@ -940,6 +994,7 @@ __all__ = [
     "MAX_KEYWORD_ID_CHARS",
     "MAX_NODE_ID_CHARS",
     "MAX_SPEECH_CODE_POINTS",
+    "_talk_open_adapter",
     "validate_engage_payload",
     "validate_deliver_payload",
     "validate_look_payload",
@@ -949,6 +1004,7 @@ __all__ = [
     "validate_possess_payload",
     "validate_possess_release_payload",
     "validate_talk_freeform_payload",
+    "validate_talk_open_payload",
     "validate_talk_scripted_payload",
     "validate_wait_payload",
 ]

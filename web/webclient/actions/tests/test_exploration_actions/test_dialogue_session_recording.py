@@ -24,6 +24,7 @@ from web.webclient.actions.exploration_actions import (
     _present_by_id,
     _resolve_exit,
     _talk_freeform_adapter,
+    _talk_open_adapter,
     _talk_scripted_adapter,
     _wait_adapter,
     validate_engage_payload,
@@ -40,6 +41,7 @@ from web.webclient.actions.exploration_actions import (
 from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
+from world.rules.player_messages import dialogue_open_fallback_line
 from django.test import override_settings
 from unittest.mock import patch
 from world.ai.npc_dialogue import register_npc_dialogue
@@ -109,6 +111,27 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         )
         self.assertEqual(result["code"], "unregistered_keyword")
         self.assertIsNone(self.player.db.dialogue_session)
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
+    def test_talk_open_writes_the_greeting_or_the_fixed_fallback_line(self):
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
+        result = _talk_open_adapter(self.player, {"npc_id": int(host.pk)})
+        self.assertEqual(result["outcome"], "success")
+        stored = self.player.db.dialogue_session
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored["npc_id"], int(host.pk))
+        self.assertIn(_T_LODGE_GREETING, stored["line"])
+        # A host without an authored greeting (a bare LLMNPC) opens on the
+        # fixed server-authored fallback line instead.
+        bard = create_object(LLMNPC, key="吟遊詩人", location=self.room1)
+        result = _talk_open_adapter(self.player, {"npc_id": int(bard.pk)})
+        self.assertEqual(result["outcome"], "success")
+        stored = self.player.db.dialogue_session
+        self.assertEqual(stored["npc_id"], int(bard.pk))
+        self.assertEqual(stored["line"], dialogue_open_fallback_line(bard.key))
 
     def test_freeform_settled_reply_records_the_presented_line(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)

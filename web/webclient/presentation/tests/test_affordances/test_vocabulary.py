@@ -82,6 +82,25 @@ class AffordanceVocabularyTests(VocabularyTestCase):
     def test_suggestible_never_empty_in_an_exploration_room(self):
         self.assertGreaterEqual(len(suggestible_candidates(self._vocabulary())), 1)
 
+    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    def test_the_conversation_opening_code_is_allowlisted_but_never_emitted(self):
+        host = create_object(NPC, key="公會職員", location=self.room)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
+        create_object(LLMNPC, key="吟遊詩人", location=self.room)
+        action_ids = {
+            entry.action_id
+            for entry in self._vocabulary()
+            if not entry.navigation
+        }
+        # The vocabulary keeps the per-keyword and free-form entries (the
+        # context form, suggestion cards, and AI proposals consume them) and
+        # never emits the panel-only conversation opener.
+        self.assertIn("explore.talk_scripted", action_ids)
+        self.assertIn("explore.talk_freeform", action_ids)
+        self.assertNotIn("explore.talk_open", action_ids)
+        self.assertIn("explore.talk_open", ACTION_CODE_ALLOWLIST)
+        self.assertNotIn("explore.talk_open", SUGGESTIBLE_ACTION_IDS)
+
     def test_creation_pending_and_absent_location_yield_an_empty_vocabulary(self):
         self.player.db.creation_pending = True
         self.assertEqual(self._vocabulary(), ())

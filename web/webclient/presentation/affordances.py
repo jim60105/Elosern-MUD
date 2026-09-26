@@ -40,12 +40,18 @@ from world.rules.service_gate import (
 )
 from world.observability import log_warn
 
-# The eleven action codes the vocabulary may emit. ``explore.interact`` is
+# The twelve action codes the allowlist admits. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
-# per-target affordances, never a dispatcher action.
+# per-target affordances, never a dispatcher action. ``explore.talk_open`` is
+# a member because the exploration panel folds each conversable host's talk
+# entries into one 交談 affordance naming it, but the vocabulary itself never
+# emits it (the per-keyword and free-form entries stay, so the
+# ``context_actions`` form, suggestion eligibility, and the AI proposal ladder
+# keep consuming them).
 ACTION_CODE_ALLOWLIST = (
     "explore.move",
     "explore.look",
+    "explore.talk_open",
     "explore.talk_scripted",
     "explore.talk_freeform",
     "explore.party_invite",
@@ -58,8 +64,10 @@ ACTION_CODE_ALLOWLIST = (
 )
 
 # The subset of action codes a suggestion may carry: party management is a
-# dock affordance, not a suggested action.
+# dock affordance, not a suggested action, and ``explore.talk_open`` would
+# duplicate the dock's own 交談 row.
 SUGGESTIBLE_ACTION_IDS = frozenset(ACTION_CODE_ALLOWLIST) - {
+    "explore.talk_open",
     "explore.party_invite",
     "explore.party_leave",
     "explore.possess",

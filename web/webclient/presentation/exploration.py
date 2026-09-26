@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``exploration`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-3 ``exploration`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes a read-only exploration surface from canonical room,
 entity, component, and service data. It is registered beside ``status``,
@@ -13,9 +13,16 @@ room marker plus bounded present entity/object lists), ``interact`` (bounded
 present targets, each with exactly the affordances that target legally
 supports), and the ``character``/``quests``/``inventory`` availability entries.
 Affordances use a distinguished shape: an **action** affordance carries a real
-``action_id`` (``explore.talk_scripted`` / ``explore.talk_freeform`` /
-``explore.engage``) while a **navigation** affordance carries a ``surface``
-(``"guild"`` / ``"shop"``) and only opens an existing ``services`` submenu.
+``action_id`` (``explore.talk_open`` / ``explore.engage``) while a
+**navigation** affordance carries a ``surface`` (``"guild"`` / ``"shop"``) and
+only opens an existing ``services`` submenu.
+
+Version 3 folds each conversable host's talk into exactly one 交談 affordance
+naming ``explore.talk_open``, listed before the target's other affordances and
+derived from the shared ``world.rules.dialogue.opens_dialogue`` predicate the
+adapter uses; the target-level ``keywords`` list and the in-conversation
+``explore.talk_scripted`` / ``explore.talk_freeform`` target codes are gone
+(the open session's ``dialogue`` panel carries the keyword choices).
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -31,13 +38,10 @@ from web.webclient.presentation.affordances import (
     MAX_DISPLAY_NAME_CODE_POINTS,
     MAX_EXIT_REF_CHARS,
     MAX_INTERACT_TARGETS,
-    MAX_KEYWORD_ID_CHARS,
-    MAX_KEYWORD_LABEL_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_LOOK_OBJECTS,
     MAX_MOVE_EXITS,
     MAX_NODE_ID_CHARS,
-    MAX_SCRIPTED_KEYWORDS,
     _DIALOGUE_UNAVAILABLE_REASON,
     _bounded_display_name,
     _entity_kind,
@@ -46,7 +50,6 @@ from web.webclient.presentation.affordances import (
     _look_entries,
     _move_entries,
     _resolve_single_host,
-    _scripted_keyword_descriptors,
     _target_affordance_entries,
     _traversable,
 )
@@ -69,7 +72,7 @@ from web.webclient.presentation.protocol_validation import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation.options import _validate_affordance_params
-from world.rules.dialogue import is_dialogue_host
+from world.rules.dialogue import is_dialogue_host, opens_dialogue
 from world.rules.map_knowledge import (
     KnowledgeError,
     decode_node,
@@ -77,7 +80,7 @@ from world.rules.map_knowledge import (
 from world.rules.npc_identity import npc_display_name
 from world.rules.service_view import build_services_view
 
-EXPLORATION_SCHEMA_VERSION = 2
+EXPLORATION_SCHEMA_VERSION = 3
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
@@ -86,7 +89,15 @@ MAX_KIND_CODE_POINTS = 32
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 
 ACTION_KINDS = ("action", "navigate")
-ACTION_IDS = ACTION_CODE_ALLOWLIST
+# The target-scoped subset of the shared allowlist: ``explore.move``,
+# ``explore.look``, and ``explore.wait`` are never per-target affordances, and
+# the in-conversation codes are folded into one ``explore.talk_open`` 交談 row,
+# so a v3 target carrying either is a protocol error.
+ACTION_IDS = tuple(
+    code
+    for code in ACTION_CODE_ALLOWLIST
+    if code not in ("explore.talk_scripted", "explore.talk_freeform")
+)
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")
 
@@ -124,16 +135,6 @@ def _require_identity(payload: dict[str, Any], field: str) -> int:
     return _require_int(payload, field, minimum=1, maximum=MAX_IDENTITY)
 
 
-def _require_keyword_id(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ProtocolValidationError(f"{field} must be a non-empty string")
-    if sum(1 for _ in value) > MAX_KEYWORD_ID_CHARS:
-        raise ProtocolValidationError(
-            f"{field} must be at most {MAX_KEYWORD_ID_CHARS} characters"
-        )
-    return value
-
-
 def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
     if value is None:
         return None
@@ -145,15 +146,6 @@ def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
     if not message.strip():
         raise ProtocolValidationError("disabled_reason message must be non-empty")
     return {"code": code, "message": message}
-
-
-def _validate_keyword(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "scripted keyword", {"keyword_id", "label"}, {})
-    keyword_id = _require_keyword_id(value["keyword_id"], "keyword_id")
-    label = _require_str(value, "label", maximum=MAX_KEYWORD_LABEL_CODE_POINTS)
-    if not label.strip():
-        raise ProtocolValidationError("keyword label must be non-empty")
-    return {"keyword_id": keyword_id, "label": label}
 
 
 def _validate_affordance(value: Any) -> dict[str, Any]:
@@ -297,7 +289,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
         value,
         "interact target",
         {"identity", "display_name", "portrait_ref", "affordances"},
-        {"keywords": "conditional"},
+        {},
     )
     identity = _require_identity(value, "identity")
     display_name = _require_str(value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS)
@@ -311,31 +303,12 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
             f"affordances must be a list of at most {MAX_AFFORDANCES} entries"
         )
     affordances = [_validate_affordance(entry) for entry in affordances]
-    keywords = None
-    if "keywords" in value:
-        keyword_value = value["keywords"]
-        if not isinstance(keyword_value, list) or len(keyword_value) > MAX_SCRIPTED_KEYWORDS:
-            raise ProtocolValidationError(
-                f"keywords must be a list of at most {MAX_SCRIPTED_KEYWORDS} entries"
-            )
-        keywords = [_validate_keyword(entry) for entry in keyword_value]
-        if keywords and not any(
-            affordance["kind"] == "action"
-            and affordance["action_id"] == "explore.talk_scripted"
-            for affordance in affordances
-        ):
-            raise ProtocolValidationError(
-                "keywords require a talk_scripted affordance on the target"
-            )
-    result: dict[str, Any] = {
+    return {
         "identity": identity,
         "display_name": display_name,
         "portrait_ref": None,
         "affordances": affordances,
     }
-    if keywords is not None:
-        result["keywords"] = keywords
-    return result
 
 
 def _validate_availability(value: Any, name: str) -> dict[str, Any]:
@@ -542,11 +515,6 @@ def _look_objects(actor: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _scripted_keywords(npc: Any) -> list[dict[str, Any]]:
-    """Return the bounded scripted keyword descriptors for a dialogue host."""
-    return _scripted_keyword_descriptors(npc)
-
-
 def _reason_dict(entry: Any) -> dict[str, Any] | None:
     if entry.disabled_reason is None:
         return None
@@ -557,15 +525,21 @@ def _reason_dict(entry: Any) -> dict[str, Any] | None:
 def _interact_targets(actor: Any) -> list[dict[str, Any]]:
     """Serialize bounded present NPC/monster targets from the shared vocabulary.
 
-    The per-target affordance rules (dialogue-host gating, freeform, party
-    bound/full rules, companion rule, dead-monster engage, exact-local-host
-    navigation) live in the canonical vocabulary; this serializer maps the
-    shared candidates into the exact version-1 descriptor shapes, with the
-    scripted keyword buttons reading the authored keyword pool.
+    The per-target affordance rules (party bound/full rules, companion rule,
+    dead-monster engage, exact-local-host navigation) live in the canonical
+    vocabulary; this serializer maps the shared candidates into the exact
+    version-3 descriptor shapes. The single 交談 row is derived from the same
+    ``opens_dialogue`` predicate the ``explore.talk_open`` adapter commits
+    through, so the rendered affordance and the action agree.
     """
     from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
 
     location = getattr(actor, "location", None)
     if location is None:
@@ -578,40 +552,44 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
         if obj is not actor and isinstance(obj, (NPC, Monster))
     ]
     present.sort(key=lambda obj: (int(obj.pk),))
+    possessed = is_possessed_actor(actor)
     targets: list[dict[str, Any]] = []
     for obj in present[:MAX_INTERACT_TARGETS]:
         entries = _target_affordance_entries(
             obj, actor, guild_host=guild_host, shop_host=shop_host
         )
         affordances: list[dict[str, Any]] = []
-        target_keywords: list[dict[str, Any]] | None = None
-        scripted_present = any(
-            not entry.navigation and entry.action_id == "explore.talk_scripted"
-            for entry in entries
-        )
-        if is_dialogue_host(obj):
-            if scripted_present:
-                affordances.append(
-                    {
-                        "kind": "action",
-                        "action_id": "explore.talk_scripted",
-                        "label": "交談",
-                        "enabled": True,
-                        "disabled_reason": None,
-                    }
-                )
-                target_keywords = _scripted_keywords(obj) or None
-            else:
-                code, message = _DIALOGUE_UNAVAILABLE_REASON
-                affordances.append(
-                    {
-                        "kind": "action",
-                        "action_id": "explore.talk_scripted",
-                        "label": "交談",
-                        "enabled": False,
-                        "disabled_reason": {"code": code, "message": message},
-                    }
-                )
+        if opens_dialogue(obj):
+            # One 交談 per conversable host, listed before the vocabulary rows.
+            # A possessed actor sees the vocabulary's own possession refusal
+            # instead of an enabled row.
+            affordances.append(
+                {
+                    "kind": "action",
+                    "action_id": "explore.talk_open",
+                    "label": "交談",
+                    "enabled": not possessed,
+                    "disabled_reason": (
+                        None
+                        if not possessed
+                        else {
+                            "code": REASON_POSSESSED_TALK,
+                            "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK],
+                        }
+                    ),
+                }
+            )
+        elif is_dialogue_host(obj):
+            code, message = _DIALOGUE_UNAVAILABLE_REASON
+            affordances.append(
+                {
+                    "kind": "action",
+                    "action_id": "explore.talk_open",
+                    "label": "交談",
+                    "enabled": False,
+                    "disabled_reason": {"code": code, "message": message},
+                }
+            )
         for entry in entries:
             if entry.navigation:
                 affordances.append(
@@ -624,7 +602,6 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                     }
                 )
             elif entry.action_id in (
-                "explore.talk_freeform",
                 "explore.deliver",
                 "explore.party_invite",
                 "explore.party_leave",
@@ -644,15 +621,14 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                     # the row (schema version 2, quest-deliver-action).
                     row["params"] = dict(entry.params)
                 affordances.append(row)
-        target: dict[str, Any] = {
-            "identity": int(obj.pk),
-            "display_name": _bounded_entity_name(obj),
-            "portrait_ref": None,
-            "affordances": affordances[:MAX_AFFORDANCES],
-        }
-        if target_keywords is not None:
-            target["keywords"] = target_keywords
-        targets.append(target)
+        targets.append(
+            {
+                "identity": int(obj.pk),
+                "display_name": _bounded_entity_name(obj),
+                "portrait_ref": None,
+                "affordances": affordances[:MAX_AFFORDANCES],
+            }
+        )
     return targets
 
 
@@ -719,7 +695,6 @@ __all__ = [
     "MAX_LOOK_OBJECTS",
     "MAX_MOVE_EXITS",
     "MAX_NODE_ID_CHARS",
-    "MAX_SCRIPTED_KEYWORDS",
     "SURFACES",
     "exploration_presenter",
     "validate_exploration",

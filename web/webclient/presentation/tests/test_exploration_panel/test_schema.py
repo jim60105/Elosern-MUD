@@ -5,14 +5,11 @@ from web.webclient.presentation.exploration import (
     MAX_AFFORDANCES,
     MAX_EXIT_REF_CHARS,
     MAX_INTERACT_TARGETS,
-    MAX_KEYWORD_ID_CHARS,
-    MAX_KEYWORD_LABEL_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_LOOK_ENTITIES,
     MAX_LOOK_OBJECTS,
     MAX_MOVE_EXITS,
     MAX_NODE_ID_CHARS,
-    MAX_SCRIPTED_KEYWORDS,
     ExplorationPanelError,
     validate_exploration,
 )
@@ -22,7 +19,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 
-from ._support import _affordance, _entity, _keyword, _move_row, _object, _target, _valid_panel
+from ._support import _affordance, _entity, _move_row, _object, _target, _valid_panel
 
 
 
@@ -47,8 +44,11 @@ class ExplorationSchemaTests(unittest.TestCase):
     def test_rejects_wrong_kind_and_version(self):
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(kind="services"))
+        # The version-2 panel is a protocol error in v3, as is any other version.
         with self.assertRaises(ExplorationPanelError):
-            validate_exploration(_valid_panel(schema_version=3))
+            validate_exploration(_valid_panel(schema_version=2))
+        with self.assertRaises(ExplorationPanelError):
+            validate_exploration(_valid_panel(schema_version=4))
 
     def test_rejects_duplicate_interact_identities(self):
         payload = _valid_panel(
@@ -94,7 +94,7 @@ class ExplorationSchemaTests(unittest.TestCase):
                     affordances=[
                         {
                             "kind": "navigate",
-                            "action_id": "explore.talk_scripted",
+                            "action_id": "explore.talk_open",
                             "surface": "guild",
                             "label": "公會服務",
                             "enabled": True,
@@ -125,60 +125,46 @@ class ExplorationSchemaTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(payload)
 
-    def test_keywords_require_a_talk_scripted_affordance(self):
-        # Scripted keyword buttons live on the target descriptor; a target that
-        # carries keywords but no talk_scripted affordance is rejected.
-        payload = _valid_panel(
-            interact=[
-                _target(
-                    affordances=[
-                        {
-                            "kind": "action",
-                            "action_id": "explore.engage",
-                            "label": "戰鬥",
-                            "enabled": True,
-                            "disabled_reason": None,
-                        }
-                    ],
-                    keywords=[_keyword()],
-                )
-            ]
-        )
+    def test_a_keywords_field_is_rejected(self):
+        # The version-3 target descriptor is exact: the deleted keyword list
+        # (with or without a talk affordance) is a protocol error.
         with self.assertRaises(ProtocolValidationError):
-            validate_exploration(payload)
+            validate_exploration(
+                _valid_panel(
+                    interact=[
+                        _target(keywords=[{"keyword_id": "公會", "label": "公會"}])
+                    ]
+                )
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_exploration(_valid_panel(interact=[_target(keywords=[])]))
 
     def test_action_id_closed_set(self):
-        payload = _valid_panel(
-            interact=[
-                _target(
-                    affordances=[
-                        {
-                            "kind": "action",
-                            "action_id": "explore.take",
-                            "label": "拾取",
-                            "enabled": True,
-                            "disabled_reason": None,
-                        }
+        for action_id in (
+            "explore.take",
+            # The in-conversation codes left the target descriptor in v3: a
+            # host's talk is exactly one explore.talk_open 交談 row.
+            "explore.talk_scripted",
+            "explore.talk_freeform",
+        ):
+            with self.subTest(action_id=action_id):
+                payload = _valid_panel(
+                    interact=[
+                        _target(
+                            affordances=[
+                                {
+                                    "kind": "action",
+                                    "action_id": action_id,
+                                    "label": "拾取",
+                                    "enabled": True,
+                                    "disabled_reason": None,
+                                }
+                            ]
+                        )
                     ]
                 )
-            ]
-        )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(payload)
-
-    def test_keyword_count_bound(self):
-        payload = _valid_panel(
-            interact=[
-                _target(
-                    keywords=[
-                        _keyword(keyword_id=f"k{i}", label=f"話題{i}")
-                        for i in range(MAX_SCRIPTED_KEYWORDS + 1)
-                    ]
-                )
-            ]
-        )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(payload)
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(payload)
 
     def test_affordance_count_bound(self):
         payload = _valid_panel(
@@ -259,8 +245,7 @@ class ExplorationSchemaTests(unittest.TestCase):
     def test_worst_case_legal_payload_fits_the_envelope(self):
         # The structural maxima the schema allows -- 12 exits, 32 entities,
         # 32 objects, 32 targets with 8 affordances each -- with realistic
-        # bounded content. Only the scripted affordance carries keyword rows,
-        # exactly as a real dialogue host would.
+        # bounded content.
         move = [
             _move_row(
                 exit_ref=f"e{i}",
@@ -294,10 +279,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                     identity=i + 1,
                     display_name="守衛",
                     affordances=affordances,
-                    keywords=[
-                        _keyword(keyword_id=f"k{j}", label="話題")
-                        for j in range(MAX_SCRIPTED_KEYWORDS)
-                    ],
                 )
             )
         payload = _valid_panel(
@@ -315,34 +296,19 @@ class ExplorationSchemaTests(unittest.TestCase):
 
     def test_byte_budget_fails_closed_on_the_theoretical_worst_case(self):
         # Per-field ceilings are bounds, not a guarantee any combination fits.
-        # A payload with 8 scripted-with-16-keyword affordances on every one of
-        # 32 targets serializes far beyond the envelope, so the validator MUST
-        # reject it -- conformance is enforced on serialized size (D10).
+        # A payload with 8 max-label affordances on every one of 32 targets
+        # serializes far beyond the envelope, so the validator MUST reject it --
+        # conformance is enforced on serialized size (D10).
+        wide = "😀" * MAX_LABEL_CODE_POINTS
         interact = []
         for i in range(MAX_INTERACT_TARGETS):
-            affordances = []
-            for _ in range(MAX_AFFORDANCES):
-                affordances.append(
-                    {
-                        "kind": "action",
-                        "action_id": "explore.talk_scripted",
-                        "label": "交談" * 60,
-                        "enabled": True,
-                        "disabled_reason": None,
-                        "keywords": [
-                            {
-                                "keyword_id": f"keyword-{j}-{i}",
-                                "label": "很長的話題標籤" * 40,
-                            }
-                            for j in range(MAX_SCRIPTED_KEYWORDS)
-                        ],
-                    }
-                )
             interact.append(
                 _target(
                     identity=i + 1,
-                    display_name="非常長的名稱" * 40,
-                    affordances=affordances,
+                    display_name=wide,
+                    affordances=[
+                        _affordance(label=wide) for _ in range(MAX_AFFORDANCES)
+                    ],
                 )
             )
         payload = _valid_panel(interact=interact)
@@ -359,39 +325,7 @@ class ExplorationSchemaTests(unittest.TestCase):
             validate_exploration(
                 _valid_panel(
                     interact=[
-                        _target(keywords=[_keyword(keyword_id="  ", label="話題")])
-                    ]
-                )
-            )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(
-                _valid_panel(
-                    interact=[
                         _target(
-                            keywords=[
-                                _keyword(
-                                    keyword_id="x" * (MAX_KEYWORD_ID_CHARS + 1),
-                                    label="話題",
-                                )
-                            ]
-                        )
-                    ]
-                )
-            )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(
-                _valid_panel(
-                    interact=[
-                        _target(keywords=[_keyword(keyword_id="k", label="  ")])
-                    ]
-                )
-            )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(
-                _valid_panel(
-                    interact=[
-                        _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "action",
@@ -407,14 +341,13 @@ class ExplorationSchemaTests(unittest.TestCase):
             )
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(
-                _valid_panel(interact=[_target(keywords=None, affordances=[42])])
+                _valid_panel(interact=[_target(affordances=[42])])
             )
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(
                 _valid_panel(
                     interact=[
                         _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "cast",
@@ -433,7 +366,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                 _valid_panel(
                     interact=[
                         _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "action",
@@ -452,7 +384,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                 _valid_panel(
                     interact=[
                         _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "action",
@@ -471,7 +402,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                 _valid_panel(
                     interact=[
                         _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "action",
@@ -493,7 +423,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                 _valid_panel(
                     interact=[
                         _target(
-                            keywords=None,
                             affordances=[
                                 {
                                     "kind": "navigate",
@@ -570,7 +499,6 @@ class ExplorationSchemaTests(unittest.TestCase):
 
     def test_over_envelope_fails_closed(self):
         wide = "😀" * MAX_LABEL_CODE_POINTS
-        wide_keyword = "😀" * MAX_KEYWORD_LABEL_CODE_POINTS
         interact = []
         for i in range(MAX_INTERACT_TARGETS):
             interact.append(
@@ -580,10 +508,6 @@ class ExplorationSchemaTests(unittest.TestCase):
                     affordances=[
                         _affordance(label=wide)
                         for _ in range(MAX_AFFORDANCES)
-                    ],
-                    keywords=[
-                        _keyword(keyword_id=f"k{i}_{j}", label=wide_keyword)
-                        for j in range(MAX_SCRIPTED_KEYWORDS)
                     ],
                 )
             )

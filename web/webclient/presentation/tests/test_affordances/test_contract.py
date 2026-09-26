@@ -15,12 +15,13 @@ import unittest
 
 
 class AffordanceContractTests(unittest.TestCase):
-    def test_action_code_allowlist_is_exactly_the_eleven_actions(self):
+    def test_action_code_allowlist_is_exactly_the_twelve_actions(self):
         self.assertEqual(
             ACTION_CODE_ALLOWLIST,
             (
                 "explore.move",
                 "explore.look",
+                "explore.talk_open",
                 "explore.talk_scripted",
                 "explore.talk_freeform",
                 "explore.party_invite",
@@ -34,10 +35,11 @@ class AffordanceContractTests(unittest.TestCase):
         )
         self.assertNotIn("explore.interact", ACTION_CODE_ALLOWLIST)
 
-    def test_suggestible_set_excludes_party_actions(self):
+    def test_suggestible_set_excludes_party_actions_and_talk_open(self):
         self.assertEqual(
             SUGGESTIBLE_ACTION_IDS,
             set(ACTION_CODE_ALLOWLIST) - {
+                "explore.talk_open",
                 "explore.party_invite",
                 "explore.party_leave",
                 "explore.possess",

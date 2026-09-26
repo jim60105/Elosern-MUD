@@ -217,6 +217,35 @@ class DialogueTriggerTests(unittest.TestCase):
             handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
             schedule.assert_not_called()
 
+    def test_successful_talk_open_schedules_nothing(self):
+        # Opening a conversation is not a talk completion: it triggers no
+        # action-options generation (the first choice or speech still does).
+        from unittest.mock import patch
+
+        from server import option_proposal_service as service
+
+        session = self._session_with_coordinator()
+        registry = self._talk_registry(
+            "explore.talk_open",
+            lambda actor, payload, session=None: {
+                "outcome": "success",
+                "code": "dialogue_opened",
+                "message": "店員說：你好。",
+                "affected_panels": ("status",),
+            },
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(
+            epoch=coordinator.epoch,
+            base_revision=coordinator.revision,
+            action_id="explore.talk_open",
+            payload={"npc_id": 1},
+        )
+        with patch.object(service, "schedule_action_options") as schedule:
+            handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+            schedule.assert_not_called()
+
     def test_scheduling_failure_never_breaks_publication(self):
         from unittest.mock import patch
 

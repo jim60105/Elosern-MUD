@@ -13,16 +13,10 @@ def _context(actor):
     return PresentationContext(actor=actor, protocol_version=1)
 
 
-def _keyword(**overrides):
-    value = {"keyword_id": "公會", "label": "公會"}
-    value.update(overrides)
-    return value
-
-
 def _affordance(**overrides):
     value = {
         "kind": "action",
-        "action_id": "explore.talk_scripted",
+        "action_id": "explore.talk_open",
         "label": "交談",
         "enabled": True,
         "disabled_reason": None,
@@ -66,7 +60,6 @@ def _target(**overrides):
         "display_name": "南門守衛",
         "portrait_ref": None,
         "affordances": [_affordance()],
-        "keywords": [_keyword()],
     }
     value.update(overrides)
     return value

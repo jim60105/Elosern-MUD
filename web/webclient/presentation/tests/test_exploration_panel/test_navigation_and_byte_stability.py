@@ -13,7 +13,7 @@ from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
-from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
 from ._support import T_DIALOGUE_KEY, _context
 
@@ -167,12 +167,12 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return build_production_registry().render("exploration", _context(self.player))
 
-    def test_rule_table_fixture_payload_is_byte_identical_to_v2(self):
+    def test_rule_table_fixture_payload_is_byte_identical_to_v3(self):
         payload = self._render()
         self.assertEqual(
             payload,
             {
-                "schema_version": 2,
+                "schema_version": 3,
                 "available": True,
                 "kind": "exploration",
                 "move": [
@@ -238,17 +238,11 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "affordances": [
                             {
                                 "kind": "action",
-                                "action_id": "explore.talk_scripted",
+                                "action_id": "explore.talk_open",
                                 "label": "交談",
                                 "enabled": True,
                                 "disabled_reason": None,
                             }
-                        ],
-                        "keywords": [
-                            *(
-                                {"keyword_id": response.keyword, "label": response.keyword}
-                                for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses
-                            )
                         ],
                     },
                     {
@@ -258,8 +252,8 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "affordances": [
                             {
                                 "kind": "action",
-                                "action_id": "explore.talk_freeform",
-                                "label": "自由交談",
+                                "action_id": "explore.talk_open",
+                                "label": "交談",
                                 "enabled": True,
                                 "disabled_reason": None,
                             },
@@ -311,7 +305,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("explore.look", action_ids)
         self.assertEqual(
             action_ids,
-            {"explore.talk_scripted", "explore.talk_freeform", "explore.party_invite", "explore.engage"},
+            {"explore.talk_open", "explore.party_invite", "explore.engage"},
         )
         # The same room's vocabulary does carry the baseline room-look entry,
         # so the exclusion is a v1 serialization property, not an empty room.

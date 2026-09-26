@@ -84,8 +84,8 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    thirteen exploration adapters (``explore.move``, ``explore.look``,
-    ``explore.talk_scripted``, ``explore.talk_freeform``,
+    fourteen exploration adapters (``explore.move``, ``explore.look``,
+    ``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
     ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
     ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
@@ -139,6 +139,7 @@ def build_production_action_registry() -> ActionRegistry:
         _possess_adapter,
         _possess_release_adapter,
         _talk_freeform_adapter,
+        _talk_open_adapter,
         _talk_scripted_adapter,
         _wait_adapter,
         _practice_adapter,
@@ -152,6 +153,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_possess_payload,
         validate_possess_release_payload,
         validate_talk_freeform_payload,
+        validate_talk_open_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
         validate_practice_payload,
@@ -389,6 +391,17 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_look_adapter,
             # Look changes no panel; the ordinary full-snapshot refresh keeps
             # the dock honest with the room's current contents (design D4).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.talk_open",
+            validate_payload=validate_talk_open_payload,
+            adapter=_talk_open_adapter,
+            # Full snapshot so mode ``dialogue`` and the ``dialogue`` panel
+            # arrive atomically with the session write (avg-stage-redesign
+            # §8.1).
             affected_panels=(),
         )
     )
