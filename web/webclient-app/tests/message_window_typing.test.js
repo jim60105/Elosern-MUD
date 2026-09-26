@@ -458,7 +458,7 @@ describe("MessageWindow typewriter", () => {
 
   it("does not type or auto-advance the dialogue variant", async () => {
     const vm = dialogueViewModel({
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "dialogue",
       host: { identity: 41, display_name: "公會職員", portrait_ref: null },

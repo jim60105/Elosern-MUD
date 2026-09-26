@@ -226,7 +226,7 @@ export const PendingAction = {
 // dialogue and exit rows, unpaged. The view model is built from the panel
 // form exactly as AppClient does.
 const DIALOGUE_PANEL = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   kind: "dialogue",
   host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
