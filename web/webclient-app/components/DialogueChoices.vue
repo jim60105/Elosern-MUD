@@ -30,6 +30,8 @@ const props = defineProps({
   // The committed `localMapModel`, for exit destination names.
   localMap: { type: Object, default: null },
   // A mutation is in flight or awaiting its revision: no activation runs.
+  // A component-level safety net: AppClient never renders the list while a
+  // dispatch is in flight, so the live wiring does not reach it.
   locked: { type: Boolean, default: false },
   // Called before every emitted activation.
   beforeActivate: { type: Function, default: null },
@@ -169,7 +171,9 @@ function onKeydown(event) {
     }
     return;
   }
-  if (key === "Enter" || key === " ") {
+  // Shift+Enter / Shift+Space are not the list's activation keys: they pass
+  // through like every other modified key.
+  if ((key === "Enter" || key === " ") && !event.shiftKey) {
     consume(event);
     if (!event.repeat) {
       activate(activeIndex.value);

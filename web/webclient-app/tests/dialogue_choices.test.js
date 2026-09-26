@@ -150,6 +150,14 @@ describe("DialogueChoices", () => {
     expect(documentKeys).toEqual([]);
   });
 
+  it("lets Shift+Enter and Shift+Space through without activating", async () => {
+    const w = mountList();
+    await key(w, "Enter", { shiftKey: true });
+    await key(w, " ", { shiftKey: true });
+    expect(w.emitted("pick")).toBeUndefined();
+    expect(documentKeys).toEqual(["Enter", " "]);
+  });
+
   it("ignores a held Enter's repeat, which is still consumed", async () => {
     const w = mountList();
     await key(w, "Enter", { repeat: true });

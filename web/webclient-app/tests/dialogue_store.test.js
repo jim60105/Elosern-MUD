@@ -322,6 +322,25 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.freeformBound).toBe(false);
   });
 
+  it("a kept borrow is released when a commit ends the conversation, so a later send is ordinary text", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null);
+    store.borrowDialogueCommand();
+    // Refused while in flight: the borrow stays bound.
+    store.sendText("等等。");
+    expect(store.view.freeformBound).toBe(true);
+    // The server ends the conversation (the field never lost focus).
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: 5 })], {});
+    store.receive(1, "ui_update", [fx.update({ ...dialogueSnapshot(), revision: 5, mode: "exploration" })], {});
+    expect(store.view.mode).toBe("exploration");
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.freeformBound).toBe(false);
+    expect(store.sendText("look")).toBe(true);
+    expect(sender.sent.actions.filter((a) => a.action_id === "explore.talk_freeform")).toHaveLength(0);
+    expect(sender.sent.texts).toContain("look");
+  });
+
   it("a borrowed send refused while a mutation is in flight keeps the borrow", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});

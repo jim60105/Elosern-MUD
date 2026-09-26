@@ -96,7 +96,7 @@ It emits `reading-change` immediately on mount and on every flip, and mirrors th
   - The pick rows keep `data-keyword-id`.
 - **Keys (`onKey`):**
   - ArrowUp / ArrowDown wrap. Home / End jump to the ends.
-  - Enter / Space activate unless `event.repeat`.
+  - Enter / Space activate unless `event.repeat`; Shift+Enter / Shift+Space pass through like every other modified key.
   - Digits `1`–`N` act only in the `choices` view and only when pick N exists.
   - Escape acts only in the `exits` view: it returns to `choices` with the `↦ 移動…` row active.
   - Each handled key calls `preventDefault()` and `stopPropagation()`. Component listeners run before the document bridge (the same bubble-order argument as C6b D4), so the router never sees them.
@@ -158,6 +158,7 @@ Geometry check (measured):
 - `CommandLine.vue` replaces its use of `connected` / `mutationsLocked` / `inFlight` in `submit()` with one `accepting` prop. It keeps any other use of those props (disabled styling) unchanged.
 - `AppShell` passes `:accepting="commandAccepts"`.
 - `sendText` keeps `ctx.freeformTarget` when `dispatchAction` returns `null`, and clears it only after a dispatched request. The existing blur release (C5) still drops it when focus leaves the field.
+- Because a refused send now keeps the borrow, `publishView` also releases it on any commit whose mode is set and is not `dialogue`, whatever holds focus: otherwise a refusal while a mutation is in flight, followed by that mutation's commit ending the conversation (a server-side end, not the leave row, which moves focus), would leave the field bound and send the next ordinary command as speech. A transport reset's pre-snapshot `null` mode keeps it for the resync. (Post-implementation review.)
 
 The field and the dispatch path now share one predicate, so the field clears exactly when the request is sent. This closes the C5 Risks entry. `CommandLine` used `connected` / `mutationsLocked` / `inFlight` only in `submit()`, so those three props are replaced by `accepting` outright. In practice every non-active phase the reducer reaches (`awaiting_initial_snapshot`, `detached`) also locks mutations; the phase clause keeps the predicate identical to `dispatchAction`'s regardless.
 
@@ -189,6 +190,7 @@ The field and the dispatch path now share one predicate, so the field clears exa
   - `tests/dialogue_store.test.js`:
     - `commandAccepts` with and without a borrow, across phases
     - `sendText` keeps the target on a refused dispatch
+    - a kept borrow is released by a commit that ends the conversation
   - `tests/store/digit_row_picks.test.js`: the caption retarget cases are deleted, and a dialogue-mode digit is unclaimed.
   - `tests/dialogue_dock.test.js`: digits are unclaimed in dialogue.
 - **Browser:**
