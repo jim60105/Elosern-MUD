@@ -367,7 +367,9 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 
 ### Requirement: The keyboard-first exploration dock roots at the scene overview and opens dialogue directly
 
-In exploration and dialogue mode the exploration dock SHALL own the action-dock surface, and its root
+In exploration mode the exploration dock SHALL own the action-dock surface, and in dialogue mode it SHALL
+stay mounted, hidden with the collapsed command region (`webclient-contextual-hud`), with its router
+holding the same root; its root
 frame SHALL be one scene overview composed only from the validated `exploration` panel and the
 committed `context_actions` `suggestions` envelope. The overview SHALL present, in this reading order:
 
@@ -419,7 +421,9 @@ the dock SHALL return to the overview: any open popover or child frame SHALL be 
 commit that publishes the new room, and no frame from the previous room SHALL remain activatable.
 When a commit changes the mode from `exploration` to `dialogue` — a conversation opened from 交談, a
 suggestion card, or a typed command — the dock SHALL likewise return to the overview in that commit,
-so no popover or child frame stays open over the conversation.
+so no popover or child frame stays open over the conversation, and the command region that holds the
+dock is then collapsed for the rest of the conversation. While the dock is collapsed its router SHALL
+claim no key and SHALL submit nothing; leaving dialogue SHALL present that overview again.
 
 The overview SHALL be navigated as rows of chips: ArrowLeft and ArrowRight SHALL move to the previous
 and next chip in reading order, wrapping across the whole overview; ArrowUp and ArrowDown SHALL move
@@ -460,7 +464,7 @@ root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are
 
 #### Scenario: 交談 enters the conversation in one step
 - **WHEN** the player activates 交談 in a dialogue host's popover
-- **THEN** exactly one `explore.talk_open` with the host's identity is submitted and no frame is pushed, and the commit that makes the mode `dialogue` shows the dialogue surface with the host's opening line and choices while the dock has returned to the overview
+- **THEN** exactly one `explore.talk_open` with the host's identity is submitted and no frame is pushed, and the commit that makes the mode `dialogue` shows the dialogue surface with the host's opening line and choices while the dock has returned to the overview and is hidden with the collapsed command region
 
 #### Scenario: A generative host offers no separate free-form row
 - **WHEN** the player opens the popover of an `LLMNPC` host

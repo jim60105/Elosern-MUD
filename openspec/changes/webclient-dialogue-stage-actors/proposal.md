@@ -15,7 +15,7 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
 - `web/webclient-app/AppClient.vue`:
   - `#actor-left` renders `StageActor` for the player: the roster's current portrait, unchanged, replacing the bare `ReferenceArtwork`.
   - `#actor-right` renders `StageActor` for the dialogue host while the mode is `dialogue` and the dialogue view model is available. Its entry is `artPanel.portrait_catalog[vm.host.portraitRef]` when the key is non-null, else `null`. The client never builds a key.
-  - Speaking state: in dialogue mode the player is dimmed while `store.view.dialogueSpeaker === "host"`, and the host is dimmed while it is `"player"`. Outside dialogue nothing is dimmed.
+  - Speaking state: in dialogue mode, while the host actor stands, the player is dimmed while `store.view.dialogueSpeaker === "host"`, and the host is dimmed while it is `"player"`. Outside dialogue, and while the dialogue panel is transiently unavailable, nothing is dimmed.
 - `web/webclient-app/stores/elosern/view.js` publishes `dialogueSpeaker`. It is `"player"` while `ctx.inFlight.actionId` is `explore.talk_scripted` or `explore.talk_freeform`, and `"host"` otherwise. The in-flight record lasts until the declared revision is accepted or the action is rejected. The freeform adapter settles only after the LLM reply, so the player stays lit until the reply commits.
 - **Collapse in dialogue mode:**
   - `components/HudFrame.vue`: in dialogue mode `.stage-band` becomes one column and `[data-anchor="band-command"]` is `display:none`. `#action-dock` stays mounted, not remounted, and its router keeps the overview (C9b D1 already resets to it).

@@ -34,8 +34,11 @@ viewport's height — at least 702px of 1080; the 48px top band and the 300px bo
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
-SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset 6% of the stage
-width from its own side, and SHALL never cover the band. The `actor-left` anchor SHALL carry the
+SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
+stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
+(the anchor's horizontal centre) under the island column on its side — the place card and vitals on
+the left, the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%. The `actor-left` anchor SHALL carry the
 player's stage actor — the current roster character's portrait, resolved exactly as the stage
 portrait was before this requirement, with the truthful placeholder when no image exists — in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
@@ -101,6 +104,10 @@ introduced into the band this way.
 #### Scenario: The dialogue host stands opposite the player
 - **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
 - **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
+
+#### Scenario: The host's face clears the minimap at the smaller viewports
+- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
+- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
@@ -576,13 +583,15 @@ is `null` or names no catalog entry, the host's stage actor SHALL render the tru
 host display name's initial and the display name, never a stock or guessed image. The client SHALL
 NOT construct a catalog key from the host identity or any other field.
 
-While the committed mode is `dialogue` the stage actors SHALL carry a speaking state. The speaker SHALL
+While the committed mode is `dialogue` and the host's stage actor renders, the stage actors SHALL carry
+a speaking state. The speaker SHALL
 render at full brightness and the other side SHALL render dimmed to 60% brightness, from one shared
 dim token. The host SHALL be the speaker, except while a `explore.talk_scripted` or
 `explore.talk_freeform` action the player submitted is in flight — from its dispatch until its result
 is handled and its declared presentation revision is accepted, or until it is rejected — during which
-the player SHALL be the speaker. The speaking state SHALL be derived from the dispatch state and the
-committed mode only, never from narrative prose. Outside dialogue mode no stage actor SHALL be dimmed.
+the player SHALL be the speaker. The speaking state SHALL be derived from the dispatch state, the
+committed mode, and the panel's availability only, never from narrative prose. Outside dialogue mode,
+and in dialogue mode while the `dialogue` panel is unavailable, no stage actor SHALL be dimmed.
 The dim SHALL NOT be the only indication of who is speaking: the name plate names the host, and the
 speaking state SHALL be exposed on each stage actor as a data attribute for tests. The stage actors are
 decorative art and SHALL carry no focusable element; this requirement covers static states only, and
