@@ -1,15 +1,18 @@
-"""Version-1 read-only ``dialogue`` presentation panel (webclient-align-10).
+"""Version-2 read-only ``dialogue`` presentation panel (webclient-align-10).
 
 The presenter serializes the viewer's live dialogue session (change 07's
 character-held state, owned by ``world.rules.dialogue``) into the exact
 ``{schema_version, available, kind, host, bond_stage, line, choices}`` shape.
 The host triple reuses the party-row vocabulary (``identity``,
 ``display_name``, ``portrait_ref``) so the dialogue surface and the party
-islands name the same NPC with the same fields; ``bond_stage`` is the
-canonical affinity stage NAME (``null`` when the viewer has no relationship
-record with the host) and the raw affinity number never reaches the wire.
-``choices`` is the same ``{keyword_id, label}`` keyword-pool vocabulary the
-exploration interact descriptor exposes, owned by
+islands name the same NPC with the same fields; ``portrait_ref`` is the opaque
+``art`` portrait-catalog key of the host whenever the host is in the art view
+the ``art`` panel is built from for the same viewer, and ``null`` otherwise —
+the client never constructs a catalog key from the host identity. ``bond_stage``
+is the canonical affinity stage NAME (``null`` when the viewer has no
+relationship record with the host) and the raw affinity number never reaches
+the wire. ``choices`` is the same ``{keyword_id, label}`` keyword-pool
+vocabulary the exploration interact descriptor exposes, owned by
 ``affordances._scripted_keyword_descriptors`` (authored-table order; the panel
 truncates to its own ``DIALOGUE_MAX_CHOICES``, independent of the affordance
 pool's ``MAX_SCRIPTED_KEYWORDS`` bound — webclient-align-11).
@@ -49,9 +52,16 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
 from world.rules.dialogue import MAX_DIALOGUE_SESSION_LINE_CODE_POINTS
 
-DIALOGUE_SCHEMA_VERSION = 1
+DIALOGUE_SCHEMA_VERSION = 2
+
+# Wire bound for the host's opaque catalog key: the same rule and bound a
+# combat participant's ``portrait_ref`` carries (``combat_panel.py``
+# ``MAX_PARTICIPANT_REF``). Panel-owned literal rather than an import, so the
+# panel modules stay independent; a test pins the two values equal.
+MAX_DIALOGUE_PORTRAIT_REF = 32
 
 # Row-count cap: panel-owned literal (webclient-align-11). Deliberately
 # decoupled from ``MAX_SCRIPTED_KEYWORDS`` (16, the interact-target keyword
@@ -99,12 +109,21 @@ def _validate_host(value: Any) -> dict[str, Any]:
         "host display_name",
         MAX_DISPLAY_NAME_CODE_POINTS,
     )
-    if value["portrait_ref"] is not None:
-        raise DialoguePanelError("portrait_ref must be null in this schema version")
+    # Same wire vocabulary as a combat participant's portrait reference: an
+    # opaque decimal catalog key or null. The validator is a gate, never a
+    # normalizer — the presenter emits the mapper's canonical form itself.
+    portrait_ref = value["portrait_ref"]
+    if portrait_ref is not None:
+        if not isinstance(portrait_ref, str) or not portrait_ref.isdecimal():
+            raise DialoguePanelError(
+                "portrait_ref must be an opaque decimal catalog key or null"
+            )
+        if len(portrait_ref) > MAX_DIALOGUE_PORTRAIT_REF:
+            raise DialoguePanelError("portrait_ref exceeds its bound")
     return {
         "identity": identity,
         "display_name": display_name,
-        "portrait_ref": None,
+        "portrait_ref": portrait_ref,
     }
 
 
@@ -248,17 +267,32 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
         if npc.relations.has_record(actor)
         else None
     )
+    # Membership comes from the same builder the ``art`` panel uses, so the key
+    # matches a key of the committed catalog by construction — the dialogue-host
+    # and named-portrait filter, the actor exclusion, the catalog cap, and the
+    # combat roster branch all stay in one place. The host is absent (or the
+    # view is unbuildable) exactly when the committed catalog cannot carry it.
+    host_identity = int(npc.pk)
+    portrait_ref = None
+    try:
+        view = build_art_view(actor)
+    except ArtViewError:  # observability: ignore R2: an unbuildable art view is a designed degrade path; the panel stays available with a null portrait reference
+        view = None
+    if view is not None and any(
+        entity.identity == host_identity for entity in view.entities
+    ):
+        portrait_ref = portrait_catalog_key(host_identity)
     return validate_dialogue(
         {
             "schema_version": DIALOGUE_SCHEMA_VERSION,
             "available": True,
             "kind": "dialogue",
             "host": {
-                "identity": int(npc.pk),
+                "identity": host_identity,
                 "display_name": npc_display_name(npc)[
                     :MAX_DISPLAY_NAME_CODE_POINTS
                 ],
-                "portrait_ref": None,
+                "portrait_ref": portrait_ref,
             },
             "bond_stage": bond_stage,
             "line": session.line,
@@ -272,6 +306,7 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "DIALOGUE_MAX_CHOICES",
     "DIALOGUE_SCHEMA_VERSION",
+    "MAX_DIALOGUE_PORTRAIT_REF",
     "DialoguePanelError",
     "dialogue_presenter",
     "validate_dialogue",
