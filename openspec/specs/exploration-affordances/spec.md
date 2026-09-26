@@ -17,9 +17,9 @@ panel presenter and the `context_actions` exploration presenter. Every emitted e
 - an **action entry** SHALL carry exactly `action_id`, `label`, `params`, `freeform`, `navigation`
   (false), `enabled`, and nullable `disabled_reason`; `action_id` SHALL be one member of
   `ACTION_CODE_ALLOWLIST`, which SHALL contain exactly `explore.move`, `explore.look`,
-  `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`, `explore.party_leave`,
-  `explore.engage`, `explore.wait`, `explore.possess`, `explore.possess_release`, and
-  `explore.deliver` — there SHALL
+  `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`,
+  `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.possess`,
+  `explore.possess_release`, and `explore.deliver` — there SHALL
   be no `explore.interact` entry (the exploration panel's interact group is a label over
   per-target affordances, not an action); there
   SHALL be no NPC or companion `explore.engage` (engagement is monsters-only);
@@ -51,15 +51,23 @@ exclusion applies only to suggestion eligibility (suggestion-eligibility require
 A dialogue host whose authored dialogue table cannot be resolved SHALL have no talk entries in
 the vocabulary — no validator-normalized params exist for a keywordless host; the version-1
 panel's disabled `dialogue_unavailable` affordance is a panel serialization degradation, not a
-vocabulary entry. Every entry with a disabled state SHALL carry a stable disabled code and safe
+vocabulary entry. The vocabulary SHALL never emit an `explore.talk_open` entry: the allowlist
+carries that code because the `exploration` panel serializes each conversable host's talk entries
+(its per-keyword `explore.talk_scripted` entries and its `explore.talk_freeform` entry) as one 交談
+`explore.talk_open` affordance, derived from the same host, presence, and possession gates, while
+the `context_actions` form, suggestion eligibility, and the deterministic fallback keep consuming
+the per-keyword and free-form entries unchanged. `explore.talk_open` SHALL NOT be in
+`SUGGESTIBLE_ACTION_IDS`. Every entry with a disabled state SHALL carry a stable disabled code and safe
 Traditional Chinese message. Nothing in this module SHALL mutate traits, knowledge, dialogue,
 quests, inventory, combat sessions, party, or world time.
 
 #### Scenario: The exploration panel and the context form share one vocabulary
 - **WHEN** the same room is presented to the same puppeted actor through both the `exploration`
   panel and the `context_actions` exploration form
-- **THEN** both surfaces enumerate the same eligible targets and actions with identical ids,
-  labels, gates, and disabled states, and both serializations are unchanged before and after a
+- **THEN** both surfaces enumerate the same eligible targets and the same non-talk actions with
+  identical ids, labels, gates, and disabled states; every target that has talk entries in the
+  context form carries exactly one 交談 `explore.talk_open` affordance in the panel with the same
+  enabled state and possession reason; and both serializations are unchanged before and after a
   canonical-state comparison
 
 #### Scenario: A dead monster stays visible as a disabled entry
@@ -103,6 +111,11 @@ quests, inventory, combat sessions, party, or world time.
 - **WHEN** the actor has no active `DELIVER` stage bound to any co-located entity
 - **THEN** the vocabulary contains no `explore.deliver` entry
 
+#### Scenario: The conversation-opening code is allowlisted but never emitted
+- **WHEN** the vocabulary is emitted for a room holding a scripted host and an `LLMNPC`
+- **THEN** it contains the hosts' `explore.talk_scripted` and `explore.talk_freeform` entries and no
+  `explore.talk_open` entry, `explore.talk_open` is a member of `ACTION_CODE_ALLOWLIST`, and it is
+  absent from `SUGGESTIBLE_ACTION_IDS`
 ### Requirement: Affordance params are validator-normalized
 Every action entry's `params` SHALL be the normalized output of that action's registered
 validator in `web/webclient/actions/exploration_actions.py` applied to a candid payload the
