@@ -900,5 +900,39 @@ class MotionLevelEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class SceneTransitionsEvidenceTest(unittest.TestCase):
+    """webclient-scene-transitions: the inert rule, the minimap pan offset,
+    and the stage transitions driven through the real Vue <Transition> are
+    DOM-state contracts jsdom can execute, so the Vitest files are their
+    evidence (the browser file covers computed durations)."""
+
+    @covers_requirement(
+        "webclient-contextual-hud::location-appearance-and-vitals-changes-transition-at-the-motion-level",
+        "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
+    )
+    def test_scene_transitions_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/transition_hooks.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/map_pan.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/scene_transitions.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "scene-transitions Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
