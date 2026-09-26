@@ -12,7 +12,7 @@ const PANEL = explorationPanelFixture({
       identity: 11,
       name: "試驗守衛",
       affordances: [
-        { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+        { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
         {
           kind: "action",
           action_id: "explore.engage",
@@ -48,7 +48,7 @@ describe("DockVerbPopover", () => {
     expect(w.get('[data-testid="verb-popover"]').attributes("aria-label")).toBe("試驗守衛 的行動");
     const rows = w.findAll('[data-testid="dock-item"]');
     expect(rows.map((row) => row.attributes("data-item-key"))).toEqual([
-      "talk-scripted",
+      "talk-open",
       "engage",
       "look-target",
       "back",

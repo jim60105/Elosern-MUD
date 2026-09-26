@@ -290,40 +290,21 @@
     var items = [];
     affordances.forEach(function (affordance) {
       if (affordance.kind === "action") {
-        if (affordance.action_id === "explore.talk_scripted") {
-          if (affordance.enabled) {
-            items.push({
-              key: "talk-scripted",
-              label: affordance.label || "交談",
-              enabled: true,
-              actionId: null,
-              payload: null,
-              openKeywords: true,
-            });
-          } else {
-            items.push({
-              key: "talk-scripted",
-              label: affordance.label || "交談",
-              enabled: false,
-              actionId: null,
-              payload: null,
-              description:
-                (affordance.disabled_reason && affordance.disabled_reason.message) || null,
-              disabledReason: affordance.disabled_reason || null,
-            });
-          }
-        } else if (affordance.action_id === "explore.talk_freeform") {
+        if (affordance.action_id === "explore.talk_open") {
+          // The one 交談 row per conversable host: it opens the conversation
+          // (the dialogue variant carries the keyword choices and the free
+          // row), so the row dispatches explore.talk_open directly.
           items.push({
-            key: "talk-freeform",
-            label: affordance.label || "自由交談",
+            key: "talk-open",
+            label: affordance.label || "交談",
             enabled: !!affordance.enabled,
-            actionId: null,
-            payload: null,
-            freeform: true,
-            npcId: target.identity,
-            npcLabel: target.display_name,
-            description: null,
+            actionId: affordance.enabled ? "explore.talk_open" : null,
+            payload: affordance.enabled ? { npc_id: target.identity } : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
+            commandDisplay: { npcLabel: target.display_name },
           });
         } else if (affordance.action_id === "explore.party_invite") {
           items.push({

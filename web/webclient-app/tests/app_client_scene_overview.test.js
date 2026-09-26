@@ -114,7 +114,7 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     const popover = wrapper.get('[data-testid="verb-popover"]');
     // The target's affordances in payload order, then 查看, then back.
     expect(popover.findAll("[data-item-key]").map((row) => row.attributes("data-item-key"))).toEqual([
-      "talk-scripted",
+      "talk-open",
       "look-target",
       "back",
     ]);

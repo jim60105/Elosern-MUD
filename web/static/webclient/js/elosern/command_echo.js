@@ -144,6 +144,14 @@
       }
       return join(["talk", npc, keyword]);
     },
+    // Opening a conversation presents the same greeting the typed `talk <npc>`
+    // command does (the command deliberately does not open a session), so the
+    // echo is the keyword-less talk line; without a server-authored NPC label
+    // the catalog stays silent rather than guessing a name from an id.
+    "explore.talk_open": function (payload, display) {
+      var npc = label(display && display.npcLabel);
+      return npc === null ? null : join(["talk", npc]);
+    },
     "explore.talk_freeform": function (payload, display) {
       var npc = label(display && display.npcLabel);
       var speech = payloadText(payload && payload.speech);

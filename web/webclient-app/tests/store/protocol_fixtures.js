@@ -99,7 +99,7 @@ export function explorationActions(overrides = undefined) {
 export function explorationPanel(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "exploration",
       move: [
@@ -129,7 +129,7 @@ export function explorationPanel(overrides = undefined) {
           display_name: "店長",
           portrait_ref: null,
           affordances: [
-            { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+            { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
           ],
         },
       ],

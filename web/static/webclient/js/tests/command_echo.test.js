@@ -50,6 +50,17 @@ test("explore.talk_scripted resolves to talk <NPC> <keyword>", () => {
   );
 });
 
+test("explore.talk_open resolves to the keyword-less talk <NPC>", () => {
+  assert.strictEqual(
+    Echo.commandLine("explore.talk_open", { npc_id: 7 }, { npcLabel: "旅店老闆" }),
+    "talk 旅店老闆"
+  );
+  // Without the server-authored NPC label the catalog stays silent rather
+  // than guessing a name from the opaque identity.
+  assert.strictEqual(Echo.commandLine("explore.talk_open", { npc_id: 7 }, {}), null);
+  assert.strictEqual(Echo.commandLine("explore.talk_open", { npc_id: 7 }, null), null);
+});
+
 test("explore.talk_freeform resolves to talk <NPC> <speech>", () => {
   assert.strictEqual(
     Echo.commandLine(
@@ -651,6 +662,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.possess_release": { payload: { npc_id: "bard" }, display: {} },
   "explore.practice": { payload: { skill: "firebolt", seconds: 3600 }, display: {} },
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
   "explore.wait": { payload: { daypart: "dusk" }, display: {} },
   "guild.exam_start": { payload: { target_rank: "正式會員" }, display: {} },

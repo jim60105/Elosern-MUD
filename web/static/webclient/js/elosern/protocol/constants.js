@@ -107,6 +107,7 @@ var CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS = 43200;
 var CONTEXT_ACTIONS_ACTION_CODES = [
   "explore.move",
   "explore.look",
+  "explore.talk_open",
   "explore.talk_scripted",
   "explore.talk_freeform",
   "explore.party_invite",
@@ -406,7 +407,7 @@ var PANEL_ALLOWLIST = {
   objectives: 1,
   services: 4,
   creation: 5,
-  exploration: 2,
+  exploration: 3,
   character: 7,
   lineage: 1,
   dialogue: 1,

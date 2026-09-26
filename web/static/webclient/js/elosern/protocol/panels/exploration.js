@@ -17,7 +17,7 @@ var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 
 // ---------------------------------------------------------------------------
-// exploration panel v1 validators (mirror of
+// exploration panel v3 validators (mirror of
 // web.webclient.presentation.exploration, design D10). Shared bounds are
 // guarded by a dual-direction parity test.
 // ---------------------------------------------------------------------------
@@ -27,20 +27,19 @@ var EXPLORATION_MAX_LOOK_ENTITIES = 32;
 var EXPLORATION_MAX_LOOK_OBJECTS = 32;
 var EXPLORATION_MAX_INTERACT_TARGETS = 32;
 var EXPLORATION_MAX_AFFORDANCES = 8;
-var EXPLORATION_MAX_SCRIPTED_KEYWORDS = 16;
 var EXPLORATION_MAX_EXIT_REF = 64;
 var EXPLORATION_MAX_NODE_ID = 128;
 var EXPLORATION_MAX_DISPLAY_NAME = 128;
 var EXPLORATION_MAX_KIND = 32;
 var EXPLORATION_MAX_LABEL = 128;
-var EXPLORATION_MAX_KEYWORD_ID = 64;
-var EXPLORATION_MAX_KEYWORD_LABEL = 128;
 var EXPLORATION_MAX_ITEM_KEY = 64;
 var EXPLORATION_MAX_REASON_MESSAGE = 128;
 var EXPLORATION_ACTION_KINDS = ["action", "navigate"];
+// The target-scoped subset of the server's twelve-code allowlist: the panel
+// folds a host's talk into one explore.talk_open 交談 row, so the retired
+// in-conversation codes are protocol errors here.
 var EXPLORATION_ACTION_IDS = [
-  "explore.talk_scripted",
-  "explore.talk_freeform",
+  "explore.talk_open",
   "explore.party_invite",
   "explore.party_leave",
   "explore.engage",
@@ -70,19 +69,6 @@ function validateExplorationDisabledReason(value) {
   );
   if (!reasonMessage.trim()) {
     throw new Error("disabled_reason message must be non-empty");
-  }
-  return value;
-}
-
-function validateExplorationKeyword(value) {
-  requireExactFields(value, "scripted keyword", ["keyword_id", "label"], []);
-  var keywordId = requireString(value.keyword_id, "keyword_id", EXPLORATION_MAX_KEYWORD_ID);
-  if (!keywordId.trim()) {
-    throw new Error("keyword_id must be non-empty");
-  }
-  var keywordLabel = requireString(value.label, "keyword label", EXPLORATION_MAX_KEYWORD_LABEL);
-  if (!keywordLabel.trim()) {
-    throw new Error("keyword label must be non-empty");
   }
   return value;
 }
@@ -249,7 +235,7 @@ function validateExplorationInteractTarget(value) {
     value,
     "interact target",
     ["identity", "display_name", "portrait_ref", "affordances"],
-    ["keywords"]
+    []
   );
   requireIdentity(value.identity, "target.identity");
   var targetName = requireString(value.display_name, "display_name", EXPLORATION_MAX_DISPLAY_NAME);
@@ -266,26 +252,6 @@ function validateExplorationInteractTarget(value) {
     throw new Error("affordances must be a list of at most " + EXPLORATION_MAX_AFFORDANCES + " entries");
   }
   value.affordances.forEach(validateExplorationAffordance);
-  if (Object.prototype.hasOwnProperty.call(value, "keywords")) {
-    if (
-      !Array.isArray(value.keywords) ||
-      value.keywords.length > EXPLORATION_MAX_SCRIPTED_KEYWORDS
-    ) {
-      throw new Error(
-        "keywords must be a list of at most " + EXPLORATION_MAX_SCRIPTED_KEYWORDS + " entries"
-      );
-    }
-    value.keywords.forEach(validateExplorationKeyword);
-    var hasScripted = value.affordances.some(function (affordance) {
-      return (
-        affordance.kind === "action" &&
-        affordance.action_id === "explore.talk_scripted"
-      );
-    });
-    if (value.keywords.length > 0 && !hasScripted) {
-      throw new Error("keywords require a talk_scripted affordance on the target");
-    }
-  }
   return value;
 }
 
@@ -320,7 +286,7 @@ function validateExplorationMoveRow(value) {
   return value;
 }
 
-// Exact available exploration panel v1 schema (design D10).
+// Exact available exploration panel v3 schema (design D10).
 function validateExplorationPanel(payload) {
   requireExactFields(
     payload,
@@ -339,7 +305,7 @@ function validateExplorationPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 2) {
+  if (payload.schema_version !== 3) {
     throw new Error("unsupported exploration schema_version");
   }
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -370,7 +336,7 @@ function validateExplorationPanel(payload) {
   validateExplorationAvailability(payload.inventory, "inventory");
 
   var result = {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "exploration",
     move: payload.move,
@@ -396,14 +362,11 @@ module.exports = {
   EXPLORATION_MAX_LOOK_OBJECTS: EXPLORATION_MAX_LOOK_OBJECTS,
   EXPLORATION_MAX_INTERACT_TARGETS: EXPLORATION_MAX_INTERACT_TARGETS,
   EXPLORATION_MAX_AFFORDANCES: EXPLORATION_MAX_AFFORDANCES,
-  EXPLORATION_MAX_SCRIPTED_KEYWORDS: EXPLORATION_MAX_SCRIPTED_KEYWORDS,
   EXPLORATION_MAX_EXIT_REF: EXPLORATION_MAX_EXIT_REF,
   EXPLORATION_MAX_NODE_ID: EXPLORATION_MAX_NODE_ID,
   EXPLORATION_MAX_DISPLAY_NAME: EXPLORATION_MAX_DISPLAY_NAME,
   EXPLORATION_MAX_KIND: EXPLORATION_MAX_KIND,
   EXPLORATION_MAX_LABEL: EXPLORATION_MAX_LABEL,
-  EXPLORATION_MAX_KEYWORD_ID: EXPLORATION_MAX_KEYWORD_ID,
-  EXPLORATION_MAX_KEYWORD_LABEL: EXPLORATION_MAX_KEYWORD_LABEL,
   EXPLORATION_MAX_REASON_MESSAGE: EXPLORATION_MAX_REASON_MESSAGE,
   EXPLORATION_ACTION_KINDS: EXPLORATION_ACTION_KINDS,
   EXPLORATION_ACTION_IDS: EXPLORATION_ACTION_IDS,

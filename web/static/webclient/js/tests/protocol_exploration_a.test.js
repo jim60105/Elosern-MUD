@@ -1,5 +1,5 @@
 /*
- * exploration panel v1 (design D10): discriminator, bounds, affordance shapes, closed action codes.
+ * exploration panel v3 (design D10): discriminator, bounds, affordance shapes, closed action codes.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -12,7 +12,7 @@ const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
 const { unavailableStatusPanel, update } = require("./protocol_support.js");
-const { validContextActionsExplorationPanel, validExplorationAffordance, validExplorationKeyword, validExplorationLookEntity, validExplorationLookObject, validExplorationMoveRow, validExplorationPanel, validExplorationTarget } = require("./protocol_fixtures.js");
+const { validContextActionsExplorationPanel, validExplorationAffordance, validExplorationLookEntity, validExplorationLookObject, validExplorationMoveRow, validExplorationPanel, validExplorationTarget } = require("./protocol_fixtures.js");
 
 
 
@@ -21,9 +21,9 @@ test("validates the exploration panel available/unavailable discriminator", () =
     Protocol.validatePanel(
       "exploration",
       Protocol.PANEL_ALLOWLIST.exploration,
-      unavailableStatusPanel({ schema_version: 2 })
+      unavailableStatusPanel({ schema_version: 3 })
     ),
-    unavailableStatusPanel({ schema_version: 2 })
+    unavailableStatusPanel({ schema_version: 3 })
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));
@@ -31,8 +31,9 @@ test("validates the exploration panel available/unavailable discriminator", () =
   assert.throws(() =>
     Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 1 }))
   );
+  // The retired version-2 panel is a protocol error in v3.
   assert.throws(() =>
-    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 3 }))
+    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 2 }))
   );
 });
 
@@ -111,19 +112,6 @@ test("enforces exploration D10 bounds", () => {
       })
     )
   );
-  assert.throws(() =>
-    Protocol.validateExplorationPanel(
-      validExplorationPanel({
-        interact: [
-          validExplorationTarget({
-            keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS + 1).fill(
-              validExplorationKeyword()
-            ),
-          }),
-        ],
-      })
-    )
-  );
 });
 
 test("affordance shapes are exact in the exploration panel", () => {
@@ -136,7 +124,7 @@ test("affordance shapes are exact in the exploration panel", () => {
             affordances: [
               {
                 kind: "navigate",
-                action_id: "explore.talk_scripted",
+                action_id: "explore.talk_open",
                 surface: "guild",
                 label: "公會服務",
                 enabled: true,
@@ -167,20 +155,32 @@ test("affordance shapes are exact in the exploration panel", () => {
       })
     )
   );
-  // Keywords require a talk_scripted affordance on the target.
+  // The deleted target-level keywords list is a protocol error in v3.
   assert.throws(() =>
     Protocol.validateExplorationPanel(
       validExplorationPanel({
         interact: [
           validExplorationTarget({
-            affordances: [
-              validExplorationAffordance({ action_id: "explore.engage" }),
-            ],
+            keywords: [{ keyword_id: "公會", label: "公會" }],
           }),
         ],
       })
     )
   );
+  // The retired in-conversation codes are outside the closed action set.
+  for (const actionId of ["explore.talk_scripted", "explore.talk_freeform"]) {
+    assert.throws(() =>
+      Protocol.validateExplorationPanel(
+        validExplorationPanel({
+          interact: [
+            validExplorationTarget({
+              affordances: [validExplorationAffordance({ action_id: actionId })],
+            }),
+          ],
+        })
+      )
+    );
+  }
   // explore.take is outside the closed action set.
   assert.throws(() =>
     Protocol.validateExplorationPanel(
@@ -229,7 +229,6 @@ test("party invite and leave affordances are closed exploration actions", () => 
       validExplorationPanel({
         interact: [
           validExplorationTarget({
-            keywords: [],
             affordances: [
               validExplorationAffordance({
                 action_id: "explore.party_invite",
@@ -246,7 +245,6 @@ test("party invite and leave affordances are closed exploration actions", () => 
       validExplorationPanel({
         interact: [
           validExplorationTarget({
-            keywords: [],
             affordances: [
               validExplorationAffordance({
                 action_id: "explore.party_leave",
@@ -265,6 +263,7 @@ test("possession affordances are closed exploration and context actions with exa
   const EXPECTED_ACTION_CODES = [
     "explore.move",
     "explore.look",
+    "explore.talk_open",
     "explore.talk_scripted",
     "explore.talk_freeform",
     "explore.party_invite",
@@ -279,10 +278,11 @@ test("possession affordances are closed exploration and context actions with exa
 
   // EXPLORATION_ACTION_IDS is intentionally the target-scoped subset (affordances requiring an
   // NPC target identity). explore.move, explore.look, and explore.wait are omitted because they
-  // are never emitted as per-target affordances. Update if target-scoped vocabulary changes.
+  // are never emitted as per-target affordances, and explore.talk_scripted / explore.talk_freeform
+  // are absent because v3 folds a host's talk into one explore.talk_open 交談 row. Update if
+  // target-scoped vocabulary changes.
   const EXPECTED_EXPLORATION_ACTION_IDS = [
-    "explore.talk_scripted",
-    "explore.talk_freeform",
+    "explore.talk_open",
     "explore.party_invite",
     "explore.party_leave",
     "explore.engage",
@@ -369,7 +369,6 @@ test("possession affordances are closed exploration and context actions with exa
         validExplorationPanel({
           interact: [
             validExplorationTarget({
-              keywords: [],
               affordances: [
                 validExplorationAffordance({
                   action_id: actionId,

@@ -47,6 +47,15 @@ test("validates the available context_actions exploration form", () => {
       },
       affordance,
       {
+        action_id: "explore.talk_open",
+        label: "交談",
+        params: { npc_id: 5 },
+        freeform: false,
+        navigation: false,
+        enabled: true,
+        disabled_reason: null,
+      },
+      {
         surface: "guild",
         label: "公會服務",
         navigation: true,
@@ -58,10 +67,26 @@ test("validates the available context_actions exploration form", () => {
   const normalized = Protocol.validateContextActionsPanel(panel);
   assert.equal(normalized.schema_version, 5);
   assert.equal(normalized.kind, "exploration");
-  assert.equal(normalized.affordances.length, 3);
+  assert.equal(normalized.affordances.length, 4);
   assert.deepEqual(normalized.affordances[0].params, { room: true });
   assert.equal(normalized.affordances[1].freeform, false);
-  assert.equal(normalized.affordances[2].navigation, true);
+  // The conversation-opening code accepts exactly {npc_id} and nothing else.
+  assert.deepEqual(
+    Protocol.validateContextActionsAffordanceParams("explore.talk_open", { npc_id: 5 }),
+    { npc_id: 5 }
+  );
+  for (const bad of [
+    {},
+    { npc_id: 0 },
+    { npc_id: "5" },
+    { npc_id: 5, keyword_id: "公會" },
+    { npc_id: 5, speech: "你好" },
+  ]) {
+    assert.throws(() =>
+      Protocol.validateContextActionsAffordanceParams("explore.talk_open", bad)
+    );
+  }
+  assert.equal(normalized.affordances[3].navigation, true);
   assert.deepEqual(normalized.suggestions, { status: "unavailable" });
   // Cross-form contamination rejects on both sides.
   assert.throws(() =>

@@ -45,7 +45,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
                   display_name: "店長",
                   portrait_ref: null,
                   affordances: [
-                    { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+                    { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
                     { kind: "navigate", surface: "shop", label: "商店", enabled: true, disabled_reason: null },
                   ],
                 },

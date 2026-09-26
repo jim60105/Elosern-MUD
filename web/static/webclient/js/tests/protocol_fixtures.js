@@ -282,15 +282,11 @@ function validServicesPanel(overrides) {
   );
 }
 
-function validExplorationKeyword(overrides) {
-  return Object.assign({ keyword_id: "公會", label: "公會" }, overrides || {});
-}
-
 function validExplorationAffordance(overrides) {
   return Object.assign(
     {
       kind: "action",
-      action_id: "explore.talk_scripted",
+      action_id: "explore.talk_open",
       label: "交談",
       enabled: true,
       disabled_reason: null,
@@ -330,7 +326,6 @@ function validExplorationTarget(overrides) {
       display_name: "南門守衛",
       portrait_ref: null,
       affordances: [validExplorationAffordance()],
-      keywords: [validExplorationKeyword()],
     },
     overrides || {}
   );
@@ -339,7 +334,7 @@ function validExplorationTarget(overrides) {
 function validExplorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "exploration",
       move: [validExplorationMoveRow()],
@@ -485,7 +480,6 @@ module.exports = {
   validServicesStockRow,
   validServicesSellableRow,
   validServicesPanel,
-  validExplorationKeyword,
   validExplorationAffordance,
   validExplorationMoveRow,
   validExplorationLookEntity,

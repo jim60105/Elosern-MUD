@@ -1,17 +1,18 @@
 // webclient-declarative-frame-stack (task 4.1): the store-level declarative
 // frame contract. Open exploration frames are descriptors, never copies — a
-// committed snapshot RE-RESOLVES them at the next access (the open
-// scripted-keyword pane shows the target's new keywords with key-tracked
-// focus), a vanished target identity closes the verb popover and lands focus
-// on the nearest surviving chip, whole-stack loss cascades to the root, the
+// committed snapshot RE-RESOLVES them at the next access (the open verb
+// popover shows the target's new affordances with key-tracked focus), a
+// vanished target identity closes the verb popover and lands focus on the
+// nearest surviving chip, whole-stack loss cascades to the root, the
 // suggestions frame survives generating→ready and exits to the root on
 // `unavailable` with no reason row, pointer activation writes the focus key
 // before dispatch, and a mode switch yields the one-frame stack.
 //
 // webclient-retire-exploration-submenus: the move/look/interact frames are
-// gone, so the pushed frame these contracts ride is the scripted-keyword pane,
-// reached through the real path (person chip → verb popover → 交談). The file
-// also pins the new room-change reset (design D2).
+// gone, so the pushed frame these contracts ride is the verb popover, reached
+// through the real path (person chip → verb popover). The file also pins the
+// new room-change reset (design D2). The retired scripted-keyword frame keeps
+// one directly-pushed cascade case until C9b deletes it with its producer.
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -55,39 +56,14 @@ function openExploration(store, explorationOverrides) {
   expect(result.accepted).toBe(true);
 }
 
-// One interact target carrying a scripted-keyword affordance and the given
-// keyword rows: the panel shape the 交談 frame resolves from.
-function keywordTarget(identity, keywords) {
-  return {
-    identity,
-    display_name: "店長",
-    portrait_ref: null,
-    affordances: [
-      {
-        kind: "action",
-        action_id: "explore.talk_scripted",
-        label: "交談",
-        enabled: true,
-        disabled_reason: null,
-      },
-    ],
-    keywords,
-  };
+// One interact target carrying the given v3 affordances: the panel shape the
+// verb popover re-resolves from on every commit.
+function target(identity, affordances) {
+  return { identity, display_name: "店長", portrait_ref: null, affordances };
 }
 
-function keyword(keyword_id, label) {
-  return { keyword_id, label };
-}
-
-// The scripted-keyword frame, reached through the REAL path (person chip ->
-// verb popover -> 交談): the exploration family's remaining pushed frame with
-// a `back` row, so it carries the declarative re-resolution contracts below.
-function openKeywordsFrame(store) {
-  expect(store.focusItemByKey("target-7")).toBe(true);
-  expect(store.focusConfirm("keyboard")).toBe(true);
-  expect(store.focusItemByKey("talk-scripted")).toBe(true);
-  expect(store.focusConfirm("keyboard")).toBe(true);
-  expect(store.router.depth()).toBe(3);
+function affordance(action_id, label) {
+  return { kind: "action", action_id, label, enabled: true, disabled_reason: null };
 }
 
 // A person chip's verb popover: one deliberate activation from the overview.
@@ -117,29 +93,34 @@ describe("declarative frame stack (store contract)", () => {
   });
 
   describe("commit-driven re-resolution", () => {
-    it("a snapshot commit updates the open keyword frame with key-tracked focus", () => {
+    it("a snapshot commit updates the open verb popover with key-tracked focus", () => {
       openExploration(store, {
-        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+        interact: [
+          target(7, [
+            affordance("explore.talk_open", "交談"),
+            affordance("explore.party_invite", "邀請"),
+          ]),
+        ],
       });
-      // Open the 交談 frame and focus its second keyword row.
-      openKeywordsFrame(store);
-      expect(store.view.focus.key).toBe("kw-a");
+      // Open the 交談 popover and focus its second affordance row.
+      openVerbPopover(store);
+      expect(store.view.focus.key).toBe("talk-open");
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("kw-b");
+      expect(store.view.focus.key).toBe("party-invite");
 
-      // The target's keywords change under the open frame: a wholly different
-      // list where the focused key survives at a DIFFERENT index (乙 is now
-      // second). No re-push exists — the next read resolves it.
+      // The target's affordances change under the open frame: a longer list
+      // where the focused key survives at a DIFFERENT index. No re-push
+      // exists — the next read resolves it.
       const result = store.receive(
         1,
         "ui_update",
         [
           explorationCommit(3, {
             interact: [
-              keywordTarget(7, [
-                keyword("c", "丙"),
-                keyword("b", "乙"),
-                keyword("d", "丁"),
+              target(7, [
+                affordance("explore.engage", "戰鬥"),
+                affordance("explore.talk_open", "交談"),
+                affordance("explore.party_invite", "邀請"),
               ]),
             ],
           }),
@@ -148,38 +129,45 @@ describe("declarative frame stack (store contract)", () => {
       );
       expect(result.accepted).toBe(true);
 
-      // The pane lists the new keyword rows and the focus KEY survived.
-      const labels = store.router.currentMenu().items.map((item) => item.label);
-      expect(labels).toEqual(["丙", "乙", "丁", "返回上一層"]);
-      expect(store.view.focus.key).toBe("kw-b");
+      // The popover lists the new affordance rows and the focus KEY survived.
+      const keys = store.router.currentMenu().items.map((item) => item.key);
+      expect(keys).toEqual(["engage", "talk-open", "party-invite", "look-target", "back"]);
+      expect(store.view.focus.key).toBe("party-invite");
 
       // Re-activation submits the NEW row's payload (the committed
-      // npc_id/keyword_id), never a copy captured when the frame opened.
+      // npc_id), never a copy captured when the frame opened.
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
-      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, keyword_id: "b" });
+      expect(sender.sent.actions[0].action_id).toBe("explore.party_invite");
+      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, message: "" });
     });
 
     it("a lost focus key lands on the nearest surviving row", () => {
       openExploration(store, {
-        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+        interact: [
+          target(7, [
+            affordance("explore.talk_open", "交談"),
+            affordance("explore.party_invite", "邀請"),
+          ]),
+        ],
       });
-      openKeywordsFrame(store);
+      openVerbPopover(store);
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("kw-b");
+      expect(store.view.focus.key).toBe("party-invite");
       // The focused row disappears: the re-derived frame is
-      // [kw-c, back]; the router-private cached row index was 1, and
-      // the nearest surviving index (earlier on a tie) takes focus.
+      // [talk-open, look-target, back]; the router-private cached row index
+      // was 1, and the nearest surviving index takes focus.
       store.receive(
         1,
         "ui_update",
         [
-          explorationCommit(3, { interact: [keywordTarget(7, [keyword("c", "丙")])] }),
+          explorationCommit(3, {
+            interact: [target(7, [affordance("explore.talk_open", "交談")])],
+          }),
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("back");
+      expect(store.view.focus.key).toBe("look-target");
     });
   });
 
@@ -206,11 +194,11 @@ describe("declarative frame stack (store contract)", () => {
 
     it("consecutive unresolvable frames cascade in one access down to the parent", () => {
       openExploration(store);
-      // Person chip -> verb popover -> 交談 (the keywords frame carries
-      // {identity}).
+      // Person chip -> verb popover, plus the keywords frame pushed directly
+      // on top (its producer is retired, but its resolver and the cascade
+      // contract survive until C9b deletes them).
       openVerbPopover(store);
-      expect(store.focusItemByKey("talk-scripted")).toBe(true);
-      expect(store.focusConfirm("keyboard")).toBe(true);
+      store.router.pushFrame({ source: "exploration.keywords", params: { identity: 7 } });
       expect(store.router.depth()).toBe(3);
       expect(store.router.currentDescriptor()).toEqual({
         source: "exploration.keywords",
@@ -306,14 +294,19 @@ describe("declarative frame stack (store contract)", () => {
   describe("activation", () => {
     it("a pointer pick writes the frame focus key before dispatching", () => {
       openExploration(store, {
-        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+        interact: [
+          target(7, [
+            affordance("explore.talk_open", "交談"),
+            affordance("explore.party_invite", "邀請"),
+          ]),
+        ],
       });
-      openKeywordsFrame(store);
+      openVerbPopover(store);
       // Pointer selection of the second row, then a pointer confirm.
-      expect(store.focusItemByKey("kw-b")).toBe(true);
+      expect(store.focusItemByKey("party-invite")).toBe(true);
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, keyword_id: "b" });
+      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, message: "" });
 
       // The written-back key survives the next re-resolution: a commit keeps
       // focus on the ACTIVATED row, not on the row the frame first opened.
@@ -322,12 +315,18 @@ describe("declarative frame stack (store contract)", () => {
         "ui_update",
         [
           explorationCommit(3, {
-            interact: [keywordTarget(7, [keyword("c", "丙"), keyword("b", "乙")])],
+            interact: [
+              target(7, [
+                affordance("explore.engage", "戰鬥"),
+                affordance("explore.talk_open", "交談"),
+                affordance("explore.party_invite", "邀請"),
+              ]),
+            ],
           }),
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("kw-b");
+      expect(store.view.focus.key).toBe("party-invite");
     });
   });
 
@@ -455,7 +454,7 @@ describe("declarative frame stack (store contract)", () => {
   // whenever the committed room changes, whatever opened the frame — the
   // dock's own chips, the minimap, or a typed command.
   describe("room-change reset", () => {
-    it("a popover, a wait frame, and a keywords frame each reset to the overview", () => {
+    it("a popover and a wait frame each reset to the overview", () => {
       // The verb popover.
       openExploration(store);
       openVerbPopover(store);
@@ -472,11 +471,9 @@ describe("declarative frame stack (store contract)", () => {
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
 
-      // The scripted-keyword frame, two levels down.
+      // The verb popover again, one deliberate activation from the overview.
       openVerbPopover(store);
-      expect(store.focusItemByKey("talk-scripted")).toBe(true);
-      expect(store.focusConfirm("keyboard")).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("exploration.keywords");
+      expect(store.router.currentDescriptor().source).toBe("exploration.target");
       store.receive(1, "ui_update", [roomChange(5, 101)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
@@ -560,7 +557,7 @@ describe("declarative frame stack (store contract)", () => {
             revision: 3,
             panels: {
               exploration: {
-                schema_version: 2,
+                schema_version: 3,
                 available: false,
                 reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
               },

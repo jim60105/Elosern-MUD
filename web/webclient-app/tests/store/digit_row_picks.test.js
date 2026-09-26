@@ -67,7 +67,7 @@ const NINE_CHIP_OVERRIDES = {
       affordances: [
         {
           kind: "action",
-          action_id: "explore.talk_scripted",
+          action_id: "explore.talk_open",
           label: "交談",
           enabled: true,
           disabled_reason: null,
