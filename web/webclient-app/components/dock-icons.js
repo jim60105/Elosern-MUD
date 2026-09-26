@@ -38,7 +38,7 @@ export const GLYPHS = {
   npc: "M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-7 22v-1c0-3.9 3.1-7 7-7s7 3.1 7 7v1H5z",
   monster: "M12 2l4 4 4-1 1 4 4 4-4 3 1 4-4 1-3 4-3-4-4-1 1-4-4-3-4-4 1-4 4-1 3-4 3 4z",
   object: "M12 2l10 6v8l-10 6-10-6V8l10-6z",
-  // Canonical direction words (H3 design D9: the exit outlet reads these
+  // Canonical direction words (H3 design D9: the exit chips read these
   // directly; the renderer never re-parses the label).
   north: "M12 2l5 8H7l5-8z",
   south: "M12 22l-5-8h10l-5 8z",

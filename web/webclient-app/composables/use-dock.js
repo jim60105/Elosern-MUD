@@ -94,10 +94,9 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
           if (item.description) {
             normalized.description = item.description;
           }
-          // H3 (task 5.4/5.5): the pane vocabulary fields the dock's outlet /
-          // nav variants read directly (the renderer never re-parses the label).
-          normalized.direction = item.direction ?? null;
-          normalized.destination = item.destination ?? null;
+          // H3 (task 5.5): the pane vocabulary fields the dock's nav /
+          // affordance variants read directly (the renderer never re-parses
+          // the label).
           normalized.kind = item.kind ?? null;
           normalized.openSubmenu = item.openSubmenu ?? null;
           return normalized;
@@ -148,8 +147,6 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
         // normalized items (the scale step is detected by the `choose-scale`
         // action, the AREA targets by `selected` / `toggle-target`).
         normalized.scaleChoice = item.scaleChoice === true;
-        normalized.direction = item.direction ?? null;
-        normalized.destination = item.destination ?? null;
         normalized.kind = item.kind ?? null;
         return normalized;
       });

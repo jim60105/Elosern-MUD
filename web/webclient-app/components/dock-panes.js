@@ -7,11 +7,9 @@
 
 // Classify a committed router frame into a pane kind (task 5.1). The items
 // arrive normalized (the AppClient `dockItems` shape: `key`, `label`,
-// `enabled`, `action_id`, `params`, `direction`, `destination`, `kind`,
-// `scaleChoice`, `selected`). No DOM, no store access — a pure function of
-// the committed frame.
-//   - `outlet`:  move rows (exit list) — the draft's `.outlet` grid.
-//   - `nav`:     look/interact target lists and keyword lists (`.ngrid`).
+// `enabled`, `action_id`, `params`, `kind`, `scaleChoice`, `selected`). No
+// DOM, no store access — a pure function of the committed frame.
+//   - `nav`:     the scripted-keyword list (`.ngrid`).
 //   - `affordance`: a target-affordance frame (`.aff` buttons).
 //   - `cards`:   the suggestions frame (`.sugs` cards).
 //   - `skills`:  the combat skill frame (`.sk` rows beside the detail pane).
@@ -19,6 +17,10 @@
 //   - `scales`:  the 威力 scale step (`.scales`).
 //   - `confirm`: a confirm/cancel confirmation frame (`.cast` / warning panel).
 //   - `plain`:   anything else (root tab bar, empty frames).
+//
+// The retired move frame's `outlet` kind is gone with the frame
+// (webclient-retire-exploration-submenus): exits are the scene overview's
+// chips, which that component renders itself.
 export function classifyPane(frame) {
   const menu = (frame && frame.menu) || frame || {};
   const items = menu.items || [];
@@ -73,17 +75,6 @@ export function classifyPane(frame) {
   if (items.some((i) => i.action_id === "open-skill" || i.action_id === "open-group" || i.action_id === "open-category")) {
     return "skills";
   }
-  // The move outlet: content rows keyed `exit-*` or carrying a `direction`.
-  // (Block-body callback to dodge the V8 parser quirk on a grouped `&&`
-  // containing a method call inside an `if (...every(...))`.)
-  if (
-    rows.length > 0 &&
-    rows.every((i) => {
-      return (i.key && i.key.startsWith("exit-")) || i.direction != null;
-    })
-  ) {
-    return "outlet";
-  }
   // Target-affordance frames: rows with the engage / party / freeform actions.
   if (items.some((i) =>
     i.action_id === "explore.engage" ||
@@ -109,20 +100,13 @@ export function classifyPane(frame) {
 }
 
 // Tab-bar badges (task 4.4): derived from the committed payload only —
-// `互動` = `exploration.interact.length`, `建議` = `suggestions.cards.length`,
-// `技能` = the flattened skill-descriptor count. No badge for an
-// unknowable or zero count.
+// `技能` = the flattened skill-descriptor count. The combat root is the only
+// frame that renders as a tab bar (webclient-scene-overview-swap), so its
+// `skills` tab is the only badged surface. No badge for an unknowable or
+// zero count.
 export function badgeCount(surface, view) {
   const panels = (view && view.panels) || {};
   switch (surface) {
-    case "interact": {
-      const panel = panels.exploration || {};
-      return Array.isArray(panel.interact) ? panel.interact.length : 0;
-    }
-    case "suggestions": {
-      const sugg = view && view.suggestions;
-      return sugg && Array.isArray(sugg.cards) ? sugg.cards.length : 0;
-    }
     case "skills": {
       const panel = panels.context_actions || {};
       if (panel.kind !== "combat") {

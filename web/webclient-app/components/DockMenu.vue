@@ -3,21 +3,23 @@
 // row container carries the listbox role, the single tab stop,
 // `aria-activedescendant`, and `data-testid="dock-menu"` at depth ≥ 2 (the
 // tab bar carries the hook at depth 1, task 1.1). The pane renders its rows
-// by pane kind (task 5.1): `outlet` / `nav` / `affordance` / `cards` /
-// `skills` / `targets` / `scales` / `confirm` / `plain`.
+// by pane kind (task 5.1): `nav` / `affordance` / `cards` / `skills` /
+// `targets` / `scales` / `confirm` / `plain`. The exploration root is not a
+// DockMenu frame at all — it is the scene overview component
+// (webclient-scene-overview-swap), whose exit chips replaced the retired
+// move frame's exit outlet.
 //
 // Every row keeps the preserved `#<idPrefix>-<i>` row id and the
 // `data-item-key` identity (defined in exactly one place, task 5.2). The
 // detail pane keeps `exploration-detail` / `combat-detail` as the pane's
 // testid (task 5.8).
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, watch } from "vue";
 import { classifyPane } from "./dock-panes.js";
 import { glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 import OptionCard from "./OptionCard.vue";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
 import { faceObjectPosition } from "./face-rect.js";
-import { destinationLabel as destinationLabelFor, directionGlyph } from "./dock-exits.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -33,8 +35,8 @@ const props = defineProps({
   // The router's menu depth: the pane container carries `dock-menu` at
   // depth ≥ 2 (the tab bar owns the hook at depth 1).
   depth: { type: Number, default: 1 },
-  // The committed view slice (the exit outlet reads the destination label
-  // from `local_map.nodes[].label`, task 5.4).
+  // The committed view slice (the nav pane reads the interact targets'
+  // portraits from it, task 5.5).
   view: { type: Object, default: null },
   // The target's display_name for the affordance pane's head (task 5.6): the
   // frame's own `target.display_name` (the targetMenuFor title).
@@ -64,20 +66,9 @@ const rows = computed(() =>
   }),
 );
 
-// The exit-outlet pane renders one tile per exit: the standard `back` row
-// (the breadcrumb chevron owns the close control) is a navigation cell, not
-// an exit (task 5.4).
-const outletRows = computed(() => rows.value.filter((row) => row.item.key !== "back"));
-
 const focusedRow = computed(
   () => rows.value.find((row) => row.key === props.focusedKey) ?? null,
 );
-
-// The destination label for an exit row (task 5.4), read from the
-// committed `local_map` model (`dock-exits.js`).
-function destinationLabel(item) {
-  return destinationLabelFor(item, props.view?.localMapModel);
-}
 
 function onCellFocus(key) {
   emit("focus-change", key);
@@ -100,90 +91,15 @@ function onCellClick(row) {
 // The fixed framed-grid geometry (the `.dock-menu` container's `:style`
 // carries the attribute the B2 gate reads); the row container applies the
 // same `grid-template-columns` so the fixed column count actually lays out
-// the rows.
-// Nav panes keep the fixed-column content-sized tracks (`minmax(0,
-// max-content)`); every other pane kind keeps the stretch-to-fill `1fr`
-// track function. The exit-outlet pane (the move frame) emits no inline
-// grid template at all: the CSS class rule's responsive `auto-fit` grid
-// (width-adaptive, no content-width cap on the tiles) governs the layout
-// so the tiles fill the pane's available width instead of a fixed count.
+// the rows. The nav pane (the scripted-keyword list) keeps the fixed-column
+// content-sized tracks (`minmax(0, max-content)`); every other pane kind
+// keeps the stretch-to-fill `1fr` track function.
 const paneGridStyle = computed(() => {
-  if (!props.gridCols || paneKind.value === "outlet") {
+  if (!props.gridCols) {
     return {};
   }
   const sizeFn = paneKind.value === "nav" ? "minmax(0, max-content)" : "1fr";
   return { "grid-template-columns": `repeat(${props.gridCols}, ${sizeFn})` };
-});
-
-// The outlet pane measures its own width so the responsive `auto-fit`
-// column count is known to the last tile: when the exit count exceeds the
-// rendered column count and the final row is partial, the last tile spans
-// its own column through the row's end, so no horizontal space is left
-// blank (the spec's four-or-more-exits scenario). Short exit lists (fewer
-// exits than the column count) are handled by `auto-fit` collapsing the
-// empty tracks.
-const outletPaneEl = ref(null);
-const outletWidth = ref(0);
-let outletObserver = null;
-let observedEl = null;
-const OUTLET_TRACK_MIN_PX = 150;
-const OUTLET_GAP_PX = 8;
-
-function bindOutletObserver(el) {
-  if (typeof ResizeObserver === "undefined" || !el) {
-    return;
-  }
-  if (outletObserver && observedEl === el) {
-    return;
-  }
-  if (outletObserver) {
-    outletObserver.disconnect();
-  }
-  outletObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      outletWidth.value = Math.round(entry.contentRect.width);
-    }
-  });
-  outletObserver.observe(el);
-  observedEl = el;
-}
-
-onMounted(() => {
-  bindOutletObserver(outletPaneEl.value);
-});
-watch(
-  [() => paneKind.value, outletPaneEl],
-  ([kind, el]) => {
-    if (kind === "outlet") {
-      bindOutletObserver(el);
-    }
-  },
-  { flush: "post" }
-);
-onBeforeUnmount(() => {
-  if (outletObserver) {
-    outletObserver.disconnect();
-    outletObserver = null;
-    observedEl = null;
-  }
-  outletWidth.value = 0;
-});
-
-const outletCols = computed(() => {
-  const w = outletWidth.value;
-  if (!w) {
-    return 0;
-  }
-  return Math.max(1, Math.floor((w + OUTLET_GAP_PX) / (OUTLET_TRACK_MIN_PX + OUTLET_GAP_PX)));
-});
-
-const outletSpanCol = computed(() => {
-  const n = outletCols.value;
-  const len = outletRows.value.length;
-  if (!n || len <= n) {
-    return 0;
-  }
-  return len % n;
 });
 
 // The focused row scrolls into view (task 5.9).
@@ -231,49 +147,14 @@ watch(
     class="dock-menu"
       role="listbox"
       tabindex="0"
-      :aria-activedescendant="focusedRow && (paneKind !== 'outlet' || focusedRow.key !== 'back') ? focusedRow.rowId : null"
+      :aria-activedescendant="focusedRow ? focusedRow.rowId : null"
       :style="gridCols ? { 'grid-template-columns': 'repeat(' + gridCols + ', 1fr)' } : {}"
       v-bind="depth >= 2 ? { 'data-testid': 'dock-menu' } : {}"
     >
-      <!-- OUTLET: exit tiles — one direction glyph plus a single bold
-           headline (task 5.4, outlet-tile-presentation): the destination's
-           display name when enabled + canonical + known destination, else
-           the exit's own label (it carries the （無法通行） suffix on
-           disabled rows — the only visible disabled marker). -->
-      <div v-if="paneKind === 'outlet'" ref="outletPaneEl" class="dock-menu__outlet" :style="paneGridStyle">
-        <button
-          v-for="(row, i) in outletRows"
-          :id="row.rowId"
-          type="button"
-          role="option"
-          :aria-selected="row.key === focusedKey"
-          :aria-describedby="!row.item.enabled && row.reason ? row.rowId + '-reason' : null"
-          class="dock-menu__outlet-tile"
-          :class="{ 'dock-menu__outlet-tile--focused': row.key === focusedKey }"
-          :data-item-key="row.key"
-          :style="i === outletRows.length - 1 && outletSpanCol ? { gridColumn: outletSpanCol + ' / -1' } : undefined"
-          tabindex="-1"
-          @click="onCellClick(row)"
-        >
-          <span v-if="directionGlyph(row.item.direction)" class="dock-menu__outlet-glyph" aria-hidden="true">
-            {{ directionGlyph(row.item.direction) }}
-          </span>
-          <!-- Disabled rows keep their own label (with the `（無法通行）`
-               suffix baked in by moveItems), never the destination name:
-               the label is this row's only visible disabled marker. -->
-          <b>{{ (row.item.enabled && directionGlyph(row.item.direction) && destinationLabel(row.item)) || row.item.label }}</b>
-          <span
-            v-if="!row.item.enabled && row.reason"
-            :id="row.rowId + '-reason'"
-            class="visually-hidden"
-          >{{ row.reason }}</span>
-        </button>
-      </div>
-
       <!-- NAV: look/interact target rows (task 5.5): icon, name, backed
            sub-line (entity kind / affordance labels), `›` chevron on rows
            that open a deeper frame. No stat line, no portrait slot. -->
-      <div v-else-if="paneKind === 'nav'" class="dock-menu__nav" :style="paneGridStyle">
+      <div v-if="paneKind === 'nav'" class="dock-menu__nav" :style="paneGridStyle">
         <div
           v-for="row in rows"
           :id="row.rowId"
@@ -480,12 +361,10 @@ watch(
     </div>
 
     <!-- The detail pane: names the focused skill/item (tasks 5.8/6.5).
-         The outlet pane's tiles are self-contained, so the aside is
-         suppressed for `paneKind === 'outlet'` — including when a
-         `detailMessage` is set, so the move frame keeps the pane's full
-         width (outlet-tile-presentation). -->
+         The scene overview (the exploration root) is not a DockMenu frame,
+         so every pane kind here renders the aside by the same rule. -->
     <aside
-      v-if="paneKind !== 'outlet' && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
+      v-if="(props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage"
       class="dock-detail"
       :data-testid="props.detailTestId"
       tabindex="-1"
@@ -524,53 +403,6 @@ watch(
 .dock-menu:focus {
   outline: 2px solid var(--gold-400);
   outline-offset: 2px;
-}
-
-/* OUTLET (task 5.4 + outlet-tile-presentation): the exit-outlet grid —
-   one direction glyph plus a single bold headline (the destination name
-   when known, else the exit's own label). The grid is width-adaptive:
-   `auto-fit` collapses the empty tracks so even a 1- or 2-exit frame fills
-   the pane's full width, and the `min(150px, 100%)` floor lets a very
-   narrow pane shrink the tracks instead of overflowing. The focused state
-   is a background + border + color swap (not color alone); the tile's own
-   direction glyph is the only glyph-shaped element, focused or not. */
-.dock-menu__outlet {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
-  gap: 8px;
-}
-.dock-menu__outlet-tile {
-  display: grid;
-  place-items: center;
-  text-align: center;
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  border-radius: 9px;
-  padding: 9px 8px;
-  font-size: 12.5px;
-  color: var(--paper-300);
-  cursor: pointer;
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-.dock-menu__outlet-tile b {
-  display: block;
-  font-size: 15px;
-  color: var(--paper-100);
-  font-family: var(--f-mono);
-}
-.dock-menu__outlet-glyph {
-  font-size: 14px;
-  color: var(--gold-400);
-}
-/* The focused outlet tile is marked by a bundled fill + border swap (the
-   same non-color-alone treatment as every other dock row form); no extra
-   focus-only caret glyph is stacked on the tile's persistent direction
-   glyph (outlet-tile-presentation). */
-.dock-menu__outlet-tile--focused {
-  background: var(--gold-glow);
-  border-color: var(--gold-500);
-  color: var(--paper-50);
 }
 
 /* NAV (task 5.5): the draft's `.nrow` rows — icon, name, backed sub-line,

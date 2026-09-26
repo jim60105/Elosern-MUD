@@ -115,7 +115,6 @@ function onPaneActivate(payload) {
       :trail="trail"
       :depth="depth"
       :guidance-prefix="guidancePrefix"
-      :focused-key="focusedKey"
       @back="onBack"
     />
     <!-- The body: the scrolling pane plus the overlay layer. The pane holds
@@ -130,17 +129,18 @@ function onPaneActivate(payload) {
       <slot name="overlay" />
     </div>
     <!-- The shortcut legend (webclient-align-01-dock-chrome, re-homed by
-         webclient-scene-overview-swap D3): the draft's `.dock .hint` markup —
-         `數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回` with styled
-         `<kbd>` elements. It is the single visible legend and the only
-         element carrying the `action-dock-description` hook; it renders in
-         exploration, dialogue, and combat mode (never in creation mode). -->
+         webclient-scene-overview-swap D3 and widened by
+         webclient-retire-exploration-submenus): the draft's `.dock .hint`
+         markup — `數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回`
+         with styled `<kbd>` elements. It is the single visible legend and the
+         only element carrying the `action-dock-description` hook; it renders
+         in exploration, dialogue, and combat mode (never in creation mode). -->
     <p
       v-if="mode !== 'creation'"
       class="action-dock__legend"
       data-testid="action-dock-description"
     >
-      數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
+      數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
     </p>
     <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
          and ✕ 清除建議 from ActionDock.vue source text). The active suggestions
