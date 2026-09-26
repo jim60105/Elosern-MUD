@@ -15,10 +15,6 @@ const props = defineProps({
   // The per-surface guidance prefix (legacy dock chrome); when set, the
   // crumb row carries it before the trail.
   guidancePrefix: { type: String, default: null },
-  // The committed focus key: when the keyboard router's focus is on the
-  // move frame's non-rendered `back` item, the back control carries the
-  // focused presentation (fill + ring, not color alone).
-  focusedKey: { type: String, default: null },
 });
 
 const emit = defineEmits(["back"]);
@@ -49,7 +45,6 @@ function onBack() {
     <button
       type="button"
       class="dock-crumb__back"
-      :class="{ 'dock-crumb__back--focused': focusedKey === 'back' }"
       aria-label="返回上一層"
       @click="onBack"
     >‹</button>
@@ -99,10 +94,9 @@ function onBack() {
   background: var(--gold-glow);
 }
 
-/* The focused back control: a fill + ring (box-shadow, no layout shift)
-   — the same non-color-alone treatment the dock rows use, so the
-   non-rendered `back` row keeps a visible focus carrier. */
-.dock-crumb__back--focused,
+/* The back control's own DOM focus ring (box-shadow, no layout shift). Every
+   frame renders its `back` item as a row of its own listbox, so the control
+   carries no state mirroring the router's focus. */
 .dock-crumb__back:focus-visible {
   background: var(--panel-hi);
   box-shadow: 0 0 0 1px var(--gold-500);

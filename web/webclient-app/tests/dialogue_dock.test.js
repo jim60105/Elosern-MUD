@@ -63,7 +63,7 @@ describe("dock keeps its ordinary form in dialogue mode", () => {
     const w = mountDock();
     const legends = w.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);
-    expect(legends[0].text()).toBe("數字鍵 1–4 · Enter 執行 · Esc 返回");
+    expect(legends[0].text()).toBe("數字鍵 1–9 · Enter 執行 · Esc 返回");
     // The deleted dialogue legend wording never appears.
     expect(w.text()).not.toContain("指令列自由對話");
   });

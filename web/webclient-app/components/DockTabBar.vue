@@ -38,11 +38,11 @@ const props = defineProps({
 
 const emit = defineEmits(["tab-click"]);
 
-// Badge surface for each root item key (task 4.4): 互動 / 建議 / 技能 badges;
-// every other key carries no badge.
+// Badge surface for each root item key (task 4.4): the combat root's 技能
+// tab; every other key carries no badge. The bar only renders for the combat
+// root (webclient-scene-overview-swap), whose root items are
+// attack/skills/items/bag/defend/flee/forfeit.
 const BADGE_SURFACES = {
-  interact: "interact",
-  suggestions: "suggestions",
   skills: "skills",
 };
 

@@ -283,37 +283,6 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
         )
 
 
-def push_exploration_frame(
-    page: Page,
-    source: str,
-    params: dict | None = None,
-    depth: int = 2,
-    timeout: int = 15000,
-) -> None:
-    """Mount a retired exploration submenu frame by a direct router push.
-
-    The dock's root frame is the scene overview (webclient-scene-overview-swap),
-    so no keyboard or pointer path reaches the move, look, or interact submenus
-    any more. Until ``webclient-retire-exploration-submenus`` deletes those
-    frames together with the tests that pin their panes, the outlet assertions
-    mount one through the router's own push entry — the same seam the
-    keyboard-router Node gate uses. The stack is normalized to the committed
-    root first, so the push always lands at ``depth``.
-    """
-    focus_action_dock(page, timeout=timeout)
-    page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-    page.evaluate(
-        "(args) => window.__elosernBridge.router.pushFrame("
-        "{ source: args.source, params: args.params }, { openerKey: null })",
-        {"source": source, "params": params or {}},
-    )
-    page.wait_for_function(
-        "(expected) => window.__elosernBridge.router.depth() === expected",
-        arg=depth,
-        timeout=timeout,
-    )
-
-
 def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
     """Activate one scene-overview chip by its keyboard key.
 

@@ -1,10 +1,11 @@
 /*
  * DOM-independent tests for the exploration-menu model.
  *
- * Runs with Node 24's built-in test runner; no npm packages. Covers root
- * routing, move/look/interact submenus, scripted keyword buttons, the free-form
- * flow, disabled-row non-submission, and the navigate-kind service affordance
- * being dock-navigation only (never submitted as an action).
+ * Runs with Node 24's built-in test runner; no npm packages. Covers the
+ * scene-overview chip builders (exits, look rows, the footer), the wait
+ * submenu, the top navigation bar's entries, scripted keyword buttons, the
+ * free-form flow, disabled-row non-submission, and the navigate-kind service
+ * affordance being dock-navigation only (never submitted as an action).
  */
 
 "use strict";
@@ -71,13 +72,15 @@ function validPanel(overrides) {
   );
 }
 
-test("root routes Move/Look/Interact/Character plus available quests and inventory", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  const keys = model.menus.root.items.map((item) => item.key);
-  assert.deepEqual(keys, ["move", "look", "interact", "character", "quests", "inventory", "wait"]);
+test("the navigation builder carries 角色狀態 plus available quests and inventory", () => {
+  const items = ExplorationMenu.navigationItems(validPanel());
+  assert.deepEqual(
+    items.map((item) => item.key),
+    ["character", "quests", "inventory"]
+  );
   // 任務 is a frameless drawer open (the 背包 precedent):
   // the exact shape carries openDrawer and no submenu/service-submenu field.
-  const quests = model.menus.root.items.find((item) => item.key === "quests");
+  const quests = items.find((item) => item.key === "quests");
   assert.deepEqual(quests, {
     key: "quests",
     label: "任務",
@@ -86,9 +89,9 @@ test("root routes Move/Look/Interact/Character plus available quests and invento
     payload: null,
     openDrawer: "quest",
   });
-  // The 背包 root row is a frameless drawer open (the 角色 row precedent):
+  // The 背包 row is a frameless drawer open (the 角色 row precedent):
   // the exact shape carries openDrawer and no submenu/service-submenu field.
-  const inventory = model.menus.root.items.find((item) => item.key === "inventory");
+  const inventory = items.find((item) => item.key === "inventory");
   assert.deepEqual(inventory, {
     key: "inventory",
     label: "背包",
@@ -97,26 +100,24 @@ test("root routes Move/Look/Interact/Character plus available quests and invento
     payload: null,
     openDrawer: "inventory",
   });
+  assert.equal(items.find((item) => item.key === "character").openCharacter, true);
 });
 
 test("quests and inventory are omitted when the services capability is absent", () => {
-  const model = ExplorationMenu.buildMenus(
-    validPanel({ quests: { available: false }, inventory: { available: false } }),
-    {}
+  const items = ExplorationMenu.navigationItems(
+    validPanel({ quests: { available: false }, inventory: { available: false } })
   );
-  const keys = model.menus.root.items.map((item) => item.key);
-  assert.deepEqual(keys, ["move", "look", "interact", "character", "wait"]);
+  assert.deepEqual(items.map((item) => item.key), ["character"]);
 });
 
 test("move rows carry the exit_ref and canonical current_node payload", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  const moveItem = model.menus.move.items[0];
+  const moveItem = ExplorationMenu.moveItems(validPanel(), "room:3")[0];
   assert.equal(moveItem.enabled, true);
   assert.equal(moveItem.actionId, "explore.move");
   assert.deepEqual(moveItem.payload, { exit_ref: "42", current_node: "room:3" });
 });
 
-test("a locked exit row is disabled and never submits", () => {
+test("a locked exit chip is disabled, never submits, and keeps its plain label", () => {
   const panel = validPanel({
     move: [
       {
@@ -128,32 +129,39 @@ test("a locked exit row is disabled and never submits", () => {
       },
     ],
   });
-  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
-  const moveItem = model.menus.move.items[0];
+  const items = ExplorationMenu.moveItems(panel, "room:3");
+  assert.equal(items.length, 1, "the chip builder carries no back row");
+  const moveItem = items[0];
   assert.equal(moveItem.enabled, false);
   assert.equal(moveItem.actionId, null);
   assert.equal(moveItem.description, "此出口目前無法通行。");
+  // The shared chip renderer owns the disabled marker: no per-frame suffix.
+  assert.equal(moveItem.label, "東");
 });
 
-test("move rows disable without the local-map current_node", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: null });
-  const moveItem = model.menus.move.items[0];
+test("move rows disable without the local-map current_node, and an empty exit list yields no placeholder", () => {
+  const moveItem = ExplorationMenu.moveItems(validPanel(), null)[0];
   assert.equal(moveItem.enabled, false);
   assert.equal(moveItem.actionId, null);
+  // A room with no exits omits the overview's section instead of rendering a
+  // dead `move-empty` row.
+  assert.deepEqual(ExplorationMenu.moveItems({ move: [] }, "room:3"), []);
 });
 
-test("look items cover the room marker plus entities and objects", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const keys = model.menus.look.items.map((item) => item.key);
-  assert.deepEqual(keys, ["look-room", "entity-5", "object-6", "back"]);
-  assert.deepEqual(model.menus.look.items[0].payload, { room: true });
-  assert.deepEqual(model.menus.look.items[1].payload, { target_id: 5 });
-  assert.deepEqual(model.menus.look.items[2].payload, { target_id: 6 });
+test("look rows cover the room marker plus entities and objects, with no back row", () => {
+  const items = ExplorationMenu.lookItems(validPanel());
+  assert.deepEqual(
+    items.map((item) => item.key),
+    ["look-room", "entity-5", "object-6"]
+  );
+  assert.deepEqual(items[0].payload, { room: true });
+  assert.deepEqual(items[1].payload, { target_id: 5 });
+  assert.deepEqual(items[2].payload, { target_id: 6 });
 });
 
-test("every exploration submenu ends with an enabled back row", () => {
+test("every pushed exploration frame ends with an enabled back row", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  ["move", "look", "interact", "wait"].forEach((key) => {
+  ["wait"].forEach((key) => {
     const items = model.menus[key].items;
     const back = items[items.length - 1];
     assert.equal(back.key, "back", `${key} must end with the back row`);
@@ -169,36 +177,21 @@ test("every exploration submenu ends with an enabled back row", () => {
   const scripted = ExplorationMenu.scriptedAffordanceFor(target);
   const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
   assert.equal(keywordMenu.items[keywordMenu.items.length - 1].key, "back");
+  // The suggestions frame too (the exploration root, the scene overview, does
+  // not: it carries no parent to return to).
+  const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
+  assert.equal(suggestions.items[suggestions.items.length - 1].key, "back");
 });
 
-test("the root menu never gains a back row", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const keys = model.menus.root.items.map((item) => item.key);
-  assert.deepEqual(keys, ["move", "look", "interact", "character", "quests", "inventory", "wait"]);
-  assert.ok(keys.indexOf("back") === -1);
-});
-
-test("parentKeyFor maps every submenu key to its parent", () => {
-  assert.equal(ExplorationMenu.parentKeyFor("move"), "root");
-  assert.equal(ExplorationMenu.parentKeyFor("look"), "root");
-  assert.equal(ExplorationMenu.parentKeyFor("interact"), "root");
-  assert.equal(ExplorationMenu.parentKeyFor("wait"), "root");
-  assert.equal(ExplorationMenu.parentKeyFor("target-5"), "interact");
-  assert.equal(ExplorationMenu.parentKeyFor("keywords-5"), "target-5");
-  assert.equal(ExplorationMenu.parentKeyFor("root"), "root");
-  assert.equal(ExplorationMenu.parentKeyFor("unknown-key"), "root");
+test("the scene overview never gains a back row", () => {
+  const menu = ExplorationMenu.overviewMenu(validPanel(), { currentNode: "room:3" });
+  assert.ok(!menu.items.some((item) => item.key === "back"));
 });
 
 test("menu models carry the mockup grid geometry", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  assert.equal(model.menus.root.grid, true);
-  assert.equal(model.menus.root.gridCols, 7);
-  // The move frame navigates as a single-column list: its keyboard geometry
-  // carries no fixed column count (the rendered exit-outlet grid is
-  // width-adaptive, so the DOM-independent router assumes no column count).
-  assert.equal(model.menus.move.grid, true, "move must be a grid");
-  assert.equal(model.menus.move.gridCols, null, "move must use no fixed column count");
-  ["look", "interact", "wait"].forEach((key) => {
+  assert.deepEqual(Object.keys(model.menus), ["wait"]);
+  ["wait"].forEach((key) => {
     assert.equal(model.menus[key].grid, true, `${key} must be a grid`);
     assert.equal(model.menus[key].gridCols, 2, `${key} must use 2 columns`);
   });
@@ -208,23 +201,38 @@ test("menu models carry the mockup grid geometry", () => {
   const scripted = ExplorationMenu.scriptedAffordanceFor(target);
   const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
   assert.equal(keywordMenu.gridCols, 2);
+  // The suggestions frame is a single-row grid whose column count is its own
+  // item count; the scene overview is a sections menu with no grid flag.
+  const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
+  assert.equal(suggestions.gridCols, suggestions.items.length);
+  const overview = ExplorationMenu.overviewMenu(validPanel(), { currentNode: "room:3" });
+  assert.equal(overview.grid, undefined);
+  assert.equal(overview.geometry, "sections");
 });
 
-test("interact targets open their server-authored affordances", () => {
+test("overview person chips open their server-authored affordances", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const targetItem = model.menus.interact.items[0];
-  assert.equal(targetItem.enabled, true);
-  assert.equal(targetItem.openTarget, 5);
+  const menu = ExplorationMenu.overviewMenu(model.panel, { currentNode: "room:3" });
+  const person = menu.items.find((item) => item.key === "target-5");
+  assert.equal(person.enabled, true);
+  assert.equal(person.openTarget, 5);
 });
 
-test("a target with no affordances is disabled", () => {
+test("a target with no affordances still opens its popover, and its affordance frame keeps the empty placeholder", () => {
   const panel = validPanel({
     interact: [{ identity: 8, display_name: "路人", portrait_ref: null, affordances: [] }],
   });
   const model = ExplorationMenu.buildMenus(panel, {});
-  const targetItem = model.menus.interact.items[0];
-  assert.equal(targetItem.enabled, false);
-  assert.equal(targetItem.actionId, null);
+  // The person chip is always enabled: its verb popover has at least 查看.
+  const menu = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
+  const person = menu.items.find((item) => item.key === "target-8");
+  assert.equal(person.enabled, true);
+  assert.equal(person.openTarget, 8);
+  // The popover's own source frame carries the disabled empty row.
+  const targetMenu = ExplorationMenu.targetMenuFor(model, ExplorationMenu.targetById(model, 8));
+  const empty = targetMenu.items.find((item) => item.key === "target-empty");
+  assert.equal(empty.enabled, false);
+  assert.equal(empty.actionId, null);
 });
 
 test("the navigate-kind service affordance is dock-navigation only, never an action", () => {

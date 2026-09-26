@@ -263,7 +263,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page.locator('[data-testid="dialogue-exit"]').count(), 0
         )
         # The ordinary dock rows work again (movement parity after the
-        # session): open the Move outlet and press its first exit row.
+        # session): the overview's first exit chip submits its move.
         activate_first_overview_exit(page)  # the overview's first exit -> explore.move
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
         self._wait_panel(

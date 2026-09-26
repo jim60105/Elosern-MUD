@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): outlet/navigation tile geometry, pointer back-cell, and escape/back navigation through the exploration dock.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): navigation tile geometry, pointer back-cell, and escape/back navigation through the exploration dock.
 """
 
 from __future__ import annotations

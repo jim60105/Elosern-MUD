@@ -72,7 +72,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             # below the scrolling body rather than in a tab bar
             # (webclient-scene-overview-swap D3).
             description = page.locator('[data-testid="action-dock-description"]').inner_text()
-            for keyword in ("數字鍵 1–4", "Enter 執行", "Esc 返回"):
+            for keyword in ("數字鍵 1–9", "Enter 執行", "Esc 返回"):
                 self.assertIn(keyword, description)
             # The exploration root is the scene overview: one frame of chips
             # (exits, people, objects, and the footer) and NO tab bar. The
@@ -152,7 +152,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         The old visually-hidden ``action-dock-description`` duplicate was
         deleted: the dock's own legend strip IS the hook (webclient-scene-
         overview-swap D3 re-homed it out of the tab bar, so it also shows in
-        combat). The legend names only implemented behaviour (1–4 pick rows,
+        combat). The legend names only implemented behaviour (1–9 pick rows,
         Enter activates, Esc pops one frame); the ``/`` focus binding stays
         implemented but the reference's legend does not advertise it, so
         neither does this one.
@@ -178,7 +178,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         # The reference draft's wording (index.html line 855).
         hint_text = hint.first.inner_text()
-        self.assertEqual(hint_text, "數字鍵 1–4 · Enter 執行 · Esc 返回")
+        self.assertEqual(hint_text, "數字鍵 1–9 · Enter 執行 · Esc 返回")
         self.assertNotIn("/ 聚焦指令列", hint_text)
         self.assertNotIn("方向鍵選擇", hint_text)
         # The draft's <kbd> structure: exactly two styled kbd elements.

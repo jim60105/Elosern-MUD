@@ -13,6 +13,12 @@ See proposal.md (Why). The state after C8b (`webclient-scene-overview-swap`):
 - `DockBreadcrumb.vue` takes `focusedKey` only to draw `dock-crumb__back--focused` when the router focuses the outlet's non-rendered `back`.
 - `use-dock.js` `dockItems` normalizes `direction` / `destination` for the outlet.
 - The frameworks C8b left for tests: `test_browser_contextual_hud_dock.py` reaches the outlet by a direct `pushFrame({source: "exploration.move"})`, and `test_browser_exploration_tiles.py` pins the outlet grid.
+- `exploration.navigation` and its builder `ExplorationMenu.navigationItems` are LIVE, not part of the
+  dead path: the top navigation bar (角色狀態 / 任務 / 背包) resolves them as its sole
+  keyboard-visible entry set (C8b). Only the tab root that also consumed the builder is dead; the
+  builder, its resolver source, and the bar stay. `test_browser_exploration_frame.py` and
+  `test_browser_exploration_state.py` also mount the retired move frame by a direct push (they are not
+  named in the proposal's Impact list); they are re-pointed in the same change.
 
 ## Goals / Non-Goals
 
@@ -47,7 +53,11 @@ Deleting the three resolver entries makes any stray `exploration.move/look/inter
 
 For the overview, `menu.items` is the reading order (C8a D1), so the slots match what the player sees. Disabled entries take slots, as the 1–4 rule already did, so a digit's target never shifts with enabled state.
 
-The dialogue variant's picks: `webclient-dialogue-session` allows up to 16 scripted keywords, so picks 1–9 become addressable and 10–16 stay pointer-reachable, as 5–16 were before.
+The dialogue variant's picks do NOT widen: the caption panel's own bound is `DIALOGUE_MAX_CHOICES = 4`
+(`web.webclient.presentation.dialogue`, mirrored in `protocol/constants.js`), so 1–4 were already the
+whole caption range and a 5th–9th press stays unclaimed and falls through. (`webclient-dialogue-session`'s
+16-keyword pool belongs to the interact affordance's scripted-keyword frame, not to the caption.) The
+wider range is what the dock frames needed: the scene overview's nine chips.
 
 *Conflict check:* no other surface binds `5`–`9`. C3 deleted the quick-word letter bindings, and the command field is editable, so the bridge never routes digits typed there.
 

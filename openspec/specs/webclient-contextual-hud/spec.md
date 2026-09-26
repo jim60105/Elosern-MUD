@@ -717,7 +717,7 @@ SHALL carry whatever glyph best represents it.
 The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the
 scrolling region, in exploration, dialogue, and combat mode (never in creation mode), matching
 `docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text
-`數字鍵 1–4 · ` followed by an `<kbd>` element naming `Enter`
+`數字鍵 1–9 · ` followed by an `<kbd>` element naming `Enter`
 and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`.
 The legend renders
 with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
@@ -733,12 +733,12 @@ updated in the same change that alters the behaviour.
 
 The digits the legend names SHALL be bound: while the dock owns keyboard focus (the key target is
 not editable), pressing
-`1`–`4` moves the current dock frame's focus onto its first four entries (1-indexed, rendered order —
-for the scene overview, its first four chips in reading order) and activates the entry through the
+`1`–`9` moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order —
+for the scene overview, its first nine chips in reading order: exits, then people, then objects, then
+the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the
 same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an
 in-flight entry stays locked, and a held repeat is suppressed.
-The slots address the frame's rendered entries: where a pane does not render the standard `back`
-cell as a row (the exit-outlet pane), that cell takes no slot. While the message window
+The slots address the frame's rendered entries, disabled ones included. While the message window
 presents the dialogue variant with at least one pick, the slots address the window's pick rows
 instead of the dock's entries — the trailing free-dialogue and exit rows never take
 a digit slot — and the dock's own entries claim no digit while that hold applies.
@@ -754,14 +754,15 @@ through to the text / command-history path.
 
 #### Scenario: The legend matches the reference wording and kbd structure
 - **WHEN** the dock renders its legend strip in exploration, combat, or dialogue mode
-- **THEN** the legend reads `數字鍵 1–4 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
+- **THEN** the legend reads `數字鍵 1–9 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
 
 #### Scenario: A digit picks its row
-- **WHEN** the scene overview's first two chips are an exit and a person, and the player presses `2`
-  from a non-editable focus
-- **THEN** the person chip becomes the frame's focus and its popover opens exactly as `Enter`
-  would, once
+- **WHEN** the scene overview holds three exit chips, two person chips, and one object chip, and the
+  player presses `5`, and later `6`, from a non-editable focus
+- **THEN** the `5` press focuses the second person chip and opens its popover exactly as `Enter`
+  would, once, and after Escape the `6` press focuses the object chip and submits its `explore.look`
+  once
 
 #### Scenario: A digit beyond the frame's rows is unclaimed
 - **WHEN** the current dock frame has fewer rendered entries than the pressed digit and the command
@@ -769,9 +770,9 @@ through to the text / command-history path.
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders three picks over the dock's scene overview and the player presses
-  `2` and `4` from a non-editable focus
-- **THEN** the `2` press activates pick two through the same dispatch entry, the `4` press
+- **WHEN** the dialogue variant renders its four picks (the panel-owned `DIALOGUE_MAX_CHOICES` bound) over the dock's scene overview and the player presses
+  `4` and `5` from a non-editable focus
+- **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press
   is unclaimed and falls through, and no dock chip is focused or activated
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
@@ -787,12 +788,12 @@ stack and depth, published through the committed view in the same pass as the fr
 client SHALL NOT maintain a second navigation state — no local pane selection, no locally accumulated
 crumb stack — so the breadcrumb can never disagree with what Escape will do. A frame's breadcrumb
 label SHALL come from the frame itself; for a frame scoped to one target, that label SHALL be the
-target's server-authored display name. When the keyboard router's focus is on the `back` item (the
-non-rendered navigation cell of the exit outlet), the breadcrumb's back control SHALL carry a visible
-focused state — a background fill and border change together (the same non-color-alone treatment
-shared with every other dock row form), so the focused `back` row keeps a visible focus carrier;
-activating it with the back control or with Enter SHALL pop exactly one level, restore the parent
-frame's previously focused row, and dispatch no action.
+target's server-authored display name. Every frame's `back` item SHALL render as a row of that frame, so
+a focused `back` item carries the same focused treatment as any other row (a background fill and
+border change together); the breadcrumb's back control SHALL carry no focus state of its own that
+mirrors the router's focus. Activating the back row with Enter or the pointer, or activating the
+breadcrumb's back control, SHALL pop exactly one level, restore the parent frame's previously
+focused entry, and dispatch no action.
 
 #### Scenario: The breadcrumb appears only below the root
 - **WHEN** the dock is at its root frame
@@ -805,8 +806,8 @@ frame's previously focused row, and dispatch no action.
 - **THEN** exactly one menu level closes, the parent frame's rows render with the previously focused row marked, and no `ui_action` is emitted
 
 #### Scenario: A focused `back` row keeps a visible focus carrier
-- **WHEN** keyboard focus moves onto the move frame's `back` item, which is not rendered as an outlet tile
-- **THEN** the breadcrumb's back control renders a focused state (fill and border change together, not color alone), and Enter or a click on that control pops exactly one level back to the parent frame
+- **WHEN** keyboard focus moves onto the suggestions frame's or a verb popover's `back` item
+- **THEN** that `back` item is rendered as a row carrying the focused state (fill and border change together, not color alone), the breadcrumb's back control carries no focused state, and Enter on the row or a click on the breadcrumb control pops exactly one level back to the parent frame
 
 #### Scenario: The breadcrumb tracks a target frame's own name
 - **WHEN** the player opens an interact target's affordance frame
@@ -821,83 +822,78 @@ frame's previously focused row, and dispatch no action.
 The dock's row region SHALL render the current frame in a form chosen for what that frame contains,
 using one shared row renderer for every form so the focused marker, the disabled marker and its
 `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined
-in exactly one place. The forms SHALL be: an exit outlet for a move frame, navigation rows for a
-target or object list, affordance rows under a target head for a target-affordance frame, suggestion
-cards for the suggestions frame, and the combat forms specified elsewhere in this capability.
+in exactly one place. The forms SHALL be: exit, person, object, and footer chips for the scene
+overview; navigation rows for the scripted-keyword list; the verb popover's rows under a target head;
+the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified
+elsewhere in this capability. No exploration frame SHALL render an exit-outlet grid: exits are chips
+of the scene overview.
 
-A move row SHALL render the exit's direction as a leading glyph, and, while the row is enabled, its
+An exit chip SHALL render the exit's direction as a leading glyph, and, while the chip is enabled, its
 primary text SHALL be the destination's display name — never a repetition of the direction word or the
 exit's own label once a glyph already carries that meaning. The glyph SHALL be resolved from a fixed
 client-side table of canonical direction words; an exit label outside that table SHALL render verbatim
-as the row's primary text (there being no glyph to carry it) rather than being mapped to a guessed
-direction. The destination's display name SHALL be resolved by matching the move row's server-authored
+as the chip's primary text (there being no glyph to carry it) rather than being mapped to a guessed
+direction. The destination's display name SHALL be resolved by matching the exit's server-authored
 destination node against the committed local-map nodes; when that node is not present in the committed
-lattice, an enabled canonical-direction row SHALL fall back to its own exit label as its primary text
-rather than rendering blank — but SHALL NOT render both the destination name and the exit's own label at
-once when both are available, since that repeats the glyph's meaning as text. A disabled row SHALL
-always render its own exit label as its primary text, never the destination name, because the label is
-this row form's only carrier of the disabled marker; the destination-name substitution above applies
-only to enabled rows. A move row's focused state SHALL be conveyed by its background and border fill
-together (the same non-color-alone treatment shared with every other dock row form) and SHALL NOT
-additionally render a focus caret glyph when the row already carries a persistent direction glyph — a
-second, focus-only glyph on top of one already shown is not an additional signal. The move frame SHALL
-render no companion detail panel or side surface: the outlet tile is self-contained, and the row region
-SHALL receive the pane's full available width, with the exit outlet laid out as a width-adaptive
-`repeat(auto-fit, minmax(min(150px, 100%), 1fr))` grid whose `1fr` tracks the tiles stretch to fill (no
-content-width cap on the tile). A disabled move row's server-authored explanation SHALL remain reachable
-by assistive technology directly from the tile (an accessible association such as `aria-describedby`),
-independent of whether any companion panel exists. The submitted move payload SHALL be unchanged.
+lattice, an enabled canonical-direction chip SHALL fall back to its own exit label as its primary text
+rather than rendering blank — but SHALL NOT render both the destination name and the exit's own label
+at once. A disabled exit chip SHALL always render its own exit label as its primary text, never the
+destination name, followed by the shared disabled marker. An exit chip's focused state SHALL be
+conveyed by its background and border fill together and SHALL NOT additionally render a focus-only
+glyph beside its persistent direction glyph. A disabled exit chip's server-authored explanation SHALL
+remain reachable by assistive technology directly from the chip and SHALL be shown in the overview's
+reason strip while the chip is focused. The submitted move payload SHALL be unchanged.
 
-A navigation row SHALL render a decorative icon, the row's server-authored name, an optional sub-line
-and, when the row opens a deeper frame, a trailing affordance chevron. A sub-line SHALL contain only
-fields the committed payload carries. No row SHALL render a statistics line, a portrait, or any other
-element for which the payload has no field; where the design draft shows such an element it SHALL be
-absent rather than emptied or mocked. Icons SHALL be decorative, SHALL be hidden from assistive
-technology, SHALL always accompany a real text label, and SHALL be selected only from stable
-server-authored keys — never from free text such as a display name.
+A chip or navigation row SHALL render only fields the committed payload carries: its server-authored
+name and, for a navigation row, an optional sub-line composed of such fields. No chip or row SHALL
+render a statistics line, a portrait, or any other element for which the payload has no field; where
+the design draft shows such an element it SHALL be absent rather than emptied or mocked. Icons and
+glyphs SHALL be decorative, SHALL be hidden from assistive technology, SHALL always accompany a real
+text label, and SHALL be selected only from stable server-authored keys or the direction table — never
+from free text such as a display name.
 
-A target-affordance frame SHALL render a head naming the target it is scoped to, taken from the
-frame's own server-authored display name, above that target's affordance rows.
+A target's verb popover SHALL render a head naming the target it is scoped to, taken from the frame's
+own server-authored display name, above that target's rows.
 
-Every row in every form SHALL keep the existing disabled contract: a disabled row SHALL remain
-focusable by arrow keys and by pointer, SHALL keep its accessible disabled state and its
+Every row and chip in every form SHALL keep the existing disabled contract: a disabled entry SHALL
+remain focusable by arrow keys and by pointer, SHALL keep its accessible disabled state and its
 server-authored explanation, and SHALL submit nothing.
 
 #### Scenario: A move row names where it goes
-- **WHEN** the move frame renders an enabled exit whose label is a canonical direction and whose destination node is present in the committed local map
-- **THEN** the row renders that direction's glyph together with the destination node's display name as the row's primary text, with no separate rendering of the exit's own direction-word label, and activating it submits the unchanged move payload
+- **WHEN** the scene overview renders an enabled exit chip whose label is a canonical direction and whose destination node is present in the committed local map
+- **THEN** the chip renders that direction's glyph together with the destination node's display name as its primary text, with no separate rendering of the exit's own direction-word label, and activating it submits the unchanged move payload
 
 #### Scenario: A non-canonical exit keeps its own name
-- **WHEN** a move row's label is a named door or a dynamic wilderness exit rather than a canonical direction
-- **THEN** the row renders that label verbatim as its primary text and no direction is guessed for it
+- **WHEN** an exit chip's label is a named door or a dynamic wilderness exit rather than a canonical direction
+- **THEN** the chip renders that label verbatim as its primary text and no direction is guessed for it
 
 #### Scenario: An unknown destination falls back to the exit's own label
-- **WHEN** an enabled canonical-direction move row's destination node is absent from the committed local map
-- **THEN** the row renders its glyph together with the exit's own label as a fallback primary text, and no destination name is invented
+- **WHEN** an enabled canonical-direction exit chip's destination node is absent from the committed local map
+- **THEN** the chip renders its glyph together with the exit's own label as a fallback primary text, and no destination name is invented
 
 #### Scenario: A disabled exit never loses its disabled marker to a known destination
-- **WHEN** a canonical-direction move row is disabled and its destination node is present in the committed local map
-- **THEN** the row renders its own exit label (carrying the server's disabled suffix) as its primary text, not the destination's display name, and its server-authored explanation remains reachable by assistive technology from the row itself
+- **WHEN** a canonical-direction exit chip is disabled and its destination node is present in the committed local map
+- **THEN** the chip renders its own exit label followed by the shared disabled marker as its primary text, not the destination's display name, and its server-authored explanation remains reachable by assistive technology from the chip itself
 
 #### Scenario: A focused move row is not double-marked
-- **WHEN** a move row carrying a direction glyph is focused
-- **THEN** the row's background and border change together to mark focus, and no additional focus-only glyph renders alongside the row's existing direction glyph
+- **WHEN** an exit chip carrying a direction glyph is focused
+- **THEN** the chip's background and border change together to mark focus, and no additional focus-only glyph renders alongside its existing direction glyph
 
 #### Scenario: The move frame has no companion panel
-- **WHEN** the move frame renders with any row focused
-- **THEN** no detail aside or other side panel renders beside the outlet grid, the row region occupies the pane's full available width, and the `auto-fit` grid fills the remaining horizontal space (each column at least 150px wide, or the pane's own width when the pane is narrower)
+- **WHEN** the scene overview renders with any chip focused
+- **THEN** no detail aside or other side panel renders beside the overview, the overview occupies the pane's full available width, and no exit-outlet grid exists anywhere in the dock
 
 #### Scenario: A row renders only backed fields
-- **WHEN** a look frame renders a present entity
-- **THEN** the row shows the entity's display name with its kind as the sub-line, and shows no statistics line and no portrait, because the exploration payload carries no such field
+- **WHEN** the scene overview renders a look-only chip for a present entity
+- **THEN** the chip shows the entity's display name only, and shows no statistics line and no portrait, because the exploration payload carries no such field
 
 #### Scenario: A target-affordance frame names its target
-- **WHEN** the player opens an interact target's affordance frame
-- **THEN** the pane renders a head naming that target above the target's server-authored affordance rows
+- **WHEN** the player opens an interact target's verb popover
+- **THEN** the popover renders a head naming that target above the target's server-authored rows
 
 #### Scenario: A disabled row in any pane stays readable
-- **WHEN** a disabled row is focused in any pane form, by arrow key or by pointer
-- **THEN** the row keeps focus, exposes its accessible disabled state and its server-authored explanation, and no action is submitted
+- **WHEN** a disabled row or chip is focused in any form, by arrow key or by pointer
+- **THEN** it keeps focus, exposes its accessible disabled state and its server-authored explanation, and no action is submitted
 
 ### Requirement: The combat participant frame presents the session's participants and their portraits
 In combat the shell SHALL render a participant frame as a HUD island in the stage's top-right `map`
@@ -1553,32 +1549,6 @@ The settings surface SHALL offer no control it does not implement.
 - **WHEN** the settings surface's controls are enumerated
 - **THEN** every control changes an outcome the client actually implements, and no control is rendered that has no effect
 
-### Requirement: A fixed-column-count dock pane sizes its columns to content, never stretching to fill the panel
-
-When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count SHALL govern only which cell each row occupies, never the rendered width of a column. A column's rendered width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows are fewer or narrower than the panel's available width SHALL leave the remaining width empty rather than stretching every column to consume it. When the pane's available width is narrower than the combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies which cell. The exit-outlet pane (the move frame) SHALL be exempt from the fixed-column rule: its row region SHALL be laid out with the width-adaptive `repeat(auto-fit, minmax(min(150px, 100%), 1fr))` grid, the column count SHALL follow the pane's available width, and the tiles SHALL stretch with their `1fr` tracks (no content-width cap) so the row region receives the pane's full available width. The track floor SHALL shrink to the pane's own width (`100%`) when the pane is narrower than 150px, so the outlet never overflows a very narrow pane. When the exit count exceeds the pane's rendered column count and the final row is partial, the last exit tile SHALL span the remaining columns of that row so no horizontal space is left blank. The move frame's keyboard geometry SHALL be a single-column list, so the arrow-key cell mapping SHALL NOT depend on the pane's rendered column count.
-
-#### Scenario: A short exit list fills the pane width
-- **WHEN** the move frame renders one or two exits in a pane whose available width could fit many 150px columns
-- **THEN** the `auto-fit` grid collapses the empty tracks, the rendered tiles each occupy their full-width tracks, and no horizontal space in the pane is left empty
-- **WHEN** the move frame renders four or more exits in a pane whose available width fits N columns of at least 150px
-- **THEN** the outlet grid renders N columns, each tile stretches with its track, and no horizontal space in the pane is left empty
-
-#### Scenario: A very narrow pane does not overflow
-- **WHEN** the pane's available width is narrower than 150px
-- **THEN** the track floor shrinks to the pane's width (the `min(150px, 100%)` floor), a single full-width track renders the exits without horizontal overflow, and the tiles fill the available space
-
-#### Scenario: Column-count-driven layout never invents equal-width stretching
-- **WHEN** a fixed-column dock pane (a nav or combat pane) applies a fixed column count for its keyboard geometry
-- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width, and the exit-outlet pane is the exempted width-adaptive exception
-
-#### Scenario: A narrow pane compresses the fixed columns instead of overflowing
-- **WHEN** the pane's available width (e.g. the minimum supported 1280x720 viewport) is narrower than the combined natural width of the fixed columns
-- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width
-
-#### Scenario: The move frame navigates as a single-column list
-- **WHEN** the player presses ArrowUp or ArrowDown inside the move frame
-- **THEN** focus cycles through the move frame's items — the exit rows in order, then the `back` row — ArrowLeft and ArrowRight are no-ops, and the keyboard cell mapping does not depend on the pane's rendered column count
-
 ### Requirement: Narrative lines carry the reference's semantic classes
 Committed narrative lines SHALL render with the reference draft's semantic presentation: a line of
 committed `sys` kind SHALL render in the sans face at the reference's secondary size and colour with
@@ -2015,3 +1985,28 @@ outside the defined steps SHALL be discarded, and the default SHALL apply.
 #### Scenario: An invalid stored speed falls back to the default
 - **WHEN** the stored wrapper carries a text speed outside the four steps
 - **THEN** the client loads with the `normal` speed, and the other stored preferences still apply
+
+### Requirement: A fixed-column dock pane sizes its columns to content
+When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count
+SHALL govern only which cell each row occupies, never the rendered width of a column. A column's
+rendered width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows
+are fewer or narrower than the panel's available width SHALL leave the remaining width empty rather
+than stretching every column to consume it. When the pane's available width is narrower than the
+combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink
+toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns
+the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies
+which cell. The content-sized track rule SHALL apply to the nav pane, the only pane whose fixed column
+count sizes its tracks to content. The combat skill, target, and scale panes lay out their rows with
+their own flex forms, which the fixed column count does not size, and the suggestion-card pane's grid
+keeps equal-share tracks; those panes SHALL be bound by the no-overflow rule above and the keyboard
+cell mapping, not by the content-sized track rule. The scene
+overview is not a fixed-column pane (its chips wrap by width under the section geometry the exploration
+dock requirement defines).
+
+#### Scenario: Column-count-driven layout never invents equal-width stretching
+- **WHEN** a fixed-column dock pane (a nav pane) applies a fixed column count for its keyboard geometry
+- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width
+
+#### Scenario: A narrow pane compresses the fixed columns instead of overflowing
+- **WHEN** the pane's available width (e.g. the command region at the minimum supported 1280x720 viewport) is narrower than the combined natural width of the fixed columns
+- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width

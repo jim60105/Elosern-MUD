@@ -17,7 +17,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
-    delete globalThis.ResizeObserver;
   });
 
   function mountMenu(items, idPrefix = "combat-row") {
@@ -43,10 +42,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     );
   }
 
-  const outletItems = [
-    { key: "exit-north", label: "北へ", enabled: true, action_id: "explore.move", direction: "north" },
-    { key: "exit-east", label: "東へ", enabled: true, action_id: "explore.move", direction: "east" },
-  ];
   const navItems = [
     { key: "look-room", label: "查看房間", enabled: true, action_id: "explore.look" },
     { key: "entity-1", label: "老婦", enabled: true, action_id: "explore.look", kind: "npc" },
@@ -75,15 +70,12 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "confirm-forfeit", label: "確認投降", enabled: true, action_id: "combat.forfeit" },
     { key: "cancel-forfeit", label: "取消", enabled: true, navigation: true, surface: "cancel-forfeit" },
   ];
+  // The character panel's read-only rows: focusable navigation cells that
+  // submit nothing — the `plain` pane's production shape.
   const plainItems = [
-    { key: "move", label: "移動", enabled: true, navigation: true, surface: "move" },
-    { key: "look", label: "查看", enabled: true, navigation: true, surface: "look" },
+    { key: "trait-hp", label: "HP 100 / 100", enabled: true, navigation: true, surface: "trait-hp" },
+    { key: "trait-mp", label: "MP 40 / 40", enabled: true, navigation: true, surface: "trait-mp" },
   ];
-
-  it("outlet: rows equal the committed move items in order", () => {
-    const w = mountMenu(outletItems, "exploration-row");
-    assertRowsInOrder(w, outletItems, "exploration-row");
-  });
 
   it("nav: rows equal the committed look items in order", () => {
     const w = mountMenu(navItems, "exploration-row");
@@ -150,17 +142,17 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     assertRowsInOrder(w, confirmItems, "combat-row");
   });
 
-  it("plain: rows equal the committed root items in order", () => {
+  it("plain: rows equal the committed display-only items in order", () => {
     const w = mountMenu(plainItems, "exploration-row");
     assertRowsInOrder(w, plainItems, "exploration-row");
   });
 
   it("no pane renders a field the payload does not carry", () => {
-    // A plain root frame has no `cost_text` / `kind` / `direction`; the pane
-    // must not invent a cost, kind sub-line, or direction glyph.
+    // A plain frame of display-only rows has no `cost_text` / `kind` /
+    // `direction`; the pane must not invent a cost, kind sub-line, or
+    // direction glyph.
     const w = mountMenu(plainItems, "exploration-row");
     expect(w.find(".dock-menu__skill-cost").exists()).toBe(false);
-    expect(w.find(".dock-menu__outlet-glyph").exists()).toBe(false);
     expect(w.find(".dock-menu__nav-sub").exists()).toBe(false);
   });
 
@@ -169,7 +161,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
   // inline `grid-template-columns` is asserted on the rendered element (the
   // script-setup computed is closed, so `wrapper.vm` is not relied upon).
   const PANE_SELECTORS = {
-    outlet: ".dock-menu__outlet",
     nav: ".dock-menu__nav",
     affordance: ".dock-menu__aff",
     cards: ".dock-menu__cards",
@@ -190,11 +181,10 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     return w;
   }
 
-  it("the nav pane emits content-sized tracks; the outlet pane and every other kind keep 1fr or none; no gridCols emits none", () => {
+  it("the nav pane emits content-sized tracks; every other kind keeps 1fr or none; no gridCols emits none", () => {
     const contentCases = [
       { items: navItems, sel: PANE_SELECTORS.nav, expected: "repeat(2, minmax(0, max-content))" },
     ];
-    const outletCase = { items: outletItems, sel: PANE_SELECTORS.outlet, expected: "" };
     const stretchCases = [
       { items: affordanceItems, sel: PANE_SELECTORS.affordance, expected: "repeat(2, 1fr)" },
       { items: cardItems, sel: PANE_SELECTORS.cards, expected: "repeat(2, 1fr)" },
@@ -204,7 +194,7 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
       { items: confirmItems, sel: PANE_SELECTORS.confirm, expected: "repeat(2, 1fr)" },
       { items: plainItems, sel: PANE_SELECTORS.plain, expected: "repeat(2, 1fr)" },
     ];
-    for (const { items, sel, expected } of [outletCase, ...contentCases, ...stretchCases]) {
+    for (const { items, sel, expected } of [...contentCases, ...stretchCases]) {
       const w = mountMenuWithCols(items, 2);
       const pane = w.find(sel);
       expect(pane.exists()).toBe(true, sel + " pane rendered");
@@ -227,92 +217,19 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     }
   });
 
-  it("outlet: a partial last row spans its remaining columns (no blank space)", async () => {
-    // 8 exits in a pane that fits 7 columns of 150px tracks: row 1 holds 7
-    // tiles, row 2 holds a single tile that must span the rest of the row.
-    const exits = Array.from({ length: 8 }, (_, i) => ({
-      key: `exit-${i + 1}`,
-      label: `出口${i + 1}`,
-      enabled: true,
-      action_id: "explore.move",
-    }));
-    // Fake the pane's own measured width (1140px → floor(1148/158) = 7 cols).
-    globalThis.ResizeObserver = class {
-      constructor(cb) {
-        this.cb = cb;
-      }
-      observe(el) {
-        const entry = { contentRect: { width: 1140 } };
-        this.cb([entry], this);
-      }
-      disconnect() {}
-      unobserve() {}
-    };
-    const w = mountMenuWithCols(exits, null, "exploration-row");
-    await w.vm.$nextTick();
-    const tiles = w.findAll(".dock-menu__outlet-tile");
-    expect(tiles).toHaveLength(8);
-    // The last tile (the lone row-2 tile) spans from its own column (1) to
-    // the row's end; no tile before it carries the span.
-    expect(tiles[tiles.length - 1].element.style.gridColumn).toBe("1 / -1");
-    expect(tiles[0].element.style.gridColumn).toBe("");
-    w.unmount();
-    document.body.innerHTML = "";
-  });
-
-  it("outlet: a complete last row carries no span", async () => {
-    // 14 exits at 7 columns: two complete rows, no partial row to fill.
-    const exits = Array.from({ length: 14 }, (_, i) => ({
-      key: `exit-${i + 1}`,
-      label: `出口${i + 1}`,
-      enabled: true,
-      action_id: "explore.move",
-    }));
-    globalThis.ResizeObserver = class {
-      constructor(cb) {
-        this.cb = cb;
-      }
-      observe(el) {
-        const entry = { contentRect: { width: 1140 } };
-        this.cb([entry], this);
-      }
-      disconnect() {}
-      unobserve() {}
-    };
-    const w = mountMenuWithCols(exits, null, "exploration-row");
-    await w.vm.$nextTick();
-    const tiles = w.findAll(".dock-menu__outlet-tile");
-    expect(tiles).toHaveLength(14);
-    for (const t of tiles) {
-      expect(t.element.style.gridColumn).toBe("");
-    }
-    w.unmount();
-    document.body.innerHTML = "";
-  });
-
   it("the listbox active descendant never dangles on a focused back row", async () => {
     const backItem = { key: "back", label: "返回上一層", enabled: true, navigation: true, surface: "back" };
-    // OUTLET: the back row is not rendered as an outlet tile, so the
-    // listbox must not name a non-existent row id as its active descendant.
-    const w = mountMenu([...outletItems, backItem], "exploration-row");
+    // Every frame renders its `back` item as a row of its own listbox, so the
+    // active descendant keeps naming its real row id.
+    const navWithBack = [...navItems, backItem];
+    const w = mountMenu(navWithBack, "exploration-row");
     w.setProps({ focusedKey: "back" });
     await w.vm.$nextTick();
     const listbox = w.find('[role="listbox"]');
-    expect(listbox.attributes("aria-activedescendant")).toBeUndefined();
-    w.unmount();
-    document.body.innerHTML = "";
-
-    // NAV: the back row IS rendered as a nav row, so the active descendant
-    // keeps naming its real row id.
-    const navWithBack = [...navItems, backItem];
-    const w2 = mountMenu(navWithBack, "exploration-row");
-    w2.setProps({ focusedKey: "back" });
-    await w2.vm.$nextTick();
-    const listbox2 = w2.find('[role="listbox"]');
-    expect(listbox2.attributes("aria-activedescendant")).toBe(
+    expect(listbox.attributes("aria-activedescendant")).toBe(
       `exploration-row-${navWithBack.length - 1}`,
     );
-    w2.unmount();
+    w.unmount();
     document.body.innerHTML = "";
   });
 });

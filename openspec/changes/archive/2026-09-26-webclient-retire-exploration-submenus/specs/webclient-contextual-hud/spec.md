@@ -57,9 +57,9 @@ through to the text / command-history path.
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders six picks over the dock's scene overview and the player presses
-  `6` and `7` from a non-editable focus
-- **THEN** the `6` press activates pick six through the same dispatch entry, the `7` press
+- **WHEN** the dialogue variant renders its four picks (the panel-owned `DIALOGUE_MAX_CHOICES` bound) over the dock's scene overview and the player presses
+  `4` and `5` from a non-editable focus
+- **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press
   is unclaimed and falls through, and no dock chip is focused or activated
 
 ### Requirement: Dock panes render a per-kind vocabulary from backed fields only
@@ -193,10 +193,11 @@ than stretching every column to consume it. When the pane's available width is n
 combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink
 toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns
 the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies
-which cell. The content-sized track rule SHALL apply to the nav pane, the only pane that lays out its
-row region as a grid on the fixed column count. The combat skill, target, and scale panes lay out their
-rows with their own flex forms, which the fixed column count does not size; they SHALL be bound by the
-no-overflow rule above and the keyboard cell mapping, not by the content-sized track rule. The scene
+which cell. The content-sized track rule SHALL apply to the nav pane, the only pane whose fixed column
+count sizes its tracks to content. The combat skill, target, and scale panes lay out their rows with
+their own flex forms, which the fixed column count does not size, and the suggestion-card pane's grid
+keeps equal-share tracks; those panes SHALL be bound by the no-overflow rule above and the keyboard
+cell mapping, not by the content-sized track rule. The scene
 overview is not a fixed-column pane (its chips wrap by width under the section geometry the exploration
 dock requirement defines).
 

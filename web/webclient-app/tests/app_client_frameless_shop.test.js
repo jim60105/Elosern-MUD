@@ -94,8 +94,8 @@ describe("frameless 商店 drawer (composition contract)", () => {
 
     const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
     const descriptors = [
-      { source: "exploration.move", params: {} },
-      { source: "exploration.interact", params: {} },
+      { source: "exploration.keywords", params: { identity: 7 } },
+      { source: "exploration.suggestions", params: {} },
     ];
 
     for (const drawerName of drawers) {

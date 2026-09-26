@@ -1,6 +1,7 @@
-// Exit presentation helpers shared by the dock's exit outlet (DockMenu.vue)
-// and the scene overview's exit chips (SceneOverview.vue), moved out of
-// DockMenu.vue (webclient-scene-overview-component design D6).
+// Exit presentation helpers for the scene overview's exit chips
+// (SceneOverview.vue), moved out of DockMenu.vue when the dock's exit outlet
+// was retired (webclient-scene-overview-component design D6,
+// webclient-retire-exploration-submenus).
 //
 // The fixed client-side direction-glyph table (H3 design D9): a move row's
 // canonical direction resolves to a glyph; a direction string outside the

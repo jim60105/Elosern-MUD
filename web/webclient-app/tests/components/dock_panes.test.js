@@ -3,27 +3,17 @@
 // pin the classifier against the real exploration/combat frame shapes —
 // including the standard `back` row that must not break the `every(...)`
 // checks, and the distinction between the combat `targets` pane and the
-// exploration interact-target (nav) rows.
+// exploration navigation rows.
+//
+// webclient-retire-exploration-submenus: the move frame's `outlet` kind and
+// the exploration interact/suggestions badges are gone with the frames and the
+// tab-root entry that carried them.
 
 import { describe, expect, it } from "vitest";
 
 import { badgeCount, classifyPane } from "../../components/dock-panes.js";
 
 describe("classifyPane (task 5.1)", () => {
-  it("classifies the move outlet frame (exit rows + back row) as outlet", () => {
-    // Normalized exploration move frame: `exit-*` rows with `direction`,
-    // plus the standard `back` row. The `back` row must not break the
-    // `every(...)` check.
-    const frame = {
-      items: [
-        { key: "exit-north", label: "北へ", enabled: true, action_id: "explore.move", direction: "north" },
-        { key: "exit-east", label: "東へ", enabled: true, action_id: "explore.move", direction: "east" },
-        { key: "back", label: "戻る", navigation: true, surface: "back" },
-      ],
-    };
-    expect(classifyPane(frame)).toBe("outlet");
-  });
-
   it("classifies the look nav frame (explore.look rows + back row) as nav", () => {
     const frame = {
       items: [
@@ -36,10 +26,11 @@ describe("classifyPane (task 5.1)", () => {
     expect(classifyPane(frame)).toBe("nav");
   });
 
-  it("classifies the exploration interact-target list (target-<id> nav rows) as nav, not combat targets", () => {
-    // Exploration interact targets are navigation cells whose `surface` is a
-    // `target-<id>` key (they open the target-affordance frame). They must
-    // NOT be classified as the combat `targets` pane.
+  it("classifies the exploration person chip rows (target-<id> nav rows) as nav, not combat targets", () => {
+    // The scene overview's person chips are navigation cells whose `surface`
+    // is a `target-<id>` key (they open the verb popover). They must NOT be
+    // classified as the combat `targets` pane. (The overview is rendered by
+    // SceneOverview, not DockMenu, but the classifier's contract is unchanged.)
     const frame = {
       items: [
         { key: "target-1", label: "老婦", navigation: true, surface: "target-1" },
@@ -113,7 +104,7 @@ describe("classifyPane (task 5.1)", () => {
     expect(classifyPane(frame)).toBe("nav");
   });
 
-  it("classifies the stable root frame (no action rows) as plain", () => {
+  it("classifies a frame of submenu openers (no action rows) as plain", () => {
     const frame = {
       items: [
         { key: "move", label: "移動", navigation: true, surface: "move" },
@@ -131,20 +122,6 @@ describe("classifyPane (task 5.1)", () => {
 });
 
 describe("badgeCount (task 4.4)", () => {
-  it("derives the 互動 badge from exploration.interact.length", () => {
-    // Hoist the nested arrays so the V8/Node 24 parser doesn't trip on a
-    // nested object-in-array-in-object literal (the session's documented quirk).
-    const interact = [{ identity: "t1" }, { identity: "t2" }];
-    const view = { panels: { exploration: { interact } } };
-    expect(badgeCount("interact", view)).toBe(2);
-  });
-
-  it("derives the 建議 badge from suggestions.cards.length", () => {
-    const cards = [{ action_code: "explore.wait" }];
-    const view = { suggestions: { status: "ready", cards } };
-    expect(badgeCount("suggestions", view)).toBe(1);
-  });
-
   it("derives the 技能 badge from the flattened skill-descriptor count", () => {
     // `context_actions.skills` is an array of categories; each category owns
     // a `groups` array; each group owns a `skills` array. The badge counts

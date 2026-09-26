@@ -383,9 +383,6 @@ export function applyFrames(ctx) {
   // place naming exploration frame sources; the frame content itself comes
   // only from the resolver.
   ctx.EXPLORATION_SUBMENU_PUSHES = {
-    move: { source: "exploration.move", params: {} },
-    look: { source: "exploration.look", params: {} },
-    interact: { source: "exploration.interact", params: {} },
     wait: { source: "exploration.wait", params: {} },
     suggestions: { source: "exploration.suggestions", params: {} },
   };

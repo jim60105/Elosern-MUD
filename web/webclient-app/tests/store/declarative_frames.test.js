@@ -1,19 +1,17 @@
 // webclient-declarative-frame-stack (task 4.1): the store-level declarative
 // frame contract. Open exploration frames are descriptors, never copies — a
-// committed snapshot RE-RESOLVES them at the next access (the open move
-// outlet pane shows the new room's exits with key-tracked focus), a vanished
-// target identity closes the verb popover and lands focus on the nearest
-// surviving chip, whole-stack loss cascades to the root, the suggestions
-// frame survives generating→ready and exits to the root on `unavailable`
-// with no reason row, pointer activation writes the focus key before
-// dispatch, and a mode switch yields the one-frame stack.
+// committed snapshot RE-RESOLVES them at the next access (the open
+// scripted-keyword pane shows the target's new keywords with key-tracked
+// focus), a vanished target identity closes the verb popover and lands focus
+// on the nearest surviving chip, whole-stack loss cascades to the root, the
+// suggestions frame survives generating→ready and exits to the root on
+// `unavailable` with no reason row, pointer activation writes the focus key
+// before dispatch, and a mode switch yields the one-frame stack.
 //
-// webclient-scene-overview-swap: the dock's exploration root is the scene
-// overview, so the move/look/interact submenus are no longer reachable by
-// keyboard or pointer — they are mounted here by a direct router push (the
-// same seam the keyboard-router Node gate uses) and stay covered until
-// webclient-retire-exploration-submenus deletes them with their tests. The
-// file also pins the new room-change reset (design D2).
+// webclient-retire-exploration-submenus: the move/look/interact frames are
+// gone, so the pushed frame these contracts ride is the scripted-keyword pane,
+// reached through the real path (person chip → verb popover → 交談). The file
+// also pins the new room-change reset (design D2).
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -35,7 +33,7 @@ function explorationCommit(revision, explorationOverrides, contextActionsOverrid
   });
 }
 
-function openExploration(store) {
+function openExploration(store, explorationOverrides) {
   store.beginTransport(1);
   store.setConnected(true);
   const result = store.receive(
@@ -46,7 +44,7 @@ function openExploration(store) {
         revision: 1,
         panels: {
           status: fx.statusPanel(),
-          exploration: fx.explorationPanel(),
+          exploration: fx.explorationPanel(explorationOverrides),
           local_map: fx.localMapPanel(),
           context_actions: fx.explorationActions(),
         },
@@ -57,12 +55,39 @@ function openExploration(store) {
   expect(result.accepted).toBe(true);
 }
 
-// The move outlet frame, mounted by a direct router push: the dock root is
-// the scene overview, so no keyboard or pointer path reaches it any more.
-// Until webclient-retire-exploration-submenus deletes the frame with this
-// test, the direct push keeps the declarative re-resolution contract covered.
-function pushMoveOutlet(store) {
-  store.router.pushFrame({ source: "exploration.move", params: {} }, { openerKey: null });
+// One interact target carrying a scripted-keyword affordance and the given
+// keyword rows: the panel shape the 交談 frame resolves from.
+function keywordTarget(identity, keywords) {
+  return {
+    identity,
+    display_name: "店長",
+    portrait_ref: null,
+    affordances: [
+      {
+        kind: "action",
+        action_id: "explore.talk_scripted",
+        label: "交談",
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+    keywords,
+  };
+}
+
+function keyword(keyword_id, label) {
+  return { keyword_id, label };
+}
+
+// The scripted-keyword frame, reached through the REAL path (person chip ->
+// verb popover -> 交談): the exploration family's remaining pushed frame with
+// a `back` row, so it carries the declarative re-resolution contracts below.
+function openKeywordsFrame(store) {
+  expect(store.focusItemByKey("target-7")).toBe(true);
+  expect(store.focusConfirm("keyboard")).toBe(true);
+  expect(store.focusItemByKey("talk-scripted")).toBe(true);
+  expect(store.focusConfirm("keyboard")).toBe(true);
+  expect(store.router.depth()).toBe(3);
 }
 
 // A person chip's verb popover: one deliberate activation from the overview.
@@ -92,33 +117,30 @@ describe("declarative frame stack (store contract)", () => {
   });
 
   describe("commit-driven re-resolution", () => {
-    it("a snapshot commit updates the open move frame with key-tracked focus", () => {
-      openExploration(store);
-      // Mount the move outlet frame and focus the north exit row.
-      pushMoveOutlet(store);
-      expect(store.router.depth()).toBe(2);
-      expect(store.view.focus.key).toBe("exit-east");
+    it("a snapshot commit updates the open keyword frame with key-tracked focus", () => {
+      openExploration(store, {
+        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+      });
+      // Open the 交談 frame and focus its second keyword row.
+      openKeywordsFrame(store);
+      expect(store.view.focus.key).toBe("kw-a");
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("kw-b");
 
-      // The room changes under the open frame: a wholly different exit list
-      // where the focused key survives at a DIFFERENT index (the locked door
-      // is now second). No re-push exists — the next read resolves it.
+      // The target's keywords change under the open frame: a wholly different
+      // list where the focused key survives at a DIFFERENT index (乙 is now
+      // second). No re-push exists — the next read resolves it.
       const result = store.receive(
         1,
         "ui_update",
         [
           explorationCommit(3, {
-            move: [
-              { exit_ref: "south", label: "南門", destination: "room:51", enabled: true, disabled_reason: null },
-              {
-                exit_ref: "north",
-                label: "北門",
-                destination: "room:52",
-                enabled: true,
-                disabled_reason: null,
-              },
-              { exit_ref: "west", label: "西站", destination: "room:53", enabled: true, disabled_reason: null },
+            interact: [
+              keywordTarget(7, [
+                keyword("c", "丙"),
+                keyword("b", "乙"),
+                keyword("d", "丁"),
+              ]),
             ],
           }),
         ],
@@ -126,42 +148,34 @@ describe("declarative frame stack (store contract)", () => {
       );
       expect(result.accepted).toBe(true);
 
-      // The pane lists the new room's exits and the focus KEY survived.
+      // The pane lists the new keyword rows and the focus KEY survived.
       const labels = store.router.currentMenu().items.map((item) => item.label);
-      expect(labels).toEqual(["南門", "北門", "西站", "返回上一層"]);
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(labels).toEqual(["丙", "乙", "丁", "返回上一層"]);
+      expect(store.view.focus.key).toBe("kw-b");
 
       // Re-activation submits the NEW row's payload (the committed
-      // exit_ref/current_node), never a copy captured when the frame opened.
+      // npc_id/keyword_id), never a copy captured when the frame opened.
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].action_id).toBe("explore.move");
-      expect(sender.sent.actions[0].payload).toEqual({ exit_ref: "north", current_node: "room:42" });
+      expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
+      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, keyword_id: "b" });
     });
 
     it("a lost focus key lands on the nearest surviving row", () => {
-      openExploration(store);
-      pushMoveOutlet(store);
+      openExploration(store, {
+        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+      });
+      openKeywordsFrame(store);
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("kw-b");
       // The focused row disappears: the re-derived frame is
-      // [exit-south, back]; the router-private cached row index was 1, and
+      // [kw-c, back]; the router-private cached row index was 1, and
       // the nearest surviving index (earlier on a tie) takes focus.
       store.receive(
         1,
         "ui_update",
         [
-          explorationCommit(3, {
-            move: [
-              {
-                exit_ref: "south",
-                label: "南門",
-                destination: "room:51",
-                enabled: true,
-                disabled_reason: null,
-              },
-            ],
-          }),
+          explorationCommit(3, { interact: [keywordTarget(7, [keyword("c", "丙")])] }),
         ],
         {},
       );
@@ -291,27 +305,15 @@ describe("declarative frame stack (store contract)", () => {
 
   describe("activation", () => {
     it("a pointer pick writes the frame focus key before dispatching", () => {
-      openExploration(store);
-      // Two enabled exits (the base fixture's north exit is disabled).
-      store.receive(
-        1,
-        "ui_update",
-        [
-          explorationCommit(2, {
-            move: [
-              { exit_ref: "east", label: "東門", destination: "room:43", enabled: true, disabled_reason: null },
-              { exit_ref: "north", label: "北門", destination: "room:44", enabled: true, disabled_reason: null },
-            ],
-          }),
-        ],
-        {},
-      );
-      pushMoveOutlet(store);
+      openExploration(store, {
+        interact: [keywordTarget(7, [keyword("a", "甲"), keyword("b", "乙")])],
+      });
+      openKeywordsFrame(store);
       // Pointer selection of the second row, then a pointer confirm.
-      expect(store.focusItemByKey("exit-north")).toBe(true);
+      expect(store.focusItemByKey("kw-b")).toBe(true);
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].payload).toEqual({ exit_ref: "north", current_node: "room:42" });
+      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, keyword_id: "b" });
 
       // The written-back key survives the next re-resolution: a commit keeps
       // focus on the ACTIVATED row, not on the row the frame first opened.
@@ -320,21 +322,12 @@ describe("declarative frame stack (store contract)", () => {
         "ui_update",
         [
           explorationCommit(3, {
-            move: [
-              { exit_ref: "south", label: "南門", destination: "room:51", enabled: true, disabled_reason: null },
-              {
-                exit_ref: "north",
-                label: "北門",
-                destination: "room:52",
-                enabled: true,
-                disabled_reason: null,
-              },
-            ],
+            interact: [keywordTarget(7, [keyword("c", "丙"), keyword("b", "乙")])],
           }),
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("kw-b");
     });
   });
 

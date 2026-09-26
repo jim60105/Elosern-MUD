@@ -365,8 +365,8 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 | Hook | Bucket |
 |---|---|
-| `.dock-menu-item` (prefix; covers `.dock-menu-item--focused` under `#action-dock`) | REMAP-TO-TESTID |
-| `.dock-menu`, `.dock-menu__outlet`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
+| `.dock-menu-item`, `.dock-menu-item--focused`, `.dock-menu-item__label`, `.dock-menu-item__glyph` (the shared row renderer's cell, its focused fill, and the scene-overview chip's label and direction glyph) | REMAP-TO-TESTID |
+| `.dock-menu`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed`, `.scene-chip` (the scene overview's chips), `.action-dock__pane` (the dock's scrolling pane) | REMAP-TO-TESTID |
 | `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
 | `.hint` (the command-line hint cluster naming the history-recall keys; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
 | `.desktop-navigation button` (the desktop redesign's top navigation control set: 角色狀態 / 任務 / 背包 surface re-homes; targeted by `test_browser_exploration.py` and `test_browser_inventory_grid.py` via `page.locator('.desktop-navigation button', has_text=...)`) | PRESERVE-SAME-HOOK |
@@ -537,6 +537,12 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### webclient-retire-exploration-submenus — 2026-09-26（webclient-retire-exploration-submenus）
+
+- **§2.3 退役識別碼：** `.dock-menu__outlet` 與 `.dock-menu__outlet-tile` 自 CSS class hooks 表移除。探索 dock 的根框架是場景總覽（webclient-scene-overview-swap），出口即總覽的 chips，因此移動子選單連同其 exit-outlet pane 一併刪除；受管瀏覽器套件對該 pane 的引用同步改指場景總覽的 chips。
+- **§2.3 新增 hooks：** `.scene-chip`（場景總覽的 chips）、`.action-dock__pane`（dock 的捲動面板）、`.dock-menu-item__label` 與 `.dock-menu-item__glyph`（chip 的文字與方向字形）——皆為既有的 `.dock-menu-item` 列所描述的同一個共享列渲染器之穩定鉤點，本變更把該列展開為明列項目。
+- **§5 完整性聲明維持成立：** 本變更只退役並新增受管目標，未遺留未註冊的識別碼；`tests/test_webclient_frozen_contract.py` 的單向涵蓋檢查維持與本變更前相同的判定結果。
 
 ### quest-drawer-split — 2026-09-06（webclient-quest-drawer-split）
 
