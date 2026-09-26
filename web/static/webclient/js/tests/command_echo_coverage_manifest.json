@@ -23,6 +23,7 @@
     "explore.possess_release",
     "explore.practice",
     "explore.talk_freeform",
+    "explore.talk_open",
     "explore.talk_scripted",
     "explore.wait",
     "gallery.subject.select",

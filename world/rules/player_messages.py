@@ -91,6 +91,18 @@ def terminal_outcome_message(outcome: str) -> str:
     return TERMINAL_OUTCOME_MESSAGES.get(outcome, CONTINUE_COMBAT_MESSAGE)
 
 
+# The fixed server-authored line a conversation opens on when the host has no
+# authored greeting (``explore.talk_open``, avg-stage-redesign D3). It is
+# narration, not quoted speech, so it carries no corner brackets; ``name`` is
+# the host's key, the same name the scripted narrative message uses.
+DIALOGUE_OPEN_FALLBACK_TEMPLATE = "{name}看向你，等你開口。"
+
+
+def dialogue_open_fallback_line(name: str) -> str:
+    """Return the fixed server-authored opening line for a greetingless host."""
+    return DIALOGUE_OPEN_FALLBACK_TEMPLATE.format(name=name)
+
+
 # Stable defeat-aftermath EventLog templates (defeat-aftermath-core D-C6).
 # Every new aftermath kind ships its zh-tw offline template line here and the
 # rendered text flows through the ordinary EventLog path (Telnet and WebClient

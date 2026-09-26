@@ -92,12 +92,15 @@ server validator rather than emitted. The client's global envelope gate (list-it
 clear the maximal affordance list so a large room's form is never rejected before panel
 validation. The production client mirror's action-code enumerations (context-action codes,
 exploration action ids) and its affordance `params` validation branches SHALL stay in lockstep
-with the server vocabulary. `CONTEXT_ACTIONS_ACTION_CODES` is the full 10-code sequence and
-SHALL contain every code in `ACTION_CODE_ALLOWLIST`. `EXPLORATION_ACTION_IDS` is intentionally
-the target-scoped subset (affordances that require an NPC target identity) — `explore.move`,
-`explore.look`, and `explore.wait` are intentionally absent because they are never emitted as
-per-target affordances; adding `explore.possess` and `explore.possess_release` brings this list
-to seven entries. Every code in each enumeration SHALL have a params branch accepting exactly the
+with the server vocabulary. `CONTEXT_ACTIONS_ACTION_CODES` is the full sequence of every code in
+`ACTION_CODE_ALLOWLIST` (twelve codes, including `explore.talk_open`, which the vocabulary never
+emits but which the shared params gate accepts with exactly `{npc_id}`). `EXPLORATION_ACTION_IDS`
+is intentionally the `exploration` panel's target-scoped subset (affordances that require an NPC
+target identity) — `explore.move`, `explore.look`, and `explore.wait` are absent because they are
+never emitted as per-target affordances, and `explore.talk_scripted` and `explore.talk_freeform`
+are absent because the panel folds a host's talk entries into one `explore.talk_open` affordance;
+the list is exactly `explore.talk_open`, `explore.party_invite`, `explore.party_leave`,
+`explore.engage`, `explore.possess`, `explore.possess_release`, and `explore.deliver`. Every code in each enumeration SHALL have a params branch accepting exactly the
 server validator's accepted shape and rejecting everything else; the parity SHALL be pinned by
 dependency-free Node test fixtures carrying the server's authoritative code lists and accept/reject
 params vectors.
@@ -121,3 +124,9 @@ params vectors.
 - **THEN** the client mirror's enumeration and params validation accept both, and reject mutated
   params (missing or extra keys, wrong kinds, out-of-range ids) exactly as the server validator
   does
+
+#### Scenario: The client mirror accepts the conversation-opening code
+- **WHEN** the client mirror's params gate validates `explore.talk_open` with `{npc_id: 7}`, and
+  again with an added `keyword_id`, a missing `npc_id`, or a zero `npc_id`
+- **THEN** the first is accepted and the others are rejected exactly as the server validator does,
+  and `CONTEXT_ACTIONS_ACTION_CODES` equals the server's twelve-code allowlist

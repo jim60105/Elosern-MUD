@@ -125,6 +125,13 @@ function validateContextActionsAffordanceParams(actionId, params) {
     }
     return params;
   }
+  if (actionId === "explore.talk_open") {
+    // The conversation opener carries exactly the host identity; the server
+    // validator's accepted shape is {npc_id}.
+    requireExactFields(params, "talk_open params", ["npc_id"], []);
+    requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+    return params;
+  }
   if (actionId === "explore.talk_freeform") {
     // Binding-only shape: no validator produces npc_id without speech.
     requireExactFields(params, "freeform params", ["npc_id"], []);

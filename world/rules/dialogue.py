@@ -25,6 +25,10 @@ as its ONLY read/write surface: ``open_or_refresh_dialogue`` /
 ``db.dialogue_session`` on the character is the single truth of WHO the
 character is speaking to and the latest server-authored LINE; no presenter,
 AI layer, or client payload may open, refresh, or clear it.
+The opener success paths are the ``explore.talk_open`` opener (a conversation
+with the host's greeting, or the fixed fallback line), the
+``explore.talk_scripted`` and ``explore.talk_freeform`` adapters, and the
+``talk`` text command.
 The clear seams are: movement settlement, combat engage, NPC departure
 cleanup, and the ``explore.dialogue_leave`` adapter's explicit exit
 (webclient-align-11) — the adapter calls ``clear_dialogue_session`` here and
@@ -143,6 +147,25 @@ def greeting_for(npc: Any) -> str | None:
     if definition is None:
         return None
     return definition.greeting
+
+
+def opens_dialogue(npc: Any) -> bool:
+    """Whether a conversation can open on ``npc`` (the conversable-host gate).
+
+    True for an ``LLMNPC`` (the generative host) or for a host carrying a
+    ``ScriptedDialogue`` component whose authored ``dialogue_key`` resolves in
+    ``DIALOGUE_TABLE``. A component host whose table does not resolve has no
+    greeting and no choices, so opening a session on it would be a dead end;
+    the caller shows its disabled ``dialogue_unavailable`` affordance instead.
+    The adapter and the exploration panel share this one predicate, so the
+    rendered affordance and the committed action agree. Read-only.
+    """
+    from typeclasses.npcs import LLMNPC
+
+    if isinstance(npc, LLMNPC):
+        return True
+    key = dialogue_key_for(npc)
+    return key is not None and key in DIALOGUE_TABLE
 
 
 @dataclass(frozen=True)
@@ -269,10 +292,11 @@ def open_or_refresh_dialogue(character: Any, npc: Any, line: str) -> DialogueSes
     """Record one delivered server-authored line as the character's session.
 
     The ONLY opener: called from the deterministic-core success paths (the
-    scripted adapter/command branches and the freeform settled observer). The
-    line is truncated to ``MAX_DIALOGUE_SESSION_LINE_CODE_POINTS`` at write, so
-    the stored value is always within the bound no producer can exceed it.
-    Refreshing replaces the value in place (one session per character).
+    ``explore.talk_open`` opener, the scripted adapter/command branches, and
+    the freeform settled observer). The line is truncated to
+    ``MAX_DIALOGUE_SESSION_LINE_CODE_POINTS`` at write, so the stored value is
+    always within the bound no producer can exceed it. Refreshing replaces the
+    value in place (one session per character).
     """
     session = DialogueSession(
         npc_id=int(npc.pk),

@@ -19,12 +19,12 @@ function exitRow(exit, index) {
   };
 }
 
-// A synthesized `exploration` panel (schema v2). `targets` are interact
+// A synthesized `exploration` panel (schema v3). `targets` are interact
 // descriptors (`{identity, name, affordances}`), `entities` extra present
 // characters with no interact descriptor, `objects` look-only things.
 export function explorationPanelFixture({ exits = [], targets = [], entities = [], objects = [] } = {}) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "exploration",
     move: exits.map(exitRow),
@@ -51,7 +51,6 @@ export function explorationPanelFixture({ exits = [], targets = [], entities = [
       display_name: target.name,
       portrait_ref: null,
       affordances: target.affordances || [],
-      keywords: target.keywords || [],
     })),
   };
 }
@@ -82,7 +81,7 @@ export function verbArgs(panel, identity, { focusedKey = null } = {}) {
 
 // Synthesized affordance rows.
 export const AFFORDANCES = {
-  talk: { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+  talk: { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
   trade: { kind: "navigate", surface: "shop", label: "交易", enabled: true, disabled_reason: null },
   guild: { kind: "navigate", surface: "guild", label: "公會服務", enabled: true, disabled_reason: null },
   engage: { kind: "action", action_id: "explore.engage", label: "戰鬥", enabled: true, disabled_reason: null },

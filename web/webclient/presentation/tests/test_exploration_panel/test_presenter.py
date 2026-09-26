@@ -13,6 +13,7 @@ from web.webclient.presentation.exploration import ACTION_IDS
 from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
+from world.rules.dialogue import greeting_for, open_or_refresh_dialogue
 from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY
@@ -72,7 +73,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return self._registry().render("exploration", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_room_renders_exploration_payload_without_mutation(self):
         before = {
             "location": self.player.location,
@@ -91,7 +92,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.player.attributes.get("map_knowledge"), before["map_knowledge"]
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_move_lists_exits_with_canonical_destinations(self):
         destination = create_object(Room, key="南大道", location=None)
         exit_obj = create_object(
@@ -108,7 +109,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row["destination"], f"room:{int(destination.pk)}")
         self.assertIsNone(row["disabled_reason"])
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_locked_exit_is_disclosed_but_disabled(self):
         destination = create_object(Room, key="密室", location=None)
         exit_obj = create_object(
@@ -126,7 +127,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row["disabled_reason"]["code"], "locked")
         self.assertTrue(row["disabled_reason"]["message"].strip())
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_no_location_is_unavailable_without_fabrication(self):
         self.player.location = None
         payload = self._render()
@@ -136,8 +137,9 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_scripted_host_exposes_its_authored_keywords(self):
-        # Keywords render from the live dialogue table: run this surface on
-        # the kit-authored dialogue row.
+        # A scripted host's talk is exactly one 交談 explore.talk_open row on
+        # the descriptor; the authored keywords are the OPEN dialogue panel's
+        # choices, not a target-level list.
         open_synthetic_scope(self, "dialogue")
         host = create_object(NPC, key="公會職員", location=self.south_gate)
         host.components.add(
@@ -145,23 +147,30 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(host.pk))
-        scripted = next(
-            a for a in target["affordances"] if a["kind"] == "action"
-            and a["action_id"] == "explore.talk_scripted"
-        )
-        self.assertTrue(scripted["enabled"])
-        self.assertIsNotNone(target.get("keywords"))
-        keyword_ids = [keyword["keyword_id"] for keyword in target["keywords"]]
+        self.assertNotIn("keywords", target)
+        talk = [
+            a
+            for a in target["affordances"]
+            if a["kind"] == "action" and a["action_id"] == "explore.talk_open"
+        ]
+        self.assertEqual(len(talk), 1)
+        self.assertTrue(talk[0]["enabled"])
+        self.assertIsNone(talk[0]["disabled_reason"])
+        self.assertEqual(talk[0]["label"], "交談")
+        # The single conversation row is listed before the other affordances.
+        self.assertIs(target["affordances"][0], talk[0])
+        # A scripted-only host offers no free-form affordance, and none of the
+        # retired in-conversation codes reaches the descriptor.
+        action_ids = {a.get("action_id") for a in target["affordances"]}
+        self.assertNotIn("explore.talk_freeform", action_ids)
+        self.assertNotIn("explore.talk_scripted", action_ids)
+        # Once the conversation opens, the dialogue panel carries the authored
+        # keyword choices.
+        open_or_refresh_dialogue(self.player, host, greeting_for(host))
+        dialogue = self._registry().render("dialogue", _context(self.player))
         self.assertEqual(
-            keyword_ids,
+            [choice["keyword_id"] for choice in dialogue["choices"]],
             [response.keyword for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses],
-        )
-        # A scripted-only host offers no free-form affordance.
-        self.assertFalse(
-            any(
-                a["kind"] == "action" and a["action_id"] == "explore.talk_freeform"
-                for a in target["affordances"]
-            )
         )
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
@@ -169,11 +178,48 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.south_gate)
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(npc.pk))
-        freeform = next(
-            a for a in target["affordances"] if a["kind"] == "action"
-            and a["action_id"] == "explore.talk_freeform"
+        talk = [
+            a
+            for a in target["affordances"]
+            if a["kind"] == "action" and a["action_id"] == "explore.talk_open"
+        ]
+        self.assertEqual(len(talk), 1)
+        self.assertTrue(talk[0]["enabled"])
+        self.assertIs(target["affordances"][0], talk[0])
+        self.assertNotIn("keywords", target)
+        # The free-form surface is the open conversation's own free row, not a
+        # target-level affordance.
+        self.assertNotIn(
+            "explore.talk_freeform",
+            {a.get("action_id") for a in target["affordances"]},
         )
-        self.assertTrue(freeform["enabled"])
+
+    @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
+    def test_possessed_actor_sees_a_disabled_talk_open(self):
+        from world.rules.party import join_party
+        from world.rules.possession import enter_possession, release_possession
+
+        # The possessed puppet still sees every conversable host, but its 交談
+        # is the vocabulary's own possession refusal, never an enabled row.
+        open_synthetic_scope(self, "dialogue")
+        companion = create_object(LLMNPC, key="被附身者", location=self.south_gate)
+        join_party(companion, self.player)
+        host = create_object(NPC, key="公會職員", location=self.south_gate)
+        host.components.add(
+            ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY)
+        )
+        enter_possession(self.player, companion)
+        try:
+            payload = self._registry().render("exploration", _context(companion))
+        finally:
+            release_possession(self.player, npc=companion, reason="handback")
+        target = next(t for t in payload["interact"] if t["identity"] == int(host.pk))
+        talk = next(
+            a for a in target["affordances"] if a.get("action_id") == "explore.talk_open"
+        )
+        self.assertFalse(talk["enabled"])
+        self.assertEqual(talk["disabled_reason"]["code"], "possessed_talk")
+        self.assertTrue(talk["disabled_reason"]["message"].strip())
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_living_hostile_monster_offers_engage(self):
@@ -310,7 +356,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             all_action_ids & {"explore.take", "explore.drop"}, set()
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_quests_and_inventory_respect_the_services_capability(self):
         payload = self._render()
         self.assertTrue(payload["quests"]["available"])
@@ -323,7 +369,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(payload["quests"]["available"])
         self.assertFalse(payload["inventory"]["available"])
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
     def test_combat_mode_renders_unavailable_form(self):
         monster = create_object(Monster, key="哥布林", location=self.south_gate)
         monster.threat_tier = "low"
@@ -347,12 +393,12 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         target = next(t for t in payload["interact"] if t["identity"] == int(host.pk))
-        scripted = next(
+        talk = next(
             a for a in target["affordances"] if a["kind"] == "action"
-            and a["action_id"] == "explore.talk_scripted"
+            and a["action_id"] == "explore.talk_open"
         )
-        self.assertFalse(scripted["enabled"])
-        self.assertEqual(scripted["disabled_reason"]["code"], "dialogue_unavailable")
+        self.assertFalse(talk["enabled"])
+        self.assertEqual(talk["disabled_reason"]["code"], "dialogue_unavailable")
         self.assertNotIn("keywords", target)
 
     def test_missing_host_and_broken_presenter_keep_status_healthy(self):
@@ -492,17 +538,25 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(hasattr(module, "_destination_node"))
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_exploration_action_ids_derived_from_shared_allowlist(self):
         from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
         from web.webclient.presentation.exploration import ACTION_IDS
 
-        self.assertIs(ACTION_IDS, ACTION_CODE_ALLOWLIST)
-        self.assertEqual(set(ACTION_IDS), set(ACTION_CODE_ALLOWLIST))
+        # The panel's target-scoped list is the shared allowlist minus the two
+        # codes v3 folds into one explore.talk_open 交談 row.
+        self.assertEqual(
+            set(ACTION_IDS),
+            set(ACTION_CODE_ALLOWLIST)
+            - {"explore.talk_scripted", "explore.talk_freeform"},
+        )
+        self.assertIn("explore.talk_open", ACTION_IDS)
+        self.assertNotIn("explore.talk_scripted", ACTION_IDS)
+        self.assertNotIn("explore.talk_freeform", ACTION_IDS)
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_bound_companion_renders_both_panels_with_possession_affordances(self):
         from unittest.mock import patch

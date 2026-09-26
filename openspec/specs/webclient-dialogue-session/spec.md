@@ -10,12 +10,14 @@ consume, with the only-writers boundary and stale-host rules pinned here.
 ### Requirement: The dialogue session is deterministic-core-only character state
 The dialogue session SHALL be persistent JSON-safe state on the character (`db.dialogue_session`)
 naming the host NPC's database identity, the latest server-authored line, and an update marker.
-Its ONLY writers SHALL be the deterministic dialogue-session helpers: the `explore.talk_scripted`
-and `explore.talk_freeform` adapter success paths, the `talk` text-command path, the
-`explore.dialogue_leave` adapter success path, and the clear seams — a successful
+Its ONLY writers SHALL be the deterministic dialogue-session helpers: the `explore.talk_open`,
+`explore.talk_scripted`, and `explore.talk_freeform` adapter success paths, the `talk` text-command
+path, the `explore.dialogue_leave` adapter success path, and the clear seams — a successful
 `settle_movement` of the character, an `engage` involving the actor, and
-NPC leave-room, despawn, or leave-party cleanup naming the session NPC. No presenter, AI layer,
-client payload, or `ui_action` other than the `explore.dialogue_leave` adapter SHALL open,
+NPC leave-room, despawn, or leave-party cleanup naming the session NPC. The `explore.talk_open`
+success path SHALL open the session with the host's authored greeting or, for a host without one,
+the fixed server-authored fallback line, and SHALL write nothing else. No presenter, AI layer,
+client payload, or `ui_action` other than these adapters SHALL open,
 refresh, or clear a session directly. A session whose
 NPC identity no longer resolves to a present, interactable NPC in the character's location SHALL
 be treated as not live: the panel degrades to the unavailable form and the next clear seam or
@@ -42,10 +44,16 @@ the scripted table path SHALL fully drive open, refresh, line, and choices.
   commit, never presenting a stale host
 
 #### Scenario: Offline scripted dialogue drives the whole panel
-- **WHEN** every LLM and image profile is disabled and the player works only scripted keywords
+- **WHEN** every LLM and image profile is disabled and the player opens a conversation with
+  `explore.talk_open` and then works only scripted keywords
 - **THEN** session open, line refresh, choices, mode, and clears all behave identically with zero
   network requests
 
+#### Scenario: Opening a conversation is a session write
+- **WHEN** an actor with no session submits a successful `explore.talk_open` for a present host
+- **THEN** the character holds a session naming that host whose line is the host's greeting (or
+  the fixed fallback line), a live session naming another host is replaced by it, and no state
+  other than `db.dialogue_session` changes
 ### Requirement: The dialogue panel is an exact read-only version-1 presentation panel
 The presentation registry SHALL register a `dialogue` panel at schema version 1. Its available
 form SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `bond_stage`, `line`,

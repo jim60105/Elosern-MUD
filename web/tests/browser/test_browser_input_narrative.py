@@ -31,7 +31,6 @@ from .browser_helpers import (
     narrative_log_length,
     narrative_log_text,
     outbound_messages,
-    overview_target_with_affordance,
     sent_action_count,
     store_state,
     wait_for_narrative_settled,
@@ -1081,28 +1080,29 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
-        bard = None
-        for target in panel.get("interact") or []:
-            for affordance in target.get("affordances") or []:
-                if affordance.get("action_id") == "explore.talk_freeform":
-                    bard = target
-                    break
-            if bard:
-                break
-        self.assertIsNotNone(bard, "the fixture must offer free-form dialogue")
+        # The seed creates the scripted host first, so the LLMNPC bard is the
+        # SECOND present target carrying the v3 conversation affordance (the
+        # panel no longer marks free-form talk).
+        talking = [
+            target
+            for target in panel.get("interact") or []
+            if any(
+                affordance.get("action_id") == "explore.talk_open"
+                for affordance in target.get("affordances") or []
+            )
+        ]
+        self.assertGreaterEqual(
+            len(talking), 2, "the fixture must offer the host and the LLMNPC bard"
+        )
+        bard = talking[1]
 
         # The overview's 人物 chip for the bard opens its verb popover
-        # (webclient-scene-overview-swap); the popover's rows are a vertical
-        # list.
+        # (webclient-scene-overview-swap); 交談 opens the conversation, whose
+        # caption carries the free row.
         activate_overview_chip(page, "target-%s" % bard["identity"])
-        # The target affordances are the spec's single-column rows now
-        # (webclient-exploration-menu: "the selected target's heading and its
-        # single-column affordance rows hold the second column, keyboard
-        # target switching and vertical affordance navigation traverse the
-        # same frames the router owns" — synced with the interaction
-        # workspace), so 自由交談 is reached vertically.
-        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
-        _press(page, "Enter")
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        page.wait_for_selector('[data-testid="dialogue-freeform"]', timeout=30000)
+        page.click('[data-testid="dialogue-freeform"]')
         _wait_field_focused(page)
         speech = "你好，詩人"
         page.keyboard.type(speech)
@@ -1111,16 +1111,23 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # and the command line is still present (it is never closed).
         wait_command_field_released(page)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
-        _wait_inp_line(page, 1, keep_open=True)
-        inp = page.locator('[data-testid="fulllog-overlay"] .inp').first
+        # Two deliberate mutations echoed: the conversation open, then the
+        # one free-form send.
+        _wait_inp_line(page, 2, keep_open=True)
+        lines = page.locator('[data-testid="fulllog-overlay"] .inp')
         self.assertEqual(
-            inp.inner_text(),
+            lines.nth(0).inner_text(),
+            "talk %s" % bard["display_name"],
+            "opening the conversation echoes the keyword-less talk line",
+        )
+        self.assertEqual(
+            lines.nth(1).inner_text(),
             "talk %s %s" % (bard["display_name"], speech),
             "the free-form send echoes exactly one resolved line",
         )
         self.assertEqual(
-            page.locator('[data-testid="fulllog-overlay"] .inp').count(),
-            1,
+            lines.count(),
+            2,
             "no second raw-text echo may appear",
         )
 
@@ -1135,14 +1142,26 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 chip for the bard opens its verb popover.
-        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # opens the conversation (whose caption carries the free row) and the
+        # locked send is attempted after that open.
+        panel = self._wait_exploration_available(page)
+        talking = [
+            target
+            for target in panel.get("interact") or []
+            if any(
+                affordance.get("action_id") == "explore.talk_open"
+                for affordance in target.get("affordances") or []
+            )
+        ]
+        self.assertGreaterEqual(
+            len(talking), 2, "the fixture must offer the host and the LLMNPC bard"
+        )
+        bard = talking[1]
         activate_overview_chip(page, "target-%s" % bard["identity"])
-        # Vertical affordance navigation (webclient-exploration-menu:
-        # "single-column affordance rows ... vertical affordance
-        # navigation").
-        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
-        _press(page, "Enter")
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        page.wait_for_selector('[data-testid="dialogue-freeform"]', timeout=30000)
+        page.click('[data-testid="dialogue-freeform"]')
         _wait_field_focused(page)
         inp_before = page.evaluate(
             "() => window.__elosernBridge.store.narrative.filter((l) => l && l.kind === 'in').length"

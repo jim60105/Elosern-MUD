@@ -558,8 +558,9 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(len(vocabulary), expected_vocabulary)
         self.assertLessEqual(len(vocabulary), MAX_CONTEXT_AFFORDANCES)
         # Every target slot and every navigation surface is present; only the
-        # monster-bound engage code and the companion-bound leave code are
-        # absent from this room.
+        # monster-bound engage code, the companion-bound leave/possess codes,
+        # the delivery code, and the panel-only conversation opener (which the
+        # vocabulary never emits) are absent from this room.
         from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
 
         ids = {
@@ -576,6 +577,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 "explore.possess",
                 "explore.possess_release",
                 "explore.deliver",
+                "explore.talk_open",
             },
         )
         surfaces = {entry.surface for entry in vocabulary if entry.navigation}

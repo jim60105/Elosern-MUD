@@ -331,8 +331,8 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     }
 
     const target = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
-    const scripted = target.items.find((i) => i.key === "talk-scripted");
-    expect(scripted.label).toBe("交談");
+    const talk = target.items.find((i) => i.key === "talk-open");
+    expect(talk.label).toBe("交談");
     const party = panel.interact[0].affordances.find((a) => a.action_id === "explore.party_invite");
     if (party) {
       const row = target.items.find((i) => i.key === "party-invite");
@@ -368,7 +368,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
 
     // An unavailable exploration panel degrades to the shared marker.
     state.panels.exploration = {
-      schema_version: 2,
+      schema_version: 3,
       available: false,
       reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
     };

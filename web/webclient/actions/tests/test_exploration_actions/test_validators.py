@@ -27,6 +27,7 @@ from web.webclient.actions.exploration_actions import (
     validate_party_invite_payload,
     validate_party_leave_payload,
     validate_talk_freeform_payload,
+    validate_talk_open_payload,
     validate_talk_scripted_payload,
     validate_wait_payload,
 )
@@ -83,6 +84,20 @@ class ExplorationValidatorTests(unittest.TestCase):
         ):
             with self.assertRaises(ExplorationActionError):
                 validate_talk_scripted_payload(bad)
+
+    def test_talk_open_payload_exact(self):
+        self.assertEqual(validate_talk_open_payload({"npc_id": 1}), {"npc_id": 1})
+        for bad in (
+            None,
+            {},
+            {"npc_id": 1, "keyword_id": "公會"},
+            {"npc_id": 1, "speech": "你好"},
+            {"npc_id": 0},
+            {"npc_id": True},
+            {"npc_id": "1"},
+        ):
+            with self.assertRaises(ExplorationActionError):
+                validate_talk_open_payload(bad)
 
     def test_talk_freeform_payload_exact(self):
         self.assertEqual(
@@ -194,6 +209,7 @@ class ExplorationValidatorTests(unittest.TestCase):
             for validator in (
                 validate_move_payload,
                 validate_look_payload,
+                validate_talk_open_payload,
                 validate_talk_scripted_payload,
                 validate_talk_freeform_payload,
                 validate_party_invite_payload,

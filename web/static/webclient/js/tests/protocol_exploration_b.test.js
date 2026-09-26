@@ -13,7 +13,7 @@ const assert = require("node:assert/strict");
 const Protocol = require("../elosern/protocol.js");
 const { SYNTH_ITEM } = require("./support/synthetic-data.js");
 const { VALID_EPOCH, serverTime } = require("./protocol_support.js");
-const { validContextActionsExplorationPanel, validExplorationAffordance, validExplorationKeyword, validExplorationLookEntity, validExplorationLookObject, validExplorationMoveRow, validExplorationPanel, validExplorationTarget } = require("./protocol_fixtures.js");
+const { validContextActionsExplorationPanel, validExplorationAffordance, validExplorationLookEntity, validExplorationLookObject, validExplorationMoveRow, validExplorationPanel, validExplorationTarget } = require("./protocol_fixtures.js");
 
 test("the delivery affordance is closed exploration and context actions with exact npc_id and item_key params", () => {
   const actionId = "explore.deliver";
@@ -100,7 +100,6 @@ test("the delivery affordance is closed exploration and context actions with exa
       validExplorationPanel({
         interact: [
           validExplorationTarget({
-            keywords: [],
             affordances: [
               validExplorationAffordance({
                 action_id: actionId,
@@ -153,9 +152,6 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
       validExplorationTarget({
         identity: i + 1,
         affordances,
-        keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS).fill(
-          validExplorationKeyword()
-        ),
       })
     );
   }
@@ -172,18 +168,14 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
   assert.ok(Protocol.jsonByteSize(normalized) <= Protocol.MAX_CANONICAL_JSON_BYTES);
 
   const overInteract = [];
+  const wide = "😀".repeat(Protocol.EXPLORATION_MAX_LABEL);
   for (let i = 0; i < Protocol.EXPLORATION_MAX_INTERACT_TARGETS; i++) {
     overInteract.push(
       validExplorationTarget({
         identity: i + 1,
+        display_name: wide,
         affordances: Array(Protocol.EXPLORATION_MAX_AFFORDANCES).fill(
-          validExplorationAffordance({ label: "交談".repeat(60) })
-        ),
-        keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS).fill(
-          validExplorationKeyword({
-            keyword_id: "k".repeat(Protocol.EXPLORATION_MAX_KEYWORD_ID),
-            label: "話".repeat(Protocol.EXPLORATION_MAX_KEYWORD_LABEL),
-          })
+          validExplorationAffordance({ label: wide })
         ),
       })
     );
@@ -193,7 +185,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 });
 
 test("exploration and character are in the production panel allowlist", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   const envelope = {
     protocol_version: 1,

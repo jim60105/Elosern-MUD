@@ -445,3 +445,77 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(state["mode"], "exploration")
         # The exploration dock mounts from the fresh state.
         self.assertEqual(self._dock_mode(page), "exploration")
+
+    @covers_requirement(
+        "webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content"
+    )
+    def test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region(self):
+        """The fixed-column skill pane stays inside the command region (1280x720).
+
+        Relocated from the exploration keyword frame (C8c's nav pane, which
+        this change leaves without a reachable producer): the combat skill
+        frame carries the requirement's surviving assertions — every row
+        inside the pane's right edge at the minimum supported viewport, and
+        the fixed column count governing which cell a row occupies.
+        """
+        page = self.logged_in_page((1280, 720))
+        install_outbound_recorder(page)
+        self._engage(page)
+        self._open_skills(page)  # skills tab -> category frame
+
+        pane_selector = '#action-dock [data-testid="dock-menu"]'
+        page.wait_for_selector(pane_selector, timeout=15000)
+        rows = page.locator(pane_selector + " [data-item-key]")
+        self.assertGreater(
+            rows.count(), 0, "the skill pane must render at least one row"
+        )
+        pane_box = page.locator(pane_selector).bounding_box()
+        self.assertIsNotNone(pane_box, "the skill pane must be visible at 1280x720")
+        pane_right_edge = pane_box["x"] + pane_box["width"]
+        for i in range(rows.count()):
+            box = rows.nth(i).bounding_box()
+            self.assertIsNotNone(box, "skill row %d must have a bounding box" % i)
+            self.assertLessEqual(
+                box["x"] + box["width"],
+                pane_right_edge + 1,
+                "skill row %d overflows the pane horizontally" % i,
+            )
+            self.assertGreaterEqual(
+                box["x"],
+                pane_box["x"] - 1,
+                "skill row %d starts left of the pane" % i,
+            )
+
+        # The fixed column count governs the keyboard geometry, never the
+        # rendered width: the router's own frame model decides whether
+        # ArrowRight advances a cell. A multi-column mapping moves to the next
+        # key in row-major order (the second column of a two-column mapping);
+        # a single-column/list frame is a no-op.
+        geometry = page.evaluate(
+            "() => { const r = window.__elosernBridge.router;"
+            " const m = r.currentMenu();"
+            " return { grid: !!m.grid, cols: m.gridCols || 0,"
+            " keys: m.items.map((i) => i.key),"
+            " focus: (window.__elosernBridge.store.view.focus || {}).key }; }"
+        )
+        self.assertIn(
+            geometry["focus"], geometry["keys"], "the focused row must be a frame cell"
+        )
+        start_index = geometry["keys"].index(geometry["focus"])
+        self._press(page, "ArrowRight")
+        moved = self._focus_key(page)
+        if geometry["grid"] and geometry["cols"] > 1:
+            self.assertEqual(
+                moved,
+                geometry["keys"][start_index + 1],
+                "ArrowRight must advance one cell of the fixed multi-column mapping",
+            )
+        else:
+            self.assertEqual(
+                moved,
+                geometry["focus"],
+                "ArrowRight is a no-op without a multi-column grid",
+            )
+        self.assertEqual(
+            sent_action_count(page), 0, "arrow-key navigation submits nothing"
+        )

@@ -38,8 +38,8 @@ service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`,
 `shop.sell`, the two inventory adapters `inventory.use` and
 `inventory.toggle_equip`, the six creation adapters `creation.preset`,
 `creation.custom`, `creation.concept`, `creation.roll_name`,
-`creation.activate`, and `creation.reset`, the thirteen exploration adapters
-`explore.move`, `explore.look`, `explore.talk_scripted`,
+`creation.activate`, and `creation.reset`, the fourteen exploration adapters
+`explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`,
 `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`,
 `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`,
 `explore.possess`, `explore.possess_release`, and `explore.deliver`, the two
@@ -68,13 +68,12 @@ management adapters `gallery.subject.select`, `gallery.generate`,
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
 
 - **WHEN** the production registry is loaded after the practice-webclient change and the gallery-management change adds its six gallery adapters
-- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`, each with its own exact validator and deterministic adapter
+- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`, each with its own exact validator and deterministic adapter
 
 #### Scenario: Test proof action remains isolated
 
 - **WHEN** a dispatcher test installs a synthetic proof adapter
 - **THEN** that adapter exists only in the test-owned registry and does not appear in the production registry
-
 ### Requirement: Adapters may receive the authenticated session through a fixed optional third parameter
 
 Every registered adapter SHALL declare the callable signature `adapter(actor, payload, session=None)`. The dispatcher SHALL invoke every adapter with the authenticated session as the third positional argument and SHALL never use runtime signature introspection to decide what to pass. A direct two-argument invocation of an adapter (for example in a unit test) SHALL behave exactly as before through the default. The session SHALL be used only for per-session presentation targeting (for example dismiss eviction); adapters SHALL NOT read or write character state through it, and the actor identity rule (session.puppet only) is unchanged.

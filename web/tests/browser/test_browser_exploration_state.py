@@ -140,7 +140,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -351,7 +351,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {
             "exploration": {
-                "schema_version": 2,
+                "schema_version": 3,
                 "available": False,
                 "reason": {"code": "exploration.unavailable", "message": withdrawn},
             },
@@ -392,13 +392,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(accepted["accepted"], accepted)
         self.assertIsNone(store_state(page)["degradedRoot"])
         root_keys = self._pane_keys(page)
-        # The desktop redesign (webclient-exploration-menu, synced
-        # projection scenario) omits the character, quests, and inventory
-        # entries the top navigation owns: the recovered root's dock
-        # projection is the capability-driven [move, look, interact, wait,
-        # suggestions].
+        # The recovered root is the scene overview (webclient-scene-overview-
+        # swap): the fabricated room's exit chip, the room-look chip, the
+        # footer's 等待／休息, and the 建議 entry — the retired move/look/
+        # interact dock entries are gone, and the character, quests, and
+        # inventory entries belong to the top navigation.
         self.assertTrue(
-            {"move", "look", "interact", "wait", "suggestions"} <= set(root_keys),
+            {"exit-ex-a", "look-room", "wait", "suggestions"} <= set(root_keys),
             f"the recovered root lost its entries: {root_keys}",
         )
 
@@ -490,5 +490,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The rebuilt dock derives from server-persisted state and no dialogue
         # or mutation is automatically replayed.
         self.assertEqual(sent_action_count(page, "explore.move"), 0)
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)

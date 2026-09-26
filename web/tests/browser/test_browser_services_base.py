@@ -113,15 +113,14 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         frameless (make-inventory-drawer-frameless): no keyboard frame is
         pushed and the router's stack is unchanged.
 
-        The target's affordance frame renders ONE `talk-scripted` row per
-        server talk affordance (exploration_menu.js: one row per authored
-        keyword — the guild staff's six keywords fill the grid rows before
-        the `service-<surface>` row), so the service entry is NOT reachable
-        by a fixed arrow walk. The dock-navigation row is focused by its
-        stable key through the store (focusItemByKey + focusConfirm: the
-        same keyboard-parity fallback tabToRootAndConfirm uses; the frozen
-        KeyboardRouter.confirm façade member, so no pointer path and no OOB
-        emission beyond the journey's own later steps).
+        The target's verb popover carries the host's single 交談
+        `explore.talk_open` row followed by its navigate-kind service entry
+        (exploration_menu.js targetMenuFor; the panel's per-host keyword list
+        left the wire in exploration panel v3), so the service entry is
+        focused by its stable key through the store (focusItemByKey +
+        focusConfirm: the same keyboard-parity fallback tabToRootAndConfirm
+        uses; the frozen KeyboardRouter.confirm façade member, so no pointer
+        path and no OOB emission beyond the journey's own later steps).
         """
         # Close any open drawer first so its scrim does not cover the stage or
         # block the dock arrow walk.

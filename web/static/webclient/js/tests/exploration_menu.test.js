@@ -20,7 +20,7 @@ const { SYNTH_ITEM } = require("./support/synthetic-data.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "exploration",
       move: [
@@ -45,7 +45,7 @@ function validPanel(overrides) {
           affordances: [
             {
               kind: "action",
-              action_id: "explore.talk_scripted",
+              action_id: "explore.talk_open",
               label: "交談",
               enabled: true,
               disabled_reason: null,
@@ -58,10 +58,6 @@ function validPanel(overrides) {
               disabled_reason: null,
             },
           ],
-          keywords: [
-            { keyword_id: "公會", label: "公會" },
-            { keyword_id: "再見", label: "再見" },
-          ],
         },
       ],
       character: { available: true },
@@ -70,6 +66,30 @@ function validPanel(overrides) {
     },
     overrides || {}
   );
+}
+
+// The retired in-conversation descriptor shape: keywordMenuFor and
+// scriptedAffordanceFor survive until C9b deletes them, so their cases drive
+// a legacy target directly (no v3 panel can carry explore.talk_scripted).
+function scriptedTarget() {
+  return {
+    identity: 5,
+    display_name: "南門守衛",
+    portrait_ref: null,
+    affordances: [
+      {
+        kind: "action",
+        action_id: "explore.talk_scripted",
+        label: "交談",
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+    keywords: [
+      { keyword_id: "公會", label: "公會" },
+      { keyword_id: "再見", label: "再見" },
+    ],
+  };
 }
 
 test("the navigation builder carries 角色狀態 plus available quests and inventory", () => {
@@ -174,8 +194,12 @@ test("every pushed exploration frame ends with an enabled back row", () => {
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.items[targetMenu.items.length - 1].key, "back");
-  const scripted = ExplorationMenu.scriptedAffordanceFor(target);
-  const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
+  const scripted = scriptedTarget();
+  const keywordMenu = ExplorationMenu.keywordMenuFor(
+    model,
+    scripted,
+    ExplorationMenu.scriptedAffordanceFor(scripted)
+  );
   assert.equal(keywordMenu.items[keywordMenu.items.length - 1].key, "back");
   // The suggestions frame too (the exploration root, the scene overview, does
   // not: it carries no parent to return to).
@@ -198,8 +222,12 @@ test("menu models carry the mockup grid geometry", () => {
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.gridCols, 2);
-  const scripted = ExplorationMenu.scriptedAffordanceFor(target);
-  const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
+  const scripted = scriptedTarget();
+  const keywordMenu = ExplorationMenu.keywordMenuFor(
+    model,
+    scripted,
+    ExplorationMenu.scriptedAffordanceFor(scripted)
+  );
   assert.equal(keywordMenu.gridCols, 2);
   // The suggestions frame is a single-row grid whose column count is its own
   // item count; the scene overview is a sections menu with no grid flag.
@@ -345,7 +373,7 @@ test("no exploration menu item carries openServiceSubmenu", () => {
 
 test("scripted keyword buttons submit explore.talk_scripted with the server IDs", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const target = ExplorationMenu.targetById(model, 5);
+  const target = scriptedTarget();
   const scripted = ExplorationMenu.scriptedAffordanceFor(target);
   assert.ok(scripted);
   const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
@@ -355,7 +383,7 @@ test("scripted keyword buttons submit explore.talk_scripted with the server IDs"
   assert.equal(keywordMenu.items[0].actionId, "explore.talk_scripted");
 });
 
-test("free-form dialogue keeps the server-held target reference", () => {
+test("the conversation row submits explore.talk_open with the host identity", () => {
   const panel = validPanel({
     interact: [
       {
@@ -365,8 +393,8 @@ test("free-form dialogue keeps the server-held target reference", () => {
         affordances: [
           {
             kind: "action",
-            action_id: "explore.talk_freeform",
-            label: "自由交談",
+            action_id: "explore.talk_open",
+            label: "交談",
             enabled: true,
             disabled_reason: null,
           },
@@ -377,11 +405,50 @@ test("free-form dialogue keeps the server-held target reference", () => {
   const model = ExplorationMenu.buildMenus(panel, {});
   const target = ExplorationMenu.targetById(model, 9);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-  const freeform = targetMenu.items.find((item) => item.key === "talk-freeform");
-  assert.ok(freeform);
-  assert.equal(freeform.freeform, true);
-  assert.equal(freeform.npcId, 9);
-  assert.equal(freeform.actionId, null);
+  const talk = targetMenu.items.find((item) => item.key === "talk-open");
+  assert.ok(talk);
+  assert.equal(talk.enabled, true);
+  assert.equal(talk.label, "交談");
+  assert.equal(talk.actionId, "explore.talk_open");
+  assert.deepEqual(talk.payload, { npc_id: 9 });
+  assert.deepEqual(talk.commandDisplay, { npcLabel: "吟遊詩人" });
+});
+
+test("a disabled conversation row keeps its reason and submits nothing", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 9,
+        display_name: "吟遊詩人",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.talk_open",
+            label: "交談",
+            enabled: false,
+            disabled_reason: {
+              code: "possessed_talk",
+              message: "附身狀態下無法與他人開啟對話。",
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 9);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const talk = targetMenu.items.find((item) => item.key === "talk-open");
+  assert.ok(talk);
+  assert.equal(talk.enabled, false);
+  assert.equal(talk.actionId, null);
+  assert.equal(talk.payload, null);
+  assert.equal(talk.description, "附身狀態下無法與他人開啟對話。");
+  assert.deepEqual(talk.disabledReason, {
+    code: "possessed_talk",
+    message: "附身狀態下無法與他人開啟對話。",
+  });
 });
 
 test("engage submits explore.engage only when enabled", () => {
@@ -599,7 +666,6 @@ function overviewPanel() {
         display_name: "試驗守衛",
         portrait_ref: null,
         affordances: [],
-        keywords: [],
       },
     ],
   });
@@ -732,7 +798,7 @@ test("verbMenuFor keeps payload order and appends 查看 then back", () => {
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["talk-scripted", "service-guild", "look-target", "back"]
+    ["talk-open", "service-guild", "look-target", "back"]
   );
   const look = menu.items[2];
   assert.equal(look.label, "查看");
