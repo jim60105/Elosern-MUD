@@ -34,6 +34,8 @@
         "world.rules.tests.test_combat_modifiers_self_arming",
         "world.rules.tests.test_combat_party",
         "world.rules.tests.test_combat_result",
+        "world.rules.tests.test_combat_beats",
+        "world.rules.tests.test_combat_round_record",
         "world.rules.tests.test_combat_initiation",
         "world.rules.tests.test_combat_session_flow",
         "world.rules.tests.test_combat_session_persistence",
