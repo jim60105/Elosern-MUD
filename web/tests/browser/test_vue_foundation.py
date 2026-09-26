@@ -630,7 +630,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # scene overview, whose first chip is then `look-room`
                 # (webclient-scene-overview-swap).
                 "exploration": {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "available": True,
                     "kind": "exploration",
                     "move": [],

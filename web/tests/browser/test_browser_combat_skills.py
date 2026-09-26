@@ -486,28 +486,35 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "skill row %d starts left of the pane" % i,
             )
 
-        # The fixed column count governs the keyboard geometry: ArrowRight
-        # advances a column when the frame maps more than one (and is a no-op
-        # in a single-column frame), never a function of the rendered width.
-        columns = page.locator(pane_selector).evaluate(
-            "el => { const m = /repeat\\((\\d+)/.exec(el.style.gridTemplateColumns || '');"
-            " return m ? Number(m[1]) : 1; }"
+        # The fixed column count governs the keyboard geometry, never the
+        # rendered width: the router's own frame model decides whether
+        # ArrowRight advances a cell. A multi-column mapping moves to the next
+        # key in row-major order (the second column of a two-column mapping);
+        # a single-column/list frame is a no-op.
+        geometry = page.evaluate(
+            "() => { const r = window.__elosernBridge.router;"
+            " const m = r.currentMenu();"
+            " return { grid: !!m.grid, cols: m.gridCols || 0,"
+            " keys: m.items.map((i) => i.key),"
+            " focus: (window.__elosernBridge.store.view.focus || {}).key }; }"
         )
-        grid = self._cell_grid(page)
-        start = self._focus_key(page)
-        self.assertIn(start, grid, "the focused skill row must be a measured cell")
+        self.assertIn(
+            geometry["focus"], geometry["keys"], "the focused row must be a frame cell"
+        )
+        start_index = geometry["keys"].index(geometry["focus"])
         self._press(page, "ArrowRight")
         moved = self._focus_key(page)
-        self.assertIn(moved, grid, "ArrowRight must land on a measured cell")
-        if columns > 1:
+        if geometry["grid"] and geometry["cols"] > 1:
             self.assertEqual(
-                grid[moved][1],
-                grid[start][1] + 1,
-                "ArrowRight must reach the second column of the fixed mapping",
+                moved,
+                geometry["keys"][start_index + 1],
+                "ArrowRight must advance one cell of the fixed multi-column mapping",
             )
         else:
             self.assertEqual(
-                moved, start, "ArrowRight is a no-op in a single-column frame"
+                moved,
+                geometry["focus"],
+                "ArrowRight is a no-op without a multi-column grid",
             )
         self.assertEqual(
             sent_action_count(page), 0, "arrow-key navigation submits nothing"
