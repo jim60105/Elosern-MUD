@@ -7,7 +7,7 @@ See proposal.md (Why). The state below was checked in code, assuming C1 to C8c a
   - `frame-resolvers.js` still registers the `exploration.keywords` source, and `frames.js` still lists it for `gridCols = 1`.
   - `handleExplorationItem` in `interaction.js` still has an `openKeywords` branch (push `exploration.keywords`) and a `freeform` branch (set `ctx.freeformTarget`, bump `drawerRequest`). No row sets either flag any more.
   - The dialogue variant's free row uses `borrowDialogueCommand`, a separate entry that also sets `freeformTarget`. It is now the only borrower of the command line.
-  - `settleFrameStack` resets to `EXPLORATION_ROOT_DESCRIPTOR` on a room change inside the `inStackMutation` window (C8b). Nothing resets the stack when the mode changes to `dialogue`, so the popover stays open after a successful `talk_open`.
+  - `settleFrameStack` resets to `EXPLORATION_ROOT_DESCRIPTOR` on a room change inside the `inStackMutation` window (C8b). A committed mode change already returns the stack to the root: `syncHudDrawer`'s teardown calls `resetFramesToRoot` on any mode change, which covers `exploration` -> `dialogue` (verified during implementation; see D1).
   - `fillDisplayFor` in `combat.js` fills `npcLabel` for the talk family but not for `explore.talk_open`.
 - **Dock panes** (`components/dock-panes.js` `classifyPane`, `components/DockMenu.vue`):
   - `nav` is returned for `kw-*` rows, rows that are all `explore.look`, or `target-*` navigation cells. After C8c and C9a nothing produces any of these: the overview and the popover render through `SceneOverview` and `DockVerbPopover`, and the keyword frame is unreachable.
@@ -29,9 +29,26 @@ See proposal.md (Why). The state below was checked in code, assuming C1 to C8c a
 ## Decisions
 
 ### D1. The dock returns to the overview when a conversation opens
-Without a new rule, the verb popover stays open after a successful `talk_open`: dialogue mode keeps the exploration form, and the target is still present. `settleFrameStack` records `ctx.lastMode`. When the committed mode changes from `exploration` to `dialogue` and `router.depth() > 1`, it resets to `EXPLORATION_ROOT_DESCRIPTOR` inside the `inStackMutation` window, reusing C8b's room-change reset path. The first settle and every other transition never reset.
+The dock's required behaviour is that the commit which makes the mode `dialogue` returns
+the stack to the overview, so no popover stays open over the conversation. Implementation
+finding: the store already does exactly that, and no new rule is needed. `syncHudDrawer`
+(webclient-services-combat-creation-frames) treats any committed mode change as a teardown
+and calls `resetFramesToRoot`, which posts the committed mode's root descriptor — the
+ordinary exploration root for `dialogue`. Verified before writing any code: a verb popover
+open at depth 2 is at depth 1 with `dockSource === "exploration.root"` in the commit that
+carries `mode: "dialogue"`, for both the snapshot and the update form, and for the real
+`talk_open` flow (popover row activation -> `explore.talk_open` -> the mode-dialogue
+commit). Stubbing that one `resetFramesToRoot()` call out leaves the popover open at depth
+2, which confirms the mechanism. So this change adds no second reset: `settleFrameStack`
+keeps its room-change rule only, and the behaviour is pinned by store tests instead
+(declarative_frames.test.js "the conversation-open reset", dialogue_store.test.js). The
+earlier premise ("the popover stays open after a successful `talk_open`", C9a's design note)
+was wrong; C9a's browser journeys that walked the popover after opening a conversation were
+broken by it and are repaired in this change (see tasks 5.2).
 
-The rule covers any opener: dock, typed `talk X kw`, or a suggestion card. It is the dock-side half of "交談 enters the dialogue immediately". C10b then collapses the command panel in dialogue mode.
+The pinned contract covers any opener: dock, typed `talk X kw`, or a suggestion card. It is
+the dock-side half of "交談 enters the dialogue immediately". C10b then collapses the
+command panel in dialogue mode.
 
 ### D2. Client deletions
 - `exploration_menu.js`:
