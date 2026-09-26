@@ -275,7 +275,11 @@ treatment: charcoal panel fill, a hairline border, shared radius and restrained 
 SHALL never grow into the stage and SHALL never change size with its content. In every mode, dialogue
 included, the window SHALL present exactly one page of the current response at a time, paged as
 `webclient-input-narrative` defines and revealed as its typing requirement defines, and SHALL NOT
-present earlier responses: they remain readable in the full-log surface. Page text SHALL be set in the
+present earlier responses: they remain readable in the full-log surface. The one exception is the clear
+transition: when a new response replaces the previous one, the previous page MAY remain only as an
+opaque layer over the new page that fades out within the clear duration of the client's motion level
+(at most 150ms, and none at `off`), carries no focusable element, and is outside the accessibility
+tree and pointer hit-testing from the moment the new response starts. Page text SHALL be set in the
 serif reading face at 28px at the 1920x1080 reference size and the default prose scale, SHALL scale
 with the viewport height and with the client's prose scale, and SHALL hold at most 42 CJK characters
 per line in every mode, including the whole-band width of dialogue mode.
@@ -316,8 +320,8 @@ waits for.
 
 #### Scenario: One page of the current response is shown
 - **WHEN** the log holds three responses and the latest one fills two pages
-- **THEN** the window shows only the first page of the latest response, and no line of the two
-  earlier responses is rendered in the window
+- **THEN** the window shows only the first page of the latest response, and once the clear transition
+  has finished no line of the two earlier responses is rendered in the window
 
 #### Scenario: The page measure is bounded at the reference size
 - **WHEN** the stage renders at 1920x1080 with the default prose scale and a long prose response, in exploration mode and in dialogue mode with the panel transiently unavailable
@@ -416,8 +420,12 @@ entry whose `severity` is `warning`, `harmful`, or `critical`. A condition whose
 `beneficial` or `informational` — including a passive `skill_owned` combat-modifier row — SHALL NOT
 by itself make the island visible, and neither SHALL an entry with a missing or unknown `severity`.
 While the island is visible its condition chips SHALL render every committed condition, whatever its
-severity. Otherwise the island SHALL be hidden with `display:none`, so it leaves the accessibility tree and the
-tab order and contributes no visible box. The rule SHALL be derived client-side from the committed
+severity. Otherwise the island SHALL be hidden: from the moment the committed revision turns the rule false it
+SHALL leave the accessibility tree, the tab order, and pointer hit-testing, and once its exit transition
+has finished it SHALL be `display:none` and contribute no visible box. The island SHALL enter and leave
+with a fade and a 12px slide at the client's motion level (`webclient-contextual-hud` "Location,
+appearance, and vitals changes transition at the motion level"); at `off` it is shown and hidden in the
+same frame as the commit. The rule SHALL be derived client-side from the committed
 `status` panel and the committed mode alone: no server field, request, or timer is involved, and a
 vital that is absent from the payload or carries a non-numeric field SHALL NOT count as below its
 maximum. Dialogue mode SHALL follow the same rule as exploration; creation mode hides the island
@@ -431,7 +439,7 @@ the same focus-restore path a mode change uses.
 
 #### Scenario: Full health outside combat hides the island
 - **WHEN** the committed mode is exploration, every committed vital's `current` equals its `maximum`, and `status.conditions` is empty
-- **THEN** the vitals island is hidden with `display:none`, is absent from the accessibility tree and the tab order, and no vitals, numerals, or low-HP marker are visible
+- **THEN** the vitals island is absent from the accessibility tree and the tab order, and once any exit transition has finished it is hidden with `display:none` and no vitals, numerals, or low-HP marker are visible
 
 #### Scenario: A vital below its maximum shows the island
 - **WHEN** a committed revision in exploration mode carries `mp` at 40 of 60 with no condition
@@ -443,7 +451,7 @@ the same focus-restore path a mode change uses.
 
 #### Scenario: A beneficial-only condition keeps the island hidden at full health
 - **WHEN** a committed revision in exploration mode carries full vitals and only conditions whose `severity` is `beneficial`, such as a passive `skill_owned` combat-modifier row
-- **THEN** the vitals island stays hidden with `display:none` and none of its condition chips is visible or focusable
+- **THEN** the vitals island stays hidden with `display:none` and none of its condition chips is visible or focusable, and no enter transition plays
 
 #### Scenario: Visible island renders every condition chip
 - **WHEN** the vitals island is visible because a vital is below its maximum and the committed conditions carry one `beneficial` and one `informational` entry
@@ -2248,3 +2256,110 @@ a stepped presentation waits for SHALL come from the motion tokens, and SHALL re
 - **THEN** the click shows the page in full at once, and the action shows the previous response's
   last page complete before the new response's first page starts, with every page still in the full
   log
+
+### Requirement: Location, appearance, and vitals changes transition at the motion level
+The stage SHALL animate the following committed changes, taking every duration and distance from the
+client's motion tokens, so they follow the effective motion level of "The motion level is a client-local
+preference that governs every client animation":
+- **A new scene image** SHALL crossfade from the previous image to the new one over the scene duration
+  (500ms at `full`). The new image SHALL start its fade only once it is decoded. Until then, the previous
+  image SHALL stay visible with the dimmed treatment the backdrop already uses for a prior image, so the
+  fade never passes through an empty frame and a previous scene is never presented undimmed as the
+  current one. The new image SHALL fade in above the previous one, and the pair SHALL NOT dip through
+  the stage behind them mid-fade. The scene label, the alternative text, and the placeholder SHALL
+  update at commit.
+- **A new location label** SHALL slide the place card's heading in from the left and fade it in, while
+  the previous heading fades out. A change of the world time alone SHALL NOT animate.
+- **A new current map node** SHALL pan the minimap: the drawing SHALL start where the previous current
+  node stood on screen and ease to its committed placement, and the current-node marker SHALL travel
+  the step from the node the player left to the new current node, so a move reads even when the drawing
+  itself does not shift. When the previous current node is absent from the new placement, the minimap
+  SHALL show the new placement at once. The full-map surface SHALL NOT pan.
+- **A new response** SHALL clear the message window as "The message window presents the current
+  response one page at a time in the band's message region" allows: the previous page fades out over
+  the clear duration (150ms at `full` and at `reduced`) while the new page starts at once and surfaces
+  beneath it within the same duration, so the two pages never read through each other.
+- **A new portrait source** on a stage actor (a new image URL, or a switch between an image and a
+  placeholder) SHALL crossfade over the portrait duration (400ms at `full`), and a change of the speaking
+  state SHALL ease the dim.
+- **The vitals island** SHALL fade in and slide 12px into place when it becomes visible, and SHALL fade
+  out and slide away when it hides.
+
+At `reduced`, each of these SHALL play as an opacity fade of at most 150ms with no slide, no pan, and no
+marker travel, and the dim SHALL change instantly. At `off`, each SHALL render its final state in the commit's frame. No
+transition SHALL delay a committed value or the player's input beyond its own duration, as "Presentation
+timing never gates committed state or input" requires.
+
+#### Scenario: A new scene crossfades once decoded
+- **WHEN** the effective level is `full`, the backdrop shows a done scene, and a committed revision names
+  a different done scene URL
+- **THEN** the scene label and alternative text read the new values in the commit's frame, the previous
+  image stays visible and dimmed until the new image is decoded, and then both images are present while
+  the previous one fades out over 500ms, after which only the new image remains
+
+#### Scenario: The place card slides in the new location
+- **WHEN** the effective level is `full` and a move commits a new location label, and later only the
+  world time changes
+- **THEN** the new heading enters from the left with a fade while the old heading fades out, and the
+  time-only change swaps the time line with no transition
+
+#### Scenario: The minimap pans to the new node
+- **WHEN** the effective level is `full` and a move commits a current node adjacent to the previous one
+- **THEN** the minimap's drawing starts offset so the previous current node sits where it stood, and it
+  eases to the committed placement over the base duration while the current-node marker travels from
+  the node the player left, and the nodes' visibility states, accessible names, and click targets
+  already describe the new placement
+
+#### Scenario: The message window clears between responses
+- **WHEN** the effective level is `full`, page 1 of a response is on screen, and the player acts
+- **THEN** the new response's first page starts typing at once beneath an inert layer holding the
+  previous page, which fades out over 150ms and is then removed
+
+#### Scenario: An appearance change crossfades the player's portrait
+- **WHEN** the effective level is `full` and the roster's current character portrait changes URL
+- **THEN** the player's stage actor shows both portraits while the previous one fades out over 400ms, and
+  then only the new one
+
+#### Scenario: The vitals island fades and slides in and out
+- **WHEN** the effective level is `full` and a committed revision lowers `hp` from full outside combat,
+  and a later revision restores it
+- **THEN** the island fades in while sliding 12px into place, and on restore it fades out while sliding
+  away and ends hidden with `display:none`
+
+#### Scenario: Reduced plays short fades with no travel
+- **WHEN** the effective level is `reduced` and a move commits a new scene, location, and current node
+- **THEN** the backdrop and the place card fade within 150ms with no slide, the minimap shows the new
+  placement at once, and the message window's clear fades within 150ms
+
+#### Scenario: Off renders every final state at once
+- **WHEN** the effective level is `off` and a move commits a new scene, location, current node, portrait,
+  and vitals state
+- **THEN** in the commit's frame the backdrop holds only the new image once decoded, and the place card,
+  the minimap, the message window, the stage actor, and the vitals island each hold only their final
+  state
+
+### Requirement: A leaving element is out of reach while it animates out
+Every stage element that animates out — a crossfading image or portrait, a previous place-card heading,
+the message window's clearing layer, the vitals island, and every later leaving element the client
+animates — SHALL leave the accessibility tree, the tab order, and pointer hit-testing at the moment the
+change that removes it commits, and SHALL stay out of reach until it is removed or re-enters. Focus SHALL
+never move onto a leaving element. When focus is inside an element that is about to leave, the client
+SHALL move focus to its current focus home before the element leaves, so focus never falls to the
+document body. An element that is entering MAY receive focus from its first frame. An element that
+re-enters while it is still leaving SHALL be in reach again from that moment.
+
+#### Scenario: A leaving layer cannot be reached
+- **WHEN** the effective level is `full` and a scene crossfade, a place-card change, or a message clear
+  is in progress
+- **THEN** each leaving copy is inert, is absent from the accessibility tree, and receives no click, and
+  sequential focus navigation never lands in it
+
+#### Scenario: Focus leaves the vitals island before it animates out
+- **WHEN** focus is on a condition chip and a committed revision hides the vitals island
+- **THEN** focus has moved to the focus home before the island becomes inert, and at no point during its
+  exit is focus on the island or on the document body
+
+#### Scenario: A re-shown island is in reach again at once
+- **WHEN** the vitals island starts to leave and a committed revision shows it again before its exit
+  finishes
+- **THEN** the island is no longer inert from that revision on, and its condition chips are focusable
