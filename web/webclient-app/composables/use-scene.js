@@ -9,21 +9,22 @@ import { dialogueViewModel } from "../stores/dialogue-view.js";
 
 export function useScene(store, { panel, panelAvailable, dispatchIntent }) {
   // The dialogue surface source (webclient-align-08-dialogue-surface): the ONE
-  // derived view model over the committed `dialogue` panel (webclient-align-11:
-  // the feed dialogue variant is its ONLY presentation — the dock has no
+  // derived view model over the committed `dialogue` panel (the choice list
+  // over the stage is its ONLY choice presentation — the dock has no
   // dialogue form) — the client never keeps a second copy of the picks.
   const dialogueVM = computed(() =>
     store.view.mode === "dialogue" ? dialogueViewModel(panel("dialogue")) : null,
   );
-  // Feed-variant activation shares the dock's dispatch contract (the store owns
-  // the single dispatch entry and the freeform-borrow path).
+  // The dialogue choice list's activations share the dock's dispatch
+  // contract (the store owns the single dispatch entry and the freeform-
+  // borrow path).
   function onDialoguePick(pick) {
     store.dispatchAction(pick.actionId, pick.payload || {}, pick.commandDisplay || null);
   }
   function onDialogueFreeform() {
     store.borrowDialogueCommand();
   }
-  // The caption's exit row (webclient-align-11-dialogue-ux): ends the live
+  // The choice list's `✕ 結束對話` row (webclient-align-11-dialogue-ux): ends the live
   // session through the deterministic exit seam. The committed full snapshot
   // re-homes the mode; no client-side optimistic state.
   function onDialogueLeave() {

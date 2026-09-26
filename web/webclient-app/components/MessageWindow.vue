@@ -4,22 +4,18 @@ import {
   h,
   nextTick,
   onMounted,
-  onUpdated,
   ref,
   shallowRef,
   useId,
-  vShow,
   watch,
-  withDirectives,
 } from "vue";
 import {
   pageIndexForOffset,
   paginate,
-  responseBlocks,
   responseLength,
   segmentResponses,
 } from "../lib/message_pages.js";
-import { lineText, narrativeBlockNodes } from "../lib/narrative_line_nodes.js";
+import { narrativeBlockNodes } from "../lib/narrative_line_nodes.js";
 import {
   TEXT_SPEEDS,
   autoAdvanceAllowed,
@@ -73,18 +69,18 @@ import { useTypewriter } from "../composables/use-typewriter.js";
 // Effective reduced motion (the override, else the OS query) makes every
 // page instant. Opt-in auto-advance arms on a fully shown page with a next
 // page (never past the last page, never on an oversize or map page) and
-// pauses while `held` (an open drawer, overlay, or the full log). The
-// dialogue variant does not type.
+// pauses while `held` (an open drawer, overlay, or the full log).
 //
-// While mode is `dialogue` and the dialogue panel is available, the window
-// renders the dialogue variant (design D6): unpaged, scrolling
-// inside the text area, with the pick, free-dialogue, and exit rows. In
-// dialogue the window spans the whole band and heads the variant with the
-// host's name plate; the host's portrait stands on the stage, so the box
-// carries no avatar or speaker line (webclient-dialogue-stage-actors D7).
-// The window is dialogue mode's focus home: `focusHome()` focuses the first
-// dialogue row, else the page surface, and the window keeps focus inside
-// the conversation when its own re-renders would drop it (design D5).
+// Dialogue (webclient-dialogue-choices-overlay D1/D3): the window pages and
+// types the session line exactly like any response. While mode is
+// `dialogue` and the dialogue panel is available, the host's name plate
+// heads the text area (webclient-dialogue-stage-actors D7), and the text
+// column starts under the player portrait's anchor edge. The window holds no
+// choice row: the centred `DialogueChoices` list over the stage does. The
+// window reports `reading-change` — true exactly while the current
+// response's last page is on screen, fully shown, with no pending action
+// mark — so the shell knows when the list may appear. `focusHome()` focuses
+// the page surface.
 export default {
   name: "MessageWindow",
   props: {
@@ -115,17 +111,17 @@ export default {
     // auto-advance wait pauses.
     held: { type: Boolean, default: false },
   },
-  emits: ["dialogue-pick", "dialogue-freeform", "dialogue-leave", "open-full-log"],
+  emits: ["open-full-log", "reading-change"],
   setup(props, { emit, expose }) {
     const rootRef = ref(null);
     const surfaceRef = ref(null);
-    const dialogueScrollRef = ref(null);
     // Registered first so its onMounted creates the measurer before the
     // window's own first paging pass.
     const measure = useMessageMeasure(surfaceRef);
     const pageLabelId = useId();
 
-    const dialogueVariant = computed(() => props.mode === "dialogue" && !!props.dialogue);
+    // The name plate renders while the dialogue panel is available.
+    const plated = computed(() => props.mode === "dialogue" && !!props.dialogue);
     const responses = computed(() => segmentResponses(props.lines, props.marks));
 
     // A dispatch is out and no line has taken its ordinal yet.
@@ -166,6 +162,10 @@ export default {
     });
 
     const pages = shallowRef([]);
+    // The response the pages were cut from (design D3): a new or appended
+    // response dirties `display` at once, before the post-flush re-page, so
+    // completeness is never read off the previous response's stale pages.
+    const pagedBlocks = shallowRef(null);
     const pageIndex = ref(0);
     const provisional = ref(false);
     const liveText = ref("");
@@ -270,15 +270,8 @@ export default {
 
     function repage() {
       generation += 1;
-      if (dialogueVariant.value) {
-        // Leaving the variant reopens like a mount: on the last page.
-        initialized = false;
-        provisionalKey = undefined;
-        pages.value = [];
-        typewriter.stop();
-        return;
-      }
       const shown = display.value;
+      pagedBlocks.value = shown.blocks;
       // Read before the pages are replaced: the anchor is on the old page.
       const anchor = readerAnchor();
       if (!measure.ready.value) {
@@ -370,7 +363,7 @@ export default {
     }
 
     function advance() {
-      if (dialogueVariant.value || provisional.value) {
+      if (provisional.value) {
         return false;
       }
       if (typing.value) {
@@ -401,7 +394,6 @@ export default {
     watch(
       () => [
         props.autoAdvance,
-        dialogueVariant.value,
         provisional.value,
         typing.value,
         pageIndex.value,
@@ -409,9 +401,9 @@ export default {
       ],
       // An awaiting flush always parks on the last page, so `index` then
       // fails the next-page test and nothing arms.
-      ([auto, dialogue, unpaged, isTyping, index, list]) => {
+      ([auto, unpaged, isTyping, index, list]) => {
         const page = list[index];
-        if (auto && !dialogue && !unpaged && !isTyping && index < list.length - 1 && autoAdvanceAllowed(page)) {
+        if (auto && !unpaged && !isTyping && index < list.length - 1 && autoAdvanceAllowed(page)) {
           typewriter.armAdvance(autoAdvanceDelayMs(page), () => advance());
         } else {
           typewriter.disarmAdvance();
@@ -427,7 +419,6 @@ export default {
         display.value.awaiting,
         measure.boxKey.value,
         measure.ready.value,
-        dialogueVariant.value,
       ],
       () => repage(),
       { flush: "post" },
@@ -448,11 +439,22 @@ export default {
 
     onMounted(() => {
       repage();
-      if (dialogueVariant.value) {
-        dialoguePin.value = true;
-        void nextTick(pinDialogueBox);
-      }
     });
+
+    // Reading complete (design D3): the current response's last page is on
+    // screen and fully shown, with no pending action mark. Pure reader
+    // state, never prose. A response with no text has nothing to read.
+    const readingComplete = computed(() => {
+      if (!measure.ready.value || provisional.value || display.value.awaiting) {
+        return false;
+      }
+      if (pagedBlocks.value !== display.value.blocks || typing.value) {
+        return false;
+      }
+      const total = pages.value.length;
+      return total === 0 || pageIndex.value === total - 1;
+    });
+    watch(readingComplete, (complete) => emit("reading-change", complete), { immediate: true });
 
     // ---- reading controls (design D4) ----
 
@@ -465,9 +467,6 @@ export default {
     }
 
     function onClick(event) {
-      if (dialogueVariant.value) {
-        return;
-      }
       const target = event.target;
       if (target && typeof target.closest === "function" && target.closest("button, a, [role=button]")) {
         return;
@@ -498,7 +497,7 @@ export default {
     }
 
     function onWheel(event) {
-      if (dialogueVariant.value || !(event.deltaY < 0)) {
+      if (!(event.deltaY < 0)) {
         return;
       }
       const surface = surfaceRef.value;
@@ -511,229 +510,24 @@ export default {
       }
     }
 
-    // ---- dialogue variant (design D6) ----
-
-    // Announce-once: the `.dlg` box renders the same committed line the
-    // narrative stream carries, so the stream's record of that exchange is
-    // dropped, but ONLY through an anchored match on the final `out` line:
-    // the verbatim reply or the adapters' `<host>說：<reply>` echo form. A
-    // daily-affinity hint glued to the echo survives as the residual line.
-    function suppressDialogueEcho(lines, reply) {
-      if (lines.length === 0) {
-        return lines;
-      }
-      const last = lines[lines.length - 1];
-      if (!last || (last.kind || "out") !== "out") {
-        return lines;
-      }
-      const text = lineText(last)
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/?(?:span|a)(?: [^>]*)?>/gi, "");
-      const prefixCut = text.lastIndexOf("說：");
-      const suffix = prefixCut > 0 ? text.slice(prefixCut + 2) : "";
-      const exactEcho =
-        prefixCut > 0 &&
-        prefixCut <= 48 &&
-        !text.slice(0, prefixCut).includes("說：") &&
-        suffix.startsWith(reply);
-      const remainder = exactEcho
-        ? suffix.slice(reply.length).replace(/^(\n|<br\s*\/?>)+/i, "")
-        : "";
-      const matches =
-        text === reply ||
-        (exactEcho &&
-          (suffix === reply || suffix[reply.length] === "\n" || suffix[reply.length] === "（"));
-      if (!matches) {
-        return lines;
-      }
-      // The residual is re-tokenized from its own text (never the stored
-      // tokens of the whole echo).
-      return remainder === ""
-        ? lines.slice(0, -1)
-        : [...lines.slice(0, -1), { ...last, text: remainder, tokens: null }];
-    }
-
-    const dialogueBlocks = computed(() => {
-      if (!dialogueVariant.value) {
-        return [];
-      }
-      const list = responses.value;
-      const current = list.length > 0 ? list[list.length - 1] : null;
-      const lines = current ? current.lines : [];
-      return responseBlocks(suppressDialogueEcho(lines, props.dialogue.line));
-    });
-
-    const dialoguePin = ref(false);
-
-    function pinDialogueBox() {
-      const el = dialogueScrollRef.value;
-      const box = el?.querySelector(".dlg");
-      if (!el || !box) {
-        return;
-      }
-      el.scrollTop = Math.max(0, box.offsetTop - 8);
-    }
-
-    onUpdated(() => {
-      if (dialoguePin.value && dialogueVariant.value) {
-        pinDialogueBox();
-      }
-    });
-
-    watch(
-      () => (dialogueVariant.value ? props.dialogue.line : null),
-      (line, previous) => {
-        if (!dialogueVariant.value) {
-          dialoguePin.value = false;
-          return;
-        }
-        if (line !== previous) {
-          dialoguePin.value = true;
-          void nextTick(pinDialogueBox);
-          announce(line);
-        }
-      },
-    );
-
-    function onDialogueScroll() {
-      if (!dialoguePin.value) {
-        return;
-      }
-      const el = dialogueScrollRef.value;
-      const box = el?.querySelector(".dlg");
-      if (box && el) {
-        const drift = Math.abs(box.getBoundingClientRect().top - el.getBoundingClientRect().top - 8);
-        dialoguePin.value = drift < 64;
-      }
-    }
-
-    function dialogueNodes(vm) {
-      const nodes = [
-        h("div", { key: "dlg-box", class: "dlg", "data-testid": "dialogue-box" }, [
-          h("div", { class: "say", "data-testid": "dialogue-say" }, [vm.line]),
-        ]),
-      ];
-      if (vm.picks.length > 0 || vm.freeRow) {
-        nodes.push(
-          h("div", { key: "dlg-choices", class: "choices", "data-testid": "dialogue-choices" }, [
-            ...vm.picks.map((pick, index) =>
-              h(
-                "button",
-                {
-                  key: pick.key,
-                  type: "button",
-                  class: "pick",
-                  "data-testid": "dialogue-pick",
-                  "data-keyword-id": pick.payload.keyword_id,
-                  onClick: () => emit("dialogue-pick", pick),
-                },
-                [h("span", { class: "k" }, String(index + 1)), h("span", { class: "t" }, pick.label)],
-              ),
-            ),
-            vm.freeRow
-              ? h(
-                  "button",
-                  {
-                    key: vm.freeRow.key,
-                    type: "button",
-                    class: "pick",
-                    "data-testid": "dialogue-freeform",
-                    onClick: () => emit("dialogue-freeform"),
-                  },
-                  [
-                    h("span", { class: "k" }, "⌨"),
-                    h("span", { class: "t" }, "自由對話（輸入任意話語）→ 指令列"),
-                  ],
-                )
-              : null,
-            h(
-              "button",
-              {
-                key: "dlg-exit",
-                type: "button",
-                class: "pick pick-exit",
-                "data-testid": "dialogue-exit",
-                onClick: () => emit("dialogue-leave"),
-              },
-              [h("span", { class: "k" }, "✕"), h("span", { class: "t" }, "結束對話")],
-            ),
-          ]),
-        );
-      }
-      return nodes;
-    }
-
     function focus() {
-      const target = dialogueVariant.value ? dialogueScrollRef.value : surfaceRef.value;
-      target?.focus({ preventScroll: true });
-    }
-
-    // Dialogue mode's focus home (webclient-dialogue-stage-actors D5): the
-    // first dialogue row while the variant renders (a pick, else the free
-    // row, else the exit row), otherwise the page surface. Every lookup is
-    // null-safe: before the rows render this is a no-op.
-    function focusHome() {
-      if (dialogueVariant.value) {
-        const region = dialogueScrollRef.value;
-        const row =
-          region?.querySelector('[data-testid="dialogue-pick"]') ||
-          region?.querySelector('[data-testid="dialogue-freeform"]') ||
-          region?.querySelector('[data-testid="dialogue-exit"]');
-        row?.focus({ preventScroll: true });
-        return;
-      }
       surfaceRef.value?.focus({ preventScroll: true });
     }
 
-    // Focus fell out of the conversation: to the body, onto a removed row,
-    // or it still sits on the page surface the dialogue variant just hid
-    // (a browser may not have blurred it yet).
-    function focusDropped() {
-      const active = document.activeElement;
-      return (
-        !active ||
-        active === document.body ||
-        active === document.documentElement ||
-        !active.isConnected ||
-        (dialogueVariant.value && active === surfaceRef.value)
-      );
+    // Dialogue mode's focus home while no choice list is shown
+    // (webclient-dialogue-choices-overlay D7): the page surface.
+    function focusHome() {
+      surfaceRef.value?.focus({ preventScroll: true });
     }
-
-    // Two of the window's own renders drop a focused element (design D5):
-    // the panel turning available while the page surface holds focus (v-show
-    // hides it), and a reply re-rendering the rows under a focused row (or
-    // the panel turning unavailable while mode stays dialogue). Read where
-    // focus sits before the flush; after it, re-home only when focus fell
-    // out of the conversation (see `focusDropped`). Leaving dialogue is the
-    // shell's case alone.
-    watch(
-      () => [dialogueVariant.value, props.dialogue],
-      () => {
-        const active = document.activeElement;
-        const held =
-          !!active &&
-          ((surfaceRef.value && active === surfaceRef.value) ||
-            (dialogueScrollRef.value && dialogueScrollRef.value.contains(active)));
-        if (!held) {
-          return;
-        }
-        void nextTick(() => {
-          if (props.mode === "dialogue" && focusDropped()) {
-            focusHome();
-          }
-        });
-      },
-    );
 
     expose({ focus, focusHome, advance });
 
     return () => {
-      const variant = dialogueVariant.value ? "dialogue" : "paged";
       const page = pages.value[pageIndex.value] || null;
       const total = pages.value.length;
       const onLast = pageIndex.value >= total - 1;
-      const isTyping = variant === "paged" && typing.value;
-      const showMarker = variant === "paged" && !provisional.value && total > 0 && !isTyping;
+      const isTyping = typing.value;
+      const showMarker = !provisional.value && total > 0 && !isTyping;
       const reveals = isTyping && page ? fragmentReveal(page, typewriter.typed.value) : null;
       return h(
         "section",
@@ -742,16 +536,18 @@ export default {
           class: "message-window",
           "data-testid": "message-window",
           "data-mode": props.mode,
-          "data-variant": variant,
+          "data-variant": "paged",
+          "data-reading-complete": readingComplete.value ? "true" : "false",
           "data-typing": isTyping ? "true" : "false",
           onClick,
           onWheel,
         },
         [
-          // The name plate (design D7): a header row above the text area while
-          // the dialogue variant renders; outside it, an empty placeholder
-          // slot, so the text area below keeps its vnode position.
-          variant === "dialogue"
+          // The name plate (webclient-dialogue-stage-actors D7): a header row
+          // above the text area while the dialogue panel is available;
+          // otherwise an empty placeholder slot, so the text area below keeps
+          // its vnode position.
+          plated.value
             ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
                 h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
                 props.dialogue.bondStage == null
@@ -763,54 +559,30 @@ export default {
                     ),
               ])
             : null,
-          // Exactly two vnode slots (the dialogue region or its placeholder,
-          // then the page surface): the measurer is an untracked DOM node
-          // appended after them by use-message-measure.js and must stay the
-          // last child, so never add a slot or key a fragment here without
-          // moving the measurer into the vnode tree.
+          // The measurer is an untracked DOM node appended after the page
+          // surface by use-message-measure.js and must stay the text area's
+          // last child, so never add a sibling slot or key a fragment here
+          // without moving the measurer into the vnode tree.
           h("div", { class: "message-window__text" }, [
-            variant === "dialogue"
-              ? h(
-                  "div",
-                  {
-                    ref: dialogueScrollRef,
-                    class: "message-window__dialogue",
-                    "data-testid": "message-dialogue",
-                    tabindex: "-1",
-                    onScroll: onDialogueScroll,
-                  },
-                  [
-                    ...dialogueBlocks.value.map((block, index) =>
-                      narrativeBlockNodes({ ...block, first: true }, `b${index}`),
-                    ),
-                    ...dialogueNodes(props.dialogue),
-                  ],
-                )
-              : null,
-            // The page surface stays mounted in the dialogue variant (hidden)
-            // so the measurer and its observer keep one stable host.
-            withDirectives(
-              h(
-                "div",
-                {
-                  ref: surfaceRef,
-                  class: "message-window__page",
-                  "data-testid": "message-page",
-                  "data-oversize": page && page.oversize ? "true" : "false",
-                  "data-page": total > 0 ? String(pageIndex.value + 1) : "0",
-                  "data-pages": String(total),
-                  tabindex: "0",
-                  "aria-label": "訊息",
-                  "aria-describedby": pageLabelId,
-                  onKeydown: onSurfaceKeydown,
-                },
-                page
-                  ? page.blocks.map((fragment, index) =>
-                      narrativeBlockNodes(fragment, `f${index}`, reveals ? reveals[index] : undefined),
-                    )
-                  : [],
-              ),
-              [[vShow, variant === "paged"]],
+            h(
+              "div",
+              {
+                ref: surfaceRef,
+                class: "message-window__page",
+                "data-testid": "message-page",
+                "data-oversize": page && page.oversize ? "true" : "false",
+                "data-page": total > 0 ? String(pageIndex.value + 1) : "0",
+                "data-pages": String(total),
+                tabindex: "0",
+                "aria-label": "訊息",
+                "aria-describedby": pageLabelId,
+                onKeydown: onSurfaceKeydown,
+              },
+              page
+                ? page.blocks.map((fragment, index) =>
+                    narrativeBlockNodes(fragment, `f${index}`, reveals ? reveals[index] : undefined),
+                  )
+                : [],
             ),
           ]),
           h("div", { class: "message-window__controls" }, [
@@ -1048,21 +820,36 @@ export default {
   border: 0;
 }
 
-/* The dialogue variant (design D6; webclient-dialogue-stage-actors D7): in
-   dialogue the window spans the whole band. A name plate heads it; below,
-   the reply line and the pick rows scroll inside the text area in one
-   left-aligned column whose left edge lines up with the player's portrait
-   anchor (6% of the stage), so the conversation reads down from the figure
-   standing above it. The reply keeps the 42em measure; the right part of
-   the band stays open under the host's portrait. */
-.message-window[data-variant="dialogue"] {
+/* Dialogue (webclient-dialogue-stage-actors D7; webclient-dialogue-choices-
+   overlay D1): the window spans the whole band. The name plate heads it and
+   the page below it keeps the 42em measure, but in one left-aligned column
+   whose left edge lines up with the player portrait's anchor, so the line
+   reads down from the figure standing above it and the right part of the
+   band stays open under the host. The measurer shares the page's classes,
+   so it measures the same column. */
+.message-window[data-mode="dialogue"] {
   /* The player portrait's left inset, less the band region's 18px left
      padding: the text column starts under the figure's anchor edge. */
   --dialogue-inset: max(24px, calc(var(--actor-left-inset, 6vw) - 18px));
 }
 
-.message-window[data-variant="dialogue"]::before {
-  display: none;
+.message-window[data-mode="dialogue"] .message-window__page {
+  max-width: calc(42em + var(--dialogue-inset) + 24px);
+  margin: 0;
+  padding-left: var(--dialogue-inset);
+}
+
+/* The focus rule follows the column: just left of the text, and only while
+   the page holds keyboard focus (the plate's rule already edges the
+   window). */
+.message-window[data-mode="dialogue"]::before {
+  left: calc(var(--dialogue-inset) - 14px);
+  top: calc(var(--message-text) * 2);
+  visibility: hidden;
+}
+
+.message-window[data-mode="dialogue"]:has(.message-window__page:focus-visible)::before {
+  visibility: visible;
 }
 
 .message-window__plate {
@@ -1071,7 +858,7 @@ export default {
   align-items: baseline;
   min-width: 0;
   box-sizing: border-box;
-  max-width: calc(42em * 0.72 + var(--dialogue-inset) + 160px);
+  max-width: calc(42em + var(--dialogue-inset) + 24px);
   margin: 4px 0 0;
   padding: 2px 24px 9px var(--dialogue-inset);
   font-size: calc(var(--message-text) * var(--prose-scale));
@@ -1102,114 +889,5 @@ export default {
   font-family: var(--f-sans);
   font-size: max(12px, 0.46em);
   letter-spacing: 0.12em;
-}
-
-.message-window__dialogue {
-  --message-dialogue-text: calc(var(--message-text) * 0.72 * var(--prose-scale));
-  position: relative;
-  box-sizing: border-box;
-  height: 100%;
-  overflow-y: auto;
-  padding: 10px 24px 8px var(--dialogue-inset, 24px);
-  outline: none;
-  scrollbar-color: var(--ink-600) transparent;
-  scrollbar-width: thin;
-}
-
-.message-window__dialogue .narrative-line {
-  max-width: 42em;
-  margin-bottom: 10px;
-  font-family: var(--f-serif);
-  font-size: var(--message-dialogue-text);
-  line-height: 1.6;
-  color: var(--paper-300);
-}
-
-.message-window__dialogue .narrative-line.sys {
-  font-size: calc(var(--message-dialogue-text) * 0.8);
-}
-
-.message-window__dialogue .dlg .say {
-  max-width: 42em;
-  font-family: var(--f-serif);
-  font-size: var(--message-dialogue-text);
-  line-height: 1.6;
-  color: var(--paper-50);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-}
-
-.message-window__dialogue .choices {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 10px;
-  max-width: min(100%, 880px);
-  margin-top: 14px;
-}
-
-.message-window__dialogue .choices .pick {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-  min-height: 40px;
-  width: 100%;
-  box-sizing: border-box;
-  text-align: left;
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid #625c50;
-  border-radius: var(--radius-sm);
-  padding: 7px 12px;
-  cursor: pointer;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
-}
-
-.message-window__dialogue .choices .pick[data-testid="dialogue-freeform"],
-.message-window__dialogue .choices .pick[data-testid="dialogue-exit"] {
-  grid-column: 1 / -1;
-}
-
-.message-window__dialogue .choices .pick:hover,
-.message-window__dialogue .choices .pick:focus-visible {
-  border-color: var(--gold-500);
-  background: var(--panel-hi);
-  transform: translateX(3px);
-}
-
-.message-window__dialogue .choices .pick:focus-visible {
-  outline: none;
-  box-shadow: inset 2px 0 0 var(--gold-400);
-}
-
-.message-window__dialogue .choices .pick .k {
-  flex: none;
-  width: 20px;
-  padding: 1px 6px;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  text-align: center;
-  color: var(--gold-400);
-  border: 1px solid var(--gold-500);
-  border-radius: 5px;
-}
-
-.message-window__dialogue .choices .pick .t {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 15px;
-  color: var(--paper-100);
-}
-
-/* The exit row reads as an exit, not another reply. */
-.message-window__dialogue .choices .pick-exit .k {
-  color: var(--seal-400);
-  border-color: var(--seal-600);
-}
-
-.message-window__dialogue .choices .pick-exit:hover,
-.message-window__dialogue .choices .pick-exit:focus-visible {
-  border-color: var(--seal-500);
 }
 </style>

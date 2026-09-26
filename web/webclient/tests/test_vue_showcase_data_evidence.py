@@ -180,6 +180,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The dialogue stage actor (webclient-dialogue-stage-actors), the
                 # standing portrait that wraps Core/ReferenceArtwork on the stage.
                 "Core/StageActor",
+                # The dialogue choice list (webclient-dialogue-choices-overlay), centred
+                # over the stage once the session line is read.
+                "Core/DialogueChoices",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

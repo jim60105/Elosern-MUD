@@ -282,10 +282,12 @@ describe("dock digit row picks (1–9)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the caption's picks claim the slots while the dialogue variant presents", () => {
+  // webclient-dialogue-choices-overlay: the caption retarget is deleted.
+  // In dialogue the keyboard router claims only `/`; the dialogue choice list
+  // handles its own digits before they reach the bridge, so a digit that
+  // does reach the store is unclaimed and the hidden dock never moves.
+  it("a dialogue-mode digit is unclaimed and the collapsed dock never moves", () => {
     openSession();
-    // The caption panel's own bound is four picks (`DIALOGUE_MAX_CHOICES`,
-    // webclient-align-11), so the caption range is 1–4.
     const choices = ["fare", "smell", "chest", "silence"].map(
       (keyword_id) => ({ keyword_id, label: `「${keyword_id}」` }),
     );
@@ -315,23 +317,12 @@ describe("dock digit row picks (1–9)", () => {
       {},
     );
     expect(store.view.mode).toBe("dialogue");
-    expect(store.focusPress("4")).toBe(true);
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.talk_scripted",
-      payload: { npc_id: 41, keyword_id: "silence" },
-    });
-    // A digit past the rendered picks has no pick: the caption branch owns the
-    // press and declines, so it falls through.
-    expect(store.focusPress("5")).toBe(false);
-    // The dock's own chips claim no digit while the caption presents, and
-    // the collapsed dock's focus never moves (webclient-dialogue-stage-actors
-    // D6).
-    expect(store.view.dockDepth).toBe(1);
     const focusBefore = store.view.focus.key;
-    // A held repeat is claimed but never re-dispatches.
-    expect(store.focusPress("1", true)).toBe(true);
-    expect(sender.sent.actions).toHaveLength(1);
+    expect(store.focusPress("4")).toBe(false);
+    expect(store.focusPress("5")).toBe(false);
+    expect(store.focusPress("1", true)).toBe(false);
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.dockDepth).toBe(1);
     expect(store.view.focus.key).toBe(focusBefore);
   });
 

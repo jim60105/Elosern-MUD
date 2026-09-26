@@ -99,7 +99,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_actions_client_node_suite_passes(self):
         # The legacy `actions.test.js` Node file was retired with the Vue
@@ -222,7 +222,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
     )
     def test_ui_contract_node_suite_passes(self):
@@ -592,13 +592,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
 
 
 class DialogueSurfaceEvidenceTest(unittest.TestCase):
-    """webclient-align-08/11 and webclient-dialogue-stage-actors: the dialogue
-    surface's window variant, the collapsed command region, and the stage
-    actors are Vue-layer contracts; the Vitest files are their executed
+    """webclient-align-08/11, webclient-dialogue-stage-actors, and
+    webclient-dialogue-choices-overlay: the paged dialogue window, the choice
+    list over the stage, the collapsed command region, and the stage actors
+    are Vue-layer contracts; the Vitest files are their executed
     evidence."""
 
     @covers_requirement(
-        "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel",
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read",
     )
     def test_dialogue_feed_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -608,6 +609,8 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
                 "vitest",
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/message_window_dialogue.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_choices.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_dialogue_choices.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/dialogue_view_model.test.js"),
             ],
             cwd=str(REPO_ROOT),
@@ -618,7 +621,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "dialogue-feed Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "dialogue choices Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

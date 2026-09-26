@@ -27,6 +27,12 @@ const renderFrame = (args) => ({
     h(HudFrame, args, {
       "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
       "actor-right": () => (args.mode === "dialogue" ? sample("actor-right · 對話對象立繪", "background:#1a1d2099;") : null),
+      // The dialogue choice list's card (webclient-dialogue-choices-overlay
+      // D6): a sample of its height, centred in the `choices` anchor's span.
+      choices: () =>
+        args.mode === "dialogue"
+          ? sample("choices · 對話選項（置中）", "height:330px;pointer-events:auto;background:#1a1d20cc;")
+          : null,
       place: () => sample("place · 地點卡"),
       vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
       map: () => [
@@ -62,7 +68,9 @@ export default {
           "command region spans the whole band; the objective line shows only " +
           "in exploration; dialogue collapses the command region " +
           "(display:none, the dock stays mounted) so the message region " +
-          "spans the band, and `actor-right` carries the dialogue host. The " +
+          "spans the band, `actor-right` carries the dialogue host, and the " +
+          "`choices` anchor centres the dialogue choice list over the stage, " +
+          "above the expanded command-line row. The " +
           "open-surface registry drives the stage recession behind open " +
           "drawers and overlays.",
       },
@@ -86,10 +94,18 @@ export const CreationStage = {
 };
 
 // Dialogue (webclient-dialogue-stage-actors design D4): one band column,
-// the command region collapsed, both portrait anchors occupied.
+// the command region collapsed, both portrait anchors occupied, and the
+// choice list centred over the stage (webclient-dialogue-choices-overlay).
 export const DialogueStage = {
   render: renderFrame,
   args: { mode: "dialogue", commandLineExpanded: false },
+};
+
+// The borrowed command line open under the choice list: the list's span
+// ends above the row.
+export const DialogueCommandLine = {
+  render: renderFrame,
+  args: { mode: "dialogue", commandLineExpanded: true },
 };
 
 export const MenuOpenRecession = {

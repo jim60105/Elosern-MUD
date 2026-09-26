@@ -1,9 +1,8 @@
 // Dialogue surface view model (webclient-align-08-dialogue-surface): the ONE
-// derived shape over the committed `dialogue` panel, consumed by the feed
-// dialogue variant and the store's caption digit retarget
-// (webclient-align-11-dialogue-ux: the dock's `dialogue.root` mirror form is
-// deleted — the caption is the ONE presentation; feed rows and digit slots
-// derive from this helper, neither ever re-fetches or keeps a copy).
+// derived shape over the committed `dialogue` panel, consumed by the message
+// window's name plate, the stage's host actor, the dialogue choice list
+// (webclient-dialogue-choices-overlay), and the store's free-form borrow.
+// Every consumer derives from this helper; none re-fetches or keeps a copy.
 //
 // The view model reads ONLY the committed panel form (available `dialogue`
 // panels); an unavailable or absent panel yields null and every consumer

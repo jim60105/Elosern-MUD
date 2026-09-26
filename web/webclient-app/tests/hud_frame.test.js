@@ -20,6 +20,7 @@ import HudFrame from "../components/HudFrame.vue";
 import ActionDock from "../components/ActionDock.vue";
 import LocalMap from "../components/LocalMap.vue";
 import SceneBackdrop from "../components/SceneBackdrop.vue";
+import DialogueChoices from "../components/DialogueChoices.vue";
 import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 
@@ -178,7 +179,7 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     ]);
   });
 
-  describe("the dialogue focus home (webclient-dialogue-stage-actors D5)", () => {
+  describe("the dialogue focus home (webclient-dialogue-stage-actors D5; webclient-dialogue-choices-overlay D7)", () => {
     const VM = dialogueViewModel({
       schema_version: 2,
       available: true,
@@ -189,31 +190,50 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
       choices: [{ keyword_id: "fare", label: "「就五枚，走嗎？」" }],
     });
 
-    function mountLive(mode, extra = {}) {
+    // `list` renders the dialogue choice list in the `choices` slot, as
+    // AppClient does once the line is read.
+    function mountLive(mode, extra = {}, { list = false } = {}) {
       const host = document.createElement("div");
       host.id = "elosern-app";
       document.body.appendChild(host);
       wrapper = mount(AppShell, {
         attachTo: host,
         props: { mode, dialogue: mode === "dialogue" ? VM : null, ...extra },
-        slots: { "action-dock": () => h(ActionDock, { mode }) },
+        slots: {
+          "action-dock": () => h(ActionDock, { mode }),
+          choices: () => (list ? h(DialogueChoices, { picks: VM.picks }) : null),
+        },
       });
       return wrapper;
     }
 
-    it("moves focus from the dock to the first dialogue row on entering dialogue", async () => {
+    const page = (shell) => shell.get('[data-testid="message-page"]').element;
+    const choiceList = (shell) => shell.get('[data-anchor="choices"] [data-testid="dialogue-choices"]').element;
+
+    it("moves focus from the dock to the message page on entering dialogue (no list while the line is read)", async () => {
       const shell = mountLive("exploration");
       const dock = document.getElementById("action-dock");
       dock.focus();
       expect(document.activeElement).toBe(dock);
       await shell.setProps({ mode: "dialogue", dialogue: VM });
       await nextTick();
-      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+      await nextTick();
+      expect(document.activeElement).toBe(page(shell));
     });
 
-    it("returns focus from a dialogue row to the dock on leaving dialogue", async () => {
-      const shell = mountLive("dialogue");
-      shell.get('[data-testid="dialogue-pick"]').element.focus();
+    it("lands on the choice list when it is already shown on entering dialogue", async () => {
+      const shell = mountLive("exploration", {}, { list: true });
+      document.getElementById("action-dock").focus();
+      await shell.setProps({ mode: "dialogue", dialogue: VM });
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      expect(document.activeElement).toBe(choiceList(shell));
+    });
+
+    it("returns focus from the choice list to the dock on leaving dialogue", async () => {
+      const shell = mountLive("dialogue", {}, { list: true });
+      choiceList(shell).focus();
       await shell.setProps({ mode: "exploration", dialogue: null });
       await nextTick();
       await nextTick();
@@ -221,9 +241,9 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     });
 
     for (const nextMode of ["combat", "creation"]) {
-      it(`moves focus from a dialogue row to the dock when dialogue gives way to ${nextMode}`, async () => {
-        const shell = mountLive("dialogue");
-        shell.get('[data-testid="dialogue-pick"]').element.focus();
+      it(`moves focus from the choice list to the dock when dialogue gives way to ${nextMode}`, async () => {
+        const shell = mountLive("dialogue", {}, { list: true });
+        choiceList(shell).focus();
         await shell.setProps({ mode: nextMode, dialogue: null });
         await nextTick();
         await nextTick();
@@ -241,24 +261,58 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
       expect(document.activeElement).toBe(outside);
     });
 
-    it("rescues focus from a hiding vitals island to the message window in dialogue", async () => {
-      const shell = mountLive("dialogue", { vitalsVisible: true });
+    it("rescues focus from a hiding vitals island to the message page, then to the shown list", async () => {
+      const shell = mountLive("dialogue", { vitalsVisible: true }, { list: true });
       const island = document.createElement("div");
       island.setAttribute("data-testid", "status-panel");
       island.tabIndex = 0;
       shell.get('[data-anchor="vitals"]').element.appendChild(island);
       island.focus();
       await shell.setProps({ vitalsVisible: false });
-      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+      expect(document.activeElement).toBe(page(shell));
+      await nextTick();
+      expect(document.activeElement).toBe(choiceList(shell));
     });
 
-    it("an Escape from the command line in dialogue lands on the first dialogue row", async () => {
+    it("an Escape from the command line in dialogue lands on the message page without a list", async () => {
       const shell = mountLive("dialogue");
       await shell.vm.focusCommandField();
       expect(document.activeElement?.id).toBe("inputfield");
       shell.vm.releaseCommandField(true);
-      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+      await nextTick();
+      expect(document.activeElement).toBe(page(shell));
     });
+
+    it("an Escape from the command line in dialogue lands on the choice list once it is rendered", async () => {
+      const shell = mountLive("dialogue", {}, { list: true });
+      await shell.vm.focusCommandField();
+      shell.vm.releaseCommandField(true);
+      // The page first (always rendered), the list after the next render.
+      expect(document.activeElement).toBe(page(shell));
+      await nextTick();
+      expect(document.activeElement).toBe(choiceList(shell));
+    });
+
+    it("focusMessagePage() parks focus on the message page", () => {
+      const shell = mountLive("dialogue", {}, { list: true });
+      choiceList(shell).focus();
+      shell.vm.focusMessagePage();
+      expect(document.activeElement).toBe(page(shell));
+    });
+  });
+
+  it("gates the choices anchor to dialogue mode and bounds it above the command-line row", () => {
+    const css = styleBlock("components/HudFrame.vue");
+    const anchor = extractRule(css, '.elosern-stage [data-anchor="choices"]');
+    expect(anchor).toMatch(/width: min\(560px, 40%\)/);
+    expect(anchor).toMatch(/left: calc\(50% - min\(280px, 20%\)\)/);
+    expect(anchor).toMatch(/bottom: calc\(var\(--stage-content-bottom\) \+ var\(--stage-inset-y\)\)/);
+    expect(anchor).toMatch(/z-index: 4/);
+    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
+    const frame = mount(HudFrame, { props: { mode: "dialogue" }, slots: { choices: () => h("div", { class: "probe" }) } });
+    expect(frame.get('[data-testid="anchor-choices"]').attributes("data-anchor")).toBe("choices");
+    expect(frame.find('[data-anchor="choices"] .probe').exists()).toBe(true);
+    frame.unmount();
   });
 
   it("tracks commandLineExpanded on [data-anchor='command-line'] and hides the collapsed anchor in stage CSS", async () => {

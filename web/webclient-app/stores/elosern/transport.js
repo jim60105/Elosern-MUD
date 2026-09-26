@@ -295,13 +295,17 @@ export function applyTransport(ctx) {
         }
       }
       const sent = ctx.dispatchAction("explore.talk_freeform", { npc_id: ctx.freeformTarget, speech: value }, { npcLabel });
-      // A successful dock-borrowed send collapses the command line and
-      // restores action-dock focus (webclient-desktop-shell; design D2/D3);
-      // a rejected send leaves the command line expanded with its text.
+      // A delivered borrowed send collapses the command line and restores
+      // the dialogue's focus home, and releases the borrow
+      // (webclient-desktop-shell). A refused send (locked, a non-active
+      // phase, or a mutation in flight) leaves the line expanded with its
+      // text and KEEPS the borrow bound to the same host, so the next send
+      // once the lock lifts is still that speech
+      // (webclient-dialogue-choices-overlay D9).
       if (sent !== null) {
         ctx.drawerCloseRequest += 1;
+        ctx.freeformTarget = null;
       }
-      ctx.freeformTarget = null;
       ctx.publishView();
       return true;
     }

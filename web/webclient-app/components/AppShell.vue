@@ -6,7 +6,8 @@
 // webclient-avg-place-card-top-bar design D3), the island anchors `vitals`
 // and `map` (webclient-avg-stage-hud-anchors design D1), the portrait
 // anchors (`actor-left`,
-// `actor-right`), the fixed-height bottom band's message and command
+// `actor-right`), the dialogue `choices` anchor (webclient-dialogue-choices-
+// overlay D6), the fixed-height bottom band's message and command
 // regions (`band-message` holds the paged message window and the `[日誌] [⌨]`
 // control strip, `band-command` the action dock), and the `command-line` row
 // docked on the message region (webclient-avg-stage-shell design D1/D3/D6;
@@ -28,8 +29,9 @@
 // `/` outside an editable control, the ⌨ toggle in `#band-message`, or the
 // free-form dialogue borrow expands the line and focuses `#inputfield` after
 // the DOM update (no literal slash). Escape from the field or an accepted
-// send restores focus to the mode's focus home (`#action-dock`, or the
-// message window in dialogue) and collapses the line (design D3's
+// send restores focus to the mode's focus home (`#action-dock`, or in
+// dialogue the choice list while it is shown, else the message page) and
+// collapses the line (design D3's
 // ladder: open overlay → open drawer → focused command field → dock menu
 // level). The mount retires the replaced text fallback (hidden, not removed).
 // A mode change that hides the surface holding focus moves focus to the
@@ -61,8 +63,8 @@ const props = defineProps({
   // forwarded to MessageWindow so silent actions segment responses.
   responseMarks: { type: Array, default: () => [] },
   // The dialogue view model (webclient-align-08-dialogue-surface): forwarded
-  // verbatim to the message window's dialogue variant (null outside the
-  // available dialogue window).
+  // verbatim to the message window, whose name plate names the host (null
+  // outside the available dialogue window).
   dialogue: { type: Object, default: null },
   // The client-local prose scale (`store.view.fontScale`), forwarded to
   // MessageWindow so a scale change re-measures pages.
@@ -88,8 +90,8 @@ const props = defineProps({
   prompt: { type: String, default: "" },
   commandHistory: { type: Array, default: () => [] },
   // The store's mutation-lock flag (connection-loss or a reload-required
-  // protocol error locks all graphical mutations). Passed to the drawer so a
-  // rejected send preserves the typed speech.
+  // protocol error locks all graphical mutations). The top bar's switcher
+  // locks with it.
   mutationsLocked: { type: Boolean, default: false },
   // The open-surface registry (design D9): overlay surfaces the parent
   // (AppClient) tracks — e.g. "full-log", "creation". The drawer is owned
@@ -108,10 +110,10 @@ const props = defineProps({
   // text (the preference chooses whether the markup pipeline runs, never
   // what it permits).
   textToHtml: { type: Boolean, default: true },
-  // The action client's in-flight mutation flag (H5, webclient-input-narrative):
-  // forwarded to the command line so a send blocked by an in-flight mutation
-  // keeps the typed speech in the field.
-  inFlight: { type: Boolean, default: false },
+  // The command line's accept rule (webclient-dialogue-choices-overlay D9):
+  // `store.view.commandAccepts`, the same predicate the dispatch path applies
+  // to the send the field would make, so a rejected send keeps its text.
+  commandAccepts: { type: Boolean, default: false },
   // Extra Tab-completion candidates (webclient-align-02-quickbar-shortcuts):
   // the committed exploration panel's exit labels and interact-target display
   // names, forwarded untouched to the command line.
@@ -130,9 +132,7 @@ const emit = defineEmits([
   "submit-command",
   "open-full-log",
   "focus-lost",
-  "dialogue-pick",
-  "dialogue-freeform",
-  "dialogue-leave",
+  "reading-change",
   "switch-character",
   "create-character",
 ]);
@@ -156,15 +156,39 @@ function isEditable(target) {
   );
 }
 
+const CHOICE_LIST_SELECTOR = '[data-anchor="choices"] [data-testid="dialogue-choices"]';
+
+function messagePage() {
+  return messageWindow.value?.$el?.querySelector?.('[data-testid="message-page"]') ?? null;
+}
+
+// Park focus on the message page (webclient-dialogue-choices-overlay D7):
+// the choice list calls this before an activation dispatches, so the list's
+// removal on the next render never drops focus to the body.
+function focusMessagePage() {
+  messageWindow.value?.focusHome?.();
+}
+
 // The mode's focus home (webclient-dialogue-stage-actors design D5): the
 // side-effect-free rescue every return path shares (no drawer-close side
-// effects, no `drawer-closed` emit). In dialogue mode the command region is
-// collapsed, so the home is the message window's focus target (its first
-// dialogue row, else its page surface); in every other mode it is
-// `#action-dock`.
+// effects, no `drawer-closed` emit). In every mode but dialogue it is
+// `#action-dock`. In dialogue the command region is collapsed and the home
+// is the choice list while it is shown, else the message page
+// (webclient-dialogue-choices-overlay D7). The page takes focus at once —
+// it is always rendered in dialogue — and the list takes it after the next
+// render: a return path can run between a dispatch and the render that
+// removes the list (an accepted borrowed send), so the list is only trusted
+// once that render has happened.
 function restoreFocusHome() {
   if (props.mode === "dialogue") {
-    messageWindow.value?.focusHome?.();
+    focusMessagePage();
+    void nextTick(() => {
+      const active = document.activeElement;
+      const list = document.querySelector(CHOICE_LIST_SELECTOR);
+      if (props.mode === "dialogue" && list && (active === messagePage() || focusIsLost(active))) {
+        list.focus({ preventScroll: true });
+      }
+    });
     return;
   }
   const dock = document.getElementById("action-dock");
@@ -276,7 +300,7 @@ watch(
       // A drawer or the command field that holds focus keeps it.
       const band = active?.closest?.(HIDDEN_BY_MODE.dialogue);
       if (band) {
-        messageWindow.value?.$el?.querySelector?.('[data-testid="message-page"]')?.focus({ preventScroll: true });
+        focusMessagePage();
       }
       await nextTick();
       const now = document.activeElement;
@@ -306,12 +330,15 @@ watch(
       commandLineExpanded.value = false;
     }
     if (prevMode === "dialogue") {
-      // Leaving dialogue (design D5): the dialogue rows are gone after the
-      // flush, so focus held in the message region (or already dropped to
-      // the body) returns to the now-rendered dock.
+      // Leaving dialogue (design D5): the choice list is gone after the
+      // flush, so focus held in the message region or the `choices` anchor
+      // (or already dropped to the body) returns to the now-rendered dock.
       await nextTick();
       const now = document.activeElement;
-      if (focusIsLost(now, hiddenSelector) || now?.closest?.("[data-anchor='band-message']")) {
+      if (
+        focusIsLost(now, hiddenSelector) ||
+        now?.closest?.("[data-anchor='band-message'], [data-anchor='choices']")
+      ) {
         restoreFocusHome();
       }
     }
@@ -348,7 +375,7 @@ onBeforeUnmount(() => {
 // the field via `focusCommandField`, a successful borrowed send returns focus
 // to the mode's focus home via `releaseCommandField(true)`, and the dock's
 // popover-close watcher re-homes focus through `restoreFocusHome`.
-defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome });
+defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMessagePage });
 </script>
 
 <template>
@@ -382,6 +409,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome });
       <template #actor-right>
         <slot name="actor-right" />
       </template>
+      <template #choices>
+        <slot name="choices" />
+      </template>
       <template #band-message>
         <MessageWindow
           ref="messageWindow"
@@ -394,9 +424,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome });
           :auto-advance="props.autoAdvance"
           :reduced-motion="props.reducedMotion"
           :held="props.openSurfaces.length > 0"
-          @dialogue-pick="(pick) => emit('dialogue-pick', pick)"
-          @dialogue-freeform="() => emit('dialogue-freeform')"
-          @dialogue-leave="() => emit('dialogue-leave')"
+          @reading-change="(complete) => emit('reading-change', complete)"
           @open-full-log="() => emit('open-full-log')"
         />
         <button
@@ -430,9 +458,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome });
           ref="commandLine"
           :prompt="props.prompt"
           :history="props.commandHistory"
-          :connected="props.connected"
-          :mutations-locked="props.mutationsLocked"
-          :in-flight="props.inFlight"
+          :accepting="props.commandAccepts"
           :text-to-html="props.textToHtml"
           :completion-candidates="props.completionCandidates"
           @submit="onSubmit"

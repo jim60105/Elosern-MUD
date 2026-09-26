@@ -15,7 +15,7 @@ The WebClient SHALL render as a full-bleed stage that fills the viewport, with t
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
 named stage anchors — the top-left `place` and `vitals` anchors, the top-right `map` anchor, the portrait anchors
-`actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, and
+`actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, the dialogue `choices` anchor, and
 the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
 required surface out of view.
 
@@ -55,11 +55,18 @@ exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the
 actor while the committed mode is `dialogue` and the committed `dialogue` panel is available, and SHALL
 carry no content in every other state. Both stage actors follow "Stage actors present the player and the
 dialogue host with a speaking state". The portrait anchors are non-interactive art: they SHALL carry no
-focusable element and SHALL NOT intercept pointer events, and they MAY sit behind the HUD islands and
-the command-line row.
+focusable element and SHALL NOT intercept pointer events, and they MAY sit behind the HUD islands, the
+`choices` anchor, and the command-line row.
+
+The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
+box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
+SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
+command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
+command-line row, or the bottom band.
 
 At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
-`band-message`, `band-command`, `command-line`) SHALL overlap another interactive anchor's content,
+`band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
 and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
 anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
 than sized by its content. A transient popover opened from a top-band element MAY overlay the
@@ -119,6 +126,10 @@ introduced into the band this way.
 - **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
 - **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
 
+#### Scenario: The choice list sits over the stage between the portraits
+- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080, 1440x900, and 1280x720 with the minimap island present and the command line expanded
+- **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable
+
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
 visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
@@ -128,7 +139,8 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | place card (location, world time) | visible | visible | visible | hidden |
-| message window (band message region) | visible | visible | visible (whole band width, dialogue variant, name plate) | hidden |
+| message window (band message region) | visible | visible | visible (whole band width, paged, name plate) | hidden |
+| dialogue choice list (`choices` anchor, centred over the stage) | not rendered | not rendered | once the current response's last page is fully shown, while no action is in flight | not rendered |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
 | party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
@@ -143,7 +155,7 @@ the accessibility tree and the tab order. The matrix SHALL be:
 
 While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
 exploration art truthfully — the dialogue's focus is carried by the stage actors, the name plate, and
-the message window, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
+the message window, and the choice list, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
 sets SHALL stay consistent with this matrix. A cell that names a data rule instead of `visible` means
 the surface is shown in that mode only while its own requirement's rule holds for the committed state,
 and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
@@ -260,8 +272,8 @@ The narrative SHALL render as a message window that fills the bottom band's mess
 two thirds of the band, or the whole band in dialogue mode, at the band's fixed height — drawn with the
 reference's caption panel
 treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The window
-SHALL never grow into the stage and SHALL never change size with its content. Outside the dialogue
-variant, the window SHALL present exactly one page of the current response at a time, paged as
+SHALL never grow into the stage and SHALL never change size with its content. In every mode, dialogue
+included, the window SHALL present exactly one page of the current response at a time, paged as
 `webclient-input-narrative` defines and revealed as its typing requirement defines, and SHALL NOT
 present earlier responses: they remain readable in the full-log surface. Page text SHALL be set in the
 serif reading face at 28px at the 1920x1080 reference size and the default prose scale, SHALL scale
@@ -280,8 +292,22 @@ The `日誌` control SHALL open the full-log surface in one action. Scrolling up
 nothing left to scroll up SHALL also open it. The full-log surface's content, markup renderer, focus
 trap, Escape close, focus restore to the opening control, and opening at its latest line are
 unchanged. The window SHALL render no unread indicator and no jump-to-latest control, and no head row
-other than the dialogue name plate its dialogue variant defines. In creation mode the window, its
-marker, and the `日誌` control are hidden with the message region.
+other than the dialogue name plate. In creation mode the window, its marker, and the `日誌` control are
+hidden with the message region.
+
+While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
+carry a name plate above its text area, naming the host with the panel's `display_name` plus
+` · 羈絆 <stage>` only when `bond_stage` is non-null; in dialogue mode the plate and the page text SHALL
+share one left-aligned column whose left edge lines up with the player portrait anchor's left edge (the
+42-character line cap still applies); the window's text area below the plate SHALL
+present the current response's pages — the session line as the narrative delivered it, paged and typed
+like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
+from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
+dialogue choice list's. While mode is `dialogue` but the panel is unavailable (the transient window
+between a clear seam and its commit), the window SHALL render no name plate. The window SHALL make known
+to the shell, from its own reader state and never from narrative prose, whether the current response's
+last page is on screen, fully shown, with no pending action mark — the moment the dialogue choice list
+waits for.
 
 #### Scenario: The window keeps the message region's box
 - **WHEN** the current response holds more text than one page and new lines keep arriving
@@ -322,6 +348,18 @@ marker, and the `日誌` control are hidden with the message region.
 #### Scenario: No unread indicator is rendered
 - **WHEN** the window renders in exploration, combat, or dialogue mode while lines arrive
 - **THEN** no unread count, unread live region, or jump-to-latest control exists in the window
+
+#### Scenario: The dialogue line is paged under the name plate
+- **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, and a greeting long enough for two pages at 1920x1080
+- **THEN** the window spans the whole band, shows the name plate `灰婆婆 · 羈絆 親睦`, types page 1 with no marker until it is fully shown, shows `▼`, advances on Enter on the page surface to page 2, and shows `■` once page 2 is fully shown, with no choice row inside the window at any point
+
+#### Scenario: An unbonded host's plate names only the host
+- **WHEN** mode `dialogue` commits with `bond_stage` `null`
+- **THEN** the name plate reads the host's `display_name` alone and carries no `羈絆` text
+
+#### Scenario: A transiently unavailable panel shows no plate
+- **WHEN** mode is `dialogue` but the committed panel is the unavailable form
+- **THEN** no name plate renders and the window shows the current response's pages with their page marker
 
 ### Requirement: An open drawer or overlay dims the stage behind it
 When a drawer or a full-screen overlay is open, the shell SHALL mark the stage so the surfaces behind
@@ -759,12 +797,11 @@ for the scene overview, its first nine chips in reading order: exits, then peopl
 the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the
 same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an
 in-flight entry stays locked, and a held repeat is suppressed.
-The slots address the frame's rendered entries, disabled ones included. In dialogue mode the dock's
-entries claim no digit: while the message window presents the dialogue variant with at least one pick,
-a digit pressed from a non-editable focus addresses the window's pick rows — the trailing free-dialogue
-and exit rows never take a digit slot.
-A digit whose entry does not exist (a frame with fewer rendered entries, a dialogue variant with no
-picks, dialogue mode without the variant, or
+The slots address the frame's rendered entries, disabled ones included. In dialogue mode neither the
+dock's entries nor the keyboard router claim any digit: the digits `1`–`N` belong to the dialogue choice
+list while it holds focus, which handles them itself as "Dialogue choices appear centred over the stage
+after the line is fully read" defines.
+A digit whose entry does not exist (a frame with fewer rendered entries, dialogue mode, or
 the pre-session empty stack) is not claimed and falls
 through to the text / command-history path.
 
@@ -792,10 +829,11 @@ through to the text / command-history path.
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders four picks while the command region is collapsed and the
-  player presses `4` and `5` from a non-editable focus
-- **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press
-  is unclaimed and falls through, and the hidden dock's focus and frame are unchanged
+- **WHEN** the dialogue choice list shows four picks with focus on the list, the command region is
+  collapsed, and the player presses `4` and `5`
+- **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press is handled
+  by neither the list nor the keyboard router and falls through, and the hidden dock's focus and frame
+  are unchanged
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 
@@ -1322,16 +1360,17 @@ message region SHALL carry, at its bottom-right corner, a labelled ⌨ toggle co
 row's state through `aria-expanded` and names the row through `aria-controls`. The toggle SHALL be
 rendered in every mode that renders the message region, SHALL NOT cover the message text (the text's
 scroll region SHALL keep its last line clear of the toggle), and SHALL NOT be affected by the committed
-narrative, the dialogue variant, or the dock frame.
+narrative, the dialogue choice list, or the dock frame.
 
 The command line SHALL expand, and focus SHALL move into its input field only after the row is
 rendered, on exactly three paths: `/` pressed while no editable control is focused, activation of the ⌨
 toggle while the row is collapsed, and the free-form dialogue borrow. It SHALL collapse, with focus
-moved to the current mode's focus home (the action dock, or the message window's focus target in
-dialogue mode) before the row is hidden, on exactly two paths: Escape in the input field, and
+moved to the current mode's focus home (the action dock, or in dialogue mode the dialogue choice list
+while it is rendered and the message window's page surface otherwise) before the row is hidden, on exactly two paths: Escape in the input field, and
 a send the field accepts (the field clears). Activating the ⌨ toggle while the row is expanded SHALL
-collapse it and leave focus on the toggle. A send the field rejects — offline, mutations locked, or a
-mutation in flight — SHALL leave the row expanded with the typed text and focus in the field. Losing
+collapse it and leave focus on the toggle. A send the field rejects — offline, mutations locked, a
+mutation in flight, or, for a borrowed free-form send, a presentation phase other than active — SHALL
+leave the row expanded with the typed text and focus in the field. Losing
 focus by any other means (a pointer activation elsewhere, a drawer or overlay opening) SHALL NOT
 collapse the row.
 
@@ -1370,7 +1409,7 @@ visibility matrix.)
 - **THEN** the row is hidden, the toggle reports `aria-expanded="false"`, and focus is on the toggle
 
 #### Scenario: The free-form borrow expands the line
-- **WHEN** the command line is collapsed and the player activates the dialogue variant's free-dialogue row
+- **WHEN** the command line is collapsed and the player activates the dialogue choice list's `⌨ 自由對話` row
 - **THEN** the row expands, focus moves into the input field, and no action is dispatched until the player sends
 
 #### Scenario: No opener or chip is rendered in the bar
@@ -1383,7 +1422,7 @@ visibility matrix.)
 
 #### Scenario: Escape in dialogue returns to the message window
 - **WHEN** the committed mode is dialogue, the player expands the command line with `/`, and presses Escape
-- **THEN** nothing is sent, the row is hidden, and focus is on the message window's focus target, never on the hidden action dock or the document body
+- **THEN** nothing is sent, the row is hidden, and focus is on the dialogue's focus home — the choice list while it is shown, else the message window's page surface — never on the hidden action dock or the document body
 
 ### Requirement: The command line advertises only affordances this client implements
 The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
@@ -1753,73 +1792,6 @@ optional or previous-stage rows.
 - **WHEN** the first row's `objective_line` is longer than the line's width
 - **THEN** the text is truncated with an overflow indicator, the line keeps its single-row height, and the full `objective_line` is the line's accessible text
 
-### Requirement: The feed presents the dialogue variant from the committed panel
-While the committed mode is `dialogue` and the committed `dialogue` panel is available, the
-message window SHALL be the ONE dialogue surface and SHALL present the reference's dialogue
-variant, unpaged, across the whole band: a name plate at the top of the window carrying the host's
-`display_name` plus ` · 羈絆 <stage>` only when `bond_stage` is non-null, then a dialogue box
-carrying the serif reply line with the panel's `line` verbatim. The box SHALL carry no avatar and no
-speaker line of its own: the host's portrait stands in the stage's `actor-right` anchor and the name
-plate names the speaker. Below the box, the window SHALL present one numbered pick row per
-`dialogue.choices` entry in payload order with its mono digit badge and bounded label, laid out in a
-compact row grid (at most two pick columns), followed by a trailing free-dialogue row (`⌨` badge,
-`自由對話（輸入任意話語）→ 指令列`) and, after it, a trailing exit row (`✕` badge, label
-`結束對話`). The box SHALL follow the current response's lines (see `webclient-input-narrative`);
-earlier responses SHALL NOT be presented and remain in the full-log surface. The exchange SHALL keep
-the window's fixed box in the band: when the response's lines, the box, picks, and trailing rows
-exceed the text area below the name plate they SHALL scroll inside it, with the dialogue box at the
-top of that area when a new reply commits, and SHALL NOT grow the window or the band. While the
-variant renders, the window SHALL show no page marker, a pointer activation on the window SHALL NOT
-advance a page, and Enter and Space SHALL keep their meaning for the focused row. Activating a pick row SHALL dispatch
-`explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` under the existing dispatch
-contract; activating the free-dialogue row SHALL focus the borrowed command line through the
-existing freeform-borrow path and SHALL dispatch nothing itself; activating the exit row SHALL
-dispatch `explore.dialogue_leave` with `{npc_id: host.identity}` under the same dispatch contract
-and nothing else. The variant SHALL render the
-session line exactly once — the box replaces the current response's duplicate final line for that
-exchange, keeping any residual text of that line, while the polite live region announces each new
-committed line exactly once — and SHALL
-NOT render picks the panel does not carry, reason tags, or disabled-row states. While mode is
-`dialogue` but the panel is unavailable (the transient window between a clear seam and its
-commit), the window SHALL fall back to its paged presentation of the current response with no
-name plate and no dialogue box. The dialogue variant SHALL NOT depend on any dock frame or router
-descriptor: its rows derive from the committed panel alone.
-
-#### Scenario: The dialogue box mirrors the committed panel
-- **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, a line, and four
-  keyword choices
-- **THEN** the window spans the whole band and shows the name plate `灰婆婆 · 羈絆 親睦`, the reply
-  line in a box with no avatar, four numbered pick rows, the free-dialogue row, and the exit row —
-  with the name plate and the reply line visible without scrolling while the picks render
-
-#### Scenario: A pick dispatches the scripted keyword
-- **WHEN** the player activates pick 2 through pointer or Enter
-- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and that
-  row's `keyword_id` is submitted through the existing dispatch contract
-
-#### Scenario: Free dialogue borrows the command line
-- **WHEN** the player activates the trailing free-dialogue row
-- **THEN** the command line receives focus for a freeform utterance and no action is dispatched
-
-#### Scenario: The exit row ends the conversation
-- **WHEN** the player activates the exit row
-- **THEN** exactly one `explore.dialogue_leave` request with the committed host identity is
-  submitted and no other action is dispatched
-
-#### Scenario: The session line announces once
-- **WHEN** a new reply commits while the dialogue variant renders
-- **THEN** the reply appears once in the window and the polite live region names its text exactly
-  once
-
-#### Scenario: A transiently unavailable panel falls back plainly
-- **WHEN** mode is `dialogue` but the committed panel is the unavailable form
-- **THEN** no name plate, dialogue box, picks, or exit row render and the window shows the current
-  response's pages with their page marker
-
-#### Scenario: An unbonded host's plate names only the host
-- **WHEN** mode `dialogue` commits with `bond_stage` `null`
-- **THEN** the name plate reads the host's `display_name` alone and carries no `羈絆` text
-
 ### Requirement: The skill book offers a bounded declared-practice sub-screen
 The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed
 `character` panel supports, and activating it SHALL replace the book body with a practice
@@ -2026,23 +1998,23 @@ again with no remount. The dialogue SHALL NOT present any dock frame, and no exp
 SHALL be removed from the committed `exploration` panel: movement stays reachable through the minimap
 and the conversation's own controls.
 
-In dialogue mode the shell's focus home SHALL be the message window's focus target: the first row of
-the dialogue variant while it renders, and otherwise the window's page surface. Every path that returns
+In dialogue mode the shell's focus home SHALL be the dialogue choice list while it is rendered, and
+otherwise the message window's page surface. Every path that returns
 focus to the focus home — the command line's Escape and accepted send, the mode-change rescue, and the
 return after a completed or rejected action — SHALL land there, never on the hidden dock and never on
 the document body. On entering dialogue, focus held inside the command region SHALL move to the
-message window before the region is hidden. On leaving dialogue for exploration, focus held inside the
-message region or on the document body SHALL move to the action dock once the region is rendered
-again.
+message window's page surface before the region is hidden. On leaving dialogue for exploration, focus
+held inside the message region, inside the `choices` anchor, or on the document body SHALL move to the
+action dock once the region is rendered again.
 
-While the mode is `dialogue`, the keyboard bridge SHALL claim only `/` (the command-line opener) and the
-digits that address the dialogue variant's picks; every other key SHALL be unclaimed by the dock
-router, so no key moves the hidden dock's focus, pushes or pops a frame, or activates a hidden entry.
-Enter and Space on a focused dialogue row keep their native activation.
+While the mode is `dialogue`, the keyboard router SHALL claim only `/` (the command-line opener); every
+other key SHALL be unclaimed by the dock router, so no key moves the hidden dock's focus, pushes or pops
+a frame, or activates a hidden entry. The keys the dialogue choice list handles never reach the router,
+and Enter and Space on the focused page surface keep their reading meaning.
 
 #### Scenario: Entering dialogue collapses the command region
 - **WHEN** the player activates 交談 in a host's verb popover at 1920x1080 and the commit makes the mode `dialogue`
-- **THEN** the band's command region and the `#action-dock` element are hidden with `display:none`, the message region spans the band's whole width at 300px (±1px) height, and focus is on the dialogue variant's first row
+- **THEN** the band's command region and the `#action-dock` element are hidden with `display:none`, the message region spans the band's whole width at 300px (±1px) height, focus is on the message window's page surface while the greeting is read, and focus moves to the dialogue choice list when the greeting's last page is fully shown
 
 #### Scenario: Leaving dialogue restores the overview without a remount
 - **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
@@ -2108,3 +2080,82 @@ any transition between them is owned by the motion layer.
 #### Scenario: Nothing is dimmed outside dialogue
 - **WHEN** the committed mode is exploration or combat
 - **THEN** the player's stage actor renders at full brightness and `actor-right` carries no stage actor
+
+### Requirement: Dialogue choices appear centred over the stage after the line is fully read
+While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL
+present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere
+else. The list SHALL render only while the message window reports that the current response's last
+page is on screen, fully shown, with no pending action mark, and while no action the player dispatched
+is in flight; at every other moment — a page still typing, a further page not yet read, a pick or
+free-form speech awaiting its reply — it SHALL NOT be rendered. Its rows SHALL be, in order: one pick
+row per `dialogue.choices` entry in payload order, each carrying the digit badge of its 1-based position
+and its bounded label; a `⌨ 自由對話` row; a `↦ 移動…` row; and a `✕ 結束對話` row. It SHALL render no
+row the panel does not back, no reason tag, and no disabled pick.
+
+Activating a pick row SHALL dispatch `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}`
+through the single dispatch entry. Activating `⌨ 自由對話` SHALL expand the command line and focus its
+field through the free-form borrow path, bound to the host, and SHALL dispatch nothing itself.
+Activating `✕ 結束對話` SHALL dispatch `explore.dialogue_leave` with `{npc_id: host.identity}` and nothing
+else. Activating `↦ 移動…` SHALL dispatch nothing and SHALL replace the rows with the exit rows of the
+committed exploration scene overview, in its order, each carrying the exit's direction glyph and, while
+enabled, the destination's display name under the scene overview's exit-chip rules, and ending with a
+back row; activating an enabled exit row SHALL dispatch the same `explore.move` payload the overview's
+exit chip dispatches, and a disabled exit row SHALL stay focusable with its server-authored reason and
+dispatch nothing. Escape or the back row in the exit rows SHALL return to the choice rows with the
+`↦ 移動…` row focused. A committed room without exits SHALL still show the back row alone.
+
+The list SHALL be one keyboard composite and one tab stop: DOM focus SHALL rest on the list container,
+which names its focused row through an active-descendant reference. ArrowUp and ArrowDown SHALL move to
+the previous and next row, wrapping; Home and End SHALL move to the first and last row; Enter and Space
+SHALL activate the focused row; while the choice rows are shown, digit `1`–`N` SHALL activate pick N
+directly; a held key's auto-repeat SHALL NOT activate. While the list holds focus its active row SHALL be
+shown by shape and fill — a leading `▸` and the dock's muted-gold fill — never by colour alone, and an
+active disabled exit row SHALL keep a quiet treatment that promises no action. Every key the list handles SHALL be consumed by it and SHALL NOT reach the keyboard
+router or the page surface; `/` and every key the list does not handle SHALL pass on unchanged. A pointer
+activation of a row SHALL focus that row and activate it through the same path as Enter. When the list
+appears while focus is on the message window, inside the message region, or on the document body, focus
+SHALL move to the list with its first row focused. Before an activation dispatches, focus SHALL move to
+the message window's page surface, so the list's removal never leaves focus on a removed element or the
+document body. Every activation is suppressed while a mutation is in flight or awaiting its declared
+presentation revision, exactly like a dock entry, and no combination of key and pointer input SHALL
+emit more than one request per deliberate activation.
+
+The list's rows derive from the committed `dialogue` and `exploration` panels alone and SHALL NOT depend
+on any dock frame or router descriptor. Its presence SHALL be derived from the window's reader state and
+the dispatch state, never from narrative prose.
+
+#### Scenario: The choices wait for the last page
+- **WHEN** a greeting of two pages commits with three choices at the `normal` text speed
+- **THEN** no choice list is rendered while page 1 types, after it is fully shown, or while page 2 types, and the list renders in the `choices` anchor with focus on its first row once page 2 is fully shown
+
+#### Scenario: The rows follow the committed panel
+- **WHEN** the list renders for a panel with three choices
+- **THEN** it shows pick rows badged `1`, `2`, `3` with the panel's labels in payload order, then `⌨ 自由對話`, `↦ 移動…`, and `✕ 結束對話`, and nothing else
+
+#### Scenario: A pick dispatches the scripted keyword
+- **WHEN** the player activates pick 2 through pointer, Enter, or the `2` key
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and that row's `keyword_id` is submitted, the list is removed while the request is in flight, focus is on the message window's page surface, and the list returns once the reply's last page is fully shown
+
+#### Scenario: Free dialogue borrows the command line
+- **WHEN** the player activates `⌨ 自由對話`
+- **THEN** the command line expands with focus in its field for a freeform utterance to the host, and no action is dispatched
+
+#### Scenario: The exit row ends the conversation
+- **WHEN** the player activates `✕ 結束對話`
+- **THEN** exactly one `explore.dialogue_leave` request with the committed host identity is submitted and no other action is dispatched
+
+#### Scenario: Move swaps in the exits and Escape returns
+- **WHEN** the room has two exits, one locked, and the player activates `↦ 移動…`, focuses the locked exit and presses Enter, then presses Escape
+- **THEN** the list shows the two exit rows with their direction glyphs and the back row, the locked row shows its reason and nothing is submitted, and Escape returns to the choice rows with `↦ 移動…` focused
+
+#### Scenario: A move from the list leaves the conversation
+- **WHEN** the player activates `↦ 移動…` and then an enabled exit row
+- **THEN** exactly one `explore.move` request with the overview exit chip's payload is submitted, the movement settlement clears the session through the existing seam, and the committed mode returns to `exploration` with the dock at the new room's overview
+
+#### Scenario: The list is one tab stop and keeps its keys
+- **WHEN** the list has focus and the player presses Tab, then Shift+Tab back, then ArrowDown twice and Enter
+- **THEN** Tab leaves the list in one step, the list is reached again in one step, the arrows move the active-descendant reference, Enter activates the focused row once, and the keyboard router saw none of those arrow or Enter keys
+
+#### Scenario: The choices never show beside unread text
+- **WHEN** a reply's first page is on screen and further lines of the same response arrive
+- **THEN** the list stays unrendered until the response's last page is fully shown

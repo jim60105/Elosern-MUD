@@ -44,6 +44,7 @@ import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
+import DialogueChoices from "./components/DialogueChoices.vue";
 
 const store = useElosernStore();
 const currentCharacter = computed(
@@ -60,6 +61,7 @@ const sceneBackdropRef = ref(null);
 const {
   panel, panelAvailable, dispatchIntent,
   dialogueVM, onDialoguePick, onDialogueFreeform, onDialogueLeave,
+  onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
   completionCandidates, possessionBanner, contextAffordances, releaseAffordance,
   titleBallotPanel, titleBallotCandidates, onMapMove, showObjectiveTracker,
   restFormOpen, restFormError, onRestFormSubmit, onRestFormClose, onRestFormError,
@@ -117,7 +119,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
         :low-hp="store.view.vitals.lowHp"
         :vitals-visible="store.view.vitals.visible"
         :text-to-html="store.view.textToHtml"
-        :in-flight="store.view.dispatch.inFlight !== null"
+        :command-accepts="store.view.commandAccepts"
         :completion-candidates="completionCandidates"
         :roster-available="store.rosterAvailable"
         :roster-characters="store.rosterCharacters"
@@ -129,9 +131,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
         @submit-command="onSubmitCommand"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
-        @dialogue-pick="onDialoguePick"
-        @dialogue-freeform="onDialogueFreeform"
-        @dialogue-leave="onDialogueLeave"
+        @reading-change="onReadingChange"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
@@ -176,6 +176,24 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
             :portrait="hostPortrait"
             :name="dialogueVM.host.displayName"
             :dimmed="store.view.dialogueSpeaker === 'player'"
+          />
+        </template>
+        <!-- The dialogue choice list (webclient-dialogue-choices-overlay
+             D4/D5), centred over the stage: only in dialogue with the panel
+             available, once the line is fully read, and never while an
+             action is in flight. -->
+        <template #choices>
+          <DialogueChoices
+            v-if="choicesShown"
+            :picks="dialogueVM.picks"
+            :exits="dialogueExits"
+            :local-map="store.view.localMapModel"
+            :locked="store.view.dispatch.inFlight !== null"
+            :before-activate="beforeChoiceActivate"
+            @pick="onDialoguePick"
+            @freeform="onDialogueFreeform"
+            @move="onDialogueMove"
+            @leave="onDialogueLeave"
           />
         </template>
         <!-- The `vitals` anchor (webclient-avg-stage-hud-anchors design D1),

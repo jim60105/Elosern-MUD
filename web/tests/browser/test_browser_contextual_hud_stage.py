@@ -9,6 +9,7 @@ from .browser_helpers import (
     activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
+    open_dialogue_choices,
     inject_snapshot,
     open_command_line,
     outbound_messages,
@@ -881,7 +882,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             mode="dialogue",
         )
         _wait_mode(page, "dialogue")
-        page.wait_for_selector('[data-testid="dialogue-exit"]', timeout=15000)
+        # The choice list appears once the window's pages are read.
+        open_dialogue_choices(page)
         states["dialogue"] = page.evaluate(measure)
 
         baseline = states["root"]

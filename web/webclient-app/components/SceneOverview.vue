@@ -23,8 +23,8 @@
 // scrolls itself — the dock pane is the single scrolling region.
 import { computed, nextTick, ref, watch } from "vue";
 import DockMenuItem from "./DockMenuItem.vue";
-import { destinationLabel, directionGlyph } from "./dock-exits.js";
-import { disabledReasonText, dockItemKeys } from "./dock-items.js";
+import { directionGlyph, disabledRowReason, exitLabel } from "./dock-exits.js";
+import { dockItemKeys } from "./dock-items.js";
 
 const props = defineProps({
   // The resolved overview menu: `{items, sections, geometry, title}`.
@@ -40,25 +40,12 @@ const emit = defineEmits(["focus-change", "activate"]);
 
 const listEl = ref(null);
 
-// The server-authored reason of a disabled exploration row: the dock's
-// shared reader first, then the exploration menu's own fields.
 function reasonFor(item) {
-  if (!item || item.enabled !== false) {
-    return null;
-  }
-  return (
-    disabledReasonText(item) ||
-    (item.disabledReason && item.disabledReason.message) ||
-    item.description ||
-    null
-  );
+  return disabledRowReason(item);
 }
 
 function chipLabel(item, isExit) {
-  if (isExit && item.enabled !== false && directionGlyph(item.direction)) {
-    return destinationLabel(item, props.localMap) || item.label;
-  }
-  return item.label;
+  return isExit ? exitLabel(item, props.localMap) : item.label;
 }
 
 const chips = computed(() => {

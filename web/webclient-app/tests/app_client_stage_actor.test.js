@@ -5,7 +5,8 @@
 // and the committed panel is available, fed by the raw `art` catalog entry
 // named by `host.portrait_ref`. The listener is dimmed from the in-flight
 // speech action. The dock stays one mounted element across the mode flips,
-// and focus moves to the first dialogue row on entering and back to the
+// and focus moves to the dialogue's focus home on entering (the choice list,
+// shown at once here because the log holds no unread line) and back to the
 // dock on leaving.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -139,7 +140,8 @@ describe("the stage actors in the portrait anchors", () => {
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("false");
     expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
 
-    expect(store.focusPress("1")).toBe(true);
+    // The choice list's pick: the single dispatch entry.
+    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 7, keyword_id: "news" }, null)).not.toBe(null);
     await nextTick();
     expect(store.view.dialogueSpeaker).toBe("player");
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
@@ -153,14 +155,17 @@ describe("the stage actors in the portrait anchors", () => {
     expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
   });
 
-  it("keeps one #action-dock element and moves focus to the first row and back across the mode flips", async () => {
+  const choiceList = () => wrapper.get('[data-anchor="choices"] [data-testid="dialogue-choices"]').element;
+
+  it("keeps one #action-dock element and moves focus to the choice list and back across the mode flips", async () => {
     const dock = document.getElementById("action-dock");
     dock.focus();
     commit("dialogue", dialoguePanel("7"));
     await nextTick();
     await nextTick();
+    await nextTick();
     expect(document.getElementById("action-dock")).toBe(dock);
-    expect(document.activeElement).toBe(wrapper.get('[data-testid="dialogue-pick"]').element);
+    expect(document.activeElement).toBe(choiceList());
 
     commit("exploration");
     await nextTick();
@@ -182,7 +187,8 @@ describe("the stage actors in the portrait anchors", () => {
     await nextTick();
     await nextTick();
     expect(store.view.dockDepth).toBe(1);
-    expect(document.activeElement).toBe(wrapper.get('[data-testid="dialogue-pick"]').element);
+    await nextTick();
+    expect(document.activeElement).toBe(choiceList());
 
     commit("exploration");
     await nextTick();

@@ -153,6 +153,13 @@ const renderPlayer = (args) => ({
             art: ART_PANEL_SAMPLE,
           } : {}),
           exploration: protocolFixtures.explorationPanel({
+            // Exits labelled by direction, as the server labels them: the
+            // choice list's `↦ 移動…` rows then show each direction's glyph
+            // and the destination's name.
+            ...(args.dialogue ? { move: [
+              { exit_ref: "east", label: "東", destination: "room:43", enabled: true, disabled_reason: null },
+              { exit_ref: "north", label: "北", destination: "room:44", enabled: false, disabled_reason: { code: "blocked", message: "門被鎖住了" } },
+            ] } : {}),
             interact: [
               { identity: 7, display_name: "店長", portrait_ref: null, affordances: [
                 { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
@@ -202,6 +209,8 @@ const renderPlayer = (args) => ({
           // (`portrait_ref` null → the name's initial and the name).
           ...(args.dialogue && args.dialogue !== "missing" ? { art: {
             ...ART_PANEL_PENDING_SAMPLE,
+            // A local scene image for layout review (optional arg).
+            ...(args.sceneUrl ? { scene: { ...ART_PANEL_SAMPLE.scene, url: args.sceneUrl } } : {}),
             portrait_catalog: {
               "7": args.dialogue === "pending" ? {
                 subject_key: "npc_7", status: "pending", url: null, aspect_ratio: null,
@@ -231,9 +240,32 @@ const renderPlayer = (args) => ({
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      // The session line as the narrative delivers it (webclient-dialogue-
+      // choices-overlay D2): paged verbatim under the name plate. On mount
+      // the window shows the last page complete, so the choice list shows at
+      // once; `lateGreeting` delivers it after mount, so it types first.
+      if (args.dialogue) {
+        const hostName = args.dialogue === "missing" ? "合成·旅人" : "店長";
+        const deliver = () =>
+          store.appendText("out", `${hostName}說：「${args.greeting || "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。"}」`);
+        if (args.lateGreeting) setTimeout(deliver, 400);
+        else deliver();
+      }
       // The player speaking: a pick in flight (no transport is attached, so
       // the request stays open and the player stays lit).
       if (args.playerSpeaking) store.dispatchAction("explore.talk_scripted", { npc_id: 7, keyword_id: "news" }, null);
+      // The `↦ 移動…` swap: the list shows the committed overview's exits.
+      if (args.moveExits) {
+        // The list renders once the fonts are ready and the line is read.
+        for (let tries = 0; tries < 60; tries += 1) {
+          const row = host.value?.querySelector('[data-testid="dialogue-move"]');
+          if (row) {
+            row.click();
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+      }
       if (args.practice) {
         store.openHudDrawer("skill");
         await nextTick();
@@ -253,10 +285,20 @@ export const ActionNavigation = { render: renderPlayer, args: {} };
 // A person chip's verb popover (webclient-scene-overview-swap): the overview
 // stays rendered beneath it while the popover's card covers the pane.
 export const VerbPopoverSelector = { render: renderPlayer, args: { pane: "target-7" } };
-// Dialogue (webclient-dialogue-stage-actors): the command region collapses,
-// the message window spans the band under the host's name plate, and the
-// host stands opposite the player — lit while speaking, the player dimmed.
+// Dialogue (webclient-dialogue-stage-actors; webclient-dialogue-choices-
+// overlay): the command region collapses, the message window pages the
+// session line under the host's name plate, the host stands opposite the
+// player — lit while speaking, the player dimmed — and the choice list sits
+// centred over the stage once the line is read.
 export const DialogueSelector = { render: renderPlayer, args: { dialogue: true } };
+// The choice list's `↦ 移動…` swap (webclient-dialogue-choices-overlay):
+// the committed overview's exits with their glyphs, a locked exit with its
+// reason, and the back row.
+export const DialogueMoveExits = { render: renderPlayer, args: { dialogue: true, moveExits: true } };
+// The greeting arrives after mount, so it types under the name plate with no
+// choice list; the list appears centred over the stage and takes focus once
+// the last page is fully shown.
+export const DialogueGreetingTypes = { render: renderPlayer, args: { dialogue: true, lateGreeting: true } };
 // The player's pick is in flight: the player is lit and the host dimmed.
 export const DialoguePlayerSpeaking = { render: renderPlayer, args: { dialogue: true, playerSpeaking: true } };
 // The host's catalog entry is still generating: its own placeholder card.

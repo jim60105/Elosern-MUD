@@ -17,6 +17,7 @@ from .browser_helpers import (
     fresh_epoch,
     focus_action_dock,
     install_outbound_recorder,
+    open_dialogue_choices,
     inject_snapshot,
     narrative_log_length,
     open_command_line,
@@ -555,7 +556,9 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 # Dialogue (webclient-dialogue-stage-actors): the command region
                 # collapses with the still-mounted dock inside it, the message
                 # window spans the band, and focus held in the dock moves to the
-                # message window before the dock is hidden.
+                # message page before the dock is hidden, then to the choice
+                # list (webclient-dialogue-choices-overlay: the injected
+                # snapshot adds no unread line, so the list shows at once).
                 page.evaluate("() => document.getElementById('action-dock').focus()")
                 self.assertEqual(page.evaluate("() => document.activeElement.id"), "action-dock")
                 self._inject_snapshot(
@@ -575,7 +578,8 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                     mode="dialogue",
                 )
                 self._wait_mode(page, "dialogue")
-                page.wait_for_selector('[data-testid="dialogue-pick"]', timeout=15000)
+                # The choice list appears once the window's unread pages are read.
+                open_dialogue_choices(page)
                 page.wait_for_timeout(100)
                 self.assertEqual(page.locator("#action-dock").count(), 1, "the dock stays mounted in dialogue")
                 self.assertFalse(page.locator("#action-dock").is_visible(), "the dock is display:none in dialogue")
@@ -594,9 +598,9 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                     self.assertTrue(page.locator(selector).is_visible(), f"{selector} stays visible in dialogue")
                 self.assertTrue(
                     page.evaluate(
-                        "() => document.activeElement === document.querySelector('[data-testid=\"dialogue-pick\"]')"
+                        "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
                     ),
-                    "focus moved from the hidden dock to the message window's first row",
+                    "focus moved from the hidden dock to the dialogue's focus home, the shown choice list",
                 )
 
                 # Creation: the full gated set is display:none (H1's visibility

@@ -15,7 +15,7 @@ export const CONTROLS_REFERENCE = [
     key: "Enter",
     label: "Send the command",
     detail:
-      "A single send path; a successful send collapses the line and returns to the dock (in a conversation, to its first choice); Shift+Enter inserts a newline without sending. Enter or Space on the focused message window first shows a typing page in full, then advances a page. In a conversation the dock is collapsed, and Enter activates the focused choice.",
+      "A single send path; a successful send collapses the line and returns to the dock (in a conversation, to its choice list); Shift+Enter inserts a newline without sending. Enter or Space on the focused message window first shows a typing page in full, then advances a page. In a conversation the dock is collapsed; once the line is fully read the choice list appears over the stage, ↑ / ↓ move through it, and Enter or Space activates the focused choice.",
   },
   {
     key: "↑ / ↓",
@@ -26,7 +26,7 @@ export const CONTROLS_REFERENCE = [
     key: "Esc",
     label: "Close the topmost open surface",
     detail:
-      "Precedence: open overlay → open drawer → focused command field (collapses the line) → dock menu level.",
+      "Precedence: open overlay → open drawer → focused command field (collapses the line) → dock menu level. In a conversation's choice list, Esc leaves the exits of ↦ 移動… and returns to the choices.",
   },
   {
     key: "Tab",
@@ -38,7 +38,7 @@ export const CONTROLS_REFERENCE = [
     key: "1-4",
     label: "Pick a dock row by position",
     detail:
-      "Moves the dock focus to the first four rows of the current frame (in rendered order) and runs it like Enter; a slot beyond the row count does nothing. In a conversation the dock is collapsed and the digits pick the conversation's numbered choices instead.",
+      "Moves the dock focus to the first four rows of the current frame (in rendered order) and runs it like Enter; a slot beyond the row count does nothing. In a conversation the dock is collapsed; while the choice list has focus, the digits pick its numbered choices instead.",
   },
   {
     key: "日誌",

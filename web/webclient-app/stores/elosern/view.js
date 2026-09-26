@@ -158,6 +158,16 @@ export function applyView(ctx) {
         timeLabel: formatTimeLabel(rs.serverTime),
       },
       prompt: ctx.prompt,
+      // The command line's accept rule (webclient-dialogue-choices-overlay
+      // D9). A bound free-form borrow sends through `dispatchAction`, which
+      // also requires the active presentation phase; ordinary text does not.
+      // The field clears exactly when the send it would make is delivered.
+      freeformBound: ctx.freeformTarget != null,
+      commandAccepts:
+        rs.connected &&
+        !rs.mutationsLocked &&
+        !ctx.inFlight &&
+        (ctx.freeformTarget == null || rs.phase === "active"),
       lastSurface: ctx.lastSurface,
       lastTarget: ctx.lastTarget,
       drawerRequest: ctx.drawerRequest,

@@ -70,12 +70,11 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(input.element.value).toBe("line one");
   });
 
-  it.each([
-    ["offline", { connected: false, mutationsLocked: false, inFlight: false }],
-    ["mutationsLocked", { connected: true, mutationsLocked: true, inFlight: false }],
-    ["inFlight", { connected: true, mutationsLocked: false, inFlight: true }],
-  ])("a rejected send (%s) preserves the typed speech and does not emit sent", async (_label, props) => {
-    const w = mountLine(props);
+  // webclient-dialogue-choices-overlay D9: one `accepting` prop (the store's
+  // `commandAccepts`) decides the clear; offline, locked, in flight, and a
+  // borrowed send outside the active phase all reach the field as false.
+  it("a rejected send (accepting=false) preserves the typed speech and does not emit sent", async () => {
+    const w = mountLine({ accepting: false });
     const input = w.get("textarea#inputfield");
     input.element.value = "talk 老周";
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
