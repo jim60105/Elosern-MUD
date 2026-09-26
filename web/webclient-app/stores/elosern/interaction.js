@@ -4,7 +4,6 @@
 // adapters (focusPress and friends).
 
 import KeyboardRouter from "../../lib/keyboard_router.js";
-import { classifyPane } from "../../components/dock-panes.js";
 import { dialogueViewModel } from "../dialogue-view.js";
 
 const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
@@ -171,19 +170,19 @@ export function applyInteraction(ctx) {
   };
 
   ctx.focusPress = function focusPress(key, repeat) {
-    // The dock's positional row picks (webclient-align-01-dock-chrome): the
-    // legend `數字鍵 1-4 · Enter 執行 · Esc 返回` names the first four rows
-    // of the current dock frame as reachable by the top-row number keys. A
-    // digit moves the frame's focus onto its row (1-indexed, rendered
-    // order) and activates it through the same confirm path Enter uses
-    // (disabled rows show their explanation, in-flight rows stay locked,
-    // repeats are suppressed by the router's guard). Focus moving is the
-    // consumption signal: a digit whose row does not exist (a frame with
-    // fewer rows, or the pre-session empty stack) is unclaimed and falls
-    // through to the text / command-history path. Implemented entirely
-    // through the frozen router façade members — the UMD source is not
-    // edited (design D1).
-    if (key === "1" || key === "2" || key === "3" || key === "4") {
+    // The dock's positional row picks (webclient-align-01-dock-chrome,
+    // widened by webclient-retire-exploration-submenus): the legend
+    // `數字鍵 1-9 · Enter 執行 · Esc 返回` names the first nine entries of the
+    // current dock frame as reachable by the top-row number keys. A digit
+    // moves the frame's focus onto its entry (1-indexed, rendered order) and
+    // activates it through the same confirm path Enter uses (disabled entries
+    // show their explanation, in-flight ones stay locked, repeats are
+    // suppressed by the router's guard). Focus moving is the consumption
+    // signal: a digit whose entry does not exist (a frame with fewer rendered
+    // entries, or the pre-session empty stack) is unclaimed and falls through
+    // to the text / command-history path. Implemented entirely through the
+    // frozen router façade members — the UMD source is not edited (design D1).
+    if (typeof key === "string" && key.length === 1 && key >= "1" && key <= "9") {
       // A held or repeated digit is suppressed exactly like a held Enter
       // (the router's Enter repeat branch is the reference): the first
       // press already picked its row, and re-confirming on every
@@ -195,8 +194,8 @@ export function applyInteraction(ctx) {
       const slot = Number(key) - 1;
       // The caption retarget (webclient-align-11-dialogue-ux, design D3):
       // while the dialogue caption presents picks, digits address the
-      // caption's scripted picks, not the dock rows underneath. A panel with
-      // no picks (or an unavailable one) keeps the dock digits untouched.
+      // caption's scripted picks, not the dock entries underneath. A panel
+      // with no picks (or an unavailable one) keeps the dock digits untouched.
       if (ctx.captionDialoguePresented()) {
         return handleCaptionDialoguePick(slot);
       }
@@ -204,18 +203,11 @@ export function applyInteraction(ctx) {
         return false;
       }
       const menu = ctx.router.currentMenu();
-      // The slots address the RENDERED rows, not the raw item list: the
-      // exit-outlet pane never renders the `back` cell (the breadcrumb
-      // chevron owns the close control), so its row order excludes `back`
-      // — the same rule DockMenu's outletRows applies (same classifier,
-      // one source of truth). Every other pane renders `back` as an
-      // ordered row, so its slot is real there.
+      // The slots address the frame's rendered entries in order: every form
+      // renders its `back` item as a row of its own frame, so the item list
+      // IS the rendered order and no cell needs to be filtered out.
       const items = menu && menu.items ? menu.items : [];
-      const slots =
-        classifyPane({ items }) === "outlet"
-          ? items.filter((i) => i && i.key !== "back")
-          : items;
-      const item = slots[slot];
+      const item = items[slot];
       if (!item) {
         return false;
       }

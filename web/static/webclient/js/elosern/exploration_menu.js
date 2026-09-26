@@ -2,12 +2,13 @@
  * Elosern DOM-independent exploration-menu model.
  *
  * Reduces a validated `exploration` panel into the logical keyboard menus
- * consumed by KeyboardRouter: the stable Move/Look/Interact/Character/Quests/
- * Inventory root, the bounded exit list, the look room/entity/object list, the
- * present interact targets, and each target's server-authored affordances
- * (scripted keyword buttons, free-form dialogue, engage, or a navigate-kind
- * guild/shop service entry). Move payloads carry the canonical `current_node`
- * supplied by the local-map panel so `explore.move` passes its stale guard.
+ * consumed by KeyboardRouter: the bounded exit list and look room/entity/
+ * object rows (the scene overview's chip builders), the wait/rest submenu,
+ * the suggestions frame, and each interact target's server-authored
+ * affordances (scripted keyword buttons, free-form dialogue, engage, or a
+ * navigate-kind guild/shop service entry). Move payloads carry the canonical
+ * `current_node` supplied by the local-map panel so `explore.move` passes its
+ * stale guard.
  *
  * The `navigate`-kind service affordance is dock-navigation only: it opens a
  * frameless drawer (guild -> quest, shop -> shop) and is never
@@ -15,12 +16,16 @@
  * server-provided reason is readable, and every server string is display
  * text -- never parsed narrative.
  *
+ * The top navigation bar (角色狀態 / 任務 / 背包) owns its rows: they are NOT
+ * a dock frame, so `navigationItems` is the bar's own builder and outlives the
+ * retired tab root (webclient-retire-exploration-submenus).
+ *
  * The AVG scene overview (webclient-scene-overview-component, AVG stage
  * design §7): `overviewMenu` flattens the exits, the people, the objects,
  * and a footer (查看房間 · 等待／休息 · 建議) into ONE reading-order menu
  * with a `sections` index and `geometry: "sections"` for the router, and
  * `verbMenuFor` is a person chip's verb popover (the target's affordances
- * plus 查看). Neither is called by a resolver until the swap change.
+ * plus 查看). `overviewMenu` is the exploration root the resolver serves.
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -37,21 +42,10 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  function openItem(key, label, submenu) {
-    return {
-      key: key,
-      label: label,
-      enabled: true,
-      actionId: null,
-      payload: null,
-      openSubmenu: submenu,
-    };
-  }
-
-  // The final cell of every exploration submenu: a pointer affordance that
-  // pops exactly one router frame back to the parent menu (Escape remains
-  // the keyboard fast path). Never rendered on the root, which has no
-  // parent to return to.
+  // The final cell of every pushed exploration frame: a pointer affordance
+  // that pops exactly one router frame back to the parent menu (Escape remains
+  // the keyboard fast path). The scene overview is the root frame and carries
+  // no back row.
   function backItem() {
     return {
       key: "back",
@@ -61,26 +55,6 @@
       payload: null,
       goBack: true,
     };
-  }
-
-  // Parent mapping for the back row and dock stack bookkeeping. Unknown keys
-  // fall back to the root so a stale key can never throw.
-  function parentKeyFor(menuKey) {
-    if (
-      menuKey === "move" ||
-      menuKey === "look" ||
-      menuKey === "interact" ||
-      menuKey === "wait"
-    ) {
-      return "root";
-    }
-    if (menuKey && menuKey.indexOf("target-") === 0) {
-      return "interact";
-    }
-    if (menuKey && menuKey.indexOf("keywords-") === 0) {
-      return "target-" + menuKey.slice("keywords-".length);
-    }
-    return "root";
   }
 
   function disabledItem(key, label, message) {
@@ -94,10 +68,6 @@
       disabledReason: message ? { code: "unavailable", message: message } : null,
     };
   }
-
-  // -------------------------------------------------------------------------
-  // Root menu.
-  // -------------------------------------------------------------------------
 
   // Canonical direction words the exit label can carry, mapped to one
   // canonical token. A label outside the table (a named door or a dynamic
@@ -191,35 +161,6 @@
     return items;
   }
 
-  function rootItems(panel, suggestions) {
-    var items = [
-      openItem("move", "移動", "move"),
-      openItem("look", "查看", "look"),
-      openItem("interact", "互動", "interact"),
-    ];
-    // The navigation-presented rows share one builder with the top
-    // navigation bar (webclient-scene-overview-swap): the retired tab root
-    // carried them in its own order, the bar derives them from the same
-    // source.
-    Array.prototype.push.apply(items, navigationItems(panel));
-    items.push(openItem("wait", "等待/休息", "wait"));
-    // The suggestions root entry (H3 webclient-hud-03-action-dock): present
-    // whenever the committed `suggestions` envelope is not `unavailable`;
-    // `unavailable` renders no entry at all (today's "renders nothing").
-    var status = suggestions && suggestions.status;
-    if (status && status !== "unavailable") {
-      items.push({
-        key: "suggestions",
-        label: "建議",
-        enabled: true,
-        actionId: null,
-        payload: null,
-        openSubmenu: "suggestions",
-      });
-    }
-    return items;
-  }
-
   // -------------------------------------------------------------------------
   // Wait/rest submenu.
   // -------------------------------------------------------------------------
@@ -254,7 +195,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // Move submenu.
+  // Exit (move) rows — the scene overview's 出口 chips.
   // -------------------------------------------------------------------------
 
   function moveItems(panel, currentNode) {
@@ -265,7 +206,11 @@
       var canSubmit = row.enabled && mapAvailable;
        var item = {
          key: "exit-" + row.exit_ref,
-         label: row.label + (row.enabled ? "" : "（無法通行）"),
+         // The plain server label: the shared chip renderer adds the
+         // `（無法使用）` disabled marker and the overview's reason strip
+         // carries the server-authored explanation, so no per-frame suffix is
+         // baked in here.
+         label: row.label,
          enabled: canSubmit,
          actionId: canSubmit ? "explore.move" : null,
          payload: null,
@@ -274,10 +219,10 @@
            : (row.disabled_reason && row.disabled_reason.message) ||
              (mapAvailable ? null : "地圖資料尚未同步。"),
          disabledReason: row.disabled_reason || null,
-         // H3: the renderer's exit outlet reads these directly instead of
-         // re-parsing the exit label (H3 design D9): the canonical direction
-         // (null for named doors / dynamic wilderness gates) and the
-         // destination node id the server re-derived for this exit.
+         // H3: the chip renderer reads these directly instead of re-parsing
+         // the exit label (H3 design D9): the canonical direction (null for
+         // named doors / dynamic wilderness gates) and the destination node id
+         // the server re-derived for this exit.
          direction: normalizeDirection(row.label),
          destination: row.destination || null,
        };
@@ -289,15 +234,11 @@
       }
       items.push(item);
     });
-    if (items.length === 0) {
-      items.push(disabledItem("move-empty", "這裡沒有可以通行的出口。", null));
-    }
-    items.push(backItem());
     return items;
   }
 
   // -------------------------------------------------------------------------
-  // Look submenu.
+  // Look rows — the scene overview's 人物 / 物件 / 查看房間 chips.
   // -------------------------------------------------------------------------
 
   function lookItems(panel) {
@@ -337,34 +278,6 @@
         commandDisplay: { targetLabel: obj.display_name },
       });
     });
-    items.push(backItem());
-    return items;
-  }
-
-  // -------------------------------------------------------------------------
-  // Interact target list.
-  // -------------------------------------------------------------------------
-
-  function interactItems(panel) {
-    var targets = (panel && panel.interact) || [];
-    var items = [];
-    targets.forEach(function (target) {
-      var affordances = target.affordances || [];
-      items.push({
-        key: "target-" + target.identity,
-        label: target.display_name,
-        enabled: affordances.length > 0,
-        actionId: null,
-        payload: null,
-        openTarget: affordances.length > 0 ? target.identity : null,
-        description:
-          affordances.length > 0 ? null : "此對象沒有可用的互動。",
-      });
-    });
-    if (items.length === 0) {
-      items.push(disabledItem("interact-empty", "這裡沒有可以互動的對象。", null));
-    }
-    items.push(backItem());
     return items;
   }
 
@@ -721,23 +634,10 @@
       Array.prototype.push.apply(items, rows);
     }
 
-    // 出口: the move rows without the back row or the empty placeholder
-    // (the section is omitted instead). A chip's label is the plain server
-    // label: the chip renderer adds the disabled marker, so the
-    // `（無法通行）` suffix is not baked in.
-    var moveRows = (panel && panel.move) || [];
-    var exits = moveItems(panel, currentNode)
-      .filter(function (item) {
-        return item.key !== "back" && item.key !== "move-empty";
-      })
-      .map(function (item, index) {
-        var row = moveRows[index];
-        if (row && typeof row.label === "string") {
-          item.label = row.label;
-        }
-        return item;
-      });
-    addSection("exits", "出口", exits);
+    // 出口: the exit chip builder's rows verbatim. It carries no back row and
+    // no empty placeholder, so a room with no exits omits the section instead
+    // of rendering a dead row.
+    addSection("exits", "出口", moveItems(panel, currentNode));
 
     // 人物: every interact target opens its verb popover (always enabled:
     // the popover has at least 查看), then a look chip for each present
@@ -823,42 +723,14 @@
     options = options || {};
     var currentNode = options.currentNode || null;
     var suggestions = options.suggestions || null;
-    var rootItemsList = rootItems(panel, suggestions);
-    // The root is a single-row tab bar: the column count equals the item
-    // count (H3 design D12) so arrow-key geometry matches the rendered
-    // order.
+    // The exploration root is the scene overview (`overviewMenu`, resolved as
+    // `exploration.root`), so this model carries only the pushed frames: the
+    // wait/rest submenu and — when the envelope is not `unavailable` — the
+    // suggestions frame.
     var model = {
       panel: panel,
       currentNode: currentNode,
       menus: {
-        root: {
-          items: rootItemsList,
-          focusKey: null,
-          grid: true,
-          gridCols: rootItemsList.length,
-          title: "探索",
-        },
-        move: {
-          items: moveItems(panel, currentNode),
-          focusKey: null,
-          grid: true,
-          gridCols: null,
-          title: "移動",
-        },
-        look: {
-          items: lookItems(panel),
-          focusKey: null,
-          grid: true,
-          gridCols: 2,
-          title: "查看",
-        },
-        interact: {
-          items: interactItems(panel),
-          focusKey: null,
-          grid: true,
-          gridCols: 2,
-          title: "互動",
-        },
         wait: {
           items: waitItems(),
           focusKey: null,
@@ -900,16 +772,13 @@
    return {
      buildMenus: buildMenus,
      navigationItems: navigationItems,
-     rootItems: rootItems,
      moveItems: moveItems,
      lookItems: lookItems,
-     interactItems: interactItems,
      waitItems: waitItems,
      targetMenuFor: targetMenuFor,
      verbMenuFor: verbMenuFor,
      overviewMenu: overviewMenu,
      keywordMenuFor: keywordMenuFor,
-     parentKeyFor: parentKeyFor,
      targetById: targetById,
      scriptedAffordanceFor: scriptedAffordanceFor,
      normalizeDirection: normalizeDirection,

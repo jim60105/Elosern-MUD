@@ -18,11 +18,11 @@
 // `exploration.target` resolves `ExplorationMenu.verbMenuFor`, the target's
 // verb popover. `exploration.navigation` is the top navigation bar's own
 // entry set (the character status, quest, and inventory surfaces, which no
-// dock frame carries any more). The move/look/interact submenus and the
-// `targetMenuFor` grid stay registered but unreachable until
-// `webclient-retire-exploration-submenus` deletes them with their tests;
-// `ExplorationMenu.navigationItems` outlives them, because the bar keeps
-// reading it.
+// dock frame carries any more). The move/look/interact submenus are retired
+// (webclient-retire-exploration-submenus): their sources are unregistered, so
+// a stray descriptor for one degrades to the marker and pops, exactly like
+// every other unregistered source. `ExplorationMenu.navigationItems` outlives
+// them, because the bar keeps reading it.
 //
 // Purity contract: resolving twice against one committed state returns deep-
 // equal menus and mutates nothing — the builders are pure over their inputs,
@@ -266,9 +266,6 @@ export function createFrameResolver(deps) {
   const table = {
     "exploration.root": explorationOverviewSource,
     "exploration.navigation": explorationNavigationSource,
-    "exploration.move": explorationMenuSource("move"),
-    "exploration.look": explorationMenuSource("look"),
-    "exploration.interact": explorationMenuSource("interact"),
     "exploration.wait": explorationMenuSource("wait"),
     "exploration.target": (params) => {
       const found = targetForIdentity(params);
