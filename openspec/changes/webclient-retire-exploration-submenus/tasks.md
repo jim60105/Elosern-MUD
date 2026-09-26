@@ -54,5 +54,4 @@
 ## 7. Validation
 
 - [x] 7.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, and `uv run --locked python -m tools.spec_traceability check`. All green.
-- [ ] 7.2 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_exploration_tiles web.tests.browser.test_browser_contextual_hud_dock web.tests.browser.test_browser_shell_dock web.tests.browser.test_browser_exploration_nav web.tests.browser.test_browser_exploration_frame web.tests.browser.test_browser_exploration_dialogue web.tests.browser.test_browser_combat_menu web.tests.browser.test_browser_pointer`, and `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence`. All green.
 - [x] 7.3 Run `openspec validate webclient-retire-exploration-submenus --strict` and `git diff --check`. Both clean.
