@@ -1,6 +1,8 @@
 // webclient-align-08-dialogue-surface / webclient-message-window-swap (design
-// D3): the message window's dialogue variant. The `.dlg` box mirrors the
-// committed panel (avatar/who/serif), the numbered picks dispatch
+// D3; webclient-dialogue-stage-actors D5/D7): the message window's dialogue
+// variant. The name plate names the host (plus the bond stage), the `.dlg`
+// box carries the serif reply with no avatar or speaker line (the host
+// stands on the stage), `focusHome()` finds the first row, the numbered picks dispatch
 // `explore.talk_scripted` payloads, the trailing free row borrows the command
 // line without dispatching, the exit row dispatches `explore.dialogue_leave`,
 // the session line renders once in the current response, and a transiently
@@ -63,35 +65,78 @@ describe("MessageWindow dialogue variant (D3)", () => {
     return wrapper;
   }
 
-  it("renders the box: gold initial avatar, speaker line with bond stage, serif reply", () => {
+  it("heads the variant with the name plate and renders the reply box with no avatar or speaker line", () => {
     const w = mountWindow();
+    const plate = w.get('[data-testid="message-name-plate"]');
+    expect(plate.text()).toBe("灰婆婆 · 羈絆 親睦");
+    expect(plate.get('[data-testid="dialogue-bond"]').element.textContent).toBe(" · 羈絆 親睦");
+    // The plate is the window's first row, above the text area.
+    const root = w.get('[data-testid="message-window"]').element;
+    expect(root.firstElementChild).toBe(plate.element);
     const box = w.get('[data-testid="dialogue-box"]');
-    expect(box.find(".av img").exists()).toBe(false);
-    expect(box.get(".av").text()).toBe("灰");
-    expect(w.get('[data-testid="dialogue-who"]').text()).toContain("灰婆婆");
-    expect(w.get('[data-testid="dialogue-bond"]').text()).toContain("羈絆 親睦");
+    expect(box.find(".av").exists()).toBe(false);
+    expect(box.find("img").exists()).toBe(false);
+    expect(w.find('[data-testid="dialogue-who"]').exists()).toBe(false);
+    expect(w.find(".who").exists()).toBe(false);
     expect(w.get('[data-testid="dialogue-say"]').text()).toBe(PANEL.line);
   });
 
-  it("renders the host's catalog portrait with its face-rect crop offset", () => {
-    const hostedPanel = { ...PANEL, host: { identity: 41, display_name: "灰婆婆", portrait_ref: "p41" } };
-    const w = mountWindow({
-      dialogue: dialogueViewModel(hostedPanel),
-      artPanel: {
-        portrait_catalog: {
-          p41: { url: "/art/portraits/granny.png", face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
-        },
-      },
-    });
-    const img = w.get('[data-testid="dialogue-box"] img.av');
-    expect(img.attributes("src")).toBe("/art/portraits/granny.png");
-    expect(img.element.style.objectPosition).toBe("50% 31%");
-  });
-
-  it("drops the bond segment when bond_stage is null", () => {
+  it("names only the host when bond_stage is null", () => {
     const w = mountWindow({ dialogue: dialogueViewModel({ ...PANEL, bond_stage: null }) });
     expect(w.find('[data-testid="dialogue-bond"]').exists()).toBe(false);
-    expect(w.get('[data-testid="dialogue-who"]').text()).toBe("灰婆婆");
+    expect(w.get('[data-testid="message-name-plate"]').text()).toBe("灰婆婆");
+    expect(w.text()).not.toContain("羈絆");
+  });
+
+  it("renders no name plate outside the dialogue variant", async () => {
+    const w = mountWindow({ dialogue: null });
+    await nextTick();
+    expect(w.find('[data-testid="message-name-plate"]').exists()).toBe(false);
+  });
+
+  it("focusHome() focuses the first dialogue row, else the page surface", async () => {
+    const w = mountWindow();
+    w.vm.focusHome();
+    expect(document.activeElement).toBe(w.findAll('[data-testid="dialogue-pick"]')[0].element);
+    // Without picks the free row, then the exit row, is the first row.
+    await w.setProps({ dialogue: dialogueViewModel({ ...PANEL, choices: [] }) });
+    w.vm.focusHome();
+    expect(["dialogue-freeform", "dialogue-exit"]).toContain(document.activeElement.dataset.testid);
+    // The paged variant's home is the page surface.
+    await w.setProps({ mode: "exploration", dialogue: null });
+    w.vm.focusHome();
+    expect(document.activeElement).toBe(w.get('[data-testid="message-page"]').element);
+  });
+
+  it("keeps focus in the conversation when a reply replaces the focused row", async () => {
+    const w = mountWindow();
+    w.findAll('[data-testid="dialogue-pick"]')[1].element.focus();
+    await w.setProps({
+      dialogue: dialogueViewModel({
+        ...PANEL,
+        line: "「五枚就五枚。」",
+        choices: [{ keyword_id: "board", label: "上船" }],
+      }),
+    });
+    await nextTick();
+    expect(document.activeElement).toBe(w.get('[data-testid="dialogue-pick"]').element);
+  });
+
+  it("moves focus from the page surface to the first row when the panel turns available", async () => {
+    const w = mountWindow({ dialogue: null });
+    await nextTick();
+    w.get('[data-testid="message-page"]').element.focus();
+    await w.setProps({ dialogue: vm });
+    await nextTick();
+    expect(document.activeElement).toBe(w.findAll('[data-testid="dialogue-pick"]')[0].element);
+  });
+
+  it("does not re-home focus when the mode leaves dialogue (the shell owns that case)", async () => {
+    const w = mountWindow();
+    w.findAll('[data-testid="dialogue-pick"]')[0].element.focus();
+    await w.setProps({ mode: "exploration", dialogue: null });
+    await nextTick();
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("renders numbered picks in payload order plus the trailing free-dialogue row", () => {

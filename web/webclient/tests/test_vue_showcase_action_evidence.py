@@ -186,6 +186,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # story-documented before C8b mounts them.
                 "Action/SceneOverview",
                 "Action/DockVerbPopover",
+                # The dialogue stage actor (webclient-dialogue-stage-actors), the
+                # standing portrait that wraps Core/ReferenceArtwork on the stage.
+                "Core/StageActor",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

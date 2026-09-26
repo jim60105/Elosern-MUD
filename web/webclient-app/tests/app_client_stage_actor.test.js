@@ -1,39 +1,192 @@
-// webclient-avg-stage-shell (design D4): the player's standing portrait lives
-// in the stage's `actor-left` anchor, standing on the bottom band, not in the
-// backdrop slot; the `actor-right` anchor stays empty in this change.
+// webclient-avg-stage-shell (design D4) and webclient-dialogue-stage-actors
+// (design D1/D2/D3/D5): the stage actors live in the portrait anchors. The
+// player's StageActor stands in `actor-left` outside creation; the dialogue
+// host's StageActor stands in `actor-right` only while the mode is dialogue
+// and the committed panel is available, fed by the raw `art` catalog entry
+// named by `host.portrait_ref`. The listener is dimmed from the in-flight
+// speech action. The dock stays one mounted element across the mode flips,
+// and focus moves to the first dialogue row on entering and back to the
+// dock on leaving.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
+import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 
-describe("the player portrait stands in the actor-left anchor", () => {
-  let store, wrapper;
-  beforeEach(() => {
+const HOST_ENTRY = {
+  subject_key: "npc_7",
+  status: "done",
+  url: "/art/portraits/npc_7.webp",
+  aspect_ratio: "3:4",
+  alt: "店長的肖像",
+  placeholder: null,
+  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+  context: { name: "店長", role: "對話對象" },
+};
+
+function basePanels() {
+  return {
+    status: fx.statusPanel(),
+    exploration: fx.explorationPanel(),
+    context_actions: fx.explorationActions(),
+    local_map: fx.localMapPanel(),
+    art: { ...ART_PANEL_SAMPLE, portrait_catalog: { ...ART_PANEL_SAMPLE.portrait_catalog, 7: HOST_ENTRY } },
+  };
+}
+
+function dialoguePanel(portraitRef = "7") {
+  return {
+    schema_version: 2,
+    available: true,
+    kind: "dialogue",
+    host: { identity: 7, display_name: "店長", portrait_ref: portraitRef },
+    bond_stage: "熟識",
+    line: "歡迎來到西風酒館。",
+    choices: [
+      { keyword_id: "news", label: "最近有什麼消息？" },
+      { keyword_id: "town", label: "關於這座城鎮" },
+    ],
+  };
+}
+
+describe("the stage actors in the portrait anchors", () => {
+  let store, wrapper, revision;
+
+  beforeEach(async () => {
     setActivePinia(createPinia());
     store = useElosernStore();
     store.setSender(fx.createFakeSender());
     wrapper = mount(AppClient, { attachTo: document.body });
     store.beginTransport(1);
     store.setConnected(true);
+    store.setLoggedIn(true);
+    revision = 1;
+    commit("exploration");
+    await nextTick();
   });
-  afterEach(() => { wrapper.unmount(); document.body.replaceChildren(); });
+  afterEach(() => {
+    wrapper.unmount();
+    document.body.replaceChildren();
+  });
 
-  it("renders the reference artwork in actor-left outside creation mode", async () => {
-    const panels = { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.explorationActions() };
-    const response = store.receive(1, "ui_snapshot", [fx.snapshot({ panels, revision: 1 })]);
+  function commit(mode, dialogue = null) {
+    const panels = basePanels();
+    if (dialogue) {
+      panels.dialogue = dialogue;
+    }
+    const response = store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels })], {});
     expect(response.accepted).toBe(true);
-    await wrapper.vm.$nextTick();
+    revision += 1;
+  }
 
+  const actorIn = (anchor) => wrapper.find(`[data-testid="anchor-${anchor}"] [data-testid="stage-actor"]`);
+
+  it("stands the player in actor-left, lit, with actor-right empty outside dialogue", () => {
+    const player = actorIn("actor-left");
+    expect(player.exists()).toBe(true);
+    expect(player.attributes("data-side")).toBe("left");
+    expect(player.attributes("data-speaking")).toBe("true");
     const actorLeft = wrapper.get('[data-testid="anchor-actor-left"]');
-    expect(actorLeft.find('[data-testid="reference-artwork"]').exists()).toBe(true);
-    // No focusable element: the portrait anchor is non-interactive art.
-    expect(actorLeft.findAll("button, a, input, textarea, select, [tabindex]").length).toBe(0);
+    expect(actorLeft.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
     // Exactly one stage portrait, and none left behind in the backdrop.
-    expect(wrapper.findAll('[data-testid="elosern-stage"] [data-testid="reference-artwork"]').length).toBe(1);
-    expect(wrapper.find(".stage-portrait").exists()).toBe(false);
-    // actor-right is reserved (C10 hosts the dialogue actor there).
-    expect(wrapper.get('[data-testid="anchor-actor-right"]').element.children.length).toBe(0);
+    expect(wrapper.findAll('[data-testid="elosern-stage"] [data-testid="reference-artwork"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="anchor-actor-right"]').element.children).toHaveLength(0);
+  });
+
+  it("stands the host in actor-right from the catalog entry the committed key names, only in dialogue", async () => {
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+    const host = actorIn("actor-right");
+    expect(host.exists()).toBe(true);
+    expect(host.attributes("data-side")).toBe("right");
+    expect(host.get("img").attributes("src")).toBe("/art/portraits/npc_7.webp");
+    expect(host.get("img").element.style.objectPosition).toBe("50% 31%");
+    expect(host.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
+
+    commit("exploration");
+    await nextTick();
+    expect(wrapper.get('[data-testid="anchor-actor-right"]').element.children).toHaveLength(0);
+  });
+
+  it("falls back to the host's name placeholder when the key is null or names no entry", async () => {
+    commit("dialogue", dialoguePanel(null));
+    await nextTick();
+    let host = actorIn("actor-right");
+    expect(host.find("img").exists()).toBe(false);
+    expect(host.get(".reference-artwork__placeholder-glyph").text()).toBe("店");
+    expect(host.get(".reference-artwork__placeholder-label").text()).toBe("店長");
+
+    commit("dialogue", dialoguePanel("999"));
+    await nextTick();
+    host = actorIn("actor-right");
+    expect(host.find("img").exists()).toBe(false);
+    expect(host.get(".reference-artwork__placeholder-label").text()).toBe("店長");
+  });
+
+  it("renders no host actor while the dialogue panel is unavailable", async () => {
+    commit("dialogue", { schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } });
+    await nextTick();
+    expect(actorIn("actor-right").exists()).toBe(false);
+    expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
+  });
+
+  it("dims the listener: the player while the host speaks, the host while a pick is in flight", async () => {
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+    expect(actorIn("actor-left").attributes("data-speaking")).toBe("false");
+    expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
+
+    expect(store.focusPress("1")).toBe(true);
+    await nextTick();
+    expect(store.view.dialogueSpeaker).toBe("player");
+    expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
+    expect(actorIn("actor-right").attributes("data-speaking")).toBe("false");
+
+    // The reply's revision commits: the host speaks again.
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+    commit("dialogue", { ...dialoguePanel("7"), line: "北岸大道最近不太平。" });
+    await nextTick();
+    expect(actorIn("actor-left").attributes("data-speaking")).toBe("false");
+    expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
+  });
+
+  it("keeps one #action-dock element and moves focus to the first row and back across the mode flips", async () => {
+    const dock = document.getElementById("action-dock");
+    dock.focus();
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+    await nextTick();
+    expect(document.getElementById("action-dock")).toBe(dock);
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="dialogue-pick"]').element);
+
+    commit("exploration");
+    await nextTick();
+    await nextTick();
+    expect(document.getElementById("action-dock")).toBe(dock);
+    expect(document.activeElement).toBe(dock);
+  });
+
+  it("re-homes focus once when the conversation opens from a verb popover and again on leaving", async () => {
+    document.getElementById("action-dock").focus();
+    // The overview's person chip opens its verb popover (the dockSource
+    // watcher's case), then the commit that opens the conversation closes it.
+    expect(store.focusItemByKey("target-7")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
+    await nextTick();
+    expect(store.view.dockSource).toBe("exploration.target");
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    expect(store.view.dockDepth).toBe(1);
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="dialogue-pick"]').element);
+
+    commit("exploration");
+    await nextTick();
+    await nextTick();
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
   });
 });

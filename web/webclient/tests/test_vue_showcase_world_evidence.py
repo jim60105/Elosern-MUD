@@ -182,6 +182,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # before C8b mounts them.
     "Action/SceneOverview",
     "Action/DockVerbPopover",
+    # The dialogue stage actor (webclient-dialogue-stage-actors), the
+    # standing portrait that wraps Core/ReferenceArtwork on the stage.
+    "Core/StageActor",
 }
 
 # The World-directory story files that sit outside the B4 family: the

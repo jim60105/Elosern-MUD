@@ -324,8 +324,15 @@ describe("dock digit row picks (1–9)", () => {
     // A digit past the rendered picks has no pick: the caption branch owns the
     // press and declines, so it falls through.
     expect(store.focusPress("5")).toBe(false);
-    // The dock's own chips claim no digit while the caption presents.
+    // The dock's own chips claim no digit while the caption presents, and
+    // the collapsed dock's focus never moves (webclient-dialogue-stage-actors
+    // D6).
     expect(store.view.dockDepth).toBe(1);
+    const focusBefore = store.view.focus.key;
+    // A held repeat is claimed but never re-dispatches.
+    expect(store.focusPress("1", true)).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(store.view.focus.key).toBe(focusBefore);
   });
 
   it("an unconsumed digit before any frame is mounted is unclaimed", () => {
