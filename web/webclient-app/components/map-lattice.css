@@ -223,7 +223,7 @@
 }
 /* Its own variables: the marker sits inside a pan group, whose `--pan-*`
    it would otherwise inherit and apply twice. */
-.local-map__marker--current {
+.map-lattice__pan .local-map__marker--current {
   transform: translate(
     calc(var(--glide-x, 0px) * var(--motion-travel)),
     calc(var(--glide-y, 0px) * var(--motion-travel))

@@ -462,7 +462,10 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
               return w && p && p.getAttribute('data-page') === '1'
                 && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2
                 && w.getAttribute('data-typing') === 'true'
-                && p.querySelector('.narrative-unrevealed, .narrative-line.unrevealed') !== null; }""",
+                && p.querySelector('.narrative-unrevealed, .narrative-line.unrevealed') !== null
+                // The previous page's clear layer (webclient-scene-transitions
+                // D4) has faded out, so only this page's lines are measured.
+                && p.querySelectorAll('[data-testid="message-content"]').length === 1; }""",
             timeout=30000,
         )
         # Typing: no marker, and the page already occupies its final layout.

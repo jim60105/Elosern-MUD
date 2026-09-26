@@ -18,10 +18,11 @@
 // The minimap pan (webclient-scene-transitions, design D3): with `panOnMove`
 // a move of the current node starts the drawing translated so the node the
 // player left sits where it stood on screen, then eases it to the committed
-// placement (a FLIP offset; `lib/map_pan.js`). Only the drawing's two
-// `.map-lattice__pan` groups move — edges, pin, and axis; the node groups —
-// as one rigid shape, so nodes, names, and click targets carry the new
-// placement from the commit on. The dot field, the fog, and the gutter's
+// placement (a FLIP offset; `lib/map_pan.js`). Only the drawing's two pan
+// groups move — edges, pin, and axis; the node groups — as one rigid shape,
+// and they carry the `.map-lattice__pan` transform only with `panOnMove`, so
+// the full map's drawing has no CSS transform at all. Nodes, names, and click
+// targets carry the new placement from the commit on. The dot field, the fog, and the gutter's
 // edge-direction markers stay put. Travel is multiplied by `--motion-travel`,
 // so the reduced and off levels show the new placement at once.
 import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
@@ -367,7 +368,7 @@ defineExpose({
       :fill="`url(#${fogId})`"
       aria-hidden="true"
     />
-    <g class="map-lattice__pan" data-testid="map-lattice__pan">
+    <g :class="{ 'map-lattice__pan': panOnMove }" data-testid="map-lattice__pan--lines">
     <line
       v-for="edge in edgeGeoms"
       :key="`edge-${edge.i}`"
@@ -475,7 +476,7 @@ defineExpose({
         </text>
       </template>
     </g>
-    <g class="map-lattice__pan" data-testid="map-lattice__pan">
+    <g :class="{ 'map-lattice__pan': panOnMove }" data-testid="map-lattice__pan--nodes">
     <g
       v-for="node in drawnNodes"
       :key="node.id"

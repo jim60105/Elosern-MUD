@@ -130,10 +130,8 @@ let decoder = null;
 
 const transitionCss = computed(() => props.motionLevel !== "off");
 
-// A new URL's pixels are ready: `decode()` where the engine has it (a
-// rejection — a broken image — still settles, so the rendered `<img>`'s own
-// error path records the failure). Returns null where there is no decode API
-// (jsdom), so the caller swaps at once.
+// A new URL's pixels are ready: `decode()` where the engine has it. Returns
+// null where there is no decode API (jsdom), so the caller swaps at once.
 function decodeImage(url) {
   if (typeof Image === "undefined") {
     return null;
@@ -174,18 +172,28 @@ watch(
       return;
     }
     decodingUrl.value = url;
-    const settle = () => {
+    const settle = (ok) => {
       // A newer target replaced this one while it decoded: drop it.
       if (decodingUrl.value !== url) {
         return;
       }
       decodingUrl.value = null;
       decoder = null;
+      if (!ok) {
+        // The URL failed to load or decode: the same failure the rendered
+        // image's error path records, so the URL is never fetched again, the
+        // previous image fades out, and the placeholder takes over.
+        recordFailure(url);
+        return;
+      }
       if (targetImage.value?.url === url) {
         shownImage.value = targetImage.value;
       }
     };
-    pending.then(settle, settle);
+    pending.then(
+      () => settle(true),
+      () => settle(false),
+    );
   },
 );
 
@@ -255,17 +263,23 @@ function onImageLoad(event) {
   imageLoadFailed.value = false;
 }
 
-function onImageError(event) {
-  const url = eventUrl(event);
-  if (!url) {
-    return;
-  }
+// A scene URL that failed to load: remembered, so it is not fetched again
+// before a new URL or a reload, and — when it is the scene the committed
+// state asks for — the placeholder takes over.
+function recordFailure(url) {
   failedUrls.add(url);
-  if (url !== shownImage.value?.url) {
+  if (url !== targetImage.value?.url && url !== shownImage.value?.url) {
     return;
   }
   priorImage.value = null;
   imageLoadFailed.value = true;
+}
+
+function onImageError(event) {
+  const url = eventUrl(event);
+  if (url) {
+    recordFailure(url);
+  }
 }
 
 function openFullView() {

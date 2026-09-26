@@ -88,18 +88,22 @@ describe("SceneBackdrop crossfade", () => {
     expect(images(wrapper)[0].attributes("src")).toBe("/art/scene/b.png");
   });
 
-  it("a rejected decode still swaps, so the image's own error path records the failure", async () => {
+  it("a rejected decode records the failure: the old image goes, the placeholder shows, no refetch", async () => {
     const pending = holdDecode();
     wrapper = mount(SceneBackdrop, { ...REAL, props: { art: artWith("/art/scene/a.png") } });
     await wrapper.setProps({ art: artWith("/art/scene/broken.png") });
     pending[0].reject(new Error("EncodingError"));
     await flushPromises();
-    await frames();
-    expect(images(wrapper)).toHaveLength(1);
-    const img = images(wrapper)[0];
-    expect(img.attributes("src")).toBe("/art/scene/broken.png");
-    await img.trigger("error");
+    // The broken URL is never rendered (a second fetch of a failed URL), and
+    // the previous scene leaves rather than staying as if current.
+    expect(images(wrapper).some((img) => img.attributes("src") === "/art/scene/broken.png")).toBe(false);
     expect(wrapper.find('[data-testid="scene-backdrop-placeholder"]').exists()).toBe(true);
+    await frames();
+    expect(images(wrapper)).toHaveLength(0);
+    // The same URL committed again is not decoded (fetched) again.
+    await wrapper.setProps({ art: artWith("/art/scene/broken.png", { label: "再看一次" }) });
+    await flushPromises();
+    expect(pending).toHaveLength(1);
   });
 
   it("drops a decode that a newer scene overtook", async () => {

@@ -73,7 +73,7 @@ Every `<Transition>` in this change binds it with `v-bind="inertWhileLeaving"`, 
 - `shownImage` is a ref.
 - A watcher on `targetImage.url` handles three cases:
   - An unchanged URL only updates `dimmed`.
-  - A new URL starts `decodeImage(url)`: `new Image()`, set `src`, then `img.decode()` when the method exists, otherwise resolve at once, as in jsdom. On settle (resolve or reject), if the target is still that URL, `shownImage` becomes the target. A reject still swaps: the rendered `<img>`'s existing `@error` then records the failure and shows the placeholder, so failure handling keeps one path.
+  - A new URL starts `decodeImage(url)`: `new Image()`, set `src`, then `img.decode()` when the method exists, otherwise resolve at once, as in jsdom. On resolve, if the target is still that URL, `shownImage` becomes the target. On reject, the URL is recorded exactly as the rendered `<img>`'s `@error` records it (one `recordFailure` path): it joins `failedUrls`, the placeholder shows, and the previous image fades out. Swapping the broken URL in instead would make the `<img>` fetch it a second time, which the art panel's "a failed URL is not re-fetched" rule forbids.
   - While the decode is pending, the previous `shownImage` stays, with `dimmed` forced to true. That is the backdrop's existing "prior image, never presented as current" treatment, and the scene label, alt text, and `pending` notice have already switched at commit.
 - The template renders `<Transition name="scene-xfade" v-bind="inertWhileLeaving"><img v-if="shownImage" :key="shownImage.url" …></Transition>` with no `mode`, so the entering and leaving images coexist.
 - CSS:
@@ -162,7 +162,7 @@ The component root gains `transition: filter var(--motion-base) var(--ease-stand
     - a missing node gives `null`
     - the graph variant's recentred placement gives an offset equal to the previous node's old screen position mapped into the new units
   - `tests/scene_transitions.test.js`, with `stubs: { transition: false }`, also covers the `off` level (no second layer, even for a frame), a decode overtaken by a newer scene, appended lines patching in place, and the minimap: the marker's glide and a recentring pan anchored on the old screen point (with a stubbed 208px canvas box). It covers:
-    - `SceneBackdrop`: a mocked `HTMLImageElement.prototype.decode` holds a promise, the previous image is shown dimmed while pending, both images are present after resolve with the leaving one `inert`, and a reject still swaps.
+    - `SceneBackdrop`: a mocked `HTMLImageElement.prototype.decode` holds a promise, the previous image is shown dimmed while pending, both images are present after resolve with the leaving one `inert`, and a reject records the failure with no swap and no second decode of that URL.
     - `PlaceCard`: the heading's leave is `inert`, and a time-only change adds no leaving element.
     - `MessageWindow`: a new `responseKey` leaves one inert container, the new one mounts and `data-typing` is true at once, and the page surface keeps focus.
     - `StageActor`: a URL change leaves one inert copy, and a same-URL refresh leaves none.
