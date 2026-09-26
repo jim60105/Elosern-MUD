@@ -7,6 +7,7 @@
 // else must not be masked with decorative stand-ins.
 import { computed, ref } from "vue";
 import { faceObjectPosition } from "./face-rect.js";
+import { portraitGlyph } from "./character-identity.js";
 
 const props = defineProps({
   portrait: { type: Object, default: null },
@@ -33,7 +34,7 @@ function onImageError() {
       @error="onImageError"
     />
     <div v-else class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
-      <span class="reference-artwork__placeholder-glyph">{{ placeholderLabel.slice(0, 1) }}</span>
+      <span class="reference-artwork__placeholder-glyph">{{ portraitGlyph(placeholderLabel) }}</span>
       <span class="reference-artwork__placeholder-label">{{ placeholderLabel }}</span>
     </div>
     <figcaption :data-sample="String(!portraitUrl)">{{ portraitUrl ? (portrait.alt || "角色肖像") : placeholderLabel }}</figcaption>

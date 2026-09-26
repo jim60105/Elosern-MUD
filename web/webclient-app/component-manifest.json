@@ -5,6 +5,7 @@
     "Core/PlaceCard",
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
+    "Core/StageActor",
     "Core/CharacterSwitcher",
     "Core/ConnectOverlay",
     "Core/MessageWindow",
