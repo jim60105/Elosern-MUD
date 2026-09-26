@@ -299,6 +299,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0, "a disabled skill submits no packet")
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_combat_rebuilds_keyboard_menu_after_round(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -343,6 +344,27 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "keyboard menu was not rebuilt from the accepted panel: "
                 f"panel={panel!r} lastActionResult={result!r}"
             )
+        # The same publication carries the round's structured beats: the store
+        # commits them under `combat_beats` with that round's identity, and at
+        # least one roll beat names the monster's catalog key. Read them before
+        # any later action, because only the completing publication is
+        # available.
+        beats = page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store.view;"
+            "return (s && s.panels && s.panels['combat_beats']) || null; }"
+        )
+        self.assertIsNotNone(beats, "the round's beats panel must be committed")
+        self.assertTrue(beats["available"], beats)
+        self.assertTrue(beats["round"].endswith("/1"), beats["round"])
+        foe_ref = next(
+            participant["portrait_ref"]
+            for participant in panel["participants"]
+            if participant["team"] == "foes"
+        )
+        self.assertIn(
+            foe_ref,
+            [beat["target"] for beat in beats["beats"] if beat["kind"] == "roll"],
+        )
         # The rebuilt root lets another action submit from fresh data.
         self._press(page, "Enter")  # attack again
         self._walk_to(page, f"target-{self._basic_attack_target_identity(page)}")
