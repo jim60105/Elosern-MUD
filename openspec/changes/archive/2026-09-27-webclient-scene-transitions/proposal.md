@@ -17,29 +17,31 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
   - `onBeforeLeave` sets `inert` on the leaving element.
   - `onAfterLeave` and `onLeaveCancelled` clear it, and `onBeforeEnter` clears it on the entering element.
   - Every transition this change adds binds it, so a leaving copy is outside the accessibility tree, the tab order, and pointer hit-testing while it animates.
+  - Every transition also binds `:css="motionLevel !== 'off'"`: a CSS `<Transition>` waits a double frame even at 0s, so at `off` the transitions drop their CSS phase and settle in the commit's own patch. The six components take the effective level as a `motionLevel` prop, threaded from `store.view.motionLevel` like `MessageWindow`'s.
 - New pure module `web/webclient-app/lib/map_pan.js`: `panOffset(prev, next)`. It returns the translation, in the new drawing's user units, that puts the previous current node back where it was on screen. It returns `null` when that node is absent from the new placement.
 - `web/webclient-app/components/SceneBackdrop.vue`:
-  - The scene image becomes a two-layer crossfade over `--motion-scene`: a `<Transition name="scene-xfade">` keyed by the shown URL, with the leaving layer absolutely stacked under the entering one.
+  - The scene image becomes a two-layer crossfade over `--motion-scene`: a `<Transition name="scene-xfade">` keyed by the shown URL, with the new painting fading in above the old one on curves that never dip through the stage behind them, and settling from a hair larger where travel is allowed.
   - A new URL is decoded first (`HTMLImageElement.decode()` when available). Until it is decoded, the previous image stays up with the existing dimmed treatment, so the fade never runs over a blank frame and an old scene is never shown as current.
   - The scene label, alt text, placeholder, and `pending` rules are unchanged, and they update at commit.
 - `web/webclient-app/components/PlaceCard.vue` (C4b): the location heading is keyed by the location label inside a `<Transition name="place-card">`.
-  - The new heading slides in from the left (`--motion-shift-lg`) and fades in over `--motion-reveal`, and the old one fades out.
+  - The new heading slides in from the left (`--motion-shift-lg`) and fades in over `--motion-reveal`, and the old one fades out; the two hand over in one grid cell rather than cross-dissolve.
   - A time-only change does not animate.
-- `web/webclient-app/components/MapLattice.vue` gains a `panOnMove` prop, which `LocalMap.vue` sets in minimap mode only. When the committed current node changes and the previous current node is in the new placement, the drawing group starts translated by `panOffset` and eases to rest over `--motion-base`. The translation is multiplied by `--motion-travel`, so `reduced` and `off` snap. The full-map overlay does not pan.
+- `web/webclient-app/components/MapLattice.vue` gains a `panOnMove` prop, which `LocalMap.vue` sets in minimap mode only. When the committed current node changes and the previous current node is in the new placement, the drawing group starts translated by `panOffset` and eases to rest over `--motion-base`. The current-node marker also travels the step from the node the player left, so a move reads even when the drawing does not shift. The translation is multiplied by `--motion-travel`, so `reduced` and `off` snap. The full-map overlay does not pan.
 - `web/webclient-app/components/MessageWindow.vue`: the page content is keyed by the response inside a `<Transition name="message-clear">`.
   - When a new response replaces the previous one, the previous page's content leaves as an opaque, inert layer over the new page and fades out over `--motion-clear`.
-  - The new page mounts and starts typing at once, so no latency is added.
+  - The new page mounts and starts typing at once, so no latency is added, and surfaces beneath the layer in the clear's last stretch, so the two pages never read through each other.
   - This runs on every new response, not only on a location change (coordinator-approved, design D4).
   - The focusable page surface is not keyed and keeps focus.
 - `web/webclient-app/components/StageActor.vue` (C10b):
   - The portrait is keyed by its source (the image URL, or the placeholder label) inside a `<Transition name="actor-xfade">`, crossfading over `--motion-portrait`.
-  - The speaking dim gains `transition: filter var(--motion-fast)`.
+  - The speaking dim gains `transition: filter var(--motion-base)` (instant at `reduced` and `off`).
 - `web/webclient-app/components/StatusPanel.vue` (C3): the root that carries C3's `v-show="visible"` is wrapped in `<Transition name="vitals-reveal" v-bind="inertWhileLeaving">`, so the island fades and slides 12px (`--motion-shift-sm`) over `--motion-reveal`. The `visible` prop, its binding in `AppClient.vue`, and C3's pre-flush focus rescue are unchanged.
 - Stories:
   - `stories/Core/SceneBackdrop.stories.js` gains a `SceneChange` story.
   - `stories/Core/StageActor.stories.js` gains an `AppearanceChange` story.
   - `stories/Core/PlaceCard.stories.js` gains a `LocationChange` story.
   - `stories/Data/StatusPanel.stories.js` gains a `RevealToggle` story.
+  - `stories/Core/AppShell.stories.js` gains a `StageJourney` story that walks the real client down a street; `.storybook/main.js` serves the redesign's sample paintings under `/art/showcase/` for it.
 - Browser: a new `web/tests/browser/test_browser_scene_transitions.py` runs at `full`, `reduced`, and `off`. It asserts the in-flight layers, their inert state, and their computed durations, not wall-clock timing.
 - No OOB schema, presenter, server, persistence, or component-manifest change. No component is added or deleted.
 
@@ -69,11 +71,11 @@ Out of scope:
   - Vitest `web/webclient-app/tests/transition_hooks.test.js`, `web/webclient-app/tests/map_pan.test.js`, `web/webclient-app/tests/scene_transitions.test.js`
   - `web/tests/browser/test_browser_scene_transitions.py`
 - Edited source:
-  - `web/webclient-app/components/{SceneBackdrop,PlaceCard,MapLattice,LocalMap,MessageWindow,StageActor,StatusPanel}.vue`
-- Stories: `stories/Core/SceneBackdrop.stories.js`, `stories/Core/StageActor.stories.js`, `stories/Core/PlaceCard.stories.js`, `stories/Data/StatusPanel.stories.js`.
+  - `web/webclient-app/components/{SceneBackdrop,PlaceCard,MapLattice,LocalMap,MessageWindow,StageActor,StatusPanel,AppShell}.vue`, `components/map-lattice.css`, `web/webclient-app/AppClient.vue` (the `motionLevel` threading), `styles/tokens.css` (comments only)
+- Stories: `stories/Core/SceneBackdrop.stories.js`, `stories/Core/StageActor.stories.js`, `stories/Core/PlaceCard.stories.js`, `stories/Data/StatusPanel.stories.js`, `stories/Core/AppShell.stories.js`, new `stories/fixtures/stage_journey.js`; `.storybook/main.js`.
 - Tests edited:
   - Vitest: `tests/scene_backdrop.test.js`, `tests/core/stage_actor.test.js`, `tests/place_card.test.js` (C4b), `tests/message_window.test.js`, `tests/data/status_panel.test.js` (C3)
-  - Python: `web/webclient/tests/test_node_suite_evidence.py`
+  - Python: `web/webclient/tests/test_node_suite_evidence.py`, `web/webclient/tests/test_vue_showcase_data_evidence.py`
   - `.github/browser-shards.json`
 - Spec traceability: two new IDs, covered by the evidence test and the new browser file. The two modified titles are unchanged.
 - Dependencies:

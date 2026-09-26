@@ -360,13 +360,19 @@
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_1280x720",
-        "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use"
+        "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_rejected_custom_save_stays_on_the_form_without_confirmation",
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_actual_age_rejected_despite_disabled_client_validation",
-        "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest"
+        "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_vitals_reveal_and_inert",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_reduced_motion_fades_only",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant"
       ]
     },
     {

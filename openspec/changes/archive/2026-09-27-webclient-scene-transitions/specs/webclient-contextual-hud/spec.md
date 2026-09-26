@@ -92,7 +92,9 @@ hidden with the message region.
 
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
 carry a name plate above its text area, naming the host with the panel's `display_name` plus
-` · 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
+` · 羈絆 <stage>` only when `bond_stage` is non-null; in dialogue mode the plate and the page text SHALL
+share one left-aligned column whose left edge lines up with the player portrait anchor's left edge (the
+42-character line cap still applies); the window's text area below the plate SHALL
 present the current response's pages — the session line as the narrative delivered it, paged and typed
 like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
 from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
@@ -164,24 +166,28 @@ preference that governs every client animation":
   (500ms at `full`). The new image SHALL start its fade only once it is decoded. Until then, the previous
   image SHALL stay visible with the dimmed treatment the backdrop already uses for a prior image, so the
   fade never passes through an empty frame and a previous scene is never presented undimmed as the
-  current one. The scene label, the alternative text, and the placeholder SHALL update at commit.
+  current one. The new image SHALL fade in above the previous one, and the pair SHALL NOT dip through
+  the stage behind them mid-fade. The scene label, the alternative text, and the placeholder SHALL
+  update at commit.
 - **A new location label** SHALL slide the place card's heading in from the left and fade it in, while
   the previous heading fades out. A change of the world time alone SHALL NOT animate.
 - **A new current map node** SHALL pan the minimap: the drawing SHALL start where the previous current
-  node stood on screen and ease to its committed placement. When the previous current node is absent
-  from the new placement, the minimap SHALL show the new placement at once. The full-map surface SHALL
-  NOT pan.
+  node stood on screen and ease to its committed placement, and the current-node marker SHALL travel
+  the step from the node the player left to the new current node, so a move reads even when the drawing
+  itself does not shift. When the previous current node is absent from the new placement, the minimap
+  SHALL show the new placement at once. The full-map surface SHALL NOT pan.
 - **A new response** SHALL clear the message window as "The message window presents the current
   response one page at a time in the band's message region" allows: the previous page fades out over
-  the clear duration (150ms at `full` and at `reduced`) while the new page starts at once.
+  the clear duration (150ms at `full` and at `reduced`) while the new page starts at once and surfaces
+  beneath it within the same duration, so the two pages never read through each other.
 - **A new portrait source** on a stage actor (a new image URL, or a switch between an image and a
   placeholder) SHALL crossfade over the portrait duration (400ms at `full`), and a change of the speaking
   state SHALL ease the dim.
 - **The vitals island** SHALL fade in and slide 12px into place when it becomes visible, and SHALL fade
   out and slide away when it hides.
 
-At `reduced`, each of these SHALL play as an opacity fade of at most 150ms with no slide and no pan, and
-the dim SHALL change instantly. At `off`, each SHALL render its final state in the commit's frame. No
+At `reduced`, each of these SHALL play as an opacity fade of at most 150ms with no slide, no pan, and no
+marker travel, and the dim SHALL change instantly. At `off`, each SHALL render its final state in the commit's frame. No
 transition SHALL delay a committed value or the player's input beyond its own duration, as "Presentation
 timing never gates committed state or input" requires.
 
@@ -201,7 +207,8 @@ timing never gates committed state or input" requires.
 #### Scenario: The minimap pans to the new node
 - **WHEN** the effective level is `full` and a move commits a current node adjacent to the previous one
 - **THEN** the minimap's drawing starts offset so the previous current node sits where it stood, and it
-  eases to the committed placement over the base duration, while the node markers and accessible names
+  eases to the committed placement over the base duration while the current-node marker travels from
+  the node the player left, and the nodes' visibility states, accessible names, and click targets
   already describe the new placement
 
 #### Scenario: The message window clears between responses

@@ -1,3 +1,4 @@
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import StageActor from "../../components/StageActor.vue";
 
 // StageActor (webclient-dialogue-stage-actors design D1): one standing
@@ -98,4 +99,34 @@ export const Speaking = {
 export const Dimmed = {
   render: renderActor,
   args: { portrait: PLAYER_PORTRAIT, side: "left", dimmed: true },
+};
+
+// An appearance change (webclient-scene-transitions, design D5): every few
+// seconds the portrait source changes — another image, then the pending
+// placeholder card — and the new figure crossfades in above the old one.
+// In between, the speaking state flips, so the dim eases.
+const APPEARANCES = [
+  PLAYER_PORTRAIT,
+  { ...PLAYER_PORTRAIT, url: "/art/defaults/woman.webp", alt: "艾莉亞的新肖像" },
+  { ...PLAYER_PORTRAIT, status: "pending", url: null, placeholder: { kind: "missing", label: "肖像生成中" } },
+];
+
+export const AppearanceChange = {
+  render: () => ({
+    components: { StageActor },
+    setup() {
+      const tick = ref(0);
+      let timer = null;
+      onMounted(() => {
+        timer = setInterval(() => {
+          tick.value += 1;
+        }, 1800);
+      });
+      onBeforeUnmount(() => clearInterval(timer));
+      return { tick, APPEARANCES };
+    },
+    template:
+      '<div style="width:420px;height:630px;padding:0;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
+      '<StageActor :portrait="APPEARANCES[Math.floor(tick / 2) % APPEARANCES.length]" name="艾莉亞" side="left" :dimmed="tick % 2 === 1" /></div>',
+  }),
 };

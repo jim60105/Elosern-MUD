@@ -61,6 +61,7 @@ DATA_FAMILY_STORY_IDS = {
     "data-statuspanel--full-payload",
     "data-statuspanel--hidden-at-full-health",
     "data-statuspanel--minimal",
+    "data-statuspanel--reveal-toggle",
 }
 
 

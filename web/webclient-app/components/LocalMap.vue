@@ -27,6 +27,8 @@ const props = defineProps({
   // The committed `local_map` v1 panel payload (available form or the
   // registry-owned unavailable form).
   localMap: { type: Object, required: true },
+  // The effective motion level, for the minimap pan (MapLattice).
+  motionLevel: { type: String, default: "full" },
 });
 
 const emit = defineEmits(["move", "open-map"]);
@@ -194,6 +196,8 @@ function onIslandClick(event) {
         :show-axis="true"
         :fog-vignette="true"
         :marker-names="true"
+        :pan-on-move="true"
+        :motion-level="motionLevel"
         @move="(p) => emit('move', p)"
       />
 

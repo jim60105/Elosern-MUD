@@ -114,8 +114,8 @@
      `tests/motion_tokens.test.js` guard enforces it). The three level blocks
      below re-resolve them per level, so one attribute change
      (`<html data-motion>`) reaches every animation at once. */
-  --motion-fast: 120ms; /* control feedback, speaking dim */
-  --motion-base: 300ms; /* drawer slide, vignette, recession, toast, minimap */
+  --motion-fast: 120ms; /* control feedback */
+  --motion-base: 300ms; /* drawer slide, vignette, recession, toast, minimap pan, speaking dim */
   --motion-slow: 400ms; /* vitals fill */
   --motion-pulse: 3.2s; /* looping pulses: veil */
   --motion-hp-pulse: 1.1s; /* looping pulses: low hp */
@@ -559,8 +559,11 @@
  *   `tests/motion_tokens.test.js` guard keeps this level honest.
  * - `off` resolves every duration and delay to zero, fades included, and adds
  *   one `!important` rule so no element or pseudo-element animates or
- *   transitions at all. 0s, not 1ms: Vue's `<Transition>` finishes
- *   synchronously at 0, so no `transitionend` wait remains.
+ *   transitions at all. 0s, not 1ms, so no `transitionend` wait remains.
+ *   A CSS `<Transition>` still waits a double animation frame before it
+ *   resolves even at 0s, so every stage transition also binds
+ *   `:css="motionLevel !== 'off'"` (webclient-scene-transitions D1): with no
+ *   CSS phase Vue enters and leaves in the commit's own patch.
  * - The `@media (prefers-reduced-motion: reduce)` block is the fallback for
  *   the frames before the store's first apply and for Storybook, where no
  *   store runs. `:not([data-motion])` is load-bearing: once the store runs

@@ -1,5 +1,6 @@
 <script>
 import {
+  Transition,
   computed,
   h,
   nextTick,
@@ -30,6 +31,7 @@ import {
 import { useMessageMeasure } from "../composables/use-message-measure.js";
 import { useTypewriter } from "../composables/use-typewriter.js";
 import { MOTION_LEVELS } from "../lib/motion_level.js";
+import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 // The AVG message window (docs/superpowers/specs/2026-09-23-webclient-avg-
 // stage-redesign-design.md §6; OpenSpec change
@@ -175,6 +177,12 @@ export default {
     const pageIndex = ref(0);
     const provisional = ref(false);
     const liveText = ref("");
+    // The clear (webclient-scene-transitions, design D4): the page's content
+    // is keyed by this counter, which only a NEW response bumps. Mount,
+    // resync, a flush, and appended lines patch the content in place, so
+    // nothing replays; a new response leaves the previous page behind as a
+    // fading, inert layer while the new page mounts and types at once.
+    const clearKey = ref(0);
 
     const currentPage = () => pages.value[pageIndex.value] || null;
     const effectiveCps = computed(() =>
@@ -350,6 +358,7 @@ export default {
       if (shown.key !== shownKey) {
         // A new response opens on page 1 and types from its start.
         shownKey = shown.key;
+        clearKey.value += 1;
         announcedEnd = 0;
         setPage(0);
         announceCurrentPage({ whole: true });
@@ -585,11 +594,28 @@ export default {
                 "aria-describedby": pageLabelId,
                 onKeydown: onSurfaceKeydown,
               },
-              page
-                ? page.blocks.map((fragment, index) =>
-                    narrativeBlockNodes(fragment, `f${index}`, reveals ? reveals[index] : undefined),
-                  )
-                : [],
+              [
+                h(
+                  Transition,
+                  {
+                    name: "message-clear",
+                    // At `off` the previous page goes in the commit's frame
+                    // (a CSS phase would linger a double frame even at 0s).
+                    css: props.motionLevel !== "off",
+                    ...inertWhileLeaving,
+                  },
+                  () =>
+                    h(
+                      "div",
+                      { key: clearKey.value, class: "message-window__content", "data-testid": "message-content" },
+                      page
+                        ? page.blocks.map((fragment, index) =>
+                            narrativeBlockNodes(fragment, `f${index}`, reveals ? reveals[index] : undefined),
+                          )
+                        : [],
+                    ),
+                ),
+              ],
             ),
           ]),
           h("div", { class: "message-window__controls" }, [
@@ -645,6 +671,10 @@ export default {
   display: flex;
   flex-direction: column;
   color: var(--paper-100);
+  /* The clear layer's opaque fill (webclient-scene-transitions D4): the
+     band's own gradient (HudFrame's `.stage-band`) as it falls behind the
+     text area, so the fading page never reads as a card. */
+  --message-clear-fill: linear-gradient(180deg, #0e0f15 0%, #13101a 32%, #110e17 64%, #0e0b12 100%);
 }
 
 .message-window::before {
@@ -691,6 +721,43 @@ export default {
 
 .message-window__page:focus-visible {
   box-shadow: none;
+}
+
+/* The clear (webclient-scene-transitions, design D4). The page surface is
+   the positioning box of the leaving layer; the layer keeps the page's own
+   padding, so its text stays exactly where it was read. */
+.message-window__page {
+  position: relative;
+}
+
+.message-window .message-clear-leave-active {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: inherit;
+  pointer-events: none;
+  background: var(--message-clear-fill);
+  /* Feathered side edges, inside the page's text-free side padding. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  transition: opacity var(--motion-clear) var(--ease-standard);
+}
+
+.message-window .message-clear-leave-to {
+  opacity: 0;
+}
+
+/* The two pages hand over rather than overlap: the previous page drops
+   away on a fast-falling curve, and the new page — already mounted and
+   typing — surfaces beneath it only in the clear's last stretch, when the
+   old text is nearly gone. (At the reduced level the page is typed at once,
+   so this is what keeps two whole pages from showing through each other.) */
+.message-window .message-clear-enter-active {
+  transition: opacity calc(var(--motion-clear) * 0.6) var(--ease-standard) calc(var(--motion-clear) * 0.4);
+}
+
+.message-window .message-clear-enter-from {
+  opacity: 0;
 }
 
 .message-window__page[data-oversize="true"] {

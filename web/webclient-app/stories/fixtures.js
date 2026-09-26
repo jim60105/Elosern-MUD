@@ -36,3 +36,4 @@ export * from './fixtures/party_panels.js';
 export * from './fixtures/objectives_panels.js';
 export * from './fixtures/lore_codex_panels.js';
 export * from './fixtures/quest_log_panels.js';
+export * from './fixtures/stage_journey.js';

@@ -1,4 +1,4 @@
-import { h } from "vue";
+import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import StatusPanel from "../../components/StatusPanel.vue";
 import {
   STATUS_PANEL_COMBAT_SAMPLE,
@@ -51,4 +51,27 @@ export const HiddenAtFullHealth = {
     status: STATUS_PANEL_SAMPLE,
     visible: false,
   },
+};
+
+// The vitals reveal (webclient-scene-transitions, design D6): every few
+// seconds the island is shown or hidden — it fades in while dropping 12px
+// into place, and fades out while lifting away, keeping its trailing-bar
+// memory while hidden.
+export const RevealToggle = {
+  render: () => ({
+    setup() {
+      const visible = ref(true);
+      let timer = null;
+      onMounted(() => {
+        timer = setInterval(() => {
+          visible.value = !visible.value;
+        }, 1600);
+      });
+      onBeforeUnmount(() => clearInterval(timer));
+      return () =>
+        h("div", { style: "width: 262px; padding: 12px; min-height: 260px;" }, [
+          h(StatusPanel, { status: STATUS_PANEL_SAMPLE, visible: visible.value }),
+        ]);
+    },
+  }),
 };

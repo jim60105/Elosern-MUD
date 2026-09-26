@@ -5,7 +5,15 @@ const config = {
   // `/art/...` media URL vocabulary (the committed built-in fallbacks live
   // at web/static/art/defaults/) instead of inventing asset-import URLs the
   // wire validators reject.
-  staticDirs: [{ from: "../web/static", to: "/" }],
+  //
+  // The redesign's sample scene paintings are served under `/art/showcase/`
+  // too, so the stage-transition stories can hand the real `art` validator
+  // (which accepts only `/art/`-rooted URLs) two distinct scene bitmaps to
+  // crossfade between. Storybook only: the product never serves this path.
+  staticDirs: [
+    { from: "../web/static", to: "/" },
+    { from: "../web/webclient-app/assets/redesign", to: "/art/showcase" },
+  ],
   framework: {
     name: "@storybook/vue3-vite",
     options: {},

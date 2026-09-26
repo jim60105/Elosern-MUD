@@ -151,7 +151,12 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
              done image, the dimmed prior image, or the mode gradient with a
              truthful placeholder. -->
         <template #backdrop>
-          <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
+          <SceneBackdrop
+            ref="sceneBackdropRef"
+            :art="panel('art') || {}"
+            :mode="store.view.mode || 'exploration'"
+            :motion-level="store.view.motionLevel"
+          />
         </template>
         <!-- The player's standing portrait (webclient-avg-stage-shell D4):
              the current roster character's portrait stands on the bottom
@@ -164,6 +169,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
             :portrait="currentPortrait"
             :name="currentCharacter?.name || ''"
             :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
+            :motion-level="store.view.motionLevel"
           />
         </template>
         <!-- The dialogue host's standing portrait (webclient-dialogue-stage-
@@ -176,6 +182,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
             :portrait="hostPortrait"
             :name="dialogueVM.host.displayName"
             :dimmed="store.view.dialogueSpeaker === 'player'"
+            :motion-level="store.view.motionLevel"
           />
         </template>
         <!-- The dialogue choice list (webclient-dialogue-choices-overlay
@@ -205,6 +212,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
           :status="panel('status') || {}"
           :low-hp="store.view.vitals.lowHp"
           :visible="store.view.vitals.visible"
+          :motion-level="store.view.motionLevel"
           :revision="store.view.revision"
           :epoch="store.view.epoch"
         />
@@ -227,6 +235,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
         <LocalMap
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
+          :motion-level="store.view.motionLevel"
           @move="onMapMove"
           @open-map="onMapExpand"
         />

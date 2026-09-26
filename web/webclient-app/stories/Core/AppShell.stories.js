@@ -16,6 +16,9 @@ import {
   PROMPT_SAMPLE,
   STATUS_SLICE_SAMPLE,
   SERVICES_PANEL_SAMPLE,
+  STAGE_JOURNEY_STOPS,
+  stageJourneyLocalMap,
+  stageJourneyScene,
 } from "../fixtures.js";
 
 // AppShell (root/layout). Passive B1 contract: renders the slices it is
@@ -119,6 +122,26 @@ export const DisconnectedSession = {
 // Exercise the real composed shell: isolated component stories cannot expose
 // overlap between the dock, the wrapped overview chips, the verb popover,
 // the narrative and the command-line anchors.
+// The stage-transition journey's panels for one stop
+// (webclient-scene-transitions): the scene, the current map node, and the
+// vitals, all full except the stop's hp, so the vitals island shows only on
+// the stops that lower it.
+function journeyPanels(stop) {
+  const cell = stageJourneyLocalMap(stop.node).nodes.find((node) => node.current);
+  return {
+    art: { ...ART_PANEL_SAMPLE, scene: stageJourneyScene(stop) },
+    local_map: stageJourneyLocalMap(stop.node),
+    status: protocolFixtures.statusPanel({
+      actor: { location: { label: cell.label, identity: cell.id } },
+      resources: {
+        hp: { current: stop.hp, maximum: 100 },
+        mp: { current: 50, maximum: 50 },
+        sp: { current: 40, maximum: 40 },
+      },
+    }),
+  };
+}
+
 const renderPlayer = (args) => ({
   setup() {
     const host = ref(null);
@@ -126,6 +149,7 @@ const renderPlayer = (args) => ({
     const store = useElosernStore(pinia);
     let app;
     let bridge;
+    let journeyTimer = null;
     onMounted(async () => {
       app = createApp(AppClient);
       app.use(pinia);
@@ -177,6 +201,7 @@ const renderPlayer = (args) => ({
             ] },
           }),
           local_map: protocolFixtures.localMapPanel(),
+          ...(args.journey ? journeyPanels(STAGE_JOURNEY_STOPS[0]) : {}),
           services: SERVICES_PANEL_SAMPLE,
           character: CHARACTER_PANEL_SAMPLE,
           roster: {
@@ -266,6 +291,31 @@ const renderPlayer = (args) => ({
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
       }
+      // The stage-transition journey (webclient-scene-transitions): each
+      // step acts, commits the next stop's scene, location, map node, and
+      // vitals, then delivers its line, exactly as a move does live. The
+      // host exposes `step()` so a reviewer (or a browser driving the story)
+      // can take one step at a time; `autoplay` walks on its own.
+      if (args.journey) {
+        store.appendText("out", STAGE_JOURNEY_STOPS[0].line);
+        let index = 0;
+        let revision = 1;
+        const step = () => {
+          index = (index + 1) % STAGE_JOURNEY_STOPS.length;
+          const stop = STAGE_JOURNEY_STOPS[index];
+          revision += 1;
+          store.appendText("in", stop.command);
+          store.receive(1, "ui_update", [protocolFixtures.update({ revision, panels: journeyPanels(stop) })], {});
+          store.appendText("out", stop.line);
+          return index;
+        };
+        const journey = { step, store };
+        host.value.__stageJourney = journey;
+        window.__stageJourney = journey;
+        if (args.autoplay) {
+          journeyTimer = setInterval(step, 3600);
+        }
+      }
       if (args.practice) {
         store.openHudDrawer("skill");
         await nextTick();
@@ -273,6 +323,8 @@ const renderPlayer = (args) => ({
       }
     });
     onBeforeUnmount(() => {
+      if (journeyTimer !== null) clearInterval(journeyTimer);
+      if (window.__stageJourney && host.value?.__stageJourney === window.__stageJourney) delete window.__stageJourney;
       bridge?.uninstall();
       app?.unmount();
       disposePinia(pinia);
@@ -314,3 +366,11 @@ export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
 // Combat: the minimap and the objective line are hidden, and the participant
 // frame takes the `map` anchor.
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
+// The stage transitions (webclient-scene-transitions): a walk down a short
+// street. Each step crossfades the scene once the next painting is decoded,
+// slides the place card's new heading in, pans the minimap from the node the
+// player left, clears the message window for the new line, and reveals or
+// hides the vitals island as hp drops and recovers. It walks on its own
+// every few seconds; the host element's `__stageJourney.step()` takes one
+// step on demand.
+export const StageJourney = { render: renderPlayer, args: { journey: true, autoplay: true } };

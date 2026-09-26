@@ -207,3 +207,26 @@
   stroke-opacity: 0.45;
   stroke-dasharray: 2 5;
 }
+
+/* The minimap pan (webclient-scene-transitions, design D3): the script sets
+   `--pan-x` / `--pan-y` to the FLIP offset with the transition suspended,
+   then releases them to 0, so the drawing glides from where the previous
+   current node stood to its committed placement, and the current-node
+   marker glides the step from the node the player left. The travel multiplier
+   zeroes the move at the reduced and off levels. */
+.map-lattice__pan {
+  transform: translate(
+    calc(var(--pan-x, 0px) * var(--motion-travel)),
+    calc(var(--pan-y, 0px) * var(--motion-travel))
+  );
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+/* Its own variables: the marker sits inside a pan group, whose `--pan-*`
+   it would otherwise inherit and apply twice. */
+.map-lattice__pan .local-map__marker--current {
+  transform: translate(
+    calc(var(--glide-x, 0px) * var(--motion-travel)),
+    calc(var(--glide-y, 0px) * var(--motion-travel))
+  );
+  transition: transform var(--motion-base) var(--ease-standard);
+}
