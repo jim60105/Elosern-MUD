@@ -99,6 +99,7 @@
       "files_a": [
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_drawer_leaves_root_clean",
+        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_keyboard_only_journey_walks_the_overview",
         "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_overview_chips_wrap_inside_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
         "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker",
@@ -280,7 +281,8 @@
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_root_tab_bar_truthful_count_badges",
+        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_tab_bar_truthful_skills_badge",
+        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_verb_popover_card_lies_inside_the_command_region",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
