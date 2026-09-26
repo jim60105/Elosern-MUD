@@ -119,6 +119,7 @@
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_shift_enter_in_field_inserts_newline_without_sending",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_rejected_send_keeps_the_line_open",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_toggle_collapses_and_keeps_focus",
+        "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_borrowed_send_outside_the_active_phase_keeps_the_speech",
         "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_stage_anchors_do_not_intersect_at_both_viewports"
       ]
     },
@@ -175,7 +176,6 @@
       "name": "exploration-8",
       "files_a": [
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_cancelled_freeform_dialogue_cannot_capture_a_later_command",
-        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_engage_transitions_to_combat",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step",
@@ -207,6 +207,9 @@
         "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_look_at_scripted_host_shows_the_affinity_stage_line",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_collapses_the_band_and_stands_both_actors",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_choices_sit_over_the_stage_and_the_dock_collapses",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_journey_completes_by_keyboard",
         "web.tests.browser.test_harness.PortAllocationTests"
       ],
       "files_b": [
@@ -320,6 +323,8 @@
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_missing_scene_uses_the_placeholder_and_play_continues",
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_scene_backdrop_captions_clear_dock_and_command_line",
         "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_caption_wider_and_no_anchor_overlap",
+        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_host_stands_opposite_the_player",
+        "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_choices_sit_centred_between_the_portraits",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_participant_frame_presents_participants_and_portraits",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",

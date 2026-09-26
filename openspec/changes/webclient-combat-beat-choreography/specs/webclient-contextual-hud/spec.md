@@ -34,8 +34,11 @@ viewport's height — at least 702px of 1080; the 48px top band and the 300px bo
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
-SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset 6% of the stage
-width from its own side, and SHALL never cover the band. The `actor-left` anchor SHALL carry the
+SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
+stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
+(the anchor's horizontal centre) under the island column on its side — the place card and vitals on
+the left, the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%. The `actor-left` anchor SHALL carry the
 player's stage actor — the current roster character's portrait, resolved exactly as the stage
 portrait was before this requirement, with the truthful placeholder when no image exists — in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
@@ -51,9 +54,11 @@ focusable element and SHALL NOT intercept pointer events, and they MAY sit behin
 `choices` anchor, and the command-line row.
 
 The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
-box, at most `min(560px, 40%)` of the stage width wide, vertically centred in the stage box and bounded
-by it, above the portrait anchors; when its content is taller than the stage box allows it SHALL
-scroll internally, and it SHALL NOT grow into the top band or the bottom band.
+box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
+SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
+command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
+command-line row, or the bottom band.
 
 At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
 `band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
@@ -112,9 +117,13 @@ introduced into the band this way.
 - **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
 - **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
 
+#### Scenario: The host's face clears the minimap at the smaller viewports
+- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
+- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
+
 #### Scenario: The choice list sits over the stage between the portraits
-- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080 and at 1280x720 with the vitals island, the minimap, and the party island present
-- **THEN** the `choices` anchor is horizontally centred on the stage box (±1px), lies entirely inside the stage box, intersects no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable, scrolling inside the anchor at 1280x720 if needed
+- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080, 1440x900, and 1280x720 with the minimap island present and the command line expanded
+- **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
