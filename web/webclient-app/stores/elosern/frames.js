@@ -39,10 +39,7 @@ export function applyFrames(ctx) {
     onEvent: (name, payload) => ctx.onRouterEvent(name, payload),
     resolve: (descriptor) => {
       const menu = ctx.frameResolver.resolve(descriptor);
-      if (
-        ["exploration.suggestions", "exploration.keywords"].includes(descriptor.source) &&
-        Array.isArray(menu.items)
-      ) {
+      if (descriptor.source === "exploration.suggestions" && Array.isArray(menu.items)) {
         // Readable cards and action choices share a vertical keyboard list.
         menu.gridCols = 1;
       }

@@ -8,9 +8,9 @@
 // The view model reads ONLY the committed panel form (available `dialogue`
 // panels); an unavailable or absent panel yields null and every consumer
 // falls back (plain narrative, the shared degradation marker). Values are
-// verbatim from the panel; the row shape below is byte-identical to the
-// exploration scripted-keyword/freeform rows (`exploration_menu.js
-// keywordMenuFor`) so activation routes through the same dispatch contract.
+// verbatim from the panel; the row shape below reuses the exploration rows'
+// `{key, label, enabled, actionId, payload}` contract so activation routes
+// through the same dispatch path.
 
 export const DIALOGUE_FREE_ROW_KEY = "dlg-free";
 

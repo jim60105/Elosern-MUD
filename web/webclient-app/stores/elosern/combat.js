@@ -172,6 +172,7 @@ export function applyCombat(ctx) {
         }
       }
     } else if (
+      actionId === "explore.talk_open" ||
       actionId === "explore.talk_scripted" ||
       actionId === "explore.talk_freeform" ||
       actionId === "explore.party_invite" ||

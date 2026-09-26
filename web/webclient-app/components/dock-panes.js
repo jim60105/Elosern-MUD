@@ -9,8 +9,6 @@
 // arrive normalized (the AppClient `dockItems` shape: `key`, `label`,
 // `enabled`, `action_id`, `params`, `kind`, `scaleChoice`, `selected`). No
 // DOM, no store access — a pure function of the committed frame.
-//   - `nav`:     the scripted-keyword list (`.ngrid`).
-//   - `affordance`: a target-affordance frame (`.aff` buttons).
 //   - `cards`:   the suggestions frame (`.sugs` cards).
 //   - `skills`:  the combat skill frame (`.sk` rows beside the detail pane).
 //   - `targets`: the combat target frame (`.tok` tokens).
@@ -21,6 +19,11 @@
 // The retired move frame's `outlet` kind is gone with the frame
 // (webclient-retire-exploration-submenus): exits are the scene overview's
 // chips, which that component renders itself.
+// The retired `nav` kind went with the scripted-keyword frame, and the
+// `affordance` kind with the exploration target frame, which the verb popover
+// replaced (webclient-talk-open-dock): a frame that once classified as either
+// now falls through to `plain`, which renders the same rows through the shared
+// row renderer.
 export function classifyPane(frame) {
   const menu = (frame && frame.menu) || frame || {};
   const items = menu.items || [];
@@ -64,9 +67,8 @@ export function classifyPane(frame) {
   }
   // The combat target frame: the AREA candidate rows carry the `toggle-target`
   // action or a client-local `selected` flag. The exploration interact target
-  // rows (`target-<id>` + `openTarget`) are navigation rows, NOT this pane —
-  // they are caught by the `nav` check below, so the `target-` key prefix alone
-  // must not be used here.
+  // rows are not a DockMenu frame at all any more (the verb popover replaced
+  // them), so the `target-` key prefix alone must not be used here.
   if (items.some((i) => i.action_id === "toggle-target" || i.selected === true)) {
     return "targets";
   }
@@ -74,27 +76,6 @@ export function classifyPane(frame) {
   // `open-category` actions.
   if (items.some((i) => i.action_id === "open-skill" || i.action_id === "open-group" || i.action_id === "open-category")) {
     return "skills";
-  }
-  // Target-affordance frames: rows with the engage / party / freeform actions.
-  if (items.some((i) =>
-    i.action_id === "explore.engage" ||
-    i.action_id === "explore.party_invite" ||
-    i.action_id === "explore.talk_freeform"
-  )) {
-    return "affordance";
-  }
-  // Look / interact / wait / keyword navigation lists: the look rows carry the
-  // `explore.look` action; the keyword rows are keyed `kw-*`; the exploration
-  // interact target rows are navigation cells whose `surface` is a `target-<id>`
-  // key (they open the target-affordance frame).
-  if (
-    (rows.length > 0 && rows.every((i) => i.action_id === "explore.look")) ||
-    items.some((i) => {
-      return i.key && i.key.startsWith("kw-");
-    }) ||
-    items.some((i) => i.navigation && i.surface && i.surface.startsWith("target-"))
-  ) {
-    return "nav";
   }
   return "plain";
 }
