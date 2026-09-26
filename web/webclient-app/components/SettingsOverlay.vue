@@ -9,17 +9,24 @@
 //
 // Controls (task 7.2–7.4): the narrative prose scale as the draft's
 // A−/A/A+ segmented control at [0.92, 1, 1.12] (replacing the 90/100/110/
-// 125% select), the reduced-motion override (three states: default = no
-// override, on, off), the text-to-HTML narrative toggle, and the
-// colorblind-safe status palette. The invented font-family select is
-// removed: the design system's three self-hosted faces are role-assigned and
-// the binding design reference has no typeface control.
+// 125% select), the motion level (完整 / 減少 / 關閉), the text-to-HTML
+// narrative toggle, and the colorblind-safe status palette. The invented
+// font-family select is removed: the design system's three self-hosted faces
+// are role-assigned and the binding design reference has no typeface control.
 //
 // C7 (webclient-typewriter-reading-prefs, design D10): the 閱讀設定 section
 // adds the text-speed segment (慢 / 標準 / 快 / 瞬間) and the auto-advance
-// toggle. The message window reads both as props; reduced motion always
-// shows pages at once, whatever the chosen speed.
+// toggle. The message window reads both as props; an effective motion level
+// other than 完整 always shows pages at once, whatever the chosen speed.
+//
+// C11a (webclient-motion-level, design D4): the 輔助顯示 section's motion
+// control is the three-level 動態效果 segment. It marks the EFFECTIVE level
+// (the stored level, or the OS preference while nothing is stored) and
+// stores the level the player picks. There is no "follow the system" button:
+// a fourth state would be one no reader could tell from its resolved level,
+// and the unset state exists only until the first choice.
 import { computed } from "vue";
+import { MOTION_LEVELS } from "../lib/motion_level.js";
 import { TEXT_SPEEDS } from "../lib/message_reveal.js";
 
 // The draft's three prose-scale steps (index.html :1297 fsScale): A− = 0.92,
@@ -35,15 +42,22 @@ const SCALE_STEPS = [
 const SPEED_LABELS = { slow: "慢", normal: "標準", fast: "快", instant: "瞬間" };
 const SPEED_STEPS = TEXT_SPEEDS.map((value) => ({ value, label: SPEED_LABELS[value] }));
 
+// The three motion levels, in `MOTION_LEVELS` order (design D4).
+const MOTION_LABELS = { full: "完整", reduced: "減少", off: "關閉" };
+const MOTION_STEPS = MOTION_LEVELS.map((value) => ({ value, label: MOTION_LABELS[value] }));
+
 const props = defineProps({
   // The client-local presentation preferences, owned by the store's
   // presentation-preferences slice (task 7.5): the prose scale (number), the
-  // text-to-HTML toggle (boolean), the optional reduced-motion override
-  // ("on" | "off" | null — null means no override, the OS preference
-  // applies), and the colorblind palette (boolean).
+  // text-to-HTML toggle (boolean), the EFFECTIVE motion level ("full" |
+  // "reduced" | "off"), and the colorblind palette (boolean).
   fontScale: { type: Number, default: 1 },
   textToHtml: { type: Boolean, default: true },
-  reducedMotion: { type: [String, null], default: null },
+  motionLevel: {
+    type: String,
+    default: "full",
+    validator: (value) => MOTION_LEVELS.includes(value),
+  },
   colorblind: { type: Boolean, default: false },
   // C7: the reading preferences — the typing speed (one of `TEXT_SPEEDS`)
   // and the opt-in auto-advance.
@@ -54,7 +68,7 @@ const props = defineProps({
 const emit = defineEmits([
   "scale-change",
   "text-html-change",
-  "reduced-motion-change",
+  "motion-level-change",
   "colorblind-change",
   "text-speed-change",
   "auto-advance-change",
@@ -72,14 +86,12 @@ function onTextHtmlChange(event) {
   emit("text-html-change", event.target.checked);
 }
 
-// The reduced-motion control is a three-state segment: 預設 (no override —
-// the OS `prefers-reduced-motion` applies), 開 (force reduced), 關 (force
-// full motion). The store persists the value through the layout store's
-// harmless display-preference lane; the CSS media block is gated on
-// `:root:not([data-reduced-motion="off"])` and the explicit states force
-// the 1ms motion tokens (task 7.6).
-function selectReducedMotion(value) {
-  emit("reduced-motion-change", value);
+// The motion control is the three-level segment (design D4). The pressed
+// button is the EFFECTIVE level; selecting one stores it through the layout
+// store's harmless display-preference lane, and the store writes the new
+// effective level to `<html data-motion>` at once.
+function selectMotionLevel(value) {
+  emit("motion-level-change", value);
 }
 
 function onColorblindChange(event) {
@@ -140,7 +152,7 @@ function onAutoAdvanceChange(event) {
       <div class="settings-row">
         <div class="settings-row__copy">
           <span id="opt-text-speed" class="settings-row__label">文字速度</span>
-          <p class="settings-row__description">逐字顯示訊息的速度；減少動態效果開啟時一律立即顯示。</p>
+          <p class="settings-row__description">逐字顯示訊息的速度；動態效果為「減少」或「關閉」時一律立即顯示。</p>
         </div>
         <span class="settings-row__control" role="group" aria-labelledby="opt-text-speed">
         <button
@@ -176,39 +188,21 @@ function onAutoAdvanceChange(event) {
       <h4 class="settings-section__title">輔助顯示</h4>
       <div class="settings-row">
         <div class="settings-row__copy">
-          <span id="opt-reduced-motion" class="settings-row__label">減少動態效果</span>
-          <p class="settings-row__description">「預設」會沿用作業系統的偏好。</p>
+          <span id="opt-motion-level" class="settings-row__label">動態效果</span>
+          <p class="settings-row__description">未選擇時跟隨作業系統的偏好。「減少」只保留短暫淡入淡出並立即顯示文字；「關閉」讓所有變化立即呈現。</p>
         </div>
-        <span class="settings-row__control" role="group" aria-labelledby="opt-reduced-motion">
+        <span class="settings-row__control" role="group" aria-labelledby="opt-motion-level">
         <button
+          v-for="step in MOTION_STEPS"
+          :key="step.value"
           type="button"
           class="affbtn"
-          :class="{ on: reducedMotion === null }"
-          data-testid="settings-overlay-reduced-motion-default"
-          :aria-pressed="reducedMotion === null"
-          @click="selectReducedMotion(null)"
+          :class="{ on: step.value === motionLevel }"
+          :data-testid="`settings-overlay-motion-${step.value}`"
+          :aria-pressed="step.value === motionLevel"
+          @click="selectMotionLevel(step.value)"
         >
-          預設
-        </button>
-        <button
-          type="button"
-          class="affbtn"
-          :class="{ on: reducedMotion === 'on' }"
-          data-testid="settings-overlay-reduced-motion-on"
-          :aria-pressed="reducedMotion === 'on'"
-          @click="selectReducedMotion('on')"
-        >
-          開
-        </button>
-        <button
-          type="button"
-          class="affbtn"
-          :class="{ on: reducedMotion === 'off' }"
-          data-testid="settings-overlay-reduced-motion-off"
-          :aria-pressed="reducedMotion === 'off'"
-          @click="selectReducedMotion('off')"
-        >
-          關
+          {{ step.label }}
         </button>
         </span>
       </div>
@@ -314,9 +308,9 @@ function onAutoAdvanceChange(event) {
   gap: var(--sp-2);
 }
 
-/* The A−/A/A+, text-speed, and reduced-motion segmented controls: the current step is
-   marked by a gold border and underline — a non-colour indicator, not a
-   fill alone (the delta's "marked by a non-colour indicator" scenario). */
+/* The A−/A/A+, text-speed, and motion-level segmented controls: the current
+   step is marked by a gold border and underline — a non-colour indicator, not
+   a fill alone (the delta's "marked by a non-colour indicator" scenario). */
 .affbtn {
   min-width: 44px;
   min-height: 40px;

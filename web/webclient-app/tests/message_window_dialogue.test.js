@@ -168,7 +168,7 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
   });
 
   it("is not reading-complete while the page types", async () => {
-    const w = mountWindow({ lines: [{ kind: "out", text: "渡口。" }], textSpeed: "slow", reducedMotion: "off" });
+    const w = mountWindow({ lines: [{ kind: "out", text: "渡口。" }], textSpeed: "slow", motionLevel: "full" });
     await nextTick();
     await w.setProps({ lines: withSeq([{ kind: "out", text: "渡口。" }, { kind: "in", text: "talk" }, { kind: "out", text: PANEL.line }]) });
     await nextTick();

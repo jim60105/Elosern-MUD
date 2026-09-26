@@ -360,35 +360,39 @@ describe("MessageWindow typewriter", () => {
     expect(revealedText(w)).toBe(NINETY);
   });
 
-  it("shows pages at once while the reduced-motion override is on", async () => {
-    const w = await arrive(NINETY, { textSpeed: "slow", reducedMotion: "on" });
+  // webclient-motion-level (design D5/D10): the window reads the EFFECTIVE
+  // level the store resolved as a prop; it never consults `matchMedia`
+  // itself, so the stylesheet and the typewriter cannot disagree.
+  it("shows pages at once while the motion level is reduced or off", async () => {
+    for (const motionLevel of ["reduced", "off"]) {
+      const w = await arrive(NINETY, { textSpeed: "slow", motionLevel });
+      expect(windowEl(w).attributes("data-typing")).toBe("false");
+      expect(revealedText(w)).toBe(NINETY);
+      expect(marker(w).text()).toBe("■");
+      w.unmount();
+    }
+  });
+
+  it("types at the full level even while the OS requests reduced motion", async () => {
+    const media = stubMatchMedia(true);
+    const w = await arrive(NINETY, { textSpeed: "slow", motionLevel: "full" });
+    expect(windowEl(w).attributes("data-typing")).toBe("true");
+    expect(revealedText(w)).toBe("");
+    // The window holds no listener of its own: the store owns the query.
+    expect(media.listeners.size).toBe(0);
+  });
+
+  it("completes the typing page when the level changes away from full", async () => {
+    const w = await arrive(NINETY, { textSpeed: "slow", motionLevel: "full" });
+    await tickSteps(1000);
+    expect(windowEl(w).attributes("data-typing")).toBe("true");
+    expect(revealedText(w)).not.toBe(NINETY);
+
+    await w.setProps({ motionLevel: "reduced" });
+    await settle();
     expect(windowEl(w).attributes("data-typing")).toBe("false");
     expect(revealedText(w)).toBe(NINETY);
     expect(marker(w).text()).toBe("■");
-  });
-
-  it("follows the OS reduced-motion query with no override, and an explicit off lets pages type", async () => {
-    const media = stubMatchMedia(true);
-    let w = await arrive(NINETY, { textSpeed: "slow" });
-    expect(windowEl(w).attributes("data-typing")).toBe("false");
-    expect(revealedText(w)).toBe(NINETY);
-    w.unmount();
-    expect(media.listeners.size).toBe(0);
-
-    w = await arrive(NINETY, { textSpeed: "slow", reducedMotion: "off" });
-    expect(windowEl(w).attributes("data-typing")).toBe("true");
-    // Going live into reduced motion with no override completes the page.
-    await w.setProps({ reducedMotion: null });
-    await settle();
-    expect(windowEl(w).attributes("data-typing")).toBe("false");
-    w.unmount();
-
-    media.set(false);
-    w = await arrive(NINETY, { textSpeed: "slow" });
-    expect(windowEl(w).attributes("data-typing")).toBe("true");
-    media.set(true);
-    await settle();
-    expect(windowEl(w).attributes("data-typing")).toBe("false");
   });
 
   describe("auto-advance", () => {

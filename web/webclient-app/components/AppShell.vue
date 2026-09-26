@@ -70,11 +70,11 @@ const props = defineProps({
   // MessageWindow so a scale change re-measures pages.
   fontScale: { type: Number, default: 1 },
   // The reading preferences (webclient-typewriter-reading-prefs):
-  // `store.view.textSpeed`, `store.view.autoAdvance`, and the reduced-motion
-  // override `store.view.reducedMotion`, forwarded to MessageWindow.
+  // `store.view.textSpeed`, `store.view.autoAdvance`, and the effective
+  // motion level `store.view.motionLevel`, forwarded to MessageWindow.
   textSpeed: { type: String, default: "normal" },
   autoAdvance: { type: Boolean, default: false },
-  reducedMotion: { type: [String, null], default: null },
+  motionLevel: { type: String, default: "full" },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -422,7 +422,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :font-scale="props.fontScale"
           :text-speed="props.textSpeed"
           :auto-advance="props.autoAdvance"
-          :reduced-motion="props.reducedMotion"
+          :motion-level="props.motionLevel"
           :held="props.openSurfaces.length > 0"
           @reading-change="(complete) => emit('reading-change', complete)"
           @open-full-log="() => emit('open-full-log')"

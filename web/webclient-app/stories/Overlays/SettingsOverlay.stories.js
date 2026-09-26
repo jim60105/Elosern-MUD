@@ -2,7 +2,7 @@ import { h } from "vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 
 // SettingsOverlay (B5 overlay family): the full-viewport settings dialog —
-// client-local options (type scale, reduced motion, the text-to-HTML
+// client-local options (type scale, the motion level, the text-to-HTML
 // narrative toggle, colorblind-safe status palette, and the reading
 // preferences: text speed and auto-advance). All preferences are
 // client-local: the store persists them through the versioned layout store
@@ -19,12 +19,14 @@ export default {
 
 export const Default = {
   render: renderOverlay,
-  args: { textSpeed: "normal", autoAdvance: false },
+  args: { motionLevel: "full", textSpeed: "normal", autoAdvance: false },
 };
 
-export const ReducedMotionOn = {
+// webclient-motion-level (task 4.2): the 減少 level — short fades only, and
+// message pages in full at once.
+export const MotionReduced = {
   render: renderOverlay,
-  args: { reducedMotion: "on" },
+  args: { motionLevel: "reduced" },
 };
 
 export const HtmlNarrative = {
