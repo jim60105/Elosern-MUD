@@ -33,7 +33,6 @@ from .browser_helpers import (
     open_dialogue_choices,
     outbound_messages,
     sent_action_count,
-    snapshot_envelope,
     store_state,
     wait_for_narrative_settled,
     wait_for_page_shown,
@@ -1122,7 +1121,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             page, ("--motion-base", "--motion-scene", "--motion-travel")
         )
         self.assertEqual(values["--motion-base"], "0ms")
-        self.assertEqual(values["--motion-scene"], "150ms")
+        # The build minifies `150ms` to `.15s`.
+        self.assertIn(values["--motion-scene"], ("150ms", ".15s"))
         self.assertEqual(values["--motion-travel"], "0")
         self._open_settings(page)
         self.assertEqual(self._motion_pressed(page, "reduced"), "true")
@@ -1263,7 +1263,12 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input"
     )
     def test_transitions_never_gate_commit(self):
-        """A committed change reaches the DOM, focus, and the store in one frame."""
+        """A committed change reaches the DOM, focus, and the store in one frame.
+
+        The stage's `data-elosern-mode` is asserted the same way by the
+        dialogue journeys (`test_browser_exploration_dialogue`), whose frame
+        probe reads it while the conversation's transitions run.
+        """
         page = self.logged_in_page(motion_level=None)
         # The full level keeps the transitions running: this asserts the
         # commit, not a motion-free shortcut.
@@ -1291,30 +1296,26 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "the drawer takes focus without waiting for its transition",
         )
         page.keyboard.press("Escape")
+        page.wait_for_selector('[data-testid="hud-drawer"]', state="detached", timeout=15000)
 
-        envelope = snapshot_envelope("", 0, {}, mode="combat")
-        stage = page.evaluate(
-            """(env) => new Promise((resolve) => {
+        # A second committed visibility change, same frame: the overlay's body
+        # is in the DOM and the store's view names it.
+        overlay = page.evaluate(
+            """() => new Promise((resolve) => {
               const store = window.__elosernBridge.store;
-              const view = store.view;
-              env.presentation_epoch = view.epoch;
-              env.revision = view.revision + 1;
-              const result = store.receive(view.generation, 'ui_snapshot', [env], {});
+              store.openOverlay('settings');
               requestAnimationFrame(() => {
-                const el = document.querySelector('[data-testid="elosern-stage"]');
                 resolve({
-                  accepted: !!(result && result.accepted),
-                  viewMode: store.view.mode,
-                  mode: el ? el.getAttribute('data-elosern-mode') : null,
+                  view: store.view.hudOverlay,
+                  present: !!document.querySelector('[data-testid="settings-overlay"]'),
                 });
               });
-            })""",
-            envelope,
+            })"""
         )
-        self.assertTrue(stage["accepted"], "the injected combat snapshot was rejected")
-        self.assertEqual(stage["viewMode"], "combat")
-        self.assertEqual(
-            stage["mode"], "combat", "the mode reaches the stage in one frame"
+        self.assertEqual(overlay["view"], "settings", "the store commits at once")
+        self.assertTrue(
+            overlay["present"],
+            "the committed overlay reaches the DOM in one frame, at the full level",
         )
         page.close()
 

@@ -294,6 +294,12 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         # writes it to `<html data-motion>`; the token blocks then resolve the
         # general durations to 0ms and keep the stage fades at 150ms.
         page.emulate_media(reduced_motion="reduce")
+        # The media query's `change` is asynchronous: wait for the store to
+        # re-apply before reading the tokens.
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'reduced'",
+            timeout=15000,
+        )
         tokens = page.evaluate(
             "() => { const s = getComputedStyle(document.documentElement);"
             " return { motion: document.documentElement.getAttribute('data-motion'),"
@@ -311,9 +317,10 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
             "0ms",
             "reduced motion must resolve the general motion tokens to 0ms",
         )
-        self.assertEqual(
+        # The build minifies `150ms` to `.15s`.
+        self.assertIn(
             tokens["scene"],
-            "150ms",
+            ("150ms", ".15s"),
             "reduced motion must keep the stage fades at 150ms",
         )
         self.assertEqual(
