@@ -4,7 +4,6 @@ The strict allowlist pipeline that renders Evennia's converted ANSI-to-HTML narr
 
 ## Requirements
 
-
 ### Requirement: The narrative renders the transport stream through a strict allowlist markup pipeline
 Evennia's portal converts server output to HTML with `parse_html` before the `text` message is sent, so the narrative surface receives markup rather than plain text. The WebClient SHALL render that markup instead of displaying its source. The conversion SHALL be performed by a DOM-independent tokenizer module that accepts a source string and returns a bounded token list, and by a renderer that constructs the corresponding nodes exclusively with `document.createElement`, `document.createElementNS`, and `document.createTextNode`. The pipeline SHALL NOT use `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `DOMParser`, `Range.createContextualFragment`, or `eval` at any point, and SHALL NOT add a third-party sanitizer or any other runtime dependency. The tokenizer SHALL access no `document` or `window` object so the Node suite can exercise the complete grammar directly.
 
@@ -63,6 +62,10 @@ The project SHALL ship a generated stylesheet defining `.color-000` through `.co
 - **WHEN** the browser reports `prefers-reduced-motion: reduce` and the server emits blinking text
 - **THEN** the text is marked by a static non-animated indicator and no animation runs
 
+#### Scenario: A stored reduced or off level suppresses blinking output
+- **WHEN** the operating system does not request reduced motion, the stored motion level is `reduced` or `off`, and the server emits blinking text
+- **THEN** the text is marked by the same static non-animated indicator and no animation runs
+
 #### Scenario: Server map art within the pane width keeps its alignment
 - **WHEN** a room description containing an ASCII or box-drawing map whose rows fit the narrative pane's content width is rendered
 - **THEN** its rows align in columns and its leading indentation is preserved
@@ -70,10 +73,6 @@ The project SHALL ship a generated stylesheet defining `.color-000` through `.co
 #### Scenario: A row wider than the pane soft-wraps rather than clipping or scrolling the page
 - **WHEN** a rendered row is wider than the narrative pane's content width
 - **THEN** it soft-wraps inside the pane, the continuation is not required to stay column-aligned, no content is clipped, and the page itself does not scroll horizontally
-
-#### Scenario: A stored reduced or off level suppresses blinking output
-- **WHEN** the operating system does not request reduced motion, the stored motion level is `reduced` or `off`, and the server emits blinking text
-- **THEN** the text is marked by the same static non-animated indicator and no animation runs
 
 ### Requirement: The pipeline is verified against the real upstream converter
 A repository test SHALL feed a fixture corpus through Evennia's real `parse_html` and then run the tokenizer over its output, asserting that no token is a literal-text fallback caused by an unrecognized element or attribute. The corpus SHALL include hostile player-authored input (including script elements, event-handler attributes, `javascript:` URLs, quote and entity sequences, unbalanced tags, and oversized input), every ANSI and xterm-256 foreground and background combination, truecolor output, blink, underline, tabs, and line breaks. If upstream begins emitting markup outside the allowlist, this test SHALL fail rather than the narrative silently regressing to displaying markup source.
