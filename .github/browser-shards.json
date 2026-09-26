@@ -139,7 +139,12 @@
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_echoes_one_input_line_with_a_divider",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_while_reading_flushes_to_new_response_and_logs_divider",
         "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_frame_refreshes_on_committed_update",
-        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_list_to_accept"
+        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_list_to_accept",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_seeded_motion_level_is_applied",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_os_reduced_motion_resolves_to_reduced",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_stored_motion_level_overrides_os",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_motion_off_is_instant",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_transitions_never_gate_commit"
       ],
       "files_b": [
         "web.tests.browser.test_browser_actions.ActionLockingTest",

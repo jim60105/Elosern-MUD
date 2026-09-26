@@ -282,16 +282,17 @@ manifest-listed overlay that nothing imports is not complete. The map, settings,
 each be opened from a real control in the live surface tree; the creation overlay SHALL instead be mounted
 by the running client on the committed `creation` panel's availability predicate, because creation mode is
 entered by the server's snapshot rather than by a player-operated trigger.
-The settings overlay SHALL expose the narrative prose scale, the reduced-motion preference, the
-text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local presentation
+The settings overlay SHALL expose the narrative prose scale, the motion level (`完整` / `減少` / `關閉`),
+the text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local presentation
 state**. It SHALL NOT dispatch a `ui_action` for any of them: `options.dismiss` — the suggestions
 dismissal — is the only allowlisted `options.*` action, and widening the action allowlist is a
 server-side change that no showcase or redesign wave makes. Each setting SHALL be applied to the
 document's presentation tokens immediately, SHALL be persisted through the client's versioned,
 presentation-only browser store as a harmless display preference, and SHALL be re-applied at load and
-reset with that store when its stored version is unrecognised. The reduced-motion preference SHALL be
+reset with that store when its stored version is unrecognised. The motion level SHALL be
 optional in the stored wrapper: when the key is absent the operating system's `prefers-reduced-motion`
-preference SHALL continue to apply, and an explicit stored value — either direction — SHALL override it. The surface SHALL offer no control it
+preference SHALL continue to apply (`reduced` when it requests reduced motion, `full` otherwise), and a
+stored level — any of the three — SHALL override it. The surface SHALL offer no control it
 does not implement, so a control with no outcome — a typeface choice the design system's role-assigned
 faces do not support, an audio level with no audio subsystem, an interface-scale slider, or a key
 remapping — SHALL NOT be rendered. The creation overlay SHALL implement a presets/custom/concept wizard
@@ -338,7 +339,7 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 #### Scenario: Settings are client-local and honor reduced motion
 - **WHEN** a settings control changes
-- **THEN** no `ui_action` is dispatched for it, the change is applied to the app-wide presentation tokens immediately — reduced motion among them — and it is persisted through the versioned presentation-only browser store
+- **THEN** no `ui_action` is dispatched for it, the change is applied to the app-wide presentation tokens immediately — the motion level among them, which resolves every motion token for the whole document at once — and it is persisted through the versioned presentation-only browser store
 
 #### Scenario: The settings surface renders nothing inert
 - **WHEN** the settings overlay's controls are enumerated

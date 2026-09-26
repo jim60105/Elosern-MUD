@@ -33,6 +33,7 @@ from .browser_helpers import (
     open_dialogue_choices,
     outbound_messages,
     sent_action_count,
+    snapshot_envelope,
     store_state,
     wait_for_narrative_settled,
     wait_for_page_shown,
@@ -440,7 +441,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-input-narrative::a-page-types-in-at-the-reader-s-text-speed-and-auto-advance-is-opt-in"
     )
     def test_message_page_types_and_completes(self):
-        page = self.logged_in_page((1920, 1080))
+        # webclient-motion-level (design D9): real typing needs the `full` level,
+        # so this journey opts out of the suite's `off` seed.
+        page = self.logged_in_page((1920, 1080), motion_level=None)
         self._settle_window_mount(page)
         sentences = "".join(
             f"【段落{i}】霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
@@ -495,7 +498,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-input-narrative::a-page-types-in-at-the-reader-s-text-speed-and-auto-advance-is-opt-in"
     )
     def test_reduced_motion_pages_are_instant(self):
-        page = self.logged_in_page((1920, 1080))
+        # webclient-motion-level (design D9): the OS preference must be the only
+        # input, so nothing is seeded.
+        page = self.logged_in_page((1920, 1080), motion_level=None)
         page.emulate_media(reduced_motion="reduce")
         self._settle_window_mount(page)
         page.evaluate("() => window.__elosernBridge.store.setTextSpeed('slow')")
@@ -526,8 +531,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             })"""
         )
         self.assertEqual(state, {"typing": "false", "hidden": 0, "marker": "▼"})
-        # An explicit reduced-motion preference of off lets pages type again.
-        page.evaluate("() => window.__elosernBridge.store.setReducedMotion('off')")
+        # Selecting the explicit `full` level turns reduced motion off and
+        # lets pages type again.
+        page.evaluate("() => window.__elosernBridge.store.setMotionLevel('full')")
         page.locator('[data-testid="message-window"]').click()
         page.wait_for_function(
             """() => { const w = document.querySelector('[data-testid="message-window"]');
@@ -541,7 +547,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::text-speed-and-auto-advance-are-client-local-reading-preferences-the-settings-surface-owns"
     )
     def test_reading_preferences_persist(self):
-        page = self.logged_in_page()
+        # webclient-motion-level (design D9): this journey asserts the stored
+        # wrapper, so it starts from nothing stored.
+        page = self.logged_in_page(motion_level=None)
         install_outbound_recorder(page)
         page.locator('[data-testid="nav-settings"]').click()
         page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
@@ -561,7 +569,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(fast.get_attribute("aria-pressed"), "true")
         self.assertIn("on", fast.get_attribute("class").split())
         stored = page.evaluate("() => JSON.parse(localStorage.getItem('elosern.layout'))")
-        self.assertEqual(stored["layout_version"], 2)
+        self.assertEqual(stored["layout_version"], 3)
         self.assertEqual(stored["preferences"]["textSpeed"], "fast")
         self.assertIs(stored["preferences"]["autoAdvance"], True)
         self.assertEqual(sent_action_count(page), 0, "no reading preference dispatches a ui_action")
@@ -1004,6 +1012,311 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             0,
         )
         self.assertEqual(page.locator('[data-testid="fulllog-overlay"] .inp script').count(), 0)
+
+    # ---- webclient-motion-level (design D9) ----
+
+    # The level-dependent duration tokens; the two non-duration level tokens
+    # (`--motion-travel`, `--motion-flash-peak`) resolve to a plain zero.
+    MOTION_DURATION_TOKENS = (
+        "--motion-fast",
+        "--motion-base",
+        "--motion-slow",
+        "--motion-pulse",
+        "--motion-hp-pulse",
+        "--motion-spin",
+        "--motion-trail",
+        "--motion-trail-delay",
+        "--motion-scene",
+        "--motion-portrait",
+        "--motion-actor",
+        "--motion-panel",
+        "--motion-reveal",
+        "--motion-clear",
+        "--motion-flash",
+        "--motion-stagger",
+    )
+
+    def _data_motion(self, page):
+        """The effective motion level the store wrote on `<html>`."""
+        return page.evaluate(
+            "() => document.documentElement.getAttribute('data-motion')"
+        )
+
+    def _open_settings(self, page):
+        page.locator('[data-testid="nav-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+
+    def _motion_pressed(self, page, level):
+        return page.locator(
+            f'[data-testid="settings-overlay-motion-{level}"]'
+        ).get_attribute("aria-pressed")
+
+    def _motion_token_values(self, page, names):
+        return page.evaluate(
+            """(names) => {
+              const style = getComputedStyle(document.documentElement);
+              return Object.fromEntries(
+                names.map((name) => [name, style.getPropertyValue(name).trim()])
+              );
+            }""",
+            list(names),
+        )
+
+    def _blink_probe(self, page):
+        """The generated palette's `.blink` rule, read off a probe element.
+
+        The palette is Evennia-authored styling outside the component tree, so
+        this is where the level's own `animation: none` rule is observable
+        (webclient-motion-level design D8).
+        """
+        return page.evaluate(
+            """() => {
+              const el = document.createElement('span');
+              el.className = 'blink';
+              el.textContent = '•';
+              document.body.appendChild(el);
+              const style = getComputedStyle(el);
+              const out = {
+                name: style.animationName,
+                line: style.textDecorationLine,
+                style: style.textDecorationStyle,
+              };
+              el.remove();
+              return out;
+            }"""
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-motion-level-is-a-client-local-preference-that-governs-every-client-animation"
+    )
+    def test_seeded_motion_level_is_applied(self):
+        """The suite's seed is the product's own version-3 wrapper (design D9).
+
+        A wrapper that drifted from the store's schema would reset to the
+        `full` default, so this journey fails the moment the seed and the
+        store disagree.
+        """
+        page = self.logged_in_page()
+        self.assertEqual(self._data_motion(page), "off")
+        stored = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('elosern.layout'))"
+        )
+        self.assertEqual(stored["layout_version"], 3)
+        self.assertEqual(stored["preferences"]["motionLevel"], "off")
+        self._open_settings(page)
+        self.assertEqual(self._motion_pressed(page, "off"), "true")
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-motion-level-is-a-client-local-preference-that-governs-every-client-animation"
+    )
+    def test_os_reduced_motion_resolves_to_reduced(self):
+        """Nothing stored: the operating system's preference is followed live."""
+        page = self.logged_in_page(motion_level=None)
+        page.emulate_media(reduced_motion="reduce")
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'reduced'",
+            timeout=15000,
+        )
+        values = self._motion_token_values(
+            page, ("--motion-base", "--motion-scene", "--motion-travel")
+        )
+        self.assertEqual(values["--motion-base"], "0ms")
+        self.assertEqual(values["--motion-scene"], "150ms")
+        self.assertEqual(values["--motion-travel"], "0")
+        self._open_settings(page)
+        self.assertEqual(self._motion_pressed(page, "reduced"), "true")
+        self.assertEqual(self._motion_pressed(page, "full"), "false")
+        blink = self._blink_probe(page)
+        self.assertEqual(blink["name"], "none", "reduced stops the blink")
+        self.assertEqual(blink["line"], "underline")
+        self.assertEqual(blink["style"], "dotted")
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[data-testid="settings-overlay"]', state="detached", timeout=15000)
+
+        # The level overrides the chosen speed: a page is shown in full.
+        page.evaluate("() => window.__elosernBridge.store.setTextSpeed('slow')")
+        self._settle_window_mount(page)
+        sentences = "".join(
+            f"第{i}句：霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火明滅。" for i in range(1, 12)
+        )
+        page.evaluate(
+            """(text) => {
+              const store = window.__elosernBridge.store;
+              store.appendText('in', 'look');
+              store.appendText('out', text);
+            }""",
+            sentences,
+        )
+        page.wait_for_function(
+            """() => { const p = document.querySelector('[data-testid="message-page"]');
+              return !!p && p.getAttribute('data-page') === '1'; }""",
+            timeout=30000,
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => document.querySelector('[data-testid=\"message-window\"]')"
+                ".getAttribute('data-typing')"
+            ),
+            "false",
+            "the reduced level shows pages in full at once",
+        )
+
+        # A live OS change re-resolves the level with no reload, and stores
+        # nothing.
+        page.emulate_media(reduced_motion="no-preference")
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'full'",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.store.view.motionLevel"), "full"
+        )
+        stored = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('elosern.layout'))"
+        )
+        self.assertNotIn("motionLevel", stored["preferences"])
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-motion-level-is-a-client-local-preference-that-governs-every-client-animation"
+    )
+    def test_stored_motion_level_overrides_os(self):
+        """A stored level beats the operating system, and survives a reload."""
+        page = self.logged_in_page(motion_level=None)
+        page.emulate_media(reduced_motion="reduce")
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'reduced'",
+            timeout=15000,
+        )
+        install_outbound_recorder(page)
+        self._open_settings(page)
+        page.locator('[data-testid="settings-overlay-motion-full"]').click()
+        page.wait_for_function(
+            "() => { const v = window.__elosernBridge.store.view;"
+            " return v.motionLevel === 'full'"
+            " && document.documentElement.getAttribute('data-motion') === 'full'; }",
+            timeout=15000,
+        )
+        self.assertEqual(self._motion_pressed(page, "full"), "true")
+        stored = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('elosern.layout'))"
+        )
+        self.assertEqual(stored["layout_version"], 3)
+        self.assertEqual(stored["preferences"]["motionLevel"], "full")
+        self.assertEqual(
+            sent_action_count(page), 0, "no motion setting dispatches a ui_action"
+        )
+
+        page.reload()
+        wait_for_store_state(page, lambda s: bool(s.get("connected")))
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'full'",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.store.view.motionLevel"), "full"
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-motion-level-is-a-client-local-preference-that-governs-every-client-animation"
+    )
+    def test_motion_off_is_instant(self):
+        """The off level resolves every duration and delay to zero."""
+        page = self.logged_in_page(motion_level=None)
+        self._open_settings(page)
+        page.locator('[data-testid="settings-overlay-motion-off"]').click()
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-motion') === 'off'",
+            timeout=15000,
+        )
+        durations = self._motion_token_values(page, self.MOTION_DURATION_TOKENS)
+        for name, value in durations.items():
+            self.assertIn(
+                value,
+                ("0ms", "0s"),
+                f"{name} must resolve to zero at the off level, not {value}",
+            )
+        multipliers = self._motion_token_values(
+            page, ("--motion-travel", "--motion-flash-peak")
+        )
+        for name, value in multipliers.items():
+            self.assertEqual(value, "0", f"{name} must resolve to zero at off")
+        self.assertEqual(
+            page.evaluate(
+                "() => getComputedStyle(document.querySelector("
+                "'[data-testid=\"message-window\"]')).transitionDuration"
+            ),
+            "0s",
+            "the off level forces the element's transition duration to zero",
+        )
+        blink = self._blink_probe(page)
+        self.assertEqual(blink["name"], "none", "off stops the blink")
+        self.assertEqual(blink["style"], "dotted")
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.store.view.motionLevel"), "off"
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input"
+    )
+    def test_transitions_never_gate_commit(self):
+        """A committed change reaches the DOM, focus, and the store in one frame."""
+        page = self.logged_in_page(motion_level=None)
+        # The full level keeps the transitions running: this asserts the
+        # commit, not a motion-free shortcut.
+        self.assertEqual(self._data_motion(page), "full")
+        drawer = page.evaluate(
+            """() => new Promise((resolve) => {
+              const store = window.__elosernBridge.store;
+              store.openHudDrawer('skill');
+              requestAnimationFrame(() => {
+                const el = document.querySelector('[data-testid="hud-drawer"]');
+                resolve({
+                  view: store.view.hudDrawer,
+                  open: el ? el.getAttribute('data-open') : null,
+                  focused: el ? el.contains(document.activeElement) : false,
+                });
+              });
+            })"""
+        )
+        self.assertEqual(drawer["view"], "skill", "the store commits at once")
+        self.assertEqual(
+            drawer["open"], "true", "the committed state reaches the DOM in one frame"
+        )
+        self.assertTrue(
+            drawer["focused"],
+            "the drawer takes focus without waiting for its transition",
+        )
+        page.keyboard.press("Escape")
+
+        envelope = snapshot_envelope("", 0, {}, mode="combat")
+        stage = page.evaluate(
+            """(env) => new Promise((resolve) => {
+              const store = window.__elosernBridge.store;
+              const view = store.view;
+              env.presentation_epoch = view.epoch;
+              env.revision = view.revision + 1;
+              const result = store.receive(view.generation, 'ui_snapshot', [env], {});
+              requestAnimationFrame(() => {
+                const el = document.querySelector('[data-testid="elosern-stage"]');
+                resolve({
+                  accepted: !!(result && result.accepted),
+                  viewMode: store.view.mode,
+                  mode: el ? el.getAttribute('data-elosern-mode') : null,
+                });
+              });
+            })""",
+            envelope,
+        )
+        self.assertTrue(stage["accepted"], "the injected combat snapshot was rejected")
+        self.assertEqual(stage["viewMode"], "combat")
+        self.assertEqual(
+            stage["mode"], "combat", "the mode reaches the stage in one frame"
+        )
+        page.close()
 
 
 class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):

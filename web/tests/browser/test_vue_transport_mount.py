@@ -68,9 +68,14 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         page.click('input[type="submit"]')
         page.wait_for_load_state("networkidle")
 
-    def open_vue_page(self, capture_responses: bool = False, block_bundle: bool = False):
+    def open_vue_page(
+        self,
+        capture_responses: bool = False,
+        block_bundle: bool = False,
+        motion_level: str | None = "off",
+    ):
         """Log in and open the WebClient Vue branch; optionally block the bundle."""
-        page = self.new_page()
+        page = self.new_page(motion_level=motion_level)
         responses: list = []
         if capture_responses:
             page.on("response", lambda response: responses.append(response))
@@ -279,20 +284,42 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
     )
     def test_reduced_motion_and_status_not_color_only(self):
         """C4 task 3.2: reduced-motion is honored; status is never color-only."""
-        page, _ = self.open_vue_page()
+        # webclient-motion-level (design D9): opt out of the suite's `off`
+        # seed so the operating system's own preference is what resolves.
+        page, _ = self.open_vue_page(motion_level=None)
         self._store_active(page)
 
-        # Reduced motion: emulate prefers-reduced-motion: reduce; the tokens.css
-        # @media block must resolve the motion tokens to 1ms.
+        # Reduced motion: emulate prefers-reduced-motion: reduce. Nothing is
+        # stored, so the store resolves the effective level to `reduced` and
+        # writes it to `<html data-motion>`; the token blocks then resolve the
+        # general durations to 0ms and keep the stage fades at 150ms.
         page.emulate_media(reduced_motion="reduce")
-        motion_base = page.evaluate(
-            "() => getComputedStyle(document.documentElement)."
-            "getPropertyValue('--motion-base').trim()"
+        tokens = page.evaluate(
+            "() => { const s = getComputedStyle(document.documentElement);"
+            " return { motion: document.documentElement.getAttribute('data-motion'),"
+            " base: s.getPropertyValue('--motion-base').trim(),"
+            " scene: s.getPropertyValue('--motion-scene').trim(),"
+            " travel: s.getPropertyValue('--motion-travel').trim() }; }"
         )
         self.assertEqual(
-            motion_base,
-            "1ms",
-            "prefers-reduced-motion must resolve the motion tokens to 1ms",
+            tokens["motion"],
+            "reduced",
+            "the OS preference must resolve the effective motion level",
+        )
+        self.assertEqual(
+            tokens["base"],
+            "0ms",
+            "reduced motion must resolve the general motion tokens to 0ms",
+        )
+        self.assertEqual(
+            tokens["scene"],
+            "150ms",
+            "reduced motion must keep the stage fades at 150ms",
+        )
+        self.assertEqual(
+            tokens["travel"],
+            "0",
+            "reduced motion must drop every travel distance",
         )
 
         # Not color-only: each vitals gauge carries a symbol glyph, a text

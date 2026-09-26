@@ -544,12 +544,13 @@ types. Text not yet revealed SHALL be hidden from assistive technology. The reve
 same markup, spans, and classes as the fully shown page, SHALL emit no markup the narrative pipeline
 does not produce, and SHALL run that pipeline no more than once per line.
 
-Typing SHALL be instant, whatever the text speed, while the reduced-motion preference is on, or while
-no reduced-motion preference is stored and the operating system requests reduced motion. An explicit
-reduced-motion preference of off SHALL let pages type even when the operating system requests
-reduced motion. A change of text speed or of the effective reduced-motion state SHALL apply from the
-next page, except that a change to `instant` or to reduced motion SHALL also complete the page that
-is typing. The page marker SHALL render only once the page is fully shown. Time the page spends in a
+Typing SHALL be instant, whatever the text speed, while the effective motion level is `reduced` or
+`off`, as `webclient-contextual-hud` "The motion level is a client-local preference that governs every
+client animation" resolves it: a stored level, or, while none is stored, `reduced` when the operating
+system requests reduced motion. A stored `full` level SHALL let pages type even when the operating
+system requests reduced motion. A change of text speed or of the effective motion level SHALL apply
+from the next page, except that a change to `instant`, or to a level other than `full`, SHALL also
+complete the page that is typing. The page marker SHALL render only once the page is fully shown. Time the page spends in a
 hidden browser tab SHALL NOT count toward typing.
 
 When auto-advance is on and the page on screen is fully shown, the window SHALL advance to the next
@@ -567,8 +568,8 @@ appear centred over the stage after the line is fully read" defines. Auto-advanc
 past the last page into the choices: the choices are not a page.
 
 #### Scenario: A page types at the normal speed
-- **WHEN** a one-page response of 90 characters arrives at the `normal` text speed with no
-  reduced-motion preference and the operating system not requesting reduced motion
+- **WHEN** a one-page response of 90 characters arrives at the `normal` text speed with the effective
+  motion level `full`
 - **THEN** after about one second about 45 characters are visible, the page is fully shown after
   about two seconds, the marker is absent until then, and the text's rendered line boxes do not
   change between the first frame and the last
@@ -579,12 +580,14 @@ past the last page into the choices: the choices are not a page.
   the fully shown page's markup equals the markup of the same page at the `instant` speed
 
 #### Scenario: Reduced motion forces instant pages
-- **WHEN** the text speed is `slow` and the operating system requests reduced motion with no
-  reduced-motion preference stored, or the reduced-motion preference is on
-- **THEN** each page is fully shown with its marker as soon as it is shown
+- **WHEN** the text speed is `slow` and the operating system requests reduced motion with no motion
+  level stored, or the stored motion level is `reduced` or `off`
+- **THEN** each page is fully shown with its marker as soon as it is shown, and a page that was
+  typing when the level changed away from `full` completes at once
 
 #### Scenario: An explicit off lets pages type
-- **WHEN** the operating system requests reduced motion and the reduced-motion preference is off
+- **WHEN** the operating system requests reduced motion and the stored motion level is `full`, which
+  turns reduced motion off
 - **THEN** pages type at the chosen text speed
 
 #### Scenario: Auto-advance waits in proportion to the page and stops at the last page

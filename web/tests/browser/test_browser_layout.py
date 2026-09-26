@@ -61,9 +61,9 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::browser-persistence-is-versioned-and-presentation-only"
     )
     def test_known_layout_version_persists_across_reload(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         wrapper = {
-            "layout_version": 2,
+            "layout_version": 3,
             "dimensions": {"narrative": 55},
             "tabs": {"status": True},
             "preferences": {"text2html": True},
@@ -90,7 +90,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
                 count, 1, f"required component {component} missing after reload"
             )
         saved = self._layout(page)
-        self.assertEqual(saved["layout_version"], 2)
+        self.assertEqual(saved["layout_version"], 3)
         # The reload re-persists the full dimension set from the live layout;
         # the stored narrative dimension and tab state must survive it.
         self.assertEqual(saved["dimensions"]["narrative"], 55)
@@ -100,7 +100,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::the-webclient-loads-a-local-vue-spa-desktop-shell"
     )
     def test_mounted_shell_renders_no_tab_strip(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
@@ -129,7 +129,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             self.assertEqual(count, 1, f"required component {component} missing")
 
     def test_migration_registry_migrates_known_prior_version(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         # A stored prior version (0) with a known migration is migrated to the
         # current version and the migrated wrapper is persisted.
         result = page.evaluate(
@@ -160,7 +160,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::browser-persistence-is-versioned-and-presentation-only"
     )
     def test_unknown_malformed_layout_resets(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         page.goto(self.webclient_url)
         wait_for_store_state(
             page,
@@ -222,44 +222,49 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         )
         self.assert_surfaces_after_reload(page)
         stored = self._layout(page)
-        self.assertEqual(stored["layout_version"], 2, "unknown version resets")
+        self.assertEqual(stored["layout_version"], 3, "unknown version resets")
 
-        # A well-formed version-1 wrapper has no registered migration and
-        # resets to the version-2 default (webclient-typewriter-reading-prefs).
-        self._set_layout(
-            page,
-            {
-                "layout_version": 1,
-                "dimensions": {},
-                "tabs": {},
-                "preferences": {"fontScale": 1.12},
-            },
-        )
-        page.reload()
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="status-panel"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
-                    "return el !== null; }"
-                ),
-                "description": "status panel mounted after reload",
-            },
-        )
-        self.assert_surfaces_after_reload(page)
-        stored = self._layout(page)
-        self.assertEqual(stored["layout_version"], 2, "a version-1 wrapper resets")
-        self.assertEqual(stored["preferences"].get("fontScale"), 1)
-        self.assertEqual(stored["preferences"].get("textSpeed"), "normal")
-        self.assertIs(stored["preferences"].get("autoAdvance"), False)
+        # A well-formed version-1 or version-2 wrapper has no registered
+        # migration and resets to the version-3 default
+        # (webclient-typewriter-reading-prefs, webclient-motion-level).
+        for version in (1, 2):
+            self._set_layout(
+                page,
+                {
+                    "layout_version": version,
+                    "dimensions": {},
+                    "tabs": {},
+                    "preferences": {"fontScale": 1.12, "reducedMotion": True},
+                },
+            )
+            page.reload()
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": '[data-testid="status-panel"]',
+                    "predicate": (
+                        "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                        "return el !== null; }"
+                    ),
+                    "description": "status panel mounted after reload",
+                },
+            )
+            self.assert_surfaces_after_reload(page)
+            stored = self._layout(page)
+            self.assertEqual(
+                stored["layout_version"], 3, f"a version-{version} wrapper resets"
+            )
+            self.assertEqual(stored["preferences"].get("fontScale"), 1)
+            self.assertEqual(stored["preferences"].get("textSpeed"), "normal")
+            self.assertIs(stored["preferences"].get("autoAdvance"), False)
+            self.assertNotIn("motionLevel", stored["preferences"])
 
         # An oversized wrapper resets regardless of content.
         self._set_layout(
             page,
             {
-                "layout_version": 2,
+                "layout_version": 3,
                 "dimensions": {"narrative": 50},
                 "tabs": {},
                 "preferences": {},
@@ -311,7 +316,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         )
 
     def test_one_sync_malformed_panel_degrades_without_loop(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         install_outbound_recorder(page)
         generation = store_state(page)["generation"]
 
@@ -357,7 +362,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
         "webclient-browser-verification::browser-acceptance-covers-foundation-recovery-and-layout-behavior",
     )
     def test_incompatible_protocol_locks_actions_but_text_continues(self):
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         install_outbound_recorder(page)
         generation = store_state(page)["generation"]
 
@@ -475,7 +480,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         journey)."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
-                page = self.logged_in_page(viewport)
+                page = self.logged_in_page(viewport, motion_level=None)
                 self._wait_mode(page, "exploration")
                 open_command_line(page)
                 # All four stage anchors must be present with non-zero boxes; a
@@ -506,7 +511,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         focus home: the message window in dialogue, the action dock otherwise."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
-                page = self.logged_in_page(viewport)
+                page = self.logged_in_page(viewport, motion_level=None)
                 map_panel = valid_local_map_panel()
                 self._inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
                 self._wait_mode(page, "exploration")
@@ -661,7 +666,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
     def test_complete_log_reachable_in_one_action_from_bounded_caption(self):
         """The narrative caption is bounded and the full log opens in one action;
         the minimap stays inside its HUD island (task 6.4 phrasing)."""
-        page = self.logged_in_page()
+        page = self.logged_in_page(motion_level=None)
         for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
             page.evaluate("(text) => window.__elosernBridge.store.appendText('out', text)", line)
         feed = page.locator('[data-testid="message-window"]')
