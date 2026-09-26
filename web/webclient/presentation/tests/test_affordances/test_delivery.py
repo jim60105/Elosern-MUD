@@ -147,7 +147,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         payload = validate_exploration(
             {
-                "schema_version": 2,
+                "schema_version": 3,
                 "available": True,
                 "kind": "exploration",
                 "move": [],
