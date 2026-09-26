@@ -197,11 +197,16 @@ test("exploration menus carry fixed breadcrumb titles", () => {
     currentNode: "room:3",
     suggestions: suggestionsEnvelope("unavailable"),
   });
-  assert.equal(model.menus.root.title, "探索");
-  assert.equal(model.menus.move.title, "移動");
-  assert.equal(model.menus.look.title, "查看");
-  assert.equal(model.menus.interact.title, "互動");
+  // The exploration root is the scene overview (webclient-scene-overview-swap)
+  // and the retired move/look/interact frames are gone
+  // (webclient-retire-exploration-submenus): the model carries the pushed
+  // wait/rest submenu.
+  assert.equal(
+    ExplorationMenu.overviewMenu(model.panel, { currentNode: "room:3" }).title,
+    "場景"
+  );
   assert.equal(model.menus.wait.title, "等待");
+  assert.equal(ExplorationMenu.suggestionsMenu(suggestionsEnvelope("generating")).title, "建議");
 });
 
 test("combat menus carry fixed breadcrumb titles", () => {
@@ -300,11 +305,16 @@ test("suggestions frame: ready lists card rows plus dismiss", () => {
   assert.deepEqual(menu.items[1].payload, { npc_id: 5, speech: "和南門守衛交談" });
   assert.equal(menu.items[2].actionId, "options.dismiss");
   assert.deepEqual(menu.items[2].payload, {});
-  // The root entry appears for the non-unavailable statuses.
-  const root = ExplorationMenu.rootItems(explorationPanel(), suggestionsEnvelope("ready", cards));
-  const keys = root.map((item) => item.key);
+  // The footer's 建議 chip appears for the non-unavailable statuses (the
+  // scene overview is the root frame; the retired tab root carried the entry
+  // before webclient-scene-overview-swap).
+  const root = ExplorationMenu.overviewMenu(explorationPanel(), {
+    currentNode: "room:3",
+    suggestions: suggestionsEnvelope("ready", cards),
+  });
+  const keys = root.items.map((item) => item.key);
   assert.ok(keys.includes("suggestions"));
-  const suggItem = root.find((item) => item.key === "suggestions");
+  const suggItem = root.items.find((item) => item.key === "suggestions");
   assert.equal(suggItem.openSubmenu, "suggestions");
 });
 
@@ -318,8 +328,11 @@ test("suggestions frame: degraded with zero cards keeps the muted empty line", (
 });
 
 test("suggestions unavailable: no root entry, no menu", () => {
-  const root = ExplorationMenu.rootItems(explorationPanel(), suggestionsEnvelope("unavailable"));
-  assert.ok(!root.some((item) => item.key === "suggestions"));
+  const root = ExplorationMenu.overviewMenu(explorationPanel(), {
+    currentNode: "room:3",
+    suggestions: suggestionsEnvelope("unavailable"),
+  });
+  assert.ok(!root.items.some((item) => item.key === "suggestions"));
   const model = ExplorationMenu.buildMenus(explorationPanel(), {
     currentNode: "room:3",
     suggestions: suggestionsEnvelope("unavailable"),
@@ -330,18 +343,8 @@ test("suggestions unavailable: no root entry, no menu", () => {
 // ---------------------------------------------------------------- geometry
 
 test("root geometry: gridCols equals the item count (single-row tab bar)", () => {
-  const model = ExplorationMenu.buildMenus(explorationPanel(), {
-    currentNode: "room:3",
-    suggestions: suggestionsEnvelope("ready", [
-      { kind: "known_action", action_code: "explore.look", params: {}, label: "查看房間" },
-    ]),
-  });
-  const root = model.menus.root;
-  // 5 base entries + 2 available services + 1 suggestions entry = 8.
-  assert.equal(root.gridCols, root.items.length);
-  assert.equal(root.items.length, 8);
-  assert.equal(root.grid, true);
-
+  // The combat root is the only frame that still renders as a tab bar
+  // (webclient-scene-overview-swap).
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   const combatRoot = combat.menus.root;
   assert.equal(combatRoot.gridCols, combatRoot.items.length);
@@ -439,7 +442,7 @@ test("openCategory: a multi-group category opens the group frame", () => {
   assert.equal(groupFrame.gridCols, 1);
 });
 
-test("move rows expose normalized direction and destination node", () => {
+test("exit chip rows expose normalized direction and destination node, with no back row or disabled suffix", () => {
   const panel = explorationPanel({
     move: [
       {
@@ -463,9 +466,18 @@ test("move rows expose normalized direction and destination node", () => {
         enabled: true,
         disabled_reason: null,
       },
+      {
+        exit_ref: "45",
+        label: "南",
+        destination: "room:12",
+        enabled: false,
+        disabled_reason: { code: "blocked", message: "出口被阻擋。" },
+      },
     ],
   });
   const items = ExplorationMenu.moveItems(panel, "room:3");
+  // The plain chip builder: one row per exit, no trailing `back` cell.
+  assert.equal(items.length, 4);
   assert.equal(items[0].direction, "east");
   assert.equal(items[0].destination, "room:7");
   assert.equal(items[1].direction, "up");
@@ -475,6 +487,11 @@ test("move rows expose normalized direction and destination node", () => {
   assert.equal(items[2].destination, "room:11");
   // The payload always carries the canonical current_node.
   assert.deepEqual(items[0].payload, { exit_ref: "42", current_node: "room:3" });
+  // The disabled chip keeps the plain server label: the shared renderer owns
+  // the `（無法使用）` marker and the overview's reason strip owns the reason.
+  assert.equal(items[3].enabled, false);
+  assert.equal(items[3].label, "南");
+  assert.equal(items[3].description, "出口被阻擋。");
 
   // normalizeDirection unit behavior.
   assert.equal(ExplorationMenu.normalizeDirection("北"), "north");

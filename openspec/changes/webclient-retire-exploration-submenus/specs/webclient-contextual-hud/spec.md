@@ -57,9 +57,9 @@ through to the text / command-history path.
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders six picks over the dock's scene overview and the player presses
-  `6` and `7` from a non-editable focus
-- **THEN** the `6` press activates pick six through the same dispatch entry, the `7` press
+- **WHEN** the dialogue variant renders its four picks (the panel-owned `DIALOGUE_MAX_CHOICES` bound) over the dock's scene overview and the player presses
+  `4` and `5` from a non-editable focus
+- **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press
   is unclaimed and falls through, and no dock chip is focused or activated
 
 ### Requirement: Dock panes render a per-kind vocabulary from backed fields only

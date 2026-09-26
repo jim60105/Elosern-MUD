@@ -53,7 +53,11 @@ Deleting the three resolver entries makes any stray `exploration.move/look/inter
 
 For the overview, `menu.items` is the reading order (C8a D1), so the slots match what the player sees. Disabled entries take slots, as the 1–4 rule already did, so a digit's target never shifts with enabled state.
 
-The dialogue variant's picks: `webclient-dialogue-session` allows up to 16 scripted keywords, so picks 1–9 become addressable and 10–16 stay pointer-reachable, as 5–16 were before.
+The dialogue variant's picks do NOT widen: the caption panel's own bound is `DIALOGUE_MAX_CHOICES = 4`
+(`web.webclient.presentation.dialogue`, mirrored in `protocol/constants.js`), so 1–4 were already the
+whole caption range and a 5th–9th press stays unclaimed and falls through. (`webclient-dialogue-session`'s
+16-keyword pool belongs to the interact affordance's scripted-keyword frame, not to the caption.) The
+wider range is what the dock frames needed: the scene overview's nine chips.
 
 *Conflict check:* no other surface binds `5`–`9`. C3 deleted the quick-word letter bindings, and the command field is editable, so the bridge never routes digits typed there.
 

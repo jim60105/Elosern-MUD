@@ -141,7 +141,7 @@ describe("ActionDock (B2 action-dock family)", () => {
     expect(legends).toHaveLength(1);
     const legend = legends[0];
     expect(legend.classes()).toContain("action-dock__legend");
-    expect(legend.text()).toBe("數字鍵 1–4 · Enter 執行 · Esc 返回");
+    expect(legend.text()).toBe("數字鍵 1–9 · Enter 執行 · Esc 返回");
     // The draft's <kbd> structure: exactly two kbd children, in order.
     const kbds = legend.findAll("kbd");
     expect(kbds.map((k) => k.text())).toEqual(["Enter", "Esc"]);

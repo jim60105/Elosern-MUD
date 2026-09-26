@@ -295,7 +295,10 @@ describe("dialogue store mode lifecycle", () => {
     // Escape pops the frame and the widened menu-close cleanup clears the
     // sub-dock, exactly as in exploration mode.
     store.setActiveSubDock("character");
-    store.router.pushFrame({ source: "exploration.move", params: {} }, "character");
+    store.router.pushFrame(
+      { source: "exploration.keywords", params: { identity: 7 } },
+      "character",
+    );
     expect(store.view.dockDepth).toBe(2);
     expect(store.view.activeSubDock).toBe("character");
     expect(store.focusEscape()).toBe(true);

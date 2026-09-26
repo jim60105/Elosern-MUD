@@ -37,7 +37,7 @@
   - `5`–`9` on the overview pick chips in reading order
   - `9` on a nine-chip overview picks the ninth chip, and `9` on a six-chip overview is unclaimed
   - a combat skill frame's `6`th row
-  - a dialogue variant with seven picks answering `7`
+  - a dialogue variant at its panel-owned bound (four picks) answering `4`, with `5` unclaimed
   - held repeats suppressed
   - no outlet case
 

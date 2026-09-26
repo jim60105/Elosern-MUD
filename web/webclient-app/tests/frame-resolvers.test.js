@@ -59,7 +59,7 @@ describe("frame resolver — committed-state following and purity", () => {
   it("re-resolving after a newer committed snapshot names the newer exits with no stale row", () => {
     const state = committedState();
     const resolver = resolverFor(state);
-    const before = resolver.resolve({ source: "exploration.move" });
+    const before = resolver.resolve({ source: "exploration.root" });
     expect(before.items.map((i) => i.label)).toContain("西風酒館");
 
     // A newer committed snapshot replaces the exploration panel atomically.
@@ -76,7 +76,7 @@ describe("frame resolver — committed-state following and purity", () => {
     });
     state.revision = 2;
 
-    const after = resolver.resolve({ source: "exploration.move" });
+    const after = resolver.resolve({ source: "exploration.root" });
     const labels = after.items.map((i) => i.label);
     expect(labels).toContain("歸旅客棧");
     expect(labels).not.toContain("西風酒館");
@@ -92,20 +92,15 @@ describe("frame resolver — committed-state following and purity", () => {
     // Deep-equal menu identity beyond reference.
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     // The exploration model resolves identically to a direct builder call —
-    // no hidden model state participates.
-    const direct = ExplorationMenu.buildMenus(state.panels.exploration, {
-      currentNode: state.panels.local_map.current_node,
-      suggestions: state.panels.context_actions.suggestions,
-    });
-    // The root is the scene overview (webclient-scene-overview-swap D1), not
-    // the tab root: it resolves to the overview builder's own menu.
+    // no hidden model state participates. The root is the scene overview
+    // (webclient-scene-overview-swap D1), not the tab root: it resolves to the
+    // overview builder's own menu.
     expect(second).toEqual(
       ExplorationMenu.overviewMenu(state.panels.exploration, {
         currentNode: state.panels.local_map.current_node,
         suggestions: state.panels.context_actions.suggestions,
       }),
     );
-    expect(second.items).not.toEqual(direct.menus.root.items);
   });
 
   it("a resolver throwing mid-build degrades to the marker without an exception", () => {
@@ -120,8 +115,8 @@ describe("frame resolver — committed-state following and purity", () => {
       },
     });
     const resolver = resolverFor(state);
-    expect(() => resolver.resolve({ source: "exploration.move" })).not.toThrow();
-    expect(resolver.resolve({ source: "exploration.move" })).toEqual({
+    expect(() => resolver.resolve({ source: "exploration.root" })).not.toThrow();
+    expect(resolver.resolve({ source: "exploration.root" })).toEqual({
       unresolvable: true,
       reason: null,
     });
@@ -129,7 +124,7 @@ describe("frame resolver — committed-state following and purity", () => {
     // poison restores resolution (the marker is not sticky).
     delete state.panels.exploration.move;
     state.panels.exploration.move = [];
-    expect(resolver.resolve({ source: "exploration.move" }).unresolvable).toBeUndefined();
+    expect(resolver.resolve({ source: "exploration.root" }).unresolvable).toBeUndefined();
   });
 
   it("a resolver throwing while the exploration panel carries an unavailable reason reports it", () => {
@@ -141,7 +136,7 @@ describe("frame resolver — committed-state following and purity", () => {
       reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
     };
     const resolver = resolverFor(state);
-    const result = resolver.resolve({ source: "exploration.move" });
+    const result = resolver.resolve({ source: "exploration.root" });
     expect(result).toEqual({ unresolvable: true, reason: "這片區域暫時不可用。" });
   });
 });
@@ -155,9 +150,10 @@ describe("frame resolver — the finite exploration table", () => {
       suggestions: state.panels.context_actions.suggestions,
     });
     // The root frame is the scene overview, not the tab root
-    // (webclient-scene-overview-swap D1); the move/look/interact/wait
-    // submenus stay registered and builder-identical until C8c retires them.
-    for (const key of ["move", "look", "interact", "wait"]) {
+    // (webclient-scene-overview-swap D1). The wait submenu is the exploration
+    // family's remaining pushed frame; the move/look/interact frames are
+    // retired (webclient-retire-exploration-submenus).
+    for (const key of ["wait"]) {
       const resolved = resolver.resolve({ source: `exploration.${key}` });
       expect(resolved.unresolvable).toBeUndefined();
       expect(resolved).toEqual(direct.menus[key]);
@@ -212,6 +208,21 @@ describe("frame resolver — the finite exploration table", () => {
     expect(resolver.resolve(null)).toEqual({ unresolvable: true, reason: null });
   });
 
+  it("every retired exploration source resolves to the unresolvable marker", () => {
+    // webclient-retire-exploration-submenus: the move/look/interact frames are
+    // gone, so their descriptors are unregistered. A stray push for one
+    // degrades to the shared marker and pops instead of resurrecting a pane.
+    const FORMER_EXPLORATION_SOURCES = [
+      "exploration.move",
+      "exploration.look",
+      "exploration.interact",
+    ];
+    const resolver = resolverFor(committedState());
+    for (const source of FORMER_EXPLORATION_SOURCES) {
+      expect(resolver.resolve({ source })).toEqual({ unresolvable: true, reason: null });
+    }
+  });
+
   it("suggestions degrade on unavailable/absent and resolve on generating/ready/degraded", () => {
     const state = committedState();
     const resolver = resolverFor(state);
@@ -232,22 +243,20 @@ describe("frame resolver — the finite exploration table", () => {
 });
 
 describe("frame resolver — verbatim domain rows, reproduced navigation rows", () => {
-  it("a two-exit room's move frame is exactly the two server exit rows plus the builder back row", () => {
+  it("a two-exit room's overview exit chips are exactly the two server exit rows", () => {
     const state = committedState();
     const resolver = resolverFor(state);
-    const menu = resolver.resolve({ source: "exploration.move" });
+    const menu = resolver.resolve({ source: "exploration.root" });
     const panel = state.panels.exploration;
-    expect(menu.items).toHaveLength(panel.move.length + 1);
+    const chips = menu.items.filter((item) => item.key.startsWith("exit-"));
+    expect(chips).toHaveLength(panel.move.length);
     panel.move.forEach((exitRow, index) => {
-      const row = menu.items[index];
-      // Builder-verbatim row shape (labels, disabled suffix, payloads).
+      const row = chips[index];
+      // Builder-verbatim chip shape (plain labels, payloads, disabled reasons).
       expect(JSON.parse(JSON.stringify(row))).toEqual(
         JSON.parse(
           JSON.stringify(
-            ExplorationMenu.buildMenus(panel, {
-              currentNode: state.panels.local_map.current_node,
-              suggestions: null,
-            }).menus.move.items[index],
+            ExplorationMenu.moveItems(panel, state.panels.local_map.current_node)[index],
           ),
         ),
       );
@@ -263,15 +272,17 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
       }
       expect(row.disabledReason).toEqual(exitRow.disabled_reason);
     });
-    expect(menu.items[menu.items.length - 1].goBack).toBe(true);
+    // The overview is the root frame: no back row and no empty placeholder.
+    expect(menu.items.some((item) => item.goBack)).toBe(false);
+    expect(menu.items.some((item) => item.key === "move-empty")).toBe(false);
   });
 
   it("a traversable exit stays activatable when local_map is unavailable (fresh character, no map-knowledge yet)", () => {
     // Reproduces the 虛境 (starting-room) bug: a brand-new character has no
     // recorded map-knowledge yet, so `local_map` legitimately reports
     // unavailable (map-knowledge spec), but the exit itself is still a
-    // perfectly traversable, server-enabled row — the move frame must not
-    // treat "no minimap" as "no movement".
+    // perfectly traversable, server-enabled row — the overview must not treat
+    // "no minimap" as "no movement".
     const state = committedState();
     state.panels.local_map = {
       schema_version: 1,
@@ -292,27 +303,31 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
       ],
     });
     const resolver = resolverFor(state);
-    const menu = resolver.resolve({ source: "exploration.move" });
-    const enabledRow = menu.items.find((item) => item.key === "exit-east");
-    expect(enabledRow.enabled).toBe(true);
-    expect(enabledRow.actionId).toBe("explore.move");
-    expect(enabledRow.payload).toEqual({ exit_ref: "east", current_node: "room:42" });
+    const menu = resolver.resolve({ source: "exploration.root" });
+    const enabledChip = menu.items.find((item) => item.key === "exit-east");
+    expect(enabledChip.enabled).toBe(true);
+    expect(enabledChip.actionId).toBe("explore.move");
+    expect(enabledChip.payload).toEqual({ exit_ref: "east", current_node: "room:42" });
   });
 
-  it("look and target frames reproduce labels, sub-lines, actions, payloads, and disabled reasons verbatim", () => {
+  it("look chips and the target popover reproduce labels, actions, payloads, and disabled reasons verbatim", () => {
     const state = committedState();
     const resolver = resolverFor(state);
     const panel = state.panels.exploration;
 
-    const look = resolver.resolve({ source: "exploration.look" });
-    const roomRow = look.items.find((i) => i.key === "look-room");
-    expect(roomRow.payload).toEqual({ room: true });
-    expect(roomRow.description).toBe(panel.look.room.display_name);
+    const overview = resolver.resolve({ source: "exploration.root" });
+    const roomChip = overview.items.find((i) => i.key === "look-room");
+    expect(roomChip.payload).toEqual({ room: true });
+    expect(roomChip.description).toBe(panel.look.room.display_name);
     for (const entity of panel.look.entities) {
-      const row = look.items.find((i) => i.key === `entity-${entity.identity}`);
-      expect(row.label).toBe(entity.display_name);
-      expect(row.actionId).toBe("explore.look");
-      expect(row.payload).toEqual({ target_id: entity.identity });
+      // An entity with an interact descriptor is a person chip instead; the
+      // builder's own look rows still carry the look payload.
+      const lookRow = ExplorationMenu.lookItems(panel).find(
+        (i) => i.key === `entity-${entity.identity}`,
+      );
+      expect(lookRow.label).toBe(entity.display_name);
+      expect(lookRow.actionId).toBe("explore.look");
+      expect(lookRow.payload).toEqual({ target_id: entity.identity });
     }
 
     const target = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
@@ -326,9 +341,8 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     }
     // Server-authored disabled reason survives verbatim on the locked exit.
     const locked = panel.move.find((m) => m.disabled_reason);
-    const move = resolver.resolve({ source: "exploration.move" });
-    const lockedRow = move.items.find((i) => i.key === `exit-${locked.exit_ref}`);
-    expect(lockedRow.disabledReason).toEqual(locked.disabled_reason);
+    const lockedChip = overview.items.find((i) => i.key === `exit-${locked.exit_ref}`);
+    expect(lockedChip.disabledReason).toEqual(locked.disabled_reason);
   });
 
   it("the navigation source carries the bar's entries, and only while the panel is available", () => {
@@ -345,13 +359,12 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     expect(nav.items.find((item) => item.key === "quests").openDrawer).toBe("quest");
     expect(nav.items.find((item) => item.key === "inventory").openDrawer).toBe("inventory");
     // A capability surface the panel does not report available is absent (no
-    // dead functional entry), and the builder is shared with the retired tab
-    // root, so both agree.
+    // dead functional entry): the source and its builder agree.
     state.panels.exploration = explorationPanel({ quests: { available: false } });
     const narrowed = resolver.resolve({ source: "exploration.navigation" });
     expect(narrowed.items.map((item) => item.key)).toEqual(["character", "inventory"]);
-    const root = ExplorationMenu.rootItems(state.panels.exploration, null);
-    expect(root.filter((item) => item.key === "quests")).toHaveLength(0);
+    const bar = ExplorationMenu.navigationItems(state.panels.exploration);
+    expect(bar.filter((item) => item.key === "quests")).toHaveLength(0);
 
     // An unavailable exploration panel degrades to the shared marker.
     state.panels.exploration = {
@@ -413,9 +426,9 @@ describe("frame resolver — ownership isolation", () => {
     const before = JSON.stringify(state.panels, (k, v) => v);
     // Write through every reference the builder handed out.
     target.target.display_name = "POISONED";
-    const move = resolver.resolve({ source: "exploration.move" });
-    const disabledRow = move.items.find((i) => i.disabledReason);
-    if (disabledRow) disabledRow.disabledReason.message = "POISONED";
+    const overview = resolver.resolve({ source: "exploration.root" });
+    const disabledChip = overview.items.find((i) => i.disabledReason);
+    if (disabledChip) disabledChip.disabledReason.message = "POISONED";
     const suggestions = resolver.resolve({ source: "exploration.suggestions" });
     suggestions.items.forEach((item) => {
       if (item.payload && item.payload.exit_ref) item.payload.exit_ref = "POISONED";
@@ -515,8 +528,8 @@ describe("frame resolver — (legacy) the degradation marker", () => {
     const state = committedState();
     delete state.panels.exploration;
     const resolver = resolverFor(state);
-    expect(() => resolver.resolve({ source: "exploration.look" })).not.toThrow();
-    expect(resolver.resolve({ source: "exploration.look" })).toEqual({
+    expect(() => resolver.resolve({ source: "exploration.wait" })).not.toThrow();
+    expect(resolver.resolve({ source: "exploration.wait" })).toEqual({
       unresolvable: true,
       reason: null,
     });
