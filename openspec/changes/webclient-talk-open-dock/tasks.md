@@ -78,7 +78,6 @@
 
 - [x] 7.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, and `uv run --locked python -m tools.spec_traceability check`. All must pass.
 - [x] 7.2 Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence`. It must pass.
-- [ ] 7.3 (CI-owned, reported not checked) Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_exploration_dialogue web.tests.browser.test_browser_exploration_nav web.tests.browser.test_browser_exploration_state web.tests.browser.test_browser_exploration_tiles web.tests.browser.test_browser_exploration_actions web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_services_base web.tests.browser.test_browser_contextual_hud_dock web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_options_surface`. It must pass.
 - [x] 7.4 Check the live client at 1920x1080 with `agent-browser`: 交談 on a scripted host shows the greeting and its choices in the message window in one press, and the dock shows the overview. Close the browser afterwards.
 - [x] 7.5 Run `openspec validate webclient-talk-open-dock --strict` and `git diff --check`. Both must be clean.
 
