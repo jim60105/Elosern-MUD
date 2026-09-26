@@ -1,0 +1,136 @@
+<script setup>
+// StageActor (webclient-dialogue-stage-actors design D1): one standing
+// portrait on the stage. It wraps `ReferenceArtwork` (which stays the plain
+// frame of the drawer's art slot) and adds the stage's own concerns:
+// - the side it stands on (`left` for the player, `right` for the dialogue
+//   host), exposed as `data-side` so the soft edge masks can mirror;
+// - the static speaking state: the listener is dimmed through the shared
+//   `--actor-dim` token and `data-speaking` names the state for tests. The
+//   dim is never the only cue (the message window's name plate names the
+//   host), and there is no transition here — the motion layer owns it;
+// - the truthful placeholder: with no catalog or roster entry the actor
+//   draws the name's initial and the name (never a stock image); a
+//   placeholder entry keeps its own label (肖像生成中, 無肖像) with the
+//   name's initial in the ring; with no name at all, `ReferenceArtwork`
+//   keeps its own `肖像生成中` card.
+// Decorative art: no focusable element, no pointer events.
+import { computed } from "vue";
+import ReferenceArtwork from "./ReferenceArtwork.vue";
+
+const props = defineProps({
+  // A roster portrait or an `art` panel `portrait_catalog` entry, or null.
+  portrait: { type: Object, default: null },
+  // The display name the placeholder states when no entry exists.
+  name: { type: String, default: "" },
+  side: {
+    type: String,
+    default: "left",
+    validator: (value) => value === "left" || value === "right",
+  },
+  // True while the other side speaks (AppClient derives it from the
+  // committed mode and `view.dialogueSpeaker`).
+  dimmed: { type: Boolean, default: false },
+});
+
+const shown = computed(() => {
+  if (props.portrait) {
+    return props.portrait;
+  }
+  return props.name ? { placeholder: { kind: "missing", label: props.name } } : null;
+});
+</script>
+
+<template>
+  <div
+    class="stage-actor"
+    data-testid="stage-actor"
+    :data-side="side"
+    :data-speaking="String(!dimmed)"
+  >
+    <ReferenceArtwork :portrait="shown" :initial-of="name" />
+  </div>
+</template>
+
+<style>
+.stage-actor {
+  position: relative;
+  height: 100%;
+  pointer-events: none;
+}
+.stage-actor > .reference-artwork {
+  height: 100%;
+  overflow: visible;
+}
+/* The listener (design D1): one shared dim token, a static state. */
+.stage-actor[data-speaking="false"] {
+  filter: brightness(var(--actor-dim));
+}
+
+/* The figure dissolves into the stage instead of ending in a rectangle (a
+   generated portrait carries its own flat backdrop): an elliptical mask
+   centred on the figure, nudged towards the stage centre and mirrored with
+   the side, intersected with a long fade at the feet into the band it
+   stands on. The placeholder card takes the same silhouette. */
+.stage-actor .reference-artwork img,
+.stage-actor .reference-artwork__placeholder {
+  --actor-mask-shape: radial-gradient(ellipse 54% 60% at 52% 46%, #000 60%, transparent 100%);
+  --actor-mask-feet: linear-gradient(#000 70%, transparent 97%);
+  -webkit-mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
+  mask-composite: intersect;
+}
+.stage-actor[data-side="right"] .reference-artwork img,
+.stage-actor[data-side="right"] .reference-artwork__placeholder {
+  --actor-mask-shape: radial-gradient(ellipse 54% 60% at 48% 46%, #000 60%, transparent 100%);
+}
+.stage-actor .reference-artwork img {
+  object-position: center 12%;
+}
+
+/* The truthful placeholder at stage scale: a quiet ink silhouette field with
+   the initial set large in the display face inside a hairline gold ring, and
+   the label under it — it reads as "someone stands here", never as art. */
+.stage-actor .reference-artwork__placeholder {
+  place-content: center stretch;
+  gap: 18px;
+  background:
+    radial-gradient(46% 34% at 50% 40%, rgba(185, 154, 96, 0.14), transparent 72%),
+    radial-gradient(70% 60% at 50% 58%, #1c1a1f, #0f1013 78%);
+}
+.stage-actor .reference-artwork__placeholder-glyph {
+  display: grid;
+  place-items: center;
+  width: clamp(88px, 11vh, 132px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border: 1px solid rgba(185, 154, 96, 0.55);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 6px rgba(185, 154, 96, 0.08),
+    inset 0 0 28px rgba(0, 0, 0, 0.55);
+  color: var(--gold-400);
+  font-family: var(--f-display);
+  font-size: clamp(44px, 5.6vh, 66px);
+  line-height: 1;
+  text-shadow: 0 0 18px var(--gold-glow);
+}
+.stage-actor .reference-artwork__placeholder-label {
+  max-width: 78%;
+  margin: 0 auto;
+  text-align: center;
+  color: var(--paper-300);
+  font-family: var(--f-serif);
+  font-size: 14px;
+  letter-spacing: 0.24em;
+  overflow-wrap: anywhere;
+}
+/* The placeholder already states its label on the figure itself; the host's
+   caption is the message window's name plate, so in a conversation neither
+   figure carries a caption. */
+.stage-actor .reference-artwork figcaption[data-sample="true"],
+.stage-actor[data-side="right"] .reference-artwork figcaption,
+[data-elosern-mode="dialogue"] .stage-actor .reference-artwork figcaption {
+  display: none;
+}
+</style>

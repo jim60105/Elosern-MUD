@@ -532,11 +532,14 @@ class ManagedServerTearDownMixin:
 
 
 def wait_command_field_released(page, timeout=30000):
-    """Gate on the command line collapsing and the action dock holding focus.
+    """Gate on the command line collapsing and the mode's focus home holding focus.
 
     webclient-collapsible-command-line (design D2): Escape or an accepted
-    send restores focus to ``#action-dock`` and collapses the command-line
+    send restores focus to the focus home and collapses the command-line
     anchor (``data-expanded="false"``) while ``#inputfield`` stays in the DOM.
+    The focus home is ``#action-dock``, or in dialogue mode — where the
+    command region is collapsed — the message window's dialogue row
+    (webclient-dialogue-stage-actors design D5).
     """
     wait_for_store_state(
         page,
@@ -546,12 +549,16 @@ def wait_command_field_released(page, timeout=30000):
             "predicate": (
                 "() => { const a = document.querySelector('[data-anchor=\"command-line\"]');"
                 " const d = document.querySelector('[data-testid=\"command-line\"]');"
-                " const dock = document.getElementById('action-dock');"
-                " return a && a.getAttribute('data-expanded') === 'false' && d && dock && "
-                "(document.activeElement === dock || "
-                "(document.activeElement && dock.contains(document.activeElement))); }"
+                " const stage = document.querySelector('[data-elosern-mode]');"
+                " const dialogue = !!stage && stage.getAttribute('data-elosern-mode') === 'dialogue';"
+                " const home = dialogue"
+                " ? document.querySelector('[data-anchor=\"band-message\"]')"
+                " : document.getElementById('action-dock');"
+                " const active = document.activeElement;"
+                " return a && a.getAttribute('data-expanded') === 'false' && d && home && "
+                "active && active !== document.body && (active === home || home.contains(active)); }"
             ),
-            "description": "command field released: #action-dock focused, command line collapsed",
+            "description": "command field released: the focus home focused, command line collapsed",
         },
         timeout=timeout,
     )

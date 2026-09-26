@@ -43,11 +43,13 @@ import PartyDrawer from "./components/PartyDrawer.vue";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
+import StageActor from "./components/StageActor.vue";
 
 const store = useElosernStore();
-const currentPortrait = computed(
-  () => store.view.rosterCharacters?.find((character) => character.current)?.portrait ?? null,
+const currentCharacter = computed(
+  () => store.view.rosterCharacters?.find((character) => character.current) ?? null,
 );
+const currentPortrait = computed(() => currentCharacter.value?.portrait ?? null);
 // The shell handle (H5, design D1/D6) and the SceneBackdrop harness hook
 // (the __-prefixed pending-scene journey seeds the prior-image memory
 // through this handle — SceneBackdrop's exposed setPriorImage).
@@ -76,6 +78,18 @@ const {
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
 } = useAppClient(store, shellRef, sceneBackdropRef);
+// The dialogue host's standing portrait (webclient-dialogue-stage-actors
+// D2): the committed `art` panel's raw catalog entry named by the committed
+// `dialogue` panel's `host.portrait_ref` — the raw entry, so a pending entry
+// shows its own placeholder card; a null or unknown key falls to the
+// StageActor's name placeholder. The client never builds a catalog key.
+const hostPortrait = computed(() => {
+  const key = dialogueVM.value?.host.portraitRef;
+  return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
+});
+// The speaking state (design D3): only a conversation with its host on the
+// stage dims anyone (a transiently unavailable panel leaves the player lit).
+const inDialogue = computed(() => store.view.mode === "dialogue");
 </script>
 
 <template>
@@ -89,7 +103,6 @@ const {
         :narrative="store.narrative"
         :response-marks="store.responseMarks"
         :dialogue="dialogueVM"
-        :art-panel="panel('art')"
         :font-scale="store.view.fontScale"
         :text-speed="store.view.textSpeed"
         :auto-advance="store.view.autoAdvance"
@@ -142,9 +155,28 @@ const {
         </template>
         <!-- The player's standing portrait (webclient-avg-stage-shell D4):
              the current roster character's portrait stands on the bottom
-             band's top edge in the `actor-left` anchor, outside creation. -->
+             band's top edge in the `actor-left` anchor, outside creation,
+             dimmed while the dialogue host speaks. -->
         <template #actor-left>
-          <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" />
+          <StageActor
+            v-if="store.view.mode !== 'creation'"
+            side="left"
+            :portrait="currentPortrait"
+            :name="currentCharacter?.name || ''"
+            :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
+          />
+        </template>
+        <!-- The dialogue host's standing portrait (webclient-dialogue-stage-
+             actors D2): only while the mode is dialogue and the committed
+             panel is available; empty in every other state. -->
+        <template #actor-right>
+          <StageActor
+            v-if="inDialogue && dialogueVM"
+            side="right"
+            :portrait="hostPortrait"
+            :name="dialogueVM.host.displayName"
+            :dimmed="store.view.dialogueSpeaker === 'player'"
+          />
         </template>
         <!-- The `vitals` anchor (webclient-avg-stage-hud-anchors design D1),
              under the place card: the vitals and conditions islands, then

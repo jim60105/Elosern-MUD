@@ -592,9 +592,10 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
 
 
 class DialogueSurfaceEvidenceTest(unittest.TestCase):
-    """webclient-align-08/11: the dialogue surface's feed variant and the dock's
-    regular-form guarantee are Vue-layer contracts; the Vitest files are their
-    executed evidence."""
+    """webclient-align-08/11 and webclient-dialogue-stage-actors: the dialogue
+    surface's window variant, the collapsed command region, and the stage
+    actors are Vue-layer contracts; the Vitest files are their executed
+    evidence."""
 
     @covers_requirement(
         "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel",
@@ -622,7 +623,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-dock-keeps-its-regular-exploration-form-in-dialogue-mode",
+        "webclient-contextual-hud::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band",
     )
     def test_dialogue_dock_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -633,6 +634,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/dialogue_dock.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/dialogue_store.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/hud_frame.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -643,6 +645,32 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
             result.returncode,
             0,
             "dialogue-dock Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state",
+    )
+    def test_stage_actor_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/core/stage_actor.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_stage_actor.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_store.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "stage-actor Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

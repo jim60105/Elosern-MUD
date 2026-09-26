@@ -1,13 +1,15 @@
-// webclient-align-11-dialogue-ux (tasks 2.4): the store side of the retired
-// dock dialogue form. A committed dialogue mode keeps the dock on
-// `exploration.root` (the `dialogue.root` mirror is deleted); digits retarget
-// to the caption's scripted picks while the caption presents, and fall
-// through to the dock otherwise; the caption's free row keeps the
-// command-line borrow through `borrowDialogueCommand`; ArrowRight keeps its
-// router meaning; the exit row's `dialogue-leave` dispatch rides the single
-// dispatch entry; and exploration-form lifecycle guards widen to dialogue
-// mode (a character sub-dock opened while talking closes, re-homes,
-// and settles exactly as in exploration mode).
+// webclient-align-11-dialogue-ux (tasks 2.4) and webclient-dialogue-stage-
+// actors (design D3/D6): the store side of dialogue mode. A committed
+// dialogue mode keeps the (collapsed, hidden) dock on `exploration.root`
+// (the `dialogue.root` mirror is deleted); digits retarget to the caption's
+// scripted picks while the caption presents and are otherwise unclaimed;
+// the caption's free row keeps the command-line borrow through
+// `borrowDialogueCommand`; arrows are unclaimed, so the hidden router never
+// moves; the exit row's `dialogue-leave` dispatch rides the single dispatch
+// entry; exploration-form lifecycle guards widen to dialogue mode (a
+// character sub-dock opened while talking closes, re-homes, and settles
+// exactly as in exploration mode); and `view.dialogueSpeaker` follows the
+// in-flight speech action.
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -183,7 +185,7 @@ describe("dialogue store mode lifecycle", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("an unavailable panel releases the digits back to the dock", () => {
+  it("an unavailable panel leaves the digits unclaimed (the dock is collapsed)", () => {
     openSession();
     store.receive(
       1,
@@ -192,15 +194,15 @@ describe("dialogue store mode lifecycle", () => {
       {},
     );
     expect(store.view.mode).toBe("dialogue");
-    // No caption: digit 1 addresses the overview's first chip (focus +
-    // confirm submits it) — the ordinary dock semantics.
-    expect(store.focusPress("1")).toBe(true);
-    expect(store.view.focus.key).toBe("exit-east");
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].action_id).toBe("explore.move");
+    // No variant: the digit has no pick to address, and the hidden dock's
+    // chips claim no digit in dialogue (webclient-dialogue-stage-actors D6).
+    const focusBefore = store.view.focus.key;
+    expect(store.focusPress("1")).toBe(false);
+    expect(store.view.focus.key).toBe(focusBefore);
+    expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("a zero-choice panel releases the digits back to the dock", () => {
+  it("a zero-choice panel leaves the digits unclaimed", () => {
     openSession();
     store.receive(
       1,
@@ -208,9 +210,10 @@ describe("dialogue store mode lifecycle", () => {
       [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [] } })],
       {},
     );
-    expect(store.focusPress("1")).toBe(true);
-    expect(store.view.focus.key).toBe("exit-east");
-    expect(sender.sent.actions).toHaveLength(1);
+    const focusBefore = store.view.focus.key;
+    expect(store.focusPress("1")).toBe(false);
+    expect(store.view.focus.key).toBe(focusBefore);
+    expect(sender.sent.actions).toHaveLength(0);
   });
 
   it("the caption free row keeps the command-line borrow", () => {
@@ -297,13 +300,13 @@ describe("dialogue store mode lifecycle", () => {
     });
   });
 
-  it("ArrowRight keeps its router meaning in dialogue mode (no form borrow)", () => {
+  it("ArrowRight is unclaimed in dialogue mode: the collapsed dock's router never moves", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     const before = store.view.drawerRequest;
-    // The dock's overview walks the reading order through the ROUTER.
-    expect(store.focusPress("ArrowRight")).toBe(true);
-    expect(store.view.focus.key).toBe("exit-north");
+    const focusBefore = store.view.focus.key;
+    expect(store.focusPress("ArrowRight")).toBe(false);
+    expect(store.view.focus.key).toBe(focusBefore);
     expect(store.view.drawerRequest).toBe(before);
     expect(sender.sent.actions).toHaveLength(0);
   });
@@ -416,5 +419,66 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.depth()).toBe(1);
     expect(store.router.currentMenu().title).toBe("場景");
+  });
+});
+
+// webclient-dialogue-stage-actors (design D3): the stage's speaking state is
+// derived from the in-flight dispatch — "player" from a talk_scripted or
+// talk_freeform dispatch until its declared revision is accepted or it is
+// rejected, "host" otherwise.
+describe("dialogueSpeaker follows the in-flight speech action", () => {
+  let store;
+  let sender;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    expect(store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted).toBe(true);
+  });
+
+  it("is the host at rest and the player from a pick's dispatch until its revision commits", () => {
+    expect(store.view.dialogueSpeaker).toBe("host");
+    expect(store.focusPress("1")).toBe(true);
+    expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
+    expect(store.view.dialogueSpeaker).toBe("player");
+    // The handled result declares revision 5: the reply has not committed.
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: 5 })], {});
+    expect(store.view.dialogueSpeaker).toBe("player");
+    // The reply's revision commits: the light returns to the host.
+    store.receive(1, "ui_update", [fx.update({ ...dialogueSnapshot(), revision: 5 })], {});
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.dialogueSpeaker).toBe("host");
+  });
+
+  it("returns to the host once a generic rejection of a freeform line is handled", () => {
+    store.dispatchAction("explore.talk_freeform", { npc_id: 41, speech: "五枚就五枚。" }, null);
+    expect(store.view.dialogueSpeaker).toBe("player");
+    // An ordinary rejection (not no_puppet) declaring the committed revision.
+    store.receive(
+      1,
+      "ui_action_result",
+      [
+        fx.actionResult({
+          outcome: "rejected",
+          code: "invalid_speech",
+          message: "說不出口。",
+          presentation_revision: 4,
+        }),
+      ],
+      {},
+    );
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.dialogueSpeaker).toBe("host");
+  });
+
+  it("stays on the host while a non-speech action is in flight", () => {
+    store.dispatchAction("explore.dialogue_leave", { npc_id: 41 }, null);
+    expect(store.view.dispatch.inFlight).not.toBe(null);
+    expect(store.view.dialogueSpeaker).toBe("host");
   });
 });

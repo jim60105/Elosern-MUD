@@ -33,11 +33,14 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 - **THEN** no tab-title chrome is rendered anywhere, every required surface is present, and each surface carries its own self-identifying content instead of a component-name tab title
 
 ### Requirement: Required desktop surfaces remain visible and usable
-The narrative SHALL occupy the bottom band's message region as a bounded caption whose complete log is
-reachable in one action, with the brand, the top-meta pill, the place card, the action dock and the command-line toggle visible at 1920x1080, 1440x900, and
+The narrative SHALL occupy the bottom band's message region as the bounded message window, whose
+complete log is reachable in one action through its `日誌` control, with the brand, the top-meta pill, the
+place card, the action dock (in every playing mode except dialogue, where the command region collapses)
+and the command-line toggle visible at 1920x1080, 1440x900, and
 1280x720, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
 island in combat or while a vital or a `warning`, `harmful`, or `critical` condition needs attention, the party island while the party is
-non-empty). The action dock and the narrative caption SHALL NOT be permanently closable. The command
+non-empty). The action dock and the message window SHALL NOT be permanently closable; the dock's collapse in
+dialogue mode lasts exactly as long as the committed mode is `dialogue`. The command
 line SHALL NOT be permanently closable either: it is collapsed by default, and its input field SHALL be
 reachable in exactly one action — `/` outside an editable control, or the ⌨ toggle — in every mode that
 renders it; every other surface MAY be opened on demand and closed. The reference
@@ -73,21 +76,22 @@ render each frame's rows in the form that frame calls for — a target's verb po
 overview, navigation rows, the waiting cards, suggestion cards, or the combat forms — beside a detail
 pane that names the focused item, its availability, and the next key action wherever the frame
 carries one.
-The stage SHALL give the narrative caption and the action dock one fixed-height bottom band - the
-message region on the left two thirds and the command region on the right third - whose height comes
+The stage SHALL give the message window and the action dock one fixed-height bottom band - the
+message region on the left two thirds and the command region on the right third, or the message region
+across the whole band in dialogue mode - whose height comes
 from one shared band-height token and never depends on the frame the dock carries, on the mode, or on
 the narrative: the scene overview, a target's verb popover, the waiting frame, the combat frames, and an empty
-pane host all render inside the same command-region box, so the narrative caption and the action dock never
+pane host all render inside the same command-region box, so the message window and the action dock never
 overlap and neither clips the other at a supported viewport. A frame whose rows exceed the region
 SHALL scroll inside the pane host while the dock's chrome (the combat tab bar, the breadcrumb, and
 the legend strip) stays fixed around it. In dialogue
-mode the narrative caption SHALL keep the message region's fixed box, and the host, the latest line,
-the choice rows, the free-form input and the exit control SHALL all stay reachable at 1280x720 by
-scrolling inside the caption, never by growing it.
+mode the message window SHALL span the whole band at the band's fixed height, and the host's name
+plate, the latest line, the choice rows, the free-form input and the exit control SHALL all stay
+reachable at 1280x720 by scrolling inside the window, never by growing it.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
-- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar with its tool group, the place card, every HUD island its own rule renders, the action dock, and the command-line toggle are present without overlapping the narrative input path, and one `/` press renders the command line with its input field focused
+- **THEN** the message window, the brand, the top-meta surface, the top navigation bar with its tool group, the place card, every HUD island its own rule renders, the action dock, and the command-line toggle are present without overlapping the narrative input path, and one `/` press renders the command line with its input field focused
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
@@ -99,7 +103,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: An open drawer is always one action from closed
 - **WHEN** a reference drawer is open at either supported viewport
-- **THEN** Escape, its labelled close control, and the scrim each close it in one action and return focus to the control that opened it, and the dock, the narrative caption, and the command-line toggle remain present behind it
+- **THEN** Escape, its labelled close control, and the scrim each close it in one action and return focus to the control that opened it, and the dock, the message window, and the command-line toggle remain present behind it
 
 #### Scenario: The map, settings and help surfaces are reachable and closable
 - **WHEN** the shell renders in exploration mode at either supported viewport with the command line collapsed
@@ -110,8 +114,8 @@ scrolling inside the caption, never by growing it.
 - **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's scene overview
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
-- **WHEN** the narrative holds more lines than the bounded caption can display
-- **THEN** the player reaches the complete retained log in one action from the caption card
+- **WHEN** the narrative holds more lines than the message window's page can display
+- **THEN** the player reaches the complete retained log in one action through the window's `日誌` control
 
 #### Scenario: Mounting the shell retires the degraded text fallback
 - **WHEN** the Vue SPA shell mounts into its container
@@ -135,7 +139,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: A tall frame grows the band without touching the narrative
 - **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1440x900 or 1280x720
-- **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the narrative caption's box is unchanged, and neither surface clips the other
+- **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the message window's box is unchanged, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
 - **WHEN** the active frame's rows exceed the command region's height
@@ -143,7 +147,7 @@ scrolling inside the caption, never by growing it.
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1280x720
-- **THEN** the host identity, the latest line, every choice row, the free-form input and the exit control are all reachable by scrolling inside the caption, without document-level scrolling and without the caption or the band changing size
+- **THEN** the message window spans the whole band, the command region is not rendered, and the host's name plate, the latest line, every choice row, the free-form input and the exit control are all reachable by scrolling inside the window, without document-level scrolling and without the window or the band changing size
 
 ### Requirement: Narrative output remains the authoritative text surface and is read page by page
 The shell SHALL route Evennia's existing narrative and command output to the retained narrative log
@@ -198,7 +202,9 @@ The client state store SHALL validate protocol, transport generation, epoch, rev
 ### Requirement: Keyboard routing is menu-first and submission-safe
 
 After initial synchronization and after every completed or rejected action whose declared
-presentation revision has been accepted, the action dock SHALL own focus. Key events SHALL
+presentation revision has been accepted, the current mode's focus home SHALL own focus: the action
+dock, or in dialogue mode the message window's focus target, as `webclient-contextual-hud` "The command
+region collapses in dialogue mode and the message window spans the band" defines. Key events SHALL
 be dispatched through the public keyboard bridge (the `window.Elosern.KeyboardRouter` handle
 contract), claimed exactly when the router consumed them, rather than bound directly to the
 document. Arrow keys SHALL move within the active finite menu, Enter SHALL confirm an
@@ -209,8 +215,10 @@ NOT insert a literal `/` into it. A `/` pressed while an
 editable control is focused — the command field included — SHALL be ordinary text input: it SHALL
 never be claimed by the router, so commands or text that contain a slash remain
 typeable in the command field and in other editable controls (creation forms, rest forms). Escape
-pressed while the command field holds focus SHALL send nothing, SHALL return focus to the action
-dock, and SHALL collapse the command line.
+pressed while the command field holds focus SHALL send nothing, SHALL return focus to the current
+mode's focus home, and SHALL collapse the command line. While the committed mode is `dialogue` the
+router SHALL claim only `/` and the dialogue picks' digits; arrows, Enter, Space, and Escape SHALL be
+unclaimed, so the hidden dock is never navigated or activated.
 Pointer activation of a rendered row SHALL be admitted and SHALL traverse the identical
 focus, disabled-explanation, and submission-gating path as Enter, as specified by
 `webclient-pointer-activation`. Disabled entries SHALL remain focusable for their
@@ -280,6 +288,10 @@ B2 key-derivation contract is preserved only as the isolated Node gate
   available and the dock renders its root
 - **THEN** the scene overview carries no 角色狀態, 任務, or 背包 entry - those surfaces are opened
   from the top navigation bar - and the overview's chips keep the panel's order
+
+#### Scenario: The router is inert while the dock is collapsed
+- **WHEN** the committed mode is dialogue, focus is on the document body, and the player presses ArrowDown, Enter, Space, and Escape
+- **THEN** the bridge reports each key unclaimed by the router, the router's focused key and depth are unchanged, and no request is emitted
 
 ### Requirement: The collapsible command line preserves ordinary text control
 

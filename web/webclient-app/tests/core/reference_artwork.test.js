@@ -54,4 +54,24 @@ describe("reference artwork gallery consumption", () => {
     expect(img.element.style.objectPosition).toBe("50% 30%");
     wrapper.unmount();
   });
+
+  it("draws the placeholder initial as a whole grapheme, even outside the BMP", () => {
+    // An astral-plane initial (U+20B9F 𠮟) is a surrogate pair: slicing one
+    // code unit would draw half of it (webclient-dialogue-stage-actors D1).
+    const wrapper = mount(ReferenceArtwork, {
+      props: { portrait: { placeholder: { kind: "missing", label: "𠮟婆婆" } } },
+    });
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("𠮟");
+    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("𠮟婆婆");
+    wrapper.unmount();
+  });
+
+  it("draws the initial of `initialOf` when given, keeping the placeholder's own label", () => {
+    const wrapper = mount(ReferenceArtwork, {
+      props: { portrait: { placeholder: { kind: "unavailable", label: "無肖像" } }, initialOf: "灰婆婆" },
+    });
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
+    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("無肖像");
+    wrapper.unmount();
+  });
 });

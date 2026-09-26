@@ -23,7 +23,8 @@ import SceneBackdrop from "../components/SceneBackdrop.vue";
 import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 
-import { h } from "vue";
+import { h, nextTick } from "vue";
+import { dialogueViewModel } from "../stores/dialogue-view.js";
 
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
@@ -98,7 +99,7 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
 
     // Change the committed mode to combat: the shell's mode watcher moves
     // focus to the action dock BEFORE the CSS hides the focused surface
-    // (the side-effect-free `restoreDockFocus` path).
+    // (the side-effect-free `restoreFocusHome` path).
     explore.setProps({ mode: "combat" });
     await explore.vm.$nextTick();
     const dock = document.getElementById("action-dock");
@@ -147,40 +148,117 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     });
   });
 
-  it("keeps the whole cockpit visible in dialogue mode (matrix dialogue column)", () => {
-    // webclient-align-08-dialogue-surface: the dialogue column hides nothing
-    // — the message window, the HUD island stack, the minimap, the dock,
-    // and the command line all stay rendered; only the narrative
-    // presentation changes (the dialogue variant lives inside MessageWindow).
+  it("collapses the command region in dialogue mode and keeps the rest of the cockpit (matrix dialogue column)", () => {
+    // webclient-dialogue-stage-actors (design D4): dialogue hides only the
+    // command region (with the still-mounted dock inside it) and the band
+    // turns into one column, so the message region spans it. The message
+    // window, the island stack, the minimap, both portrait anchors, and the
+    // command line stay rendered.
     const dialogue = mountShell("dialogue", true);
     expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="band-message"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="actor-left"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="vitals"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="map"]').exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="command-line"]').exists()).toBe(true);
+    for (const anchor of ["band-message", "actor-left", "actor-right", "vitals", "map", "command-line", "band-command"]) {
+      expect(dialogue.find(`[data-anchor="${anchor}"]`).exists()).toBe(true);
+    }
     expect(dialogue.find(".local-map").exists()).toBe(true);
-    expect(dialogue.find('[data-anchor="band-command"]').exists()).toBe(true);
+    // The dock stays in the DOM (never remounted); CSS hides it.
+    expect(document.getElementById("action-dock")).not.toBe(null);
 
-    // The HudFrame gate rules name ONLY creation/combat — a dialogue mode
-    // can never match a display:none arm (source-level guard, the same
-    // style used by the dock-band ownership guard).
     const css = styleBlock("components/HudFrame.vue");
-    // The gate arms exist (creation message region / combat minimap), and NO
-    // arm ever names the dialogue mode.
-    expect(css).toMatch(
-      /\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="band-message"\]/,
+    expect(
+      extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"]'),
+    ).toContain("display: none");
+    expect(extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] .stage-band')).toContain(
+      "grid-template-columns: minmax(0, 1fr)",
     );
-    expect(css).toMatch(/\.elosern-stage\[data-elosern-mode="combat"\] \.local-map/);
-    expect(/data-elosern-mode="dialogue"/.test(css)).toBe(false);
+    // No other surface is gated on the dialogue mode.
+    const dialogueArms = css.match(/\.elosern-stage\[data-elosern-mode="dialogue"\][^{]*\{/g) || [];
+    expect(dialogueArms.map((arm) => arm.trim())).toEqual([
+      '.elosern-stage[data-elosern-mode="dialogue"] .stage-band {',
+      '.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"] {',
+    ]);
+  });
 
-    // Flipping exploration → dialogue never strands focus: the shell's
-    // focus-rescue map carries an explicit empty dialogue row (nothing is
-    // hidden, so a focused message window keeps focus).
-    const winEl = dialogue.find('[data-testid="message-window"]').element;
-    winEl.tabIndex = 0;
-    winEl.focus();
-    expect(document.activeElement).toBe(winEl);
+  describe("the dialogue focus home (webclient-dialogue-stage-actors D5)", () => {
+    const VM = dialogueViewModel({
+      schema_version: 2,
+      available: true,
+      kind: "dialogue",
+      host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
+      bond_stage: null,
+      line: "「渡河要五枚銅板。」",
+      choices: [{ keyword_id: "fare", label: "「就五枚，走嗎？」" }],
+    });
+
+    function mountLive(mode, extra = {}) {
+      const host = document.createElement("div");
+      host.id = "elosern-app";
+      document.body.appendChild(host);
+      wrapper = mount(AppShell, {
+        attachTo: host,
+        props: { mode, dialogue: mode === "dialogue" ? VM : null, ...extra },
+        slots: { "action-dock": () => h(ActionDock, { mode }) },
+      });
+      return wrapper;
+    }
+
+    it("moves focus from the dock to the first dialogue row on entering dialogue", async () => {
+      const shell = mountLive("exploration");
+      const dock = document.getElementById("action-dock");
+      dock.focus();
+      expect(document.activeElement).toBe(dock);
+      await shell.setProps({ mode: "dialogue", dialogue: VM });
+      await nextTick();
+      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+    });
+
+    it("returns focus from a dialogue row to the dock on leaving dialogue", async () => {
+      const shell = mountLive("dialogue");
+      shell.get('[data-testid="dialogue-pick"]').element.focus();
+      await shell.setProps({ mode: "exploration", dialogue: null });
+      await nextTick();
+      await nextTick();
+      expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    });
+
+    for (const nextMode of ["combat", "creation"]) {
+      it(`moves focus from a dialogue row to the dock when dialogue gives way to ${nextMode}`, async () => {
+        const shell = mountLive("dialogue");
+        shell.get('[data-testid="dialogue-pick"]').element.focus();
+        await shell.setProps({ mode: nextMode, dialogue: null });
+        await nextTick();
+        await nextTick();
+        expect(document.activeElement).toBe(document.getElementById("action-dock"));
+      });
+    }
+
+    it("leaves a focus outside the dock and the band alone on entering dialogue", async () => {
+      const shell = mountLive("exploration");
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+      await shell.setProps({ mode: "dialogue", dialogue: VM });
+      await nextTick();
+      expect(document.activeElement).toBe(outside);
+    });
+
+    it("rescues focus from a hiding vitals island to the message window in dialogue", async () => {
+      const shell = mountLive("dialogue", { vitalsVisible: true });
+      const island = document.createElement("div");
+      island.setAttribute("data-testid", "status-panel");
+      island.tabIndex = 0;
+      shell.get('[data-anchor="vitals"]').element.appendChild(island);
+      island.focus();
+      await shell.setProps({ vitalsVisible: false });
+      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+    });
+
+    it("an Escape from the command line in dialogue lands on the first dialogue row", async () => {
+      const shell = mountLive("dialogue");
+      await shell.vm.focusCommandField();
+      expect(document.activeElement?.id).toBe("inputfield");
+      shell.vm.releaseCommandField(true);
+      expect(document.activeElement).toBe(shell.get('[data-testid="dialogue-pick"]').element);
+    });
   });
 
   it("tracks commandLineExpanded on [data-anchor='command-line'] and hides the collapsed anchor in stage CSS", async () => {

@@ -425,11 +425,11 @@ describe("MessageWindow dialogue variant", () => {
     ...seqLines(2, [["in", "talk 灰婆婆"], ["out", reply]]),
   ];
 
-  it("renders the box, speaker and bond, the reply once, picks, free and exit rows", async () => {
+  it("renders the name plate with the bond, the reply once, picks, free and exit rows", async () => {
     const w = await mountDialogue(talk(`灰婆婆說：${PANEL.line}`));
     expect(w.get('[data-testid="message-window"]').attributes("data-variant")).toBe("dialogue");
-    expect(w.get('[data-testid="dialogue-box"] .av').text()).toBe("灰");
-    expect(w.get('[data-testid="dialogue-who"]').text()).toContain("灰婆婆");
+    expect(w.find('[data-testid="dialogue-box"] .av').exists()).toBe(false);
+    expect(w.get('[data-testid="message-name-plate"]').text()).toContain("灰婆婆");
     expect(w.get('[data-testid="dialogue-bond"]').text()).toContain("羈絆 親睦");
     expect(w.get('[data-testid="dialogue-say"]').text()).toBe(PANEL.line);
     const dialogueText = w.get('[data-testid="message-dialogue"]').text();

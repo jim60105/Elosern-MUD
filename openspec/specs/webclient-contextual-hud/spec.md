@@ -35,7 +35,8 @@ the committed mode, or on any measurement: no frame, pane, line count, dialogue 
 change SHALL grow or shrink it. The band SHALL be divided into the message region `band-message`,
 covering the left two thirds of the band's width, and the command region `band-command`, covering
 the remaining right third; in creation mode, where the message region is hidden, the command region
-SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
+SHALL span the whole band, and in dialogue mode, where the command region is collapsed, the message
+region SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
 the hairline top border, and the upward shadow) on the band itself, not on the content inside it.
 The stage box — the region between the top band's lower edge and the bottom band's upper edge — is
 where the scene is seen, and at the 1920x1080 reference viewport it SHALL be at least 65% of the
@@ -43,13 +44,19 @@ viewport's height — at least 702px of 1080; the 48px top band and the 300px bo
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
-SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset 6% of the stage
-width from its own side, and SHALL never cover the band. The `actor-left` anchor SHALL carry the
-player's standing portrait — the current roster character's portrait, resolved exactly as the
-stage portrait was before this requirement, with the truthful placeholder when no image exists —
-in exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry no content. The
-portrait anchors are non-interactive art: they SHALL carry no focusable element and SHALL NOT
-intercept pointer events, and they MAY sit behind the HUD islands and the command-line row.
+SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
+stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
+(the anchor's horizontal centre) under the island column on its side — the place card and vitals on
+the left, the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%. The `actor-left` anchor SHALL carry the
+player's stage actor — the current roster character's portrait, resolved exactly as the stage
+portrait was before this requirement, with the truthful placeholder when no image exists — in
+exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
+actor while the committed mode is `dialogue` and the committed `dialogue` panel is available, and SHALL
+carry no content in every other state. Both stage actors follow "Stage actors present the player and the
+dialogue host with a speaking state". The portrait anchors are non-interactive art: they SHALL carry no
+focusable element and SHALL NOT intercept pointer events, and they MAY sit behind the HUD islands and
+the command-line row.
 
 At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
 `band-message`, `band-command`, `command-line`) SHALL overlap another interactive anchor's content,
@@ -82,11 +89,11 @@ introduced into the band this way.
 
 #### Scenario: The bottom band keeps one height whatever it holds
 - **WHEN** the shell renders at 1920x1080 and the player moves through the exploration scene overview, a target's verb popover, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
-- **THEN** the bottom band's rendered height is 300px (±1px) in every one of those states, and the message region's and the command region's boxes are unchanged between them
+- **THEN** the bottom band's rendered height is 300px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
 
 #### Scenario: The band splits two thirds and one third
 - **WHEN** the shell renders in exploration mode at 1920x1080, 1440x900, and 1280x720
-- **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, and in creation mode the command region spans the whole band
+- **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, in creation mode the command region spans the whole band, and in dialogue mode the message region spans the whole band while the command region is not rendered
 
 #### Scenario: The player portrait stands on the band
 - **WHEN** the shell renders in exploration mode at 1920x1080 with a committed roster portrait for the current character
@@ -104,6 +111,14 @@ introduced into the band this way.
 - **WHEN** the shell renders in exploration mode with a committed location label and world time
 - **THEN** the top band's rendered height is 48px, no element inside the top band states the location label or the world time, and the place anchor below the top band states both
 
+#### Scenario: The dialogue host stands opposite the player
+- **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
+- **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
+
+#### Scenario: The host's face clears the minimap at the smaller viewports
+- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
+- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
+
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
 visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
@@ -113,30 +128,34 @@ the accessibility tree and the tab order. The matrix SHALL be:
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | place card (location, world time) | visible | visible | visible | hidden |
-| message window (band message region) | visible | visible | visible (dialogue variant) | hidden |
+| message window (band message region) | visible | visible | visible (whole band width, dialogue variant, name plate) | hidden |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
 | minimap island | visible | **hidden** | visible | hidden |
 | party quickbar island | while the party is non-empty | while the party is non-empty | while the party is non-empty | hidden |
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
-| player standing portrait | visible | visible | visible | hidden |
-| action dock (band command region) | visible | visible | visible (regular exploration form) | visible (creation form, full band width) |
+| player standing portrait (`actor-left`) | visible | visible | visible (dimmed while the host speaks) | hidden |
+| dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
+| action dock (band command region) | visible | visible | **hidden** (command region collapsed) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
 | command line (row on the message region's top edge) | while expanded | while expanded | while expanded | hidden |
 | scene backdrop | visible (exploration stage) | visible (combat stage) | visible (unchanged art) | visible |
 
 While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
-exploration art truthfully — the reference's dialogue focus is carried by the dialogue box
-itself, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
+exploration art truthfully — the dialogue's focus is carried by the stage actors, the name plate, and
+the message window, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
 sets SHALL stay consistent with this matrix. A cell that names a data rule instead of `visible` means
 the surface is shown in that mode only while its own requirement's rule holds for the committed state,
 and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
 says so). The command line's `while expanded` cell is such a rule: its own requirement defines when the
 row is expanded, and a collapsed row is hidden with `display:none` exactly like a mode-hidden surface.
-When a mode change, a committed revision that turns a surface's data rule false, or a collapse of the
-command line hides the surface that currently holds focus, the shell SHALL move focus to the action
-dock before the surface is removed, using the existing focus-restore path. A mode change into creation
-SHALL also collapse the command line, so leaving creation never reveals an expanded row.
+Each playing mode has one focus home: the action dock in exploration, combat, and creation mode, and
+the message window's focus target in dialogue mode, as "The command region collapses in dialogue mode
+and the message window spans the band" defines. When a mode change, a committed revision that turns a
+surface's data rule false, or a collapse of the command line hides the surface that currently holds
+focus, the shell SHALL move focus to the focus home of the mode being entered or kept before the
+surface is removed, using the existing focus-restore path. A mode change into creation SHALL also
+collapse the command line, so leaving creation never reveals an expanded row.
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
@@ -147,19 +166,18 @@ SHALL also collapse the command line, so leaving creation never reveals an expan
 - **THEN** the minimap island renders again with the committed `local_map` payload
 
 #### Scenario: Focus is rescued before its surface is hidden
-- **WHEN** the focused element belongs to a surface that the incoming mode hides
-- **THEN** focus is moved to the action dock before the surface is removed, and no focus is lost to the document body
+- **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip when the incoming mode is dialogue
+- **THEN** focus is moved to the incoming mode's focus home before the surface is removed, and no focus is lost to the document body
 
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
 - **THEN** the place card, the message window, the command-line toggle, the log control, the `vitals` and `map` anchors with every island in them, the player standing portrait, and the command line are absent, and the action dock renders the creation form across the whole bottom band
 
 #### Scenario: Dialogue mode keeps the cockpit visible
-- **WHEN** the committed mode changes from exploration to dialogue
-- **THEN** the place card, message window, minimap, player standing portrait, action dock, command-line toggle, and log control all
-  remain rendered, the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals and party islands keep following the same data rules as in
-  exploration, the action dock keeps its regular exploration form
-  with every ordinary root affordance present, and only the message window's presentation changes
+- **WHEN** the committed mode changes from exploration to dialogue with an available `dialogue` panel
+- **THEN** the place card, message window, minimap, player standing portrait, command-line toggle, and log control all
+  remain rendered, the dialogue host's standing portrait is rendered in `actor-right`, the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals and party islands keep following the same data rules as in
+  exploration, the action dock is hidden with `display:none` together with the band's command region while the message window spans the whole band with the host's name plate, and the `#action-dock` element is not removed from the document
 
 #### Scenario: Dialogue backdrop keeps its committed art
 - **WHEN** the committed mode is dialogue
@@ -239,7 +257,8 @@ stage anchors but are absolutely positioned within the same full-bleed stage.
 
 ### Requirement: The message window presents the current response one page at a time in the band's message region
 The narrative SHALL render as a message window that fills the bottom band's message region — the left
-two thirds of the band, at the band's fixed height — drawn with the reference's caption panel
+two thirds of the band, or the whole band in dialogue mode, at the band's fixed height — drawn with the
+reference's caption panel
 treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The window
 SHALL never grow into the stage and SHALL never change size with its content. Outside the dialogue
 variant, the window SHALL present exactly one page of the current response at a time, paged as
@@ -247,7 +266,7 @@ variant, the window SHALL present exactly one page of the current response at a 
 present earlier responses: they remain readable in the full-log surface. Page text SHALL be set in the
 serif reading face at 28px at the 1920x1080 reference size and the default prose scale, SHALL scale
 with the viewport height and with the client's prose scale, and SHALL hold at most 42 CJK characters
-per line.
+per line in every mode, including the whole-band width of dialogue mode.
 
 The window's lower edge SHALL keep a control strip in which no page text renders. The strip SHALL
 hold a page marker and, at its right end, a labelled `日誌` control beside the command-line toggle.
@@ -260,13 +279,14 @@ scroll inside the window's text area; it SHALL never be truncated and SHALL neve
 The `日誌` control SHALL open the full-log surface in one action. Scrolling up over a page that has
 nothing left to scroll up SHALL also open it. The full-log surface's content, markup renderer, focus
 trap, Escape close, focus restore to the opening control, and opening at its latest line are
-unchanged. The window SHALL render no head row, no unread indicator, and no jump-to-latest control. In
-creation mode the window, its marker, and the `日誌` control are hidden with the message region.
+unchanged. The window SHALL render no unread indicator and no jump-to-latest control, and no head row
+other than the dialogue name plate its dialogue variant defines. In creation mode the window, its
+marker, and the `日誌` control are hidden with the message region.
 
 #### Scenario: The window keeps the message region's box
 - **WHEN** the current response holds more text than one page and new lines keep arriving
 - **THEN** the window keeps the message region's box — the band's height and two thirds of its
-  width — and never expands into the stage
+  width, or the whole band in dialogue mode — and never expands into the stage
 
 #### Scenario: One page of the current response is shown
 - **WHEN** the log holds three responses and the latest one fills two pages
@@ -274,9 +294,9 @@ creation mode the window, its marker, and the `日誌` control are hidden with t
   earlier responses is rendered in the window
 
 #### Scenario: The page measure is bounded at the reference size
-- **WHEN** the stage renders at 1920x1080 with the default prose scale and a long prose response
+- **WHEN** the stage renders at 1920x1080 with the default prose scale and a long prose response, in exploration mode and in dialogue mode with the panel transiently unavailable
 - **THEN** the page text's computed font size is 28px (±0.5px) and no rendered text line holds more
-  than 42 CJK characters
+  than 42 CJK characters in either mode
 
 #### Scenario: The marker names more pages and the last page
 - **WHEN** the current response has two pages, page 1 types to its end, and the player advances
@@ -715,7 +735,8 @@ SHALL carry whatever glyph best represents it.
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
 The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the
-scrolling region, in exploration, dialogue, and combat mode (never in creation mode), matching
+scrolling region, in exploration and combat mode (never in creation mode, and never visibly in
+dialogue mode, where the strip is hidden with the collapsed command region), matching
 `docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text
 `數字鍵 1–9 · ` followed by an `<kbd>` element naming `Enter`
 and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`.
@@ -738,22 +759,23 @@ for the scene overview, its first nine chips in reading order: exits, then peopl
 the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the
 same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an
 in-flight entry stays locked, and a held repeat is suppressed.
-The slots address the frame's rendered entries, disabled ones included. While the message window
-presents the dialogue variant with at least one pick, the slots address the window's pick rows
-instead of the dock's entries — the trailing free-dialogue and exit rows never take
-a digit slot — and the dock's own entries claim no digit while that hold applies.
+The slots address the frame's rendered entries, disabled ones included. In dialogue mode the dock's
+entries claim no digit: while the message window presents the dialogue variant with at least one pick,
+a digit pressed from a non-editable focus addresses the window's pick rows — the trailing free-dialogue
+and exit rows never take a digit slot.
 A digit whose entry does not exist (a frame with fewer rendered entries, a dialogue variant with no
-picks, or
+picks, dialogue mode without the variant, or
 the pre-session empty stack) is not claimed and falls
 through to the text / command-history path.
 
 #### Scenario: The legend renders once
-- **WHEN** the dock renders in exploration, dialogue, or combat mode, at the overview, in a child frame, or at the combat root
+- **WHEN** the dock renders in exploration or combat mode, at the overview, in a child frame, or at the combat root, and later the mode changes to dialogue
 - **THEN** exactly one element carries the shortcut-legend text and test hook, it is the dock's
-  legend strip, and no tab bar or pane renders a duplicate copy
+  legend strip, no tab bar or pane renders a duplicate copy, and in dialogue mode the strip is hidden
+  with the command region and no other element shows a legend
 
 #### Scenario: The legend matches the reference wording and kbd structure
-- **WHEN** the dock renders its legend strip in exploration, combat, or dialogue mode
+- **WHEN** the dock renders its legend strip in exploration or combat mode
 - **THEN** the legend reads `數字鍵 1–9 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
 
@@ -770,10 +792,10 @@ through to the text / command-history path.
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
-- **WHEN** the dialogue variant renders its four picks (the panel-owned `DIALOGUE_MAX_CHOICES` bound) over the dock's scene overview and the player presses
-  `4` and `5` from a non-editable focus
+- **WHEN** the dialogue variant renders four picks while the command region is collapsed and the
+  player presses `4` and `5` from a non-editable focus
 - **THEN** the `4` press activates pick four through the same dispatch entry, the `5` press
-  is unclaimed and falls through, and no dock chip is focused or activated
+  is unclaimed and falls through, and the hidden dock's focus and frame are unchanged
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 
@@ -1286,8 +1308,10 @@ cluster, and the command-history controls. The bar SHALL carry no quick-word chi
 writes a fixed command word into the field, and no overlay or drawer opener: those openers live in the
 top navigation bar's tool group. The `command-line` anchor SHALL be one row 44px tall docked to the top
 edge of the bottom band's message region: its lower edge SHALL coincide with the band's upper edge, it
-SHALL extend from the left HUD island column's right edge to the message region's right edge, and it
-SHALL overlay the lowest strip of the stage box, never the band and never the message text.
+SHALL extend from the left HUD island column's right edge to the right edge of the band's left two
+thirds in every mode — so in dialogue mode, where the message region spans the whole band, it stops
+short of the dialogue host's portrait — and it SHALL overlay the lowest strip of the stage box, never
+the band and never the message text.
 
 The command line SHALL be collapsed by default. It SHALL start collapsed on every mount of the shell,
 and its expanded state SHALL be client-local and never persisted, so no stored presentation state can
@@ -1303,7 +1327,8 @@ narrative, the dialogue variant, or the dock frame.
 The command line SHALL expand, and focus SHALL move into its input field only after the row is
 rendered, on exactly three paths: `/` pressed while no editable control is focused, activation of the ⌨
 toggle while the row is collapsed, and the free-form dialogue borrow. It SHALL collapse, with focus
-moved to the action dock before the row is hidden, on exactly two paths: Escape in the input field, and
+moved to the current mode's focus home (the action dock, or the message window's focus target in
+dialogue mode) before the row is hidden, on exactly two paths: Escape in the input field, and
 a send the field accepts (the field clears). Activating the ⌨ toggle while the row is expanded SHALL
 collapse it and leave focus on the toggle. A send the field rejects — offline, mutations locked, or a
 mutation in flight — SHALL leave the row expanded with the typed text and focus in the field. Losing
@@ -1321,8 +1346,8 @@ visibility matrix.)
 - **THEN** the command-line row is hidden with `display:none`, the input field is present in the DOM but outside the tab order, the ⌨ toggle is rendered at the message region's bottom-right with `aria-expanded="false"`, and pressing `/` or activating the toggle once renders the row and puts focus in the input field
 
 #### Scenario: The expanded row keeps its geometry at the minimum viewport
-- **WHEN** the command line is expanded at 1280x720 and at 1920x1080
-- **THEN** the row is 44px tall (±1px), its lower edge sits on the bottom band's upper edge, its horizontal extent runs from the left HUD column's right edge to the message region's right edge, its rendered box intersects no HUD island anchor, band region, or other interactive stage anchor, and the input field, its send control, and the history controls are all rendered
+- **WHEN** the command line is expanded at 1280x720 and at 1920x1080, in exploration mode and in dialogue mode
+- **THEN** the row is 44px tall (±1px), its lower edge sits on the bottom band's upper edge, its horizontal extent runs from the left HUD column's right edge to the right edge of the band's left two thirds, its rendered box intersects no HUD island anchor, band region, or other interactive stage anchor, and the input field, its send control, and the history controls are all rendered
 
 #### Scenario: Constrained width drops the hint before any control
 - **WHEN** the bar's content exceeds its available width
@@ -1345,7 +1370,7 @@ visibility matrix.)
 - **THEN** the row is hidden, the toggle reports `aria-expanded="false"`, and focus is on the toggle
 
 #### Scenario: The free-form borrow expands the line
-- **WHEN** the command line is collapsed and the player activates a free-form dialogue entry (the dock's free-form row or the dialogue variant's free-dialogue row)
+- **WHEN** the command line is collapsed and the player activates the dialogue variant's free-dialogue row
 - **THEN** the row expands, focus moves into the input field, and no action is dispatched until the player sends
 
 #### Scenario: No opener or chip is rendered in the bar
@@ -1355,6 +1380,10 @@ visibility matrix.)
 #### Scenario: The expanded state is never restored from storage
 - **WHEN** the player expands the command line and reloads the page
 - **THEN** the reloaded shell renders the command line collapsed
+
+#### Scenario: Escape in dialogue returns to the message window
+- **WHEN** the committed mode is dialogue, the player expands the command line with `/`, and presses Escape
+- **THEN** nothing is sent, the row is hidden, and focus is on the message window's focus target, never on the hidden action dock or the document body
 
 ### Requirement: The command line advertises only affordances this client implements
 The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
@@ -1727,19 +1756,18 @@ optional or previous-stage rows.
 ### Requirement: The feed presents the dialogue variant from the committed panel
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the
 message window SHALL be the ONE dialogue surface and SHALL present the reference's dialogue
-variant, unpaged: a dialogue box carrying the
-host's avatar (the bound portrait through the client's art catalog when the row's `portrait_ref`
-resolves, otherwise the display name's initial letter in the reference's gold display face), a
-gold speaker line carrying the host's `display_name` plus ` · 羈絆 <stage>` only when
-`bond_stage` is non-null, and the serif reply line carrying the panel's `line` verbatim; below
-the box, one numbered pick row per `dialogue.choices` entry in payload order with its mono
-digit badge and bounded label, laid out in a compact row grid (at most two pick columns),
-followed by a trailing free-dialogue row (`⌨` badge,
+variant, unpaged, across the whole band: a name plate at the top of the window carrying the host's
+`display_name` plus ` · 羈絆 <stage>` only when `bond_stage` is non-null, then a dialogue box
+carrying the serif reply line with the panel's `line` verbatim. The box SHALL carry no avatar and no
+speaker line of its own: the host's portrait stands in the stage's `actor-right` anchor and the name
+plate names the speaker. Below the box, the window SHALL present one numbered pick row per
+`dialogue.choices` entry in payload order with its mono digit badge and bounded label, laid out in a
+compact row grid (at most two pick columns), followed by a trailing free-dialogue row (`⌨` badge,
 `自由對話（輸入任意話語）→ 指令列`) and, after it, a trailing exit row (`✕` badge, label
 `結束對話`). The box SHALL follow the current response's lines (see `webclient-input-narrative`);
 earlier responses SHALL NOT be presented and remain in the full-log surface. The exchange SHALL keep
-the window's fixed box in the band's message region: when the response's lines, the box, picks, and
-trailing rows exceed it they SHALL scroll inside the window's text area, with the dialogue box at the
+the window's fixed box in the band: when the response's lines, the box, picks, and trailing rows
+exceed the text area below the name plate they SHALL scroll inside it, with the dialogue box at the
 top of that area when a new reply commits, and SHALL NOT grow the window or the band. While the
 variant renders, the window SHALL show no page marker, a pointer activation on the window SHALL NOT
 advance a page, and Enter and Space SHALL keep their meaning for the focused row. Activating a pick row SHALL dispatch
@@ -1754,15 +1782,15 @@ committed line exactly once — and SHALL
 NOT render picks the panel does not carry, reason tags, or disabled-row states. While mode is
 `dialogue` but the panel is unavailable (the transient window between a clear seam and its
 commit), the window SHALL fall back to its paged presentation of the current response with no
-dialogue box. The dialogue variant SHALL NOT depend on any dock frame or router
+name plate and no dialogue box. The dialogue variant SHALL NOT depend on any dock frame or router
 descriptor: its rows derive from the committed panel alone.
 
 #### Scenario: The dialogue box mirrors the committed panel
 - **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, a line, and four
   keyword choices
-- **THEN** the window shows the initial-letter gold avatar, the speaker line
-  `灰婆婆 · 羈絆 親睦`, the reply line, four numbered pick rows, the free-dialogue row, and the
-  exit row — with the reply line visible without scrolling while the picks render
+- **THEN** the window spans the whole band and shows the name plate `灰婆婆 · 羈絆 親睦`, the reply
+  line in a box with no avatar, four numbered pick rows, the free-dialogue row, and the exit row —
+  with the name plate and the reply line visible without scrolling while the picks render
 
 #### Scenario: A pick dispatches the scripted keyword
 - **WHEN** the player activates pick 2 through pointer or Enter
@@ -1785,34 +1813,12 @@ descriptor: its rows derive from the committed panel alone.
 
 #### Scenario: A transiently unavailable panel falls back plainly
 - **WHEN** mode is `dialogue` but the committed panel is the unavailable form
-- **THEN** no dialogue box, picks, or exit row render and the window shows the current response's
-  pages with their page marker
+- **THEN** no name plate, dialogue box, picks, or exit row render and the window shows the current
+  response's pages with their page marker
 
-### Requirement: The dock keeps its regular exploration form in dialogue mode
-While the committed mode is `dialogue`, the action dock SHALL render its ordinary exploration
-root — the same scene overview, verb popover, child frames, digit bindings outside the caption-retarget
-rule, and router behaviour as exploration mode — derived from the committed `exploration` panel, which keeps
-shipping its ordinary payload in dialogue mode. The dock SHALL NOT present a dialogue-specific
-root, SHALL NOT duplicate the dialogue panel's pick rows in the overview or any frame, and SHALL NOT remove any
-ordinary affordance while mode is `dialogue`. A mode switch into or out of `dialogue` SHALL
-re-home the router stack to the ordinary exploration root descriptor through the existing teardown
-decision point.
-
-#### Scenario: The dock stays usable during a conversation
-- **WHEN** mode commits to `dialogue` with the exploration panel's ordinary payload
-- **THEN** the dock shows the ordinary scene overview (exits, people, objects, and the footer)
-  with no `對話選項` entry and no pick-row frame anywhere
-
-#### Scenario: Movement stays one action away
-- **WHEN** the player activates an exit chip in the scene overview while a dialogue session is live
-- **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the
-  session through the existing seam, and the committed mode returns to `exploration`
-
-#### Scenario: Mode flips re-home the stack
-- **WHEN** a committed snapshot switches the mode from exploration to dialogue while a verb popover
-  or another exploration child frame is open
-- **THEN** the stack holds exactly the ordinary exploration root descriptor and no stale submenu
-  row remains activatable
+#### Scenario: An unbonded host's plate names only the host
+- **WHEN** mode `dialogue` commits with `bond_stage` `null`
+- **THEN** the name plate reads the host's `display_name` alone and carries no `羈絆` text
 
 ### Requirement: The skill book offers a bounded declared-practice sub-screen
 The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed
@@ -1870,21 +1876,25 @@ menu key, or the meaning of Escape.
 ### Requirement: The action dock fills the band's command region at a fixed size
 The action dock SHALL fill the bottom band's command region — the right third of the band, or the
 whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed
-elsewhere on the stage. Its box SHALL be the command region's box in every mode and for every frame:
-no frame (the scene overview, a target's verb popover, the waiting frame, the combat frames, the skill
-master-detail, the destructive confirmation, or an empty pane host) SHALL widen, heighten, shorten, or
-move it, and
-no surface outside the band SHALL be positioned from the frame the dock currently carries. The
+elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation
+mode and for every frame: no frame (the scene overview, a target's verb popover, the waiting frame, the
+combat frames, the skill master-detail, the destructive confirmation, or an empty pane host) SHALL
+widen, heighten, shorten, or move it, and
+no surface outside the band SHALL be positioned from the frame the dock currently carries. In dialogue
+mode the command region is collapsed and the dock SHALL be hidden with `display:none` together with it,
+as "The command region collapses in dialogue mode and the message window spans the band" states; it
+SHALL NOT be rendered anywhere else in that mode. The
 content column SHALL be laid out as fixed chrome — the combat root's tab bar in combat mode and no bar
-in exploration or dialogue mode, an optional breadcrumb line, and the shortcut-legend strip at the
+in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the
 bottom — around one remaining region that holds the current frame's rows or chips; that region SHALL
 be the surface's only scrolling area, so no dock content is ever pushed outside the command region.
 A target's verb popover SHALL render as a card laid over that region's visible box, inside the command
 region, and SHALL scroll inside its own card when its rows exceed it. A frame whose content
 does not fit the region's width SHALL wrap or collapse its own columns inside the region, never
 overflow it horizontally. The panel SHALL be the same single `#action-dock` element in every mode,
-carrying its existing tab index, its `data-mode` attribute and its role as the surface's documented
-focus target, and SHALL NOT be remounted when the mode changes.
+carrying its existing tab index, its `data-mode` attribute and its role as the documented focus home
+of every mode except dialogue, and SHALL NOT be remounted when the mode changes, including a change
+into or out of dialogue.
 
 The command region SHALL use the current charcoal-and-gold presentation, and the band that contains
 it SHALL paint the reference's band chrome. Selected actions remain distinguishable by text and shape
@@ -1904,9 +1914,10 @@ as well as their gold or warm-red emphasis.
   and the legend strip) stays fixed, and no row or chip is rendered outside the command region
 
 #### Scenario: One dock element persists across a mode change
-- **WHEN** the committed mode changes between exploration, combat and creation
+- **WHEN** the committed mode changes between exploration, dialogue, combat and creation
 - **THEN** exactly one `#action-dock` element exists at every point, its `data-mode` attribute
-  switches to the new mode, and it is not removed and re-created
+  switches to the new mode, it is hidden with `display:none` exactly while the mode is dialogue, and
+  it is not removed and re-created
 
 #### Scenario: The panel stays inside its region at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with the deepest combat frame open
@@ -2004,3 +2015,96 @@ wrap by width under the section geometry the exploration dock requirement define
 #### Scenario: Rendered width never changes the keyboard cell mapping
 - **WHEN** the player presses ArrowRight in a pane whose keyboard geometry fixes two columns
 - **THEN** focus reaches the row that the fixed column count places in the second column, whatever width each row renders at
+
+### Requirement: The command region collapses in dialogue mode and the message window spans the band
+While the committed mode is `dialogue`, the bottom band's command region SHALL be collapsed: it and
+the action dock inside it SHALL be hidden with `display:none`, and the message region SHALL span the
+band's whole width at the band's fixed height. The dock SHALL stay the same mounted `#action-dock`
+element, its router SHALL keep the exploration scene overview as its only frame (the reset on entering
+dialogue that `webclient-exploration-menu` defines), and leaving dialogue SHALL show that overview
+again with no remount. The dialogue SHALL NOT present any dock frame, and no exploration affordance
+SHALL be removed from the committed `exploration` panel: movement stays reachable through the minimap
+and the conversation's own controls.
+
+In dialogue mode the shell's focus home SHALL be the message window's focus target: the first row of
+the dialogue variant while it renders, and otherwise the window's page surface. Every path that returns
+focus to the focus home — the command line's Escape and accepted send, the mode-change rescue, and the
+return after a completed or rejected action — SHALL land there, never on the hidden dock and never on
+the document body. On entering dialogue, focus held inside the command region SHALL move to the
+message window before the region is hidden. On leaving dialogue for exploration, focus held inside the
+message region or on the document body SHALL move to the action dock once the region is rendered
+again.
+
+While the mode is `dialogue`, the keyboard bridge SHALL claim only `/` (the command-line opener) and the
+digits that address the dialogue variant's picks; every other key SHALL be unclaimed by the dock
+router, so no key moves the hidden dock's focus, pushes or pops a frame, or activates a hidden entry.
+Enter and Space on a focused dialogue row keep their native activation.
+
+#### Scenario: Entering dialogue collapses the command region
+- **WHEN** the player activates 交談 in a host's verb popover at 1920x1080 and the commit makes the mode `dialogue`
+- **THEN** the band's command region and the `#action-dock` element are hidden with `display:none`, the message region spans the band's whole width at 300px (±1px) height, and focus is on the dialogue variant's first row
+
+#### Scenario: Leaving dialogue restores the overview without a remount
+- **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
+- **THEN** the same `#action-dock` element is rendered in the command region at the scene overview with no popover open, and focus is on the action dock
+
+#### Scenario: Keys never drive the hidden dock
+- **WHEN** the mode is dialogue, focus is on the document body, and the player presses ArrowRight, Enter, and Escape
+- **THEN** none of the keys is claimed by the dock router, the router's focused key and depth are unchanged, and no `ui_action` is emitted
+
+#### Scenario: Slash still opens the command line in dialogue
+- **WHEN** the mode is dialogue, no editable control is focused, and the player presses `/`
+- **THEN** the command line expands and focus moves into its input field with no literal `/` inserted
+
+#### Scenario: Movement stays reachable during a conversation
+- **WHEN** a dialogue session is live and the player activates an adjacent minimap node
+- **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the session through the existing seam, the committed mode returns to `exploration`, and the command region renders the new room's overview
+
+### Requirement: Stage actors present the player and the dialogue host with a speaking state
+Each standing portrait on the stage SHALL be rendered by one stage-actor component. The player's stage
+actor in `actor-left` SHALL present the current roster character's portrait. The dialogue host's stage
+actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry named by the
+committed `dialogue` panel's `host.portrait_ref` — the image with its face-rect crop when the entry
+carries one, and the entry's own placeholder card — its own label, with the host display name's
+initial as the card's glyph — when the entry is a placeholder. When `portrait_ref`
+is `null` or names no catalog entry, the host's stage actor SHALL render the truthful placeholder: the
+host display name's initial and the display name, never a stock or guessed image. The client SHALL
+NOT construct a catalog key from the host identity or any other field.
+
+While the committed mode is `dialogue` and the host's stage actor renders, the stage actors SHALL carry
+a speaking state. The speaker SHALL
+render at full brightness and the other side SHALL render dimmed to 60% brightness, from one shared
+dim token. The host SHALL be the speaker, except while a `explore.talk_scripted` or
+`explore.talk_freeform` action the player submitted is in flight — from its dispatch until its result
+is handled and its declared presentation revision is accepted, or until it is rejected — during which
+the player SHALL be the speaker. The speaking state SHALL be derived from the dispatch state, the
+committed mode, and the panel's availability only, never from narrative prose. Outside dialogue mode,
+and in dialogue mode while the `dialogue` panel is unavailable, no stage actor SHALL be dimmed.
+The dim SHALL NOT be the only indication of who is speaking: the name plate names the host, and the
+speaking state SHALL be exposed on each stage actor as a data attribute for tests. The stage actors are
+decorative art and SHALL carry no focusable element; this requirement covers static states only, and
+any transition between them is owned by the motion layer.
+
+#### Scenario: The host portrait comes from the art catalog
+- **WHEN** the committed `dialogue` panel names `portrait_ref` `"41"` and the committed `art` panel's catalog entry `"41"` carries an image URL and a face rectangle
+- **THEN** the host's stage actor renders that image with the face-rect crop, and no other image source is requested
+
+#### Scenario: A pending or missing portrait shows the truthful placeholder
+- **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安·衛登` opens a conversation
+- **THEN** the first stage actor shows the entry's placeholder card with its own label and the host's initial, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
+
+#### Scenario: The host speaks and the player is dimmed
+- **WHEN** a conversation opens and the host's greeting commits
+- **THEN** the host's stage actor renders at full brightness with `data-speaking="true"`, and the player's stage actor renders at 60% brightness with `data-speaking="false"`
+
+#### Scenario: The player is lit until the reply commits
+- **WHEN** the player activates a pick, and the `explore.talk_scripted` request stays in flight until its reply's revision is accepted
+- **THEN** from the dispatch until that revision is accepted the player's stage actor is at full brightness and the host's is dimmed, and once the reply commits the host is lit and the player dimmed again
+
+#### Scenario: A rejected choice returns the light to the host
+- **WHEN** the player's `explore.talk_freeform` request is rejected
+- **THEN** once the rejection is handled the host's stage actor is lit and the player's is dimmed
+
+#### Scenario: Nothing is dimmed outside dialogue
+- **WHEN** the committed mode is exploration or combat
+- **THEN** the player's stage actor renders at full brightness and `actor-right` carries no stage actor

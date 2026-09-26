@@ -6,6 +6,7 @@ import { useElosernStore } from "../../stores/elosern.js";
 import { createWindowBridge } from "../../bridge.js";
 import * as protocolFixtures from "../../tests/store/protocol_fixtures.js";
 import {
+  ART_PANEL_PENDING_SAMPLE,
   ART_PANEL_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
   COMMAND_HISTORY_SAMPLE,
@@ -196,9 +197,26 @@ const renderPlayer = (args) => ({
             switch_locked: false,
             lock_reason: null,
           },
+          // The dialogue host's catalog entry (webclient-dialogue-stage-
+          // actors): an image, a pending placeholder card, or no entry at all
+          // (`portrait_ref` null → the name's initial and the name).
+          ...(args.dialogue && args.dialogue !== "missing" ? { art: {
+            ...ART_PANEL_PENDING_SAMPLE,
+            portrait_catalog: {
+              "7": args.dialogue === "pending" ? {
+                subject_key: "npc_7", status: "pending", url: null, aspect_ratio: null,
+                alt: "店長的肖像", placeholder: { kind: "missing", label: "肖像生成中" },
+                face_rect: null, context: { name: "店長", role: "對話對象" },
+              } : {
+                subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
+                alt: "店長的肖像", placeholder: null,
+                face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
+              },
+            },
+          } } : {}),
           ...(args.dialogue ? { dialogue: {
             schema_version: 2, available: true, kind: "dialogue",
-            host: { identity: 7, display_name: "店長", portrait_ref: null },
+            host: { identity: 7, display_name: args.dialogue === "missing" ? "合成·旅人" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
             bond_stage: "熟識",
             line: "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。",
             choices: [
@@ -213,6 +231,9 @@ const renderPlayer = (args) => ({
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      // The player speaking: a pick in flight (no transport is attached, so
+      // the request stays open and the player stays lit).
+      if (args.playerSpeaking) store.dispatchAction("explore.talk_scripted", { npc_id: 7, keyword_id: "news" }, null);
       if (args.practice) {
         store.openHudDrawer("skill");
         await nextTick();
@@ -232,7 +253,16 @@ export const ActionNavigation = { render: renderPlayer, args: {} };
 // A person chip's verb popover (webclient-scene-overview-swap): the overview
 // stays rendered beneath it while the popover's card covers the pane.
 export const VerbPopoverSelector = { render: renderPlayer, args: { pane: "target-7" } };
+// Dialogue (webclient-dialogue-stage-actors): the command region collapses,
+// the message window spans the band under the host's name plate, and the
+// host stands opposite the player — lit while speaking, the player dimmed.
 export const DialogueSelector = { render: renderPlayer, args: { dialogue: true } };
+// The player's pick is in flight: the player is lit and the host dimmed.
+export const DialoguePlayerSpeaking = { render: renderPlayer, args: { dialogue: true, playerSpeaking: true } };
+// The host's catalog entry is still generating: its own placeholder card.
+export const DialogueHostPending = { render: renderPlayer, args: { dialogue: "pending" } };
+// The host is not in the catalog: the name's initial and the name.
+export const DialogueHostMissing = { render: renderPlayer, args: { dialogue: "missing" } };
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
 export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
 // The island anchors populated (webclient-avg-stage-hud-anchors): vitals,

@@ -254,17 +254,162 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.dialogue_leave"), 1)
 
     @covers_requirement(
+        "webclient-contextual-hud::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state"
+    )
+    def test_dialogue_stage_collapses_the_band_and_stands_both_actors(self):
+        """webclient-dialogue-stage-actors at 1920x1080.
+
+        交談 collapses the command region (the dock stays mounted, hidden),
+        the message window spans the 300px band under the host's name plate,
+        the host stands in `actor-right` lit while the player is dimmed, a
+        pick lights the player until its reply commits, `/` then Escape
+        returns focus to the first dialogue row, and 結束對話 brings the dock
+        back at the overview with focus on it.
+        """
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        dock_handle = page.evaluate_handle("() => document.getElementById('action-dock')")
+
+        host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
+        activate_overview_chip(page, "target-%s" % host_identity)
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s)
+            and s.get("mode") == "dialogue"
+            and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        page.wait_for_selector('[data-anchor="actor-right"] [data-testid="stage-actor"]')
+        page.wait_for_timeout(150)
+        geometry = page.evaluate(
+            """() => {
+              const box = (sel) => {
+                const el = document.querySelector(sel);
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+              };
+              const band = box('[data-testid="stage-band"]');
+              const dock = document.getElementById('action-dock');
+              const active = document.activeElement;
+              return {
+                band,
+                message: box('[data-anchor="band-message"]'),
+                commandDisplay: getComputedStyle(document.querySelector('[data-anchor="band-command"]')).display,
+                dockDisplayed: !!dock && dock.getClientRects().length > 0,
+                dockConnected: !!dock && dock.isConnected,
+                hostSide: document.querySelector('[data-anchor="actor-right"] [data-testid="stage-actor"]').dataset.side,
+                hostSpeaking: document.querySelector('[data-anchor="actor-right"] [data-testid="stage-actor"]').dataset.speaking,
+                playerSpeaking: document.querySelector('[data-anchor="actor-left"] [data-testid="stage-actor"]').dataset.speaking,
+                playerFilter: getComputedStyle(document.querySelector('[data-anchor="actor-left"] [data-testid="stage-actor"]')).filter,
+                host: box('[data-anchor="actor-right"]'),
+                player: box('[data-anchor="actor-left"]'),
+                plate: (document.querySelector('[data-testid="message-name-plate"]') || {}).textContent || null,
+                activeIsFirstRow: active === document.querySelector('[data-testid="message-dialogue"] .pick'),
+                activeIsBody: active === document.body,
+              };
+            }"""
+        )
+        self.assertEqual(geometry["commandDisplay"], "none")
+        self.assertFalse(geometry["dockDisplayed"])
+        self.assertTrue(geometry["dockConnected"])
+        self.assertTrue(
+            page.evaluate("(dock) => dock === document.getElementById('action-dock')", dock_handle),
+            "the dock element must not be remounted on entering dialogue",
+        )
+        self.assertAlmostEqual(geometry["message"]["width"], 1920, delta=1)
+        self.assertAlmostEqual(geometry["message"]["height"], 300, delta=1)
+        self.assertAlmostEqual(geometry["band"]["height"], 300, delta=1)
+        self.assertEqual(geometry["hostSide"], "right")
+        self.assertEqual(geometry["hostSpeaking"], "true")
+        self.assertEqual(geometry["playerSpeaking"], "false")
+        self.assertEqual(geometry["playerFilter"], "brightness(0.6)")
+        # The host stands on the band, 6% in from the right, as tall as the player.
+        self.assertAlmostEqual(geometry["host"]["bottom"], geometry["band"]["top"], delta=1)
+        self.assertAlmostEqual(1920 - geometry["host"]["right"], 1920 * 0.06, delta=1)
+        self.assertAlmostEqual(geometry["host"]["height"], geometry["player"]["height"], delta=1)
+        self.assertTrue(geometry["plate"])
+        self.assertTrue(geometry["activeIsFirstRow"], "entering dialogue focuses the first row")
+        self.assertFalse(geometry["activeIsBody"])
+
+        # A pick lights the player until its reply commits: record every
+        # speaking state the player's actor passes through.
+        page.evaluate(
+            """() => {
+              const actor = document.querySelector('[data-anchor="actor-left"] [data-testid="stage-actor"]');
+              window.__speakingTrail = [actor.dataset.speaking];
+              new MutationObserver(() => window.__speakingTrail.push(actor.dataset.speaking))
+                .observe(actor, { attributes: true, attributeFilter: ['data-speaking'] });
+            }"""
+        )
+        result_before_pick = (store_state(page).get("lastActionResult") or {}).get("requestId")
+        _press(page, "1", wait_ms=0)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") not in (None, result_before_pick)
+            and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        page.wait_for_timeout(150)
+        trail = page.evaluate("() => window.__speakingTrail")
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        self.assertIn("true", trail, "the player must be lit while the pick is in flight")
+        self.assertEqual(trail[-1], "false", "the host speaks again once the reply commits")
+
+        # `/` opens the command line; Escape returns to the window's first row.
+        _press(page, "/")
+        self.assertEqual(page.evaluate("() => document.activeElement && document.activeElement.id"), "inputfield")
+        _press(page, "Escape", wait_ms=150)
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement === document.querySelector('[data-testid=\"message-dialogue\"] .pick')"
+            ),
+            "Escape in dialogue must land on the first dialogue row",
+        )
+
+        # 結束對話 brings the dock back at the overview, focused, not remounted.
+        result_before_exit = (store_state(page).get("lastActionResult") or {}).get("requestId")
+        page.click('[data-testid="dialogue-exit"]')
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") not in (None, result_before_exit)
+            and s.get("mode") == "exploration",
+        )
+        page.wait_for_timeout(150)
+        after = page.evaluate(
+            """(dock) => ({
+              same: dock === document.getElementById('action-dock'),
+              visible: dock.getClientRects().length > 0,
+              focused: document.activeElement === dock || dock.contains(document.activeElement),
+              hostActors: document.querySelectorAll('[data-anchor="actor-right"] [data-testid="stage-actor"]').length,
+              playerSpeaking: document.querySelector('[data-anchor="actor-left"] [data-testid="stage-actor"]').dataset.speaking,
+            })""",
+            dock_handle,
+        )
+        self.assertEqual(
+            after,
+            {"same": True, "visible": True, "focused": True, "hostActors": 0, "playerSpeaking": "true"},
+        )
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        self.assertEqual(store_state(page)["dockSource"], "exploration.root")
+
+    @covers_requirement(
         "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel"
     )
-    def test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary(self):
+    def test_dialogue_surface_is_the_caption_and_the_dock_collapses(self):
         # The leave-requirement annotation (delta id
         # webclient-dialogue-session::explore-dialogue-leave-ends-the-live-session-through-the-sole-writer)
         # is added at delta sync — the traceability gate only recognizes
         # main-spec ids during the change window.
-        """webclient-align-11-dialogue-ux: entering dialogue keeps the dock in
-        its ordinary exploration form (no 對話選項 mirror tab); the caption's
-        scripted pick dispatches by digit; the caption's exit row ends the
-        session and the committed snapshot restores exploration."""
+        """webclient-align-11-dialogue-ux / webclient-dialogue-stage-actors:
+        entering dialogue keeps the (collapsed, hidden) dock in its ordinary
+        exploration form (no 對話選項 mirror tab); the caption's scripted pick
+        dispatches by digit; the caption's exit row ends the session and the
+        committed snapshot restores exploration."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -290,9 +435,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page, "dialogue", lambda p: p.get("available") is True
         )
 
-        # The dock keeps its ORDINARY form while talking: the scene overview
-        # renders (webclient-scene-overview-swap), never the retired 對話選項
-        # mirror and never a tab bar.
+        # The dock keeps its ORDINARY form while talking — the scene overview
+        # (webclient-scene-overview-swap), never the retired 對話選項 mirror and
+        # never a tab bar — but the command region is collapsed around it
+        # (webclient-dialogue-stage-actors): mounted, hidden with display:none.
+        self.assertFalse(page.locator("#action-dock").is_visible())
+        self.assertEqual(page.locator("#action-dock").count(), 1)
         overview_labels = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
@@ -468,16 +616,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             _connected_active,
             dom_readiness={
-                "selector": "#action-dock",
+                "selector": '[data-testid="dialogue-pick"], [data-testid="dialogue-freeform"]',
                 "predicate": (
                     "() => { const a = document.querySelector('[data-anchor=\"command-line\"]'); "
                     "const d = document.querySelector('[data-testid=\"command-line\"]'); "
                     "const collapsed = !!a && a.getAttribute('data-expanded') === 'false' && !!d; "
-                    "const dock = document.getElementById('action-dock'); "
-                    "const active = document.activeElement; "
-                    "return collapsed && !!dock && (active === dock || (active && dock.contains(active))); }"
+                    "const first = document.querySelector('[data-testid=\"message-dialogue\"] .pick'); "
+                    "return collapsed && !!first && document.activeElement === first; }"
                 ),
-                "description": "command line collapsed and action dock focused",
+                # webclient-dialogue-stage-actors: in dialogue the focus home
+                # is the message window's first row, never the hidden dock.
+                "description": "command line collapsed and the first dialogue row focused",
             },
         )
 

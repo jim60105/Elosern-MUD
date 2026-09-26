@@ -62,7 +62,6 @@ ACTION_FAMILY_STORY_IDS = {
     "action-actiondock--generating-suggestions",
     "action-actiondock--unavailable-suggestions",
     "action-choicecardrow--ready-row",
-    "action-dockmenu--exploration-frame",
     "action-dockmenu--fixed-grid-frame",
     "action-dockmenu--target-frame",
     "action-dockmenuitem--default",
@@ -186,6 +185,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # story-documented before C8b mounts them.
                 "Action/SceneOverview",
                 "Action/DockVerbPopover",
+                # The dialogue stage actor (webclient-dialogue-stage-actors), the
+                # standing portrait that wraps Core/ReferenceArtwork on the stage.
+                "Core/StageActor",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

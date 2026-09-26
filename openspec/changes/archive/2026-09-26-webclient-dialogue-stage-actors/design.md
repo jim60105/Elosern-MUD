@@ -16,7 +16,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
   - While `mode === "dialogue"` and the view model exists, `data-variant="dialogue"` renders, unpaged and untyped, in the text area's scroll region: the residual response blocks, the `.dlg` box (`.av` avatar, `.who` / `.who-bond` / `.say`), and the `.choices` rows (`dialogue-pick`, `dialogue-freeform`, `dialogue-exit`).
   - The page surface `message-page` is focusable in the paged variant.
 - **`AppShell.vue`** (current code plus C5 and C6c):
-  - `restoreDockFocus()` focuses `#action-dock`. It is exposed, and it is called by `releaseCommandField`, by the mode watcher's pre-flush rescue (`HIDDEN_BY_MODE`, dialogue `""`), and by `composables/use-dock.js` `onNavigateHome`.
+  - `restoreDockFocus()` focuses `#action-dock`. It is exposed, and it is called by `releaseCommandField`, by the mode watcher's pre-flush rescue (`HIDDEN_BY_MODE`, dialogue `""`), by the `vitalsVisible` rescue, and by the `store.view.dockSource` watcher in `composables/use-dock.js` (the verb popover's close).
   - C5 routes Escape, `sent`, and the borrow's `drawerCloseRequest` into `releaseCommandField(true)`.
 - **Keyboard**:
   - `bridge.js` `onDocumentKeydown` sends every non-editable, non-modified key to `store.focusPress`.
@@ -45,16 +45,20 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 - Props: `portrait` (Object|null), `name` (String), `side` (`"left"` | `"right"`), and `dimmed` (Boolean).
 - Root: `<div class="stage-actor" data-testid="stage-actor" :data-side="side" :data-speaking="String(!dimmed)">`, holding `<ReferenceArtwork :portrait="shown" />`.
 - `shown` is `portrait` when it is non-null. Otherwise it is `{ placeholder: { kind: "missing", label: name } }` when `name` is set, so `ReferenceArtwork` draws the name's first grapheme and the name. With neither, it is `null`, so `ReferenceArtwork` shows its default `肖像生成中`.
-- `ReferenceArtwork`'s glyph uses `label.slice(0, 1)`. For a surrogate-pair initial that splits the character, so `ReferenceArtwork` switches to `portraitGlyph(label)` (`components/character-identity.js`). This is the only edit to it.
+- A placeholder entry keeps its own label (`肖像生成中`, the server's `無肖像`), but the ring's glyph is the actor's name initial whenever a name is known: the label's first character (`肖`, `無`) names nothing. `ReferenceArtwork` takes an optional `initialOf` string for that; `StageActor` passes its `name`, and the player's actor receives the current roster character's name.
+- `ReferenceArtwork`'s glyph uses `label.slice(0, 1)`. For a surrogate-pair initial that splits the character, so `ReferenceArtwork` switches to `portraitGlyph(label)` (`components/character-identity.js`). With the optional `initialOf` above, these are its only edits.
 - Dim: `.stage-actor[data-speaking="false"] { filter: brightness(var(--actor-dim)); }`, with `--actor-dim: 0.6` in `styles/tokens.css`. There is no transition property; C11 adds the motion token.
-- `actor-left`'s `.reference-artwork { height: 100% }` rule moves to `.stage-actor` and its child, so both anchors share it. `actor-right` mirrors the horizontal mask.
+- HudFrame's `.stage-actor > .reference-artwork { height: 100% }` sizing rule moves to the component, and the `actor-left` mask rules in `styles/app-shell.css` move to `.stage-actor` so both anchors share them; `actor-right` mirrors the horizontal mask. HudFrame's two portrait anchor divs carried the class `stage-actor` themselves; they are renamed `stage-actor-anchor` so the component's root class is unambiguous.
 
 *Why wrap, not replace:* the drawer's art slot needs a plain portrait frame with no side or speaking state, and the design's "Becomes `StageActor`" is met by the stage using only `StageActor`.
 
 *Why `dimmed` and not `speaking`:* outside dialogue nothing is dimmed, and "not speaking" is not meaningful there. `AppClient` computes `dimmed` from the mode and the speaker.
 
+- **Portrait insets (visual pass).** At 1440x900 and 1280x720 the 6% inset parks the host's face under the fixed 218px minimap card and the player's face half under the place card. Each anchor's inset becomes `max(6vw, <island column clearance> - H/3)` (the tokens `--actor-h`, `--actor-left-inset`, `--actor-right-inset` in `styles/tokens.css`; the stage fills the viewport, so 6vw is 6% of the stage), where `H/3` is half the anchor's width (`aspect-ratio: 2/3`) and `H` is the anchor's own height expression with the stage box written as `100vh - header - band` (the stage fills the viewport). The right clearance is 280px (the 16px gutter, the 218px card, and ~46px for the face); the left one is `--left-column + 8px`, tuned so both insets stay exactly 6% at 1920x1080. The command-line row still ends before the host at every supported viewport.
+- **Stage masks (visual pass).** A generated portrait carries its own flat backdrop, which the old edge fades left as a pale rectangle. Both actors use an elliptical mask centred on the figure (nudged towards the stage centre and mirrored with the side) intersected with the long fade at the feet; the placeholder card takes the same silhouette, with the initial set large in the display face inside a hairline gold ring. In dialogue neither figure carries a caption (the name plate names the host).
+
 ### D2. Host source: the raw catalog entry by the committed key
-`AppClient.vue` adds `hostPortrait = computed(() => { const ref = dialogueVm.value?.host.portraitRef; return ref == null ? null : (panel('art')?.portrait_catalog?.[ref] ?? null); })`. It uses the raw entry, not `portraitFor`, so a pending entry shows its own placeholder card (design §12, "truthful placeholder"). A missing entry falls to D1's name placeholder. `actor-right` renders `<StageActor v-if="store.view.mode === 'dialogue' && dialogueVm" side="right" :portrait="hostPortrait" :name="dialogueVm.host.displayName" :dimmed="store.view.dialogueSpeaker === 'player'" />`. `dialogueVm` is the same `dialogueViewModel(panel('dialogue'))` the window receives, computed once in `AppClient`.
+`AppClient.vue` adds `hostPortrait = computed(() => { const ref = dialogueVM.value?.host.portraitRef; return ref == null ? null : (panel('art')?.portrait_catalog?.[ref] ?? null); })`. It uses the raw entry, not `portraitFor`, so a pending entry shows its own placeholder card (design §12, "truthful placeholder"). A missing entry falls to D1's name placeholder. `actor-right` renders `<StageActor v-if="store.view.mode === 'dialogue' && dialogueVM" side="right" :portrait="hostPortrait" :name="dialogueVM.host.displayName" :dimmed="store.view.dialogueSpeaker === 'player'" />`. The player's `StageActor` is `dimmed` while `store.view.mode === 'dialogue' && dialogueVM && store.view.dialogueSpeaker === 'host'`: with the panel transiently unavailable no host stands opposite, so the lone player stays lit. `dialogueVM` is the existing computed from `composables/use-scene.js` (`dialogueViewModel(panel('dialogue'))` while the mode is `dialogue`) that the window already receives; no second derivation is added.
 
 ### D3. `dialogueSpeaker` from the in-flight action
 `view.js` publishes `dialogueSpeaker: ctx.inFlight && DIALOGUE_SPEECH_ACTIONS.has(ctx.inFlight.actionId) ? "player" : "host"`, with `DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_scripted", "explore.talk_freeform"])`. `publishView` already runs on dispatch, on result, on revision acceptance, and on rejection, which are exactly the moments `inFlight` changes.
@@ -86,14 +90,20 @@ In `AppShell.vue`:
 - In dialogue mode (`props.mode === "dialogue"`) it calls `messageWindow.value?.focusHome()`.
 - Otherwise it focuses `#action-dock`.
 
-The exposed API and `use-dock.js` `onNavigateHome` follow the rename. `MessageWindow` exposes `focusHome()`:
+The exposed API, the vitals-hide rescue, and the `use-dock.js` `dockSource` watcher follow the rename. `MessageWindow` exposes `focusHome()`:
 - while the dialogue variant renders, it focuses its first row (`dialogue-pick`, else `dialogue-freeform`, else `dialogue-exit`)
 - otherwise it focuses the page surface (`message-page`)
 - both with `preventScroll`
 
 The mode watcher's two phases:
-- **Entering dialogue (pre-flush).** If focus is inside `band-command`, focus `message-page`, which is visible in both modes, before the attribute hides the dock. This avoids the browser's blur to body. Then, after `nextTick` (the variant is rendered), call `restoreFocusHome()`.
+- **Entering dialogue (pre-flush).** If focus is inside `band-command`, focus `message-page`, which is visible in both modes, before the attribute hides the dock. This avoids the browser's blur to body. Then, after `nextTick` (the variant is rendered), call `restoreFocusHome()` when focus is still on the body, on `message-page`, or inside `band-command` (a drawer or the command field that holds focus keeps it). The entering branch replaces the generic `HIDDEN_BY_MODE` rescue for that transition, so the window's `focusHome()` never runs before its rows exist; every lookup in `focusHome()` is null-safe.
 - **Leaving dialogue (post-flush).** Focus inside `band-message` is on a row that is about to disappear, and the body may already hold it. In a `nextTick` after the flush, if `document.activeElement` is the body or inside `band-message`, call `restoreFocusHome()`, which now focuses the rendered dock.
+
+The window also keeps its own focus inside the conversation, because two dialogue-internal renders drop a focused element:
+- the panel turns available while `message-page` holds focus (the unavailable seam's fallback), so `v-show` hides the page surface;
+- a reply commits new choices, so the focused pick button is replaced.
+
+`MessageWindow` watches both before the flush. When the page surface held focus and the variant turns on, or focus was inside the dialogue region and the rows re-render while the mode is still `dialogue`, it calls `focusHome()` after the render if focus fell to the body. When the mode leaves dialogue it does nothing, so the shell's leave branch owns that case alone. The vitals-hide rescue follows the same focus home, so in dialogue it lands on the window, not the hidden dock.
 
 The command line's collapse paths (C5 D2) already end in `releaseCommandField(true)`, which now calls `restoreFocusHome()`. Escape and an accepted send in dialogue therefore land on the window.
 
@@ -102,6 +112,8 @@ The command line's collapse paths (C5 D2) already end in `releaseCommandField(tr
 - Digits run the existing caption retarget only.
 - `/` goes to `ctx.router.press` (the router's `SLASH` → `toggle-drawer` → `drawerRequest` path).
 - Every other key returns `false`.
+
+Arrow keys stay inert in dialogue: the bridge still prevents their default page scroll, and nothing moves focus. This is accepted for C10b; C10c's choice list owns arrow navigation.
 
 Unclaimed keys reach the text path exactly as today, and a focused dialogue button keeps its native Enter (the bridge already skips Enter on buttons) and Space.
 
@@ -118,7 +130,7 @@ It is placed as the first flex child of the window, above the text area, 30px ta
 
 *Why inside the window, not straddling its top edge:* a plate that straddles the border would sit in the stage strip that the expanded command-line row occupies, and would be covered while the player types a freeform line. Inside the window, the text area loses 30px in dialogue. The variant scrolls in C10b, and C10c's paging measures the text area's box through the ResizeObserver (C6b D2), so no constant changes.
 
-Width: the window spans 1920px, but the page text keeps its `max-width: 42em` cap (C6b D1), so the measure stays ≤ 42 characters. The text column stays left-aligned under the plate, as in design §8.2's sketch.
+Width: the window spans 1920px, but the page text keeps its `max-width: 42em` cap (C6b D1), so the measure stays ≤ 42 characters. The text column stays left-aligned under the plate, as in design §8.2's sketch. The column's left edge is `--actor-left-inset` less the band region's 18px padding, so the reply starts under the player anchor's left edge at every viewport. The plate is a flex row whose name span carries its own ellipsis (`text-overflow` does not apply to the flex row itself), so a long name truncates while the bond segment stays readable.
 
 ### D8. Tests
 - **Vitest.**

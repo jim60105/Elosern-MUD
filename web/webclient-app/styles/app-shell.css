@@ -159,21 +159,10 @@ body {
   right: calc(var(--right-column) + 12px);
   bottom: calc(var(--command-line-h) + 28vh + 44px);
 }
-/* The player's standing portrait (design D4): soft side edges and a long
-   fade at the feet, so the figure dissolves into the band it stands on
-   instead of ending in a hard rectangle. The two masks intersect. */
-.elosern-root [data-anchor="actor-left"] .reference-artwork img,
-.elosern-root [data-anchor="actor-left"] .reference-artwork__placeholder {
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), linear-gradient(#000 72%, transparent 98%);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), linear-gradient(#000 72%, transparent 98%);
-  mask-composite: intersect;
-}
-.elosern-root [data-anchor="actor-left"] .reference-artwork img { object-position: center 12%; }
+/* The standing portraits' soft edge masks live in StageActor.vue
+   (webclient-dialogue-stage-actors D1), shared by both portrait anchors. */
 /* The portrait's caption reads as a small name plate at the figure's lower
    left, clear of the command-line row that starts at the island column. */
-/* The placeholder already states its label on the figure itself. */
-.elosern-root [data-anchor="actor-left"] .reference-artwork figcaption[data-sample="true"] { display: none; }
 .elosern-root [data-anchor="actor-left"] .reference-artwork figcaption {
   left: 17%;
   right: auto;
@@ -259,22 +248,6 @@ body {
 .elosern-root .action-dock__pane {
   overflow-x: hidden;
   scrollbar-width: thin;
-}
-.elosern-root .m-dialogue .dlg { gap: 18px; padding: 0; border: 0; background: none; }
-.elosern-root .m-dialogue .dlg .av { width: 82px; height: 96px; border-radius: var(--radius-sm); }
-.elosern-root .m-dialogue .dlg .who { font: 19px var(--f-serif); margin-bottom: 9px; overflow-wrap: anywhere; }
-.elosern-root .m-dialogue .dlg .who-bond { display: block; margin-top: 5px; }
-.elosern-root .m-dialogue .choices { gap: 9px; margin-top: 20px; }
-.elosern-root .m-dialogue .choices .pick { min-height: 44px; min-width: 0; border-color: #625c50; border-radius: var(--radius-sm); }
-.elosern-root .m-dialogue .choices .pick .k { color: var(--gold-400); border-color: var(--gold-500); }
-.elosern-root .m-dialogue .choices .pick .t { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 1000px) {
-  .elosern-root .m-dialogue .dlg .av { width: 60px; height: 74px; }
-}
-@media (max-height: 780px) {
-  .elosern-root .m-dialogue .dlg .av { width: 68px; height: 80px; }
-  .elosern-root .m-dialogue .dlg .who { font-size: 17px; margin-bottom: 5px; }
-  .elosern-root .m-dialogue .choices { margin-top: 12px; gap: 8px; }
 }
 /* The `[日誌] [⌨]` control strip at the bottom-right of the message region
    (webclient-message-window-swap design D1; MessageWindow reserves its own

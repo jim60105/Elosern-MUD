@@ -136,6 +136,21 @@
   --vignette: inset 0 0 220px 40px rgba(0, 0, 0, 0.6);
   --vignette-lowhp: inset 0 0 260px 70px rgba(150, 20, 24, 0.42);
   --menu-open-filter: brightness(0.5) blur(1.5px);
+  /* The listening stage actor's dim (webclient-dialogue-stage-actors D1):
+     the side that is not speaking renders at this brightness. A static
+     state; the motion layer owns any transition into it. */
+  --actor-dim: 0.6;
+  /* The standing portraits' geometry (webclient-dialogue-stage-actors): the
+     anchor height (`min(62vh, 680px)`, clamped to the stage box — the stage
+     fills the viewport) and each side's inset. The inset is 6% of the stage
+     width, grown where the island column on that side would cover the
+     figure's face (the anchor's centre, a third of its height in): the
+     place card column on the left, the 218px minimap card 16px from the
+     right edge (+ ~46px of air) on the right. At 1920x1080 both are 6%. The
+     dialogue text column aligns to the left inset. */
+  --actor-h: min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h)));
+  --actor-left-inset: max(6vw, calc(var(--left-column) + 8px - var(--actor-h) / 3));
+  --actor-right-inset: max(6vw, calc(280px - var(--actor-h) / 3));
 
   /* ---- shape & chrome ---- */
   --radius: 7px;
