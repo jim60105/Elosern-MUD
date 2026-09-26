@@ -772,10 +772,10 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C6c | `webclient-message-window-swap` | logic | archived |
 | C7 | `webclient-typewriter-reading-prefs` | visual | archived  |
 | C8a | `webclient-scene-overview-component` | visual | archived  |
-| C8b | `webclient-scene-overview-swap` | logic | proposed |
-| C8c | `webclient-retire-exploration-submenus` | logic | proposed |
-| C9a | `explore-talk-open-action` | logic | proposed |
-| C9b | `webclient-talk-open-dock` | logic | proposed |
+| C8b | `webclient-scene-overview-swap` | logic | archived   |
+| C8c | `webclient-retire-exploration-submenus` | logic | archived   |
+| C9a | `explore-talk-open-action` | logic | archived   |
+| C9b | `webclient-talk-open-dock` | logic | archived   |
 | C10a | `dialogue-panel-host-portrait` | logic | proposed (server; parallel-safe) |
 | C10b | `webclient-dialogue-stage-actors` | visual | proposed |
 | C10c | `webclient-dialogue-choices-overlay` | visual | proposed |
