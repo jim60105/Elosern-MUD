@@ -15,8 +15,8 @@
 
 ## 3. Speaker and wiring
 
-- [ ] 3.1 `web/webclient-app/stores/elosern/view.js`: publish `dialogueSpeaker` per design D3. Add the store case to `tests/dialogue_store.test.js` (dispatch → `"player"`, handled result plus accepted revision → `"host"`, rejection → `"host"`, a `explore.dialogue_leave` dispatch → `"host"`).
-- [ ] 3.2 `web/webclient-app/AppClient.vue`: compute `dialogueVm` once, `hostPortrait` per design D2, and render `StageActor` in `#actor-left` (the player, `dimmed` when mode is dialogue and the speaker is `"host"`) and `#actor-right` (the host, `v-if` dialogue and `dialogueVm`, `dimmed` when the speaker is `"player"`). The `#art` drawer slot keeps `ReferenceArtwork`. Move the `[data-anchor="actor-left"] .reference-artwork` sizing rule in `styles/app-shell.css` to cover `.stage-actor` in both anchors, with `actor-right`'s mask mirrored.
+- [ ] 3.1 `web/webclient-app/stores/elosern/view.js`: publish `dialogueSpeaker` per design D3. Add the store case to `tests/dialogue_store.test.js` (dispatch → `"player"`, handled result plus accepted revision → `"host"`, a generic (non-`no_puppet`) rejection declaring the committed revision → `"host"`, a `explore.dialogue_leave` dispatch → `"host"`).
+- [ ] 3.2 `web/webclient-app/AppClient.vue`: reuse the existing `dialogueVM` (`composables/use-scene.js`), compute `hostPortrait` per design D2, and render `StageActor` in `#actor-left` (the player, `dimmed` when mode is dialogue and the speaker is `"host"`) and `#actor-right` (the host, `v-if` dialogue and `dialogueVM`, `dimmed` when the speaker is `"player"`). The `#art` drawer slot keeps `ReferenceArtwork`. Move HudFrame's portrait sizing rule into the component and the `[data-anchor="actor-left"] .reference-artwork` mask rules in `styles/app-shell.css` to `.stage-actor`, with `actor-right`'s mask mirrored; rename HudFrame's anchor class `stage-actor` to `stage-actor-anchor`. Delete the retired `.m-dialogue` rules in `styles/app-shell.css`.
 
 ## 4. Collapse, focus home, and keys
 
@@ -26,7 +26,7 @@
   - rename `restoreDockFocus` to `restoreFocusHome` (design D5), including `releaseCommandField`, the exposed API, and the header comment
   - add the enter-dialogue pre-flush rescue to `message-page` plus the `nextTick` `restoreFocusHome()`, and the leave-dialogue post-flush rescue
 
-  `grep -rn "restoreDockFocus" web/webclient-app --include='*.js' --include='*.vue'` (excluding `dist/`) returns nothing after `composables/use-dock.js` `onNavigateHome` and every test are updated.
+  `grep -rn "restoreDockFocus" web/webclient-app --include='*.js' --include='*.vue'` (excluding `dist/`) returns nothing after the `composables/use-dock.js` `dockSource` watcher, the vitals rescue, and every test are updated.
 - [ ] 4.3 `web/webclient-app/stores/elosern/interaction.js` `focusPress`: the dialogue gate of design D6. Update the function's comment.
 
 ## 5. Message window
@@ -42,7 +42,7 @@
 
 ## 6. Vitest and evidence
 
-- [ ] 6.1 Update `tests/hud_frame.test.js`, `tests/app.test.js`, `tests/message_window_dialogue.test.js`, `tests/store/digit_row_picks.test.js`, and `tests/store/store_dispatch_focus.test.js` per design D8. Rewrite `tests/dialogue_dock.test.js` as the collapse test (design D8). Run `pnpm test` (repository root); green.
+- [ ] 6.1 Update `tests/hud_frame.test.js` (including the vitals-hide rescue landing on the window in dialogue), `tests/app.test.js`, `tests/app_client_stage_actor.test.js` (the actor-right and ReferenceArtwork pins move to StageActor), `tests/message_window.test.js` (its `dialogue-who` read), `tests/message_window_dialogue.test.js`, `tests/store/digit_row_picks.test.js`, and `tests/store/store_dispatch_focus.test.js` per design D8. Rewrite `tests/dialogue_dock.test.js` as the collapse test (design D8). Cover leaving dialogue right after the verb popover closed (focus lands on the dock once, no error) and the window's internal rescues (panel turning available, rows re-rendering). Run `pnpm test` (repository root); green.
 - [ ] 6.2 `web/webclient/tests/test_node_suite_evidence.py`:
   - re-anchor `test_dialogue_dock_vitest_evidence_passes` from `webclient-contextual-hud::the-dock-keeps-its-regular-exploration-form-in-dialogue-mode` to `webclient-contextual-hud::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band`
   - add `test_stage_actor_vitest_evidence_passes` (runs `tests/core/stage_actor.test.js`, `tests/app.test.js`, and `tests/dialogue_store.test.js`), annotated `webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state`

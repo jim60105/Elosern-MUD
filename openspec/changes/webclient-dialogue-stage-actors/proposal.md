@@ -21,7 +21,7 @@ The AVG stage design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-red
   - `components/HudFrame.vue`: in dialogue mode `.stage-band` becomes one column and `[data-anchor="band-command"]` is `display:none`. `#action-dock` stays mounted, not remounted, and its router keeps the overview (C9b D1 already resets to it).
   - `components/AppShell.vue`:
     - `HIDDEN_BY_MODE.dialogue` names `[data-anchor='band-command']`.
-    - `restoreDockFocus` becomes `restoreFocusHome`, which focuses the action dock, or in dialogue mode the message window's focus target. Every caller follows, including `composables/use-dock.js` `onNavigateHome` and the exposed API.
+    - `restoreDockFocus` becomes `restoreFocusHome`, which focuses the action dock, or in dialogue mode the message window's focus target. Every caller follows, including the verb-popover `dockSource` watcher in `composables/use-dock.js`, the vitals-hide rescue, and the exposed API.
     - Focus is rescued before the dock hides on entering dialogue, and moved back to the dock after the attribute flips on leaving it.
 - `web/webclient-app/stores/elosern/interaction.js` `focusPress`: in dialogue mode only the caption digit retarget and `/` are claimed. Every other key is unclaimed, so no key moves or activates the hidden dock.
 - **`components/MessageWindow.vue`** (C6b/C6c):
@@ -73,12 +73,12 @@ Out of scope:
 - New: `web/webclient-app/components/StageActor.vue`, `stories/Core/StageActor.stories.js`, `tests/core/stage_actor.test.js`.
 - Edited source:
   - `web/webclient-app/AppClient.vue`, `components/AppShell.vue`, `components/HudFrame.vue`, `components/MessageWindow.vue`, `components/ReferenceArtwork.vue` (placeholder initial through `portraitGlyph`, design D1)
-  - `composables/use-dock.js`, `composables/use-shell-focus.js` (if it calls the renamed API)
+  - `composables/use-dock.js` (the `dockSource` watcher calls the renamed API)
   - `stores/elosern/view.js`, `stores/elosern/interaction.js`
   - `styles/tokens.css`, `styles/app-shell.css`, `lib/controls-reference.js`
   - `component-manifest.json`
   - Stories `stories/Core/HudFrame.stories.js`, `stories/Core/AppShell.stories.js`, `stories/Core/MessageWindow.stories.js` (the dialogue state)
-- Vitest: `tests/hud_frame.test.js`, `tests/app.test.js`, `tests/message_window_dialogue.test.js`, `tests/dialogue_dock.test.js`, `tests/dialogue_store.test.js`, `tests/store/digit_row_picks.test.js`, `tests/store/store_dispatch_focus.test.js`.
+- Vitest: `tests/hud_frame.test.js`, `tests/app.test.js`, `tests/app_client_stage_actor.test.js`, `tests/message_window.test.js`, `tests/message_window_dialogue.test.js`, `tests/dialogue_dock.test.js`, `tests/dialogue_store.test.js`, `tests/store/digit_row_picks.test.js`, `tests/store/store_dispatch_focus.test.js`.
 - Python evidence:
   - `web/webclient/tests/test_node_suite_evidence.py` (the dialogue-dock evidence re-anchors, plus new stage-actor evidence)
   - the showcase snapshots that list `Core/ReferenceArtwork` (`test_vue_showcase_{action,data,world,overlays}_evidence.py`) gain `Core/StageActor`
