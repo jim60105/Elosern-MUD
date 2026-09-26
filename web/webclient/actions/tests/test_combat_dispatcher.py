@@ -203,6 +203,11 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
                 self.action_registry,
                 self.registry,
             )
+            presentations = [
+                call
+                for call in self.session.sent
+                if "ui_snapshot" in call or "ui_update" in call
+            ]
             handle_ui_action(
                 self.session,
                 self.player,
@@ -211,6 +216,15 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
                 self.registry,
             )
             self.assertEqual(forfeit_mock.call_count, 1)
+        # A duplicate replays only the cached result: no second presentation.
+        self.assertEqual(
+            [
+                call
+                for call in self.session.sent
+                if "ui_snapshot" in call or "ui_update" in call
+            ],
+            presentations,
+        )
 
     @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
     def test_stale_forfeit_through_dispatcher(self):
@@ -387,6 +401,121 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertIsNotNone(read_session(self.player), "the session survives")
         schedule.assert_not_called()
+
+    @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    def test_combat_cast_round_publishes_beats_beside_status(self):
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.cast",
+                    {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        updates = [call for call in self.session.sent if "ui_update" in call]
+        self.assertEqual(len(updates), 1, "one round publishes exactly one update")
+        update = updates[-1]["ui_update"][0][0]
+        self.assertEqual(update["revision"], coordinator.revision)
+        panels = update["panels"]
+        for name in ("status", "context_actions", "art", "combat_beats"):
+            self.assertIn(name, panels)
+        beats = panels["combat_beats"]
+        self.assertTrue(beats["available"])
+        self.assertEqual(beats["round"], f"{session_id}/1")
+        hp_current = {
+            participant["portrait_ref"]: participant["hp_current"]
+            for participant in panels["context_actions"]["participants"]
+        }
+        last_hp_after: dict[str, int] = {}
+        for beat in beats["beats"]:
+            if beat["kind"] == "damage":
+                last_hp_after[beat["target"]] = beat["hp_after"]
+        self.assertTrue(last_hp_after, "the round damaged at least one participant")
+        for target, hp in last_hp_after.items():
+            self.assertEqual(hp, hp_current[target])
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "round")
+        for key in ("combat_round", "round_record", "logs"):
+            self.assertNotIn(key, result)
+
+    @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    def test_defeating_cast_publishes_a_full_snapshot_with_beats(self):
+        self.monster.traits.hp.base = 1
+        self.monster.traits.hp.current = 1
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.cast",
+                    {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        snapshots = [call for call in self.session.sent if "ui_snapshot" in call]
+        self.assertTrue(snapshots, "a terminal round publishes a full snapshot")
+        snapshot = snapshots[-1]["ui_snapshot"][0][0]
+        self.assertEqual(snapshot["mode"], "exploration")
+        beats = snapshot["panels"]["combat_beats"]
+        self.assertTrue(beats["available"])
+        self.assertEqual(beats["round"], f"{session_id}/1")
+        kinds = [beat["kind"] for beat in beats["beats"]]
+        self.assertIn("target_defeated", kinds)
+        # The defeat closes the exchange: no damage beat follows it.
+        self.assertNotIn("damage", kinds[kinds.index("target_defeated") + 1 :])
+
+    @covers_requirement("webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only")
+    def test_later_sync_and_forfeit_snapshots_render_beats_unavailable(self):
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        from web.webclient.presentation.ingress import synchronize_session
+
+        with patch("server.option_proposal_service.schedule_action_options"):
+            self.assertTrue(synchronize_session(self.session, self.player))
+            sync_snapshot = [
+                call for call in self.session.sent if "ui_snapshot" in call
+            ][-1]["ui_snapshot"][0][0]
+            self.assertFalse(sync_snapshot["panels"]["combat_beats"]["available"])
+            self.assertEqual(
+                sync_snapshot["panels"]["combat_beats"]["reason"]["code"],
+                "presentation_unavailable",
+            )
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.forfeit",
+                    {"session_id": session_id},
+                    request_id="forfeit",
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        forfeit_snapshot = [
+            call for call in self.session.sent if "ui_snapshot" in call
+        ][-1]["ui_snapshot"][0][0]
+        self.assertFalse(forfeit_snapshot["panels"]["combat_beats"]["available"])
 
 
 if __name__ == "__main__":

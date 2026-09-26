@@ -42,6 +42,7 @@ from world.rules.item_effects import (
     ItemTargetScope,
 )
 from world.rules.clock import get_world_clock
+from world.rules.combat_beats import RoundRecord
 from world.rules.combat_session import engage, read_session
 from world.skills.equipment import EquipmentSlot, list_items
 from world.rules.tests._combat_session_helpers import (
@@ -252,6 +253,60 @@ class InventoryUseAdapterTests(InventoryActionBase):
         record = read_session(self.player)
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 1)
+        # The completing publication's read context carries this round's frozen
+        # record, so the same full snapshot ships the available beats panel.
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        self.assertEqual(round_record.round_id, f"{record.session_id}/1")
+        payload = build_production_registry().render(
+            "combat_beats",
+            PresentationContext(
+                actor=self.player,
+                protocol_version=1,
+                combat_round=round_record,
+            ),
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["round"], f"{record.session_id}/1")
+
+    def test_in_combat_heal_and_foe_damage_make_the_round_unavailable(self):
+        # The item heals the actor while the foe damages it in the same round:
+        # the round has an HP change with no damage entry, so the projection
+        # cannot be checked against the recorded HP and the panel is
+        # unavailable (design D7) while the text output stays authoritative.
+        self._hurt(20)
+        self.player.db.inventory = [_T_POTION.key]
+        engage(self.player, self._monster())
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _inventory_use_adapter(
+                self.player, {"item_key": _T_POTION.key}
+            )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "round")
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        with patch(
+            "web.webclient.presentation.combat_beats.log_warn"
+        ) as warn:
+            payload = build_production_registry().render(
+                "combat_beats",
+                PresentationContext(
+                    actor=self.player,
+                    protocol_version=1,
+                    combat_round=round_record,
+                ),
+            )
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
+        self.assertNotIn("beats", payload)
+        # The heal is the unmodeled HP mover: the bounded reason is the HP
+        # mismatch, never a bound.
+        self.assertEqual(warn.call_args.kwargs["context"]["reason"], "hp_mismatch")
 
     def test_in_combat_full_hp_rejection_carries_stable_code(self):
         self.player.db.inventory = [_T_POTION.key]
