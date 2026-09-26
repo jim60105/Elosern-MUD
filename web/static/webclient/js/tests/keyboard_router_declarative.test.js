@@ -124,25 +124,25 @@ test("an unresolvable frame pops one level and restores the opener key", () => {
 });
 
 test("cascade pops while each next top is also unresolvable", () => {
-  const state = { target: false, keywords: false };
+  const state = { target: false, wait: false };
   const resolve = (d) => {
     if (d.source === "exploration.root") return menuOf(["移動"]);
     if (d.source === "exploration.interact") return menuOf(["Talk"]);
     if (d.source === "exploration.target") return state.target ? menuOf(["x"]) : MARKER;
-    if (d.source === "exploration.keywords") return state.keywords ? menuOf(["k"]) : MARKER;
+    if (d.source === "exploration.wait") return state.wait ? menuOf(["k"]) : MARKER;
     return MARKER;
   };
   const { router } = declRouter(resolve);
   state.target = true;
-  state.keywords = true;
+  state.wait = true;
   router.pushFrame({ source: "exploration.root", params: {} });
   router.pushFrame({ source: "exploration.interact", params: {} }, { openerKey: "移動" });
   router.pushFrame({ source: "exploration.target", params: {} }, { openerKey: "Talk" });
-  router.pushFrame({ source: "exploration.keywords", params: {} }, { openerKey: "x" });
+  router.pushFrame({ source: "exploration.wait", params: {} }, { openerKey: "x" });
   assert.strictEqual(router.depth(), 4);
   // Both upper frames become unresolvable → cascade stops at interact.
   state.target = false;
-  state.keywords = false;
+  state.wait = false;
   assert.strictEqual(router.depth(), 2);
   assert.strictEqual(router.currentMenu().items[0].label, "Talk");
 });

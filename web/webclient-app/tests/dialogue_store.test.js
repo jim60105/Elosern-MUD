@@ -231,6 +231,53 @@ describe("dialogue store mode lifecycle", () => {
     });
   });
 
+  it("the 交談 row opens the conversation and the popover closes in that commit", () => {
+    openSession();
+    // The overview's person chip -> the verb popover: the dock is the ordinary
+    // exploration root in dialogue mode too.
+    expect(store.focusItemByKey("target-7")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
+    expect(store.router.depth()).toBe(2);
+
+    // 交談 submits explore.talk_open in one step (no keyword frame).
+    expect(store.focusItemByKey("talk-open")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.talk_open",
+      payload: { npc_id: 7 },
+    });
+    // The commit that opens the conversation closes the popover in the SAME
+    // commit: no frame stays open over the conversation. The committed panel
+    // names the host the row opened.
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        dialogueSnapshot({
+          dialogue: {
+            ...DIALOGUE_PANEL,
+            host: { identity: 7, display_name: "店長", portrait_ref: null },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(store.view.mode).toBe("dialogue");
+    expect(store.router.depth()).toBe(1);
+    expect(store.router.currentDescriptor()).toEqual({
+      source: "exploration.root",
+      params: {},
+    });
+    expect(store.view.dockSource).toBe("exploration.root");
+
+    // The caption's free row still borrows the command line for the host the
+    // conversation is with.
+    const before = store.view.drawerRequest;
+    expect(store.borrowDialogueCommand()).toBe(true);
+    expect(store.view.drawerRequest).toBe(before + 1);
+  });
+
   it("the borrow declines without a live caption", () => {
     openSession();
     const before = store.view.drawerRequest;
@@ -296,7 +343,7 @@ describe("dialogue store mode lifecycle", () => {
     // sub-dock, exactly as in exploration mode.
     store.setActiveSubDock("character");
     store.router.pushFrame(
-      { source: "exploration.keywords", params: { identity: 7 } },
+      { source: "exploration.wait", params: {} },
       "character",
     );
     expect(store.view.dockDepth).toBe(2);

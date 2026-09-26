@@ -1,21 +1,27 @@
 // H3 (task 5.1/4.4): table-driven unit tests for the pane-kind classifier
 // (`classifyPane`) and the tab-bar badge derivation (`badgeCount`). These
-// pin the classifier against the real exploration/combat frame shapes —
-// including the standard `back` row that must not break the `every(...)`
-// checks, and the distinction between the combat `targets` pane and the
-// exploration navigation rows.
+// pin the classifier against the real combat frame shapes — including the
+// standard `back` row that must not break the `every(...)` checks.
 //
 // webclient-retire-exploration-submenus: the move frame's `outlet` kind and
 // the exploration interact/suggestions badges are gone with the frames and the
 // tab-root entry that carried them.
+// webclient-talk-open-dock: the `nav` kind went with the scripted-keyword
+// frame and the `affordance` kind with the exploration target frame, so the
+// frames they classified fall through to `plain`.
 
 import { describe, expect, it } from "vitest";
 
 import { badgeCount, classifyPane } from "../../components/dock-panes.js";
 
 describe("classifyPane (task 5.1)", () => {
-  it("classifies the look nav frame (explore.look rows + back row) as nav", () => {
-    const frame = {
+  it("classifies the retired exploration look/target frames (no producer) as plain", () => {
+    // The look and interact frames are not DockMenu frames any more
+    // (webclient-talk-open-dock): their rows are the scene overview's chips
+    // and the verb popover's rows, rendered by SceneOverview and
+    // DockVerbPopover. A frame that still carries the retired shapes renders
+    // through the shared `plain` row renderer.
+    const lookFrame = {
       items: [
         { key: "look-room", label: "查看房間", action_id: "explore.look" },
         { key: "entity-1", label: "老婦", action_id: "explore.look", kind: "npc" },
@@ -23,22 +29,15 @@ describe("classifyPane (task 5.1)", () => {
       ],
       title: "查看",
     };
-    expect(classifyPane(frame)).toBe("nav");
-  });
-
-  it("classifies the exploration person chip rows (target-<id> nav rows) as nav, not combat targets", () => {
-    // The scene overview's person chips are navigation cells whose `surface`
-    // is a `target-<id>` key (they open the verb popover). They must NOT be
-    // classified as the combat `targets` pane. (The overview is rendered by
-    // SceneOverview, not DockMenu, but the classifier's contract is unchanged.)
-    const frame = {
+    expect(classifyPane(lookFrame)).toBe("plain");
+    const targetFrame = {
       items: [
         { key: "target-1", label: "老婦", navigation: true, surface: "target-1" },
         { key: "target-2", label: "木箱", navigation: true, surface: "target-2" },
         { key: "back", label: "戻る", navigation: true, surface: "back" },
       ],
     };
-    expect(classifyPane(frame)).toBe("nav");
+    expect(classifyPane(targetFrame)).toBe("plain");
   });
 
   it("classifies the combat target frame (toggle-target / selected) as targets", () => {
@@ -94,14 +93,18 @@ describe("classifyPane (task 5.1)", () => {
     expect(classifyPane(frame)).toBe("cards");
   });
 
-  it("classifies the keyword frame (kw-* rows) as nav", () => {
+  it("classifies a frame of target-affordance rows (engage / party invite) as plain", () => {
+    // The exploration target-affordance frame is gone (its only producer
+    // moved into DockVerbPopover), so the rows it used to classify fall
+    // through to `plain`, which renders them with the shared row renderer.
     const frame = {
       items: [
-        { key: "kw-1", label: "尋常", navigation: true, surface: "kw-1" },
-        { key: "kw-2", label: "詳細", navigation: true, surface: "kw-2" },
+        { key: "engage", label: "交戰", action_id: "explore.engage" },
+        { key: "party-invite", label: "邀請入隊", action_id: "explore.party_invite" },
+        { key: "back", label: "返回上一層", navigation: true, surface: "back" },
       ],
     };
-    expect(classifyPane(frame)).toBe("nav");
+    expect(classifyPane(frame)).toBe("plain");
   });
 
   it("classifies a frame of submenu openers (no action rows) as plain", () => {

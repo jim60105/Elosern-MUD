@@ -93,9 +93,15 @@ describe("frameless 商店 drawer (composition contract)", () => {
     await wrapper.vm.$nextTick();
 
     const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
+    // The two deep exploration frames left that render a row region: the
+    // suggestions frame (DockMenu's cards pane) and a target's verb popover
+    // (the DockVerbPopover card over the inert overview). The wait frame is
+    // the waiting screen and the root is the SceneOverview, so neither is a
+    // row-container frame (webclient-talk-open-dock retired the keyword
+    // frame, the last other one).
     const descriptors = [
-      { source: "exploration.keywords", params: { identity: 7 } },
       { source: "exploration.suggestions", params: {} },
+      { source: "exploration.target", params: { identity: 7 } },
     ];
 
     for (const drawerName of drawers) {
