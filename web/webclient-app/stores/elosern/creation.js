@@ -318,6 +318,13 @@ export function applyCreation(ctx) {
       // may not have its panel committed yet; the root then degrades to the
       // marker-reason row and recovers on the next commit (no copy rebuild,
       // no empty-stack fuse).
+      // The exploration → dialogue leg of `modeChanged` is also the dock's own
+      // contract: webclient-exploration-menu::the-keyboard-first-exploration-
+      // dock-roots-at-the-scene-overview-and-opens-dialogue-directly requires
+      // the commit that opens a conversation to return the dock to the
+      // overview, and this reset is what provides it (webclient-talk-open-dock
+      // D1; pinned by tests/store/declarative_frames.test.js). Scoping this
+      // teardown to drawer-holding modes would break that requirement.
       ctx.resetFramesToRoot();
       return;
     }

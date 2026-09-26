@@ -690,7 +690,7 @@
         return menu;
       },
       // The current frame's descriptor — the single source for opener-context
-      // reads such as the scripted-keywords identity or the hosted service
+      // reads such as a verb popover's target identity or the hosted service
       // surface. (Not a menu-content read: null on an unmounted stack, so the
       // pre-session key routing stays total.)
       currentDescriptor: function () {

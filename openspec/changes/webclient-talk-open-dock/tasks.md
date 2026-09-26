@@ -64,7 +64,7 @@
 - [x] 5.1 `web/tests/browser/test_browser_exploration_dialogue.py` (class run: 6 of 7 pass, including the new `test_talk_open_enters_the_dialogue_in_one_step` and both dock-at-overview assertions; the one failure is the known pre-existing `test_look_at_scripted_host_shows_the_affinity_stage_line`, entity- vs target-chip premise, left untouched):
   - `test_scripted_keyword_dialogue_completes` and `test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary`: after 交談, assert that the dock is back at the overview (`router.depth()` is 1) before digit `1` sends `explore.talk_scripted`.
   - Add `test_talk_open_enters_the_dialogue_in_one_step`, a keyboard-only journey at 1920x1080 annotated `webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly` and `webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting`. One Enter on 交談 sends one `explore.talk_open` and no `explore.talk_scripted`. The next commit has mode `dialogue` and a `dialogue` panel whose line is the greeting, `router.depth()` is 1, and `✕ 結束對話` sends `explore.dialogue_leave`.
-- [x] 5.2 `test_browser_services_base.py`: fix the `_open_surface` docstring (no per-keyword talk rows). `test_browser_contextual_hud_dock.py`: drop any nav-row or affordance-pane assertion (`dock-menu__nav`, `dock-menu__aff`). `git grep -n "exploration\.keywords\|dock-menu__nav\|dock-menu__aff\|talk-scripted\|talk-freeform\|自由交談" web/tests/browser` returns nothing.
+- [x] 5.2 `test_browser_services_base.py`: fix the `_open_surface` docstring (no per-keyword talk rows), and repair the walk itself (its second Enter activated the popover's leading 交談 row, so the popover closed and `service-<surface>` was gone). Both hops now use stable keys read from the committed panel, and the helper normalizes the stack back to the overview afterwards so its postcondition (the callers' depth/trail invariance across the drawer open) holds; the invariance is pinned un-normalized by the helper's inventory branch and by the quest-drawer journey in `test_browser_exploration_nav.py`. `test_browser_contextual_hud_dock.py`: drop any nav-row or affordance-pane assertion (`dock-menu__nav`, `dock-menu__aff`). `git grep -n "exploration\.keywords\|dock-menu__nav\|dock-menu__aff\|talk-scripted\|talk-freeform\|自由交談" web/tests/browser` returns nothing.
 
 ## 6. Specs and traceability
 
@@ -79,10 +79,39 @@
 - [x] 7.1 Run `node --test web/static/webclient/js/tests/*.test.js`, `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage` (repository root), `uv run --locked python -m tools.test_data_lint check`, and `uv run --locked python -m tools.spec_traceability check`. All must pass.
 - [x] 7.2 Run `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence`. It must pass.
 - [ ] 7.3 (CI-owned, reported not checked) Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_exploration_dialogue web.tests.browser.test_browser_exploration_nav web.tests.browser.test_browser_exploration_state web.tests.browser.test_browser_exploration_tiles web.tests.browser.test_browser_exploration_actions web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_services_base web.tests.browser.test_browser_contextual_hud_dock web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_options_surface`. It must pass.
-- [ ] 7.4 (not run in this budget-limited run) Check the live client at 1920x1080 with `agent-browser`: 交談 on a scripted host shows the greeting and its choices in the message window in one press, and the dock shows the overview. Close the browser afterwards.
+- [x] 7.4 Check the live client at 1920x1080 with `agent-browser`: 交談 on a scripted host shows the greeting and its choices in the message window in one press, and the dock shows the overview. Close the browser afterwards.
 - [x] 7.5 Run `openspec validate webclient-talk-open-dock --strict` and `git diff --check`. Both must be clean.
 
 ## 8. Notes from the apply run
+
+- Browser classes run serially with `unittest_driver` (all green except the known
+  pre-existing failure):
+  - `test_browser_exploration_dialogue` — 7 tests, 1 failure
+    (`test_look_at_scripted_host_shows_the_affinity_stage_line`, the known entity- vs
+    target-chip premise; left untouched). The new
+    `test_talk_open_enters_the_dialogue_in_one_step` and both dock-at-overview
+    assertions pass.
+  - `test_browser_services_shop` — 3 tests OK (the repaired walk).
+  - `test_browser_services_guild.GuildTurninJourneys.test_completed_quest_turnin` — OK.
+  - `test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_dock_panes_render_per_kind_vocabulary`
+    — OK (the re-pointed chip-field assertions).
+  - `test_browser_combat_skills.CombatMenuBrowserTest.test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region`
+    — OK (the re-anchored fixed-column case).
+- Task 7.4: headless `agent-browser` against the built Storybook
+  (`Action/DockVerbPopover` → `DialogueHost`) rendered the 交談 affordance surface:
+  head 葛里安·衛登 and rows 交談 (focused) / 交易 / 查看 / 返回上一層, with no keyword
+  list and no free-form row; the browser was closed afterwards. The live end-to-end
+  path (one press → greeting + choices in the message window, dock at the overview) is
+  the managed journey above. The story's `focusedKey` still named the retired
+  `talk-scripted` row and was corrected in the same commit.
+- Post-implementation rubber-duck pass (the pre-implementation pass is moot: the change
+  was already implemented when the budget stop landed): verdict SAFE TO PROCEED, no
+  blocking issues. Dispositions — NB1 (`_open_surface`'s normalization blinds those
+  journeys to a drawer that pushes a frame): comment added naming the two un-normalized
+  pins; NB2 (the D1 reset is an emergent side effect of the drawer teardown): a comment
+  in `syncHudDrawer` now names the dock requirement as co-owner; NB3 restated NB1 and
+  needed no further action; N1 (stale `keyboard_router.js` comment citing the deleted
+  scripted-keywords machinery): re-worded; N2 was a recorded no-op.
 
 - Verification run: `uv run --locked python -m web.tests.browser.unittest_driver
   web.tests.browser.test_browser_exploration_dialogue` -> Ran 7 tests, 1 failure

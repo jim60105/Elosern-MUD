@@ -233,7 +233,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # committed root before returning so the helper's postcondition is the
         # one the journeys assert — opening a frameless surface leaves the
         # router's frame and trail untouched (resetFramesToRoot is the
-        # browser-helper stack normalizer; it never closes a drawer).
+        # browser-helper stack normalizer; it never closes a drawer). This
+        # normalization is why those journeys can only catch a drawer that
+        # pushes a frame through the OTHER frameless entry points, which open no
+        # popover: the inventory branch below and the quest-drawer journey in
+        # test_browser_exploration_nav.py, both of which assert the invariance
+        # un-normalized.
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(80)
         return self._services_panel(page)
