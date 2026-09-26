@@ -41,20 +41,27 @@ const LEVEL_TOKENS = [
 ];
 
 const MOTION_DECLARATION =
-  /(?:^|[;{\s])(transition|transition-duration|transition-delay|animation|animation-duration|animation-delay)\s*:\s*([^;}]+)/g;
+  /(?:^|[;{\s])((?:-webkit-)?(?:transition|animation)(?:-duration|-delay)?)\s*:\s*([^;}]+)/g;
 
-// A time literal: `0.6s`, `120ms`, `.2s`, `1s`. A bare `0` is not a time.
-const TIME_LITERAL = /(?<![\w-])\d*\.?\d+m?s\b/;
+// A time literal: `0.6s`, `120ms`, `.2s`, `1s`, and a negative delay
+// `-250ms`. Case-insensitive, so an uppercase `1S` cannot slip through. A
+// bare `0` is not a time.
+const TIME_LITERAL = /(?<![\w-])[+-]?\d*\.?\d+m?s\b/i;
 
 function scannedFiles() {
   const files = [];
   for (const dir of ["components", "styles"]) {
-    const root = join(APP_ROOT, dir);
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (entry.isFile() && /\.(vue|css)$/.test(entry.name)) {
-        files.push(join(dir, entry.name));
+    const walk = (relative) => {
+      for (const entry of readdirSync(join(APP_ROOT, relative), { withFileTypes: true })) {
+        const path = join(relative, entry.name);
+        if (entry.isDirectory()) {
+          walk(path);
+        } else if (/\.(vue|css)$/.test(entry.name)) {
+          files.push(path);
+        }
       }
-    }
+    };
+    walk(dir);
   }
   files.push("AppClient.vue");
   return files.sort();
