@@ -65,7 +65,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
     def test_overview_chips_wrap_inside_the_pane_at_a_narrow_viewport(self):
         """The scene overview's chips wrap by width inside the command region.
 
