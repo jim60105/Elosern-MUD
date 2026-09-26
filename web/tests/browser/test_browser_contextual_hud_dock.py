@@ -511,12 +511,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             1,
             "the chip carries exactly one direction glyph element",
         )
-        # The unfocused chip renders no focus caret; the focus treatment is the
-        # bundled fill + border + shadow swap, never color alone.
-        self.assertIn(
+        # The focused chip carries the shared focus caret (::before) while an
+        # unfocused one does not: the direction glyph is a separate, persistent
+        # element, so focus never double-marks the chip.
+        self.assertEqual(
             first.evaluate("el => getComputedStyle(el, '::before').content"),
-            ("normal", "none"),
-            "an unfocused chip renders no ::before caret content",
+            '"▶"',
+            "the focused chip carries the shared focus caret",
+        )
+        self.assertEqual(
+            chips.nth(1).evaluate("el => getComputedStyle(el, '::before').content"),
+            "none",
+            "an unfocused chip carries no caret",
         )
 
         # Row 2: a non-canonical door "南門" renders verbatim (no guessed

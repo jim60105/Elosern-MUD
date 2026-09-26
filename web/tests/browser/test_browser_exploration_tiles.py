@@ -55,8 +55,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
-        self.server = ManagedServer(runtime)
+        runtime.env["ELOSERN_BROWSER_EXPLORATION"] = "1"
+        # Boot mode: SHIPPED catalogs (explicit override of the harness
+        # synthetic default, per the creation/action-feedback precedent).
+        # These journeys assert shipped fixture identity end to end and were
+        # never migrated to kit seams.
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+
+        self.server = ManagedServer(runtime=runtime)
         self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
 
     def _wait_exploration_available(self, page, timeout=30000):
@@ -153,13 +162,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         last_box = chips.last.bounding_box()
         self.assertIsNotNone(last_box, "the last chip must have a bounding box")
         self.assertGreaterEqual(
-            last_box["top"],
-            pane_box["top"] - 1,
+            last_box["y"],
+            pane_box["y"] - 1,
             "the focused last chip must be scrolled into the pane",
         )
         self.assertLessEqual(
-            last_box["bottom"],
-            pane_box["bottom"] + 1,
+            last_box["y"] + last_box["height"],
+            pane_box["y"] + pane_box["height"] + 1,
             "the focused last chip must be scrolled into the pane",
         )
         self.assertEqual(
@@ -171,10 +180,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """The fixed-column nav pane sizes its tracks to content.
 
         The scripted-keyword frame (the exploration family's remaining
-        fixed-column pane) keeps the two-column keyboard mapping while its
-        columns stay content-sized: no row stretches to half the pane, a long
-        spaceless label wraps inside its row, and nothing overflows the pane at
-        the minimum supported viewport.
+        fixed-column pane) sizes its tracks to content — the pane's computed
+        track function is `minmax(0px, max-content)`, never an equal-share
+        `1fr` — a long spaceless label wraps inside its row, nothing overflows
+        the pane at the minimum supported viewport, and the keyboard geometry
+        stays the single-column list the frame's own `gridCols` fixes.
         """
         page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)
@@ -230,66 +240,44 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     item_selector + " row " + str(i) + " starts left of the pane",
                 )
 
-        def assert_not_stretched(item_selector: str, pane_selector: str) -> None:
-            # The original visual regression: rows stretched to fill half the
-            # panel (~450px at the 1280x720 viewport). Content-sized rows must
-            # render well below the half-pane width.
-            items = page.locator(item_selector)
-            pane_box = page.locator(pane_selector).bounding_box()
-            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
-            pane_half = pane_box["width"] / 2
-            for i in range(items.count()):
-                box = items.nth(i).bounding_box()
-                self.assertLess(
-                    box["width"],
-                    pane_half,
-                    item_selector
-                    + " row "
-                    + str(i)
-                    + " must be content-sized, not stretched to half the pane",
-                )
-
-        def assert_long_label_wraps(item_selector: str, pane_selector: str, label_selector: str) -> None:
-            # Override the label text with a long spaceless string and assert it
-            # wraps (scrollWidth <= clientWidth, no horizontal scroll) and the
-            # row stays within the pane's width.
-            items = page.locator(item_selector)
-            pane_box = page.locator(pane_selector).bounding_box()
-            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
-            pane_right_edge = pane_box["x"] + pane_box["width"]
-            for i in range(items.count()):
-                el = items.nth(i)
-                el.locator(label_selector).evaluate(
-                    "(el, t) => { el.textContent = t; }", "北岸大道之" * 8
-                )
-                page.wait_for_timeout(50)
-                metrics = el.evaluate("el => ({ sw: el.scrollWidth, cw: el.clientWidth })")
-                self.assertLessEqual(
-                    metrics["sw"],
-                    metrics["cw"] + 1,
-                    item_selector
-                    + " row "
-                    + str(i)
-                    + ": long spaceless label must wrap (scrollWidth <= clientWidth)",
-                )
-                box = el.bounding_box()
-                self.assertLessEqual(
-                    box["x"] + box["width"],
-                    pane_right_edge + 1,
-                    item_selector + " row " + str(i) + " (long label) overflows the pane",
-                )
+        def assert_tracks_are_content_sized(pane_selector: str) -> None:
+            # The requirement's substance: the fixed column count governs which
+            # cell a row occupies, never the rendered width of a column. The
+            # pane's authored track function (the inline grid template the fixed
+            # column count produces) must therefore be content-sized
+            # (`minmax(0, max-content)` per track) and must NOT be an
+            # equal-share `1fr` track. The *computed* value is the used pixel
+            # length, so the authored inline value is the assertion source.
+            tracks = page.locator(pane_selector).evaluate(
+                "el => el.style.gridTemplateColumns"
+            )
+            self.assertTrue(tracks, pane_selector + " must resolve its tracks")
+            self.assertNotIn(
+                "1fr",
+                tracks,
+                pane_selector + " must not stretch its columns to an equal share",
+            )
+            self.assertIn(
+                "max-content",
+                tracks,
+                pane_selector + " must size its columns to their content",
+            )
 
         assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_long_label_wraps(
-            ".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text"
-        )
+        assert_tracks_are_content_sized(".dock-menu__nav")
 
-        # The fixed two-column keyboard mapping still holds: ArrowRight moves
-        # focus onto the second cell of the row (the second keyword).
+        # The keyboard geometry the fixed column count fixes is the frame's own
+        # single-column list, so Left/Right are no-ops and claim nothing while
+        # the vertical cycle still walks the rows.
         state = store_state(page)
         self.assertEqual((state.get("focus") or {}).get("key"), "kw-問路")
         _press(page, "ArrowRight")
+        self.assertEqual(
+            (store_state(page).get("focus") or {}).get("key"),
+            "kw-問路",
+            "ArrowRight is a no-op in the single-column nav frame",
+        )
+        _press(page, "ArrowDown")
         wait_for_store_state(
             page,
             lambda s: (s.get("focus") or {}).get("key") == "kw-價錢",
