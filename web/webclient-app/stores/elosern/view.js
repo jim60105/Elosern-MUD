@@ -198,13 +198,16 @@ export function applyView(ctx) {
       hudOverlayOpener: ctx.hudOverlayOpener.value,
       // H5 (task 7.5/7.8): the client-local presentation preferences the
       // settings surface owns — the narrative prose scale, the text-to-HTML
-      // narrative toggle, the optional reduced-motion override and the
-      // colorblind status palette. No setting dispatches a `ui_action`; the
-      // store applies each to the document's presentation tokens and
-      // persists it through the versioned layout store.
+      // narrative toggle, the effective motion level and the colorblind
+      // status palette. No setting dispatches a `ui_action`; the store
+      // applies each to the document's presentation tokens and persists it
+      // through the versioned layout store.
       fontScale: ctx.prefs.fontScale,
       textToHtml: ctx.prefs.text2html,
-      reducedMotion: ctx.prefs.reducedMotion,
+      // C11a (webclient-motion-level, design D1): the EFFECTIVE level — the
+      // stored level, or the OS preference while nothing is stored. The
+      // settings surface marks it, and the message window reads it as a prop.
+      motionLevel: ctx.effectiveMotionLevel(),
       colorblind: ctx.prefs.colorblind,
       // C7 (webclient-typewriter-reading-prefs): the reading preferences the
       // message window reads as props — the typing speed and the opt-in

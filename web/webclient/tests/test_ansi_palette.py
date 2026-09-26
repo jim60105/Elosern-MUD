@@ -94,6 +94,12 @@ class AnsiPaletteTest(unittest.TestCase):
         self.assertIn("@media (prefers-reduced-motion: reduce)", text)
         self.assertIn("text-decoration: underline dotted", text)
         self.assertIn("animation: none", text)
+        # webclient-motion-level (design D8): the level attribute stops the
+        # blink too, not only the OS media query. The palette is generated
+        # Evennia styling outside `web/webclient-app`, so the component guard
+        # never scans it — this assertion is what keeps the selector here.
+        self.assertIn(':root[data-motion="reduced"] .blink', text)
+        self.assertIn(':root[data-motion="off"] .blink', text)
         # The standard cube level (not Evennia's stock 0xdf quirk at level 4).
         self.assertIn("#d7d7d7", text)
         self.assertNotIn("#dfdfdf", text)

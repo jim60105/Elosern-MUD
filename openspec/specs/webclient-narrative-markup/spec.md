@@ -4,7 +4,6 @@ The strict allowlist pipeline that renders Evennia's converted ANSI-to-HTML narr
 
 ## Requirements
 
-
 ### Requirement: The narrative renders the transport stream through a strict allowlist markup pipeline
 Evennia's portal converts server output to HTML with `parse_html` before the `text` message is sent, so the narrative surface receives markup rather than plain text. The WebClient SHALL render that markup instead of displaying its source. The conversion SHALL be performed by a DOM-independent tokenizer module that accepts a source string and returns a bounded token list, and by a renderer that constructs the corresponding nodes exclusively with `document.createElement`, `document.createElementNS`, and `document.createTextNode`. The pipeline SHALL NOT use `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `DOMParser`, `Range.createContextualFragment`, or `eval` at any point, and SHALL NOT add a third-party sanitizer or any other runtime dependency. The tokenizer SHALL access no `document` or `window` object so the Node suite can exercise the complete grammar directly.
 
@@ -49,7 +48,7 @@ The pipeline SHALL treat every input outside the accepted grammar as literal tex
 - **THEN** the URL renders as readable text, no anchor element is created, and no navigation or outbound request is possible from the narrative
 
 ### Requirement: The narrative palette is generated with a contrast floor and honors reduced motion
-The project SHALL ship a generated stylesheet defining `.color-000` through `.color-255` and `.bgcolor-000` through `.bgcolor-255` covering the 16 ANSI entries, the 6×6×6 color cube on the standard component levels `0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff`, and the 24-step grayscale ramp. Foreground entries SHALL pass a deterministic contrast floor against the theme's ink background: while an entry's WCAG contrast ratio against the page background is below 3.0, it SHALL be blended 10% toward the theme's paper foreground, for at most 9 steps. Background entries SHALL use the unmodified palette value. The stylesheet SHALL be produced by a pure generator, and a repository test SHALL regenerate it and compare it byte-for-byte with the committed file. The `blink` class SHALL be neutralized to a non-animated indicator under `prefers-reduced-motion: reduce`. The narrative surface SHALL use a monospace-first font stack while preserving `white-space: pre-wrap`, so server-rendered ASCII and box-drawing map art keeps its column alignment and its leading indentation.
+The project SHALL ship a generated stylesheet defining `.color-000` through `.color-255` and `.bgcolor-000` through `.bgcolor-255` covering the 16 ANSI entries, the 6×6×6 color cube on the standard component levels `0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff`, and the 24-step grayscale ramp. Foreground entries SHALL pass a deterministic contrast floor against the theme's ink background: while an entry's WCAG contrast ratio against the page background is below 3.0, it SHALL be blended 10% toward the theme's paper foreground, for at most 9 steps. Background entries SHALL use the unmodified palette value. The stylesheet SHALL be produced by a pure generator, and a repository test SHALL regenerate it and compare it byte-for-byte with the committed file. The `blink` class SHALL be neutralized to a non-animated indicator under `prefers-reduced-motion: reduce`, and also whenever the client's effective motion level is `reduced` or `off` (`webclient-contextual-hud` "The motion level is a client-local preference that governs every client animation"). The narrative surface SHALL use a monospace-first font stack while preserving `white-space: pre-wrap`, so server-rendered ASCII and box-drawing map art keeps its column alignment and its leading indentation.
 
 #### Scenario: Every emitted color class is legible on the ink background
 - **WHEN** the generated palette is evaluated against the theme background
@@ -62,6 +61,10 @@ The project SHALL ship a generated stylesheet defining `.color-000` through `.co
 #### Scenario: Reduced motion suppresses blinking output
 - **WHEN** the browser reports `prefers-reduced-motion: reduce` and the server emits blinking text
 - **THEN** the text is marked by a static non-animated indicator and no animation runs
+
+#### Scenario: A stored reduced or off level suppresses blinking output
+- **WHEN** the operating system does not request reduced motion, the stored motion level is `reduced` or `off`, and the server emits blinking text
+- **THEN** the text is marked by the same static non-animated indicator and no animation runs
 
 #### Scenario: Server map art within the pane width keeps its alignment
 - **WHEN** a room description containing an ASCII or box-drawing map whose rows fit the narrative pane's content width is rendered

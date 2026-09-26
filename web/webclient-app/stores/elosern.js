@@ -252,14 +252,14 @@ export const useElosernStore = defineStore("elosern", () => {
     closeOverlay: ctx.closeOverlay,
     // H5 (task 7.8): the presentation-preferences controller — the
     // client-local presentation state the settings surface owns (prose
-    // scale, text-to-HTML toggle, optional reduced-motion override,
-    // colorblind palette). No setting dispatches a `ui_action`; each
-    // setter applies the preference to the document's presentation tokens
-    // and persists it through the versioned layout store (reloading the
-    // latest validated wrapper before writing).
+    // scale, text-to-HTML toggle, motion level, colorblind palette). No
+    // setting dispatches a `ui_action`; each setter applies the preference
+    // to the document's presentation tokens and persists it through the
+    // versioned layout store (reloading the latest validated wrapper before
+    // writing). C11a: `setMotionLevel` stores one of the three motion levels.
     setFontScale: ctx.setFontScale,
     setTextToHtml: ctx.setTextToHtml,
-    setReducedMotion: ctx.setReducedMotion,
+    setMotionLevel: ctx.setMotionLevel,
     setColorblind: ctx.setColorblind,
     // C7: the reading preferences (text speed, auto-advance).
     setTextSpeed: ctx.setTextSpeed,

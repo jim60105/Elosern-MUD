@@ -580,7 +580,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         conversation the command region is collapsed, both stage actors
         stand, and focus is never on the document body.
         """
-        page = self.logged_in_page((1920, 1080))
+        # webclient-motion-level (design D9): the frame probe below counts the
+        # frames where the list showed beside a typing or unread page, so the
+        # window must really type — the `full` level, not the suite's instant
+        # `off` seed, which would make that guard vacuous.
+        page = self.logged_in_page((1920, 1080), motion_level="full")
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         # Record, on every animation frame, whether the list ever showed

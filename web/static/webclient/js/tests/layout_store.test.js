@@ -80,8 +80,8 @@ function componentByName(config, name) {
 
 test("default wrapper is versioned and bounded", () => {
   const def = LayoutStore.defaultWrapper();
-  assert.equal(def.layout_version, 2);
-  assert.equal(LayoutStore.CURRENT_LAYOUT_VERSION, 2);
+  assert.equal(def.layout_version, 3);
+  assert.equal(LayoutStore.CURRENT_LAYOUT_VERSION, 3);
   assert.ok(JSON.stringify(def).length <= LayoutStore.MAX_STORAGE_BYTES);
 });
 
@@ -238,10 +238,11 @@ test("fontScale preference is bounded", () => {
   assert.deepEqual(stored.preferences, { text2html: true }, "out-of-range fontScale dropped");
 });
 
-// webclient-typewriter-reading-prefs (task 5.2): version 2 registers no
-// migration, so a well-formed version-1 wrapper resets to the version-2
-// default with every preference at its default.
-test("a version-1 wrapper resets to the version-2 default", () => {
+// webclient-typewriter-reading-prefs (task 5.2) and webclient-motion-level
+// (task 3.2): no migration is registered, so a well-formed version-1 or
+// version-2 wrapper resets to the version-3 default with every preference at
+// its default and no stored motion level.
+test("a version-1 wrapper resets to the version-3 default", () => {
   const storage = mockStorage({
     "elosern.layout": JSON.stringify(
       wrapper({ layout_version: 1, preferences: { text2html: true, fontScale: 1.12 } })
@@ -250,12 +251,33 @@ test("a version-1 wrapper resets to the version-2 default", () => {
   const store = defaultStore(storage);
   const result = store.load();
   assert.deepEqual(result.state, LayoutStore.defaultWrapper());
-  assert.equal(result.state.layout_version, 2);
+  assert.equal(result.state.layout_version, 3);
   assert.equal(result.state.preferences.textSpeed, "normal");
   assert.equal(result.state.preferences.autoAdvance, false);
+  assert.equal(result.state.preferences.motionLevel, undefined);
   const stored = JSON.parse(storage.getItem("elosern.layout"));
-  assert.equal(stored.layout_version, 2, "the reset version-2 wrapper is persisted");
+  assert.equal(stored.layout_version, 3, "the reset version-3 wrapper is persisted");
   assert.equal(stored.preferences.fontScale, 1);
+});
+
+test("a version-2 wrapper resets to the version-3 default", () => {
+  const storage = mockStorage({
+    "elosern.layout": JSON.stringify(
+      wrapper({
+        layout_version: 2,
+        dimensions: { narrative: 55 },
+        preferences: { text2html: true, fontScale: 1.12, textSpeed: "fast" },
+      })
+    ),
+  });
+  const store = defaultStore(storage);
+  const result = store.load();
+  assert.deepEqual(result.state, LayoutStore.defaultWrapper());
+  assert.equal(result.state.layout_version, 3);
+  assert.equal(result.state.preferences.fontScale, 1);
+  assert.equal(result.state.preferences.textSpeed, "normal");
+  assert.equal(result.state.preferences.motionLevel, undefined);
+  assert.equal(JSON.parse(storage.getItem("elosern.layout")).layout_version, 3);
 });
 
 test("textSpeed validates against its enum and autoAdvance as a boolean", () => {
@@ -284,14 +306,20 @@ test("the textSpeed enum equals TEXT_SPEEDS of the reveal lib", async () => {
   assert.deepEqual(LayoutStore.PREFERENCE_ENUMS.textSpeed, TEXT_SPEEDS);
 });
 
-test("the H5 preference keys (reducedMotion, colorblind) validate as booleans", () => {
+test("the motionLevel enum equals MOTION_LEVELS of the motion lib", async () => {
+  const { MOTION_LEVELS } = await import("../../../../webclient-app/lib/motion_level.js");
+  assert.deepEqual(LayoutStore.PREFERENCE_ENUMS.motionLevel, MOTION_LEVELS);
+});
+
+test("motionLevel validates against its enum and the reducedMotion key is gone", () => {
   const store = defaultStore();
   const saved = store.save(
     wrapper({
       preferences: {
         text2html: true,
         fontScale: 0.92,
-        reducedMotion: false,
+        motionLevel: "warp",
+        reducedMotion: "on",
         colorblind: true,
         evil: "x",
       }
@@ -301,8 +329,19 @@ test("the H5 preference keys (reducedMotion, colorblind) validate as booleans", 
   const stored = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
   assert.deepEqual(
     stored.preferences,
-    { text2html: true, fontScale: 0.92, reducedMotion: false, colorblind: true }
+    { text2html: true, fontScale: 0.92, colorblind: true },
+    "an invalid motionLevel and the retired reducedMotion key are dropped"
   );
+  assert.equal(LayoutStore.PREFERENCE_TYPES.reducedMotion, undefined);
+
+  // Every level is accepted; the key stays optional.
+  for (const level of LayoutStore.PREFERENCE_ENUMS.motionLevel) {
+    assert.equal(store.save(wrapper({ preferences: { motionLevel: level } })), true);
+    assert.deepEqual(
+      JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY)).preferences,
+      { motionLevel: level }
+    );
+  }
 });
 
 test("required components are preserved and never closable", () => {

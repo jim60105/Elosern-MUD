@@ -866,5 +866,39 @@ class MessagePagesEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class MotionLevelEvidenceTest(unittest.TestCase):
+    """webclient-motion-level: the motion level is resolved in one pure
+    module, applied by the store, and enforced by a duration guard — all
+    three are DOM-independent JS contracts, so the Vitest files are their
+    executed evidence."""
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-motion-level-is-a-client-local-preference-that-governs-every-client-animation",
+        "webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input",
+    )
+    def test_motion_level_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/motion_level.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/motion_tokens.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/motion_preferences.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "motion-level Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

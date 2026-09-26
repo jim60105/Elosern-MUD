@@ -65,7 +65,7 @@ OVERLAYS_STORY_IDS = {
     "overlays-mapoverlay--minimal",
     "overlays-mapoverlay--unavailable",
     "overlays-settingsoverlay--default",
-    "overlays-settingsoverlay--reduced-motion-on",
+    "overlays-settingsoverlay--motion-reduced",
     "overlays-settingsoverlay--html-narrative",
     "overlays-settingsoverlay--colorblind",
     "overlays-settingsoverlay--reading-preferences",

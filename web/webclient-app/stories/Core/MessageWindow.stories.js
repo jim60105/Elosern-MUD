@@ -111,7 +111,7 @@ export default {
   argTypes: {
     textSpeed: { control: "inline-radio", options: ["slow", "normal", "fast", "instant"] },
     autoAdvance: { control: "boolean" },
-    reducedMotion: { control: "inline-radio", options: [null, "on", "off"] },
+    motionLevel: { control: "inline-radio", options: ["full", "reduced", "off"] },
     held: { control: "boolean" },
   },
   parameters: {
@@ -133,7 +133,7 @@ export default {
           "invisibly); a click or Enter while typing shows the page in full. " +
           "Opt-in `autoAdvance` turns a fully shown page after 1.2s + 60ms per " +
           "character, never past the last page; `held` pauses the wait; " +
-          "reduced motion shows pages at once.",
+          "a motion level other than `full` shows pages at once.",
       },
     },
   },

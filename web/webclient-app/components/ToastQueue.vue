@@ -7,7 +7,7 @@
 // draft's `.toasts`/`.toast`/`.tt`/`.ts`/`.toast.crit` rules
 // (docs/design/elosern-redesign/index.html:287-294) on repo tokens; the
 // entrance reuses the formerly orphan `@keyframes elosern-toast-in`, so the
-// reduced-motion token block covers it at the token level (D5). The queue is
+// motion level's token blocks cover it at the token level (D5). The queue is
 // fixed-positioned above every product overlay (the modal tier + 100, the
 // `.inventory-confirm` precedent) so a concept failure is visible while the
 // creation overlay is mounted; only the offline overlay (the reserved

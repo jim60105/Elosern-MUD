@@ -1,7 +1,8 @@
 // webclient-typewriter-reading-prefs (task 5.3): the reading preferences of
 // the presentation-preferences slice — the text speed and the opt-in
 // auto-advance. Client-local, published on the view, persisted through the
-// versioned layout store (version 2), and reset with it.
+// versioned layout store (version 3 since webclient-motion-level), and reset
+// with it.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -42,7 +43,7 @@ describe("reading preferences", () => {
     expect(store.view.textSpeed).toBe("fast");
     expect(store.view.autoAdvance).toBe(true);
     const wrapper = stored();
-    expect(wrapper.layout_version).toBe(2);
+    expect(wrapper.layout_version).toBe(3);
     expect(wrapper.preferences.textSpeed).toBe("fast");
     expect(wrapper.preferences.autoAdvance).toBe(true);
 
@@ -64,7 +65,7 @@ describe("reading preferences", () => {
     window.localStorage.setItem(
       KEY,
       JSON.stringify({
-        layout_version: 2,
+        layout_version: 3,
         dimensions: {},
         tabs: {},
         preferences: { fontScale: 1.12, textSpeed: "warp", autoAdvance: true },
@@ -76,23 +77,27 @@ describe("reading preferences", () => {
     expect(store.view.fontScale).toBe(1.12);
   });
 
-  it("resets a version-1 wrapper to every default", () => {
-    window.localStorage.setItem(
-      KEY,
-      JSON.stringify({
-        layout_version: 1,
-        dimensions: {},
-        tabs: {},
-        preferences: { fontScale: 1.12, colorblind: true },
-      }),
-    );
-    const store = freshStore();
-    expect(store.view.fontScale).toBe(1);
-    expect(store.view.colorblind).toBe(false);
-    expect(store.view.textSpeed).toBe("normal");
-    expect(store.view.autoAdvance).toBe(false);
-    const wrapper = stored();
-    expect(wrapper.layout_version).toBe(2);
-    expect(wrapper.preferences.textSpeed).toBe("normal");
+  it("resets a version-1 or version-2 wrapper to every default", () => {
+    for (const version of [1, 2]) {
+      window.localStorage.clear();
+      window.localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          layout_version: version,
+          dimensions: {},
+          tabs: {},
+          preferences: { fontScale: 1.12, colorblind: true, textSpeed: "fast" },
+        }),
+      );
+      const store = freshStore();
+      expect(store.view.fontScale).toBe(1);
+      expect(store.view.colorblind).toBe(false);
+      expect(store.view.textSpeed).toBe("normal");
+      expect(store.view.autoAdvance).toBe(false);
+      expect(store.view.motionLevel).toBe("full");
+      const wrapper = stored();
+      expect(wrapper.layout_version).toBe(3);
+      expect(wrapper.preferences.textSpeed).toBe("normal");
+    }
   });
 });

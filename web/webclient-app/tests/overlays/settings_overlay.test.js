@@ -28,15 +28,15 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
     expect(wrapper.find('[data-testid="settings-overlay-close"]').exists()).toBe(false);
   });
 
-  it("renders the A−/A/A+ scale segment, the 3-state reduced-motion control and the two toggles", () => {
+  it("renders the A−/A/A+ scale segment, the three motion-level buttons and the two toggles", () => {
     wrapper = mount(SettingsOverlay);
     for (const testid of [
       "settings-overlay-scale-A−",
       "settings-overlay-scale-A",
       "settings-overlay-scale-A+",
-      "settings-overlay-reduced-motion-default",
-      "settings-overlay-reduced-motion-on",
-      "settings-overlay-reduced-motion-off",
+      "settings-overlay-motion-full",
+      "settings-overlay-motion-reduced",
+      "settings-overlay-motion-off",
       "settings-overlay-text-to-html",
       "settings-overlay-colorblind",
     ]) {
@@ -61,23 +61,34 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
     expect(wrapper.emitted("scale-change")).toEqual([[1.12]]);
   });
 
-  it("emits reduced-motion-change across the three states", async () => {
+  it("emits motion-level-change across the three levels", async () => {
     wrapper = mount(SettingsOverlay);
-    wrapper.get('[data-testid="settings-overlay-reduced-motion-on"]').trigger("click");
+    wrapper.get('[data-testid="settings-overlay-motion-reduced"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"]]);
-    wrapper.get('[data-testid="settings-overlay-reduced-motion-off"]').trigger("click");
+    expect(wrapper.emitted("motion-level-change")).toEqual([["reduced"]]);
+    wrapper.get('[data-testid="settings-overlay-motion-off"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"], ["off"]]);
-    wrapper.get('[data-testid="settings-overlay-reduced-motion-default"]').trigger("click");
+    expect(wrapper.emitted("motion-level-change")).toEqual([["reduced"], ["off"]]);
+    wrapper.get('[data-testid="settings-overlay-motion-full"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"], ["off"], [null]]);
+    expect(wrapper.emitted("motion-level-change")).toEqual([["reduced"], ["off"], ["full"]]);
   });
 
-  it("marks the active reduced-motion state with a non-colour indicator", () => {
-    wrapper = mount(SettingsOverlay, { props: { reducedMotion: "on" } });
-    expect(wrapper.get('[data-testid="settings-overlay-reduced-motion-on"]').attributes("aria-pressed")).toBe("true");
-    expect(wrapper.get('[data-testid="settings-overlay-reduced-motion-default"]').attributes("aria-pressed")).toBe("false");
+  it("marks the effective motion level with a non-colour indicator", () => {
+    wrapper = mount(SettingsOverlay, { props: { motionLevel: "reduced" } });
+    const pressed = wrapper.get('[data-testid="settings-overlay-motion-reduced"]');
+    expect(pressed.attributes("aria-pressed")).toBe("true");
+    expect(pressed.classes()).toContain("on");
+    for (const other of ["full", "off"]) {
+      const button = wrapper.get(`[data-testid="settings-overlay-motion-${other}"]`);
+      expect(button.attributes("aria-pressed")).toBe("false");
+      expect(button.classes()).not.toContain("on");
+    }
+  });
+
+  it("names the motion level in the text-speed description", () => {
+    wrapper = mount(SettingsOverlay);
+    expect(wrapper.text()).toContain("動態效果為「減少」或「關閉」時一律立即顯示");
   });
 
   it("emits text-html-change from the HTML narrative toggle", async () => {
@@ -108,7 +119,7 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
     );
     expect(labels).toEqual(["慢", "標準", "快", "瞬間"]);
     expect(reading.find('[data-testid="settings-overlay-auto-advance"]').exists()).toBe(true);
-    expect(reading.text()).toContain("減少動態效果開啟時一律立即顯示");
+    expect(reading.text()).toContain("動態效果為「減少」或「關閉」時一律立即顯示");
   });
 
   it("marks the current text speed with a non-colour indicator and the pressed state", () => {

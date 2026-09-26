@@ -11,7 +11,7 @@ import unittest
 
 from playwright.sync_api import sync_playwright
 
-from .browser_helpers import guard_local_only, login_and_open
+from .browser_helpers import guard_local_only, login_and_open, seed_motion_level
 from .harness import get_shared_server
 
 DEFAULT_VIEWPORT = (1440, 900)
@@ -66,19 +66,35 @@ class BrowserAcceptanceTest(unittest.TestCase):
             pass
         self._playwright.stop()
 
-    def new_page(self, viewport: tuple[int, int] = DEFAULT_VIEWPORT):
-        """Open a fresh context with the localhost-only request guard."""
+    def new_page(
+        self,
+        viewport: tuple[int, int] = DEFAULT_VIEWPORT,
+        motion_level: str | None = "off",
+    ):
+        """Open a fresh context with the localhost-only request guard.
+
+        webclient-motion-level (design D9): the suite runs at the `off` motion
+        level, so every transition and every message page is instant and no
+        journey races a running animation. Pass ``motion_level=None`` where a
+        journey needs first-load defaults or real typing.
+        """
         context = self._browser.new_context(
             viewport={"width": viewport[0], "height": viewport[1]}
         )
         self._contexts.append(context)
+        if motion_level is not None:
+            seed_motion_level(context, motion_level)
         page = context.new_page()
         page.add_init_script(_WS_CAPTURE_SCRIPT)
         guard_local_only(page)
         return page
 
-    def logged_in_page(self, viewport: tuple[int, int] = DEFAULT_VIEWPORT):
+    def logged_in_page(
+        self,
+        viewport: tuple[int, int] = DEFAULT_VIEWPORT,
+        motion_level: str | None = "off",
+    ):
         """A logged-in WebClient page with the active shell rendered."""
-        page = self.new_page(viewport)
+        page = self.new_page(viewport, motion_level)
         login_and_open(page, self.webclient_url, self.base_url)
         return page

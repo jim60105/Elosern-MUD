@@ -150,13 +150,15 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             "the design-draft selection rule must survive into the built "
             "stylesheet",
         )
-        # The reduced-motion media query must survive with its disabling rule
-        # intact (nonessential motion forced to 1ms), not merely its keyword.
-        # The minifier emits `@media(prefers-reduced-motion:reduce)`; component
-        # styles may re-declare the keyword for local suppression (e.g. the
-        # gallery panel's spinner block), so brace-match every occurrence and
-        # take the design-token block — the exactly-one block that redeclares
-        # the motion tokens.
+        # The motion level's blocks must survive the minifier with their
+        # tokens intact, not merely their keywords (webclient-motion-level,
+        # design D3/D10). The minifier emits
+        # `@media(prefers-reduced-motion:reduce)` and normalizes a `150ms`
+        # value to `.15s`, so every assertion below is quote- and
+        # unit-tolerant. Brace-match each media-query occurrence and identify
+        # the design-token fallback by its token redeclares: the `off` level's
+        # `!important` collapse lives in its own rule, outside the media
+        # query, so it can never identify this block.
         blocks = []
         for match in re.finditer("prefers-reduced-motion", css):
             start = css.index("{", match.start())
@@ -175,41 +177,72 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             blocks,
             "no reduced-motion block survived into the built stylesheet",
         )
-        # The design-token block is identified by ALL FOUR collapsing tokens
-        # together; component blocks may legitimately suppress a single
-        # animation, but only the token block pairs the two token redeclares
-        # with the two !important duration collapses.
+        # The design-token fallback redeclares the reduced level's tokens: the
+        # general durations at 0ms, the stage fades at 150ms, and the travel
+        # multiplier at 0.
+        token_patterns = (
+            r"--motion-fast:0ms",
+            r"--motion-base:0ms",
+            r"--motion-scene:(?:150ms|\.15s)",
+            r"--motion-travel:0(?:[;}]|$)",
+        )
         token_block = None
         for candidate in blocks:
-            if all(
-                token in candidate
-                for token in (
-                    "--motion-fast:1ms",
-                    "--motion-base:1ms",
-                    "transition-duration:1ms!important",
-                    "animation-duration:1ms!important",
-                )
-            ):
+            if all(re.search(pattern, candidate) for pattern in token_patterns):
                 token_block = candidate
                 break
         self.assertIsNotNone(
             token_block,
-            "no reduced-motion block collapses all four design motion tokens "
-            "— the design-token block must survive the minifier",
+            "no prefers-reduced-motion block resolves the design motion "
+            "tokens — the fallback block must survive the minifier",
         )
         block = token_block
-        for token in (
-            "--motion-fast:1ms",
-            "--motion-base:1ms",
-            "transition-duration:1ms!important",
-            "animation-duration:1ms!important",
-        ):
-            self.assertIn(
-                token,
+        for pattern in token_patterns:
+            self.assertRegex(
                 block,
-                f"reduced motion must disable nonessential motion: {token} "
-                "is not in the media block",
+                pattern,
+                "reduced motion must resolve the design motion tokens: "
+                f"{pattern} is not in the fallback block",
             )
+        # The `off` level forces every duration and delay to 0s, fades
+        # included, on every element and pseudo-element.
+        off_bodies = [
+            re.sub(r"\s+", "", body)
+            for _selector, body in re.findall(
+                r"([^{}]*\[data-motion=[\"']?off[\"']?\][^{}]*)\{([^}]*)\}",
+                css,
+            )
+        ]
+        off_bodies = [
+            body for body in off_bodies if "transition-duration:0s!important" in body
+        ]
+        self.assertTrue(
+            off_bodies,
+            "the off motion level must force transition-duration to 0s with "
+            "!important — the rule must survive the minifier",
+        )
+        for body in off_bodies:
+            for declaration in (
+                "animation-delay:0s!important",
+                "animation-duration:0s!important",
+                "transition-delay:0s!important",
+                "transition-duration:0s!important",
+            ):
+                self.assertIn(
+                    declaration,
+                    body,
+                    "off must make every visual change instant: "
+                    f"{declaration} is not in the rule",
+                )
+        # The `off` rule is the only one that collapses durations with
+        # `!important`: the reduced level keeps its short fades, so it must
+        # not carry the universal rule.
+        self.assertNotRegex(
+            block,
+            r"!important",
+            "the reduced fallback must not force durations — it keeps the "
+            "permitted short fades",
+        )
 
     @covers_requirement(
         "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline",

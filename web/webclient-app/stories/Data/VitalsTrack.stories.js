@@ -85,8 +85,8 @@ export const ReducedMotion = {
   parameters: {
     docs: {
       description:
-        "With `prefers-reduced-motion` set, the reduced-motion block in " +
-        "styles/tokens.css collapses every `--motion-*` token to 1ms, so " +
+        "At the `reduced` or `off` motion level the block in " +
+        "styles/tokens.css resolves the trail and fill tokens to 0ms, so " +
         "the fill and the trailing (ghost) bar snap without a visible " +
         "transition. The numerals and the 危險 text marker still render, " +
         "so no information is lost when the motion is disabled.",

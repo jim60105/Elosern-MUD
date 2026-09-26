@@ -238,7 +238,7 @@ watch(
   inset: 0;
   width: 0;
   background: rgba(255, 255, 255, 0.28);
-  transition: width 0.6s ease 0.25s;
+  transition: width var(--motion-trail) ease var(--motion-trail-delay);
 }
 
 .track .ghost[data-instant="true"] {
@@ -249,7 +249,7 @@ watch(
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 99px;
-  transition: width 0.4s var(--ease-standard);
+  transition: width var(--motion-slow) var(--ease-standard);
 }
 
 .track .fill::after {

@@ -245,7 +245,7 @@ function onIslandClick(event) {
 
 <style scoped>
 /* The island chrome (design D9): the shared tokens, so a token change or
-   the reduced-motion block reaches it at once. The root keeps the
+   the motion level's blocks reach it at once. The root keeps the
    load-bearing `.local-map` class that H1's mode-gate CSS selects on.
 
    `position: relative` (webclient-minimap-04-island-single-affordance D1):

@@ -4,8 +4,8 @@
 // presentation-preferences slice. Client-local presentation state
 // (webclient-component-showcase delta): the narrative prose scale
 // (`fontScale`), the text-to-HTML narrative toggle (`text2html`), the
-// optional reduced-motion override (`reducedMotion` — `null` means no
-// override, the OS `prefers-reduced-motion` applies) and the colorblind
+// optional motion level (`motionLevel` — `null` means nothing stored, so the
+// OS `prefers-reduced-motion` preference is followed live) and the colorblind
 // status palette (`colorblind`). C7 (webclient-typewriter-reading-prefs,
 // design D10) adds the reading preferences the message window reads as
 // props: the typing speed (`textSpeed`, one of `TEXT_SPEEDS`) and the
@@ -16,22 +16,47 @@
 // own LayoutStore instance is the only writer (main.js's instance stays
 // load-only): a preference save reloads the latest validated wrapper
 // before writing, so the caller's `dimensions` and `tabs` are preserved.
+//
+// C11a (webclient-motion-level, design D1/D2): the store is the only
+// motion-level resolver. It holds `prefs.motionLevel` (`null` or one of
+// `MOTION_LEVELS`) and one `matchMedia` query; `ctx.effectiveMotionLevel()`
+// resolves the stored level against the live OS preference, and
+// `applyPresentationPreferences` writes the EFFECTIVE level to
+// `<html data-motion>` — the single value the stylesheet's token blocks and
+// the script both read. `data-reduced-motion` is gone.
 
 import LayoutStore from "../../lib/layout_store.js";
+import { MOTION_LEVELS, resolveMotionLevel } from "../../lib/motion_level.js";
 import { TEXT_SPEEDS } from "../../lib/message_reveal.js";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 export function applyPreferences(ctx) {
   const layoutPersistence = LayoutStore.createStore({ storage: window.localStorage });
   const prefs = {
     fontScale: 1,
     text2html: true,
-    // Optional key: absent in the stored wrapper = no override (task 7.5).
-    reducedMotion: null,
+    // Optional key: absent in the stored wrapper = nothing stored, so the OS
+    // preference is followed (design D2).
+    motionLevel: null,
     colorblind: false,
     textSpeed: "normal",
     autoAdvance: false,
   };
   ctx.prefs = prefs;
+
+  // One query for the page (design D1): the store lives as long as the
+  // document, so the listener is never removed.
+  const query =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(REDUCED_MOTION_QUERY)
+      : null;
+
+  // The one resolved value (design D1): the stored level when it is valid,
+  // else the live OS preference.
+  ctx.effectiveMotionLevel = function effectiveMotionLevel() {
+    return resolveMotionLevel(prefs.motionLevel, !!(query && query.matches));
+  };
 
   function applyPresentationPreferences() {
     const root = document.documentElement;
@@ -39,17 +64,28 @@ export function applyPreferences(ctx) {
     // text, the full-log surface's lines and the prompt line read this
     // token; no HUD/dock/drawer/overlay chrome reads it.
     root.style.setProperty("--prose-scale", String(prefs.fontScale));
-    if (prefs.reducedMotion) {
-      root.setAttribute("data-reduced-motion", prefs.reducedMotion);
-    } else {
-      root.removeAttribute("data-reduced-motion");
-    }
+    // The effective level, always written (design D1): the stylesheet's
+    // `:root[data-motion="…"]` blocks own every motion token from the first
+    // apply on, so the `:root:not([data-motion])` OS fallback only covers the
+    // frames before this runs (and Storybook, where no store runs).
+    root.setAttribute("data-motion", ctx.effectiveMotionLevel());
     if (prefs.colorblind) {
       root.setAttribute("data-colorblind", "on");
     } else {
       root.removeAttribute("data-colorblind");
     }
     ctx.publishView();
+  }
+
+  // A live OS change re-applies the presentation while nothing is stored
+  // (design D1). It persists nothing: the effective level is derived, and a
+  // store reset must return to "follow the OS".
+  if (query && typeof query.addEventListener === "function") {
+    query.addEventListener("change", () => {
+      if (prefs.motionLevel === null) {
+        applyPresentationPreferences();
+      }
+    });
   }
 
   function persistPresentationPreferences() {
@@ -65,13 +101,10 @@ export function applyPreferences(ctx) {
       textSpeed: prefs.textSpeed,
       autoAdvance: prefs.autoAdvance,
     };
-    // The reducedMotion key is optional (task 7.5): only write it when the
-    // override is explicit. The layout store validates it as a boolean —
-    // `true` forces reduced motion ("on"), `false` forces full motion
-    // ("off"); absence in the stored wrapper means "no override" (the OS
-    // `prefers-reduced-motion` applies).
-    if (prefs.reducedMotion) {
-      wrapper.preferences.reducedMotion = prefs.reducedMotion === "on";
+    // The motionLevel key is optional (design D2): only write it when a level
+    // is stored. Its absence means "follow the OS".
+    if (prefs.motionLevel !== null) {
+      wrapper.preferences.motionLevel = prefs.motionLevel;
     }
     layoutPersistence.save(wrapper);
   }
@@ -89,12 +122,11 @@ export function applyPreferences(ctx) {
     if (typeof stored.text2html === "boolean") {
       prefs.text2html = stored.text2html;
     }
-    // The `reducedMotion` key is optional (task 7.5): stored as a boolean
-    // override — `true` forces reduced motion ("on"), `false` forces full
-    // motion ("off"); its absence means "no override" (the OS
-    // `prefers-reduced-motion` applies).
-    if (typeof stored.reducedMotion === "boolean") {
-      prefs.reducedMotion = stored.reducedMotion ? "on" : "off";
+    // The `motionLevel` key is optional (design D2): a stored value outside
+    // the three levels is discarded, as if nothing were stored, so the OS
+    // preference applies again.
+    if (MOTION_LEVELS.includes(stored.motionLevel)) {
+      prefs.motionLevel = stored.motionLevel;
     }
     if (typeof stored.colorblind === "boolean") {
       prefs.colorblind = stored.colorblind;
@@ -123,14 +155,15 @@ export function applyPreferences(ctx) {
     persistPresentationPreferences();
   };
 
-  ctx.setReducedMotion = function setReducedMotion(value) {
-    // `null` = no override (the OS preference applies); `"on"` forces
-    // reduced motion; `"off"` beats the OS `prefers-reduced-motion` media
-    // query (task 7.6).
-    if (value !== null && value !== "on" && value !== "off") {
+  ctx.setMotionLevel = function setMotionLevel(level) {
+    // Only the three levels may be stored (design D1). A stored level always
+    // overrides the OS preference; there is no "follow the system" value —
+    // the unset state exists only until the first choice, or after a store
+    // reset.
+    if (!MOTION_LEVELS.includes(level)) {
       return;
     }
-    prefs.reducedMotion = value;
+    prefs.motionLevel = level;
     applyPresentationPreferences();
     persistPresentationPreferences();
   };

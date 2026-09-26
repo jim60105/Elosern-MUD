@@ -112,7 +112,7 @@ describe("HudDrawer (H4 D1)", () => {
     // head type scale (align-drawer-chrome-symbols) are pinned at the
     // selector level: each assertion reads its rule's own block, so moving a
     // declaration into another block cannot satisfy it (the same source-pinning
-    // pattern the reduced-motion test below uses for the transition).
+    // pattern the motion-level test below uses for the transition).
     const source = readFileSync(
       join(process.cwd(), "web/webclient-app/components/HudDrawer.vue"),
       "utf-8",
@@ -147,14 +147,14 @@ describe("HudDrawer (H4 D1)", () => {
   });
 
   it("reduced motion keeps the open state and drops the transition", () => {
-    // The transition is expressed through `--motion-base`; the reduced-motion
-    // block sets the token to 1ms, so the open state still applies while the
-    // slide transition is effectively disabled.
+    // The transition is expressed through `--motion-base`; the motion level's
+    // `reduced` and `off` blocks resolve the token to 0ms, so the open state
+    // still applies while the slide transition is effectively disabled.
     mountDrawer({ open: true });
     const drawer = wrapper.get('[data-testid="hud-drawer"]');
     expect(drawer.classes()).toContain("open");
     expect(drawer.attributes("data-open")).toBe("true");
-    // The CSS transition is token-gated (the reduced-motion block covers it):
+    // The CSS transition is token-gated (the motion level's blocks cover it):
     // the component's <style> block references `var(--motion-base)`.
     const source = readFileSync(
       join(process.cwd(), "web/webclient-app/components/HudDrawer.vue"),

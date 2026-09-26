@@ -122,7 +122,8 @@ describe("VitalsTrack (H2 vitals island)", () => {
     const fill = hpRow.find(".fill");
     const ghost = hpRow.find(".ghost");
     // Both the fill and the ghost now bind the new committed ratio; the
-    // ghost's CSS transition (0.6s ease 0.25s delay) makes it lag on damage.
+    // ghost's CSS transition (`--motion-trail` with `--motion-trail-delay`)
+    // makes it lag on damage.
     expect(ghost.attributes("data-instant")).toBe("false");
     expect(parseFloat(ghost.element.style.width)).toBeCloseTo(120 / 405 * 100, 1);
     // The ghost is decorative: aria-hidden, no accessible name.

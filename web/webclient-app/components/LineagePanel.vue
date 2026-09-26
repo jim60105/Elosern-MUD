@@ -226,7 +226,7 @@ function nodeMeter(node) {
   width: 14px;
   height: 14px;
   color: var(--paper-500);
-  transition: transform 120ms ease;
+  transition: transform var(--motion-fast) ease;
 }
 
 .lineage-chain__chevron--open {

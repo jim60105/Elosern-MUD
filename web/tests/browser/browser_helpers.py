@@ -48,6 +48,53 @@ def fixture_home_xyz_arg() -> str:
 
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
+# The three motion levels (webclient-motion-level, design D3).
+MOTION_LEVELS = ("full", "reduced", "off")
+
+# The seed writes the product's own version-3 wrapper, so no test-only hook
+# exists in the bundle (design D9). `%s` is the JSON-encoded level.
+_SEED_MOTION_LEVEL_SCRIPT = """
+(function () {
+  try {
+    if (window.localStorage.getItem("elosern.layout") === null) {
+      window.localStorage.setItem(
+        "elosern.layout",
+        JSON.stringify({
+          layout_version: 3,
+          dimensions: {},
+          tabs: {},
+          preferences: {
+            text2html: true,
+            fontScale: 1,
+            colorblind: false,
+            textSpeed: "normal",
+            autoAdvance: false,
+            motionLevel: %s,
+          },
+        })
+      );
+    }
+  } catch (error) {
+    /* A storage-blocked document (about:blank) must not break the page. */
+  }
+})();
+"""
+
+
+def seed_motion_level(target, level: str) -> None:
+    """Seed a stored motion level on a page or context, once per document.
+
+    webclient-motion-level (design D9): the browser suite runs with every
+    transition and every page instant, so a journey never races a running
+    animation. The init script writes a version-3 wrapper only while nothing
+    is stored, so a reload-persistence journey still observes the value the
+    product itself wrote. A wrapper that drifted from the store's schema would
+    reset to the `full` default, which the first motion journey catches.
+    """
+    if level not in MOTION_LEVELS:
+        raise ValueError(f"motion level must be one of {MOTION_LEVELS}: {level!r}")
+    target.add_init_script(script=_SEED_MOTION_LEVEL_SCRIPT % json.dumps(level))
+
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the
 # message window, and the ⌨ command-line toggle in `#band-message`
 # (webclient-collapsible-command-line: the command line itself starts

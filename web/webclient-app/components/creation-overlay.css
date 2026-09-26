@@ -256,7 +256,7 @@
   border-radius: 50%;
   border: 4px solid var(--line);
   border-top-color: var(--gold-400);
-  animation: concept-spin 0.9s linear infinite;
+  animation: concept-spin var(--motion-spin) linear infinite;
 }
 
 @keyframes concept-spin {

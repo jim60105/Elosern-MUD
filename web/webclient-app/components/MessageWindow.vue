@@ -28,8 +28,8 @@ import {
   unitsAtOffset,
 } from "../lib/message_reveal.js";
 import { useMessageMeasure } from "../composables/use-message-measure.js";
-import { useReducedMotion } from "../composables/use-reduced-motion.js";
 import { useTypewriter } from "../composables/use-typewriter.js";
+import { MOTION_LEVELS } from "../lib/motion_level.js";
 
 // The AVG message window (docs/superpowers/specs/2026-09-23-webclient-avg-
 // stage-redesign-design.md §6; OpenSpec change
@@ -66,8 +66,10 @@ import { useTypewriter } from "../composables/use-typewriter.js";
 // Enter / Space while typing completes the page instead of advancing; the
 // marker renders only on a fully shown page. Mount and a flush show the page
 // complete; the live region still announces a page once, when it starts.
-// Effective reduced motion (the override, else the OS query) makes every
-// page instant. Opt-in auto-advance arms on a fully shown page with a next
+// An effective motion level other than `full` makes every page instant
+// (webclient-motion-level, design D5): the window reads the level the store
+// resolved — never `matchMedia` itself — so the stylesheet and the typewriter
+// cannot disagree. Opt-in auto-advance arms on a fully shown page with a next
 // page (never past the last page, never on an oversize or map page) and
 // pauses while `held` (an open drawer, overlay, or the full log).
 //
@@ -105,8 +107,12 @@ export default {
     },
     // Opt-in auto-advance (`store.view.autoAdvance`).
     autoAdvance: { type: Boolean, default: false },
-    // The reduced-motion override: "on" | "off" | null (the OS applies).
-    reducedMotion: { type: [String, null], default: null },
+    // The EFFECTIVE motion level (`store.view.motionLevel`).
+    motionLevel: {
+      type: String,
+      default: "full",
+      validator: (value) => MOTION_LEVELS.includes(value),
+    },
     // True while a drawer, overlay, or the full log is open: the
     // auto-advance wait pauses.
     held: { type: Boolean, default: false },
@@ -171,9 +177,10 @@ export default {
     const liveText = ref("");
 
     const currentPage = () => pages.value[pageIndex.value] || null;
-    const reduced = useReducedMotion(() => props.reducedMotion);
     const effectiveCps = computed(() =>
-      reduced.value ? Infinity : cpsFor(TEXT_SPEEDS.includes(props.textSpeed) ? props.textSpeed : "normal"),
+      props.motionLevel !== "full"
+        ? Infinity
+        : cpsFor(TEXT_SPEEDS.includes(props.textSpeed) ? props.textSpeed : "normal"),
     );
     const typewriter = useTypewriter({
       units: () => pageUnits(currentPage()),
@@ -380,8 +387,8 @@ export default {
       return true;
     }
 
-    // A switch to `instant` or into reduced motion completes the typing
-    // page; any other speed change applies from the next page.
+    // A switch to `instant`, or away from the `full` motion level, completes
+    // the typing page; any other speed change applies from the next page.
     watch(effectiveCps, (cps) => {
       if (cps === Infinity) {
         typewriter.complete();

@@ -43,7 +43,7 @@ const renderHost = (args) => ({
                 return h(SettingsOverlay, {
                   fontScale: 1,
                   textToHtml: true,
-                  reducedMotion: null,
+                  motionLevel: "full",
                   colorblind: false,
                 });
               }

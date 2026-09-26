@@ -178,7 +178,7 @@ function onActivate() {
   font-size: 17px;
   line-height: 1;
   color: var(--gold-400);
-  transition: border-color var(--motion-base, 150ms) var(--ease-standard, ease);
+  transition: border-color var(--motion-base) var(--ease-standard);
 }
 
 .comp:hover .av {
@@ -229,7 +229,7 @@ function onActivate() {
   height: 100%;
   background: var(--vit-hp);
   border-radius: 99px;
-  transition: width var(--motion-base, 150ms) var(--ease-standard, ease);
+  transition: width var(--motion-base) var(--ease-standard);
 }
 
 /* Short viewports (webclient-avg-stage-hud-anchors design D6). */

@@ -367,8 +367,8 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
 
   it("gates its transitions through the motion tokens (reduced motion is instant)", () => {
     // The cell outline and inspector transitions/animation use the existing
-    // `--motion-fast` token; the reduced-motion override sets the token to
-    // 1ms, making every transition effectively instant.
+    // `--motion-fast` token; the motion level's `reduced` and `off` blocks
+    // resolve the token to 0ms, making every transition effectively instant.
     const source = readFileSync(
       join(process.cwd(), "web/webclient-app/components/InventoryPanel.vue"),
       "utf-8",
