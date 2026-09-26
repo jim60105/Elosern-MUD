@@ -557,8 +557,8 @@ the only host of the dock's row region: no reference drawer body renders it.
   of them, and the pair renders side by side
 
 #### Scenario: A frame without a detail pane renders the row region directly
-- **WHEN** the active dock frame renders without a detail pane (an exit-outlet
-  frame or any full-width frame)
+- **WHEN** the active dock frame renders without a detail pane (any full-width
+  frame)
 - **THEN** the focusable row region is the pane host's only dock-menu child and
   fills the host's full width, with no wrapper element rendered
 
