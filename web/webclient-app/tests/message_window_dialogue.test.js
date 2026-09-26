@@ -8,6 +8,8 @@
 // the session line renders once in the current response, and a transiently
 // unavailable panel falls back to the paged presentation.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
@@ -79,6 +81,20 @@ describe("MessageWindow dialogue variant (D3)", () => {
     expect(w.find('[data-testid="dialogue-who"]').exists()).toBe(false);
     expect(w.find(".who").exists()).toBe(false);
     expect(w.get('[data-testid="dialogue-say"]').text()).toBe(PANEL.line);
+  });
+
+  it("truncates only the host's name, so the bond segment stays readable", () => {
+    // `text-overflow` does not apply to a flex row: the name carries its own
+    // ellipsis box and the bond never shrinks (source-level guard; jsdom has
+    // no layout).
+    const source = readFileSync(join(process.cwd(), "web/webclient-app/components/MessageWindow.vue"), "utf-8");
+    const rule = (sel) => (source.match(new RegExp(sel.replace(/[.]/g, "\\.") + "\\s*\\{[^}]*\\}")) || [""])[0];
+    expect(rule(".message-window__plate-name")).toMatch(/text-overflow: ellipsis/);
+    expect(rule(".message-window__plate-name")).toMatch(/min-width: 0/);
+    expect(rule(".message-window__plate-bond")).toMatch(/flex: none/);
+    const w = mountWindow();
+    const plate = w.get('[data-testid="message-name-plate"]');
+    expect(plate.get(".message-window__plate-name").text()).toBe("灰婆婆");
   });
 
   it("names only the host when bond_stage is null", () => {

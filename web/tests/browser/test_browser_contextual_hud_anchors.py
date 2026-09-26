@@ -49,7 +49,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """webclient-dialogue-stage-actors: in dialogue the host's stage actor
         stands in `actor-right` on the band, as tall as the player, 6% in
         from the right at 1920x1080 and far enough in at 1440x900 and
-        1280x720 that its face (the anchor's centre) clears the minimap; no
+        1280x720 that its face (the anchor's centre) clears the minimap; the
+        reply column starts under the player anchor's left edge; no
         interactive anchor overlaps another; the return to exploration empties
         `actor-right`."""
         dialogue = {
@@ -74,12 +75,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       const player = r('[data-anchor="actor-left"]');
                       const band = r('[data-testid="stage-band"]');
                       const map = r('.local-map');
+                      const say = r('[data-testid="dialogue-say"]');
                       const focusable = document.querySelectorAll(
                         '[data-anchor="actor-right"] :is(button, a, input, textarea, select, [tabindex])').length;
                       return {
                         hostRight: host.right, hostBottom: host.bottom, hostHeight: host.height,
                         hostCentre: (host.left + host.right) / 2, playerHeight: player.height,
                         bandTop: band.top, mapLeft: map ? map.left : null, focusable,
+                        playerLeft: player.left, sayLeft: say ? say.left : null,
                         width: innerWidth,
                       };
                     }"""
@@ -95,6 +98,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertIsNotNone(geo["mapLeft"])
                 self.assertLess(geo["hostCentre"], geo["mapLeft"], f"the host's face is under the minimap at {viewport}")
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap in dialogue at {viewport}")
+                # The conversation reads down from the player's figure: the
+                # reply column starts at the player anchor's left edge.
+                self.assertIsNotNone(geo["sayLeft"])
+                self.assertAlmostEqual(geo["sayLeft"], geo["playerLeft"], delta=1.5)
 
                 _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
                 _wait_mode(page, "exploration")

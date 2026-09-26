@@ -220,6 +220,17 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
       expect(document.activeElement).toBe(document.getElementById("action-dock"));
     });
 
+    for (const nextMode of ["combat", "creation"]) {
+      it(`moves focus from a dialogue row to the dock when dialogue gives way to ${nextMode}`, async () => {
+        const shell = mountLive("dialogue");
+        shell.get('[data-testid="dialogue-pick"]').element.focus();
+        await shell.setProps({ mode: nextMode, dialogue: null });
+        await nextTick();
+        await nextTick();
+        expect(document.activeElement).toBe(document.getElementById("action-dock"));
+      });
+    }
+
     it("leaves a focus outside the dock and the band alone on entering dialogue", async () => {
       const shell = mountLive("exploration");
       const outside = document.createElement("button");

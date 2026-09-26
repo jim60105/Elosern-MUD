@@ -1056,7 +1056,9 @@ export default {
    standing above it. The reply keeps the 42em measure; the right part of
    the band stays open under the host's portrait. */
 .message-window[data-variant="dialogue"] {
-  --dialogue-inset: max(24px, calc(6vw - 18px));
+  /* The player portrait's left inset, less the band region's 18px left
+     padding: the text column starts under the figure's anchor edge. */
+  --dialogue-inset: max(24px, calc(var(--actor-left-inset, 6vw) - 18px));
 }
 
 .message-window[data-variant="dialogue"]::before {
@@ -1067,7 +1069,6 @@ export default {
   flex: none;
   display: flex;
   align-items: baseline;
-  gap: 2px;
   min-width: 0;
   box-sizing: border-box;
   max-width: calc(42em * 0.72 + var(--dialogue-inset) + 160px);
@@ -1076,13 +1077,17 @@ export default {
   font-size: calc(var(--message-text) * var(--prose-scale));
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   background:
     linear-gradient(90deg, transparent, var(--gold-500) calc(var(--dialogue-inset) - 8px), rgba(185, 154, 96, 0.35) 55%, transparent)
     left bottom / 100% 1px no-repeat;
 }
 
+/* `text-overflow` does not apply to the flex row itself, so the name
+   truncates inside its own box and the bond segment always stays readable. */
 .message-window__plate-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--gold-300);
   font-family: var(--f-display);
   font-size: 0.86em;
@@ -1091,6 +1096,8 @@ export default {
 }
 
 .message-window__plate-bond {
+  flex: none;
+  white-space: pre;
   color: var(--paper-500);
   font-family: var(--f-sans);
   font-size: max(12px, 0.46em);

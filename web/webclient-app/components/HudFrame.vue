@@ -230,24 +230,12 @@ defineExpose({ menuOpen });
   z-index: 2;
   pointer-events: none;
 }
-/* The left-hand figure faces the island column (the place card and the
-   vitals under it, `--left-column` wide): where 6% would park the face under
-   it, the inset grows by what the column needs. At 1920x1080 it is exactly
-   6% (webclient-dialogue-stage-actors). */
-.elosern-stage [data-anchor="actor-left"] {
-  left: max(6%, calc(var(--left-column) + 8px - min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h))) / 3));
-}
-/* The right-hand figure faces the map column: its minimap card is a fixed
-   218px square 16px from the stage's right edge. Where 6% would park the
-   figure's face (the anchor's horizontal centre, half an anchor width = a
-   third of its height in) under that card — 1440x900 and narrower — the
-   inset grows until the face clears it by ~46px; at 1920x1080 it stays 6%
-   (webclient-dialogue-stage-actors). The stage fills the viewport, so the
-   stage-box clamp uses 100vh here. */
-.elosern-stage [data-anchor="actor-right"] {
-  --actor-map-clear: 280px;
-  right: max(6%, calc(var(--actor-map-clear) - min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h))) / 3));
-}
+/* The insets (webclient-dialogue-stage-actors): 6% of the stage width,
+   grown where the island column on that side would cover the figure's face
+   (`--actor-left-inset` / `--actor-right-inset` in tokens.css; exactly 6% at
+   1920x1080). */
+.elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); }
+.elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
 
 /* The bottom band (design D1): one fixed-height container spanning the
    stage bottom. It carries the reference draft's band chrome (the upward
