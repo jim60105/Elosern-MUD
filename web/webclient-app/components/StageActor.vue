@@ -9,8 +9,10 @@
 //   dim is never the only cue (the message window's name plate names the
 //   host), and there is no transition here — the motion layer owns it;
 // - the truthful placeholder: with no catalog or roster entry the actor
-//   draws the name's initial and the name (never a stock image); with no
-//   name either, `ReferenceArtwork` keeps its own `肖像生成中` card.
+//   draws the name's initial and the name (never a stock image); a
+//   placeholder entry keeps its own label (肖像生成中, 無肖像) with the
+//   name's initial in the ring; with no name at all, `ReferenceArtwork`
+//   keeps its own `肖像生成中` card.
 // Decorative art: no focusable element, no pointer events.
 import { computed } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
@@ -45,7 +47,7 @@ const shown = computed(() => {
     :data-side="side"
     :data-speaking="String(!dimmed)"
   >
-    <ReferenceArtwork :portrait="shown" />
+    <ReferenceArtwork :portrait="shown" :initial-of="name" />
   </div>
 </template>
 

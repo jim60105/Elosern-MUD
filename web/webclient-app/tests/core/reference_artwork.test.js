@@ -65,4 +65,13 @@ describe("reference artwork gallery consumption", () => {
     expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("𠮟婆婆");
     wrapper.unmount();
   });
+
+  it("draws the initial of `initialOf` when given, keeping the placeholder's own label", () => {
+    const wrapper = mount(ReferenceArtwork, {
+      props: { portrait: { placeholder: { kind: "unavailable", label: "無肖像" } }, initialOf: "灰婆婆" },
+    });
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
+    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("無肖像");
+    wrapper.unmount();
+  });
 });

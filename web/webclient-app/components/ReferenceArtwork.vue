@@ -11,6 +11,9 @@ import { portraitGlyph } from "./character-identity.js";
 
 const props = defineProps({
   portrait: { type: Object, default: null },
+  // The name whose initial the placeholder draws (StageActor passes the
+  // actor's name); without one the placeholder label's initial is drawn.
+  initialOf: { type: String, default: "" },
 });
 const failedUrl = ref(null);
 const portraitUrl = computed(() => {
@@ -18,6 +21,7 @@ const portraitUrl = computed(() => {
   return url && url !== failedUrl.value ? url : null;
 });
 const placeholderLabel = computed(() => props.portrait?.placeholder?.label || "肖像生成中");
+const placeholderGlyph = computed(() => portraitGlyph(props.initialOf || placeholderLabel.value));
 function onImageError() {
   if (portraitUrl.value) failedUrl.value = portraitUrl.value;
 }
@@ -34,7 +38,7 @@ function onImageError() {
       @error="onImageError"
     />
     <div v-else class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
-      <span class="reference-artwork__placeholder-glyph">{{ portraitGlyph(placeholderLabel) }}</span>
+      <span class="reference-artwork__placeholder-glyph">{{ placeholderGlyph }}</span>
       <span class="reference-artwork__placeholder-label">{{ placeholderLabel }}</span>
     </div>
     <figcaption :data-sample="String(!portraitUrl)">{{ portraitUrl ? (portrait.alt || "角色肖像") : placeholderLabel }}</figcaption>

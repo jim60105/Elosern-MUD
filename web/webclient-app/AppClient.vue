@@ -46,9 +46,10 @@ import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
 
 const store = useElosernStore();
-const currentPortrait = computed(
-  () => store.view.rosterCharacters?.find((character) => character.current)?.portrait ?? null,
+const currentCharacter = computed(
+  () => store.view.rosterCharacters?.find((character) => character.current) ?? null,
 );
+const currentPortrait = computed(() => currentCharacter.value?.portrait ?? null);
 // The shell handle (H5, design D1/D6) and the SceneBackdrop harness hook
 // (the __-prefixed pending-scene journey seeds the prior-image memory
 // through this handle — SceneBackdrop's exposed setPriorImage).
@@ -161,6 +162,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
             v-if="store.view.mode !== 'creation'"
             side="left"
             :portrait="currentPortrait"
+            :name="currentCharacter?.name || ''"
             :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
           />
         </template>

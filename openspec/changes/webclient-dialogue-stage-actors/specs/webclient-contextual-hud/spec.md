@@ -578,7 +578,8 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 actor in `actor-left` SHALL present the current roster character's portrait. The dialogue host's stage
 actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry named by the
 committed `dialogue` panel's `host.portrait_ref` — the image with its face-rect crop when the entry
-carries one, and the entry's own placeholder card when the entry is a placeholder. When `portrait_ref`
+carries one, and the entry's own placeholder card — its own label, with the host display name's
+initial as the card's glyph — when the entry is a placeholder. When `portrait_ref`
 is `null` or names no catalog entry, the host's stage actor SHALL render the truthful placeholder: the
 host display name's initial and the display name, never a stock or guessed image. The client SHALL
 NOT construct a catalog key from the host identity or any other field.
@@ -603,7 +604,7 @@ any transition between them is owned by the motion layer.
 
 #### Scenario: A pending or missing portrait shows the truthful placeholder
 - **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安·衛登` opens a conversation
-- **THEN** the first stage actor shows the entry's placeholder card and label, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
+- **THEN** the first stage actor shows the entry's placeholder card with its own label and the host's initial, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
 
 #### Scenario: The host speaks and the player is dimmed
 - **WHEN** a conversation opens and the host's greeting commits

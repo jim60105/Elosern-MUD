@@ -48,11 +48,17 @@ describe("StageActor", () => {
     expect(wrapper.find('[data-testid="reference-artwork__placeholder"]').exists()).toBe(false);
   });
 
-  it("shows a pending entry's own placeholder card, not the name", () => {
+  it("shows a pending entry's own placeholder label with the name's initial in the ring", () => {
     wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY, name: "灰婆婆", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     const card = wrapper.get('[data-testid="reference-artwork__placeholder"]');
     expect(card.get(".reference-artwork__placeholder-label").text()).toBe("肖像圖像尚未生成");
+    expect(card.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
+  });
+
+  it("keeps the entry label's initial when no name is known", () => {
+    wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY } });
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("肖");
   });
 
   it("draws the name's initial and the name when no entry exists", () => {
