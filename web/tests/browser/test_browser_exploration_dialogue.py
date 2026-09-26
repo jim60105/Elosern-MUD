@@ -137,6 +137,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             0,
             "the opened conversation must present the authored picks",
         )
+        # The dock returned to the overview in the commit that opened the
+        # conversation (webclient-talk-open-dock): no popover stays open over
+        # the dialogue surface.
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and (s.get("dockDepth") or 0) == 1,
+        )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the conversation opened with the dock back at the overview",
+        )
         # The first pick then sends the scripted keyword for the host.
         _press(page, "1")
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
@@ -145,6 +157,98 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             lambda s: _connected_active(s)
             and "先在櫃檯註冊成為冒險者" in narrative_log_text(page),
         )
+
+    @covers_requirement(
+        "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
+    )
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
+    def test_talk_open_enters_the_dialogue_in_one_step(self):
+        """webclient-talk-open-dock: 交談 is one step.
+
+        A keyboard-driven journey at 1920x1080: the overview's person chip
+        opens the host's verb popover, ONE Enter on 交談 submits exactly one
+        `explore.talk_open` and never a scripted-keyword dispatch, and the
+        commit that opens the conversation carries mode `dialogue`, the
+        committed dialogue panel's greeting line, and the dock back at the
+        overview. The exit row then ends the session through the deterministic
+        leave seam.
+        """
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        # The popover is one child frame of the overview and 交談 is its
+        # focused first row: no keyword list sits between the chip and the
+        # conversation.
+        self.assertEqual(
+            page.evaluate(
+                "window.__elosernBridge.router.currentItem() && "
+                "window.__elosernBridge.router.currentItem().key"
+            ),
+            "talk-open",
+            "交談 must be the popover's focused row",
+        )
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
+        self.assertEqual(
+            sent_action_count(page, "explore.talk_scripted"),
+            0,
+            "交談 must not open a scripted-keyword frame",
+        )
+
+        # The next commit: mode `dialogue`, the host's authored greeting as the
+        # committed panel's line, and the dock back at the overview.
+        wait_for_store_state(
+            page,
+            lambda s: s.get("mode") == "dialogue"
+            and ((s.get("panels") or {}).get("dialogue") or {}).get("available")
+            is True,
+        )
+        greeting = _shipped_greeting()
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and greeting in narrative_log_text(page),
+        )
+        self.assertEqual(
+            ((store_state(page).get("panels") or {}).get("dialogue") or {}).get(
+                "line"
+            ),
+            greeting,
+            "the dialogue panel carries the host's authored greeting",
+        )
+        wait_for_store_state(page, lambda s: (s.get("dockDepth") or 0) == 1)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the dock returned to the overview with the conversation open",
+        )
+        self.assertEqual(
+            store_state(page)["dockSource"],
+            "exploration.root",
+            "the overview is the dock's current frame",
+        )
+
+        # ✕ 結束對話 ends the live session through the sole writer.
+        self.assertEqual(
+            page.locator('[data-testid="dialogue-exit"] .t').inner_text(),
+            "結束對話",
+        )
+        result_before_exit = (
+            store_state(page).get("lastActionResult") or {}
+        ).get("requestId")
+        page.click('[data-testid="dialogue-exit"]')
+        wait_for_store_state(
+            page,
+            lambda s: (
+                (s.get("lastActionResult") or {}).get("requestId")
+                not in (None, result_before_exit)
+            ),
+        )
+        self.assertEqual(sent_action_count(page, "explore.dialogue_leave"), 1)
 
     @covers_requirement(
         "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel"
@@ -219,6 +323,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(dom_shape["variantIsDialogue"])
         self.assertTrue(dom_shape["boxInsideTextArea"])
         self.assertGreater(dom_shape["picks"], 0)
+
+        # The dock is back at the overview in that commit: the popover that
+        # carried 交談 closed with it (webclient-talk-open-dock).
+        wait_for_store_state(
+            page,
+            lambda state: (state.get("dockDepth") or 0) == 1,
+        )
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the conversation opened with the dock back at the overview",
+        )
 
         # Digit activation addresses the caption pick, not the dock rows:
         # the first scripted talk dispatches through the caption exactly once.

@@ -172,6 +172,7 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_engage_transitions_to_combat",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
         "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest"
       ],

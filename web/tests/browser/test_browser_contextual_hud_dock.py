@@ -569,11 +569,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the overview's reason strip shows the focused chip's explanation",
         )
 
-        # Chips render only backed fields: no statistics line or portrait slot.
+        # Chips render only backed fields: no statistics line and no portrait
+        # slot (the exploration payload carries neither; the retired nav pane's
+        # sub-line went with the pane, webclient-talk-open-dock).
         self.assertEqual(
-            page.locator("#action-dock .dock-menu__nav-sub").count(),
+            first.locator("img").count(),
             0,
-            "the pane renders no statistics line or portrait the payload does not carry",
+            "the chip renders no portrait the payload does not carry",
+        )
+        self.assertEqual(
+            first.locator(".dock-menu-item__label").count(),
+            1,
+            "the chip carries exactly one backed label element",
         )
 
     @covers_requirement(
