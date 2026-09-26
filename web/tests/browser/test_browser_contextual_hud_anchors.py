@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
+from .browser_helpers import valid_local_map_panel
 from ._journey_support import (
     _local_map_unavailable_panel,
     _inject_snapshot,
@@ -40,6 +41,68 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 if overlap:
                     return True
         return False
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces"
+    )
+    def test_dialogue_host_stands_opposite_the_player(self):
+        """webclient-dialogue-stage-actors: in dialogue the host's stage actor
+        stands in `actor-right` on the band, as tall as the player, 6% in
+        from the right at 1920x1080 and far enough in at 1440x900 and
+        1280x720 that its face (the anchor's centre) clears the minimap; no
+        interactive anchor overlaps another; the return to exploration empties
+        `actor-right`."""
+        dialogue = {
+            "schema_version": 2,
+            "available": True,
+            "kind": "dialogue",
+            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+            "bond_stage": None,
+            "line": "歡迎光臨。",
+            "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+        }
+        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                _inject_snapshot(page, {"local_map": valid_local_map_panel(), "dialogue": dialogue}, mode="dialogue")
+                _wait_mode(page, "dialogue")
+                page.wait_for_selector('[data-anchor="actor-right"] [data-testid="stage-actor"]', timeout=15000)
+                geo = page.evaluate(
+                    """() => {
+                      const r = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+                      const host = r('[data-anchor="actor-right"]');
+                      const player = r('[data-anchor="actor-left"]');
+                      const band = r('[data-testid="stage-band"]');
+                      const map = r('.local-map');
+                      const focusable = document.querySelectorAll(
+                        '[data-anchor="actor-right"] :is(button, a, input, textarea, select, [tabindex])').length;
+                      return {
+                        hostRight: host.right, hostBottom: host.bottom, hostHeight: host.height,
+                        hostCentre: (host.left + host.right) / 2, playerHeight: player.height,
+                        bandTop: band.top, mapLeft: map ? map.left : null, focusable,
+                        width: innerWidth,
+                      };
+                    }"""
+                )
+                self.assertAlmostEqual(geo["hostBottom"], geo["bandTop"], delta=1.0)
+                self.assertAlmostEqual(geo["hostHeight"], geo["playerHeight"], delta=1.0)
+                self.assertEqual(geo["focusable"], 0)
+                inset = geo["width"] - geo["hostRight"]
+                if viewport == (1920, 1080):
+                    self.assertAlmostEqual(inset, 0.06 * 1920, delta=1.0)
+                else:
+                    self.assertGreaterEqual(inset, 0.06 * viewport[0] - 1)
+                self.assertIsNotNone(geo["mapLeft"])
+                self.assertLess(geo["hostCentre"], geo["mapLeft"], f"the host's face is under the minimap at {viewport}")
+                self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap in dialogue at {viewport}")
+
+                _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+                _wait_mode(page, "exploration")
+                self.assertEqual(
+                    page.evaluate("() => document.querySelector('[data-anchor=\"actor-right\"]').children.length"),
+                    0,
+                )
+                page.close()
 
     @covers_requirement(
         "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"

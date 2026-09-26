@@ -1107,8 +1107,9 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         speech = "你好，詩人"
         page.keyboard.type(speech)
         page.keyboard.press("Enter")
-        # The interaction completed: focus back on the dock (H5, design D2)
-        # and the command line is still present (it is never closed).
+        # The interaction completed: focus back on the focus home — in a
+        # conversation the message window (webclient-dialogue-stage-actors)
+        # — and the command line is still present (it is never closed).
         wait_command_field_released(page)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # Two deliberate mutations echoed: the conversation open, then the

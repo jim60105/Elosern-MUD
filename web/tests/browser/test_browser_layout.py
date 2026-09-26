@@ -501,7 +501,8 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         """Mode-gated surfaces are hidden with ``display:none`` (leaving the
         accessibility tree and tab order) in the modes that hide them, and present
         again in the modes that show them, at both supported viewports. Focus that
-        lands on a surface the mode change hides is rescued back to the action dock."""
+        lands on a surface the mode change hides is rescued to the incoming mode's
+        focus home: the message window in dialogue, the action dock otherwise."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
@@ -550,6 +551,53 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                         page.locator(selector).is_visible(),
                         f"{selector} must stay visible in combat",
                     )
+
+                # Dialogue (webclient-dialogue-stage-actors): the command region
+                # collapses with the still-mounted dock inside it, the message
+                # window spans the band, and focus held in the dock moves to the
+                # message window before the dock is hidden.
+                page.evaluate("() => document.getElementById('action-dock').focus()")
+                self.assertEqual(page.evaluate("() => document.activeElement.id"), "action-dock")
+                self._inject_snapshot(
+                    page,
+                    {
+                        "local_map": map_panel,
+                        "dialogue": {
+                            "schema_version": 2,
+                            "available": True,
+                            "kind": "dialogue",
+                            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                            "bond_stage": None,
+                            "line": "歡迎光臨。",
+                            "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+                        },
+                    },
+                    mode="dialogue",
+                )
+                self._wait_mode(page, "dialogue")
+                page.wait_for_selector('[data-testid="dialogue-pick"]', timeout=15000)
+                page.wait_for_timeout(100)
+                self.assertEqual(page.locator("#action-dock").count(), 1, "the dock stays mounted in dialogue")
+                self.assertFalse(page.locator("#action-dock").is_visible(), "the dock is display:none in dialogue")
+                self.assertTrue(
+                    page.evaluate(
+                        "() => { const el = document.querySelector('[data-anchor=\"band-command\"]'); "
+                        "return !!el && getComputedStyle(el).display === 'none'; }"
+                    ),
+                    "the command region is display:none in dialogue",
+                )
+                for selector in (
+                    '[data-testid="message-window"]',
+                    '[data-testid="local-map"]',
+                    '[data-testid="command-line-toggle"]',
+                ):
+                    self.assertTrue(page.locator(selector).is_visible(), f"{selector} stays visible in dialogue")
+                self.assertTrue(
+                    page.evaluate(
+                        "() => document.activeElement === document.querySelector('[data-testid=\"dialogue-pick\"]')"
+                    ),
+                    "focus moved from the hidden dock to the message window's first row",
+                )
 
                 # Creation: the full gated set is display:none (H1's visibility
                 # matrix + design D10) — the place card, the band's message region, the

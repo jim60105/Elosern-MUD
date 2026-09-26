@@ -744,6 +744,52 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertAlmostEqual(geo["height"], 44.0, delta=1.0, msg=f"expanded row is 44px at {viewport}")
                 self.assertAlmostEqual(geo["left"], geo["leftCol"], delta=1.5, msg=f"row starts at --left-column at {viewport}")
                 self.assertAlmostEqual(geo["right"], geo["messageRight"], delta=1.5, msg=f"row ends at message region's right edge at {viewport}")
+            # Dialogue (webclient-dialogue-stage-actors): the message region
+            # spans the band, but the row keeps its geometry — it ends at the
+            # right edge of the band's left two thirds, clear of the host.
+            page.evaluate("() => window.__elosernBridge.store.setFontScale(1)")
+            _inject_snapshot(
+                page,
+                {
+                    "exploration": exploration,
+                    "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                    "local_map": valid_local_map_panel(),
+                    "dialogue": {
+                        "schema_version": 2,
+                        "available": True,
+                        "kind": "dialogue",
+                        "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                        "bond_stage": None,
+                        "line": "歡迎光臨。",
+                        "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+                    },
+                },
+                mode="dialogue",
+            )
+            _wait_mode(page, "dialogue")
+            page.wait_for_selector('[data-anchor="actor-right"] [data-testid="stage-actor"]', timeout=15000)
+            open_command_line(page)
+            talk = page.evaluate(
+                """() => {
+                  const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+                  const cmd = r('[data-testid="command-line"]');
+                  const band = r('[data-testid="stage-band"]');
+                  const host = r('[data-anchor="actor-right"]');
+                  const map = r('[data-testid="anchor-map"]');
+                  const vitals = r('[data-testid="anchor-vitals"]');
+                  const hit = (b) => !(cmd.right <= b.left || b.right <= cmd.left || cmd.bottom <= b.top || b.bottom <= cmd.top);
+                  return {
+                    height: cmd.height, right: cmd.right, bottom: cmd.bottom,
+                    twoThirds: band.left + (band.right - band.left) * 2 / 3,
+                    bandTop: band.top, hitsHost: hit(host), hitsMap: hit(map), hitsVitals: hit(vitals),
+                  };
+                }"""
+            )
+            self.assertAlmostEqual(talk["height"], 44.0, delta=1.0, msg=f"dialogue row is 44px at {viewport}")
+            self.assertAlmostEqual(talk["bottom"], talk["bandTop"], delta=1.0, msg=f"dialogue row sits on the band at {viewport}")
+            self.assertAlmostEqual(talk["right"], talk["twoThirds"], delta=1.5, msg=f"dialogue row ends at two thirds at {viewport}")
+            self.assertFalse(talk["hitsHost"], f"the dialogue row covers the host at {viewport}")
+            self.assertFalse(talk["hitsMap"] or talk["hitsVitals"], f"the dialogue row covers an island at {viewport}")
             page.close()
 
     @covers_requirement(
@@ -788,12 +834,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         activate_overview_chip(page, "target-11")
         page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
         states["popover"] = page.evaluate(measure)
+        # Close the popover (one Escape pops exactly one level) so the
+        # overview's footer chip is addressable again.
+        page.evaluate(f"() => {store}.focusPress('Escape')")
+        page.wait_for_selector('[data-testid="verb-popover"]', state="detached", timeout=15000)
 
         activate_overview_chip(page, "wait")
         page.wait_for_selector(".waiting-screen", timeout=15000)
         states["wait"] = page.evaluate(measure)
 
-        page.evaluate(f"() => {store}.focusPress('Escape')")
         page.evaluate(f"() => {store}.focusPress('Escape')")
         _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
         _wait_mode(page, "combat")
@@ -837,6 +886,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         baseline = states["root"]
         self.assertAlmostEqual(baseline["band"][3] - baseline["band"][1], 300.24, delta=1.0)
+        # Dialogue collapses the command region (webclient-dialogue-stage-
+        # actors): the band keeps its box, the message region spans it at the
+        # same height, and the command region renders no box.
+        dialogue = states.pop("dialogue")
+        for got, want in zip(dialogue["band"], baseline["band"]):
+            self.assertAlmostEqual(got, want, delta=1.0, msg="the band moved in the dialogue state")
+        for got, want in zip(dialogue["message"], baseline["band"]):
+            self.assertAlmostEqual(got, want, delta=1.5, msg="the message region must span the band in dialogue")
+        self.assertEqual(dialogue["command"][2] - dialogue["command"][0], 0, "the command region is not rendered in dialogue")
         for label, state in states.items():
             for key in ("band", "message", "command"):
                 for got, want in zip(state[key], baseline[key]):
@@ -859,7 +917,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             """() => {
               const a = document.querySelector('[data-testid="anchor-actor-left"]').getBoundingClientRect();
               const b = document.querySelector('[data-testid="stage-band"]').getBoundingClientRect();
-              const holds = !!document.querySelector('[data-testid="anchor-actor-left"] [data-testid="reference-artwork"]');
+              const holds = !!document.querySelector('[data-testid="anchor-actor-left"] [data-testid="stage-actor"] [data-testid="reference-artwork"]');
               const focusable = document.querySelectorAll(
                 '[data-testid="anchor-actor-left"] :is(button, a, input, textarea, select, [tabindex])').length;
               return { left: a.left, bottom: a.bottom, height: a.height, bandTop: b.top, holds, focusable };
