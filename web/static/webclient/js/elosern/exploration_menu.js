@@ -5,8 +5,8 @@
  * consumed by KeyboardRouter: the bounded exit list and look room/entity/
  * object rows (the scene overview's chip builders), the wait/rest submenu,
  * the suggestions frame, and each interact target's server-authored
- * affordances (scripted keyword buttons, free-form dialogue, engage, or a
- * navigate-kind guild/shop service entry). Move payloads carry the canonical
+ * affordances (交談, engage, party, delivery, or a navigate-kind guild/shop
+ * service entry). Move payloads carry the canonical
  * `current_node` supplied by the local-map panel so `explore.move` passes its
  * stale guard.
  *
@@ -456,39 +456,6 @@
     };
   }
 
-  function keywordMenuFor(model, target, scriptedAffordance) {
-    void scriptedAffordance;
-    // Scripted keyword buttons live on the target descriptor so the interact
-    // payload stays within the global JSON-depth bound.
-    var keywords = (target && target.keywords) || [];
-    var items = keywords.map(function (keyword) {
-      return {
-        key: "kw-" + keyword.keyword_id,
-        label: keyword.label,
-        enabled: true,
-        actionId: "explore.talk_scripted",
-        payload: { npc_id: target.identity, keyword_id: keyword.keyword_id },
-        description: null,
-        commandDisplay: {
-          npcLabel: target.display_name,
-          keywordLabel: keyword.label,
-        },
-      };
-    });
-    if (items.length === 0) {
-      items.push(disabledItem("keywords-empty", "對方目前沒有可以交談的話題。", null));
-    }
-    items.push(backItem());
-    return {
-      items: items,
-      focusKey: null,
-      target: target,
-      grid: true,
-      gridCols: 2,
-      title: (target && target.display_name) || "交談",
-    };
-  }
-
   // -------------------------------------------------------------------------
   // Suggestions menu (H3 webclient-hud-03-action-dock): the `建議` root
   // entry's frame — the committed `context_actions.suggestions` envelope
@@ -737,19 +704,6 @@
     return null;
   }
 
-  function scriptedAffordanceFor(target) {
-    var affordances = (target && target.affordances) || [];
-    for (var i = 0; i < affordances.length; i++) {
-      if (
-        affordances[i].kind === "action" &&
-        affordances[i].action_id === "explore.talk_scripted"
-      ) {
-        return affordances[i];
-      }
-    }
-    return null;
-  }
-
    return {
      buildMenus: buildMenus,
      navigationItems: navigationItems,
@@ -759,9 +713,7 @@
      targetMenuFor: targetMenuFor,
      verbMenuFor: verbMenuFor,
      overviewMenu: overviewMenu,
-     keywordMenuFor: keywordMenuFor,
      targetById: targetById,
-     scriptedAffordanceFor: scriptedAffordanceFor,
      normalizeDirection: normalizeDirection,
      suggestionsMenu: suggestionsMenu,
    };

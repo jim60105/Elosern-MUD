@@ -64,7 +64,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

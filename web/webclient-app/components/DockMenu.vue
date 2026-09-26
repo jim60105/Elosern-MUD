@@ -3,11 +3,12 @@
 // row container carries the listbox role, the single tab stop,
 // `aria-activedescendant`, and `data-testid="dock-menu"` at depth ≥ 2 (the
 // tab bar carries the hook at depth 1, task 1.1). The pane renders its rows
-// by pane kind (task 5.1): `nav` / `affordance` / `cards` / `skills` /
-// `targets` / `scales` / `confirm` / `plain`. The exploration root is not a
-// DockMenu frame at all — it is the scene overview component
-// (webclient-scene-overview-swap), whose exit chips replaced the retired
-// move frame's exit outlet.
+// by pane kind (task 5.1): `cards` / `skills` / `targets` / `scales` /
+// `confirm` / `plain`. The exploration root is not a DockMenu frame at all —
+// it is the scene overview component (webclient-scene-overview-swap), whose
+// exit chips replaced the retired move frame's exit outlet; a target's
+// affordances render in the verb popover component, not here
+// (webclient-talk-open-dock).
 //
 // Every row keeps the preserved `#<idPrefix>-<i>` row id and the
 // `data-item-key` identity (defined in exactly one place, task 5.2). The
@@ -15,11 +16,8 @@
 // testid (task 5.8).
 import { computed, nextTick, watch } from "vue";
 import { classifyPane } from "./dock-panes.js";
-import { glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 import OptionCard from "./OptionCard.vue";
-import { portraitFor, portraitGlyph } from "./party-helpers.js";
-import { faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -35,35 +33,20 @@ const props = defineProps({
   // The router's menu depth: the pane container carries `dock-menu` at
   // depth ≥ 2 (the tab bar owns the hook at depth 1).
   depth: { type: Number, default: 1 },
-  // The committed view slice (the nav pane reads the interact targets'
-  // portraits from it, task 5.5).
-  view: { type: Object, default: null },
-  // The target's display_name for the affordance pane's head (task 5.6): the
-  // frame's own `target.display_name` (the targetMenuFor title).
-  targetName: { type: String, default: null },
-  artPanel: { type: Object, default: null },
 });
 
 const emit = defineEmits(["activate", "focus-change"]);
 
 const paneKind = computed(() => classifyPane({ items: props.items }));
-const interactionTargets = computed(() => new Map(
-  (props.view?.explorationInteract || []).map((target) => [`target-${target.identity}`, target]),
-));
 
 const rows = computed(() =>
-  dockItemKeys(props.items).map((key, index) => {
-    const target = interactionTargets.value.get(key);
-    return {
-      key,
-      item: props.items[index],
-      rowId: `${props.idPrefix}-${index}`,
-      intent: actionIntentForItem(props.items[index]),
-      reason: disabledReasonText(props.items[index]),
-      target,
-      portrait: target ? portraitFor(props.artPanel, target.portrait_ref) : null,
-    };
-  }),
+  dockItemKeys(props.items).map((key, index) => ({
+    key,
+    item: props.items[index],
+    rowId: `${props.idPrefix}-${index}`,
+    intent: actionIntentForItem(props.items[index]),
+    reason: disabledReasonText(props.items[index]),
+  })),
 );
 
 const focusedRow = computed(
@@ -91,15 +74,16 @@ function onCellClick(row) {
 // The fixed framed-grid geometry (the `.dock-menu` container's `:style`
 // carries the attribute the B2 gate reads); the row container applies the
 // same `grid-template-columns` so the fixed column count actually lays out
-// the rows. The nav pane (the scripted-keyword list) keeps the fixed-column
-// content-sized tracks (`minmax(0, max-content)`); every other pane kind
-// keeps the stretch-to-fill `1fr` track function.
+// the rows. Every pane kind keeps the stretch-to-fill `1fr` track function:
+// the one content-sized consumer was the retired scripted-keyword nav pane
+// (webclient-talk-open-dock). Whether a pane form fills its width or leaves
+// width empty is the form's own styles' decision; this inline template only
+// fixes the column count.
 const paneGridStyle = computed(() => {
   if (!props.gridCols) {
     return {};
   }
-  const sizeFn = paneKind.value === "nav" ? "minmax(0, max-content)" : "1fr";
-  return { "grid-template-columns": `repeat(${props.gridCols}, ${sizeFn})` };
+  return { "grid-template-columns": `repeat(${props.gridCols}, 1fr)` };
 });
 
 // The focused row scrolls into view (task 5.9).
@@ -151,69 +135,9 @@ watch(
       :style="gridCols ? { 'grid-template-columns': 'repeat(' + gridCols + ', 1fr)' } : {}"
       v-bind="depth >= 2 ? { 'data-testid': 'dock-menu' } : {}"
     >
-      <!-- NAV: look/interact target rows (task 5.5): icon, name, backed
-           sub-line (entity kind / affordance labels), `›` chevron on rows
-           that open a deeper frame. No stat line, no portrait slot. -->
-      <div v-if="paneKind === 'nav'" class="dock-menu__nav" :style="paneGridStyle">
-        <div
-          v-for="row in rows"
-          :id="row.rowId"
-          role="option"
-          :aria-selected="row.key === focusedKey"
-          class="dock-menu__nav-row"
-          :class="{ 'dock-menu__nav-row--focused': row.key === focusedKey }"
-          :data-item-key="row.key"
-          tabindex="-1"
-          @click="onCellClick(row)"
-        >
-          <span v-if="row.target" class="dock-menu__nav-avatar" aria-hidden="true">
-            <img v-if="row.portrait" :src="row.portrait.url" :style="{ objectPosition: faceObjectPosition(row.portrait.face_rect) }" alt="" />
-            <span v-else>{{ portraitGlyph(row.target.display_name) }}</span>
-          </span>
-          <span v-else-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>
-          <div class="dock-menu__nav-text">
-            <span class="dock-menu__nav-name">{{ row.item.label }}</span>
-            <span v-if="row.item.kind" class="dock-menu__nav-sub">{{ row.item.kind }}</span>
-            <span v-else-if="row.item.affordanceLabels && row.item.affordanceLabels.length" class="dock-menu__nav-sub">
-              {{ row.item.affordanceLabels.join("・") }}
-            </span>
-          </div>
-          <span
-            v-if="row.item.openSubmenu || row.item.openTarget || row.item.openKeywords"
-            class="dock-menu__nav-chevron"
-            aria-hidden="true"
-          >›</span>
-        </div>
-      </div>
-
-      <!-- AFFORDANCE: target-affordance buttons (task 5.6): the `對 <目標>
-           可作：` head from the frame's own `target.display_name`. -->
-      <div v-else-if="paneKind === 'affordance'" class="dock-menu__aff" :style="paneGridStyle">
-        <p v-if="targetName" class="dock-menu__aff-head">
-          對 <b>{{ targetName }}</b> 可作：
-        </p>
-        <div class="dock-menu__aff-buttons">
-          <button
-            v-for="row in rows"
-            :id="row.rowId"
-            type="button"
-            role="option"
-            :aria-selected="row.key === focusedKey"
-            class="dock-menu__aff-btn"
-            :class="{ 'dock-menu__aff-btn--focused': row.key === focusedKey }"
-            :data-item-key="row.key"
-            tabindex="-1"
-            @click="onCellClick(row)"
-          >
-            <span class="dock-menu__aff-label">{{ row.item.label }}</span>
-            <span v-if="!row.item.enabled" class="dock-menu__aff-reason">{{ row.reason || "（無法使用）" }}</span>
-          </button>
-        </div>
-      </div>
-
       <!-- CARDS: the suggestions frame (task 5.7): the `.sug` card in row
            mode (`role="option"` + row id) — a card is a listbox option. -->
-      <div v-else-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
+      <div v-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
         <template v-for="row in rows" :key="row.key">
           <OptionCard
             v-if="row.intent"
@@ -405,61 +329,6 @@ watch(
   outline-offset: 2px;
 }
 
-/* NAV (task 5.5): the draft's `.nrow` rows — icon, name, backed sub-line,
-   `›` chevron on rows that open a deeper frame. */
-.dock-menu__nav {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
-  gap: 9px;
-}
-.dock-menu__nav-row {
-  display: flex;
-  gap: 11px;
-  align-items: center;
-  text-align: left;
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid var(--ink-600);
-  border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-.dock-menu__nav-row--focused {
-  background: var(--gold-glow);
-  border-color: var(--gold-500);
-  color: var(--paper-50);
-  transform: translateY(-1px);
-}
-.dock-menu__nav-row--focused::before {
-  content: "▶";
-  color: var(--gold-400);
-  font-size: 0.8em;
-}
-.dock-menu__nav-icon {
-  width: 26px;
-  height: 26px;
-  flex: none;
-  color: var(--gold-400);
-}
-.dock-menu__nav-text {
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-.dock-menu__nav-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 46px;
-  height: 54px;
-  overflow: hidden;
-  border: 1px solid var(--gold-500);
-  border-radius: var(--radius-sm);
-  background: var(--ink-820);
-  color: var(--gold-400);
-  font: 26px var(--f-serif);
-}
-.dock-menu__nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .dock-menu__card-nav {
   min-height: 36px;
   padding: 8px 12px;
@@ -472,74 +341,6 @@ watch(
 .dock-menu__card-nav[aria-selected="true"] {
   color: var(--gold-400);
   border-color: var(--gold-500);
-}
-.dock-menu__nav-name {
-  font-size: 14px;
-  color: var(--paper-50);
-  font-weight: 600;
-}
-.dock-menu__nav-sub {
-  font-size: 12px;
-  color: var(--paper-300);
-  line-height: 1.6;
-  margin-top: 2px;
-}
-.dock-menu__nav-chevron {
-  margin-left: auto;
-  color: var(--paper-700);
-  font-size: 16px;
-}
-
-/* AFFORDANCE (task 5.6): the draft's `.affbtn` buttons + the `對 <目標>
-   可作：` head. */
-.dock-menu__aff-head {
-  font-size: 12.5px;
-  color: var(--paper-300);
-  margin: 0 0 10px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  overflow-wrap: anywhere;
-}
-.dock-menu__aff-head b {
-  color: var(--gold-400);
-  font-weight: 600;
-}
-.dock-menu__aff-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-}
-.dock-menu__aff-btn {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  gap: 9px;
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid var(--ink-600);
-  border-radius: 9px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  color: var(--paper-100);
-  cursor: pointer;
-}
-.dock-menu__aff-btn--focused {
-  background: var(--gold-glow);
-  border-color: var(--gold-500);
-  color: var(--paper-50);
-  transform: translateY(-1px);
-}
-.dock-menu__aff-btn--focused::before {
-  content: "▶";
-  color: var(--gold-400);
-  font-size: 0.8em;
-}
-.dock-menu__aff-reason {
-  color: var(--paper-500);
-  font-size: 11px;
 }
 
 /* CARDS (task 5.7): the `.sug` card in row mode (OptionCard). */

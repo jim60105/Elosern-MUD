@@ -823,10 +823,10 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 using one shared row renderer for every form so the focused marker, the disabled marker and its
 `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined
 in exactly one place. The forms SHALL be: exit, person, object, and footer chips for the scene
-overview; navigation rows for the scripted-keyword list; the verb popover's rows under a target head;
-the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified
-elsewhere in this capability. No exploration frame SHALL render an exit-outlet grid: exits are chips
-of the scene overview.
+overview; the verb popover's rows under a target head; the waiting cards; suggestion cards for the
+suggestions frame; and the combat forms specified elsewhere in this capability. No exploration frame
+SHALL render an exit-outlet grid or a navigation-row list: exits are chips of the scene overview, and
+a host's conversation topics are the dialogue surface's choices, never a dock frame.
 
 An exit chip SHALL render the exit's direction as a leading glyph, and, while the chip is enabled, its
 primary text SHALL be the destination's display name — never a repetition of the direction word or the
@@ -844,8 +844,8 @@ glyph beside its persistent direction glyph. A disabled exit chip's server-autho
 remain reachable by assistive technology directly from the chip and SHALL be shown in the overview's
 reason strip while the chip is focused. The submitted move payload SHALL be unchanged.
 
-A chip or navigation row SHALL render only fields the committed payload carries: its server-authored
-name and, for a navigation row, an optional sub-line composed of such fields. No chip or row SHALL
+A chip or row SHALL render only fields the committed payload carries: its server-authored name and,
+where its form has one, an optional sub-line composed of such fields. No chip or row SHALL
 render a statistics line, a portrait, or any other element for which the payload has no field; where
 the design draft shows such an element it SHALL be absent rather than emptied or mocked. Icons and
 glyphs SHALL be decorative, SHALL be hidden from assistive technology, SHALL always accompany a real
@@ -1986,27 +1986,21 @@ outside the defined steps SHALL be discarded, and the default SHALL apply.
 - **WHEN** the stored wrapper carries a text speed outside the four steps
 - **THEN** the client loads with the `normal` speed, and the other stored preferences still apply
 
-### Requirement: A fixed-column dock pane sizes its columns to content
+### Requirement: A fixed-column dock pane stays inside the command region
 When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count
-SHALL govern only which cell each row occupies, never the rendered width of a column. A column's
-rendered width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows
-are fewer or narrower than the panel's available width SHALL leave the remaining width empty rather
-than stretching every column to consume it. When the pane's available width is narrower than the
-combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink
-toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns
-the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies
-which cell. The content-sized track rule SHALL apply to the nav pane, the only pane whose fixed column
-count sizes its tracks to content. The combat skill, target, and scale panes lay out their rows with
-their own flex forms, which the fixed column count does not size, and the suggestion-card pane's grid
-keeps equal-share tracks; those panes SHALL be bound by the no-overflow rule above and the keyboard
-cell mapping, not by the content-sized track rule. The scene
-overview is not a fixed-column pane (its chips wrap by width under the section geometry the exploration
-dock requirement defines).
+SHALL govern only which cell each row occupies. This requirement SHALL NOT prescribe how wide a column
+or row renders: each pane form (the combat skill list, the target tokens, the scale chips) lays out its
+rows with its own styles, and whether a form fills the pane's width or leaves width empty is a visual
+decision of that form. Whatever the form, every row SHALL render inside the pane's box without
+horizontal overflow: when the pane's available width is narrower than the rows' natural width, the rows
+SHALL wrap or compress, and long content SHALL wrap within its row. Changing a row's rendered width
+SHALL NOT change which row occupies which cell. The scene overview is not a fixed-column pane (its chips
+wrap by width under the section geometry the exploration dock requirement defines).
 
-#### Scenario: Column-count-driven layout never invents equal-width stretching
-- **WHEN** a fixed-column dock pane (a nav pane) applies a fixed column count for its keyboard geometry
-- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width
+#### Scenario: A narrow command region keeps every row inside the pane
+- **WHEN** a combat skill, target, or scale pane renders in the command region at the minimum supported 1280x720 viewport
+- **THEN** every row lies inside the pane's right edge, the pane shows no horizontal overflow, and a long label wraps within its row
 
-#### Scenario: A narrow pane compresses the fixed columns instead of overflowing
-- **WHEN** the pane's available width (e.g. the command region at the minimum supported 1280x720 viewport) is narrower than the combined natural width of the fixed columns
-- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width
+#### Scenario: Rendered width never changes the keyboard cell mapping
+- **WHEN** the player presses ArrowRight in a pane whose keyboard geometry fixes two columns
+- **THEN** focus reaches the row that the fixed column count places in the second column, whatever width each row renders at

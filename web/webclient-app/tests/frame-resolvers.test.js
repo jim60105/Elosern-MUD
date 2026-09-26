@@ -174,9 +174,9 @@ describe("frame resolver — the finite exploration table", () => {
       "footer",
     ]);
     expect(overview.sections.map((section) => section.count)).toEqual([2, 1, 1, 3]);
-    // Target/keywords resolve through the same target seam the push sites use.
-    // The target frame is the verb popover (`verbMenuFor`), not the
-    // affordance grid (`targetMenuFor`).
+    // The target frame resolves through the same target seam the push sites
+    // use: it is the verb popover (`verbMenuFor`), not the affordance grid
+    // (`targetMenuFor`).
     const verbMenu = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
     expect(verbMenu).toEqual(
       ExplorationMenu.verbMenuFor(direct, ExplorationMenu.targetById(direct, 7)),
@@ -184,14 +184,6 @@ describe("frame resolver — the finite exploration table", () => {
     expect(verbMenu.items[verbMenu.items.length - 1].goBack).toBe(true);
     expect(verbMenu.items.map((i) => i.key)).toContain("look-target");
     expect(verbMenu.grid).toBeUndefined();
-    const keywords = resolver.resolve({ source: "exploration.keywords", params: { identity: 7 } });
-    expect(keywords).toEqual(
-      ExplorationMenu.keywordMenuFor(
-        direct,
-        ExplorationMenu.targetById(direct, 7),
-        ExplorationMenu.scriptedAffordanceFor(ExplorationMenu.targetById(direct, 7)),
-      ),
-    );
     // Suggestions resolve through the shipped builder.
     const suggestions = resolver.resolve({ source: "exploration.suggestions" });
     expect(suggestions).toEqual(ExplorationMenu.suggestionsMenu(state.panels.context_actions.suggestions));
@@ -212,10 +204,14 @@ describe("frame resolver — the finite exploration table", () => {
     // webclient-retire-exploration-submenus: the move/look/interact frames are
     // gone, so their descriptors are unregistered. A stray push for one
     // degrades to the shared marker and pops instead of resurrecting a pane.
+    // webclient-talk-open-dock retires the scripted-keyword frame the same
+    // way: nothing reaches its source once the v3 panel carries no keyword
+    // list and 交談 dispatches `explore.talk_open` in one step.
     const FORMER_EXPLORATION_SOURCES = [
       "exploration.move",
       "exploration.look",
       "exploration.interact",
+      "exploration.keywords",
     ];
     const resolver = resolverFor(committedState());
     for (const source of FORMER_EXPLORATION_SOURCES) {
@@ -501,10 +497,6 @@ describe("frame resolver — (legacy) the degradation marker", () => {
     const state = committedState();
     const resolver = resolverFor(state);
     expect(resolver.resolve({ source: "exploration.target", params: { identity: 999 } })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
-    expect(resolver.resolve({ source: "exploration.keywords", params: {} })).toEqual({
       unresolvable: true,
       reason: null,
     });

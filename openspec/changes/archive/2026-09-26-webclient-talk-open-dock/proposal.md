@@ -3,7 +3,7 @@
 After `explore-talk-open-action` (C9a), 交談 in the verb popover dispatches `explore.talk_open` and the conversation opens with one press (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` §1, §2 item 6, §8.1). C9a changed only the one client branch that the v3 wire forced. It left three things behind in the dock:
 - Dead code. The keyword frame (`keywordMenuFor`, `scriptedAffordanceFor`, the `exploration.keywords` source), the popover freeform borrow (the `openKeywords` and `freeform` branches of `handleExplorationItem`), and the `nav` pane kind whose last producer was the keyword frame. The validator now rejects every payload that could feed them.
 - An orphan. The `affordance` pane kind of `DockMenu` has had no producer since C8b (`webclient-scene-overview-swap`) moved target menus into `DockVerbPopover`, and no change in the series deletes it.
-- A flow gap. The verb popover stays open over the conversation after a successful open, because dialogue mode keeps the exploration form.
+- A flow gap (already closed by the store). The verb popover must not stay open over the conversation. The mode-change teardown already returns the stack to the overview in the commit that makes the mode `dialogue` (verified during implementation, design D1), so this change pins that behaviour with store and browser tests instead of adding a second reset.
 
 This change (C9b) deletes the dead code and both pane kinds, returns the dock to the overview when a conversation opens, and restates the dock's specs so 交談 is one step and the dock offers no keyword list and no borrow. The project is unreleased, so the old paths are removed, not kept.
 
@@ -14,7 +14,7 @@ This change (C9b) deletes the dead code and both pane kinds, returns the dock to
 - **Exploration menu.** `web/static/webclient/js/elosern/exploration_menu.js` deletes `keywordMenuFor`, `scriptedAffordanceFor`, and both exports, and rewrites the header comment (no "scripted keyword buttons, free-form dialogue").
 - **Frames and store.**
   - `web/webclient-app/stores/frame-resolvers.js` deletes the `exploration.keywords` source. It becomes an unregistered source, so a stray push pops, as in C8c D2.
-  - `stores/elosern/frames.js` drops `exploration.keywords` from the `gridCols = 1` list. `settleFrameStack` gains one more rule: when the committed mode turns `dialogue`, the stack resets to the overview (design D1).
+  - `stores/elosern/frames.js` drops `exploration.keywords` from the `gridCols = 1` list. `settleFrameStack` needs no new rule: the mode-change teardown already returns the stack to the overview (design D1), so this change pins it with tests.
   - `stores/elosern/interaction.js` `handleExplorationItem` deletes the `openKeywords` and `freeform` branches. The dialogue variant's free row keeps `borrowDialogueCommand`.
   - `stores/elosern/combat.js` `fillDisplayFor` adds `explore.talk_open` to its `npcLabel` family, so a dispatch without a row descriptor still echoes `talk <NPC>` (C9a added the resolver).
   - `stores/dialogue-view.js`: the header comment stops citing `keywordMenuFor`.
@@ -28,7 +28,7 @@ This change (C9b) deletes the dead code and both pane kinds, returns the dock to
 - **Tests.**
   - Node: delete the `keywordMenuFor` / `scriptedAffordanceFor` cases; rename the synthetic `exploration.keywords` source in `keyboard_router_declarative.test.js`.
   - Vitest: resolvers (the keyword source is unregistered), panes (no `nav`, no `affordance`), DockMenu, the D1 reset, the dialogue store and dock (the popover closed), and the echo surfaces (the popover row and the central fill).
-  - Browser: a new one-step keyboard journey, the dock-at-overview assertions in the dialogue journeys, the services docstring, and the contextual-hud dock journey's nav-row assertions.
+  - Browser: a new one-step keyboard journey, the dock-at-overview assertions in the dialogue journeys, the repaired services `_open_surface` walk, and the contextual-hud dock journey's chip-field assertions.
 
 Out of scope:
 - The server action, exploration panel v3, the client protocol mirror, the echo resolver, and the `targetMenuFor` talk branch: `explore-talk-open-action` (C9a).

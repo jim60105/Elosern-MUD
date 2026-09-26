@@ -447,16 +447,18 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(self._dock_mode(page), "exploration")
 
     @covers_requirement(
-        "webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content"
+        "webclient-contextual-hud::a-fixed-column-dock-pane-stays-inside-the-command-region"
     )
     def test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region(self):
         """The fixed-column skill pane stays inside the command region (1280x720).
 
-        Relocated from the exploration keyword frame (C8c's nav pane, which
-        this change leaves without a reachable producer): the combat skill
-        frame carries the requirement's surviving assertions — every row
-        inside the pane's right edge at the minimum supported viewport, and
-        the fixed column count governing which cell a row occupies.
+        Relocated from the exploration keyword frame (C8c's nav pane, retired
+        with the frame): the combat skill frame carries the requirement's
+        surviving assertions — every row inside the pane's right edge at the
+        minimum supported viewport, and the fixed column count governing which
+        cell a row occupies. It makes no claim about rendered column widths
+        (webclient-talk-open-dock retired the content-sized track rule with the
+        nav pane; the skill rows are a flex form).
         """
         page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)

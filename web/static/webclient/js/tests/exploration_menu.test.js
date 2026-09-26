@@ -3,9 +3,9 @@
  *
  * Runs with Node 24's built-in test runner; no npm packages. Covers the
  * scene-overview chip builders (exits, look rows, the footer), the wait
- * submenu, the top navigation bar's entries, scripted keyword buttons, the
- * free-form flow, disabled-row non-submission, and the navigate-kind service
- * affordance being dock-navigation only (never submitted as an action).
+ * submenu, the top navigation bar's entries, a target's verb popover rows,
+ * disabled-row non-submission, and the navigate-kind service affordance being
+ * dock-navigation only (never submitted as an action).
  */
 
 "use strict";
@@ -66,30 +66,6 @@ function validPanel(overrides) {
     },
     overrides || {}
   );
-}
-
-// The retired in-conversation descriptor shape: keywordMenuFor and
-// scriptedAffordanceFor survive until C9b deletes them, so their cases drive
-// a legacy target directly (no v3 panel can carry explore.talk_scripted).
-function scriptedTarget() {
-  return {
-    identity: 5,
-    display_name: "南門守衛",
-    portrait_ref: null,
-    affordances: [
-      {
-        kind: "action",
-        action_id: "explore.talk_scripted",
-        label: "交談",
-        enabled: true,
-        disabled_reason: null,
-      },
-    ],
-    keywords: [
-      { keyword_id: "公會", label: "公會" },
-      { keyword_id: "再見", label: "再見" },
-    ],
-  };
 }
 
 test("the navigation builder carries 角色狀態 plus available quests and inventory", () => {
@@ -190,17 +166,10 @@ test("every pushed exploration frame ends with an enabled back row", () => {
     assert.equal(back.goBack, true);
     assert.equal(back.actionId, null, "the back row never submits an action");
   });
-  // Dynamic menus (target affordances, scripted keywords) also end with it.
+  // Dynamic menus (the verb popover's target affordances) also end with it.
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.items[targetMenu.items.length - 1].key, "back");
-  const scripted = scriptedTarget();
-  const keywordMenu = ExplorationMenu.keywordMenuFor(
-    model,
-    scripted,
-    ExplorationMenu.scriptedAffordanceFor(scripted)
-  );
-  assert.equal(keywordMenu.items[keywordMenu.items.length - 1].key, "back");
   // The suggestions frame too (the exploration root, the scene overview, does
   // not: it carries no parent to return to).
   const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
@@ -222,13 +191,6 @@ test("menu models carry the mockup grid geometry", () => {
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.gridCols, 2);
-  const scripted = scriptedTarget();
-  const keywordMenu = ExplorationMenu.keywordMenuFor(
-    model,
-    scripted,
-    ExplorationMenu.scriptedAffordanceFor(scripted)
-  );
-  assert.equal(keywordMenu.gridCols, 2);
   // The suggestions frame is a single-row grid whose column count is its own
   // item count; the scene overview is a sections menu with no grid flag.
   const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
@@ -369,18 +331,6 @@ test("no exploration menu item carries openServiceSubmenu", () => {
       );
     }
   }
-});
-
-test("scripted keyword buttons submit explore.talk_scripted with the server IDs", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const target = scriptedTarget();
-  const scripted = ExplorationMenu.scriptedAffordanceFor(target);
-  assert.ok(scripted);
-  const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
-  const keywordKeys = keywordMenu.items.map((item) => item.key);
-  assert.deepEqual(keywordKeys, ["kw-公會", "kw-再見", "back"]);
-  assert.deepEqual(keywordMenu.items[0].payload, { npc_id: 5, keyword_id: "公會" });
-  assert.equal(keywordMenu.items[0].actionId, "explore.talk_scripted");
 });
 
 test("the conversation row submits explore.talk_open with the host identity", () => {

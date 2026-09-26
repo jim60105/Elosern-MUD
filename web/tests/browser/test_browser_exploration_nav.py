@@ -168,7 +168,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
     def test_pointer_back_cell_returns_to_the_root_without_an_action(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -238,7 +238,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the back cell pops exactly one router frame",
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
     def test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -313,7 +313,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), 0)
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
     def test_escape_from_quests_drawer_leaves_root_clean(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -363,7 +363,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview"
+        "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
     )
     def test_keyboard_only_journey_walks_the_overview(self):
         """A pure arrows-and-Enter journey at 1920x1080: the overview's chips

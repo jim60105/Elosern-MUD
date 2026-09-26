@@ -72,7 +72,7 @@ export default {
 // A dialogue host: 交談, 交易, 查看, and back.
 export const DialogueHost = {
   render,
-  args: verbArgs(PANEL, 11, { focusedKey: "talk-scripted" }),
+  args: verbArgs(PANEL, 11, { focusedKey: "talk-open" }),
 };
 
 // A hostile target: 戰鬥, 查看, and back.

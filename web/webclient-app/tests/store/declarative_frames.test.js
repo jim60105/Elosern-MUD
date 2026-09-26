@@ -11,8 +11,9 @@
 // webclient-retire-exploration-submenus: the move/look/interact frames are
 // gone, so the pushed frame these contracts ride is the verb popover, reached
 // through the real path (person chip → verb popover). The file also pins the
-// new room-change reset (design D2). The retired scripted-keyword frame keeps
-// one directly-pushed cascade case until C9b deletes it with its producer.
+// new room-change reset (design D2) and — webclient-talk-open-dock — the
+// conversation-open reset: the commit that changes the mode to `dialogue`
+// returns the dock to the overview (see the describe block at the end).
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -78,6 +79,38 @@ function openVerbPopover(store) {
 function roomChange(revision, identity) {
   return explorationCommit(revision, {
     look: { room: { identity, display_name: "另一個房間", room: true } },
+  });
+}
+
+// The committed dialogue panel a successful 交談 commits
+// (webclient-talk-open-dock): the conversation the popover's `talk-open` row
+// opened.
+function dialoguePanel() {
+  return {
+    schema_version: 1,
+    available: true,
+    kind: "dialogue",
+    host: { identity: 7, display_name: "店長", portrait_ref: null },
+    bond_stage: "親睦",
+    line: "「渡河要五枚銅板。」",
+    choices: [{ keyword_id: "fare", label: "「就五枚，走嗎？」" }],
+  };
+}
+
+// The presentation the server publishes when a conversation opens: the same
+// exploration/local-map pair with the committed mode `dialogue` and the
+// dialogue panel.
+function dialogueSnapshot(revision) {
+  return fx.snapshot({
+    revision,
+    mode: "dialogue",
+    panels: {
+      status: fx.statusPanel(),
+      exploration: fx.explorationPanel(),
+      local_map: fx.localMapPanel(),
+      context_actions: fx.explorationActions(),
+      dialogue: dialoguePanel(),
+    },
   });
 }
 
@@ -193,20 +226,25 @@ describe("declarative frame stack (store contract)", () => {
     });
 
     it("consecutive unresolvable frames cascade in one access down to the parent", () => {
-      openExploration(store);
-      // Person chip -> verb popover, plus the keywords frame pushed directly
-      // on top (its producer is retired, but its resolver and the cascade
-      // contract survive until C9b deletes them).
+      openExploration(store, {
+        interact: [
+          target(7, [affordance("explore.talk_open", "交談")]),
+          target(9, [affordance("explore.talk_open", "交談")]),
+        ],
+      });
+      // Person chip -> target 7's verb popover, plus target 9's popover pushed
+      // directly on top: both frames resolve from the same committed interact
+      // list, so one commit can invalidate both.
       openVerbPopover(store);
-      store.router.pushFrame({ source: "exploration.keywords", params: { identity: 7 } });
+      store.router.pushFrame({ source: "exploration.target", params: { identity: 9 } });
       expect(store.router.depth()).toBe(3);
       expect(store.router.currentDescriptor()).toEqual({
-        source: "exploration.keywords",
-        params: { identity: 7 },
+        source: "exploration.target",
+        params: { identity: 9 },
       });
 
-      // One commit removes the identity: BOTH the keywords and the target
-      // frame become unresolvable at once.
+      // One commit removes every identity: BOTH frames become unresolvable at
+      // once.
       store.receive(1, "ui_update", [explorationCommit(3, { interact: [] })], {});
 
       // Both frames cascaded to the root in a single access (no timer).
@@ -575,6 +613,101 @@ describe("declarative frame stack (store contract)", () => {
       // commit's `null` record is not a move, so nothing resets.
       store.receive(1, "ui_update", [explorationCommit(4)], {});
       expect(store.view.degradedRoot).toBeNull();
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor().source).toBe("exploration.root");
+    });
+  });
+
+  // webclient-talk-open-dock: 交談 submits `explore.talk_open` in one step and
+  // the dock returns to the overview in the commit that makes the mode
+  // `dialogue`, so no popover stays open over the conversation. The reset is
+  // the store's ONE mode-change teardown (`syncHudDrawer` ->
+  // `resetFramesToRoot`, webclient-services-combat-creation-frames): it posts
+  // the committed mode's root descriptor, which for dialogue is the ordinary
+  // exploration root. These cases pin the transition at the store level; the
+  // dock's own contract is stated by `webclient-exploration-menu`.
+  describe("the conversation-open reset", () => {
+    it("a popover open when the commit changes the mode to dialogue resets to the overview", () => {
+      openExploration(store, {
+        interact: [target(7, [affordance("explore.talk_open", "交談")])],
+      });
+      openVerbPopover(store);
+      expect(store.router.depth()).toBe(2);
+
+      const result = store.receive(1, "ui_snapshot", [dialogueSnapshot(3)], {});
+      expect(result.accepted).toBe(true);
+      expect(store.view.mode).toBe("dialogue");
+      // The popover closed IN that commit: the dock is at the overview and no
+      // deeper frame remains activatable over the conversation.
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor()).toEqual({
+        source: "exploration.root",
+        params: {},
+      });
+      expect(store.view.dockSource).toBe("exploration.root");
+      // The conversation itself presents: the committed dialogue panel.
+      expect(store.view.panels.dialogue.line).toBe("「渡河要五枚銅板。」");
+    });
+
+    it("a commit that keeps the mode dialogue leaves the open frame alone", () => {
+      // A session already in dialogue: the dock is the ordinary exploration
+      // root, so its popover is reachable mid-conversation.
+      store.beginTransport(1);
+      store.setConnected(true);
+      store.receive(1, "ui_snapshot", [dialogueSnapshot(1)], {});
+      expect(store.view.mode).toBe("dialogue");
+      expect(store.router.depth()).toBe(1);
+      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.router.depth()).toBe(2);
+
+      // No mode transition: the frame re-resolves in place.
+      store.receive(1, "ui_update", [fx.update({ revision: 2, mode: "dialogue" })], {});
+      expect(store.router.depth()).toBe(2);
+      expect(store.router.currentDescriptor().source).toBe("exploration.target");
+    });
+
+    it("the first commit of a dialogue session mounts the one root frame and resets nothing", () => {
+      store.beginTransport(1);
+      store.setConnected(true);
+      const mount = store.receive(1, "ui_snapshot", [dialogueSnapshot(1)], {});
+      expect(mount.accepted).toBe(true);
+      // A conversation already live at the first commit: the dock mounts its
+      // committed mode's root (the exploration root — dialogue has no dock form
+      // of its own), degraded to nothing, with no teardown to run.
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor()).toEqual({
+        source: "exploration.root",
+        params: {},
+      });
+      expect(store.view.degradedRoot).toBeNull();
+      expect(store.view.mode).toBe("dialogue");
+    });
+
+    it("leaving dialogue also returns the dock to the overview in that commit", () => {
+      store.beginTransport(1);
+      store.setConnected(true);
+      store.receive(1, "ui_snapshot", [dialogueSnapshot(1)], {});
+      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.router.depth()).toBe(2);
+
+      // The conversation ends: the same mode-change teardown returns the dock
+      // to the overview rather than leaving a popover over the exploration
+      // surface.
+      store.receive(
+        1,
+        "ui_update",
+        [
+          fx.update({
+            revision: 2,
+            mode: "exploration",
+            panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() },
+          }),
+        ],
+        {},
+      );
+      expect(store.view.mode).toBe("exploration");
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
     });

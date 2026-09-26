@@ -42,14 +42,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     );
   }
 
-  const navItems = [
-    { key: "look-room", label: "查看房間", enabled: true, action_id: "explore.look" },
-    { key: "entity-1", label: "老婦", enabled: true, action_id: "explore.look", kind: "npc" },
-  ];
-  const affordanceItems = [
-    { key: "engage", label: "交戰", enabled: true, action_id: "explore.engage" },
-    { key: "party-invite", label: "邀請入隊", enabled: false, action_id: "explore.party_invite", disabled_reason: { code: "full", message: "隊員已滿員" } },
-  ];
   const cardItems = [
     { key: "action-explore.talk_freeform", label: "交談", enabled: true, action_id: "explore.talk_freeform" },
     { key: "action-options.dismiss", label: "✕ 清除建議", enabled: true, action_id: "options.dismiss" },
@@ -76,23 +68,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "trait-hp", label: "HP 100 / 100", enabled: true, navigation: true, surface: "trait-hp" },
     { key: "trait-mp", label: "MP 40 / 40", enabled: true, navigation: true, surface: "trait-mp" },
   ];
-
-  it("nav: rows equal the committed look items in order", () => {
-    const w = mountMenu(navItems, "exploration-row");
-    assertRowsInOrder(w, navItems, "exploration-row");
-    // A look row with a `kind` renders the backed sub-line (entity kind).
-    const sub = w.find(".dock-menu__nav-sub");
-    expect(sub.text()).toBe("npc");
-  });
-
-  it("affordance: rows equal the committed affordance items in order", () => {
-    const w = mountMenu(affordanceItems, "exploration-row");
-    assertRowsInOrder(w, affordanceItems, "exploration-row");
-    // The disabled affordance row keeps its reason readable.
-    const reason = w.find(".dock-menu__aff-reason");
-    expect(reason.exists()).toBe(true);
-    expect(reason.text()).toContain("隊員已滿員");
-  });
 
   it("cards: rows equal the committed suggestion-card items in order", () => {
     const w = mountMenu(cardItems, "exploration-row");
@@ -149,20 +124,23 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
 
   it("no pane renders a field the payload does not carry", () => {
     // A plain frame of display-only rows has no `cost_text` / `kind` /
-    // `direction`; the pane must not invent a cost, kind sub-line, or
-    // direction glyph.
+    // `direction`; the pane must not invent a cost, a kind sub-line, or a
+    // direction glyph — the row renders its label alone.
     const w = mountMenu(plainItems, "exploration-row");
     expect(w.find(".dock-menu__skill-cost").exists()).toBe(false);
-    expect(w.find(".dock-menu__nav-sub").exists()).toBe(false);
+    expect(w.get('[data-item-key="trait-hp"]').text()).toBe("HP 100 / 100");
   });
 
   // fix-webclient-hud-dock-exploration-grid-width: the fixed keyboard column
-  // count drives the rendered track sizing per pane kind. The pane element's
-  // inline `grid-template-columns` is asserted on the rendered element (the
-  // script-setup computed is closed, so `wrapper.vm` is not relied upon).
+  // count drives the rendered `grid-template-columns` template. This pins the
+  // INLINE TEMPLATE ONLY: the combat panes are flex boxes, on which that
+  // template has no effect, so the test makes no claim about rendered column
+  // widths or equal-width columns (webclient-talk-open-dock: a fixed-column
+  // pane stays inside the command region; how its form uses the width is the
+  // form's own decision). The pane element's inline style is asserted on the
+  // rendered element (the script-setup computed is closed, so `wrapper.vm` is
+  // not relied upon).
   const PANE_SELECTORS = {
-    nav: ".dock-menu__nav",
-    affordance: ".dock-menu__aff",
     cards: ".dock-menu__cards",
     skills: ".dock-menu__skills",
     targets: ".dock-menu__targets",
@@ -181,12 +159,8 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     return w;
   }
 
-  it("the nav pane emits content-sized tracks; every other kind keeps 1fr or none; no gridCols emits none", () => {
-    const contentCases = [
-      { items: navItems, sel: PANE_SELECTORS.nav, expected: "repeat(2, minmax(0, max-content))" },
-    ];
+  it("every kind with gridCols emits repeat(n, 1fr); no gridCols emits none", () => {
     const stretchCases = [
-      { items: affordanceItems, sel: PANE_SELECTORS.affordance, expected: "repeat(2, 1fr)" },
       { items: cardItems, sel: PANE_SELECTORS.cards, expected: "repeat(2, 1fr)" },
       { items: skillItems, sel: PANE_SELECTORS.skills, expected: "repeat(2, 1fr)" },
       { items: targetItems, sel: PANE_SELECTORS.targets, expected: "repeat(2, 1fr)" },
@@ -194,7 +168,7 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
       { items: confirmItems, sel: PANE_SELECTORS.confirm, expected: "repeat(2, 1fr)" },
       { items: plainItems, sel: PANE_SELECTORS.plain, expected: "repeat(2, 1fr)" },
     ];
-    for (const { items, sel, expected } of [...contentCases, ...stretchCases]) {
+    for (const { items, sel, expected } of stretchCases) {
       const w = mountMenuWithCols(items, 2);
       const pane = w.find(sel);
       expect(pane.exists()).toBe(true, sel + " pane rendered");
@@ -221,13 +195,13 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     const backItem = { key: "back", label: "返回上一層", enabled: true, navigation: true, surface: "back" };
     // Every frame renders its `back` item as a row of its own listbox, so the
     // active descendant keeps naming its real row id.
-    const navWithBack = [...navItems, backItem];
-    const w = mountMenu(navWithBack, "exploration-row");
+    const plainWithBack = [...plainItems, backItem];
+    const w = mountMenu(plainWithBack, "exploration-row");
     w.setProps({ focusedKey: "back" });
     await w.vm.$nextTick();
     const listbox = w.find('[role="listbox"]');
     expect(listbox.attributes("aria-activedescendant")).toBe(
-      `exploration-row-${navWithBack.length - 1}`,
+      `exploration-row-${plainWithBack.length - 1}`,
     );
     w.unmount();
     document.body.innerHTML = "";

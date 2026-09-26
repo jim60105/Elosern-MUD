@@ -116,11 +116,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         The target's verb popover carries the host's single 交談
         `explore.talk_open` row followed by its navigate-kind service entry
         (exploration_menu.js targetMenuFor; the panel's per-host keyword list
-        left the wire in exploration panel v3), so the service entry is
-        focused by its stable key through the store (focusItemByKey +
-        focusConfirm: the same keyboard-parity fallback tabToRootAndConfirm
-        uses; the frozen KeyboardRouter.confirm façade member, so no pointer
-        path and no OOB emission beyond the journey's own later steps).
+        left the wire in exploration panel v3), so both hops are focused by
+        their stable keys through the store (focusItemByKey + Enter: the same
+        keyboard-parity path tabToRootAndConfirm uses, through the frozen
+        KeyboardRouter façade members — no pointer path and no OOB emission
+        beyond the journey's own later steps). The host's chip key is read from
+        the committed exploration panel, never guessed.
         """
         # Close any open drawer first so its scrim does not cover the stage or
         # block the dock arrow walk.
@@ -150,13 +151,45 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 },
             )
             return self._services_panel(page)
-        # guild/shop: Interact -> first target -> navigate service entry by
-        # its stable key (the service row's position depends on the host's
-        # keyword count; the key does not).
-        _press(page, "ArrowRight")  # Look
-        _press(page, "ArrowRight")  # Interact
-        _press(page, "Enter")  # open Interact
-        _press(page, "Enter")  # select the first present target
+        # guild/shop: the overview's person chip -> the host's verb popover ->
+        # the navigate-kind service entry. Both hops are addressed by their
+        # stable keys through the store (focusItemByKey + Enter) because the
+        # popover's row order is server-authored (交談 leads, then the target's
+        # own affordances), so a fixed arrow walk cannot name the service row.
+        # The chip's identity is read from the committed panel, never guessed.
+        target_key = page.evaluate(
+            """(surface) => {
+                const s = window.__elosernBridge && window.__elosernBridge.store;
+                const panels = (s && s.view && s.view.panels) || {};
+                const panel = panels.exploration || null;
+                for (const target of (panel && panel.interact) || []) {
+                    for (const affordance of target.affordances || []) {
+                        if (affordance.surface === surface) {
+                            return 'target-' + target.identity;
+                        }
+                    }
+                }
+                return null;
+            }""",
+            surface_key,
+        )
+        self.assertTrue(
+            target_key,
+            f"no committed interact target carries the {surface_key} service entry",
+        )
+        opened = page.evaluate(
+            """(key) => {
+                const s = window.__elosernBridge && window.__elosernBridge.store;
+                return s && s.focusItemByKey(key);
+            }""",
+            target_key,
+        )
+        self.assertTrue(
+            opened,
+            f"the {surface_key} host's overview chip ({target_key}) is not in "
+            "the current frame",
+        )
+        _press(page, "Enter")  # open the host's verb popover (no dispatch)
         item_key = "service-" + surface_key
         focused = page.evaluate(
             """(key) => {
@@ -168,9 +201,9 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(
             focused,
             f"the {surface_key} host's navigate row ({item_key}) is not in the "
-            "open target's affordance frame",
+            "open target's verb popover",
         )
-        _press(page, "Enter")  # open the service submenu / frameless drawer
+        _press(page, "Enter")  # open the frameless service drawer
         if surface_key == "shop":
             wait_for_store_state(
                 page,
@@ -195,6 +228,19 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "description": "frameless quest drawer rendered",
                 },
             )
+        # Reaching the navigate row needed the host's verb popover, which is a
+        # pushed frame; the drawer's own open pushes nothing. Restore the
+        # committed root before returning so the helper's postcondition is the
+        # one the journeys assert — opening a frameless surface leaves the
+        # router's frame and trail untouched (resetFramesToRoot is the
+        # browser-helper stack normalizer; it never closes a drawer). This
+        # normalization is why those journeys can only catch a drawer that
+        # pushes a frame through the OTHER frameless entry points, which open no
+        # popover: the inventory branch below and the quest-drawer journey in
+        # test_browser_exploration_nav.py, both of which assert the invariance
+        # un-normalized.
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+        page.wait_for_timeout(80)
         return self._services_panel(page)
 
     def _tab_until_focused(self, page, selector, max_presses=30):

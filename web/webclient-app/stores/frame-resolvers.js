@@ -23,6 +23,10 @@
 // a stray descriptor for one degrades to the marker and pops, exactly like
 // every other unregistered source. `ExplorationMenu.navigationItems` outlives
 // them, because the bar keeps reading it.
+// The scripted-keyword frame is retired the same way (webclient-talk-open-
+// dock): its source is unregistered, because the v3 panel carries no keyword
+// list and 交談 dispatches `explore.talk_open` in one step, so no push site
+// can name it any more.
 //
 // Purity contract: resolving twice against one committed state returns deep-
 // equal menus and mutates nothing — the builders are pure over their inputs,
@@ -245,9 +249,9 @@ export function createFrameResolver(deps) {
     return isolate(CreationMenu.buildMenus(gate.panel).menus[menuKey]);
   };
 
-  // A target/keywords descriptor names its subject by the SAME server-
-  // authored identity the rows carry; an identity the committed panel no
-  // longer lists is the identity-loss degradation.
+  // A target descriptor names its subject by the SAME server-authored
+  // identity the rows carry; an identity the committed panel no longer lists
+  // is the identity-loss degradation.
   function targetForIdentity(params) {
     const gate = requireExplorationPanel();
     if (!gate.ok) return { ok: false, reason: gate.reason };
@@ -271,13 +275,6 @@ export function createFrameResolver(deps) {
       const found = targetForIdentity(params);
       if (!found.ok) return found.reason;
       const menu = ExplorationMenu.verbMenuFor(found.model, found.target);
-      return menu ? isolate(menu) : marker(null);
-    },
-    "exploration.keywords": (params) => {
-      const found = targetForIdentity(params);
-      if (!found.ok) return found.reason;
-      const scripted = ExplorationMenu.scriptedAffordanceFor(found.target);
-      const menu = ExplorationMenu.keywordMenuFor(found.model, found.target, scripted);
       return menu ? isolate(menu) : marker(null);
     },
     "exploration.suggestions": () => {

@@ -434,15 +434,27 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "talk 店長 公會",
     },
     {
-      id: "exploration popover 交談 (row descriptor forwarded)",
+      id: "exploration popover 交談 row (the row descriptor forwarded)",
       ids: ["explore.talk_open"],
       prepare() {
         openExploration();
-        store.dispatchAction(
-          "explore.talk_open",
-          { npc_id: 7 },
-          { npcLabel: "店長" },
-        );
+        // The real activation path: the overview's person chip opens the verb
+        // popover, whose 交談 row carries `commandDisplay.npcLabel`.
+        expect(store.focusItemByKey("target-7")).toBe(true);
+        expect(store.focusConfirm("keyboard")).toBe(true);
+        expect(store.focusItemByKey("talk-open")).toBe(true);
+        expect(store.focusConfirm("keyboard")).toBe(true);
+      },
+      expected: "talk 店長",
+    },
+    {
+      id: "talk_open intent (central fill from the committed exploration panel)",
+      ids: ["explore.talk_open"],
+      prepare() {
+        openExploration();
+        // No descriptor at all: the store fills `npcLabel` from the committed
+        // panel's target (the central-fill path).
+        store.dispatchAction("explore.talk_open", { npc_id: 7 });
       },
       expected: "talk 店長",
     },

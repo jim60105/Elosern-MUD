@@ -46,10 +46,10 @@ export function applyInteraction(ctx) {
     return !!(vm && vm.picks.length > 0);
   };
 
-  // The free-dialogue borrow (the `→` key and the trailing free row): the
-  // SAME path the exploration 互動 → 自由對話 row uses — set the guarded
-  // freeform target to the committed host identity and expand and focus the
-  // command line through `drawerRequest` (design D2). Dispatches nothing.
+  // The free-dialogue borrow (the `→` key and the dialogue caption's trailing
+  // free row): set the guarded freeform target to the committed host identity
+  // and expand and focus the command line through `drawerRequest` (design
+  // D2). Dispatches nothing.
   ctx.borrowDialogueCommand = function borrowDialogueCommand() {
     const rs = ctx.reducer.getState();
     const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
@@ -115,19 +115,6 @@ export function applyInteraction(ctx) {
       ctx.publishView();
       return true;
     }
-    // The "talk-scripted" item opens the scripted-keyword menu for the target
-    // of the CURRENT frame (G2: finite keyword buttons, not free text). The
-    // identity comes from the open target frame's descriptor — one source,
-    // never a second client-local selection.
-    if (item.openKeywords) {
-      const current = ctx.router.currentDescriptor();
-      const identity = current && current.params ? current.params.identity : null;
-      if (identity !== null && identity !== undefined) {
-        ctx.pushExplorationFrame({ source: "exploration.keywords", params: { identity } }, item.key);
-      }
-      ctx.publishView();
-      return true;
-    }
     // The rest-duration item (openRestForm): opens the bounded custom-duration
     // form before any OOB action (webclient-exploration-menu: the form is the
     // sole local UI exception — confirm opens the form, no dispatch yet).
@@ -136,20 +123,10 @@ export function applyInteraction(ctx) {
       ctx.publishView();
       return true;
     }
-    // A free-form dialogue item: expand and focus the command line for the
-    // selected target; the typed speech submits as explore.talk_freeform with
-    // the target's npc_id (the guarded dialogue seam, webclient-exploration-menu).
-    if (item.freeform) {
-      ctx.freeformTarget = item.npcId;
-      ctx.lastTarget = String(item.npcId);
-      ctx.drawerRequest += 1;
-      ctx.publishView();
-      return true;
-    }
-    // A real OOB exploration action (explore.move / look / wait / engage /
-    // talk_scripted / talk_freeform): one dispatch through the single entry.
-    // The item's server-authored `commandDisplay` descriptor is passed through
-    // so the CommandEcho catalog resolves exactly one display line.
+    // A real OOB exploration action (explore.move / look / wait / talk_open /
+    // engage / party / deliver): one dispatch through the single entry. The
+    // item's server-authored `commandDisplay` descriptor is passed through so
+    // the CommandEcho catalog resolves exactly one display line.
     if (item.actionId) {
       ctx.dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
       return true;

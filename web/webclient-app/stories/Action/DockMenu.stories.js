@@ -6,11 +6,16 @@ import {
 } from "../fixtures.js";
 
 // DockMenu: the framed grid of action-dock cells (a root menu, a sub-menu,
-// or a target selection frame). Props: items (the context_actions v5
-// affordance/target entries — action cells get `action-` item keys, target
-// cells get `target-`), focusedKey (the parent-owned focus slice), idPrefix
-// (row id prefix, e.g. combat-row), gridCols (fixed framed-grid columns).
-// Events: focus-change(key), activate({ key, item, intent }).
+// or a target selection frame). Props: items (the normalized dock items —
+// action cells get `action-` item keys, target cells get `target-`),
+// focusedKey (the parent-owned focus slice), idPrefix (row id prefix, e.g.
+// combat-row), gridCols (fixed framed-grid columns). Events:
+// focus-change(key), activate({ key, item, intent }).
+//
+// The exploration dock's own frames do not render here: the root is the
+// SceneOverview component and a target's affordances are the DockVerbPopover
+// card (webclient-talk-open-dock retired the `nav` and `affordance` panes
+// with their last producers).
 
 const renderMenu = (args) => ({
   render: () =>
@@ -20,14 +25,6 @@ const renderMenu = (args) => ({
 export default {
   title: "Action/DockMenu",
   component: DockMenu,
-};
-
-export const ExplorationFrame = {
-  render: renderMenu,
-  args: {
-    items: EXPLORATION_AFFORDANCES_SAMPLE,
-    focusedKey: "action-explore.talk_freeform",
-  },
 };
 
 export const TargetFrame = {
