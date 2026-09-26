@@ -369,12 +369,13 @@ var QUEST_LOG_MAX_REWARD_LINE = 128;
 var QUEST_LOG_MAX_TRACK_LABEL = 64;
 
 // Dialogue panel bounds (mirror of web.webclient.presentation.dialogue,
-// webclient-align-10): the choice cap mirrors MAX_SCRIPTED_KEYWORDS, the
-// keyword bounds mirror the exploration keyword vocabulary, and the line
-// bound is the shared dialogue-session prose bound (never the generic
-// protocol ceiling) — the write path truncates to it, so over-bound
-// dialogue is corruption and rejects.
-var DIALOGUE_SCHEMA_VERSION = 1;
+// webclient-align-10; schema version 2 adds the host's opaque art catalog
+// key — dialogue-panel-host-portrait): the choice cap mirrors
+// MAX_SCRIPTED_KEYWORDS, the keyword bounds mirror the exploration keyword
+// vocabulary, and the line bound is the shared dialogue-session prose bound
+// (never the generic protocol ceiling) — the write path truncates to it, so
+// over-bound dialogue is corruption and rejects.
+var DIALOGUE_SCHEMA_VERSION = 2;
 // Panel-owned bound tracked in lockstep with
 // web.webclient.presentation.dialogue.DIALOGUE_MAX_CHOICES (align-11: four,
 // independent of the exploration keyword-pool bound).
@@ -410,7 +411,7 @@ var PANEL_ALLOWLIST = {
   exploration: 3,
   character: 7,
   lineage: 1,
-  dialogue: 1,
+  dialogue: 2,
   title_ballot: 1,
   title_codex: 1,
   roster: 2,
