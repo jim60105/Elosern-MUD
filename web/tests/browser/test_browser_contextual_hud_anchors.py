@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import valid_local_map_panel
+from .browser_helpers import open_dialogue_choices, valid_local_map_panel
 from ._journey_support import (
     _local_map_unavailable_panel,
     _inject_snapshot,
@@ -18,7 +18,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-command-line"];
+              const ids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-choices", "anchor-command-line"];
               return ids.map((id) => {
                 const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };
@@ -50,7 +50,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         stands in `actor-right` on the band, as tall as the player, 6% in
         from the right at 1920x1080 and far enough in at 1440x900 and
         1280x720 that its face (the anchor's centre) clears the minimap; the
-        reply column starts under the player anchor's left edge; no
+        paged line's column starts under the player anchor's left edge; no
         interactive anchor overlaps another; the return to exploration empties
         `actor-right`."""
         dialogue = {
@@ -75,14 +75,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       const player = r('[data-anchor="actor-left"]');
                       const band = r('[data-testid="stage-band"]');
                       const map = r('.local-map');
-                      const say = r('[data-testid="dialogue-say"]');
+                      // The page's text column: its content box starts after
+                      // its left padding (the dialogue inset).
+                      const pageEl = document.querySelector('[data-testid="message-page"]');
+                      const pageRect = pageEl.getBoundingClientRect();
+                      const textLeft = pageRect.left + parseFloat(getComputedStyle(pageEl).paddingLeft);
                       const focusable = document.querySelectorAll(
                         '[data-anchor="actor-right"] :is(button, a, input, textarea, select, [tabindex])').length;
                       return {
                         hostRight: host.right, hostBottom: host.bottom, hostHeight: host.height,
                         hostCentre: (host.left + host.right) / 2, playerHeight: player.height,
                         bandTop: band.top, mapLeft: map ? map.left : null, focusable,
-                        playerLeft: player.left, sayLeft: say ? say.left : null,
+                        playerLeft: player.left, textLeft,
                         width: innerWidth,
                       };
                     }"""
@@ -99,9 +103,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertLess(geo["hostCentre"], geo["mapLeft"], f"the host's face is under the minimap at {viewport}")
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap in dialogue at {viewport}")
                 # The conversation reads down from the player's figure: the
-                # reply column starts at the player anchor's left edge.
-                self.assertIsNotNone(geo["sayLeft"])
-                self.assertAlmostEqual(geo["sayLeft"], geo["playerLeft"], delta=1.5)
+                # paged line's column starts at the player anchor's left edge.
+                self.assertAlmostEqual(geo["textLeft"], geo["playerLeft"], delta=1.5)
 
                 _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
                 _wait_mode(page, "exploration")
@@ -109,6 +112,72 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     page.evaluate("() => document.querySelector('[data-anchor=\"actor-right\"]').children.length"),
                     0,
                 )
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
+    )
+    def test_dialogue_choices_sit_centred_between_the_portraits(self):
+        """webclient-dialogue-choices-overlay D6: with four picks and the three
+        trailing rows, the `choices` anchor is horizontally centred on the
+        stage, lies inside the stage box above the expanded command-line row,
+        intersects no other interactive anchor with the vitals, party, and
+        minimap islands present, and every row is reachable (scrolling inside
+        the card if the stage is short)."""
+        dialogue = {
+            "schema_version": 2,
+            "available": True,
+            "kind": "dialogue",
+            "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+            "bond_stage": "熟識",
+            "line": "歡迎光臨，要看看今天的貨嗎？",
+            "choices": [
+                {"keyword_id": "goods", "label": "有什麼貨？"},
+                {"keyword_id": "price", "label": "價錢怎麼算？"},
+                {"keyword_id": "town", "label": "最近鎮上如何？"},
+                {"keyword_id": "road", "label": "路上安全嗎？"},
+            ],
+        }
+        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                _inject_snapshot(page, {"local_map": valid_local_map_panel(), "dialogue": dialogue}, mode="dialogue")
+                _wait_mode(page, "dialogue")
+                # The window may still hold unread pages of the session's
+                # latest response: read them first (webclient-dialogue-choices-overlay).
+                open_dialogue_choices(page)
+                # The borrowed command line open under the list.
+                page.evaluate("() => document.querySelector('[data-testid=\"command-line-toggle\"]').click()")
+                page.wait_for_selector('[data-anchor="command-line"][data-expanded="true"]', timeout=5000)
+                geo = page.evaluate(
+                    """() => {
+                      const r = (sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; };
+                      const rows = document.querySelector('.dialogue-choices__rows');
+                      return {
+                        anchor: r('[data-anchor="choices"]'),
+                        card: r('[data-testid="dialogue-choices"]'),
+                        band: r('[data-testid="stage-band"]'),
+                        commandLine: r('[data-anchor="command-line"]'),
+                        rows: document.querySelectorAll('[data-testid="dialogue-choices"] [role="menuitem"]').length,
+                        scrollable: rows.scrollHeight > rows.clientHeight + 1,
+                        width: innerWidth,
+                      };
+                    }"""
+                )
+                self.assertEqual(geo["rows"], 7)
+                self.assertAlmostEqual((geo["anchor"]["left"] + geo["anchor"]["right"]) / 2, geo["width"] / 2, delta=1.0)
+                self.assertAlmostEqual((geo["card"]["left"] + geo["card"]["right"]) / 2, geo["width"] / 2, delta=1.0)
+                self.assertLessEqual(geo["card"]["right"] - geo["card"]["left"], min(560, 0.4 * geo["width"]) + 1)
+                self.assertGreaterEqual(geo["card"]["top"], 48)
+                self.assertLessEqual(geo["card"]["bottom"], geo["commandLine"]["top"], "the list clears the expanded command line")
+                self.assertLessEqual(geo["anchor"]["bottom"], geo["commandLine"]["top"])
+                self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap with the choice list at {viewport}")
+                # The seven rows of a four-pick conversation fit unscrolled
+                # at every supported viewport.
+                self.assertFalse(geo["scrollable"], f"the choice list scrolls at {viewport}")
                 page.close()
 
     @covers_requirement(

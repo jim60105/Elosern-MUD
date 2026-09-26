@@ -30,6 +30,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
+    open_dialogue_choices,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -209,7 +210,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         _wait_field_focused(page)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     @covers_requirement(
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge"
@@ -602,7 +603,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_field_is_focusable_without_an_opening_action(self):
         page = self.logged_in_page()
@@ -1098,18 +1099,19 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
 
         # The overview's 人物 chip for the bard opens its verb popover
         # (webclient-scene-overview-swap); 交談 opens the conversation, whose
-        # caption carries the free row.
+        # choice list carries the free row.
         activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "Enter")  # 交談 -> explore.talk_open
-        page.wait_for_selector('[data-testid="dialogue-freeform"]', timeout=30000)
+        # The choice list over the stage appears once the greeting is read.
+        open_dialogue_choices(page)
         page.click('[data-testid="dialogue-freeform"]')
         _wait_field_focused(page)
         speech = "你好，詩人"
         page.keyboard.type(speech)
         page.keyboard.press("Enter")
         # The interaction completed: focus back on the focus home — in a
-        # conversation the message window (webclient-dialogue-stage-actors)
-        # — and the command line is still present (it is never closed).
+        # conversation the message page, then the choice list once the reply
+        # is read (webclient-dialogue-choices-overlay) — and the command line is still present (it is never closed).
         wait_command_field_released(page)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # Two deliberate mutations echoed: the conversation open, then the
@@ -1136,7 +1138,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         "webclient-input-narrative::a-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
     )
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_locked_borrowed_send_keeps_the_speech_and_never_echoes(self):
         page = self.logged_in_page()
@@ -1144,7 +1146,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self._wait_exploration_available(page)
 
         # The overview's 人物 chip for the bard opens its verb popover; 交談
-        # opens the conversation (whose caption carries the free row) and the
+        # opens the conversation (whose choice list carries the free row) and the
         # locked send is attempted after that open.
         panel = self._wait_exploration_available(page)
         talking = [
@@ -1161,7 +1163,8 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         bard = talking[1]
         activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "Enter")  # 交談 -> explore.talk_open
-        page.wait_for_selector('[data-testid="dialogue-freeform"]', timeout=30000)
+        # The choice list over the stage appears once the greeting is read.
+        open_dialogue_choices(page)
         page.click('[data-testid="dialogue-freeform"]')
         _wait_field_focused(page)
         inp_before = page.evaluate(

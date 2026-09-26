@@ -632,6 +632,46 @@ def wait_for_page_shown(page: Page, timeout: int = 15000) -> None:
     )
 
 
+def open_dialogue_choices(page: Page, timeout: int = 30000) -> None:
+    """Read the dialogue line to its end and wait for the choice list.
+
+    webclient-dialogue-choices-overlay: the dialogue line is paged and typed
+    like any response, and the choice list over the stage renders only once
+    the current response's last page is fully shown and no action is in
+    flight. This reads the line with the page surface's own reading key (a
+    real Enter on the focused page: the first press shows a typing page in
+    full, the next advances) until the window reports the line read, then
+    waits for ``[data-testid="dialogue-choices"]`` in the ``choices`` anchor.
+    The shell moves focus from the page onto the list when it appears; the
+    helper leaves that focus as it lands.
+    """
+    list_selector = '[data-anchor="choices"] [data-testid="dialogue-choices"]'
+    step_ms = 150
+    spent = 0
+    while spent < timeout:
+        state = page.evaluate(
+            """(listSelector) => {
+              const win = document.querySelector('[data-testid="message-window"]');
+              const surface = document.querySelector('[data-testid="message-page"]');
+              return {
+                complete: !!win && win.getAttribute("data-reading-complete") === "true",
+                list: !!document.querySelector(listSelector),
+                onPage: !!surface && document.activeElement === surface,
+              };
+            }""",
+            list_selector,
+        )
+        if state["list"]:
+            return
+        if not state["complete"]:
+            if not state["onPage"]:
+                page.focus('[data-testid="message-page"]')
+            page.keyboard.press("Enter")
+        page.wait_for_timeout(step_ms)
+        spent += step_ms
+    page.wait_for_selector(list_selector, timeout=1000)
+
+
 def narrative_log_text(page: Page) -> str:
     """Return the retained narrative log text (`store.narrative`) joined with newlines.
 

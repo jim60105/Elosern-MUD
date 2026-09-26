@@ -187,7 +187,6 @@ export const useElosernStore = defineStore("elosern", () => {
     sendText: ctx.sendText,
     clearFreeformTarget: ctx.clearFreeformTarget,
     borrowDialogueCommand: ctx.borrowDialogueCommand,
-    captionDialoguePresented: ctx.captionDialoguePresented,
     dispatchAction: ctx.dispatchAction,
     requestCreationReset: ctx.requestCreationReset,
     focusPress: ctx.focusPress,

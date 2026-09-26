@@ -1,5 +1,8 @@
+import { disabledReasonText } from "./dock-items.js";
+
 // Exit presentation helpers for the scene overview's exit chips
-// (SceneOverview.vue), moved out of DockMenu.vue when the dock's exit outlet
+// (SceneOverview.vue) and the dialogue choice list's exit rows
+// (DialogueChoices.vue, webclient-dialogue-choices-overlay D8), moved out of DockMenu.vue when the dock's exit outlet
 // was retired (webclient-scene-overview-component design D6,
 // webclient-retire-exploration-submenus).
 //
@@ -38,4 +41,29 @@ export function destinationLabel(item, localMapModel) {
   }
   const node = localMapModel.nodes.find((n) => n.id === item.destination);
   return node ? node.label : null;
+}
+
+// An exit row's headline (the exit outlet's rule): while enabled with a
+// canonical direction and a known destination, the destination's name;
+// otherwise the row's own label.
+export function exitLabel(item, localMapModel) {
+  if (item && item.enabled !== false && directionGlyph(item.direction)) {
+    return destinationLabel(item, localMapModel) || item.label;
+  }
+  return item ? item.label : "";
+}
+
+// The server-authored reason of a disabled exploration row: the dock's
+// shared reader first, then the exploration menu's own fields. Null for an
+// enabled row.
+export function disabledRowReason(item) {
+  if (!item || item.enabled !== false) {
+    return null;
+  }
+  return (
+    disabledReasonText(item) ||
+    (item.disabledReason && item.disabledReason.message) ||
+    item.description ||
+    null
+  );
 }

@@ -12,6 +12,9 @@
 // - the portrait anchors `actor-left` (the player's stage actor) and
 //   `actor-right` (the dialogue host's stage actor while the mode is
 //   dialogue), standing on the bottom band's top edge;
+// - the `choices` anchor (webclient-dialogue-choices-overlay D6): the
+//   dialogue choice list, centred over the stage between the portraits and
+//   above the expanded command-line row, rendered only in dialogue mode;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
 //   split into the message region `band-message` (left 2/3) and the command
 //   region `band-command` (right 1/3). No frame, mode, or content resizes it;
@@ -27,7 +30,7 @@
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
 // the veil in DOM order, so the player stays bright in combat), the place
-// card and the island anchors 4, band 5, command line 6.
+// card, the island anchors, and the choices anchor 4, band 5, command line 6.
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -107,6 +110,13 @@ defineExpose({ menuOpen });
       data-testid="anchor-map"
     >
       <slot name="map" />
+    </div>
+    <div
+      class="stage-anchor"
+      data-anchor="choices"
+      data-testid="anchor-choices"
+    >
+      <slot name="choices" />
     </div>
     <div class="stage-band" data-testid="stage-band">
       <div
@@ -236,6 +246,29 @@ defineExpose({ menuOpen });
    1920x1080). */
 .elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); }
 .elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
+
+/* choices (webclient-dialogue-choices-overlay D6): the dialogue choice
+   list, horizontally centred on the stage at `min(560px, 40%)` wide and
+   vertically centred in the span between the top band's inset and the
+   expanded command-line row (`--stage-content-bottom`), so the list clears
+   the place card, the islands, the band, and the borrowed command line at
+   every supported viewport. The anchor itself is pointer-transparent; the
+   list inside it takes pointer events and scrolls when it is taller than
+   the span. No transform, so the text never lands on half pixels. */
+.elosern-stage [data-anchor="choices"] {
+  top: calc(var(--header-h) + var(--stage-inset-y));
+  bottom: calc(var(--stage-content-bottom) + var(--stage-inset-y));
+  left: calc(50% - min(280px, 20%));
+  width: min(560px, 40%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: none;
+}
+.elosern-stage:not([data-elosern-mode="dialogue"]) [data-anchor="choices"] {
+  display: none;
+}
 
 /* The bottom band (design D1): one fixed-height container spanning the
    stage bottom. It carries the reference draft's band chrome (the upward

@@ -12,6 +12,7 @@ from .browser_helpers import (
     narrative_log_length,
     narrative_log_text,
     open_command_line,
+    open_dialogue_choices,
     sent_action_count,
     store_state,
     valid_art_panel,
@@ -111,7 +112,7 @@ def _append_multipage_response(page):
 class ShellAcceptanceTest(BrowserAcceptanceTest):
     """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_keyboard_field_focus_send_cancel_and_focus_restoration(self):
@@ -290,7 +291,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(marker.inner_text(), "■")
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_pointer_focused_field_sends_on_enter(self):
@@ -324,7 +325,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertTrue(any("look" in str(item) for item in sends))
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_rejected_send_keeps_the_line_open(self):
@@ -361,7 +362,69 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control",
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
+        "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
+    )
+    def test_borrowed_send_outside_the_active_phase_keeps_the_speech(self):
+        """webclient-dialogue-choices-overlay D9: the dialogue free row borrows
+        the field; with the presentation phase no longer active (a transport
+        reset awaiting its first snapshot, injected through the bridge), Enter
+        submits nothing, the field keeps the speech and the focus, the row
+        stays expanded, and the borrow stays bound to the host."""
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        inject_snapshot(
+            page,
+            {
+                "local_map": valid_local_map_panel(),
+                "dialogue": {
+                    "schema_version": 2,
+                    "available": True,
+                    "kind": "dialogue",
+                    "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                    "bond_stage": None,
+                    "line": "歡迎光臨。",
+                    "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+                },
+            },
+            mode="dialogue",
+        )
+        wait_for_store_state(page, lambda s: s.get("mode") == "dialogue")
+        # Read any unread page of the latest response first.
+        open_dialogue_choices(page)
+        page.click('[data-testid="dialogue-freeform"]')
+        _wait_field_focused(page)
+        self.assertTrue(store_state(page)["freeformBound"])
+        # A transport reset through the bridge: connected, awaiting the first
+        # snapshot of the new generation (the phase is no longer active).
+        page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              store.beginTransport(store.view.generation + 1);
+              store.setConnected(true);
+            }"""
+        )
+        state = store_state(page)
+        self.assertNotEqual(state["phase"], "active")
+        self.assertFalse(state["commandAccepts"])
+        page.keyboard.type("話到嘴邊")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(200)
+        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
+        self.assertEqual(page.evaluate("document.getElementById('inputfield').value"), "話到嘴邊")
+        self.assertEqual(
+            page.locator('[data-testid="anchor-command-line"]').get_attribute("data-expanded"), "true"
+        )
+        self.assertTrue(
+            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
+            "a refused borrowed send keeps focus in #inputfield",
+        )
+        self.assertTrue(store_state(page)["freeformBound"], "the borrow stays bound to the host")
+        texts = [args for cmd, args, _kw in page.evaluate("window.__elosernSent || []") if cmd == "text"]
+        self.assertEqual(texts, [], "a refused borrowed send never goes out as ordinary text")
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
     )
     def test_toggle_collapses_and_keeps_focus(self):
@@ -386,7 +449,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_shift_enter_in_field_inserts_newline_without_sending(self):
         page = self.logged_in_page()
@@ -407,7 +470,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertIn("first line\nsecond line", str(sends[0]))
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
@@ -472,7 +535,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_command_line_field_button_alignment_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):

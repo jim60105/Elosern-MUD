@@ -534,7 +534,7 @@ any request.
   typed characters, on the completions, or on the resize.
 
 ### Requirement: A page types in at the reader's text speed and auto-advance is opt-in
-Outside the dialogue variant, each page the message window starts to show SHALL reveal its text in
+In every mode, dialogue included, each page the message window starts to show SHALL reveal its text in
 reading order, one character at a time, at the reader's text speed. The speeds are `slow` 20
 characters per second, `normal` 45, `fast` 90, and `instant`, which shows the page in full at once.
 A hard line break SHALL count as one character. A box-drawing map line SHALL appear whole when the
@@ -560,9 +560,11 @@ the player. The wait SHALL pause while any drawer, overlay, or the full-log surf
 the browser tab is hidden. A manual advance, a flush by a new action, or a re-page SHALL restart or
 cancel the wait for the page then on screen. Auto-advance is off by default.
 
-The dialogue variant SHALL NOT type and SHALL NOT auto-advance: its reply line, residual lines, and
-rows appear in full at once. While mode is `dialogue` but the panel is unavailable, the paged
-fallback SHALL type like any other page.
+There is no separate dialogue presentation: in dialogue mode the session line is part of the current
+response and SHALL type and auto-advance like any other page, and the conversation's choices appear
+only once the response's last page is fully shown, as `webclient-contextual-hud` "Dialogue choices
+appear centred over the stage after the line is fully read" defines. Auto-advance SHALL NOT advance
+past the last page into the choices: the choices are not a page.
 
 #### Scenario: A page types at the normal speed
 - **WHEN** a one-page response of 90 characters arrives at the `normal` text speed with no
@@ -603,7 +605,8 @@ fallback SHALL type like any other page.
 - **THEN** the window stays on the map page until the player advances
 
 #### Scenario: The dialogue variant does not type
-- **WHEN** mode is `dialogue`, the panel is available, and a new reply commits at the `slow` text
+- **WHEN** mode is `dialogue`, the panel is available, and a two-page reply commits at the `slow` text
   speed with auto-advance on
-- **THEN** the reply, the pick rows, and the exit row render in full at once, and nothing advances
-  on its own
+- **THEN** no unpaged dialogue presentation renders: page 1 types at 20 characters per second with no
+  choice row visible, the window advances to page 2 after the auto-advance wait, page 2 types, and
+  the window stays on page 2 with `■` while the dialogue choice list appears over the stage

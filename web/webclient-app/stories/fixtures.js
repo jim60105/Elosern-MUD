@@ -14,6 +14,7 @@
 //   skills.js             — B3 skills slice
 //   local_map.js          — B4 `local_map` v1 lattice family + localMapModelFor
 //   art_panels.js         — B4 `art` panel family
+//   dialogue_panels.js    — the committed `dialogue` panel (v2)
 //   services_panels.js    — B4 `services` panel family
 //   creation_panels.js    — B5 `creation` v5 wizard family
 //   party_panels.js       — align-05 party panel family
@@ -28,6 +29,7 @@ export * from './fixtures/character_panels.js';
 export * from './fixtures/skills.js';
 export * from './fixtures/local_map.js';
 export * from './fixtures/art_panels.js';
+export * from './fixtures/dialogue_panels.js';
 export * from './fixtures/services_panels.js';
 export * from './fixtures/creation_panels.js';
 export * from './fixtures/party_panels.js';

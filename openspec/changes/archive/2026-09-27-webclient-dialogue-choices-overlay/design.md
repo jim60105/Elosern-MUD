@@ -55,6 +55,8 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 
 `data-variant` always reads `paged`. The window's `dialogue` and `artPanel` props shrink to what the plate needs (`dialogue` for the view model). The plate (C10b D7) stays as the header row. The typing, marker, flush, re-page, and announcement rules (C6b, C7) now apply to the session line with no special case, which is what C7 D9 anticipated.
 
+C10b aligned the variant's reply column under the player portrait's anchor (`--dialogue-inset`, from `--actor-left-inset`). The paged surface keeps that: in dialogue mode (keyed on `data-mode="dialogue"`, since `data-variant` no longer changes) the page drops its centring and starts at the inset, with `max-width: calc(42em + inset + 24px)`, so the plate and the text share one left edge and the 42-character cap holds. The measurer shares the page's classes, so it measures the same column. The window's gold focus rule moves to the column's left edge and shows only while the page holds keyboard focus.
+
 ### D2. The narrative line is paged verbatim
 The session line reaches the narrative through the adapters: `{npc}說：{line}` for a greeting or scripted reply, and the fallback line verbatim for `talk_open` (C9a D3). The page shows exactly that. The name plate also names the host, so the name can appear twice.
 
@@ -64,12 +66,13 @@ The session line reaches the narrative through the adapters: `{npc}說：{line}`
 
 ### D3. The reading-complete signal
 `MessageWindow` computes `readingComplete` as all of the following:
-- `ready` (fonts)
-- no pending mark
-- `pageIndex === pages.length - 1`
+- `ready` (fonts), and not the provisional fonts-loading presentation
+- no pending mark: the displayed response is not `awaiting` (a pending mark, or a newest response holding only its echo header)
+- the pages on screen were cut from the displayed response (`pagedBlocks === display.blocks`): a new or appended response dirties `display` at once, before the post-flush re-page, so completeness is never read off the previous response's stale last page
+- `pageIndex === pages.length - 1`, or no page at all (a response with no text has nothing to read)
 - `!typing`
 
-It emits `reading-change` on every flip. It is purely reader state, never prose.
+It emits `reading-change` immediately on mount and on every flip, and mirrors the value on the window as `data-reading-complete` for the browser suite. It is purely reader state, never prose.
 
 `AppShell` forwards it, and `AppClient` keeps `readingComplete` as a ref. On mount (the reconnect rule, which shows the last page complete) it starts `true`, so a reconnect inside a conversation shows the choices immediately.
 
@@ -86,19 +89,20 @@ It emits `reading-change` on every flip. It is purely reader state, never prose.
   - `exits` (overview exit items)
   - `localMap` (for destination names through `dock-exits.js`)
   - `locked` (in flight or awaiting a revision)
-- **Local state:** `view` (`"choices"` | `"exits"`) and `activeIndex`.
+- **Local state:** `view` (`"choices"` | `"exits"`) and `activeIndex`. (`host` is not needed: the pick rows carry their payloads.)
 - **Markup:**
   - `<div class="dialogue-choices" role="menu" aria-label="對話選項" tabindex="0" :aria-activedescendant="rowId(activeIndex)" data-testid="dialogue-choices" @keydown="onKey">`
   - Each row is `<div role="menuitem" :id :data-testid="dialogue-pick|dialogue-freeform|dialogue-move|dialogue-exit|dialogue-exit-row|dialogue-exits-back" :aria-disabled>`, with a badge span (`1`–`N`, `⌨`, `↦`, `✕`, or the exit glyph) and a label.
   - The pick rows keep `data-keyword-id`.
 - **Keys (`onKey`):**
   - ArrowUp / ArrowDown wrap. Home / End jump to the ends.
-  - Enter / Space activate unless `event.repeat`.
+  - Enter / Space activate unless `event.repeat`; Shift+Enter / Shift+Space pass through like every other modified key.
   - Digits `1`–`N` act only in the `choices` view and only when pick N exists.
   - Escape acts only in the `exits` view: it returns to `choices` with the `↦ 移動…` row active.
   - Each handled key calls `preventDefault()` and `stopPropagation()`. Component listeners run before the document bridge (the same bubble-order argument as C6b D4), so the router never sees them.
   - Unhandled keys (`/`, Tab, and letters) pass through.
-- **Pointer:** `@click` on a row sets `activeIndex` and activates it.
+- **Pointer:** `@click` on a row focuses the list, sets `activeIndex`, and activates it.
+- **Structure:** the menu container (the one tab stop) holds a non-scrolling frame and an inner `.dialogue-choices__rows` region that scrolls, so the card's crest ornament is never clipped. In the exits view a quiet `移動` caption (`aria-hidden`) heads the rows and the menu's `aria-label` becomes `移動：選擇出口`.
 - **Disabled rows:** a disabled exit sets `aria-disabled="true"`, shows its reason under the label (`aria-describedby`), and activation does nothing.
 - **Locked:** `locked` blocks every activation, although it cannot be observed, because the list is not rendered while in flight. It is kept as a guard for the one frame between dispatch and publish.
 - **Emits:** `pick(row)`, `freeform()`, `move(item)`, and `leave()`. Before emitting, the component calls the `beforeActivate` prop callback (D7). `move` and the `↦ 移動…` swap never leave the component except as `move(item)`.
@@ -111,17 +115,27 @@ It emits `reading-change` on every flip. It is purely reader state, never prose.
 `HudFrame.vue` adds `<div class="stage-anchor" data-anchor="choices" data-testid="anchor-choices"><slot name="choices" /></div>` with:
 
 ```
-[data-anchor="choices"] { left: 50%; top: calc(var(--header-h) + (100% - var(--header-h) - var(--band-h)) / 2);
-  transform: translate(-50%, -50%); width: min(560px, 40%);
-  max-height: calc(100% - var(--header-h) - var(--band-h) - 32px); overflow-y: auto; z-index: 4; }
+[data-anchor="choices"] { top: calc(var(--header-h) + var(--stage-inset-y));
+  bottom: calc(var(--stage-content-bottom) + var(--stage-inset-y));
+  left: calc(50% - min(280px, 20%)); width: min(560px, 40%); z-index: 4;
+  display: flex; flex-direction: column; justify-content: center; pointer-events: none; }
 .elosern-stage:not([data-elosern-mode="dialogue"]) [data-anchor="choices"] { display: none; }
 ```
 
-The card uses the reference's caption-panel treatment (charcoal fill, hairline border, radius). Rows are 44px with 20px text. The active row has the muted-gold fill and the leading `▸` glyph that dock rows use, so focus is shown by shape and fill.
+The anchor is a pointer-transparent column spanning from the top band's inset to above the expanded command-line row (`--stage-content-bottom` is the band plus the 44px row). The list inside it is centred vertically in that span, takes pointer events, and has `max-height: 100%`. *Why not centre in the whole stage box (the first draft):* at 1280x720 the stage box is 412px and the command-line row occupies its lowest 44px across x 256–853, which the centred card (x 384–896) overlaps; the list stays rendered while the player types in the borrowed command line, so the two would collide. *Why no `translate(-50%, -50%)`:* a transform can land the text on half pixels and blur it.
 
-Geometry check:
-- 1920x1080: the stage box is 732px and the card is 560px wide, between the portraits (each about 446px wide at 6% inset) and clear of the 208px minimap.
-- 1280x720: the stage box is 412px and the card is 512px wide. Seven rows at 44px plus padding is about 330px, which fits.
+The card follows the reference caption-panel treatment, tuned by eye against the stage at the three viewports (screenshots in the change's review): a warm charcoal gradient at 0.95 opacity with a faint gold radial glow at its head, a gold hairline border (0.45 alpha) inside a black inner rule, the shared radius and `--shadow-lg`, and `backdrop-filter: blur(6px)`, so the rows stay legible over bright and busy scene art. A crest — a gold hairline across the top edge with a small lozenge at its centre — marks it as the conversation's card.
+
+Rows:
+- Row height and type scale with the viewport height: rows `clamp(36px, 4.075vh, 44px)` (44px at 1080), pick labels `clamp(17px, 1.852vh, 20px)` in the serif reading face (a pick is something the player says), and the three trailing rows `clamp(15px, 1.574vh, 17px)` in the quieter sans face (they are commands). Seven rows of a four-pick conversation fit the 1280x720 span unscrolled.
+- Badges are 24–28px rounded squares with a gold hairline: digits in the mono face, `↦` / `✕` / exit arrows in the sans face, and the free row's `⌨` drawn as a small inline SVG keyboard (the text glyph renders tiny in every loaded face; the badge keeps `data-badge="⌨"`). The leave row's badge is seal red.
+- A hairline divider separates the picks from the trailing rows (and the exits from the back row).
+- The active row, while the list holds focus, has the dock's muted-gold fill (a gold gradient and a gold border), the leading `▸` caret, and a filled gold badge, so focus is shown by shape and fill. The leave row's active state is seal-tinted. An active disabled exit keeps a quiet neutral frame and a dashed badge, promising no action. With focus elsewhere (the borrowed command line), no row is lit.
+
+Geometry check (measured):
+- 1920x1080: the span is 64–720px; the card is 560px wide (x 680–1240) and about 365px tall, between the portraits (x 115–562 and 1358–1805) and clear of the minimap (x 1686+).
+- 1440x900: the card is 560px wide (x 440–1000), between the portraits (110–482 and 974–1346).
+- 1280x720: the span is 58–406px; the card is 512px wide (x 384–896) and 292px tall, unscrolled, above the command-line row (top 416).
 
 `AppShell` forwards a `choices` slot to HudFrame.
 
@@ -129,11 +143,11 @@ Geometry check:
 - **Showing:** a `watch(choicesShown)` in `AppClient` (flush `post`). When it becomes true and `document.activeElement` is the body, the page surface, or inside `[data-anchor="band-message"]`, it focuses the list.
 - **Other focus:** if focus is elsewhere (a drawer, an overlay, the command field), the list does not steal it. It stays the focus home that `restoreFocusHome()` returns to.
 - **Activating:** `beforeActivate` calls `shellRef.focusMessagePage()`, a new exposed AppShell method that focuses `message-page`. The list can then disappear on the next publish without dropping focus.
-- **`restoreFocusHome()` in dialogue:** the list when it is rendered, else `messageWindow.focusHome()` (the page surface).
+- **`restoreFocusHome()` in dialogue:** the page surface at once (always rendered in dialogue), then, after the next render, the list if it is in the DOM and focus is still on the page or lost. *Why two steps:* an accepted borrowed send emits `sent` synchronously after `dispatchAction` set the in-flight record but before Vue re-rendered, so a DOM check at that moment would focus a list the same render removes, dropping focus to the body.
 - **Leaving dialogue:** C10b's post-flush rescue selector adds `[data-anchor='choices']`.
 
 ### D8. The `↦ 移動…` exits come from the committed overview
-`AppClient` computes `dialogueExits = store.view.rootMenu?.items.filter(i => i.section === "exits") ?? []`. That is the overview C9b D1 keeps as the router root in dialogue, built from the committed `exploration` panel by `overviewMenu`.
+`AppClient` computes `dialogueExits = overviewExits(store.view.rootMenu)` (`composables/use-dialogue-choices.js`): the overview's items carry no section field, so the helper slices them by the menu's `sections` geometry (`[{key, count}]` in reading order) at the `exits` section. That is the overview C9b D1 keeps as the router root in dialogue, built from the committed `exploration` panel by `overviewMenu`. The exit row's headline and the disabled reason reuse the scene overview's exit-chip rules, now shared from `components/dock-exits.js` (`exitLabel`, `disabledRowReason`) so the two surfaces cannot drift.
 - `move(item)` calls `store.dispatchAction(item.actionId, item.payload, item.commandDisplay)`. This is the same payload and echo descriptor the overview chip's confirm path submits, but without pushing through the router, which is hidden.
 - The movement settlement clears the session through the existing seam, and C8b's room-change reset keeps the dock at the new overview.
 
@@ -144,8 +158,9 @@ Geometry check:
 - `CommandLine.vue` replaces its use of `connected` / `mutationsLocked` / `inFlight` in `submit()` with one `accepting` prop. It keeps any other use of those props (disabled styling) unchanged.
 - `AppShell` passes `:accepting="commandAccepts"`.
 - `sendText` keeps `ctx.freeformTarget` when `dispatchAction` returns `null`, and clears it only after a dispatched request. The existing blur release (C5) still drops it when focus leaves the field.
+- Because a refused send now keeps the borrow, `publishView` also releases it on any commit whose mode is set and is not `dialogue`, whatever holds focus: otherwise a refusal while a mutation is in flight, followed by that mutation's commit ending the conversation (a server-side end, not the leave row, which moves focus), would leave the field bound and send the next ordinary command as speech. A transport reset's pre-snapshot `null` mode keeps it for the resync. (Post-implementation review.)
 
-The field and the dispatch path now share one predicate, so the field clears exactly when the request is sent. This closes the C5 Risks entry.
+The field and the dispatch path now share one predicate, so the field clears exactly when the request is sent. This closes the C5 Risks entry. `CommandLine` used `connected` / `mutationsLocked` / `inFlight` only in `submit()`, so those three props are replaced by `accepting` outright. In practice every non-active phase the reducer reaches (`awaiting_initial_snapshot`, `detached`) also locks mutations; the phase clause keeps the predicate identical to `dispatchAction`'s regardless.
 
 ### D10. Tests
 - **Vitest:**
@@ -163,18 +178,23 @@ The field and the dispatch path now share one predicate, so the field clears exa
     - `reading-change` flips (typing, a further page, the pending mark, the last page complete)
     - no rows in the window
   - `tests/message_window_typing.test.js`: the former "variant does not type" case now types.
-  - `tests/app.test.js`:
+  - `tests/app_client_dialogue_choices.test.js` (a live AppClient mount; `tests/app.test.js` mounts only the shell):
     - the list is shown only when all four conditions hold
     - the wiring of the four emits
-    - focus moves to the list on show, and to the page surface on activate
+    - focus moves to the list on show (never from the command field), and to the page surface on activate
+  - `tests/app.test.js`: the shell's command line takes `commandAccepts`.
+  - `tests/hud_frame.test.js`: the dialogue focus home (page, then the shown list), the leave-dialogue rescue from the list, and the `choices` anchor CSS.
+  - `tests/app_client_stage_actor.test.js`: the focus flips land on the list; the dimming case dispatches the pick through the store.
+  - `tests/message_window.test.js`: its dialogue-variant block is deleted (superseded).
   - `tests/command_line.test.js`: `accepting=false` keeps the text and does not emit `sent`.
   - `tests/dialogue_store.test.js`:
     - `commandAccepts` with and without a borrow, across phases
     - `sendText` keeps the target on a refused dispatch
+    - a kept borrow is released by a commit that ends the conversation
   - `tests/store/digit_row_picks.test.js`: the caption retarget cases are deleted, and a dialogue-mode digit is unclaimed.
   - `tests/dialogue_dock.test.js`: digits are unclaimed in dialogue.
 - **Browser:**
-  - `test_browser_exploration_dialogue.py` gains the keyboard-only journey of the browser-verification scenario at 1920x1080. It waits for `data-typing="false"` (C7 helper) before reading the list, and asserts the list is absent while typing.
+  - `test_browser_exploration_dialogue.py` gains the keyboard-only journey of the browser-verification scenario at 1920x1080: 交談 → read → `1` → read → `⌨ 自由對話` and a line → `↦ 移動…` and Escape → `✕ 結束對話` → an exit chip. The move comes last because the seeded hosts stand only in the home room. A per-frame probe asserts the list never shows beside a typing or unread page, focus never falls to the body, the command region stays collapsed, and both actors stand. The `open_dialogue_choices(page)` helper reads the line with real Enter presses on the page surface until the list renders.
   - `test_browser_contextual_hud_anchors.py` gains the `choices` anchor geometry at both viewports.
   - `test_browser_shell_command_line.py` re-points its borrow cases to the list's free row, and adds the phase case by injecting a non-active phase through the bridge, as its lock cases do.
   - `test_browser_input_narrative.py` re-anchors.
@@ -204,6 +224,7 @@ The field and the dispatch path now share one predicate, so the field clears exa
 - [A long greeting delays the choices] → Intended by the design ("after the last page"). The player can press Enter to complete typing and advance quickly. Reduced motion and the `instant` speed show pages at once.
 - [Focus stolen from a drawer when the list appears] → D7 moves focus only from the window, the body, or the message region.
 - [The browser suite's dialogue journeys now wait for typing] → They use C7's `wait_for_page_shown` helper, or Enter to complete, before interacting with the list.
+- [An action that succeeds with no narrative line would leave its response mark pending, so the list would not return] → Every dialogue action narrates (a reply, the leave line, or the one error line a non-success result appends), and `/` and the minimap stay reachable. A later change can add a settle rule if a silent action appears.
 - [Budget] → Variant deletion and the reading signal (1.5h); `DialogueChoices`, story, and tests (2.5h); anchor, wiring, and focus (1.5h); accept rule and phase fix (0.5h); browser journeys (1.5h); specs and re-anchors (0.5h). About 8h.
 
 ## Migration Plan

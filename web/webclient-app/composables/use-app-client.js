@@ -8,6 +8,7 @@ import { usePanelView } from "./panel-view.js";
 import { useResync } from "./use-resync.js";
 import { useShellFocus, useBackdropBridge } from "./use-shell-focus.js";
 import { useScene } from "./use-scene.js";
+import { useDialogueChoices } from "./use-dialogue-choices.js";
 import { useRestWait } from "./use-rest-wait.js";
 import { useOverlays } from "./use-overlays.js";
 import { useDrawers } from "./use-drawers.js";
@@ -22,11 +23,13 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
   useShellFocus(store, shellRef, sceneBackdropRef);
   useBackdropBridge(sceneBackdropRef);
   const restWait = useRestWait(store, { dispatchIntent });
+  const scene = useScene(store, { panel, panelAvailable, dispatchIntent });
   return {
     dispatchIntent,
     panel,
     panelAvailable,
-    ...useScene(store, { panel, panelAvailable, dispatchIntent }),
+    ...scene,
+    ...useDialogueChoices(store, shellRef, scene.dialogueVM),
     ...restWait,
     ...useOverlays(store, { panelAvailable }),
     ...useDrawers(store, { panel, panelAvailable }),

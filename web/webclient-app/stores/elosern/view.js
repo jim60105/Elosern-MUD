@@ -158,6 +158,16 @@ export function applyView(ctx) {
         timeLabel: formatTimeLabel(rs.serverTime),
       },
       prompt: ctx.prompt,
+      // The command line's accept rule (webclient-dialogue-choices-overlay
+      // D9). A bound free-form borrow sends through `dispatchAction`, which
+      // also requires the active presentation phase; ordinary text does not.
+      // The field clears exactly when the send it would make is delivered.
+      freeformBound: ctx.freeformTarget != null,
+      commandAccepts:
+        rs.connected &&
+        !rs.mutationsLocked &&
+        !ctx.inFlight &&
+        (ctx.freeformTarget == null || rs.phase === "active"),
       lastSurface: ctx.lastSurface,
       lastTarget: ctx.lastTarget,
       drawerRequest: ctx.drawerRequest,
@@ -303,6 +313,15 @@ export function applyView(ctx) {
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
     ctx.syncHudDrawer(prev, rs);
+    // A free-form borrow speaks to the conversation's host. A refused
+    // borrowed send keeps the borrow for the retry (webclient-dialogue-
+    // choices-overlay D9), so a commit that ends the conversation — any
+    // committed mode other than dialogue; a transport reset's pre-snapshot
+    // null mode keeps it for the resync — releases it here, whatever holds
+    // focus, and a later send travels as ordinary text.
+    if (ctx.freeformTarget != null && rs.mode != null && rs.mode !== "dialogue") {
+      ctx.freeformTarget = null;
+    }
     ctx.view.value = ctx.buildView(prev, rs);
   };
 

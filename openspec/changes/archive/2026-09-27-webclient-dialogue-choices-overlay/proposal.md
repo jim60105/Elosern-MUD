@@ -100,18 +100,18 @@ Out of scope:
 
 ## Impact
 
-- New: `web/webclient-app/components/DialogueChoices.vue`, `stories/Core/DialogueChoices.stories.js`, `tests/dialogue_choices.test.js`.
+- New: `web/webclient-app/components/DialogueChoices.vue`, `composables/use-dialogue-choices.js`, `stories/Core/DialogueChoices.stories.js`, `stories/fixtures/dialogue_panels.js`, `tests/dialogue_choices.test.js`, `tests/app_client_dialogue_choices.test.js`.
 - Edited source:
-  - `web/webclient-app/components/MessageWindow.vue`, `HudFrame.vue`, `AppShell.vue`, `CommandLine.vue`, `web/webclient-app/AppClient.vue`
+  - `web/webclient-app/components/MessageWindow.vue`, `HudFrame.vue`, `AppShell.vue`, `CommandLine.vue`, `SceneOverview.vue` and `dock-exits.js` (the exit-chip label and reason rules, now shared), `web/webclient-app/AppClient.vue`, `composables/use-app-client.js`, `composables/use-scene.js`
   - `stores/elosern/{interaction,transport,view}.js`, `stores/elosern.js` (drops the retarget exports)
   - `styles/app-shell.css`, `lib/controls-reference.js`, `component-manifest.json`
   - Stories `stories/Core/MessageWindow.stories.js`, `HudFrame.stories.js`, `AppShell.stories.js`, `CommandLine.stories.js`
 - Vitest:
   - `tests/message_window_dialogue.test.js` (rewritten for the paged dialogue with the plate and `reading-change`)
   - `tests/message_window_typing.test.js` (the dialogue case types)
-  - `tests/app.test.js`, `tests/hud_frame.test.js`, `tests/command_line.test.js`, `tests/dialogue_store.test.js`, `tests/dialogue_dock.test.js`, `tests/store/digit_row_picks.test.js`
+  - `tests/app.test.js`, `tests/hud_frame.test.js`, `tests/command_line.test.js`, `tests/dialogue_store.test.js`, `tests/dialogue_dock.test.js`, `tests/store/digit_row_picks.test.js`, `tests/message_window.test.js`, `tests/app_client_stage_actor.test.js`
 - Python evidence: `web/webclient/tests/test_node_suite_evidence.py` (dialogue evidence file list; the re-anchors below); the showcase snapshots gain `Core/DialogueChoices`.
-- Browser: `web/tests/browser/test_browser_exploration_dialogue.py` (the keyboard-only journey move → overview → 交談 → read → choice → free speech → 移動… → leave), `test_browser_input_narrative.py`, `test_browser_shell_command_line.py`, `test_browser_contextual_hud_anchors.py`, `browser_helpers.py`.
+- Browser: `web/tests/browser/test_browser_exploration_dialogue.py` (the keyboard-only journey overview → 交談 → read → choice → free speech → 移動… → leave → move), `test_browser_input_narrative.py`, `test_browser_shell_command_line.py`, `test_browser_contextual_hud_anchors.py`, `test_browser_layout.py`, `browser_helpers.py`, `harness.py`.
 - Spec traceability:
   - `webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel` re-anchors to `…::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read`.
   - `webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control` (11 annotations: `test_browser_input_narrative.py` ×3, `test_browser_shell_command_line.py` ×5, `test_browser_exploration_dialogue.py` ×1, `test_node_suite_evidence.py` ×2) re-anchors to `…-and-the-dialogue-s-free-form-borrow`.

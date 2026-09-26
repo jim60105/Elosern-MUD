@@ -1,6 +1,6 @@
 // The surface-interaction group of the composed Elosern store: the router
-// submit handler for the exploration surface, the dialogue
-// caption/borrow seam, the creation-reset entry, and the keyboard-entry
+// submit handler for the exploration surface, the dialogue free-form
+// borrow seam, the creation-reset entry, and the keyboard-entry
 // adapters (focusPress and friends).
 
 import KeyboardRouter from "../../lib/keyboard_router.js";
@@ -9,45 +9,8 @@ import { dialogueViewModel } from "../dialogue-view.js";
 const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
 
 export function applyInteraction(ctx) {
-  // The caption digit activation (webclient-align-11-dialogue-ux, design D3):
-  // while the committed `dialogue` panel is available, digits 1–4 address the
-  // caption's scripted picks (the same ONE derived source the feed renders,
-  // stores/dialogue-view.js), dispatching through the store's single
-  // dispatchAction entry exactly like a pointer click on a pick. The free and
-  // exit rows take no digit slot; an unavailable panel or an out-of-range
-  // digit is unclaimed and falls through to the dock/command-line path.
-  function handleCaptionDialoguePick(slot) {
-    const rs = ctx.reducer.getState();
-    if (rs.mode !== "dialogue") {
-      return false;
-    }
-    const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
-    if (!vm) {
-      return false;
-    }
-    const pick = vm.picks[slot];
-    if (!pick || !pick.actionId) {
-      return false;
-    }
-    ctx.dispatchAction(pick.actionId, pick.payload || {}, pick.commandDisplay || null);
-    return true;
-  }
-  // Whether the caption variant claims digits right now: committed dialogue
-  // mode with an available panel rendering at least one pick. While it
-  // presents, the dock's own root rows are NOT digit-claimed (design D3 risk
-  // note); an out-of-range digit is unclaimed and keeps command-line
-  // semantics like any missing dock row.
-  ctx.captionDialoguePresented = function captionDialoguePresented() {
-    const rs = ctx.reducer.getState();
-    if (rs.mode !== "dialogue") {
-      return false;
-    }
-    const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
-    return !!(vm && vm.picks.length > 0);
-  };
-
-  // The free-dialogue borrow (the `→` key and the dialogue caption's trailing
-  // free row): set the guarded freeform target to the committed host identity
+  // The free-dialogue borrow (the dialogue choice list's `⌨ 自由對話` row,
+  // webclient-dialogue-choices-overlay): set the guarded freeform target to the committed host identity
   // and expand and focus the command line through `drawerRequest` (design
   // D2). Dispatches nothing.
   ctx.borrowDialogueCommand = function borrowDialogueCommand() {
@@ -161,18 +124,13 @@ export function applyInteraction(ctx) {
     // frozen router façade members — the UMD source is not edited (design D1).
     const isDigit = typeof key === "string" && key.length === 1 && key >= "1" && key <= "9";
     // The collapsed command region (webclient-dialogue-stage-actors design
-    // D6): in dialogue mode the dock is hidden, so its router claims nothing
-    // but `/` (the command-line opener). Digits address only the dialogue
-    // variant's picks; every other key is unclaimed, so no key moves the
-    // hidden dock's focus, pushes or pops a frame, or activates a hidden
-    // entry. A focused dialogue row keeps its native Enter and Space.
+    // D6; webclient-dialogue-choices-overlay): in dialogue mode the dock is
+    // hidden, so its router claims nothing but `/` (the command-line
+    // opener). Every other key, digits included, is unclaimed, so no key
+    // moves the hidden dock's focus, pushes or pops a frame, or activates a
+    // hidden entry. The dialogue choice list handles its own keys (digits,
+    // arrows, Enter, Space, Escape) before they reach the bridge.
     if (ctx.reducer.getState().mode === "dialogue") {
-      if (isDigit) {
-        if (!ctx.captionDialoguePresented()) {
-          return false;
-        }
-        return repeat ? true : handleCaptionDialoguePick(Number(key) - 1);
-      }
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
     }
     if (isDigit) {
@@ -185,13 +143,6 @@ export function applyInteraction(ctx) {
         return true;
       }
       const slot = Number(key) - 1;
-      // The caption retarget (webclient-align-11-dialogue-ux, design D3):
-      // while the dialogue caption presents picks, digits address the
-      // caption's scripted picks, not the dock entries underneath. A panel
-      // with no picks (or an unavailable one) keeps the dock digits untouched.
-      if (ctx.captionDialoguePresented()) {
-        return handleCaptionDialoguePick(slot);
-      }
       if (ctx.router.depth() === 0) {
         return false;
       }

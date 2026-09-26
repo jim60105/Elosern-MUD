@@ -1,10 +1,11 @@
 // webclient-align-11-dialogue-ux (tasks 2.4) and webclient-dialogue-stage-
 // actors (design D3/D6): the store side of dialogue mode. A committed
 // dialogue mode keeps the (collapsed, hidden) dock on `exploration.root`
-// (the `dialogue.root` mirror is deleted); digits retarget to the caption's
-// scripted picks while the caption presents and are otherwise unclaimed;
-// the caption's free row keeps the command-line borrow through
-// `borrowDialogueCommand`; arrows are unclaimed, so the hidden router never
+// (the `dialogue.root` mirror is deleted); digits are unclaimed (the choice
+// list owns them, webclient-dialogue-choices-overlay); the choice list's free
+// row keeps the command-line borrow through `borrowDialogueCommand`, and the
+// command line's accept rule (`commandAccepts`) matches the borrowed send's
+// dispatch path; arrows are unclaimed, so the hidden router never
 // moves; the exit row's `dialogue-leave` dispatch rides the single dispatch
 // entry; exploration-form lifecycle guards widen to dialogue mode (a
 // character sub-dock opened while talking closes, re-homes, and settles
@@ -152,37 +153,21 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.rootMenu.items.map((i) => i.key)).not.toContain("move");
   });
 
-  it("digits 1–4 dispatch the caption's scripted picks while the caption presents", () => {
+  // webclient-dialogue-choices-overlay: the store no longer retargets
+  // digits in dialogue. The choice list owns them while it holds focus; the
+  // keyboard router claims only `/`, so a digit reaching the store is
+  // unclaimed, dispatches nothing, and never moves the hidden dock.
+  it("digits are unclaimed in dialogue: the choice list owns them, not the store", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    expect(store.focusPress("2")).toBe(true);
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.talk_scripted",
-      payload: { npc_id: 41, keyword_id: "smell" },
-    });
-    // The dock's own rows are NOT digit-claimed while the caption presents:
-    // no navigation frame opened.
-    expect(store.view.dockDepth).toBe(1);
-  });
-
-  it("digits beyond the rendered picks fall through unclaimed", () => {
-    openSession();
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        dialogueSnapshot({
-          dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] },
-        }),
-      ],
-      {},
-    );
-    // Digits address ONLY the rendered caption picks (max four). The free and
-    // exit rows take no digit slot, and digit 2 has no pick: the press is
-    // unclaimed (the caption branch owns the press and declines).
-    expect(store.focusPress("2")).toBe(false);
+    const focusBefore = store.view.focus.key;
+    for (const digit of ["1", "2", "4", "9"]) {
+      expect(store.focusPress(digit)).toBe(false);
+    }
+    expect(store.focusPress("1", true)).toBe(false);
     expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.focus.key).toBe(focusBefore);
   });
 
   it("an unavailable panel leaves the digits unclaimed (the dock is collapsed)", () => {
@@ -194,8 +179,8 @@ describe("dialogue store mode lifecycle", () => {
       {},
     );
     expect(store.view.mode).toBe("dialogue");
-    // No variant: the digit has no pick to address, and the hidden dock's
-    // chips claim no digit in dialogue (webclient-dialogue-stage-actors D6).
+    // The hidden dock's chips claim no digit in dialogue
+    // (webclient-dialogue-stage-actors D6).
     const focusBefore = store.view.focus.key;
     expect(store.focusPress("1")).toBe(false);
     expect(store.view.focus.key).toBe(focusBefore);
@@ -216,11 +201,11 @@ describe("dialogue store mode lifecycle", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the caption free row keeps the command-line borrow", () => {
+  it("the choice list's free row keeps the command-line borrow", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     const before = store.view.drawerRequest;
-    // AppClient maps the feed's dialogue-freeform emit onto this seam.
+    // AppClient maps the choice list's `freeform` emit onto this seam.
     expect(store.borrowDialogueCommand()).toBe(true);
     expect(store.view.drawerRequest).toBe(before + 1);
     expect(sender.sent.actions).toHaveLength(0);
@@ -274,24 +259,103 @@ describe("dialogue store mode lifecycle", () => {
     });
     expect(store.view.dockSource).toBe("exploration.root");
 
-    // The caption's free row still borrows the command line for the host the
-    // conversation is with.
+    // The choice list's free row still borrows the command line for the host
+    // the conversation is with.
     const before = store.view.drawerRequest;
     expect(store.borrowDialogueCommand()).toBe(true);
     expect(store.view.drawerRequest).toBe(before + 1);
   });
 
-  it("the borrow declines without a live caption", () => {
+  it("the borrow declines without a live conversation", () => {
     openSession();
     const before = store.view.drawerRequest;
     expect(store.borrowDialogueCommand()).toBe(false);
     expect(store.view.drawerRequest).toBe(before);
   });
 
+  // webclient-dialogue-choices-overlay D9: the command line accepts a send
+  // by the same predicate its delivery applies.
+  it("commandAccepts follows the dispatch path for a borrowed send and the text path otherwise", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    expect(store.view.freeformBound).toBe(false);
+    expect(store.view.commandAccepts).toBe(true);
+    store.borrowDialogueCommand();
+    expect(store.view.freeformBound).toBe(true);
+    expect(store.view.phase).toBe("active");
+    expect(store.view.commandAccepts).toBe(true);
+    // A mutation in flight: neither kind of send is accepted.
+    store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null);
+    expect(store.view.commandAccepts).toBe(false);
+  });
+
+  it("a borrowed send outside the active phase is refused and keeps the borrow for the next send", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    store.borrowDialogueCommand();
+    // A transport reset: connected again, but awaiting the first snapshot.
+    store.beginTransport(2);
+    store.setConnected(true);
+    expect(store.view.phase).not.toBe("active");
+    expect(store.view.freeformBound).toBe(true);
+    expect(store.view.commandAccepts).toBe(false);
+    const closeBefore = store.view.drawerCloseRequest;
+    expect(store.sendText("五枚就五枚。")).toBe(true);
+    // Nothing dispatched, nothing sent as ordinary text, no collapse, and the
+    // borrow is still bound to the host.
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(sender.sent.texts).toHaveLength(0);
+    expect(store.view.drawerCloseRequest).toBe(closeBefore);
+    expect(store.view.freeformBound).toBe(true);
+    // The session re-establishes: the retry is still that speech.
+    store.setLoggedIn(true);
+    expect(store.receive(2, "ui_snapshot", [{ ...dialogueSnapshot(), presentation_epoch: fx.EPOCH_C, revision: 1 }], {}).accepted).toBe(true);
+    expect(store.view.commandAccepts).toBe(true);
+    expect(store.sendText("五枚就五枚。")).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.talk_freeform",
+      payload: { npc_id: 41, speech: "五枚就五枚。" },
+    });
+    expect(sender.sent.texts).toHaveLength(0);
+    expect(store.view.drawerCloseRequest).toBe(closeBefore + 1);
+    expect(store.view.freeformBound).toBe(false);
+  });
+
+  it("a kept borrow is released when a commit ends the conversation, so a later send is ordinary text", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null);
+    store.borrowDialogueCommand();
+    // Refused while in flight: the borrow stays bound.
+    store.sendText("等等。");
+    expect(store.view.freeformBound).toBe(true);
+    // The server ends the conversation (the field never lost focus).
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: 5 })], {});
+    store.receive(1, "ui_update", [fx.update({ ...dialogueSnapshot(), revision: 5, mode: "exploration" })], {});
+    expect(store.view.mode).toBe("exploration");
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.freeformBound).toBe(false);
+    expect(store.sendText("look")).toBe(true);
+    expect(sender.sent.actions.filter((a) => a.action_id === "explore.talk_freeform")).toHaveLength(0);
+    expect(sender.sent.texts).toContain("look");
+  });
+
+  it("a borrowed send refused while a mutation is in flight keeps the borrow", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null);
+    store.borrowDialogueCommand();
+    expect(store.sendText("等等。")).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.texts).toHaveLength(0);
+    expect(store.view.freeformBound).toBe(true);
+  });
+
   it("the exit dispatch rides the single dispatch entry", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    // AppClient maps the feed's dialogue-leave emit onto the same entry.
+    // AppClient maps the choice list's `leave` emit onto the same entry.
     store.dispatchAction("explore.dialogue_leave", { npc_id: 41 }, null);
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
@@ -404,9 +468,9 @@ describe("dialogue store mode lifecycle", () => {
     );
     expect(store.view.dockDepth).toBe(1);
     expect(store.view.activeSubDock).toBe(null);
-    // The caption keeps working through the degradation: digits still
-    // address the committed dialogue picks.
-    expect(store.focusPress("1")).toBe(true);
+    // The committed dialogue picks stay dispatchable through the single
+    // entry (the choice list's path) through the degradation.
+    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null)).not.toBe(null);
   });
 
   it("closeHudDrawer() on the status drawer opened from Character entry clears character sub-dock and re-homes root", () => {
@@ -443,7 +507,8 @@ describe("dialogueSpeaker follows the in-flight speech action", () => {
 
   it("is the host at rest and the player from a pick's dispatch until its revision commits", () => {
     expect(store.view.dialogueSpeaker).toBe("host");
-    expect(store.focusPress("1")).toBe(true);
+    // The choice list's pick activation: the single dispatch entry.
+    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null)).not.toBe(null);
     expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
     expect(store.view.dialogueSpeaker).toBe("player");
     // The handled result declares revision 5: the reply has not committed.

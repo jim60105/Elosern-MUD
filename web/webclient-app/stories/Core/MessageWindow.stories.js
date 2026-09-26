@@ -1,6 +1,7 @@
 import { h, onMounted, ref } from "vue";
 import MessageWindow from "../../components/MessageWindow.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
+import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
 
 // MessageWindow: the AVG message window (AVG stage design §6;
 // webclient-message-window-component). The stories render inside a box the
@@ -124,8 +125,10 @@ export default {
           "only while the page surface has focus and never reach the dock. " +
           "Scrolling up over the page emits `open-full-log`. A polite live " +
           "region announces each page once. In dialogue mode the window spans " +
-          "the band under the host's name plate and shows the reply box and " +
-          "its pick rows, unpaged. Pages type in at the " +
+          "the band and pages the session line like any response, under the " +
+          "host's name plate, in a column starting under the player portrait; " +
+          "it holds no choice row and emits `reading-change` (true once the " +
+          "last page is fully shown). Pages type in at the " +
           "reader's `textSpeed` (the unrevealed tail keeps its place " +
           "invisibly); a click or Enter while typing shows the page in full. " +
           "Opt-in `autoAdvance` turns a fully shown page after 1.2s + 60ms per " +
@@ -225,24 +228,12 @@ export const PendingAction = {
   },
 };
 
-// The dialogue variant across the whole band: the host's name plate, the
-// reply box (no avatar — the host stands on the stage), the numbered picks,
-// the free dialogue and exit rows, unpaged. The view model is built from the panel
-// form exactly as AppClient does.
-const DIALOGUE_PANEL = {
-  schema_version: 2,
-  available: true,
-  kind: "dialogue",
-  host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-  bond_stage: "親睦",
-  line: "「渡河要五枚銅板，多一子我也不走。」她瞥了你一眼，「倒是你，身上聞起來有點……不對味。」",
-  choices: [
-    { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-    { keyword_id: "smell", label: "含糊帶過氣味" },
-    { keyword_id: "chest", label: "直接問箱櫃下落" },
-    { keyword_id: "silence", label: "保持沉默，觀察她下一步" },
-  ],
-};
+// Dialogue across the whole band (webclient-dialogue-choices-overlay D1):
+// the host's name plate over the session line, paged and typed like any
+// response, verbatim as the narrative delivered it. No row renders here:
+// the choices are the centred list over the stage. The view model is built
+// from the shared panel fixture exactly as AppClient does.
+const DIALOGUE_PANEL = DIALOGUE_PANEL_SAMPLE;
 
 export const Dialogue = {
   render: renderWindow,

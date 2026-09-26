@@ -20,9 +20,12 @@
 // byte-for-byte in behaviour: Enter without Shift sends exactly one command
 // (regardless of how focus arrived), Shift+Enter inserts a newline, a
 // send the field accepts clears the draft and emits `sent` (so the shell
-// collapses the line and returns focus to `#action-dock`), and a rejected
-// send (offline, mutations locked, or a mutation in flight) preserves the
-// typed text and leaves the line open.
+// collapses the line and returns focus to the mode's focus home), and a
+// rejected send preserves the typed text and leaves the line open. Whether
+// a send is accepted is one prop, `accepting` (webclient-dialogue-choices-
+// overlay D9): the store's `commandAccepts`, the very predicate the send's
+// delivery path applies, so the field never clears for a send the store
+// then refuses.
 import { computed, nextTick, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 
@@ -32,14 +35,11 @@ const props = defineProps({
   prompt: { type: String, default: "" },
   // The command-history slice.
   history: { type: Array, default: () => [] },
-  // The transport state (the store's connected flag).
-  connected: { type: Boolean, default: true },
-  // The store's mutation-lock flag: a rejected send preserves the typed
-  // speech (webclient-desktop-shell).
-  mutationsLocked: { type: Boolean, default: false },
-  // The action client's in-flight mutation flag (webclient-input-narrative):
-  // a free-form send blocked by an in-flight mutation keeps the typed speech.
-  inFlight: { type: Boolean, default: false },
+  // Whether a send is accepted right now (`store.view.commandAccepts`): for
+  // ordinary text, connected, unlocked, and no mutation in flight; for a
+  // borrowed free-form send, also the active presentation phase. A rejected
+  // send keeps the typed speech (webclient-desktop-shell).
+  accepting: { type: Boolean, default: true },
   // The client-local text-to-HTML narrative preference: when off, the
   // prompt line (and the feed/full-log lines) render as literal text — the
   // preference chooses whether the pipeline runs, never what it permits.
@@ -237,11 +237,10 @@ function submit() {
     return false;
   }
   emit("submit", text);
-  // Preserve the typed speech when the send is rejected (disconnected,
-  // mutations locked, or another mutation in flight); clear the draft only
-  // when the send is actually dispatched and emit `sent` so the shell
-  // collapses the line and returns focus to `#action-dock` (design D3).
-  if (props.connected && !props.mutationsLocked && !props.inFlight) {
+  // Preserve the typed speech when the send is rejected; clear the draft
+  // only when the send is actually delivered and emit `sent` so the shell
+  // collapses the line and returns focus to the mode's focus home.
+  if (props.accepting) {
     draft.value = "";
     emit("sent");
   }

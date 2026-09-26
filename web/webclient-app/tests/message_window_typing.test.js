@@ -456,7 +456,11 @@ describe("MessageWindow typewriter", () => {
     });
   });
 
-  it("does not type or auto-advance the dialogue variant", async () => {
+  // webclient-dialogue-choices-overlay D1: no dialogue variant exists; the
+  // session line types and auto-advances like any response under the plate,
+  // and no choice row ever renders inside the window.
+  it("types and auto-advances the dialogue line like any response (the dialogue variant does not type: no variant exists)", async () => {
+    budget.value = 10;
     const vm = dialogueViewModel({
       schema_version: 2,
       available: true,
@@ -467,17 +471,28 @@ describe("MessageWindow typewriter", () => {
       choices: [{ keyword_id: "公會", label: "公會" }],
     });
     const w = await mountWindow({ mode: "dialogue", dialogue: vm, textSpeed: "slow", autoAdvance: true });
-    await w.setProps({
-      dialogue: { ...vm, line: "任務板在那裡。" },
-      lines: [...ARRIVAL, ...seqLines(2, [["in", "talk"], ["out", LONG]])],
-    });
+    const reading = () => w.emitted("reading-change").at(-1)[0];
+    await w.setProps({ lines: [...ARRIVAL, ...seqLines(2, [["in", "talk"], ["out", LONG]])] });
     await settle();
-    expect(windowEl(w).attributes("data-variant")).toBe("dialogue");
+    expect(windowEl(w).attributes("data-variant")).toBe("paged");
+    expect(w.find('[data-testid="message-name-plate"]').exists()).toBe(true);
+    expect(windowEl(w).attributes("data-typing")).toBe("true");
+    expect(pageSurface(w).attributes("data-page")).toBe("1");
+    expect(reading()).toBe(false);
+    expect(w.find('[data-testid="dialogue-pick"]').exists()).toBe(false);
+    // Page 1 (10 characters at 20/s), then the auto-advance wait, page 2.
+    await tickSteps(600);
     expect(windowEl(w).attributes("data-typing")).toBe("false");
-    expect(w.get('[data-testid="dialogue-say"]').text()).toBe("任務板在那裡。");
-    expect(w.findAll('[data-testid="dialogue-pick"]').length).toBeGreaterThan(0);
-    expect(w.find(".narrative-unrevealed").exists()).toBe(false);
-    await tick(20000);
-    expect(windowEl(w).attributes("data-variant")).toBe("dialogue");
+    expect(marker(w).text()).toBe("▼");
+    expect(reading()).toBe(false);
+    await tickSteps(2000);
+    expect(pageSurface(w).attributes("data-page")).toBe("2");
+    // Page 2 and then page 3 (the last): the window stops there with ■.
+    await tickSteps(8000);
+    expect(pageSurface(w).attributes("data-page")).toBe("3");
+    expect(windowEl(w).attributes("data-typing")).toBe("false");
+    expect(marker(w).text()).toBe("■");
+    expect(reading()).toBe(true);
+    expect(w.find('[data-testid="dialogue-pick"]').exists()).toBe(false);
   });
 });

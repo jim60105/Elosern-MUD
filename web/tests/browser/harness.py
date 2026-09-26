@@ -538,8 +538,8 @@ def wait_command_field_released(page, timeout=30000):
     send restores focus to the focus home and collapses the command-line
     anchor (``data-expanded="false"``) while ``#inputfield`` stays in the DOM.
     The focus home is ``#action-dock``, or in dialogue mode — where the
-    command region is collapsed — the message window's dialogue row
-    (webclient-dialogue-stage-actors design D5).
+    command region is collapsed — the dialogue choice list while it is shown,
+    else the message page (webclient-dialogue-choices-overlay design D7).
     """
     wait_for_store_state(
         page,
@@ -551,12 +551,14 @@ def wait_command_field_released(page, timeout=30000):
                 " const d = document.querySelector('[data-testid=\"command-line\"]');"
                 " const stage = document.querySelector('[data-elosern-mode]');"
                 " const dialogue = !!stage && stage.getAttribute('data-elosern-mode') === 'dialogue';"
-                " const home = dialogue"
-                " ? document.querySelector('[data-anchor=\"band-message\"]')"
-                " : document.getElementById('action-dock');"
+                " const homes = dialogue"
+                " ? [document.querySelector('[data-anchor=\"band-message\"]'),"
+                " document.querySelector('[data-anchor=\"choices\"]')]"
+                " : [document.getElementById('action-dock')];"
                 " const active = document.activeElement;"
-                " return a && a.getAttribute('data-expanded') === 'false' && d && home && "
-                "active && active !== document.body && (active === home || home.contains(active)); }"
+                " return a && a.getAttribute('data-expanded') === 'false' && d && "
+                "active && active !== document.body && "
+                "homes.some((home) => home && (active === home || home.contains(active))); }"
             ),
             "description": "command field released: the focus home focused, command line collapsed",
         },

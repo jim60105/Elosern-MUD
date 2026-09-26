@@ -85,9 +85,11 @@ pane host all render inside the same command-region box, so the message window a
 overlap and neither clips the other at a supported viewport. A frame whose rows exceed the region
 SHALL scroll inside the pane host while the dock's chrome (the combat tab bar, the breadcrumb, and
 the legend strip) stays fixed around it. In dialogue
-mode the message window SHALL span the whole band at the band's fixed height, and the host's name
-plate, the latest line, the choice rows, the free-form input and the exit control SHALL all stay
-reachable at 1280x720 by scrolling inside the window, never by growing it.
+mode the message window SHALL span the whole band at the band's fixed height and carry the host's name
+plate and the paged line, reachable at 1280x720 by paging inside the window, never by growing it; the
+choice rows, the free-dialogue row, the move row and the exit row SHALL render in the dialogue choice
+list centred over the stage (the contextual-HUD dialogue-choices requirement), never inside the message
+window, and SHALL fit the stage above the band at 1280x720 without document-level scrolling.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
@@ -147,7 +149,7 @@ reachable at 1280x720 by scrolling inside the window, never by growing it.
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1280x720
-- **THEN** the message window spans the whole band, the command region is not rendered, and the host's name plate, the latest line, every choice row, the free-form input and the exit control are all reachable by scrolling inside the window, without document-level scrolling and without the window or the band changing size
+- **THEN** the message window spans the whole band and carries the host's name plate and the paged line, the command region is not rendered, and once the line is fully shown every choice row, the free-dialogue row, the move row and the exit row are reachable in the choice list centred over the stage, never inside the message window, without document-level scrolling and without the window or the band changing size
 
 ### Requirement: Narrative output remains the authoritative text surface and is read page by page
 The shell SHALL route Evennia's existing narrative and command output to the retained narrative log
@@ -217,8 +219,9 @@ never be claimed by the router, so commands or text that contain a slash remain
 typeable in the command field and in other editable controls (creation forms, rest forms). Escape
 pressed while the command field holds focus SHALL send nothing, SHALL return focus to the current
 mode's focus home, and SHALL collapse the command line. While the committed mode is `dialogue` the
-router SHALL claim only `/` and the dialogue picks' digits; arrows, Enter, Space, and Escape SHALL be
-unclaimed, so the hidden dock is never navigated or activated.
+router SHALL claim only `/`; arrows, Enter, Space, Escape, and digits SHALL be unclaimed by it, so the
+hidden dock is never navigated or activated, and the dialogue choice list handles its own keys before
+they reach the bridge.
 Pointer activation of a rendered row SHALL be admitted and SHALL traverse the identical
 focus, disabled-explanation, and submission-gating path as Enter, as specified by
 `webclient-pointer-activation`. Disabled entries SHALL remain focusable for their
@@ -292,103 +295,6 @@ B2 key-derivation contract is preserved only as the isolated Node gate
 #### Scenario: The router is inert while the dock is collapsed
 - **WHEN** the committed mode is dialogue, focus is on the document body, and the player presses ArrowDown, Enter, Space, and Escape
 - **THEN** the bridge reports each key unclaimed by the router, the router's focused key and depth are unchanged, and no request is emitted
-
-### Requirement: The collapsible command line preserves ordinary text control
-
-The command line SHALL be collapsed by default and SHALL always be one entrance action away from use:
-its input field SHALL become visible and focused through exactly one entrance action — `/` pressed while no
-editable control is focused, activation of the ⌨ toggle, or a dock borrowing the field for its own
-free-form dialogue — and no stored layout or presentation state SHALL be able to keep it collapsed or
-open it. While collapsed, the field SHALL stay in the DOM, hidden with its row, and SHALL keep the
-`#inputfield` identifier inside its `.inputfieldwrapper` wrapper in both states. `/` SHALL move focus
-without inserting a literal `/` into the field, and every entrance path SHALL render the row before it
-moves focus, so focus never lands on a hidden field. Focusing the input field by any of those entrance
-paths SHALL leave it ready to send through its single send implementation. The field SHALL send
-ordinary text through Evennia's text message, preserve command history, and SHALL NOT translate text
-into `ui_action`. Exactly one send implementation SHALL own the field, so a single key press can never
-traverse two send paths. Pressing Enter without Shift while the field is focused SHALL send exactly one
-command regardless of how focus arrived; Shift+Enter SHALL insert a newline without sending. After a
-send the field accepts (connected, mutations unlocked, and no mutation in flight) the field SHALL clear,
-focus SHALL move to the action dock, and the command line SHALL collapse; the next command starts with
-one more entrance action. When the field rejects a send (offline, mutations locked, or another mutation
-in flight), the typed text SHALL stay in the field, focus SHALL stay in the field, and the command line
-SHALL stay expanded, so nothing is silently lost. ArrowUp and ArrowDown SHALL walk the command-history
-slice with the unsent draft preserved across the walk and restored when the walk returns past its most
-recent entry, and the labelled history controls SHALL drive that same walk without sending; the walk
-and Tab completion SHALL behave identically in every entrance path. Escape SHALL send nothing, SHALL
-return focus to the action dock, and SHALL collapse the command line while keeping any unsent draft for
-the next expansion. When a dock has borrowed the field for one of its own actions — free-form dialogue
-— a successful send SHALL clear the field, return focus to the action dock, and collapse the command
-line, because that interaction has completed; when the action client is locked (offline, awaiting the
-first snapshot, or another mutation in flight) the borrowed send SHALL NOT dispatch, SHALL keep the
-typed speech in the field, SHALL keep focus in the field, and SHALL keep the command line expanded. A
-borrowed-field reference SHALL be released whenever focus leaves the field for any reason other than
-that dock's own successful send, and whenever a send is routed as ordinary text, so a cancelled or
-abandoned dock interaction can never capture a later unrelated command. The field SHALL remain usable
-when OOB controls are disabled.
-
-#### Scenario: The field is one entrance action away
-- **WHEN** the shell mounts the command line in a fresh browser context
-- **THEN** the input field is present in the DOM inside its wrapper but hidden and outside the tab order, the ⌨ toggle reports `aria-expanded="false"`, and after one `/` press the field is visible, focused, and can be typed into
-
-#### Scenario: Slash focuses the field without typing a slash
-- **WHEN** no editable control is focused and the player presses `/`
-- **THEN** the command line expands, focus moves into the input field, and the field's content is unchanged — no literal `/` is inserted
-
-#### Scenario: Keyboard-only command send restores focus
-- **WHEN** the player opens the field with `/`, enters a command, and sends it
-- **THEN** the command travels through the text input path, the field clears, the command line
-  collapses, and focus returns to the action dock
-
-#### Scenario: Consecutive commands need no pointer interaction
-- **WHEN** the player opens the field with `/`, sends a command, presses `/` again, types a second command,
-  and sends it
-- **THEN** both commands travel through the text input path, the field is cleared and the line collapsed
-  after each, and focus is in the action dock or the field at every step without any pointer interaction
-
-#### Scenario: Escape cancels without sending and returns to the dock
-- **WHEN** the player opens the field, enters unsent text, and presses Escape
-- **THEN** no text and no UI action is sent, action-dock focus is restored, the command line collapses, and the next expansion shows the same unsent text
-
-#### Scenario: A pointer-opened field sends on Enter without a prior slash
-- **WHEN** the player activates the ⌨ toggle with the pointer, types a command in the now-focused field,
-  and presses Enter
-- **THEN** exactly one text message is sent through the single send path, the field clears, the command
-  line collapses, and focus returns to the action dock; the plugin contract reports no unhandled keydown
-
-#### Scenario: A rejected send keeps the text and the open line
-- **WHEN** the player sends an ordinary command while mutations are locked or a mutation is in flight
-- **THEN** the typed text remains in the field, focus stays in the field, and the command line stays expanded
-
-#### Scenario: Shift+Enter inserts a newline without sending
-- **WHEN** the input field is focused and the player presses Shift+Enter
-- **THEN** no command is sent and the text insertion point moves to a new line
-
-#### Scenario: The history walk preserves the unsent draft
-- **WHEN** the player types an unsent draft, presses ArrowUp twice to recall two prior commands, and then presses ArrowDown past the most recent entry
-- **THEN** the recalled commands appear in order, the unsent draft is restored when the walk returns past its most recent entry, and no command is sent by the walk
-
-#### Scenario: A dock-borrowed send returns focus to the dock
-- **WHEN** the exploration dock borrows the field for free-form dialogue while the command line is collapsed,
-  and the player sends the speech while the action client is unlocked
-- **THEN** the borrow expanded the command line and focused the field, exactly one `explore.talk_freeform`
-  action is submitted, the field clears, the command line collapses, and action-dock focus is restored
-
-#### Scenario: A locked borrowed send keeps the speech
-- **WHEN** the exploration dock borrows the field for free-form dialogue and the player sends the speech
-  while the action client is locked
-- **THEN** no action is submitted, no text is lost (the speech remains in the field), focus stays in the
-  field, the command line stays expanded, and no input line is echoed
-
-#### Scenario: One key press sends exactly one command
-- **WHEN** the player presses Enter in the input field
-- **THEN** exactly one text message is sent regardless of how focus arrived
-
-#### Scenario: A cancelled dialogue cannot capture a later command
-- **WHEN** the player opens free-form dialogue, leaves the field without sending, and later sends an
-  ordinary command through the field
-- **THEN** the command travels through the ordinary text path, no `explore.talk_freeform` action is
-  submitted, and the typed text is not delivered as speech to the previously selected NPC
 
 ### Requirement: The top navigation bar carries the tool group
 
@@ -584,3 +490,124 @@ the only host of the dock's row region: no reference drawer body renders it.
 - **THEN** the scene overview component is the pane host's only child, fills its width, and renders
   no detail pane, and the popover's card renders in the dock's overlay layer while the pane host's
   children stay unchanged
+
+### Requirement: The collapsible command line preserves ordinary text control and the dialogue's free-form borrow
+
+The command line SHALL be collapsed by default and SHALL always be one entrance action away from use:
+its input field SHALL become visible and focused through exactly one entrance action — `/` pressed while no
+editable control is focused, activation of the ⌨ toggle, or the dialogue choice list's `⌨ 自由對話` row
+borrowing the field for free-form speech to the conversation's host — and no stored layout or presentation state SHALL be able to keep it collapsed or
+open it. While collapsed, the field SHALL stay in the DOM, hidden with its row, and SHALL keep the
+`#inputfield` identifier inside its `.inputfieldwrapper` wrapper in both states. `/` SHALL move focus
+without inserting a literal `/` into the field, and every entrance path SHALL render the row before it
+moves focus, so focus never lands on a hidden field. Focusing the input field by any of those entrance
+paths SHALL leave it ready to send through its single send implementation. The field SHALL send
+ordinary text through Evennia's text message, preserve command history, and SHALL NOT translate text
+into `ui_action`. Exactly one send implementation SHALL own the field, so a single key press can never
+traverse two send paths. Pressing Enter without Shift while the field is focused SHALL send exactly one
+command regardless of how focus arrived; Shift+Enter SHALL insert a newline without sending. The field SHALL accept a send by exactly the predicate that decides whether the send is delivered: an
+ordinary text send while connected, mutations unlocked, and no mutation in flight; a borrowed free-form
+send while connected, mutations unlocked, the presentation phase active, and no mutation in flight —
+the same predicate the action dispatch path applies, so the field never accepts a borrowed send the
+dispatch path then refuses. After a send the field accepts the field SHALL clear, focus SHALL move to
+the current mode's focus home (the action dock; in dialogue mode the dialogue choice list while it is
+rendered and otherwise the message window's page surface), and the command line SHALL collapse; the
+next command starts with one more entrance action. When the field rejects a send, the typed text SHALL
+stay in the field, focus SHALL stay in the field, and the command line SHALL stay expanded, so nothing
+is silently lost. ArrowUp and ArrowDown SHALL walk the command-history
+slice with the unsent draft preserved across the walk and restored when the walk returns past its most
+recent entry, and the labelled history controls SHALL drive that same walk without sending; the walk
+and Tab completion SHALL behave identically in every entrance path. Escape SHALL send nothing, SHALL
+return focus to the current mode's focus home, and SHALL collapse the command line while keeping any unsent draft for
+the next expansion. The only borrower is the dialogue choice list's `⌨ 自由對話` row. While it has borrowed the field, a
+successful send SHALL dispatch exactly one `explore.talk_freeform` with the host's identity and the
+speech, clear the field, return focus to the dialogue's focus home, and collapse the command line,
+because that interaction has completed; when the action client is locked (offline, awaiting the first
+snapshot, a presentation phase other than active, or another mutation in flight) the borrowed send
+SHALL NOT dispatch, SHALL keep the typed speech in the field, SHALL keep focus in the field, SHALL keep
+the command line expanded, and SHALL keep the borrow bound to the same host, so the next send once the
+lock lifts is still delivered as that speech. A
+borrowed-field reference SHALL be released whenever focus leaves the field for any reason other than
+a send the field accepted or rejected, whenever a send is routed as ordinary text, and whenever a
+committed revision ends the conversation (a committed mode other than dialogue), whatever holds focus, so
+a cancelled, abandoned, or refused dialogue interaction can never capture a later unrelated command. The field SHALL remain usable
+when OOB controls are disabled.
+
+#### Scenario: The field is one entrance action away
+- **WHEN** the shell mounts the command line in a fresh browser context
+- **THEN** the input field is present in the DOM inside its wrapper but hidden and outside the tab order, the ⌨ toggle reports `aria-expanded="false"`, and after one `/` press the field is visible, focused, and can be typed into
+
+#### Scenario: Slash focuses the field without typing a slash
+- **WHEN** no editable control is focused and the player presses `/`
+- **THEN** the command line expands, focus moves into the input field, and the field's content is unchanged — no literal `/` is inserted
+
+#### Scenario: Keyboard-only command send restores focus
+- **WHEN** the player opens the field with `/`, enters a command, and sends it
+- **THEN** the command travels through the text input path, the field clears, the command line
+  collapses, and focus returns to the action dock
+
+#### Scenario: Consecutive commands need no pointer interaction
+- **WHEN** the player opens the field with `/`, sends a command, presses `/` again, types a second command,
+  and sends it
+- **THEN** both commands travel through the text input path, the field is cleared and the line collapsed
+  after each, and focus is in the action dock or the field at every step without any pointer interaction
+
+#### Scenario: Escape cancels without sending and returns to the dock
+- **WHEN** the player opens the field, enters unsent text, and presses Escape
+- **THEN** no text and no UI action is sent, action-dock focus is restored, the command line collapses, and the next expansion shows the same unsent text
+
+#### Scenario: A pointer-opened field sends on Enter without a prior slash
+- **WHEN** the player activates the ⌨ toggle with the pointer, types a command in the now-focused field,
+  and presses Enter
+- **THEN** exactly one text message is sent through the single send path, the field clears, the command
+  line collapses, and focus returns to the action dock; the plugin contract reports no unhandled keydown
+
+#### Scenario: A rejected send keeps the text and the open line
+- **WHEN** the player sends an ordinary command while mutations are locked or a mutation is in flight
+- **THEN** the typed text remains in the field, focus stays in the field, and the command line stays expanded
+
+#### Scenario: Shift+Enter inserts a newline without sending
+- **WHEN** the input field is focused and the player presses Shift+Enter
+- **THEN** no command is sent and the text insertion point moves to a new line
+
+#### Scenario: The history walk preserves the unsent draft
+- **WHEN** the player types an unsent draft, presses ArrowUp twice to recall two prior commands, and then presses ArrowDown past the most recent entry
+- **THEN** the recalled commands appear in order, the unsent draft is restored when the walk returns past its most recent entry, and no command is sent by the walk
+
+#### Scenario: A borrowed dialogue send returns focus to the dialogue
+- **WHEN** the dialogue choice list's `⌨ 自由對話` row borrows the field while the command line is collapsed,
+  and the player sends the speech while the action client is unlocked and the presentation phase is active
+- **THEN** the borrow expanded the command line and focused the field, exactly one `explore.talk_freeform`
+  action is submitted for the host, the field clears, the command line collapses, focus is on the message
+  window's page surface while the reply is awaited, and focus moves to the choice list once the reply's
+  last page is fully shown
+
+#### Scenario: A locked borrowed send keeps the speech
+- **WHEN** the dialogue free row borrows the field and the player sends the speech while the action client
+  is locked, and then sends again after the lock lifts
+- **THEN** the first send submits no action, keeps the speech in the field with focus and the expanded
+  line, and echoes no input line; the second send submits exactly one `explore.talk_freeform` for the same
+  host and no ordinary text command
+
+#### Scenario: A borrowed send outside the active phase is rejected by the field
+- **WHEN** the dialogue free row borrows the field and the player sends the speech while the transport is
+  connected with no mutation in flight but the presentation phase is not active (a transport reset
+  awaiting its first snapshot)
+- **THEN** the field does not clear, the command line stays expanded with focus in the field, no action is
+  submitted, no ordinary text is sent, the speech is not lost, and the borrow stays bound to the host
+
+#### Scenario: One key press sends exactly one command
+- **WHEN** the player presses Enter in the input field
+- **THEN** exactly one text message is sent regardless of how focus arrived
+
+#### Scenario: A refused borrow ends with the conversation
+- **WHEN** the dialogue free row borrows the field, a send is refused while a mutation is in flight, and
+  that mutation's commit ends the conversation while the field keeps focus
+- **THEN** the borrow is released, and the next send from the field travels as ordinary text with no
+  `explore.talk_freeform` submitted
+
+#### Scenario: A cancelled dialogue cannot capture a later command
+- **WHEN** the player activates the dialogue free row, leaves the field without sending, and later sends an
+  ordinary command through the field
+- **THEN** the command travels through the ordinary text path, no `explore.talk_freeform` action is
+  submitted, and the typed text is not delivered as speech to the previously selected NPC

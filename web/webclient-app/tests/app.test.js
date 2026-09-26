@@ -188,7 +188,7 @@ describe("AppShell root (B1 core family)", () => {
     document.body.appendChild(host);
     const w = mount(AppShell, {
       attachTo: host,
-      props: { connected: true, mutationsLocked: false },
+      props: { connected: true, commandAccepts: true },
       slots: { "action-dock": () => h(ActionDock) },
     });
     wrapper = w;
@@ -209,8 +209,10 @@ describe("AppShell root (B1 core family)", () => {
     expect(anchor.attributes("data-expanded")).toBe("false");
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
 
-    // A locked Enter keeps the line expanded, keeps focus, and keeps the draft.
-    await w.setProps({ mutationsLocked: true });
+    // A refused Enter (the store's `commandAccepts` false: locked, in
+    // flight, or a borrowed send outside the active phase) keeps the line
+    // expanded, keeps focus, and keeps the draft.
+    await w.setProps({ commandAccepts: false });
     await w.vm.focusCommandField();
     await w.vm.$nextTick();
     input.element.value = "talk 老周";

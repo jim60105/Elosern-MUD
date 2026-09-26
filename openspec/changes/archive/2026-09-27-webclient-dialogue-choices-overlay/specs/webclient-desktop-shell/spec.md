@@ -253,8 +253,9 @@ SHALL NOT dispatch, SHALL keep the typed speech in the field, SHALL keep focus i
 the command line expanded, and SHALL keep the borrow bound to the same host, so the next send once the
 lock lifts is still delivered as that speech. A
 borrowed-field reference SHALL be released whenever focus leaves the field for any reason other than
-a send the field accepted or rejected, and whenever a send is routed as ordinary text, so a cancelled or
-abandoned dock interaction can never capture a later unrelated command. The field SHALL remain usable
+a send the field accepted or rejected, whenever a send is routed as ordinary text, and whenever a
+committed revision ends the conversation (a committed mode other than dialogue), whatever holds focus, so
+a cancelled, abandoned, or refused dialogue interaction can never capture a later unrelated command. The field SHALL remain usable
 when OOB controls are disabled.
 
 #### Scenario: The field is one entrance action away
@@ -315,13 +316,20 @@ when OOB controls are disabled.
 
 #### Scenario: A borrowed send outside the active phase is rejected by the field
 - **WHEN** the dialogue free row borrows the field and the player sends the speech while the transport is
-  connected and unlocked with no mutation in flight but the presentation phase is not active
+  connected with no mutation in flight but the presentation phase is not active (a transport reset
+  awaiting its first snapshot)
 - **THEN** the field does not clear, the command line stays expanded with focus in the field, no action is
-  submitted, and the speech is not lost
+  submitted, no ordinary text is sent, the speech is not lost, and the borrow stays bound to the host
 
 #### Scenario: One key press sends exactly one command
 - **WHEN** the player presses Enter in the input field
 - **THEN** exactly one text message is sent regardless of how focus arrived
+
+#### Scenario: A refused borrow ends with the conversation
+- **WHEN** the dialogue free row borrows the field, a send is refused while a mutation is in flight, and
+  that mutation's commit ends the conversation while the field keeps focus
+- **THEN** the borrow is released, and the next send from the field travels as ordinary text with no
+  `explore.talk_freeform` submitted
 
 #### Scenario: A cancelled dialogue cannot capture a later command
 - **WHEN** the player activates the dialogue free row, leaves the field without sending, and later sends an

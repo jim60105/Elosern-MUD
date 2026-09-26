@@ -1,6 +1,6 @@
 // webclient-message-window-component (tasks 4.3): the AVG message window's
-// reader state, reading controls, live region, and the ported dialogue
-// variant. jsdom has no layout, so every test injects a deterministic
+// reader state, reading controls, and live region (the dialogue mode's
+// window is covered by message_window_dialogue.test.js). jsdom has no layout, so every test injects a deterministic
 // code-point `pageFit` (the documented test seam) and stubs
 // ResizeObserver / document.fonts where a case needs them.
 
@@ -8,7 +8,6 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import MessageWindow from "../components/MessageWindow.vue";
-import { dialogueViewModel } from "../stores/dialogue-view.js";
 
 // A page holds `budget.value` code points (fragment end − start summed).
 function codePointFit(budget) {
@@ -379,139 +378,5 @@ describe("MessageWindow paged presentation", () => {
     expect(pageSurface(w).attributes("aria-describedby")).toBe(
       w.get(".message-window__sr").attributes("id"),
     );
-  });
-});
-
-describe("MessageWindow dialogue variant", () => {
-  const PANEL = {
-    schema_version: 2,
-    available: true,
-    kind: "dialogue",
-    host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-    bond_stage: "親睦",
-    line: "「渡河要五枚銅板。」",
-    choices: [
-      { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-      { keyword_id: "smell", label: "含糊帶過氣味" },
-    ],
-  };
-  const vm = dialogueViewModel(PANEL);
-  let wrapper;
-
-  afterEach(() => {
-    wrapper?.unmount();
-    wrapper = null;
-    document.body.innerHTML = "";
-  });
-
-  async function mountDialogue(lines, props = {}) {
-    wrapper = mount(MessageWindow, {
-      attachTo: document.body,
-      props: {
-        mode: "dialogue",
-        dialogue: vm,
-        lines,
-        marks: [],
-        pageFit: () => true,
-        ...props,
-      },
-    });
-    await settle();
-    return wrapper;
-  }
-
-  const talk = (reply) => [
-    ...ARRIVAL,
-    ...seqLines(2, [["in", "talk 灰婆婆"], ["out", reply]]),
-  ];
-
-  it("renders the name plate with the bond, the reply once, picks, free and exit rows", async () => {
-    const w = await mountDialogue(talk(`灰婆婆說：${PANEL.line}`));
-    expect(w.get('[data-testid="message-window"]').attributes("data-variant")).toBe("dialogue");
-    expect(w.find('[data-testid="dialogue-box"] .av').exists()).toBe(false);
-    expect(w.get('[data-testid="message-name-plate"]').text()).toContain("灰婆婆");
-    expect(w.get('[data-testid="dialogue-bond"]').text()).toContain("羈絆 親睦");
-    expect(w.get('[data-testid="dialogue-say"]').text()).toBe(PANEL.line);
-    const dialogueText = w.get('[data-testid="message-dialogue"]').text();
-    expect(dialogueText.split(PANEL.line)).toHaveLength(2);
-    expect(w.findAll('[data-testid="dialogue-pick"]').map((b) => b.text())).toEqual([
-      "1「就五枚，走嗎？」",
-      "2含糊帶過氣味",
-    ]);
-    expect(w.find('[data-testid="dialogue-freeform"]').exists()).toBe(true);
-    expect(w.find('[data-testid="dialogue-exit"]').exists()).toBe(true);
-    expect(marker(w).exists()).toBe(false);
-    expect(pageSurface(w).isVisible()).toBe(false);
-  });
-
-  it("drops the bond segment when bond_stage is null", async () => {
-    const w = await mountDialogue(talk("x"), {
-      dialogue: dialogueViewModel({ ...PANEL, bond_stage: null }),
-    });
-    expect(w.find('[data-testid="dialogue-bond"]').exists()).toBe(false);
-  });
-
-  it("emits one row payload per pick and the free and leave rows", async () => {
-    const w = await mountDialogue(talk("x"));
-    await w.findAll('[data-testid="dialogue-pick"]')[1].trigger("click");
-    expect(w.emitted("dialogue-pick")).toEqual([[vm.picks[1]]]);
-    await w.get('[data-testid="dialogue-freeform"]').trigger("click");
-    expect(w.emitted("dialogue-freeform")).toHaveLength(1);
-    await w.get('[data-testid="dialogue-exit"]').trigger("click");
-    expect(w.emitted("dialogue-leave")).toHaveLength(1);
-    expect(w.emitted("dialogue-pick")).toHaveLength(1);
-  });
-
-  it("keeps only the daily-affinity hint residual of the anchored echo", async () => {
-    const w = await mountDialogue(talk(`灰婆婆說：${PANEL.line}\n（今日好感已達上限）`));
-    const lines = w.findAll('[data-testid="message-dialogue"] .narrative-line');
-    expect(lines.map((l) => l.text())).toEqual(["（今日好感已達上限）"]);
-  });
-
-  it("never swallows a sys tail whose text coincides with the reply", async () => {
-    const w = await mountDialogue([
-      ...ARRIVAL,
-      ...seqLines(2, [["in", "talk 灰婆婆"], ["sys", PANEL.line]]),
-    ]);
-    const lines = w.findAll('[data-testid="message-dialogue"] .narrative-line');
-    expect(lines.map((l) => l.text())).toEqual([PANEL.line]);
-  });
-
-  it("does not intercept Enter, click, or wheel", async () => {
-    const w = await mountDialogue(talk("x"));
-    const documentSpy = vi.fn();
-    document.addEventListener("keydown", documentSpy);
-    try {
-      const pick = w.findAll('[data-testid="dialogue-pick"]')[0];
-      pick.element.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      expect(documentSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      document.removeEventListener("keydown", documentSpy);
-    }
-    await w.get('[data-testid="message-window"]').trigger("wheel", { deltaY: -40 });
-    expect(w.emitted("open-full-log")).toBeUndefined();
-  });
-
-  it("announces each new committed reply once, never on mount", async () => {
-    const w = await mountDialogue(talk("x"));
-    expect(live(w)).toBe("");
-    await w.setProps({ dialogue: dialogueViewModel({ ...PANEL, line: "「走吧。」" }) });
-    await settle();
-    expect(live(w)).toBe("「走吧。」");
-  });
-
-  it("returns to the paged form on the last page when the dialogue ends", async () => {
-    const w = await mountDialogue(talk("好。"), {
-      pageFit: codePointFit({ value: 10 }),
-    });
-    await w.setProps({
-      mode: "exploration",
-      dialogue: null,
-      lines: [...w.props("lines"), ...seqLines(4, [["out", LONG]])],
-    });
-    await settle();
-    expect(w.get('[data-testid="message-window"]').attributes("data-variant")).toBe("paged");
-    expect(pageSurface(w).isVisible()).toBe(true);
-    expect(marker(w).text()).toBe("■");
   });
 });

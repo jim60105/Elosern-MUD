@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): scripted and free-form dialogue surfaces, the dialogue caption, the offline degrade path, and engage-to-combat.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): scripted and free-form dialogue surfaces, the dialogue choice list over the stage, the offline degrade path, and engage-to-combat.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
+    open_dialogue_choices,
     outbound_messages,
     overview_target_with_affordance,
     sent_action_count,
@@ -123,20 +124,23 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # The overview's 人物 chip for the scripted host opens its verb
         # popover; 交談 opens the conversation in one dispatch (no topic
-        # first), and the dialogue variant carries the authored picks.
+        # first), and the choice list over the stage carries the authored
+        # picks once the greeting is read.
         host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
         activate_overview_chip(page, "target-%s" % host_identity)
         _press(page, "Enter")  # 交談 -> explore.talk_open
         self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
-        # The dialogue variant shows the host's authored greeting and picks.
+        # The window pages the host's authored greeting; the choice list
+        # appears once it is read.
         greeting = _shipped_greeting()
         wait_for_store_state(
             page,
             lambda s: _connected_active(s) and greeting in narrative_log_text(page),
         )
+        open_dialogue_choices(page)
         self.assertGreater(
-            page.locator('[data-testid="dialogue-pick"]').count(),
+            page.locator('[data-anchor="choices"] [data-testid="dialogue-pick"]').count(),
             0,
             "the opened conversation must present the authored picks",
         )
@@ -152,7 +156,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             1,
             "the conversation opened with the dock back at the overview",
         )
-        # The first pick then sends the scripted keyword for the host.
+        # The first pick then sends the scripted keyword for the host (the
+        # list holds focus and owns the digits).
         _press(page, "1")
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
         wait_for_store_state(
@@ -235,9 +240,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the overview is the dock's current frame",
         )
 
-        # ✕ 結束對話 ends the live session through the sole writer.
+        # ✕ 結束對話 (the choice list's last row, once the greeting is read)
+        # ends the live session through the sole writer.
+        open_dialogue_choices(page)
         self.assertEqual(
-            page.locator('[data-testid="dialogue-exit"] .t').inner_text(),
+            page.locator('[data-testid="dialogue-exit"] .dialogue-choices__label').inner_text(),
             "結束對話",
         )
         result_before_exit = (
@@ -265,9 +272,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         交談 collapses the command region (the dock stays mounted, hidden),
         the message window spans the 300px band under the host's name plate,
         the host stands in `actor-right` lit while the player is dimmed, a
-        pick lights the player until its reply commits, `/` then Escape
-        returns focus to the first dialogue row, and 結束對話 brings the dock
-        back at the overview with focus on it.
+        pick from the choice list lights the player until its reply commits,
+        `/` then Escape returns focus to the dialogue's focus home (the choice
+        list once the reply is read), and 結束對話 brings the dock back at the
+        overview with focus on it.
         """
         page = self.logged_in_page((1920, 1080))
         install_outbound_recorder(page)
@@ -310,7 +318,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 host: box('[data-anchor="actor-right"]'),
                 player: box('[data-anchor="actor-left"]'),
                 plate: (document.querySelector('[data-testid="message-name-plate"]') || {}).textContent || null,
-                activeIsFirstRow: active === document.querySelector('[data-testid="message-dialogue"] .pick'),
+                activeInConversation:
+                  active === document.querySelector('[data-testid="message-page"]') ||
+                  active === document.querySelector('[data-anchor="choices"] [data-testid="dialogue-choices"]'),
                 activeIsBody: active === document.body,
               };
             }"""
@@ -334,7 +344,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertAlmostEqual(1920 - geometry["host"]["right"], 1920 * 0.06, delta=1)
         self.assertAlmostEqual(geometry["host"]["height"], geometry["player"]["height"], delta=1)
         self.assertTrue(geometry["plate"])
-        self.assertTrue(geometry["activeIsFirstRow"], "entering dialogue focuses the first row")
+        self.assertTrue(
+            geometry["activeInConversation"],
+            "entering dialogue focuses the message page, or the choice list once the greeting is read",
+        )
         self.assertFalse(geometry["activeIsBody"])
 
         # A pick lights the player until its reply commits: record every
@@ -348,6 +361,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             }"""
         )
         result_before_pick = (store_state(page).get("lastActionResult") or {}).get("requestId")
+        open_dialogue_choices(page)
         _press(page, "1", wait_ms=0)
         wait_for_store_state(
             page,
@@ -360,15 +374,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIn("true", trail, "the player must be lit while the pick is in flight")
         self.assertEqual(trail[-1], "false", "the host speaks again once the reply commits")
 
-        # `/` opens the command line; Escape returns to the window's first row.
+        # `/` opens the command line; Escape returns to the choice list once
+        # the reply is read.
+        open_dialogue_choices(page)
         _press(page, "/")
         self.assertEqual(page.evaluate("() => document.activeElement && document.activeElement.id"), "inputfield")
         _press(page, "Escape", wait_ms=150)
         self.assertTrue(
             page.evaluate(
-                "() => document.activeElement === document.querySelector('[data-testid=\"message-dialogue\"] .pick')"
+                "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
             ),
-            "Escape in dialogue must land on the first dialogue row",
+            "Escape in dialogue must land on the shown choice list",
         )
 
         # 結束對話 brings the dock back at the overview, focused, not remounted.
@@ -398,25 +414,27 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(store_state(page)["dockSource"], "exploration.root")
 
     @covers_requirement(
-        "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel"
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
     )
-    def test_dialogue_surface_is_the_caption_and_the_dock_collapses(self):
+    def test_dialogue_choices_sit_over_the_stage_and_the_dock_collapses(self):
         # The leave-requirement annotation (delta id
         # webclient-dialogue-session::explore-dialogue-leave-ends-the-live-session-through-the-sole-writer)
         # is added at delta sync — the traceability gate only recognizes
         # main-spec ids during the change window.
-        """webclient-align-11-dialogue-ux / webclient-dialogue-stage-actors:
-        entering dialogue keeps the (collapsed, hidden) dock in its ordinary
-        exploration form (no 對話選項 mirror tab); the caption's scripted pick
-        dispatches by digit; the caption's exit row ends the session and the
-        committed snapshot restores exploration."""
+        """webclient-align-11-dialogue-ux / webclient-dialogue-stage-actors /
+        webclient-dialogue-choices-overlay: entering dialogue keeps the
+        (collapsed, hidden) dock in its ordinary exploration form (no 對話選項
+        mirror tab); the window pages the greeting and holds no row; the
+        choice list over the stage appears once it is read, its scripted pick
+        dispatches by digit, its exit row ends the session, and the committed
+        snapshot restores exploration."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
         # Enter dialogue through the ordinary dock affordance path: 交談
         # dispatches explore.talk_open and the committed dialogue panel
-        # presents the caption. The dispatch settles when its action result
+        # opens the conversation. The dispatch settles when its action result
         # lands — the panel's (already-true) availability would race the
         # in-flight lock and silently drop the next input.
         result_before = (store_state(page).get("lastActionResult") or {}).get("requestId")
@@ -454,26 +472,28 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "dialogue mode renders the overview, not a tab bar",
         )
 
-        # The message window presents the dialogue variant (pick grid and
-        # trailing exit row) with the dialogue box pinned inside the text area.
-        page.wait_for_selector('[data-testid="dialogue-exit"]')
+        # The message window pages the greeting (no reply box, no row); the
+        # choice list renders over the stage, outside the band, once the
+        # greeting is read.
+        open_dialogue_choices(page)
         dom_shape = page.evaluate(
             """() => {
               const win = document.querySelector('[data-testid="message-window"]');
-              const dlgScroll = document.querySelector('[data-testid="message-dialogue"]');
-              const box = document.querySelector('[data-testid="dialogue-box"]');
-              const scrollRect = dlgScroll ? dlgScroll.getBoundingClientRect() : null;
-              const boxRect = box ? box.getBoundingClientRect() : null;
               return {
-                variantIsDialogue: !!win && win.getAttribute("data-variant") === "dialogue",
-                boxInsideTextArea: !!scrollRect && !!boxRect && boxRect.top >= scrollRect.top - 1 && boxRect.top < scrollRect.bottom,
-                picks: document.querySelectorAll('[data-testid="dialogue-pick"]').length,
+                variant: win && win.getAttribute("data-variant"),
+                rowsInWindow: win.querySelectorAll('[data-testid^="dialogue-"]').length,
+                boxes: document.querySelectorAll('[data-testid="dialogue-box"], [data-testid="message-dialogue"]').length,
+                picks: document.querySelectorAll('[data-anchor="choices"] [data-testid="dialogue-pick"]').length,
+                listFocused: document.activeElement === document.querySelector('[data-testid="dialogue-choices"]'),
               };
             }"""
         )
-        self.assertTrue(dom_shape["variantIsDialogue"])
-        self.assertTrue(dom_shape["boxInsideTextArea"])
+        self.assertEqual(dom_shape["variant"], "paged")
+        # Only the plate's bond segment carries a dialogue-* hook in the window.
+        self.assertLessEqual(dom_shape["rowsInWindow"], 1)
+        self.assertEqual(dom_shape["boxes"], 0)
         self.assertGreater(dom_shape["picks"], 0)
+        self.assertTrue(dom_shape["listFocused"])
 
         # The dock is back at the overview in that commit: the popover that
         # carried 交談 closed with it (webclient-talk-open-dock).
@@ -487,8 +507,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the conversation opened with the dock back at the overview",
         )
 
-        # Digit activation addresses the caption pick, not the dock rows:
-        # the first scripted talk dispatches through the caption exactly once.
+        # Digit activation addresses the focused list's pick, not the dock
+        # rows: the first scripted talk dispatches exactly once.
         result_before_pick = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
@@ -502,7 +522,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
 
-        # The exit row dispatches the deterministic leave seam exactly once.
+        # The exit row dispatches the deterministic leave seam exactly once
+        # (the list returns once the reply is read).
+        open_dialogue_choices(page)
         result_before_exit = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
@@ -525,7 +547,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             lambda s: _connected_active(s)
             and "你結束了對話。" in narrative_log_text(page),
         )
-        # Back to the caption-free dock: no pick or exit row renders.
+        # Back to the dock: no choice list, pick, or exit row renders.
         self.assertEqual(
             page.locator('[data-testid="dialogue-exit"]').count(), 0
         )
@@ -540,6 +562,151 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             and p["current_node"] != fixture_home_node_id(),
         )
 
+    @covers_requirement(
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
+    )
+    @covers_requirement(
+        "webclient-browser-verification::browser-acceptance-covers-foundation-recovery-and-layout-behavior"
+    )
+    def test_dialogue_stage_journey_completes_by_keyboard(self):
+        """webclient-dialogue-choices-overlay: the keyboard-only journey at 1920x1080.
+
+        交談 from the scene overview opens the conversation; the greeting is
+        read with Enter and the choice list appears centred over the stage
+        (never while a page types or is unread) with focus on it; `1` sends a
+        pick; the reply is read; ⌨ 自由對話 borrows the command line and a line
+        is sent; ↦ 移動… swaps in the exits and Escape returns; ✕ 結束對話 ends
+        the conversation; an exit chip then moves. Throughout the
+        conversation the command region is collapsed, both stage actors
+        stand, and focus is never on the document body.
+        """
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        # Record, on every animation frame, whether the list ever showed
+        # beside a typing or unread page, and whether focus fell to the body
+        # during the conversation.
+        page.evaluate(
+            """() => {
+              window.__journey = { listWhileUnread: 0, bodyFocus: 0, collapsedBroken: 0, actorsMissing: 0 };
+              const tick = () => {
+                const stage = document.querySelector('[data-testid="elosern-stage"]');
+                if (stage && stage.getAttribute('data-elosern-mode') === 'dialogue') {
+                  const win = document.querySelector('[data-testid="message-window"]');
+                  const list = document.querySelector('[data-anchor="choices"] [data-testid="dialogue-choices"]');
+                  if (list && win && win.getAttribute('data-reading-complete') !== 'true') window.__journey.listWhileUnread += 1;
+                  if (list && win && win.getAttribute('data-typing') === 'true') window.__journey.listWhileUnread += 1;
+                  if (document.activeElement === document.body) window.__journey.bodyFocus += 1;
+                  const command = document.querySelector('[data-anchor="band-command"]');
+                  if (!command || getComputedStyle(command).display !== 'none') window.__journey.collapsedBroken += 1;
+                  if (document.querySelectorAll('[data-testid="stage-actor"]').length !== 2) window.__journey.actorsMissing += 1;
+                }
+                requestAnimationFrame(tick);
+              };
+              requestAnimationFrame(tick);
+            }"""
+        )
+
+        host = self._live_exploration_panel(page)["interact"][0]
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s)
+            and s.get("mode") == "dialogue"
+            and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        placement = page.evaluate(
+            """() => {
+              const box = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+              return {
+                card: box('[data-testid="dialogue-choices"]'),
+                band: box('[data-testid="stage-band"]'),
+                focused: document.activeElement === document.querySelector('[data-testid="dialogue-choices"]'),
+              };
+            }"""
+        )
+        self.assertTrue(placement["focused"], "the list takes focus when it appears over the read line")
+        self.assertAlmostEqual(
+            (placement["card"]["left"] + placement["card"]["right"]) / 2, 960, delta=1
+        )
+        self.assertLessEqual(placement["card"]["bottom"], placement["band"]["top"])
+
+        # `1`: the first pick, once.
+        _press(page, "1")
+        wait_for_store_state(page, lambda s: sent_action_count(page, "explore.talk_scripted") == 1 and s.get("dispatch", {}).get("inFlight") is None)
+        open_dialogue_choices(page)
+
+        # ⌨ 自由對話: End, ArrowUp twice lands on it (…, ⌨, ↦, ✕).
+        _press(page, "End")
+        _press(page, "ArrowUp")
+        _press(page, "ArrowUp")
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": "#inputfield",
+                "predicate": "() => document.activeElement === document.getElementById('inputfield')",
+                "description": "the borrowed command field is focused",
+            },
+        )
+        page.keyboard.type("你好")
+        page.keyboard.press("Enter")
+        wait_for_store_state(page, lambda s: sent_action_count(page, "explore.talk_freeform") == 1 and s.get("dispatch", {}).get("inFlight") is None)
+        open_dialogue_choices(page)
+
+        # ↦ 移動…: the exits swap in; Escape returns with ↦ active.
+        _press(page, "End")
+        _press(page, "ArrowUp")
+        _press(page, "Enter")
+        page.wait_for_selector('[data-testid="dialogue-choices"][data-view="exits"]')
+        self.assertGreater(page.locator('[data-testid="dialogue-exit-row"]').count(), 0)
+        _press(page, "Escape")
+        page.wait_for_selector('[data-testid="dialogue-choices"][data-view="choices"]')
+        self.assertEqual(
+            page.evaluate(
+                "() => document.getElementById(document.querySelector('[data-testid=\"dialogue-choices\"]').getAttribute('aria-activedescendant')).dataset.testid"
+            ),
+            "dialogue-move",
+        )
+
+        # ✕ 結束對話: the last row.
+        _press(page, "End")
+        _press(page, "Enter")
+        wait_for_store_state(page, lambda s: s.get("mode") == "exploration" and s.get("dispatch", {}).get("inFlight") is None)
+        page.wait_for_timeout(150)
+        journey = page.evaluate("() => window.__journey")
+        self.assertEqual(journey["listWhileUnread"], 0, "the list never shows beside unread text")
+        self.assertEqual(journey["bodyFocus"], 0, "focus never drops to the body during the conversation")
+        self.assertEqual(journey["collapsedBroken"], 0, "the command region stays collapsed")
+        self.assertEqual(journey["actorsMissing"], 0, "both stage actors stand throughout")
+        self.assertTrue(
+            page.evaluate("() => { const d = document.getElementById('action-dock'); return document.activeElement === d || d.contains(document.activeElement); }"),
+            "leaving the conversation returns focus to the dock",
+        )
+
+        # An exit chip moves from the restored overview.
+        activate_first_overview_exit(page)
+        wait_for_store_state(page, lambda s: sent_action_count(page, "explore.move") == 1)
+        sent = [
+            args[0].get("action_id") if args and isinstance(args[0], dict) else None
+            for cmd, args, _kw in outbound_messages(page)
+            if cmd == "ui_action"
+        ]
+        self.assertEqual(
+            [a for a in sent if a],
+            [
+                "explore.talk_open",
+                "explore.talk_scripted",
+                "explore.talk_freeform",
+                "explore.dialogue_leave",
+                "explore.move",
+            ],
+        )
+
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_freeform_dialogue_degrades_offline_through_the_command_line(self):
         page = self.logged_in_page()
@@ -547,7 +714,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # The overview's 人物 chip for the bard opens its verb popover; 交談
-        # opens the conversation, whose caption carries the free row.
+        # opens the conversation, whose choice list carries the free row.
         bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "Enter")  # 交談 -> explore.talk_open
@@ -555,7 +722,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         result_before_free = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
-        # The dialogue variant's free row borrows the command line.
+        # The choice list's free row borrows the command line.
+        open_dialogue_choices(page)
         page.click('[data-testid="dialogue-freeform"]')
         wait_for_store_state(
             page,
@@ -582,7 +750,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
 
     @covers_requirement(
-        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
+        "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_cancelled_freeform_dialogue_cannot_capture_a_later_command(self):
         page = self.logged_in_page()
@@ -591,11 +759,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # Open free-form dialogue but cancel with Escape without sending.
         # The overview's 人物 chip for the bard opens its verb popover; 交談
-        # opens the conversation, whose caption carries the free row.
+        # opens the conversation, whose choice list carries the free row.
         bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "Enter")  # 交談 -> explore.talk_open
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        open_dialogue_choices(page)
         page.click('[data-testid="dialogue-freeform"]')
         wait_for_store_state(
             page,
@@ -621,12 +790,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "() => { const a = document.querySelector('[data-anchor=\"command-line\"]'); "
                     "const d = document.querySelector('[data-testid=\"command-line\"]'); "
                     "const collapsed = !!a && a.getAttribute('data-expanded') === 'false' && !!d; "
-                    "const first = document.querySelector('[data-testid=\"message-dialogue\"] .pick'); "
-                    "return collapsed && !!first && document.activeElement === first; }"
+                    "const list = document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]'); "
+                    "return collapsed && !!list && document.activeElement === list; }"
                 ),
-                # webclient-dialogue-stage-actors: in dialogue the focus home
-                # is the message window's first row, never the hidden dock.
-                "description": "command line collapsed and the first dialogue row focused",
+                # webclient-dialogue-choices-overlay: in dialogue the focus
+                # home is the shown choice list, never the hidden dock.
+                "description": "command line collapsed and the choice list focused",
             },
         )
 
