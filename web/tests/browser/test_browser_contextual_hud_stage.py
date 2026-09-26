@@ -39,8 +39,8 @@ def _selectable_target(identity: int, name: str) -> dict:
     target = _interact_target(identity, name)
     target["affordances"] = [{
         "kind": "action",
-        "action_id": "explore.talk_freeform",
-        "label": "自由對話",
+        "action_id": "explore.talk_open",
+        "label": "交談",
         "enabled": True,
         "disabled_reason": None,
     }]

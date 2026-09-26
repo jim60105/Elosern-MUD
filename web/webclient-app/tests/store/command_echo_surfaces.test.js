@@ -434,6 +434,19 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "talk 店長 公會",
     },
     {
+      id: "exploration popover 交談 (row descriptor forwarded)",
+      ids: ["explore.talk_open"],
+      prepare() {
+        openExploration();
+        store.dispatchAction(
+          "explore.talk_open",
+          { npc_id: 7 },
+          { npcLabel: "店長" },
+        );
+      },
+      expected: "talk 店長",
+    },
+    {
       id: "free-form speech intent (central fill from the exploration panel)",
       ids: ["explore.talk_freeform"],
       prepare() {

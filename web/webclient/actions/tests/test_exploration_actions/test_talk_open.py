@@ -45,11 +45,6 @@ _T_GREETINGLESS_ROW = DialogueDefinition(
     responses=(KeywordResponse("話題", "「……」"),),
 )
 
-_TALK_OPEN_REQUIREMENT = (
-    "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
-)
-
-
 class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         # One dialogue scope: the kit lodgekeeper row plus the greetingless row.
@@ -74,7 +69,9 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # ------------------------------------------------------------------
     # Success paths
     # ------------------------------------------------------------------
-    @covers_requirement(_TALK_OPEN_REQUIREMENT)
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_scripted_host_opens_with_its_greeting(self):
         host = self._scripted_host()
         greeting = greeting_for(host)
@@ -92,7 +89,9 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session.npc_id, int(host.pk))
 
-    @covers_requirement(_TALK_OPEN_REQUIREMENT)
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_llmnpc_without_a_component_opens_with_the_fallback_line(self):
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.room1)
         result = _talk_open_adapter(self.player, {"npc_id": int(npc.pk)})
@@ -101,7 +100,9 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["message"], fallback)
         self.assertEqual(self.player.db.dialogue_session["line"], fallback)
 
-    @covers_requirement(_TALK_OPEN_REQUIREMENT)
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_scripted_host_without_a_greeting_opens_with_the_fallback_line(self):
         host = self._scripted_host(key="無招呼者", dialogue_key=_T_GREETINGLESS_KEY)
         self.assertIsNone(greeting_for(host))
@@ -111,7 +112,9 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["message"], fallback)
         self.assertEqual(self.player.db.dialogue_session["line"], fallback)
 
-    @covers_requirement(_TALK_OPEN_REQUIREMENT)
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_open_replaces_a_session_naming_another_host(self):
         first = self._scripted_host(key="第一位", dialogue_key=_T_GREETINGLESS_KEY)
         second = create_object(LLMNPC, key="第二位", location=self.room1)
@@ -170,7 +173,9 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # ------------------------------------------------------------------
     # Side-effect freedom
     # ------------------------------------------------------------------
-    @covers_requirement(_TALK_OPEN_REQUIREMENT)
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_a_successful_open_touches_nothing_but_the_session(self):
         host = self._scripted_host()
         tick_before = int(get_world_clock().tick)

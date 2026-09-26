@@ -154,11 +154,10 @@ const renderPlayer = (args) => ({
           exploration: protocolFixtures.explorationPanel({
             interact: [
               { identity: 7, display_name: "店長", portrait_ref: null, affordances: [
-                { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
-                { kind: "action", action_id: "explore.talk_freeform", label: "自由對話", enabled: true, disabled_reason: null },
+                { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
               ] },
               { identity: 8, display_name: "守衛", portrait_ref: null, affordances: [
-                { kind: "action", action_id: "explore.talk_scripted", label: "詢問城門", enabled: true, disabled_reason: null },
+                { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
               ] },
             ],
           }),

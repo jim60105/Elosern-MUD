@@ -140,7 +140,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -490,5 +490,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The rebuilt dock derives from server-persisted state and no dialogue
         # or mutation is automatically replayed.
         self.assertEqual(sent_action_count(page, "explore.move"), 0)
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)

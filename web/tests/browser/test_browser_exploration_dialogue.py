@@ -111,6 +111,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             and "她看著你的眼神裡帶著信賴。" in narrative_log_text(page),
         )
 
+    @covers_requirement("webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting")
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_scripted_keyword_dialogue_completes(self):
         page = self.logged_in_page()
@@ -118,25 +119,27 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # The overview's 人物 chip for the scripted host opens its verb
-        # popover; 交談 opens the keyword frame.
+        # popover; 交談 opens the conversation in one dispatch (no topic
+        # first), and the dialogue variant carries the authored picks.
         host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
         activate_overview_chip(page, "target-%s" % host_identity)
-        _press(page, "Enter")  # 交談 (scripted affordance)
-        _press(page, "Enter")  # first keyword
-        self._wait_panel(
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        # The dialogue variant shows the host's authored greeting and picks.
+        greeting = _shipped_greeting()
+        wait_for_store_state(
             page,
-            "exploration",
-            lambda p: p.get("available") is True,
+            lambda s: _connected_active(s) and greeting in narrative_log_text(page),
         )
-        sent = page.evaluate("window.__elosernSent || []")
-        talk = [
-            args[0]
-            for cmd, args, _kw in sent
-            if cmd == "ui_action" and args[0]["action_id"] == "explore.talk_scripted"
-        ]
-        self.assertEqual(len(talk), 1)
-        self.assertIn("keyword_id", talk[0]["payload"])
-        self.assertIn("npc_id", talk[0]["payload"])
+        self.assertGreater(
+            page.locator('[data-testid="dialogue-pick"]').count(),
+            0,
+            "the opened conversation must present the authored picks",
+        )
+        # The first pick then sends the scripted keyword for the host.
+        _press(page, "1")
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
         wait_for_store_state(
             page,
             lambda s: _connected_active(s)
@@ -159,17 +162,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Enter dialogue through the ordinary dock affordance path: the
-        # affordance opens the keywords frame, and the first scripted pick
-        # still rides the dock (the caption retarget only exists once the
-        # panel commits). The dispatch settles when its action result lands
-        # — the panel's (already-true) availability would race the in-flight
-        # lock and silently drop the next input.
+        # Enter dialogue through the ordinary dock affordance path: 交談
+        # dispatches explore.talk_open and the committed dialogue panel
+        # presents the caption. The dispatch settles when its action result
+        # lands — the panel's (already-true) availability would race the
+        # in-flight lock and silently drop the next input.
         result_before = (store_state(page).get("lastActionResult") or {}).get("requestId")
         host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
         activate_overview_chip(page, "target-%s" % host_identity)
-        _press(page, "Enter")  # 交談 (scripted affordance -> keywords frame)
-        _press(page, "Enter")  # first scripted keyword -> talk_scripted
+        _press(page, "Enter")  # 交談 -> explore.talk_open
         wait_for_store_state(
             page,
             lambda state: (
@@ -177,7 +178,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 not in (None, result_before)
             ),
         )
-        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
         self._wait_panel(
             page, "dialogue", lambda p: p.get("available") is True
         )
@@ -219,9 +220,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(dom_shape["boxInsideTextArea"])
         self.assertGreater(dom_shape["picks"], 0)
 
-        # Digit activation addresses the caption pick, not the dock rows.
-        # A digit now addresses the caption's pick grid, NOT the dock rows:
-        # a second scripted talk dispatches through the caption exactly once.
+        # Digit activation addresses the caption pick, not the dock rows:
+        # the first scripted talk dispatches through the caption exactly once.
         result_before_pick = (
             store_state(page).get("lastActionResult") or {}
         ).get("requestId")
@@ -233,7 +233,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 not in (None, result_before_pick)
             ),
         )
-        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 2)
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
 
         # The exit row dispatches the deterministic leave seam exactly once.
         result_before_exit = (
@@ -279,12 +279,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 chip for the bard opens its verb popover; its
-        # rows are a vertical list (the target's affordances in payload order).
-        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # opens the conversation, whose caption carries the free row.
+        bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
-        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
-        _press(page, "Enter")
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        result_before_free = (
+            store_state(page).get("lastActionResult") or {}
+        ).get("requestId")
+        # The dialogue variant's free row borrows the command line.
+        page.click('[data-testid="dialogue-freeform"]')
         wait_for_store_state(
             page,
             _connected_active,
@@ -300,19 +305,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         page.keyboard.type("你好，詩人")
         page.keyboard.press("Enter")
-        self._wait_panel(
-            page,
-            "exploration",
-            lambda p: p.get("available") is True,
-        )
-        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
-        # Offline degrade reaches the authored greeting/silence.
-        greeting = _shipped_greeting()
         wait_for_store_state(
             page,
-            lambda s: _connected_active(s)
-            and greeting in narrative_log_text(page),
+            lambda state: (
+                (state.get("lastActionResult") or {}).get("requestId")
+                not in (None, result_before_free)
+            ),
         )
+        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
 
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control"
@@ -323,11 +323,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Open free-form dialogue but cancel with Escape without sending.
-        # The overview's 人物 chip for the bard opens its verb popover.
-        bard = overview_target_with_affordance(page, "explore.talk_freeform")
+        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # opens the conversation, whose caption carries the free row.
+        bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
-        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
-        _press(page, "Enter")
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        page.click('[data-testid="dialogue-freeform"]')
         wait_for_store_state(
             page,
             _connected_active,

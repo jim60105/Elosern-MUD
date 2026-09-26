@@ -14,7 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from typeclasses.components import GuildStaff, ScriptedDialogue
-from typeclasses.npcs import NPC
+from typeclasses.npcs import LLMNPC, NPC
 from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
@@ -23,18 +23,26 @@ from world.rules.dialogue import (
     dialogue_response,
     greeting_for,
     is_dialogue_host,
+    opens_dialogue,
     resolve_dialogue_component,
     run_scripted_talk,
 )
+from world.rules.player_messages import dialogue_open_fallback_line
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
     live_dialogue_table,
     synthetic_branch_key,
 )
+from world.tests.synthetic_data import SYNTH_DIALOGUE
 
 # The staff component carries an opaque synthetic branch identity; the
 # turnin path never resolves it against any registry, so the kit branch key
 # stands in for the former shipped branch token.
 SYNTH_BRANCH = synthetic_branch_key()
+
+# The kit-authored dialogue row key (test-data-independence: the predicate is
+# exercised against the synthetic table, never shipped prose).
+SYNTH_DIALOGUE_KEY = next(iter(SYNTH_DIALOGUE))
 
 
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -266,6 +274,53 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
             "guild merit",
         ):
             self.assertIn(command, combined)
+
+
+class OpensDialoguePredicateTests(EvenniaTest):
+    """The conversable-host gate and the fixed opening line (avg-stage §8.1).
+
+    One predicate decides who can open a conversation: the ``explore.talk_open``
+    adapter commits through it and the exploration panel renders its 交談 row
+    from it, so the affordance and the action agree.
+    """
+
+    def setUp(self):
+        super().setUp()
+        open_synthetic_scope(self, "dialogue")
+        self.player = create_object(NPC, key="gate-probe")
+
+    def _scripted_host(self, dialogue_key: str = SYNTH_DIALOGUE_KEY) -> NPC:
+        host = create_object(NPC, key="synthetic-host")
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=dialogue_key))
+        return host
+
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
+    def test_a_scripted_host_with_a_table_row_opens_dialogue(self):
+        host = self._scripted_host()
+        self.assertTrue(is_dialogue_host(host))
+        self.assertTrue(opens_dialogue(host))
+
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
+    def test_an_llmnpc_without_a_component_opens_dialogue(self):
+        bard = create_object(LLMNPC, key="synthetic-bard")
+        self.assertFalse(is_dialogue_host(bard))
+        self.assertTrue(opens_dialogue(bard))
+
+    def test_a_component_host_without_a_table_row_does_not_open_dialogue(self):
+        host = self._scripted_host(dialogue_key="t_synth_absent_table")
+        self.assertTrue(is_dialogue_host(host))
+        self.assertFalse(opens_dialogue(host))
+
+    def test_a_plain_npc_does_not_open_dialogue(self):
+        plain = create_object(NPC, key="plain-probe")
+        self.assertFalse(opens_dialogue(plain))
+
+    def test_the_fallback_line_names_the_host(self):
+        self.assertEqual(dialogue_open_fallback_line("甲"), "甲看向你，等你開口。")
 
 
 class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):

@@ -113,7 +113,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -244,15 +244,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's host chip -> the verb popover -> 交談 (scripted
-        # keywords): two levels deep (webclient-scene-overview-swap).
+        # The overview's host chip -> the verb popover: two levels deep
+        # (webclient-scene-overview-swap). 交談 dispatches explore.talk_open
+        # from the popover itself, so the popover is the deepest frame.
         panel = self._live_exploration_panel(page)
         host_identity = panel["interact"][0]["identity"]
         activate_overview_chip(page, "target-%s" % host_identity)
-        _press(page, "Enter")  # 交談 (first affordance)
-        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 3)
-        _press(page, "Escape")  # back to the target's verb popover
-        page.wait_for_timeout(80)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
         # H3 (design D2): at depth >= 2 the dock renders both the root tab
         # bar (8 root tabs) and the scrolling pane (the active frame's rows).
@@ -262,21 +259,21 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "'[data-testid=\"verb-popover\"] [data-item-key]'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
-        # The host's verb popover: the scripted-talk entry plus 查看 and the
-        # final back cell (the exploration fixture carries no guild navigate
-        # entry). The card renders in the dock's overlay layer, over the
-        # inert overview (webclient-scene-overview-swap).
+        # The host's verb popover: the 交談 conversation entry plus 查看 and
+        # the final back cell (the exploration fixture carries no guild
+        # navigate entry). The card renders in the dock's overlay layer, over
+        # the inert overview (webclient-scene-overview-swap).
         self.assertEqual(
             target_keys,
-            ["talk-scripted", "look-target", "back"],
-            "the popover's cells must render after one Escape",
+            ["talk-open", "look-target", "back"],
+            "the popover's cells must render at depth 2",
         )
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "talk-scripted",
+            "talk-open",
         )
         _press(page, "Escape")  # back to the scene overview
         page.wait_for_timeout(80)
