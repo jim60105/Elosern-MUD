@@ -7,7 +7,8 @@ parsing narrative prose. This module owns the rules side:
 
 - :func:`capture_round_hp` reads every roster participant's stored HP through
   the same ``stored_gauge_pair`` source the combat panel uses, so a beat's
-  ``hp_after`` is true stored HP (``disguised_stats`` is never consulted).
+  ``hp_after`` is true stored HP; the display-only disguise layer is never
+  consulted.
 - :class:`RoundRecord` freezes one settled round: its own ``EventLog``s, the
   roster-key → dbref identities, and each participant's stored HP before and
   after the round.
