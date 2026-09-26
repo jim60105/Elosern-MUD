@@ -31,6 +31,7 @@ from twisted.internet.defer import Deferred
 
 from web.webclient.actions.registry import ActionRegistry
 from world.observability import log_error, log_warn
+from world.rules.combat_beats import RoundRecord
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import (
@@ -365,7 +366,16 @@ def _publish_completion(
 
     outcome = value.get("outcome")
     affected = value.get("affected_panels")
-    context = build_presentation_context(session, actor)
+    # The completing action's frozen round record reaches ONLY this
+    # publication, and only when it really is one (combat-beats-panel D2): an
+    # adapter cannot smuggle an arbitrary object into a presenter's read
+    # context through the internal slot.
+    combat_round = value.get("combat_round")
+    context = build_presentation_context(
+        session,
+        actor,
+        combat_round=combat_round if isinstance(combat_round, RoundRecord) else None,
+    )
     # Result-only completion (namegen-creation-ui D10): an adapter that
     # declares ``no_presentation`` on a success/rejected outcome ships its
     # result without a snapshot or panel update. Every adapter already

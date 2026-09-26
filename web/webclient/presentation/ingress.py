@@ -278,7 +278,9 @@ def _build_proposal_snapshot(actor: Any, state: Any) -> ProposalSnapshot | None:
     )
 
 
-def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
+def build_presentation_context(
+    session: Any, actor: Any, *, combat_round: Any = None
+) -> PresentationContext:
     """The single factory every publication path builds its context through.
 
     Full-snapshot synchronization, the dispatcher's completion, internal-error,
@@ -292,6 +294,11 @@ def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
     derivation (``None`` when no situation can be derived — for example in
     combat, creation, or on a malformed actor — and never raising into the
     publication path). It never hands the raw session to a presenter.
+
+    ``combat_round`` is the completing combat action's frozen round record.
+    Only the dispatcher's completion publication passes it (combat-beats-panel
+    D2); every other caller leaves it ``None``, so the beats panel stays
+    unavailable outside the one publication that settled the round.
     """
     from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
 
@@ -302,6 +309,7 @@ def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
         options_fingerprint=_current_options_fingerprint(actor),
         proposal=proposal_snapshot(session, actor),
         gallery_subject=gallery_selection_snapshot(session, actor),
+        combat_round=combat_round,
     )
 
 

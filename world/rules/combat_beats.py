@@ -34,7 +34,6 @@ from typing import Any, Mapping
 
 from evennia.utils.ansi import strip_ansi
 
-from world.rules.action import stored_gauge_pair
 from world.rules.event_log import EventEntry, EventLog, render_entry_text
 
 
@@ -117,6 +116,11 @@ def capture_round_hp(battlefield: Any) -> tuple[dict[str, int], dict[int, int]]:
     stored HP to zero, which is the projection's own floor for a lethal
     overkill).
     """
+    # Function-local import (the ``combat_view`` precedent): the action package
+    # reaches the Evennia dice contrib, which is not importable while the
+    # input-function module is still being collected at startup.
+    from world.rules.action import stored_gauge_pair
+
     identities: dict[str, int] = {}
     hp: dict[int, int] = {}
     for key, entity in battlefield.roster.items():
