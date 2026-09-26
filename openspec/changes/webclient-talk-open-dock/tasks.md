@@ -61,7 +61,7 @@
 
 ## 5. Browser journeys
 
-- [ ] 5.1 `web/tests/browser/test_browser_exploration_dialogue.py` (implemented; the class run was still in flight when this run hit its request budget — confirm with `web.tests.browser.test_browser_exploration_dialogue`):
+- [x] 5.1 `web/tests/browser/test_browser_exploration_dialogue.py` (class run: 6 of 7 pass, including the new `test_talk_open_enters_the_dialogue_in_one_step` and both dock-at-overview assertions; the one failure is the known pre-existing `test_look_at_scripted_host_shows_the_affinity_stage_line`, entity- vs target-chip premise, left untouched):
   - `test_scripted_keyword_dialogue_completes` and `test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary`: after 交談, assert that the dock is back at the overview (`router.depth()` is 1) before digit `1` sends `explore.talk_scripted`.
   - Add `test_talk_open_enters_the_dialogue_in_one_step`, a keyboard-only journey at 1920x1080 annotated `webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly` and `webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting`. One Enter on 交談 sends one `explore.talk_open` and no `explore.talk_scripted`. The next commit has mode `dialogue` and a `dialogue` panel whose line is the greeting, `router.depth()` is 1, and `✕ 結束對話` sends `explore.dialogue_leave`.
 - [x] 5.2 `test_browser_services_base.py`: fix the `_open_surface` docstring (no per-keyword talk rows). `test_browser_contextual_hud_dock.py`: drop any nav-row or affordance-pane assertion (`dock-menu__nav`, `dock-menu__aff`). `git grep -n "exploration\.keywords\|dock-menu__nav\|dock-menu__aff\|talk-scripted\|talk-freeform\|自由交談" web/tests/browser` returns nothing.
@@ -83,6 +83,11 @@
 - [x] 7.5 Run `openspec validate webclient-talk-open-dock --strict` and `git diff --check`. Both must be clean.
 
 ## 8. Notes from the apply run
+
+- Verification run: `uv run --locked python -m web.tests.browser.unittest_driver
+  web.tests.browser.test_browser_exploration_dialogue` -> Ran 7 tests, 1 failure
+  (the known pre-existing affinity-line case). The dock-at-overview assertion after
+  交談 passes in the browser, which confirms the store-level D1 finding end to end.
 
 - Task 2.2/4.2 (design D1) were revised: the reset the design asked for already exists
   (the mode-change teardown), verified by stubbing it out. No second rule was added.
