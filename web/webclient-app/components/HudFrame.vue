@@ -359,8 +359,8 @@ defineExpose({ menuOpen });
 
 /* The open-surface registry (design D9): when a drawer or overlay is open
    the stage is visually recessed; the mark clears only when nothing is
-   open. The transition is token-gated, so prefers-reduced-motion disables
-   it at the token level while the recessed state still applies. */
+   open. The transition is token-gated, so the motion level's `reduced` and
+   `off` blocks resolve it to 0ms while the recessed state still applies. */
 .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
 .elosern-stage[data-menu-open="true"] .stage-band {
   filter: var(--menu-open-filter);

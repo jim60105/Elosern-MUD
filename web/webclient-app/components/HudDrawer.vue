@@ -10,9 +10,9 @@
 // surface laid over the stage, not a region of it. The head / body / foot
 // are one column and the body is the drawer's only scrolling region. The
 // enter/leave is a horizontal slide over a blurred scrim, both expressed
-// through the `--motion-*` / `--ease-*` tokens so `prefers-reduced-motion`
-// disables the transition at the token level while the open state still
-// applies. At most one drawer is open at a time (structural: the store
+// through the `--motion-*` / `--ease-*` tokens so the motion level's
+// `reduced` and `off` blocks resolve the transition to 0ms while the open
+// state still applies. At most one drawer is open at a time (structural: the store
 // publishes a single `view.hudDrawer` name). Focus is trapped while open;
 // Escape / the close control / the scrim each close and restore focus to
 // the control that opened it.

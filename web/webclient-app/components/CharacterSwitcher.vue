@@ -328,7 +328,7 @@ onUnmounted(() => {
   cursor: pointer;
   max-width: 170px;
   height: 32px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .character-switcher__pill:hover:not(:disabled) {
@@ -435,7 +435,7 @@ onUnmounted(() => {
   font-size: 12px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
 }
 
 .character-switcher__row:hover:not(:disabled) {
@@ -523,7 +523,7 @@ onUnmounted(() => {
   color: var(--paper-300);
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
 }
 
 .character-switcher__create-btn:hover:not(:disabled) {

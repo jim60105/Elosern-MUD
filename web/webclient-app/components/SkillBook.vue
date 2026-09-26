@@ -456,7 +456,7 @@ function castText(row) {
 .skill-book__category-chevron {
   color: var(--paper-500);
   flex: none;
-  transition: transform 0.2s;
+  transition: transform var(--motion-fast);
 }
 
 details[open] > .skill-book__category-summary .skill-book__category-chevron {

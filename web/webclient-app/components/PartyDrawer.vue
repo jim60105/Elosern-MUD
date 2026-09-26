@@ -480,7 +480,7 @@ function onInviteCurrentNpc() {
   height: 100%;
   background: var(--vit-hp);
   border-radius: 99px;
-  transition: width var(--motion-base, 150ms) var(--ease-standard, ease);
+  transition: width var(--motion-base) var(--ease-standard);
 }
 
 .compbig .meta {

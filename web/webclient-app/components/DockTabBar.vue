@@ -165,7 +165,7 @@ function onTabClick(tab) {
   font-family: var(--f-sans);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: all var(--motion-fast);
 }
 
 .dock-tab-bar__tab:hover {
