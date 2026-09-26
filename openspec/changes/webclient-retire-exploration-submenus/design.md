@@ -13,6 +13,12 @@ See proposal.md (Why). The state after C8b (`webclient-scene-overview-swap`):
 - `DockBreadcrumb.vue` takes `focusedKey` only to draw `dock-crumb__back--focused` when the router focuses the outlet's non-rendered `back`.
 - `use-dock.js` `dockItems` normalizes `direction` / `destination` for the outlet.
 - The frameworks C8b left for tests: `test_browser_contextual_hud_dock.py` reaches the outlet by a direct `pushFrame({source: "exploration.move"})`, and `test_browser_exploration_tiles.py` pins the outlet grid.
+- `exploration.navigation` and its builder `ExplorationMenu.navigationItems` are LIVE, not part of the
+  dead path: the top navigation bar (角色狀態 / 任務 / 背包) resolves them as its sole
+  keyboard-visible entry set (C8b). Only the tab root that also consumed the builder is dead; the
+  builder, its resolver source, and the bar stay. `test_browser_exploration_frame.py` and
+  `test_browser_exploration_state.py` also mount the retired move frame by a direct push (they are not
+  named in the proposal's Impact list); they are re-pointed in the same change.
 
 ## Goals / Non-Goals
 

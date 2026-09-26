@@ -24,7 +24,7 @@
 
 ## 3. Components
 
-- [ ] 3.1 `web/webclient-app/components/DockMenu.vue`: delete the outlet pane, `outletRows`, `outletSpanCol`, the outlet grid-style branch, the outlet `aria-activedescendant` and detail clauses, and the `dock-exits.js` import. Update the header comment's pane-kind list. `web/webclient-app/components/dock-panes.js`: delete the `outlet` kind and the `interact` / `suggestions` badge branches, and update the comments. Delete the stale outlet comment in `web/webclient-app/styles/app-shell.css` (near line 227) and any outlet rule.
+- [ ] 3.1 `web/webclient-app/components/DockMenu.vue`: delete the outlet pane, `outletRows`, `outletSpanCol`, the outlet grid-style branch, the outlet `aria-activedescendant` and detail clauses, and the `dock-exits.js` import. Update the header comment's pane-kind list. `web/webclient-app/components/dock-panes.js`: delete the `outlet` kind and the `interact` / `suggestions` badge branches, and update the comments. `web/webclient-app/styles/app-shell.css` carries no outlet rule and no outlet comment (a repo-wide case-sensitive search finds none), so there is nothing to delete there.
 - [ ] 3.2 `web/webclient-app/composables/use-dock.js`: drop the `direction` / `destination` normalization in the exploration branch of `dockItems`. `git grep -n "\.direction\|\.destination" web/webclient-app/components/DockMenu.vue` returns nothing.
 - [ ] 3.3 `web/webclient-app/components/DockBreadcrumb.vue`: delete `focusedKey` and `dock-crumb__back--focused` (design D4). `ActionDock.vue` stops passing it. `stories/Action/DockBreadcrumb.stories.js` drops a focused-back story or arg if present.
 - [ ] 3.4 `web/webclient-app/components/ActionDock.vue`: the legend reads `數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回`.
@@ -45,7 +45,7 @@
 
 ## 5. Browser
 
-- [ ] 5.1 `web/tests/browser/test_browser_exploration_tiles.py` (design D5): convert the narrow-viewport test to the overview chip-wrap test and split off the nav-pane case, then delete `test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport`. `test_browser_contextual_hud_dock.py`: replace the direct outlet push with overview assertions. `test_browser_shell_dock.py`: the legend text reads `1–9`. Remove outlet mentions in `test_browser_exploration_{dialogue,frame,nav}.py`. `git grep -n "outlet\|dock-crumb__back--focused" web/tests/browser` returns nothing.
+- [ ] 5.1 `web/tests/browser/test_browser_exploration_tiles.py` (design D5): convert the narrow-viewport test to the overview chip-wrap test and split off the nav-pane case, then delete `test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport`. `test_browser_contextual_hud_dock.py`: replace the direct outlet push with overview assertions. `test_browser_shell_dock.py`: the legend text reads `1–9`. Re-point the move-frame pushes in `test_browser_exploration_frame.py` and `test_browser_exploration_state.py` at the scene overview, and delete the now-unused `push_exploration_frame` helper in `browser_helpers.py`. Remove outlet mentions in `test_browser_exploration_{dialogue,frame,nav}.py`. `git grep -n "outlet\|dock-crumb__back--focused" web/tests/browser` returns nothing.
 
 ## 6. Specs and traceability
 

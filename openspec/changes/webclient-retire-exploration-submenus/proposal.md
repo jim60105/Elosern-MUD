@@ -12,6 +12,10 @@ After `webclient-scene-overview-swap` (C8b), the exploration root is the scene o
 
 Keeping them leaves contracts no player can reach (the outlet grid rules, the move frame's single-column geometry) and tests that exercise only themselves.
 
+`exploration.navigation` and `ExplorationMenu.navigationItems` are NOT part of that dead path: the top
+navigation bar reads them as its sole keyboard-visible entry set (C8b), so the builder and its resolver
+source stay while the tab root that also consumed them is deleted.
+
 The design (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` §7) also binds digits 1–9 to the first nine chips in reading order. Today only 1–4 are bound. This change widens the digit rule for every dock frame and for the dialogue picks, and updates the legend in the same change, as the legend requirement demands. The project is unreleased, so the dead path is deleted, not kept for compatibility.
 
 **Implementation profile:** logic — dead-code deletion and digit-binding widening; tests define done.
@@ -81,5 +85,6 @@ Out of scope:
   - Node: `web/static/webclient/js/tests/exploration_menu.test.js`, `hud_dock_menus.test.js`
   - Vitest: `web/webclient-app/tests/frame-resolvers.test.js`, `tests/components/dock_panes.test.js`, `tests/store/digit_row_picks.test.js`, `tests/action/action_dock.test.js`, `tests/action/dock_menu_panes.test.js`
   - Browser: `web/tests/browser/test_browser_exploration_tiles.py`, `test_browser_contextual_hud_dock.py`, `test_browser_shell_dock.py`, and the outlet mentions in `test_browser_exploration_{dialogue,frame,nav}.py`
+  - Browser (the two files the first draft missed): `web/tests/browser/test_browser_exploration_frame.py` and `test_browser_exploration_state.py` mount the retired move frame by a direct push too, so their framework is re-pointed at the scene overview; `browser_helpers.py`'s `push_exploration_frame` helper is deleted with its last caller.
 - Spec traceability: `webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel` (`test_browser_exploration_tiles.py`) re-anchors to `…::a-fixed-column-dock-pane-sizes-its-columns-to-content` for the nav-pane test, and to `webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview` for the chip-wrap test.
 - Dependencies: archive order C7 → C8a → C8b (`webclient-scene-overview-swap`) → C8c (this change). The legend, pointer-activation, and direct-children blocks are written on C8b's text.
