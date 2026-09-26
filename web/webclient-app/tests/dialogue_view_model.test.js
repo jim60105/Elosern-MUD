@@ -12,7 +12,7 @@ import {
 
 function availablePanel(overrides = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "dialogue",
     host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
@@ -48,6 +48,18 @@ describe("dialogue view model", () => {
     expect(vm.bondStage).toBeNull();
   });
 
+  it("carries the host's server-authored catalog key through verbatim", () => {
+    // The client never constructs a catalog key: the panel's opaque key rides
+    // into the stage's portrait lookup unchanged, and null stays null.
+    const vm = dialogueViewModel(
+      availablePanel({
+        host: { identity: 41, display_name: "灰婆婆", portrait_ref: "41" },
+      }),
+    );
+    expect(vm.host.portraitRef).toBe("41");
+    expect(dialogueViewModel(availablePanel()).host.portraitRef).toBeNull();
+  });
+
   it("builds the trailing free-dialogue row on the same host identity", () => {
     const vm = dialogueViewModel(availablePanel());
     expect(vm.freeRow).toEqual({
@@ -62,7 +74,7 @@ describe("dialogue view model", () => {
 
   it("yields null for the unavailable, absent, or foreign-kind forms", () => {
     expect(
-      dialogueViewModel({ schema_version: 1, available: false, kind: "dialogue", reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } }),
+      dialogueViewModel({ schema_version: 2, available: false, kind: "dialogue", reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } }),
     ).toBeNull();
     expect(dialogueViewModel(null)).toBeNull();
     expect(dialogueViewModel(undefined)).toBeNull();

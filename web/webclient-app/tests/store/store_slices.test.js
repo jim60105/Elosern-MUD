@@ -54,7 +54,7 @@ describe("store view slices", () => {
   it("accepts a dialogue-mode snapshot and commits the dialogue panel", () => {
     openActiveSession(store);
     const dialoguePanel = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "dialogue",
       host: { identity: 41, display_name: "公會職員", portrait_ref: null },

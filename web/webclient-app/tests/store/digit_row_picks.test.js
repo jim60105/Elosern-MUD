@@ -301,7 +301,7 @@ describe("dock digit row picks (1–9)", () => {
             exploration: fx.explorationPanel(),
             local_map: fx.localMapPanel(),
             dialogue: {
-              schema_version: 1,
+              schema_version: 2,
               available: true,
               kind: "dialogue",
               host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },

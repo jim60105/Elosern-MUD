@@ -17,7 +17,7 @@ import { createFrameResolver } from "../stores/frame-resolvers.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 const DIALOGUE_PANEL = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   kind: "dialogue",
   host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
@@ -32,7 +32,7 @@ const DIALOGUE_PANEL = {
 };
 
 const UNAVAILABLE_PANEL = {
-  schema_version: 1,
+  schema_version: 2,
   available: false,
   reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" },
 };

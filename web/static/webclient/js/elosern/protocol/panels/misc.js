@@ -224,12 +224,15 @@ function validateObjectivesPanel(payload) {
 }
 
 // Dialogue panel validator (mirror of web.webclient.presentation.dialogue,
-// webclient-align-10). Available form is exactly schema_version, available,
-// kind, host (party-row triple with a null portrait_ref), bond_stage (a
-// stage NAME or null — never a number), a bounded line, and at most
-// DIALOGUE_MAX_CHOICES unique {keyword_id, label} rows. Every string
+// webclient-align-10; schema version 2 adds the host's opaque art catalog
+// key — dialogue-panel-host-portrait). Available form is exactly
+// schema_version, available, kind, host (party-row triple whose portrait_ref
+// is a nullable decimal catalog key, the combat participant vocabulary),
+// bond_stage (a stage NAME or null — never a number), a bounded line, and at
+// most DIALOGUE_MAX_CHOICES unique {keyword_id, label} rows. Every string
 // rejects lone surrogates exactly like the Python validator; over-bound or
-// corrupt values reject, never truncate.
+// corrupt values reject, never truncate. The client never constructs a
+// catalog key: it looks the server-authored one up in the committed art panel.
 function validateDialoguePanel(payload) {
   requireExactFields(
     payload,
@@ -262,8 +265,15 @@ function validateDialoguePanel(payload) {
   if (!hostName.trim() || hasLoneSurrogate(hostName)) {
     throw new Error("host display_name must be non-empty");
   }
-  if (payload.host.portrait_ref !== null) {
-    throw new Error("portrait_ref must be null in this schema version");
+  // Same rule, bound, and messages as a combat participant's portrait_ref.
+  var hostPortraitRef = payload.host.portrait_ref;
+  if (hostPortraitRef !== null) {
+    if (typeof hostPortraitRef !== "string" || !/^[0-9]+$/.test(hostPortraitRef)) {
+      throw new Error("portrait_ref must be an opaque decimal catalog key or null");
+    }
+    if (hostPortraitRef.length > 32) {
+      throw new Error("portrait_ref exceeds its bound");
+    }
   }
   if (payload.bond_stage !== null) {
     var bondStage = requireString(

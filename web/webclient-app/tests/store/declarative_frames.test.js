@@ -87,7 +87,7 @@ function roomChange(revision, identity) {
 // opened.
 function dialoguePanel() {
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "dialogue",
     host: { identity: 7, display_name: "店長", portrait_ref: null },

@@ -197,7 +197,7 @@ const renderPlayer = (args) => ({
             lock_reason: null,
           },
           ...(args.dialogue ? { dialogue: {
-            schema_version: 1, available: true, kind: "dialogue",
+            schema_version: 2, available: true, kind: "dialogue",
             host: { identity: 7, display_name: "店長", portrait_ref: null },
             bond_stage: "熟識",
             line: "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。",

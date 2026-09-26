@@ -1,4 +1,4 @@
-"""Tests for the version-1 ``dialogue`` presentation panel (webclient-align-10).
+"""Tests for the version-2 ``dialogue`` presentation panel (webclient-align-10).
 
 Presenter shape (party-row host vocabulary, canonical bond-stage NAME or null,
 table-order keyword choices, the recorded line), registered unavailable forms
@@ -13,6 +13,7 @@ establishing tests (landed with the change's spec-sync commit).
 from copy import deepcopy
 from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 from tools.spec_traceability import covers_requirement
 
@@ -23,18 +24,21 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.monsters import Monster
-from typeclasses.npcs import NPC
+from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.dispatcher import handle_ui_action
 from web.webclient.actions.exploration_actions import _engage_adapter
 from web.webclient.actions.registry import build_production_action_registry
+from web.webclient.presentation import dialogue as dialogue_module
 from web.webclient.presentation import watchers
 from web.webclient.presentation.affordances import _scripted_keyword_descriptors
+from web.webclient.presentation.combat_panel import MAX_PARTICIPANT_REF
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.dialogue import (
     DIALOGUE_MAX_CHOICES,
     DIALOGUE_SCHEMA_VERSION,
+    MAX_DIALOGUE_PORTRAIT_REF,
     DialoguePanelError,
     dialogue_presenter,
     validate_dialogue,
@@ -45,6 +49,11 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.affinity import AffinitySource, apply_affinity_change
+from world.rules.art_view import (
+    MAX_PORTRAIT_CATALOG,
+    ArtViewError,
+    portrait_catalog_key,
+)
 from world.rules.combat_session import engage, is_in_active_session
 from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
@@ -162,7 +171,7 @@ class DialoguePresenterTests(EvenniaTest):
         return self.registry.render("dialogue", self.context)
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_available_form_is_exact_vocabulary_for_a_bonded_host(self):
         apply_affinity_change(
@@ -184,7 +193,9 @@ class DialoguePresenterTests(EvenniaTest):
             {
                 "identity": int(self.host.pk),
                 "display_name": npc_display_name(self.host),
-                "portrait_ref": None,
+                # The host is a present dialogue host, so it is in the art view
+                # the catalog is keyed from and the panel ships its key.
+                "portrait_ref": portrait_catalog_key(self.host.pk),
             },
         )
         self.assertEqual(payload["bond_stage"], self.host.relations.stage_for(self.player).name)
@@ -201,6 +212,90 @@ class DialoguePresenterTests(EvenniaTest):
         # truncation itself is proven against an over-cap synthetic row below.
         # The raw affinity number never rides the wire.
         self.assertNotIn(affinity_value, payload.values())
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_host_portrait_reference_matches_the_art_catalog(self):
+        # One registry and one context, so the dialogue key is checked against
+        # the catalog the ``art`` panel actually commits beside it — never
+        # against a key the client would have to construct.
+        open_or_refresh_dialogue(self.player, self.host, "任務板在右側。")
+        dialogue = self._render()
+        art = self.registry.render("art", self.context)
+        self.assertIs(art["available"], True)
+        portrait_ref = dialogue["host"]["portrait_ref"]
+        self.assertEqual(portrait_ref, portrait_catalog_key(self.host.pk))
+        self.assertIn(portrait_ref, art["portrait_catalog"])
+        entry = art["portrait_catalog"][portrait_ref]
+        self.assertEqual(entry["context"]["name"], npc_display_name(self.host))
+        # Membership, never resolution success, gates the key: the entry behind
+        # it is the placeholder card while the portrait is unresolved, and the
+        # panel ships the key anyway.
+        self.assertIsNone(entry["url"])
+        self.assertIsNotNone(entry["placeholder"])
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_generative_host_outside_the_art_view_carries_a_null_reference(self):
+        # An LLMNPC is conversable (explore.talk_open accepts it) but carries
+        # no dialogue component and no named portrait policy, so the art view
+        # the key is drawn from excludes it: the panel stays available and says
+        # null instead of shipping a key the committed catalog lacks.
+        bard = create_object(LLMNPC, key="吟遊詩人", location=self.room)
+        open_or_refresh_dialogue(self.player, bard, "唱首歌吧。")
+        payload = self._render()
+        self.assertIs(payload["available"], True)
+        self.assertEqual(payload["host"]["identity"], int(bard.pk))
+        self.assertIsNone(payload["host"]["portrait_ref"])
+        art = self.registry.render("art", self.context)
+        self.assertNotIn(portrait_catalog_key(bard.pk), art["portrait_catalog"])
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_catalog_cap_drop_carries_a_null_reference(self):
+        # design.md's named risk: the art view keeps the first
+        # MAX_PORTRAIT_CATALOG eligible entities by identity, so a present host
+        # past the cap is absent from the committed catalog and the panel must
+        # agree with it rather than advertise a key that is not there.
+        crowded = create_object(Room, key="擁擠的大廳")
+        self.player.location = crowded
+        fillers = [
+            _host(crowded, key=f"職員{index}")
+            for index in range(MAX_PORTRAIT_CATALOG)
+        ]
+        host = _host(crowded, key="最後的職員")
+        open_or_refresh_dialogue(self.player, host, "歡迎。")
+
+        payload = self._render()
+        self.assertIs(payload["available"], True)
+        self.assertIsNone(payload["host"]["portrait_ref"])
+        catalog = self.registry.render("art", self.context)["portrait_catalog"]
+        self.assertEqual(len(catalog), MAX_PORTRAIT_CATALOG)
+        self.assertIn(portrait_catalog_key(fillers[-1].pk), catalog)
+        self.assertNotIn(portrait_catalog_key(host.pk), catalog)
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_unbuildable_art_view_carries_a_null_reference(self):
+        # A combat actor with no session record is the reachable ArtViewError:
+        # the presenter catches it, ships null, and keeps the panel available.
+        # The handler is pinned by a mock because that raise site is reachable
+        # only through a combat branch this presenter's own gates preclude; the
+        # mock keeps the degrade path honest if art_view grows another raise.
+        open_or_refresh_dialogue(self.player, self.host, "歡迎。")
+        with mock.patch.object(
+            dialogue_module,
+            "build_art_view",
+            side_effect=ArtViewError("no active combat session"),
+        ):
+            payload = self._render()
+        self.assertIs(payload["available"], True)
+        self.assertEqual(payload["host"]["identity"], int(self.host.pk))
+        self.assertIsNone(payload["host"]["portrait_ref"])
 
     def test_unbonded_host_discloses_a_null_stage(self):
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
@@ -272,8 +367,16 @@ class DialoguePresenterTests(EvenniaTest):
         stored_before = deepcopy(self.player.db.dialogue_session)
         affinity_before = self.host.relations.affinity_for(self.player)
 
-        first = self._render()
-        second = self._render()
+        # The catalog read the portrait reference comes from is part of the
+        # read-only claim: it runs on every render and writes nothing.
+        with mock.patch.object(
+            dialogue_module,
+            "build_art_view",
+            wraps=dialogue_module.build_art_view,
+        ) as build_art_view:
+            first = self._render()
+            second = self._render()
+        self.assertEqual(build_art_view.call_count, 2)
         self.assertEqual(first, second)
         self.assertEqual(self.player.db.dialogue_session, stored_before)
         self.assertEqual(self.host.relations.affinity_for(self.player), affinity_before)
@@ -314,9 +417,35 @@ class DialogueValidatorTests(unittest.TestCase):
             validate_dialogue(_available(bond_stage=None))["bond_stage"], None
         )
         self.assertEqual(validate_dialogue(_available(choices=[]))["choices"], [])
+        # The host's opaque catalog key rides the combat participant's wire
+        # vocabulary and passes through unchanged: the validator gates, it
+        # never normalizes the key the presenter emitted.
+        keyed = _available(
+            host={"identity": 41, "display_name": "公會職員", "portrait_ref": "42"}
+        )
+        self.assertEqual(validate_dialogue(keyed), keyed)
         # Paired astral code points are legal text.
         self.assertEqual(validate_dialogue(_available(line="歡迎\U0001F600。"))["line"], "歡迎\U0001F600。")
 
+    def test_portrait_reference_bound_matches_the_combat_participant_bound(self):
+        self.assertEqual(MAX_DIALOGUE_PORTRAIT_REF, MAX_PARTICIPANT_REF)
+        at_bound = "1" * MAX_DIALOGUE_PORTRAIT_REF
+        self.assertEqual(
+            validate_dialogue(
+                _available(
+                    host={
+                        "identity": 41,
+                        "display_name": "公會職員",
+                        "portrait_ref": at_bound,
+                    }
+                )
+            )["host"]["portrait_ref"],
+            at_bound,
+        )
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
     def test_drift_rejects(self):
         bad_payloads = [
             # unknown top-level field
@@ -324,13 +453,22 @@ class DialogueValidatorTests(unittest.TestCase):
             # missing top-level field
             {k: v for k, v in _available().items() if k != "choices"},
             # schema drift
-            _available(schema_version=2),
+            _available(schema_version=1),
+            _available(schema_version=3),
             # the unavailable form is the registry's, not the validator's
             dict(UNAVAILABLE_PAYLOAD),
             _available(available=False),
             _available(kind="party"),
-            # host vocabulary drift
-            _available(host={"identity": 1, "display_name": "a", "portrait_ref": "42"}),
+            # host vocabulary drift (the combat participant portrait rule)
+            _available(host={"identity": 1, "display_name": "a", "portrait_ref": 42}),
+            _available(host={"identity": 1, "display_name": "a", "portrait_ref": "4a"}),
+            _available(
+                host={
+                    "identity": 1,
+                    "display_name": "a",
+                    "portrait_ref": "1" * (MAX_DIALOGUE_PORTRAIT_REF + 1),
+                }
+            ),
             _available(host={"identity": 0, "display_name": "a", "portrait_ref": None}),
             _available(host={"identity": 1, "display_name": " ", "portrait_ref": None}),
             {
@@ -494,6 +632,14 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
             _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+        )
+        # End-to-end: the portrait reference the wire carries is a key of the
+        # art catalog committed in the same envelope (design §8.2 — the client
+        # looks the key up and never constructs one).
+        self.assertIs(committed["panels"]["art"]["available"], True)
+        self.assertIn(
+            committed["panels"]["dialogue"]["host"]["portrait_ref"],
+            committed["panels"]["art"]["portrait_catalog"],
         )
         # The exploration panel keeps shipping its ordinary available payload —
         # dialogue mode does not blank it (the talk's +1 affinity may flip

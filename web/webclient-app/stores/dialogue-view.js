@@ -10,7 +10,10 @@
 // falls back (plain narrative, the shared degradation marker). Values are
 // verbatim from the panel; the row shape below reuses the exploration rows'
 // `{key, label, enabled, actionId, payload}` contract so activation routes
-// through the same dispatch path.
+// through the same dispatch path. `host.portraitRef` is the server-authored
+// art portrait-catalog key of the host or null (dialogue panel v2): it is an
+// opaque lookup key into the committed `art` panel, never a key this module
+// or any consumer builds from the host identity.
 
 export const DIALOGUE_FREE_ROW_KEY = "dlg-free";
 

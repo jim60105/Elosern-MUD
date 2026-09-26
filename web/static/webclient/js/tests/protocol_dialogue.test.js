@@ -1,5 +1,5 @@
 /*
- * dialogue panel v1 mirror: choices, panels, rejections.
+ * dialogue panel v2 mirror: choices, panels, rejections.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -25,7 +25,7 @@ function validDialogueChoice(overrides) {
 function validDialoguePanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "dialogue",
       host: { identity: 41, display_name: "公會職員", portrait_ref: null },
@@ -41,6 +41,23 @@ test("dialogue available form validates and empty choices and null stage are leg
   assert.deepEqual(Protocol.validateDialoguePanel(validDialoguePanel()), validDialoguePanel());
   assert.equal(Protocol.validateDialoguePanel(validDialoguePanel({ choices: [] })).choices.length, 0);
   assert.equal(Protocol.validateDialoguePanel(validDialoguePanel({ bond_stage: null })).bond_stage, null);
+  // The host's opaque catalog key rides the combat participant vocabulary and
+  // passes through unchanged: the validator gates, it never rewrites the key
+  // the server authored.
+  const keyed = validDialoguePanel({
+    host: { identity: 41, display_name: "公會職員", portrait_ref: "42" },
+  });
+  assert.deepEqual(Protocol.validateDialoguePanel(keyed), keyed);
+  // The shared bound is 32 digits: admitted exactly at it.
+  const atBound = "1".repeat(32);
+  assert.equal(
+    Protocol.validateDialoguePanel(
+      validDialoguePanel({
+        host: { identity: 41, display_name: "公會職員", portrait_ref: atBound },
+      })
+    ).host.portrait_ref,
+    atBound
+  );
   // Paired astral code points are legal text on both mirrors.
   assert.doesNotThrow(() =>
     Protocol.validateDialoguePanel(validDialoguePanel({ line: "歡迎\u{1F600}。" }))
@@ -51,7 +68,7 @@ test("dialogue validator mirrors the server drift rejections", () => {
   for (const bad of [
     // prototype-named own keys from JSON.parse must read as unknown fields
     JSON.parse(
-      '{"schema_version":1,"available":true,"kind":"dialogue","host":{"identity":41,"display_name":"a","portrait_ref":null},"bond_stage":"友","line":"嗯","choices":[],"__proto__":{}}'
+      '{"schema_version":2,"available":true,"kind":"dialogue","host":{"identity":41,"display_name":"a","portrait_ref":null},"bond_stage":"友","line":"嗯","choices":[],"__proto__":{}}'
     ),
     validDialoguePanel({ extra: 1 }),
     (() => {
@@ -59,13 +76,18 @@ test("dialogue validator mirrors the server drift rejections", () => {
       delete missing.choices;
       return missing;
     })(),
-    validDialoguePanel({ schema_version: 2 }),
+    validDialoguePanel({ schema_version: 1 }),
+    validDialoguePanel({ schema_version: 3 }),
     // the unavailable form belongs to the registry, not this validator
-    { schema_version: 1, available: false },
+    { schema_version: 2, available: false },
     validDialoguePanel({ available: false }),
     validDialoguePanel({ kind: "party" }),
-    // host vocabulary drift
-    validDialoguePanel({ host: { identity: 41, display_name: "a", portrait_ref: "42" } }),
+    // host portrait_ref vocabulary drift (the combat participant rule)
+    validDialoguePanel({ host: { identity: 41, display_name: "a", portrait_ref: 42 } }),
+    validDialoguePanel({ host: { identity: 41, display_name: "a", portrait_ref: "4a" } }),
+    validDialoguePanel({
+      host: { identity: 41, display_name: "a", portrait_ref: "1".repeat(33) },
+    }),
     validDialoguePanel({ host: { identity: 0, display_name: "a", portrait_ref: null } }),
     validDialoguePanel({ host: { identity: 41, display_name: "  ", portrait_ref: null } }),
     validDialoguePanel({
@@ -100,14 +122,14 @@ test("dialogue validator mirrors the server drift rejections", () => {
 });
 
 test("dialogue is in the production panel allowlist with dialogue mode accepted", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
     revision: 5,
     mode: "dialogue",
     panels: {
-      dialogue: { schema_version: 1, available: true, kind: "dialogue" },
+      dialogue: { schema_version: 2, available: true, kind: "dialogue" },
     },
     layout_version: 1,
     server_time: serverTime(),
@@ -118,7 +140,7 @@ test("dialogue is in the production panel allowlist with dialogue mode accepted"
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
   envelope.panels = {
     dialogue: {
-      schema_version: 1,
+      schema_version: 2,
       available: false,
       reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" },
     },

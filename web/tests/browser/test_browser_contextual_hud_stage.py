@@ -815,7 +815,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 "exploration": exploration,
                 "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
                 "dialogue": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "available": True,
                     "kind": "dialogue",
                     "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
@@ -975,7 +975,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             {
                 **explore_panels,
                 "dialogue": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "available": True,
                     "kind": "dialogue",
                     "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
