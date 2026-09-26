@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): outlet/navigation tile geometry inside the pane at narrow viewports.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): the scene overview's chip wrapping and the fixed-column nav pane's track sizing at narrow viewports.
 """
 
 from __future__ import annotations
@@ -6,22 +6,45 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    activate_overview_chip,
-    focus_action_dock,
     install_outbound_recorder,
-    outbound_messages,
-    push_exploration_frame,
     sent_action_count,
+    valid_local_map_panel,
     store_state,
     wait_for_store_state,
+)
+from ._journey_support import (
+    _exploration_panel,
+    _move_row,
+    _exploration_context_actions_panel,
+    _inject_snapshot,
+    _wait_mode,
+    _press,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
 from . import fixtures
 
 
-def _press(page, key, wait_ms=80):
-    page.keyboard.press(key)
-    page.wait_for_timeout(wait_ms)
+def _keyword_target(identity: int, name: str, keywords: list) -> dict:
+    """One schema-valid interact target carrying the scripted-talk affordance.
+
+    The target's `keywords` are the rows the 交談 frame resolves (the
+    scripted-keyword list), so the frame is a real pushed nav pane.
+    """
+    return {
+        "identity": identity,
+        "display_name": name,
+        "portrait_ref": None,
+        "affordances": [
+            {
+                "kind": "action",
+                "action_id": "explore.talk_scripted",
+                "label": "交談",
+                "enabled": True,
+                "disabled_reason": None,
+            }
+        ],
+        "keywords": [{"keyword_id": key, "label": label} for key, label in keywords],
+    }
 
 
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -32,23 +55,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
-        runtime.env["ELOSERN_BROWSER_EXPLORATION"] = "1"
-        # Boot mode: SHIPPED catalogs (explicit override of the harness
-        # synthetic default, per the creation/action-feedback precedent).
-        # These journeys assert shipped fixture identity end to end and were
-        # never migrated to kit seams.
-        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
-
-        self.server = ManagedServer(runtime=runtime)
+        self.server = ManagedServer(runtime)
         self.server.start()
-        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
-        self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
-
-    def _live_exploration_panel(self, page):
-        # The panels mapping can be observed mid-snapshot-adoption without the
-        # exploration key; callers poll, so a missing panel reads as None.
-        return store_state(page)["panels"].get("exploration")
 
     def _wait_exploration_available(self, page, timeout=30000):
         def _exploration_available(state: dict) -> bool:
@@ -57,50 +66,145 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _exploration_available, timeout=timeout)
 
-    def _wait_panel(self, page, name, predicate, timeout=30000):
-        def _panel_ready(state: dict) -> bool:
-            panel = (state.get("panels") or {}).get(name)
-            return panel is not None and predicate(panel)
+    def _mount_overview(self, page, exploration: dict, suggestions: dict) -> None:
+        """Commit one synthetic exploration panel and settle on the overview."""
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel(suggestions),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
 
-        wait_for_store_state(page, _panel_ready, timeout=timeout)
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
+    def test_overview_chips_wrap_inside_the_pane_at_a_narrow_viewport(self):
+        """The scene overview's chips wrap by width inside the command region.
 
-    def _reset_root(self, page):
-        focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-        page.wait_for_timeout(60)
-
-    def _open_move_outlet(self, page):
-        """Mount the retired move-outlet frame by a direct push.
-
-        webclient-scene-overview-swap: the dock root is the scene overview, so
-        no keyboard or pointer path reaches the move submenu any more. Until
-        webclient-retire-exploration-submenus deletes the frame with its tests,
-        the outlet assertions mount it through the router's own push entry.
+        At the minimum supported viewport a room with many exits renders its
+        chips as wrapping rows inside the scrolling pane: no chip overflows the
+        pane horizontally, the reading order is unchanged, and the last chip is
+        reachable by scrolling (the dock pane is the single scrolling region).
         """
-        push_exploration_frame(page, "exploration.move")
-
-    @covers_requirement("webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel")
-    def test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport(self):
-        # fix-webclient-hud-dock-exploration-grid-width: at the minimum
-        # supported viewport the content-sized tracks must not overflow the
-        # pane, the fixed two-column keyboard mapping must hold, and the
-        # wait/rest (plain) pane must stay a non-grid block container.
         page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        def press_right_wait_focus(page: "Page") -> None:
-            # Press ArrowRight and wait until the store's committed focus key
-            # actually moves to the next cell (the second grid column of the
-            # same row under the fixed two-column geometry).
-            state = store_state(page)
-            focus_key_before = (state.get("focus") or {}).get("key")
-            _press(page, "ArrowRight")  # second grid column
-            wait_for_store_state(
-                page,
-                lambda s: (s.get("focus") or {}).get("key") not in (None, focus_key_before),
-                timeout=15000,
+        labels = ["北", "南", "東", "西", "東北", "西北", "東南", "西南", "上", "下", "櫃檯門", "後院小徑"]
+        exits = [
+            _move_row("e%d" % index, label, "room:%d" % (100 + index))
+            for index, label in enumerate(labels)
+        ]
+        self._mount_overview(
+            page,
+            _exploration_panel([], move_rows=exits),
+            {"status": "unavailable"},
+        )
+
+        pane = page.locator("#action-dock .action-dock__pane")
+        chips = page.locator("#action-dock .scene-chip")
+        # Twelve exit chips plus the footer's 查看房間 and 等待／休息 chips.
+        self.assertEqual(chips.count(), 14, "the overview renders one chip per entry")
+        pane_box = pane.bounding_box()
+        self.assertIsNotNone(pane_box, "the dock pane must be visible at 1280x720")
+
+        # The reading order is unchanged: the exits lead, the footer closes.
+        keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll('#action-dock .scene-chip'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
+        )
+        self.assertEqual(
+            keys,
+            ["exit-" + row["exit_ref"] for row in exits] + ["look-room", "wait"],
+            "the overview's chips keep their reading order",
+        )
+
+        # No chip overflows the pane horizontally, and the chips wrap into more
+        # than one row (the fixed 2-column grid is gone with the outlet).
+        tops = set()
+        for index in range(chips.count()):
+            box = chips.nth(index).bounding_box()
+            self.assertIsNotNone(box, "chip %d must have a bounding box" % index)
+            self.assertLessEqual(
+                box["x"] + box["width"],
+                pane_box["x"] + pane_box["width"] + 1,
+                "chip %d overflows the pane horizontally" % index,
             )
+            self.assertGreaterEqual(
+                box["x"], pane_box["x"] - 1, "chip %d starts left of the pane" % index
+            )
+            tops.add(round(box["y"]))
+        self.assertGreater(
+            len(tops), 1, "the chips must wrap into more than one row at 1280x720"
+        )
+
+        # The last chip is reachable by scrolling: focusing it (the real
+        # keyboard path) scrolls it into the pane's visible box.
+        last_key = "exit-" + exits[-1]["exit_ref"]
+        self.assertTrue(
+            page.evaluate(
+                "(key) => window.__elosernBridge.store.focusItemByKey(key)", last_key
+            ),
+            "the last exit chip must be focusable by its key",
+        )
+        page.wait_for_timeout(150)
+        last_box = chips.last.bounding_box()
+        self.assertIsNotNone(last_box, "the last chip must have a bounding box")
+        self.assertGreaterEqual(
+            last_box["top"],
+            pane_box["top"] - 1,
+            "the focused last chip must be scrolled into the pane",
+        )
+        self.assertLessEqual(
+            last_box["bottom"],
+            pane_box["bottom"] + 1,
+            "the focused last chip must be scrolled into the pane",
+        )
+        self.assertEqual(
+            sent_action_count(page), 0, "focusing a chip submits nothing"
+        )
+
+    @covers_requirement("webclient-contextual-hud::a-fixed-column-dock-pane-sizes-its-columns-to-content")
+    def test_fixed_column_nav_pane_sizes_its_tracks_to_content(self):
+        """The fixed-column nav pane sizes its tracks to content.
+
+        The scripted-keyword frame (the exploration family's remaining
+        fixed-column pane) keeps the two-column keyboard mapping while its
+        columns stay content-sized: no row stretches to half the pane, a long
+        spaceless label wraps inside its row, and nothing overflows the pane at
+        the minimum supported viewport.
+        """
+        page = self.logged_in_page((1280, 720))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        target = _keyword_target(
+            11,
+            "小販",
+            [("問路", "問路"), ("價錢", "價錢"), ("傳聞", "傳聞")],
+        )
+        self._mount_overview(
+            page,
+            _exploration_panel([target]),
+            {"status": "unavailable"},
+        )
+
+        # The person chip -> the verb popover -> 交談: the scripted-keyword
+        # frame, two levels deep (webclient-scene-overview-swap).
+        page.evaluate(
+            "() => window.__elosernBridge.store.focusItemByKey('target-11')"
+        )
+        page.keyboard.press("Enter")
+        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+        page.keyboard.press("Enter")  # 交談
+        page.wait_for_selector("#action-dock .dock-menu__nav", timeout=15000)
+        self.assertEqual(
+            page.evaluate("window.__elosernBridge.router.depth()"),
+            3,
+            "the scripted-keyword frame did not open",
+        )
 
         def assert_within_pane(item_selector: str, pane_selector: str) -> None:
             items = page.locator(item_selector)
@@ -126,15 +230,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     item_selector + " row " + str(i) + " starts left of the pane",
                 )
 
-        # A long, spaceless server-authored string (e.g. a destination name
-        # with no break opportunities) must wrap inside the capped tile/row
-        # instead of forcing the layout past the pane.
-        LONG_LABEL = "北岸大道之" * 8
-
         def assert_not_stretched(item_selector: str, pane_selector: str) -> None:
-            # The original visual regression: tiles/rows stretched to fill
-            # half the panel (~450px at the 1280x720 viewport). Content-sized
-            # tiles/rows must render well below the half-pane width.
+            # The original visual regression: rows stretched to fill half the
+            # panel (~450px at the 1280x720 viewport). Content-sized rows must
+            # render well below the half-pane width.
             items = page.locator(item_selector)
             pane_box = page.locator(pane_selector).bounding_box()
             self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
@@ -144,38 +243,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 self.assertLess(
                     box["width"],
                     pane_half,
-                    item_selector + " row " + str(i) + " must be content-sized, not stretched to half the pane",
+                    item_selector
+                    + " row "
+                    + str(i)
+                    + " must be content-sized, not stretched to half the pane",
                 )
 
-        def assert_tiles_fill_pane(item_selector: str, pane_selector: str) -> None:
-            # The outlet grid is width-adaptive (auto-fit): the tiles stretch
-            # with their 1fr tracks, so the first tile's left edge aligns
-            # with the pane's left edge and the last tile's right edge with
-            # the pane's right edge (the 8px gaps count as occupied space).
-            items = page.locator(item_selector)
-            self.assertGreater(items.count(), 0, item_selector + " must render at least one tile")
-            pane_box = page.locator(pane_selector).bounding_box()
-            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
-            first_box = items.first.bounding_box()
-            last_box = items.last.bounding_box()
-            self.assertIsNotNone(first_box, "the first tile must have a bounding box")
-            self.assertIsNotNone(last_box, "the last tile must have a bounding box")
-            self.assertLessEqual(
-                abs(first_box["x"] - pane_box["x"]),
-                1,
-                "the first tile must start at the pane's left edge",
-            )
-            self.assertLessEqual(
-                abs((last_box["x"] + last_box["width"]) - (pane_box["x"] + pane_box["width"])),
-                2,
-                "the last tile must end at the pane's right edge",
-            )
-
         def assert_long_label_wraps(item_selector: str, pane_selector: str, label_selector: str) -> None:
-            # Override the label text with a long spaceless string and assert
-            # it wraps (scrollWidth <= clientWidth, no horizontal scroll) and
-            # the item stays within the pane's width (the max-width + min-width: 0
-            # + overflow-wrap: break-word safety net).
+            # Override the label text with a long spaceless string and assert it
+            # wraps (scrollWidth <= clientWidth, no horizontal scroll) and the
+            # row stays within the pane's width.
             items = page.locator(item_selector)
             pane_box = page.locator(pane_selector).bounding_box()
             self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
@@ -183,187 +260,41 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             for i in range(items.count()):
                 el = items.nth(i)
                 el.locator(label_selector).evaluate(
-                    "(el, t) => { el.textContent = t; }", LONG_LABEL
+                    "(el, t) => { el.textContent = t; }", "北岸大道之" * 8
                 )
                 page.wait_for_timeout(50)
                 metrics = el.evaluate("el => ({ sw: el.scrollWidth, cw: el.clientWidth })")
                 self.assertLessEqual(
                     metrics["sw"],
                     metrics["cw"] + 1,
-                    item_selector + " row " + str(i) + ": long spaceless label must wrap (scrollWidth <= clientWidth)",
+                    item_selector
+                    + " row "
+                    + str(i)
+                    + ": long spaceless label must wrap (scrollWidth <= clientWidth)",
                 )
                 box = el.bounding_box()
                 self.assertLessEqual(
                     box["x"] + box["width"],
                     pane_right_edge + 1,
-                    item_selector + " row " + str(i) + " (long label) overflows the pane horizontally",
+                    item_selector + " row " + str(i) + " (long label) overflows the pane",
                 )
 
-        # Move: the exit tiles stretch with their tracks and fill the
-        # pane's full width — no blank space on the right.
-        self._open_move_outlet(page)  # Move
-        assert_within_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
-        assert_tiles_fill_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
-        assert_long_label_wraps(".dock-menu__outlet-tile", ".dock-menu__outlet", "b")
-        # The move frame navigates as a single-column list: ArrowRight is a
-        # no-op (focus stays on the current item), ArrowDown cycles the
-        # exit rows then the `back` row.
-        _state = store_state(page)
-        _focus_key_before = (_state.get("focus") or {}).get("key")
+        assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_long_label_wraps(
+            ".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text"
+        )
+
+        # The fixed two-column keyboard mapping still holds: ArrowRight moves
+        # focus onto the second cell of the row (the second keyword).
+        state = store_state(page)
+        self.assertEqual((state.get("focus") or {}).get("key"), "kw-問路")
         _press(page, "ArrowRight")
-        page.wait_for_timeout(80)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("focus") or {}).get("key") == "kw-價錢",
+            timeout=15000,
+        )
         self.assertEqual(
-            (store_state(page).get("focus") or {}).get("key"),
-            _focus_key_before,
-            "ArrowRight is a no-op in the move frame (single-column list geometry)",
+            sent_action_count(page), 0, "arrow-key navigation submits nothing"
         )
-        _press(page, "ArrowDown")
-        page.wait_for_timeout(80)
-        _state = store_state(page)
-        _move = ((_state.get("panels") or {}).get("exploration") or {}).get("move") or []
-        _move_keys = ["exit-" + str(m.get("exit_ref")) for m in _move] + ["back"]
-        self.assertEqual(
-            (_state.get("focus") or {}).get("key"),
-            _move_keys[1] if len(_move_keys) > 1 else "back",
-            "ArrowDown moves focus to the second item (the next exit or the back row)",
-        )
-        # Cycle focus onto the `back` row: the breadcrumb's back control must
-        # carry the focused presentation (fill + ring, not color alone), and
-        # Enter on it pops exactly one level back to the root. From the first
-        # exit row, `len(_move) - 1` more ArrowDown presses reach the back
-        # row (the last item of the move list).
-        for _ in range(len(_move) - 1):
-            _press(page, "ArrowDown")
-        page.wait_for_timeout(80)
-        _state = store_state(page)
-        self.assertEqual(
-            (_state.get("focus") or {}).get("key"),
-            "back",
-            "ArrowDown cycles focus onto the back row",
-        )
-        _back_btn = page.locator(".dock-crumb__back")
-        self.assertTrue(
-            "dock-crumb__back--focused" in (_back_btn.get_attribute("class") or ""),
-            "the breadcrumb back control must show the focused state",
-        )
-        _press(page, "Enter")
-        page.wait_for_timeout(80)
-        self.assertEqual(
-            page.evaluate("window.__elosernBridge.router.depth()"),
-            1,
-            "Enter on the back row must pop exactly one level",
-        )
-
-        # Look: the look rows stay within the nav pane; the keyboard column
-        # mapping is unchanged.
-        push_exploration_frame(page, "exploration.look")  # Look
-        assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
-        press_right_wait_focus(page)
-        _state = store_state(page)
-        _look = ((_state.get("panels") or {}).get("exploration") or {}).get("look") or {}
-        _look_keys = []
-        if _look.get("room"):
-            _look_keys.append("look-room")
-        for _e in _look.get("entities") or []:
-            _look_keys.append("entity-" + str(_e.get("identity")))
-        for _o in _look.get("objects") or []:
-            _look_keys.append("object-" + str(_o.get("identity")))
-        _look_keys.append("back")
-        self.assertEqual(
-            (_state.get("focus") or {}).get("key"),
-            _look_keys[1] if len(_look_keys) > 1 else "back",
-            "ArrowRight must move focus to the second grid column",
-        )
-        _press(page, "Escape")
-        page.wait_for_timeout(80)
-
-        # Interact: same width and keyboard-mapping checks for the target rows.
-        push_exploration_frame(page, "exploration.interact")  # Interact
-        assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
-        assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
-        press_right_wait_focus(page)
-        _state = store_state(page)
-        _interact = ((_state.get("panels") or {}).get("exploration") or {}).get("interact") or []
-        _interact_keys = ["target-" + str(t.get("identity")) for t in _interact] + ["back"]
-        self.assertEqual(
-            (_state.get("focus") or {}).get("key"),
-            _interact_keys[1] if len(_interact_keys) > 1 else "back",
-            "ArrowRight must move focus to the second grid column",
-        )
-        _press(page, "Escape")
-        page.wait_for_timeout(80)
-
-        # Wait/rest (task 2.3 re-confirmation, re-cut by acd3790 /
-        # webclient-exploration-menu): the wait surface left the dock pane —
-        # opening the Wait tab renders the dedicated waiting screen (the
-        # dock pane is absent) with the three-operation card row, so the old
-        # `.dock-menu__plain` non-grid check has no dock surface left to
-        # observe. The equivalent narrow-viewport guarantee: the waiting
-        # screen's card row stays inside the stage bounds.
-        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
-        waiting = page.locator(".waiting-screen")
-        self.assertGreater(waiting.count(), 0, "the waiting screen owns the wait surface")
-        # The three-operation frame: dawn / sleep / 休息 N 小時 cards.
-        self.assertGreaterEqual(
-            page.locator(".waiting-card").count(),
-            3,
-            "the waiting screen renders the three-operation card row",
-        )
-
-    def test_outlet_last_row_never_leaves_blank_space_at_a_narrower_viewport(self):
-        # fix-webclient-hud-dock-exploration-grid-width: at 1280x720 the
-        # outlet pane lives in the bottom band's command region (the band's
-        # right third, webclient-avg-stage-shell design D5), roughly 400px
-        # wide, so it holds two content-sized columns. The invariant is that the
-        # last row never leaves blank horizontal space: a partial last row
-        # must span the remaining columns via an inline grid-column style,
-        # and a row the shipped exit count fills exactly must not span. The
-        # rendered column count and tile count drive which half applies, so
-        # the assertion tracks the shipped fixture topology (the south gate
-        # gained the wilderness exit since this test was written: the move
-        # frame is 4 exits, i.e. two full rows here) instead of pinning it.
-        page = self.logged_in_page((1280, 720))
-        install_outbound_recorder(page)
-        self._wait_exploration_available(page)
-        self._open_move_outlet(page)  # Move
-        pane_box = page.locator(".dock-menu__outlet").bounding_box()
-        self.assertIsNotNone(pane_box, "the outlet pane must be visible at 1280x720")
-        tiles = page.locator(".dock-menu__outlet-tile")
-        self.assertGreaterEqual(
-            tiles.count(), 3, "the move frame must render at least 3 exit tiles"
-        )
-        first_box = tiles.first.bounding_box()
-        last_box = tiles.last.bounding_box()
-        self.assertIsNotNone(first_box, "the first tile must have a bounding box")
-        self.assertIsNotNone(last_box, "the last tile must have a bounding box")
-        self.assertLessEqual(
-            abs(first_box["x"] - pane_box["x"]),
-            1,
-            "the first tile must start at the pane's left edge",
-        )
-        self.assertLessEqual(
-            abs((last_box["x"] + last_box["width"]) - (pane_box["x"] + pane_box["width"])),
-            2,
-            "the last row must end at the pane's right edge",
-        )
-        last_style = tiles.last.get_attribute("style") or ""
-        columns = page.evaluate(
-            """() => getComputedStyle(
-                document.querySelector('.dock-menu__outlet')
-            ).gridTemplateColumns.split(' ').length"""
-        )
-        if tiles.count() % columns:
-            self.assertIn(
-                "grid-column",
-                last_style,
-                "the partial-row tile must carry the inline span style",
-            )
-        else:
-            self.assertNotIn(
-                "grid-column",
-                last_style,
-                "a tile on a fully filled row must not carry the span style",
-            )

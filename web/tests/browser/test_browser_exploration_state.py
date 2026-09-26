@@ -9,10 +9,8 @@ from .browser_helpers import (
     activate_first_overview_exit,
     activate_overview_chip,
     fixture_home_node_id,
-    focus_action_dock,
     install_outbound_recorder,
     outbound_messages,
-    push_exploration_frame,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -65,21 +63,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             return panel is not None and predicate(panel)
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
-
-    def _reset_root(self, page):
-        focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-        page.wait_for_timeout(60)
-
-    def _open_move_outlet(self, page):
-        """Mount the retired move-outlet frame by a direct push.
-
-        webclient-scene-overview-swap: the dock root is the scene overview, so
-        no keyboard or pointer path reaches the move submenu any more. Until
-        webclient-retire-exploration-submenus deletes the frame with its tests,
-        the outlet assertions mount it through the router's own push entry.
-        """
-        push_exploration_frame(page, "exploration.move")
 
     @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-roots-at-the-scene-overview")
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
@@ -215,10 +198,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
         """Focus tracks the item KEY (webclient-declarative-frame-stack):
-        with the 移動 frame open, a commit that REORDERS the exits keeps the
-        focus on the same key at its new index, and a commit that drops the
-        focused exit lands focus on a surviving row — never on the frozen
-        copy's old row. Activation then submits the NEW committed payload."""
+        at the scene overview, a commit that REORDERS the exits keeps the focus
+        on the same key at its new index, and a commit that drops the focused
+        exit lands focus on a surviving row — never on the frozen copy's old
+        row. Activation then submits the NEW committed payload."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -228,8 +211,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   self._move_row("ex-c", "東門")])})
         self.assertTrue(accepted["accepted"], accepted)
 
-        self._open_move_outlet(page)  # the move frame opens at depth 2.
-        self.assertEqual(self._depth(page), 2)
+        # The exploration root is the scene overview, so the fabricated room's
+        # exit chips are the root frame's rendered rows.
+        self.assertEqual(self._depth(page), 1)
+        self.assertEqual(
+            page.evaluate(
+                "() => window.__elosernBridge.router.currentDescriptor().source"
+            ),
+            "exploration.root",
+        )
         self.assertTrue(
             page.evaluate("() => window.__elosernBridge.store.focusItemByKey('exit-ex-b')")
         )
@@ -258,7 +248,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ("exit-ex-c", "exit-ex-d"),
             "the lost-key fallback did not land on a surviving row",
         )
-        self.assertEqual(self._depth(page), 2, "the move frame did not stay open")
+        self.assertEqual(self._depth(page), 1, "the overview did not stay current")
 
         # Activating the focused row submits the NEW committed row's payload.
         self.assertTrue(

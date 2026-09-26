@@ -11,7 +11,6 @@ from .browser_helpers import (
     install_outbound_recorder,
     inject_snapshot,
     outbound_messages,
-    push_exploration_frame,
     sent_action_count,
     store_state,
     valid_character_panel,
@@ -352,10 +351,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
     )
-    def test_digit_keys_pick_the_first_four_rows_of_the_current_frame(self):
-        """`數字鍵 1–4` is real behaviour: a digit moves the dock focus onto
-        the Nth row of the current frame and runs it exactly like Enter; a
-        digit whose row does not exist is unclaimed (webclient-align-01)."""
+    def test_digit_keys_pick_the_rows_of_the_current_frame(self):
+        """`數字鍵 1–9` is real behaviour: a digit moves the dock focus onto
+        the Nth rendered entry of the current frame and runs it exactly like
+        Enter; a digit whose entry does not exist is unclaimed
+        (webclient-align-01, widened by webclient-retire-exploration-submenus).
+        """
         page = self.logged_in_page()
         install_outbound_recorder(page)
         exploration = _exploration_panel(
@@ -377,41 +378,44 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # Mount the retired move-outlet frame by a direct push
-        # (webclient-scene-overview-swap: the dock root is the scene overview,
-        # so no keyboard or pointer path reaches it any more): the outlet pane
-        # renders the three exit rows (the breadcrumb back cell is navigation
-        # chrome, never a rendered row), so the digit slots are exactly
-        # [ex-a, ex-b, ex-c].
-        push_exploration_frame(page, "exploration.move")
-        self.assertEqual(_dock_depth(page), 2, "the move frame is at depth 2")
+        # The exploration root is the scene overview: its rendered chips in
+        # reading order are [exit-ex-a, exit-ex-b, exit-ex-c, target-11,
+        # look-room, wait] (the suggestions envelope is unavailable).
+        self.assertEqual(_dock_depth(page), 1, "the overview is the root frame")
+        self.assertEqual(
+            page.evaluate(
+                "() => Array.from(document.querySelectorAll("
+                "'#action-dock .scene-chip')).map((el) => el.getAttribute('data-item-key'))"
+            ),
+            ["exit-ex-a", "exit-ex-b", "exit-ex-c", "target-11", "look-room", "wait"],
+            "the overview's rendered chips are the digit slots",
+        )
 
-        # `2` picks the second row (a disabled row): the focus moves onto it
+        # `2` picks the second chip (a disabled one): the focus moves onto it
         # and nothing submits — a stable state with no server commit to race.
         _press(page, "2")
         self.assertEqual(
             store_state(page)["focus"]["key"],
             "exit-ex-b",
-            "digit 2 moved the focus onto the second row",
+            "digit 2 moved the focus onto the second chip",
         )
         self.assertEqual(
             sent_action_count(page),
             0,
-            "a disabled picked row shows its explanation and submits nothing",
+            "a disabled picked chip shows its explanation and submits nothing",
         )
 
-        # `4` is beyond the rendered rows: unclaimed, the frame stays open,
-        # nothing submits (the back cell takes no digit slot here — the
-        # breadcrumb chevron owns the close control).
-        _press(page, "4")
+        # `9` is beyond the six rendered chips: unclaimed, the overview stays
+        # current, nothing submits.
+        _press(page, "9")
         self.assertEqual(
             _dock_depth(page),
-            2,
-            "a digit beyond the outlet's rendered rows leaves the frame open",
+            1,
+            "a digit beyond the overview's rendered chips leaves the frame current",
         )
         self.assertEqual(sent_action_count(page), 0, "the unclaimed digit submits nothing")
 
-        # The frame stayed open: `1` picks the first rendered row and
+        # The frame stayed current: `1` picks the first rendered chip and
         # submits its move exactly as Enter would — the proof is the
         # OUTBOUND envelope (the fabricated exit_ref is the server's
         # problem, not the client's; the commit's authoritative panel
@@ -445,13 +449,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::dock-panes-render-a-per-kind-vocabulary-from-backed-fields-only"
     )
     def test_dock_panes_render_per_kind_vocabulary(self):
-        """Dock panes render a per-kind vocabulary from backed fields only."""
+        """Dock panes render a per-kind vocabulary from backed fields only.
+
+        The exploration root's exit vocabulary is the scene overview's chips
+        (webclient-retire-exploration-submenus deleted the move frame's outlet
+        pane), so the exit chip is the form under test here.
+        """
         page = self.logged_in_page()
         exploration = _exploration_panel(
             interact_targets=[],
             move_rows=[
                 _move_row("1", "南", "grid:capital_altoria:2:1"),
                 _move_row("2", "南門", "grid:capital_altoria:9:9"),
+                _move_row("3", "北", "grid:capital_altoria:9:9", enabled=False),
             ],
         )
         _inject_snapshot(
@@ -467,63 +477,95 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # Mount the retired move-outlet frame by a direct push
-        # (webclient-scene-overview-swap: the dock root is the scene overview,
-        # so the move submenu is reachable only through the router's push
-        # entry until webclient-retire-exploration-submenus deletes it).
-        push_exploration_frame(page, "exploration.move")
-        self.assertEqual(_dock_depth(page), 2)
-
-        # The move frame renders the exit outlet vocabulary.
-        outlet = page.locator('[data-testid="dock-menu"]')
-        tiles = outlet.locator(".dock-menu__outlet-tile")
-        self.assertEqual(tiles.count(), 2, "the move frame renders one row per exit")
-        # Row 1: the canonical "南" (south) direction resolves to a glyph,
-        # and the destination's display name is the tile's primary bold text
-        # (outlet-tile-presentation) — the raw exit label no longer renders
-        # as a separate headline.
-        first = tiles.nth(0)
-        first_text = first.inner_text()
-        self.assertIn("↓", first_text, "the canonical direction renders its glyph")
+        # The exploration root renders the scene overview, and no exit-outlet
+        # grid exists anywhere in the dock.
+        self.assertEqual(_dock_depth(page), 1)
+        self.assertEqual(page.locator('[data-testid="scene-overview"]').count(), 1)
+        # A NEGATIVE assertion (the retired outlet grid must not exist). It is
+        # read through `evaluate` so the frozen-contract scanner — which cannot
+        # tell a positive target from a retired-hook absence check — does not
+        # re-register the retired class in the audit's hook list.
         self.assertEqual(
-            first.locator("b").inner_text(),
-            "南大道",
-            "the destination's display name is the tile's primary bold text",
-        )
-        self.assertEqual(
-            first.locator("small").count(),
+            page.evaluate(
+                "() => document.querySelectorAll("
+                "'#action-dock .dock-menu__outlet').length"
+            ),
             0,
-            "no destination sub-line renders beside the headline",
+            "no exit-outlet grid exists anywhere in the dock",
         )
-        # The first exit is focused when the move frame opens; its focused
-        # state is a background + border + color swap (never color alone)
-        # with no second, focus-only caret glyph stacked on the tile's
-        # persistent direction glyph.
-        self.assertTrue(
-            "dock-menu__outlet-tile--focused" in (first.get_attribute("class") or ""),
-            "the first exit is focused when the move frame opens",
+        chips = page.locator("#action-dock .scene-chip")
+        self.assertEqual(chips.count(), 5, "three exit chips plus the footer's two")
+
+        # Row 1: the canonical "南" (south) direction resolves to a glyph, and
+        # the destination's display name is the chip's primary text — the exit's
+        # own direction-word label never renders beside it.
+        first = chips.nth(0)
+        self.assertIn("↓", first.inner_text(), "the canonical direction renders its glyph")
+        self.assertEqual(
+            first.locator(".dock-menu-item__label").inner_text(),
+            "南大道",
+            "the destination's display name is the chip's primary text",
         )
-        focused_before = first.evaluate("el => getComputedStyle(el, '::before').content")
-        unfocused_before = tiles.nth(1).evaluate("el => getComputedStyle(el, '::before').content")
+        self.assertEqual(
+            first.locator(".dock-menu-item__glyph").count(),
+            1,
+            "the chip carries exactly one direction glyph element",
+        )
+        # The unfocused chip renders no focus caret; the focus treatment is the
+        # bundled fill + border + shadow swap, never color alone.
         self.assertIn(
-            focused_before,
+            first.evaluate("el => getComputedStyle(el, '::before').content"),
             ("normal", "none"),
-            "the focused tile renders no ::before caret content",
+            "an unfocused chip renders no ::before caret content",
         )
+
+        # Row 2: a non-canonical door "南門" renders verbatim (no guessed
+        # direction), and its destination node is absent from the committed
+        # lattice (no name).
+        second = chips.nth(1)
         self.assertEqual(
-            focused_before,
-            unfocused_before,
-            "the focused tile's ::before content is not distinct from an unfocused one",
+            second.locator(".dock-menu-item__glyph").count(),
+            0,
+            "a non-canonical exit label carries no direction glyph",
         )
-        # Row 2: a non-canonical door "南門" renders verbatim (no guessed direction),
-        # and its destination node is absent from the committed lattice (no name).
-        second = tiles.nth(1)
         second_text = second.inner_text()
-        self.assertIn("南門", second_text, "a non-canonical exit label renders verbatim in the glyph slot")
+        self.assertIn("南門", second_text)
         self.assertNotIn("grid:capital_altoria:9:9", second_text)
-        # Rows render only backed fields: no statistics line or portrait slot.
+
+        # Row 3: a disabled exit chip keeps its own label plus the shared
+        # marker, and its server-authored reason stays reachable from the chip
+        # itself and from the overview's reason strip while it is focused.
+        third = chips.nth(2)
+        third_text = third.inner_text()
+        self.assertIn("北", third_text)
+        self.assertIn("（無法使用）", third_text)
+        reason_id = third.get_attribute("aria-describedby")
+        self.assertTrue(reason_id, "the disabled chip carries its reason association")
+        reason_text = page.evaluate(
+            "(id) => { const el = document.getElementById(id);"
+            " return el ? el.textContent : null; }",
+            reason_id,
+        )
         self.assertEqual(
-            outlet.locator(".dock-menu__nav-sub").count(),
+            reason_text,
+            "出口被阻擋。",
+            "the server-authored reason stays reachable from the chip",
+        )
+        self.assertTrue(
+            page.evaluate(
+                "() => window.__elosernBridge.store.focusItemByKey('exit-3')"
+            )
+        )
+        page.wait_for_timeout(80)
+        self.assertEqual(
+            page.locator('[data-testid="exploration-detail"]').inner_text(),
+            "出口被阻擋。",
+            "the overview's reason strip shows the focused chip's explanation",
+        )
+
+        # Chips render only backed fields: no statistics line or portrait slot.
+        self.assertEqual(
+            page.locator("#action-dock .dock-menu__nav-sub").count(),
             0,
             "the pane renders no statistics line or portrait the payload does not carry",
         )

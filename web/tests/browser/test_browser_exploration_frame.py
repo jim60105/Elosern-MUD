@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): keyboard movement charging time and refreshing the map, and the move frame/frame resolver following committed state across a real move.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): keyboard movement charging time and refreshing the map, and the scene overview/frame resolver following committed state across a real move.
 """
 
 from __future__ import annotations
@@ -8,10 +8,8 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     activate_first_overview_exit,
     fixture_home_node_id,
-    focus_action_dock,
     install_outbound_recorder,
     outbound_messages,
-    push_exploration_frame,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -65,21 +63,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    def _reset_root(self, page):
-        focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
-        page.wait_for_timeout(60)
-
-    def _open_move_outlet(self, page):
-        """Mount the retired move-outlet frame by a direct push.
-
-        webclient-scene-overview-swap: the dock root is the scene overview, so
-        no keyboard or pointer path reaches the move submenu any more. Until
-        webclient-retire-exploration-submenus deletes the frame with its tests,
-        the outlet assertions mount it through the router's own push entry.
-        """
-        push_exploration_frame(page, "exploration.move")
-
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
     @covers_requirement("webclient-desktop-shell::the-action-dock-s-row-region-and-detail-panes-are-direct-children-of-its-pane-host")
     def test_keyboard_move_charges_time_and_refreshes_map(self):
@@ -91,22 +74,29 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(map_before["current_node"], home)
         time_before = store_state(page)["serverTime"]
 
-        self._open_move_outlet(page)  # Move
-        # remove-redundant-dock-menu-layout: the exit-outlet frame shows no
-        # detail pane, so the row region (`.dock-menu`) is the pane host's only
-        # dock-menu child — no anonymous layout wrapper, no detail aside.
+        # The exploration root is the scene overview (webclient-scene-overview-
+        # swap), so its first chip is the room's first exit.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the exploration root is the scene overview",
+        )
+        # remove-redundant-dock-menu-layout: the overview is the direct-child
+        # rule's one exception for row regions — it renders as a single
+        # component that is the pane host's only child, with no anonymous
+        # layout wrapper and no detail aside.
         self.assertEqual(page.locator(".dock-menu-layout").count(), 0)
         self.assertEqual(
             page.evaluate(
                 "() => { const host = document.querySelector('.dock-pane-host');"
                 " if (!host) return false;"
                 " const kids = Array.from(host.children);"
-                " return kids.length === 1 && kids[0].classList.contains('dock-menu'); }"
+                " return kids.length === 1 && kids[0].classList.contains('scene-overview'); }"
             ),
             True,
-            "the outlet frame renders the row region as the pane host's only child",
+            "the scene overview renders as the pane host's only child",
         )
-        _press(page, "Enter")  # first exit
+        _press(page, "Enter")  # the first exit chip
         try:
             self._wait_panel(
                 page,
@@ -188,24 +178,29 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-frame-resolution::router-frames-store-descriptors-and-a-focus-key-and-resolve-at-access-time")
     @covers_requirement("webclient-frame-resolution::activation-payloads-read-committed-state-at-dispatch-time")
-    def test_open_move_frame_follows_a_committed_move(self):
-        """The shipped dock path (the user-visible bug, design doc §2): with
-        the 移動 frame open, a committed move must make the RENDERED dock pane
-        list the NEW room's exits, and activating a rendered row must submit
-        the new `exit_ref`/`current_node`. Against the copy-based router this
-        fails red: the open frame keeps the previous room's rows and payloads,
-        so the second activation is answered `stale` and the player sees
-        nothing."""
+    def test_open_overview_follows_a_committed_move(self):
+        """The shipped dock path (the user-visible bug, design doc §2): the
+        scene overview renders the committed panel's exits, so a committed move
+        must make the RENDERED chips list the NEW room's exits, and activating
+        a rendered chip must submit the new `exit_ref`/`current_node`. Against
+        the copy-based router this fails red: the rendered pane keeps the
+        previous room's rows and payloads, so the second activation is answered
+        `stale` and the player sees nothing."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         node_before = store_state(page)["panels"]["local_map"]["current_node"]
 
-        self._open_move_outlet(page)  # the submenu frame is now current.
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.depth()"),
-            2,
-            "the move frame did not open",
+            1,
+            "the exploration root is the scene overview",
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => window.__elosernBridge.router.currentDescriptor().source"
+            ),
+            "exploration.root",
         )
 
         def rendered_exit_rows():
@@ -222,7 +217,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(
             rendered_exit_rows(),
             ["exit-" + row["exit_ref"] for row in panel_before["move"]],
-            "the freshly opened pane must match the committed room",
+            "the freshly rendered overview must match the committed room",
         )
 
         # A real admitted move commits a newer snapshot for the whole room.
@@ -238,10 +233,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(
             after_rows,
             ["exit-" + row["exit_ref"] for row in panel_after["move"]],
-            "the open move pane still renders the superseded room's exits",
+            "the overview still renders the superseded room's exits",
         )
 
-        # Activating a rendered row through the pointer path submits the NEW
+        # Activating a rendered chip through the pointer path submits the NEW
         # state's payload.
         moves_before = sent_action_count(page, "explore.move")
         first_key = after_rows[0]
@@ -275,21 +270,21 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-frame-resolution::an-unresolvable-descriptor-yields-the-shared-degradation-marker-with-the-server-authored-reason")
     def test_frame_resolver_follows_committed_state_across_a_real_move(self):
         """The frame resolver registry derives menus at access time (design
-        doc D1): a move frame resolved before a real move names the old room;
-        re-resolving after the committed snapshot names the new room's exits
-        with the new current_node and no stale row."""
+        doc D1): the scene overview resolved before a real move names the old
+        room; re-resolving after the committed snapshot names the new room's
+        exits with the new current_node and no stale row."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         node_before = store_state(page)["panels"]["local_map"]["current_node"]
 
-        def resolve_move_menu():
+        def resolve_overview_menu():
             return page.evaluate(
-                "() => window.__elosernBridge.resolveFrame({ source: 'exploration.move' })"
+                "() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })"
             )
 
-        before = resolve_move_menu()
-        self.assertFalse(before.get("unresolvable", False), f"move frame did not resolve: {before}")
+        before = resolve_overview_menu()
+        self.assertFalse(before.get("unresolvable", False), f"the overview did not resolve: {before}")
         panel_before = store_state(page)["panels"]["exploration"]
         before_keys = [item["key"] for item in before["items"] if item["key"].startswith("exit-")]
         self.assertEqual(
@@ -312,8 +307,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         node_after = store_state(page)["panels"]["local_map"]["current_node"]
         self.assertNotEqual(node_after, node_before)
 
-        after = resolve_move_menu()
-        self.assertFalse(after.get("unresolvable", False), f"move frame did not re-resolve: {after}")
+        after = resolve_overview_menu()
+        self.assertFalse(after.get("unresolvable", False), f"the overview did not re-resolve: {after}")
         panel_after = store_state(page)["panels"]["exploration"]
         after_keys = [item["key"] for item in after["items"] if item["key"].startswith("exit-")]
         self.assertEqual(
@@ -362,9 +357,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 identities: ((state.panels.exploration || {}).interact) || [],
                 menus: [
                   "exploration.root",
-                  "exploration.move",
-                  "exploration.look",
-                  "exploration.interact",
                   "exploration.wait",
                   "exploration.suggestions",
                 ].map(
