@@ -99,11 +99,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 row carries a chip per look-only entity; the
-        # scripted host's own chip submits explore.look for it.
-        panel = self._live_exploration_panel(page)
-        entity_identity = panel["look"]["entities"][0]["identity"]
-        activate_overview_chip(page, "entity-%s" % entity_identity)
+        # The scripted host is both a look entity and a committed interact
+        # target, so the overview renders it only as the stable
+        # `target-<identity>` person chip (webclient-scene-overview-swap:
+        # 人物-row entity chips exist for look-only entities); 查看 in the
+        # chip's verb popover submits explore.look for that host.
+        host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
+        activate_overview_chip(page, "target-%s" % host_identity)
+        activate_overview_chip(page, "look-target")  # 查看 -> explore.look
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         wait_for_store_state(
             page,
