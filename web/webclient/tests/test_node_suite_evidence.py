@@ -934,5 +934,33 @@ class SceneTransitionsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class CombatBeatsEvidenceTest(unittest.TestCase):
+    """webclient-combat-beats: the client protocol mirrors the combat beats
+    schema. The DOM-independent Node sibling is its executed evidence."""
+
+    @covers_requirement(
+        "webclient-combat-beats::the-client-protocol-mirrors-the-combat-beats-schema"
+    )
+    def test_combat_beats_node_suite_passes(self):
+        suite = (
+            REPO_ROOT
+            / "web/static/webclient/js/tests/protocol_combat_beats.test.js"
+        )
+        self.assertTrue(suite.is_file(), "the combat beats Node sibling is missing")
+        result = subprocess.run(
+            ["node", "--test", str(suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "combat beats Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
