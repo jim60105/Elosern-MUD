@@ -315,9 +315,10 @@ when OOB controls are disabled.
 
 #### Scenario: A borrowed send outside the active phase is rejected by the field
 - **WHEN** the dialogue free row borrows the field and the player sends the speech while the transport is
-  connected and unlocked with no mutation in flight but the presentation phase is not active
+  connected with no mutation in flight but the presentation phase is not active (a transport reset
+  awaiting its first snapshot)
 - **THEN** the field does not clear, the command line stays expanded with focus in the field, no action is
-  submitted, and the speech is not lost
+  submitted, no ordinary text is sent, the speech is not lost, and the borrow stays bound to the host
 
 #### Scenario: One key press sends exactly one command
 - **WHEN** the player presses Enter in the input field

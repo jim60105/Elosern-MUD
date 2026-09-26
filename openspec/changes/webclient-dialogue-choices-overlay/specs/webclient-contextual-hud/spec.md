@@ -34,8 +34,11 @@ viewport's height — at least 702px of 1080; the 48px top band and the 300px bo
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
-SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset 6% of the stage
-width from its own side, and SHALL never cover the band. The `actor-left` anchor SHALL carry the
+SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
+stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
+(the anchor's horizontal centre) under the island column on its side — the place card and vitals on
+the left, the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%. The `actor-left` anchor SHALL carry the
 player's stage actor — the current roster character's portrait, resolved exactly as the stage
 portrait was before this requirement, with the truthful placeholder when no image exists — in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
@@ -46,9 +49,11 @@ focusable element and SHALL NOT intercept pointer events, and they MAY sit behin
 `choices` anchor, and the command-line row.
 
 The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
-box, at most `min(560px, 40%)` of the stage width wide, vertically centred in the stage box and bounded
-by it, above the portrait anchors; when its content is taller than the stage box allows it SHALL
-scroll internally, and it SHALL NOT grow into the top band or the bottom band.
+box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
+SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
+command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
+command-line row, or the bottom band.
 
 At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
 `band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
@@ -107,9 +112,13 @@ introduced into the band this way.
 - **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
 - **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
 
+#### Scenario: The host's face clears the minimap at the smaller viewports
+- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
+- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
+
 #### Scenario: The choice list sits over the stage between the portraits
-- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080 and at 1280x720 with the vitals island, the minimap, and the party island present
-- **THEN** the `choices` anchor is horizontally centred on the stage box (±1px), lies entirely inside the stage box, intersects no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable, scrolling inside the anchor at 1280x720 if needed
+- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080, 1440x900, and 1280x720 with the minimap island present and the command line expanded
+- **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
@@ -219,7 +228,9 @@ hidden with the message region.
 
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
 carry a name plate above its text area, naming the host with the panel's `display_name` plus
-` · 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
+` · 羈絆 <stage>` only when `bond_stage` is non-null; in dialogue mode the plate and the page text SHALL
+share one left-aligned column whose left edge lines up with the player portrait anchor's left edge (the
+42-character line cap still applies); the window's text area below the plate SHALL
 present the current response's pages — the session line as the narrative delivered it, paged and typed
 like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
 from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
@@ -410,7 +421,7 @@ message region SHALL carry, at its bottom-right corner, a labelled ⌨ toggle co
 row's state through `aria-expanded` and names the row through `aria-controls`. The toggle SHALL be
 rendered in every mode that renders the message region, SHALL NOT cover the message text (the text's
 scroll region SHALL keep its last line clear of the toggle), and SHALL NOT be affected by the committed
-narrative, the dialogue variant, or the dock frame.
+narrative, the dialogue choice list, or the dock frame.
 
 The command line SHALL expand, and focus SHALL move into its input field only after the row is
 rendered, on exactly three paths: `/` pressed while no editable control is focused, activation of the ⌨
@@ -502,8 +513,10 @@ dispatch nothing. Escape or the back row in the exit rows SHALL return to the ch
 The list SHALL be one keyboard composite and one tab stop: DOM focus SHALL rest on the list container,
 which names its focused row through an active-descendant reference. ArrowUp and ArrowDown SHALL move to
 the previous and next row, wrapping; Home and End SHALL move to the first and last row; Enter and Space
-SHALL activate the focused row; digit `1`–`N` SHALL activate pick N directly; a held key's auto-repeat
-SHALL NOT activate. Every key the list handles SHALL be consumed by it and SHALL NOT reach the keyboard
+SHALL activate the focused row; while the choice rows are shown, digit `1`–`N` SHALL activate pick N
+directly; a held key's auto-repeat SHALL NOT activate. While the list holds focus its active row SHALL be
+shown by shape and fill — a leading `▸` and the dock's muted-gold fill — never by colour alone, and an
+active disabled exit row SHALL keep a quiet treatment that promises no action. Every key the list handles SHALL be consumed by it and SHALL NOT reach the keyboard
 router or the page surface; `/` and every key the list does not handle SHALL pass on unchanged. A pointer
 activation of a row SHALL focus that row and activate it through the same path as Enter. When the list
 appears while focus is on the message window, inside the message region, or on the document body, focus
