@@ -140,12 +140,17 @@ The server SHALL generate a bounded cryptographically unpredictable presentation
 
 The presentation registry SHALL reject duplicate panel names and SHALL expose
 only registered stable panel names to the coordinator. The registered production
-set SHALL include the `gallery` panel alongside the existing registered panels;
-adding a registered panel SHALL remain a registry-registration act and SHALL NOT
-change any envelope schema. Each presenter SHALL receive session-derived read
-context, SHALL return JSON-safe panel data without invoking mutation APIs, and
-SHALL execute independently so one presenter failure cannot suppress other
-panels or narrative output. A presenter whose subject is the account owning the
+set SHALL include the `gallery` and `combat_beats` panels alongside the existing
+registered panels; adding a registered panel SHALL remain a registry-registration
+act and SHALL NOT change any envelope schema. Each presenter SHALL receive
+session-derived read context, SHALL return JSON-safe panel data without invoking
+mutation APIs, and SHALL execute independently so one presenter failure cannot
+suppress other panels or narrative output. The dispatcher's completion
+publication for an admitted action that settled an ordinary combat round SHALL
+add the frozen record of that round to the read context; every other publication
+path SHALL build its context without a round record. The record
+SHALL be immutable, SHALL NOT be persisted, and SHALL NOT be serialized into any
+result envelope. A presenter whose subject is the account owning the
 rendered puppet, rather than the puppet itself, SHALL derive that account from
 the rendered actor's own ownership link and SHALL be held to the identical
 read-only, isolation, and availability-discriminator contract as every
@@ -165,6 +170,11 @@ value under a dual-direction parity contract so the two never diverge.
 
 - **WHEN** the production registry is built after this change
 - **THEN** `panel_names` includes `gallery` together with every previously registered panel name, and the snapshot/update/result/error envelope schemas are unchanged
+
+#### Scenario: The combat round record reaches only the completing publication
+
+- **WHEN** an admitted combat action settles an ordinary round and the dispatcher publishes its completion, and later a reconnect snapshot and a text-command refresh are published
+- **THEN** only the completion publication's context carries the round record, the later publications' contexts carry none, and the sent `ui_action_result` contains no round-record field
 
 #### Scenario: One presenter exception is isolated
 - **WHEN** one registered presenter raises while a full snapshot is built

@@ -11,6 +11,8 @@ from dataclasses import replace
 from unittest.mock import patch
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -84,6 +86,8 @@ class CombatRoundRecordTests(BattlefieldIsolation, EvenniaTest):
     def _hp(self, entity) -> int:
         return stored_gauge_pair(entity, "hp")[0]
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_a_non_terminal_round_records_the_committed_hp(self):
         engage(self.player, self.monster)
         hp_before = {
@@ -117,6 +121,7 @@ class CombatRoundRecordTests(BattlefieldIsolation, EvenniaTest):
         # the round's.
         self.assertEqual(record.logs, tuple(result["logs"]))
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_a_terminal_round_records_the_foe_at_zero(self):
         self.monster.traits.hp.base = 1
         self.monster.traits.hp.current = 1
@@ -132,6 +137,7 @@ class CombatRoundRecordTests(BattlefieldIsolation, EvenniaTest):
         self.assertLessEqual(len(record.logs), len(result["logs"]))
         self.assertEqual(record.logs, tuple(result["logs"])[: len(record.logs)])
 
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_a_preflight_rejection_carries_no_record(self):
         self.player.traits.mp.base = 0
         self.player.traits.mp.current = 0
@@ -140,6 +146,7 @@ class CombatRoundRecordTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertNotIn("round_record", result)
 
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_forfeit_carries_no_record(self):
         engage(self.player, self.monster)
         result = forfeit(self.player)

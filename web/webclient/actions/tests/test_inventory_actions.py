@@ -233,6 +233,7 @@ class InventoryUseAdapterTests(InventoryActionBase):
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
         "inventory-item-actions::inventory-actions-publish-all-affected-canonical-panels",
     )
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_in_combat_use_occupies_the_round_and_publishes_full_snapshot(self):
         self._hurt(20)
         self.player.db.inventory = [_T_POTION.key]
@@ -269,6 +270,7 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.assertTrue(payload["available"])
         self.assertEqual(payload["round"], f"{record.session_id}/1")
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_in_combat_heal_and_foe_damage_make_the_round_unavailable(self):
         # The item heals the actor while the foe damages it in the same round:
         # the round has an HP change with no damage entry, so the projection

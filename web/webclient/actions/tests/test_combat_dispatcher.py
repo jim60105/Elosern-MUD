@@ -403,6 +403,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         schedule.assert_not_called()
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_combat_cast_round_publishes_beats_beside_status(self):
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
@@ -449,6 +450,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
             self.assertNotIn(key, result)
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_defeating_cast_publishes_a_full_snapshot_with_beats(self):
         self.monster.traits.hp.base = 1
         self.monster.traits.hp.current = 1
@@ -482,6 +484,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotIn("damage", kinds[kinds.index("target_defeated") + 1 :])
 
     @covers_requirement("webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_later_sync_and_forfeit_snapshots_render_beats_unavailable(self):
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id

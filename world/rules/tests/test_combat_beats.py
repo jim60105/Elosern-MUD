@@ -8,6 +8,8 @@ is deterministic and free of the round transaction.
 from dataclasses import asdict
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.ansi import strip_ansi
 
 from world.rules.combat_beats import (
@@ -65,6 +67,7 @@ def _record(
 
 
 class CombatBeatsBuilderTests(unittest.TestCase):
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
     def test_entry_kinds_map_to_the_closed_set_in_order(self):
         # The spec scenario: a resource_spend, a roll, a damage, a
         # target_defeated, and a target_knocked_out entry, with each beat
@@ -117,6 +120,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         self.assertEqual([beat.seq for beat in view.beats], [0, 1, 2, 3, 4])
         self.assertEqual([beat.action for beat in view.beats], [0, 0, 0, 1, 1])
 
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
     def test_an_unknown_kind_maps_to_other_and_keeps_its_actor(self):
         view = build_combat_beats(
             _record([_log([_entry("action_skipped", template="{actor} 無法行動。")])])
@@ -125,6 +129,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         self.assertEqual(view.beats[0].actor, str(_HERO_DBREF))
         self.assertEqual(view.beats[0].text, "hero 無法行動。")
 
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
     def test_beat_identities_match_the_portrait_catalog(self):
         view = build_combat_beats(
             _record(
@@ -146,6 +151,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         # A name outside the roster is not a participant: null, never a guess.
         self.assertIsNone(view.beats[0].target)
 
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
     def test_amount_and_hp_after_are_set_on_damage_beats_only(self):
         view = build_combat_beats(
             _record(
@@ -172,6 +178,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         self.assertEqual(damage.hp_after, 25)
         self.assertEqual(damage.target, str(_GOBLIN_DBREF))
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_ordered_damage_projects_hp_after(self):
         view = build_combat_beats(
             _record(
@@ -202,6 +209,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         )
         self.assertEqual([beat.hp_after for beat in view.beats], [18, 0])
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_a_knockout_floors_the_projection_at_one(self):
         view = build_combat_beats(
             _record(
@@ -229,6 +237,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         self.assertEqual(view.beats[0].hp_after, 1)
         self.assertEqual(view.beats[1].kind, "other")
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_an_hp_change_without_a_damage_entry_raises(self):
         # A damaged target that is also healed (or regenerated, drained,
         # diverted, or ticked silently) has no damage entry for the extra HP
@@ -259,6 +268,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
             )
         self.assertEqual(raised.exception.args[0], "hp_mismatch")
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_an_unknown_damage_target_raises(self):
         with self.assertRaises(CombatBeatsError) as raised:
             build_combat_beats(
@@ -279,6 +289,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
             )
         self.assertEqual(raised.exception.args[0], "unknown_damage_target")
 
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
     def test_a_damage_entry_without_an_integer_amount_raises(self):
         with self.assertRaises(CombatBeatsError) as raised:
             build_combat_beats(
@@ -298,6 +309,7 @@ class CombatBeatsBuilderTests(unittest.TestCase):
             )
         self.assertEqual(raised.exception.args[0], "damage_amount_invalid")
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_over_bound_input_raises(self):
         with self.subTest("too many beats"):
             with self.assertRaises(CombatBeatsError) as raised:
@@ -328,6 +340,8 @@ class CombatBeatsBuilderTests(unittest.TestCase):
                 )
             self.assertEqual(raised.exception.args[0], "round_id_too_long")
 
+    @covers_requirement("webclient-combat-beats::combat-beats-derive-only-from-the-settled-round-s-event-records")
+    @covers_requirement("webclient-combat-beats::combat-beats-disclose-nothing-the-combat-panel-does-not")
     def test_a_beat_text_is_the_delivered_line_with_ansi_stripped(self):
         entries = (
             _entry(
@@ -360,6 +374,8 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         )
         self.assertNotIn("|r", view.beats[0].text)
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
+    @covers_requirement("webclient-combat-beats::combat-beats-disclose-nothing-the-combat-panel-does-not")
     def test_no_beat_exposes_raw_roll_hit_or_other_entry_data(self):
         view = build_combat_beats(
             _record(

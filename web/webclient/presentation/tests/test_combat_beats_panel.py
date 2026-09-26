@@ -12,6 +12,8 @@ from unittest.mock import patch
 import json
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -124,6 +126,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self, record):
         return self.registry.render("combat_beats", _context(record, actor=self.player))
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_a_settled_round_renders_the_exact_available_form(self):
         payload = combat_beats_presenter(_context(_record()))
         self.assertEqual(
@@ -169,6 +172,8 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
         # And the registered panel returns it unchanged.
         self.assertEqual(self._render(_record()), payload)
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
     def test_no_record_renders_the_common_unavailable_form(self):
         payload = self.registry.render(
             "combat_beats",
@@ -182,6 +187,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("correlation_id", payload["reason"])
         self.assertNotIn("beats", payload)
 
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_an_hp_mismatch_renders_unavailable_and_logs_a_bounded_reason(self):
         record = _record(hp_after={_HERO_DBREF: 100, _GOBLIN_DBREF: 30})
         with patch(
@@ -196,6 +202,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(context["reason"], "hp_mismatch")
         self.assertEqual(context["char"], str(self.player.pk))
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_each_bound_renders_unavailable_never_truncated(self):
         cases = {
             "too many beats": _record(
@@ -226,6 +233,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
                 self.assertEqual(payload["reason"]["code"], UNAVAILABLE_REASON[0])
                 self.assertNotIn("beats", payload)
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_the_byte_budget_rejects_an_over_budget_payload(self):
         payload = {
             "schema_version": COMBAT_BEATS_SCHEMA_VERSION,
@@ -253,6 +261,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertLess(json_byte_size(payload), COMBAT_BEATS_MAX_BYTES)
         self.assertTrue(validate_combat_beats(payload)["available"])
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_the_validator_rejects_out_of_schema_beats(self):
         valid = combat_beats_presenter(_context(_record()))
         cases = {}
@@ -288,6 +297,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_combat_beats(payload)
 
+    @covers_requirement("webclient-combat-beats::the-combat-beats-panel-is-an-exact-read-only-panel")
     def test_rendering_leaves_traits_and_the_combat_record_unchanged(self):
         engage(self.player, self.monster)
         before = {
@@ -311,6 +321,7 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
             record.hp_after[_GOBLIN_DBREF],
         )
 
+    @covers_requirement("webclient-combat-beats::combat-beats-disclose-nothing-the-combat-panel-does-not")
     def test_the_beats_modules_never_read_the_disguise_layer(self):
         for relative in (
             "world/rules/combat_beats.py",
@@ -321,6 +332,8 @@ class CombatBeatsPanelTests(BattlefieldIsolation, EvenniaTestCase):
                 self.assertNotIn("get_display_value", source)
                 self.assertNotIn("disguised_stats", source)
 
+    @covers_requirement("webclient-combat-beats::combat-beats-disclose-nothing-the-combat-panel-does-not")
+    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
     def test_a_disguised_foe_ships_true_hp_matching_the_combat_view(self):
         engage(self.player, self.monster)
         true_hp = stored_gauge_pair(self.monster, "hp")[0]

@@ -176,6 +176,9 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         )}
         self.assertEqual(len(names), 1, f"display-name bound drifted: {extracted}")
 
+    @covers_requirement(
+        "webclient-combat-beats::the-client-protocol-mirrors-the-combat-beats-schema",
+    )
     def test_combat_beats_bounds_are_pinned(self):
         # combat-beats-panel: the rules bounds, the panel's own byte budget and
         # opaque-key bound, and the closed kind set are shared with the client
