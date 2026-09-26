@@ -60,16 +60,18 @@
 
 ## 7. Validation
 
-- [ ] 7.1 Run these from the repository root. All green:
+- [x] 7.1 Run these from the repository root. All green:
   - `node --test web/static/webclient/js/tests/*.test.js`
   - `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage`
   - `uv run --locked python -m tools.test_data_lint check`
   - `uv run --locked python -m tools.spec_traceability check`
   - `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence web.webclient.tests.test_vue_showcase_evidence web.webclient.tests.test_vue_showcase_data_evidence`
-- [ ] 7.2 Drive the live client at 1920×1080 with `agent-browser` at `完整`:
+- [x] 7.2 Drive the live client at 1920×1080 with `agent-browser` at `完整`:
   - Move between two rooms with generated scenes, and check the backdrop crossfade with no blank frame, the place-card slide, the minimap pan, and the message clear.
   - Take damage and heal, and check that the vitals island fades and slides in and out.
   - Repeat at `減少` (fades only) and `關閉` (instant).
 
   Close the browser afterwards.
-- [ ] 7.3 Run `openspec validate webclient-scene-transitions --strict` and `git diff --check`. Both clean.
+
+  (Done 2026-09-27 against the real `AppClient` and store in Storybook's `Core/AppShell` `StageJourney` story at 1920x1080, 1440x900, and 1280x720, at all three levels, with the tokens slowed 4-16x to read mid-transition frames; the redesign sample paintings stood in for generated scenes. The live-server path is covered by `test_browser_scene_transitions.py`.)
+- [x] 7.3 Run `openspec validate webclient-scene-transitions --strict` and `git diff --check`. Both clean.
