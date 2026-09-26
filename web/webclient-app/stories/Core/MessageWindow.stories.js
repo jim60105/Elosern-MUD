@@ -54,15 +54,17 @@ const MAP_LINES = [
   "└───┴───┴───┴───┴───┘",
 ].join("<br>");
 
-// The band message region at the reference size.
-const bandRegion = (story) => ({
+// The band message region at the reference size: the left two thirds of a
+// 1920px band, or the whole band in dialogue mode, where the command region
+// collapses (webclient-dialogue-stage-actors).
+const bandRegion = (story, context) => ({
   render: () =>
     h(
       "div",
       {
         style: {
           position: "relative",
-          width: "1280px",
+          width: context?.args?.mode === "dialogue" ? "1920px" : "1280px",
           height: "300px",
           boxSizing: "border-box",
           padding: "10px 12px 12px 18px",
@@ -121,8 +123,9 @@ export default {
           "(not on a control, not with a text selection); Enter / Space advance " +
           "only while the page surface has focus and never reach the dock. " +
           "Scrolling up over the page emits `open-full-log`. A polite live " +
-          "region announces each page once. In dialogue mode the window shows " +
-          "the dialogue box and its pick rows, unpaged. Pages type in at the " +
+          "region announces each page once. In dialogue mode the window spans " +
+          "the band under the host's name plate and shows the reply box and " +
+          "its pick rows, unpaged. Pages type in at the " +
           "reader's `textSpeed` (the unrevealed tail keeps its place " +
           "invisibly); a click or Enter while typing shows the page in full. " +
           "Opt-in `autoAdvance` turns a fully shown page after 1.2s + 60ms per " +
@@ -222,8 +225,9 @@ export const PendingAction = {
   },
 };
 
-// The dialogue variant: the dialogue box, the numbered picks, the free
-// dialogue and exit rows, unpaged. The view model is built from the panel
+// The dialogue variant across the whole band: the host's name plate, the
+// reply box (no avatar — the host stands on the stage), the numbered picks,
+// the free dialogue and exit rows, unpaged. The view model is built from the panel
 // form exactly as AppClient does.
 const DIALOGUE_PANEL = {
   schema_version: 2,

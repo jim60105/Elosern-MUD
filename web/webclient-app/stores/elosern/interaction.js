@@ -159,7 +159,23 @@ export function applyInteraction(ctx) {
     // entries, or the pre-session empty stack) is unclaimed and falls through
     // to the text / command-history path. Implemented entirely through the
     // frozen router façade members — the UMD source is not edited (design D1).
-    if (typeof key === "string" && key.length === 1 && key >= "1" && key <= "9") {
+    const isDigit = typeof key === "string" && key.length === 1 && key >= "1" && key <= "9";
+    // The collapsed command region (webclient-dialogue-stage-actors design
+    // D6): in dialogue mode the dock is hidden, so its router claims nothing
+    // but `/` (the command-line opener). Digits address only the dialogue
+    // variant's picks; every other key is unclaimed, so no key moves the
+    // hidden dock's focus, pushes or pops a frame, or activates a hidden
+    // entry. A focused dialogue row keeps its native Enter and Space.
+    if (ctx.reducer.getState().mode === "dialogue") {
+      if (isDigit) {
+        if (!ctx.captionDialoguePresented()) {
+          return false;
+        }
+        return repeat ? true : handleCaptionDialoguePick(Number(key) - 1);
+      }
+      return key === "/" ? ctx.router.press(key, !!repeat) : false;
+    }
+    if (isDigit) {
       // A held or repeated digit is suppressed exactly like a held Enter
       // (the router's Enter repeat branch is the reference): the first
       // press already picked its row, and re-confirming on every

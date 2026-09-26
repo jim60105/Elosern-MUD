@@ -17,6 +17,10 @@ import {
   readPanel,
 } from "./shared.js";
 
+// The player's own dialogue speech actions (webclient-dialogue-stage-actors
+// D3): while one of them is in flight the player is the speaker.
+const DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_scripted", "explore.talk_freeform"]);
+
 export function applyView(ctx) {
   ctx.buildView = function buildView(prev, rs) {
     const panels = rs.panels || {};
@@ -130,6 +134,12 @@ export function applyView(ctx) {
       epoch: rs.activeEpoch,
       revision: rs.revision,
       mode: rs.mode,
+      // The stage's speaking state (design D3): "player" from the dispatch of
+      // a talk_scripted / talk_freeform action until its declared revision is
+      // accepted or it is rejected (the in-flight record's lifetime), else
+      // "host". Derived, never stored, so a reconnect lands on "host".
+      dialogueSpeaker:
+        ctx.inFlight && DIALOGUE_SPEECH_ACTIONS.has(ctx.inFlight.actionId) ? "player" : "host",
       layoutVersion: rs.layoutVersion,
       serverTime: rs.serverTime,
       panels,

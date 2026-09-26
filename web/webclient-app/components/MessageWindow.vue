@@ -34,8 +34,6 @@ import {
 import { useMessageMeasure } from "../composables/use-message-measure.js";
 import { useReducedMotion } from "../composables/use-reduced-motion.js";
 import { useTypewriter } from "../composables/use-typewriter.js";
-import { portraitFor, portraitGlyph } from "./party-helpers.js";
-import { faceObjectPosition } from "./face-rect.js";
 
 // The AVG message window (docs/superpowers/specs/2026-09-23-webclient-avg-
 // stage-redesign-design.md §6; OpenSpec change
@@ -80,7 +78,13 @@ import { faceObjectPosition } from "./face-rect.js";
 //
 // While mode is `dialogue` and the dialogue panel is available, the window
 // renders the dialogue variant (design D6): unpaged, scrolling
-// inside the text area, with the pick, free-dialogue, and exit rows.
+// inside the text area, with the pick, free-dialogue, and exit rows. In
+// dialogue the window spans the whole band and heads the variant with the
+// host's name plate; the host's portrait stands on the stage, so the box
+// carries no avatar or speaker line (webclient-dialogue-stage-actors D7).
+// The window is dialogue mode's focus home: `focusHome()` focuses the first
+// dialogue row, else the page surface, and the window keeps focus inside
+// the conversation when its own re-renders would drop it (design D5).
 export default {
   name: "MessageWindow",
   props: {
@@ -92,8 +96,6 @@ export default {
     mode: { type: String, default: "exploration" },
     // The dialogue view model (`dialogueViewModel`), null unless available.
     dialogue: { type: Object, default: null },
-    // The committed `art` panel: the host portrait's catalog source.
-    artPanel: { type: Object, default: null },
     // The prose scale; a change re-pages (a CSS variable change is invisible
     // to the ResizeObserver).
     fontScale: { type: Number, default: 1 },
@@ -606,30 +608,9 @@ export default {
     }
 
     function dialogueNodes(vm) {
-      const portrait = portraitFor(props.artPanel, vm.host.portraitRef);
       const nodes = [
         h("div", { key: "dlg-box", class: "dlg", "data-testid": "dialogue-box" }, [
-          portrait
-            ? h("img", {
-                class: "av",
-                src: portrait.url,
-                alt: vm.host.displayName,
-                style: { objectPosition: faceObjectPosition(portrait.face_rect) },
-              })
-            : h("div", { class: "av" }, [portraitGlyph(vm.host.displayName)]),
-          h("div", { class: "body" }, [
-            h("div", { class: "who", "data-testid": "dialogue-who" }, [
-              vm.host.displayName,
-              vm.bondStage == null
-                ? null
-                : h(
-                    "span",
-                    { class: "who-bond", "data-testid": "dialogue-bond" },
-                    `  ·  羈絆 ${vm.bondStage}`,
-                  ),
-            ]),
-            h("div", { class: "say", "data-testid": "dialogue-say" }, [vm.line]),
-          ]),
+          h("div", { class: "say", "data-testid": "dialogue-say" }, [vm.line]),
         ]),
       ];
       if (vm.picks.length > 0 || vm.freeRow) {
@@ -687,7 +668,64 @@ export default {
       target?.focus({ preventScroll: true });
     }
 
-    expose({ focus, advance });
+    // Dialogue mode's focus home (webclient-dialogue-stage-actors D5): the
+    // first dialogue row while the variant renders (a pick, else the free
+    // row, else the exit row), otherwise the page surface. Every lookup is
+    // null-safe: before the rows render this is a no-op.
+    function focusHome() {
+      if (dialogueVariant.value) {
+        const region = dialogueScrollRef.value;
+        const row =
+          region?.querySelector('[data-testid="dialogue-pick"]') ||
+          region?.querySelector('[data-testid="dialogue-freeform"]') ||
+          region?.querySelector('[data-testid="dialogue-exit"]');
+        row?.focus({ preventScroll: true });
+        return;
+      }
+      surfaceRef.value?.focus({ preventScroll: true });
+    }
+
+    // Focus fell out of the conversation: to the body, onto a removed row,
+    // or it still sits on the page surface the dialogue variant just hid
+    // (a browser may not have blurred it yet).
+    function focusDropped() {
+      const active = document.activeElement;
+      return (
+        !active ||
+        active === document.body ||
+        active === document.documentElement ||
+        !active.isConnected ||
+        (dialogueVariant.value && active === surfaceRef.value)
+      );
+    }
+
+    // Two of the window's own renders drop a focused element (design D5):
+    // the panel turning available while the page surface holds focus (v-show
+    // hides it), and a reply re-rendering the rows under a focused row (or
+    // the panel turning unavailable while mode stays dialogue). Read where
+    // focus sits before the flush; after it, re-home only when focus fell
+    // out of the conversation (see `focusDropped`). Leaving dialogue is the
+    // shell's case alone.
+    watch(
+      () => [dialogueVariant.value, props.dialogue],
+      () => {
+        const active = document.activeElement;
+        const held =
+          !!active &&
+          ((surfaceRef.value && active === surfaceRef.value) ||
+            (dialogueScrollRef.value && dialogueScrollRef.value.contains(active)));
+        if (!held) {
+          return;
+        }
+        void nextTick(() => {
+          if (props.mode === "dialogue" && focusDropped()) {
+            focusHome();
+          }
+        });
+      },
+    );
+
+    expose({ focus, focusHome, advance });
 
     return () => {
       const variant = dialogueVariant.value ? "dialogue" : "paged";
@@ -710,6 +748,21 @@ export default {
           onWheel,
         },
         [
+          // The name plate (design D7): a header row above the text area while
+          // the dialogue variant renders; outside it, an empty placeholder
+          // slot, so the text area below keeps its vnode position.
+          variant === "dialogue"
+            ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
+                h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
+                props.dialogue.bondStage == null
+                  ? null
+                  : h(
+                      "span",
+                      { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
+                      ` · 羈絆 ${props.dialogue.bondStage}`,
+                    ),
+              ])
+            : null,
           // Exactly two vnode slots (the dialogue region or its placeholder,
           // then the page surface): the measurer is an untracked DOM node
           // appended after them by use-message-measure.js and must stay the
@@ -995,16 +1048,62 @@ export default {
   border: 0;
 }
 
-/* The dialogue variant (design D6): the JRPG box and its pick rows, ported
-   from the narrative feed and scaled to the window's text size. Unpaged:
-   the exchange scrolls inside the text area. */
+/* The dialogue variant (design D6; webclient-dialogue-stage-actors D7): in
+   dialogue the window spans the whole band. A name plate heads it; below,
+   the reply line and the pick rows scroll inside the text area in one
+   left-aligned column whose left edge lines up with the player's portrait
+   anchor (6% of the stage), so the conversation reads down from the figure
+   standing above it. The reply keeps the 42em measure; the right part of
+   the band stays open under the host's portrait. */
+.message-window[data-variant="dialogue"] {
+  --dialogue-inset: max(24px, calc(6vw - 18px));
+}
+
+.message-window[data-variant="dialogue"]::before {
+  display: none;
+}
+
+.message-window__plate {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+  box-sizing: border-box;
+  max-width: calc(42em * 0.72 + var(--dialogue-inset) + 160px);
+  margin: 4px 0 0;
+  padding: 2px 24px 9px var(--dialogue-inset);
+  font-size: calc(var(--message-text) * var(--prose-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background:
+    linear-gradient(90deg, transparent, var(--gold-500) calc(var(--dialogue-inset) - 8px), rgba(185, 154, 96, 0.35) 55%, transparent)
+    left bottom / 100% 1px no-repeat;
+}
+
+.message-window__plate-name {
+  color: var(--gold-300);
+  font-family: var(--f-display);
+  font-size: 0.86em;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 14px var(--gold-glow), 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.message-window__plate-bond {
+  color: var(--paper-500);
+  font-family: var(--f-sans);
+  font-size: max(12px, 0.46em);
+  letter-spacing: 0.12em;
+}
+
 .message-window__dialogue {
   --message-dialogue-text: calc(var(--message-text) * 0.72 * var(--prose-scale));
   position: relative;
   box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
-  padding: 6px 24px 8px;
+  padding: 10px 24px 8px var(--dialogue-inset, 24px);
   outline: none;
   scrollbar-color: var(--ink-600) transparent;
   scrollbar-width: thin;
@@ -1023,50 +1122,6 @@ export default {
   font-size: calc(var(--message-dialogue-text) * 0.8);
 }
 
-.message-window__dialogue .dlg {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-}
-
-.message-window__dialogue .dlg .av {
-  width: 82px;
-  height: 96px;
-  flex: none;
-  box-sizing: border-box;
-  border-radius: var(--radius-sm);
-  background: radial-gradient(60% 70% at 50% 38%, #4a3a2a, #1a150e 82%);
-  display: grid;
-  place-items: center;
-  font-family: var(--f-display);
-  font-size: 36px;
-  color: var(--gold-400);
-  border: 1px solid var(--ink-600);
-  box-shadow: 0 0 0 1px rgba(203, 161, 53, 0.28);
-  overflow: hidden;
-  object-fit: cover;
-}
-
-.message-window__dialogue .dlg .body {
-  flex: 1;
-  min-width: 0;
-}
-
-.message-window__dialogue .dlg .who {
-  font: 19px var(--f-serif);
-  letter-spacing: 0.06em;
-  color: var(--gold-400);
-  margin-bottom: 8px;
-  overflow-wrap: anywhere;
-}
-
-.message-window__dialogue .dlg .who .who-bond {
-  color: var(--paper-500);
-  font-family: var(--f-sans);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-}
-
 .message-window__dialogue .dlg .say {
   max-width: 42em;
   font-family: var(--f-serif);
@@ -1079,8 +1134,9 @@ export default {
 .message-window__dialogue .choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 16px;
+  gap: 8px 10px;
+  max-width: min(100%, 880px);
+  margin-top: 14px;
 }
 
 .message-window__dialogue .choices .pick {
@@ -1088,14 +1144,14 @@ export default {
   align-items: center;
   gap: 11px;
   min-width: 0;
-  min-height: 44px;
+  min-height: 40px;
   width: 100%;
   box-sizing: border-box;
   text-align: left;
   background: linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid #625c50;
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  padding: 7px 12px;
   cursor: pointer;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
@@ -1113,6 +1169,11 @@ export default {
   border-color: var(--gold-500);
   background: var(--panel-hi);
   transform: translateX(3px);
+}
+
+.message-window__dialogue .choices .pick:focus-visible {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--gold-400);
 }
 
 .message-window__dialogue .choices .pick .k {

@@ -9,11 +9,14 @@
 //   card (the vitals, conditions, and compact party islands) and `map` at
 //   the top-right (the minimap, the one-line objective, the combat
 //   participant frame, and the title ballot);
-// - the portrait anchors `actor-left` (the player's standing portrait) and
-//   `actor-right` (reserved), standing on the bottom band's top edge;
+// - the portrait anchors `actor-left` (the player's stage actor) and
+//   `actor-right` (the dialogue host's stage actor while the mode is
+//   dialogue), standing on the bottom band's top edge;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
 //   split into the message region `band-message` (left 2/3) and the command
 //   region `band-command` (right 1/3). No frame, mode, or content resizes it;
+//   creation hides the message region and dialogue collapses the command
+//   region, so the other one spans the band;
 // - the `command-line` row, docked on the message region's top edge and
 //   collapsed by default (`data-expanded="false"` -> `display:none`,
 //   webclient-collapsible-command-line design D1/D4).
@@ -71,14 +74,14 @@ defineExpose({ menuOpen });
     <!-- The portrait anchors come after the combat veil (same z-index), so
          the standing portraits paint above it (design D1/D4). -->
     <div
-      class="stage-anchor stage-actor"
+      class="stage-anchor stage-actor-anchor"
       data-anchor="actor-left"
       data-testid="anchor-actor-left"
     >
       <slot name="actor-left" />
     </div>
     <div
-      class="stage-anchor stage-actor"
+      class="stage-anchor stage-actor-anchor"
       data-anchor="actor-right"
       data-testid="anchor-actor-right"
     >
@@ -227,9 +230,24 @@ defineExpose({ menuOpen });
   z-index: 2;
   pointer-events: none;
 }
-.elosern-stage [data-anchor="actor-left"] { left: 6%; }
-.elosern-stage [data-anchor="actor-right"] { right: 6%; }
-.elosern-stage .stage-actor > .reference-artwork { height: 100%; }
+/* The left-hand figure faces the island column (the place card and the
+   vitals under it, `--left-column` wide): where 6% would park the face under
+   it, the inset grows by what the column needs. At 1920x1080 it is exactly
+   6% (webclient-dialogue-stage-actors). */
+.elosern-stage [data-anchor="actor-left"] {
+  left: max(6%, calc(var(--left-column) + 8px - min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h))) / 3));
+}
+/* The right-hand figure faces the map column: its minimap card is a fixed
+   218px square 16px from the stage's right edge. Where 6% would park the
+   figure's face (the anchor's horizontal centre, half an anchor width = a
+   third of its height in) under that card — 1440x900 and narrower — the
+   inset grows until the face clears it by ~46px; at 1920x1080 it stays 6%
+   (webclient-dialogue-stage-actors). The stage fills the viewport, so the
+   stage-box clamp uses 100vh here. */
+.elosern-stage [data-anchor="actor-right"] {
+  --actor-map-clear: 280px;
+  right: max(6%, calc(var(--actor-map-clear) - min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h))) / 3));
+}
 
 /* The bottom band (design D1): one fixed-height container spanning the
    stage bottom. It carries the reference draft's band chrome (the upward
@@ -285,9 +303,10 @@ defineExpose({ menuOpen });
    display:none so hidden surfaces leave the a11y tree and tab order. The
    matrix: the place card, the message region, both island anchors (`vitals`
    and `map`, with every island in them), and the command line are hidden in
-   creation, where the command region spans the whole band; the minimap is
-   hidden in combat; the objective line shows only in exploration; the
-   command region and the scene backdrop stay visible in every mode. */
+   creation, where the command region spans the whole band; the command
+   region is hidden in dialogue, where the message region spans the whole
+   band; the minimap is hidden in combat; the objective line shows only in
+   exploration; the scene backdrop stays visible in every mode. */
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="place"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="vitals"],
@@ -297,6 +316,16 @@ defineExpose({ menuOpen });
 }
 .elosern-stage[data-elosern-mode="creation"] .stage-band {
   grid-template-columns: minmax(0, 1fr);
+}
+/* Dialogue (webclient-dialogue-stage-actors design D4): the command region
+   collapses — it and the still-mounted `#action-dock` inside it leave the
+   layout, the accessibility tree, and the tab order — and the message
+   region spans the whole band at the same fixed height. */
+.elosern-stage[data-elosern-mode="dialogue"] .stage-band {
+  grid-template-columns: minmax(0, 1fr);
+}
+.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"] {
+  display: none;
 }
 .elosern-stage[data-elosern-mode="combat"] .local-map {
   display: none !important;

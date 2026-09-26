@@ -188,8 +188,10 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   // DOM focus across the popover (webclient-scene-overview-swap D5): the
   // overview listbox goes `inert` while the popover is open, and the popover
   // unmounts on close, so either transition would drop DOM focus to `<body>`
-  // when it sat inside them. Re-focus the dock — the surface's documented
-  // focus target — and never steal focus from the command line or a drawer.
+  // when it sat inside them. Re-focus the mode's focus home — the dock, or
+  // the message window when the popover closed because the mode turned
+  // dialogue (webclient-dialogue-stage-actors D5) — and never steal focus
+  // from the command line or a drawer.
   watch(
     () => store.view.dockSource,
     async (source, previous) => {
@@ -200,7 +202,7 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
       const active = document.activeElement;
       const dock = document.getElementById("action-dock");
       if (active === document.body || (dock && dock.contains(active))) {
-        shellRef?.value?.restoreDockFocus();
+        shellRef?.value?.restoreFocusHome();
       }
     },
   );

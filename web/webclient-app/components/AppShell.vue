@@ -28,12 +28,15 @@
 // `/` outside an editable control, the ⌨ toggle in `#band-message`, or the
 // free-form dialogue borrow expands the line and focuses `#inputfield` after
 // the DOM update (no literal slash). Escape from the field or an accepted
-// send restores focus to `#action-dock` and collapses the line (design D3's
+// send restores focus to the mode's focus home (`#action-dock`, or the
+// message window in dialogue) and collapses the line (design D3's
 // ladder: open overlay → open drawer → focused command field → dock menu
 // level). The mount retires the replaced text fallback (hidden, not removed).
 // A mode change that hides the surface holding focus moves focus to the
-// action dock *before* the CSS hides it (design D2; the side-effect-free
-// `restoreDockFocus` path — no second focus path), and entering creation mode
+// incoming mode's focus home *before* the CSS hides it (design D2; the
+// side-effect-free `restoreFocusHome` path — no second focus path; entering
+// dialogue collapses the command region and re-homes focus on the message
+// window, webclient-dialogue-stage-actors D5), and entering creation mode
 // collapses the command line.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
@@ -61,8 +64,6 @@ const props = defineProps({
   // verbatim to the message window's dialogue variant (null outside the
   // available dialogue window).
   dialogue: { type: Object, default: null },
-  // The committed `art` panel — the dialogue variant's portrait catalog source.
-  artPanel: { type: Object, default: null },
   // The client-local prose scale (`store.view.fontScale`), forwarded to
   // MessageWindow so a scale change re-measures pages.
   fontScale: { type: Number, default: 1 },
@@ -137,6 +138,7 @@ const emit = defineEmits([
 ]);
 
 const commandLine = ref(null);
+const messageWindow = ref(null);
 const commandLineExpanded = ref(false);
 
 // The open-surface registry (design D9): AppClient computes the set of open
@@ -154,10 +156,17 @@ function isEditable(target) {
   );
 }
 
-// Side-effect-free focus rescue (task 3.5): the existing `dock.focus()`
-// path, extracted so the mode watcher can reuse it without the drawer-close
-// side effects (no `drawer-closed` emit, no drawer state change).
-function restoreDockFocus() {
+// The mode's focus home (webclient-dialogue-stage-actors design D5): the
+// side-effect-free rescue every return path shares (no drawer-close side
+// effects, no `drawer-closed` emit). In dialogue mode the command region is
+// collapsed, so the home is the message window's focus target (its first
+// dialogue row, else its page surface); in every other mode it is
+// `#action-dock`.
+function restoreFocusHome() {
+  if (props.mode === "dialogue") {
+    messageWindow.value?.focusHome?.();
+    return;
+  }
   const dock = document.getElementById("action-dock");
   if (dock && typeof dock.focus === "function") {
     dock.focus();
@@ -181,11 +190,11 @@ async function focusCommandField() {
 
 // Collapse path (design D2): Escape from the focused field (`focus-parent`),
 // an accepted send (`sent`), and the store's `drawerCloseRequest` watcher
-// restore focus to `#action-dock` first (so `blur` fires `focus-lost` and
+// restore focus to the mode's focus home first (so `blur` fires `focus-lost` and
 // releases any borrow) and then collapse the command line.
 function releaseCommandField(restoreFocus) {
   if (restoreFocus) {
-    restoreDockFocus();
+    restoreFocusHome();
   }
   commandLineExpanded.value = false;
 }
@@ -228,54 +237,98 @@ function onWindowKeydown(event) {
 }
 
 // A mode change that hides the surface holding focus moves focus to the
-// action dock BEFORE the CSS hides the surface (design D2/D10): the
+// incoming mode's focus home BEFORE the CSS hides it (design D2/D10): the
 // `display:none` gate runs when the `data-elosern-mode` attribute updates,
-// so the rescue must happen in the pre-update phase of the watcher.
+// so the rescue must happen in the pre-update phase of the watcher (the
+// prop is already the new mode; the DOM still shows the old one).
 const HIDDEN_BY_MODE = {
   creation: "[data-anchor='place'], [data-anchor='band-message'], [data-anchor='vitals'], [data-anchor='map'], [data-anchor='command-line']",
   combat: ".local-map",
   exploration: "",
-  // webclient-align-08-dialogue-surface: dialogue keeps the whole cockpit
-  // visible (the matrix's dialogue column). Only the objective line is
-  // hidden there (and in combat), and it has no tab stop
-  // (webclient-avg-stage-hud-anchors design D2), so a mode flip into/out of
-  // dialogue never strands focus.
-  dialogue: "",
+  // webclient-dialogue-stage-actors (design D4): dialogue collapses the
+  // command region together with the dock inside it. (The objective line is
+  // hidden too, but carries no tab stop.)
+  dialogue: "[data-anchor='band-command']",
 };
+
+// Focus fell out of the rendered layout: the body, a removed element, or an
+// element that just lost its box to `display:none` before the browser
+// blurred it.
+function focusIsLost(active) {
+  return (
+    !active ||
+    active === document.body ||
+    active === document.documentElement ||
+    !active.isConnected ||
+    (typeof active.getClientRects === "function" && active.getClientRects().length === 0)
+  );
+}
 
 watch(
   () => props.mode,
-  (nextMode, prevMode) => {
+  async (nextMode, prevMode) => {
     const active = document.activeElement;
+    if (nextMode === "dialogue" && prevMode !== "dialogue") {
+      // Entering dialogue (design D5), in two phases. Pre-flush: focus held in
+      // the command region moves to the page surface, visible in both
+      // variants' layout, so the browser never blurs it to the body. After
+      // the flush the dialogue rows exist: the window's focus home takes it.
+      // A drawer or the command field that holds focus keeps it.
+      const band = active?.closest?.(HIDDEN_BY_MODE.dialogue);
+      if (band) {
+        messageWindow.value?.$el?.querySelector?.('[data-testid="message-page"]')?.focus({ preventScroll: true });
+      }
+      await nextTick();
+      const now = document.activeElement;
+      if (
+        focusIsLost(now) ||
+        now?.matches?.('[data-testid="message-page"]') ||
+        now?.closest?.(HIDDEN_BY_MODE.dialogue)
+      ) {
+        restoreFocusHome();
+      }
+      return;
+    }
     const hiddenSelector = HIDDEN_BY_MODE[nextMode] || HIDDEN_BY_MODE.exploration;
     if (active && active.closest && hiddenSelector && active.closest(hiddenSelector)) {
-      restoreDockFocus();
+      restoreFocusHome();
     }
     // A creation transition closes the open overlay (the store's syncHudDrawer
     // clears `hudOverlay`); route focus to the action dock so it is never lost
     // into a hidden or unmounted surface (webclient-contextual-hud: "A creation
     // transition closes the overlays ... focus is routed to the action dock").
     if (nextMode === "creation" && active && active.closest && active.closest(".overlay-host")) {
-      restoreDockFocus();
+      restoreFocusHome();
     }
     // Entering creation collapses the command line after the pre-hide focus
     // rescue so returning to exploration starts collapsed (design D7).
     if (nextMode === "creation") {
       commandLineExpanded.value = false;
     }
+    if (prevMode === "dialogue") {
+      // Leaving dialogue (design D5): the dialogue rows are gone after the
+      // flush, so focus held in the message region (or already dropped to
+      // the body) returns to the now-rendered dock.
+      await nextTick();
+      const now = document.activeElement;
+      if (focusIsLost(now) || now?.closest?.("[data-anchor='band-message']")) {
+        restoreFocusHome();
+      }
+    }
   },
 );
 
 // Pre-flush focus rescue for data-driven vitals island hide (design D3):
 // when the island hides outside combat (all vitals full and conditions cleared),
-// any focus held inside the island is restored to the action dock before display:none.
+// any focus held inside the island is restored to the mode's focus home before
+// display:none (the message window in dialogue).
 watch(
   () => props.vitalsVisible,
   (nextVisible, prevVisible) => {
     if (prevVisible && !nextVisible) {
       const active = document.activeElement;
       if (active && active.closest && active.closest('[data-testid="status-panel"]')) {
-        restoreDockFocus();
+        restoreFocusHome();
       }
     }
   },
@@ -292,9 +345,10 @@ onBeforeUnmount(() => {
 
 // Expose the command-line focus API (H5, design D6): the store-driven
 // freeform dialogue entry point (a freeform affordance activation) focuses
-// the field via `focusCommandField`, and a successful dock-borrowed send
-// returns focus to `#action-dock` via `releaseCommandField(true)`.
-defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
+// the field via `focusCommandField`, a successful borrowed send returns focus
+// to the mode's focus home via `releaseCommandField(true)`, and the dock's
+// popover-close watcher re-homes focus through `restoreFocusHome`.
+defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome });
 </script>
 
 <template>
@@ -330,11 +384,11 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       </template>
       <template #band-message>
         <MessageWindow
+          ref="messageWindow"
           :lines="props.narrative"
           :marks="props.responseMarks"
           :mode="props.mode"
           :dialogue="props.dialogue"
-          :art-panel="props.artPanel"
           :font-scale="props.fontScale"
           :text-speed="props.textSpeed"
           :auto-advance="props.autoAdvance"

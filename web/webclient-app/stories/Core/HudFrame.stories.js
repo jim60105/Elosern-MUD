@@ -26,14 +26,14 @@ const renderFrame = (args) => ({
   render: () =>
     h(HudFrame, args, {
       "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
-      "actor-right": () => sample("actor-right（保留）"),
+      "actor-right": () => (args.mode === "dialogue" ? sample("actor-right · 對話對象立繪", "background:#1a1d2099;") : null),
       place: () => sample("place · 地點卡"),
       vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
       map: () => [
         sample("map · 小地圖", "width:218px;height:200px;align-self:flex-end;"),
         sample("map · 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
       ],
-      "band-message": () => sample("band-message · 訊息視窗（2/3）"),
+      "band-message": () => sample(args.mode === "dialogue" ? "band-message · 訊息視窗（全寬，名牌）" : "band-message · 訊息視窗（2/3）"),
       "band-command": () => sample("band-command · 指令面板（1/3）"),
       "command-line": () => sample("command-line · 指令列"),
     }),
@@ -60,7 +60,9 @@ export default {
           "CSS-only on `data-elosern-mode` (display:none): creation hides the " +
           "place card, the message region, and both island anchors, and the " +
           "command region spans the whole band; the objective line shows only " +
-          "in exploration. The " +
+          "in exploration; dialogue collapses the command region " +
+          "(display:none, the dock stays mounted) so the message region " +
+          "spans the band, and `actor-right` carries the dialogue host. The " +
           "open-surface registry drives the stage recession behind open " +
           "drawers and overlays.",
       },
@@ -81,6 +83,13 @@ export const CombatStage = {
 export const CreationStage = {
   render: renderFrame,
   args: { mode: "creation" },
+};
+
+// Dialogue (webclient-dialogue-stage-actors design D4): one band column,
+// the command region collapsed, both portrait anchors occupied.
+export const DialogueStage = {
+  render: renderFrame,
+  args: { mode: "dialogue", commandLineExpanded: false },
 };
 
 export const MenuOpenRecession = {
