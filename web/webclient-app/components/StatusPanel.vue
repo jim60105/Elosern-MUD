@@ -4,8 +4,17 @@
 // `data-testid="status-panel"` root and the three
 // `status-panel__gauge-value--{hp,mp,sp}` hooks (carried by the VitalsTrack
 // rows) keep the combat and transport-mount browser journeys unchanged.
+//
+// The reveal (webclient-scene-transitions, design D6): the `v-show` root sits
+// inside a `<Transition>`, so the island fades and slides 12px into place
+// when it shows and back out when it hides. From the hiding commit on it is
+// inert (the shell's pre-flush rescue has already moved focus out), and it
+// reaches `display: none` when its exit ends; shown again mid-exit, it is in
+// reach again at once.
+import { computed } from "vue";
 import ConditionChips from "./ConditionChips.vue";
 import VitalsTrack from "./VitalsTrack.vue";
+import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
   // The committed `status` v1 panel payload.
@@ -22,19 +31,28 @@ const props = defineProps({
   // with v-show (display: none) at full health outside combat while keeping
   // VitalsTrack mounted so trailing bar memory is preserved.
   visible: { type: Boolean, default: true },
+  // The EFFECTIVE motion level (`store.view.motionLevel`,
+  // webclient-scene-transitions D1): at `off` the transition has no CSS
+  // phase, so the final state is on screen in the commit's frame (a CSS
+  // phase would outlive the commit by a double frame even at 0s).
+  motionLevel: { type: String, default: "full" },
 });
+
+const transitionCss = computed(() => props.motionLevel !== "off");
 </script>
 
 <template>
-  <div v-show="visible" class="island-stack" data-testid="status-panel">
-    <VitalsTrack
-      :status="status"
-      :low-hp="lowHp"
-      :revision="revision"
-      :epoch="epoch"
-    />
-    <ConditionChips :conditions="status.conditions || []" />
-  </div>
+  <Transition name="vitals-reveal" :css="transitionCss" v-bind="inertWhileLeaving">
+    <div v-show="visible" class="island-stack" data-testid="status-panel">
+      <VitalsTrack
+        :status="status"
+        :low-hp="lowHp"
+        :revision="revision"
+        :epoch="epoch"
+      />
+      <ConditionChips :conditions="status.conditions || []" />
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -55,5 +73,24 @@ const props = defineProps({
      inside the capped vitals anchor instead of overflowing the budget. */
   min-height: 0;
   font-family: var(--f-sans);
+}
+
+/* The reveal (webclient-scene-transitions, design D6): the island drops
+   12px into place under the place card as it fades in, and lifts back as it
+   fades out. Without travel (the reduced level) it only fades. */
+.vitals-reveal-enter-active {
+  transition:
+    opacity var(--motion-reveal) var(--ease-enter),
+    transform var(--motion-reveal) var(--ease-enter);
+}
+.vitals-reveal-leave-active {
+  transition:
+    opacity var(--motion-reveal) var(--ease-exit),
+    transform var(--motion-reveal) var(--ease-exit);
+}
+.vitals-reveal-enter-from,
+.vitals-reveal-leave-to {
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--motion-shift-sm) * var(--motion-travel)));
 }
 </style>

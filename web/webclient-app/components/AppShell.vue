@@ -395,7 +395,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
         <slot name="backdrop" />
       </template>
       <template #place>
-        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" />
+        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" :motion-level="props.motionLevel" />
       </template>
       <template #vitals>
         <slot name="vitals" />

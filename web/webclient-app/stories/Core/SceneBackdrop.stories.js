@@ -1,4 +1,4 @@
-import { h, onMounted, ref } from "vue";
+import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import SceneBackdrop from "../../components/SceneBackdrop.vue";
 import {
   ART_PANEL_PENDING_SAMPLE,
@@ -126,4 +126,44 @@ export const Failed = {
 export const Unavailable = {
   render: renderBackdrop,
   args: { art: ART_PANEL_UNAVAILABLE_SAMPLE, mode: "exploration" },
+};
+
+// The scene crossfade (webclient-scene-transitions, design D2): every few
+// seconds the committed scene changes to another painting. The next image is
+// decoded first — until then the current one dims, as a stale scene — and
+// then fades in above it while the previous one fades out; the label and
+// alternative text switch at once. The paintings are the redesign samples
+// Storybook serves under `/art/showcase/`.
+const SHOWCASE_SCENES = [
+  { url: "/art/showcase/sample-town.webp", label: "石板廣場", alt: "午後陽光下的市集廣場與遠方的鐘樓" },
+  { url: "/art/showcase/sample-forest.webp", label: "北岸大道", alt: "林蔭覆蓋的河岸大道" },
+  { url: "/art/showcase/sample-guild.webp", label: "西風酒館", alt: "燈火溫暖的酒館大廳" },
+];
+
+function renderSceneChange() {
+  return {
+    setup() {
+      const index = ref(0);
+      let timer = null;
+      onMounted(() => {
+        timer = setInterval(() => {
+          index.value = (index.value + 1) % SHOWCASE_SCENES.length;
+        }, 3000);
+      });
+      onBeforeUnmount(() => clearInterval(timer));
+      return () => {
+        const shown = SHOWCASE_SCENES[index.value];
+        const art = scenePanel({
+          scene: { ...ART_PANEL_SAMPLE.scene, url: shown.url, label: shown.label, alt: shown.alt },
+        });
+        return h("div", { style: "position: relative; width: 100%; height: 540px; overflow: hidden;" }, [
+          h(SceneBackdrop, { art, mode: "exploration" }),
+        ]);
+      };
+    },
+  };
+}
+
+export const SceneChange = {
+  render: renderSceneChange,
 };

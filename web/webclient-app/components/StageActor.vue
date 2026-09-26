@@ -4,18 +4,25 @@
 // frame of the drawer's art slot) and adds the stage's own concerns:
 // - the side it stands on (`left` for the player, `right` for the dialogue
 //   host), exposed as `data-side` so the soft edge masks can mirror;
-// - the static speaking state: the listener is dimmed through the shared
+// - the speaking state: the listener is dimmed through the shared
 //   `--actor-dim` token and `data-speaking` names the state for tests. The
 //   dim is never the only cue (the message window's name plate names the
-//   host), and there is no transition here — the motion layer owns it;
+//   host); it eases on the motion tokens (instant below `full`);
 // - the truthful placeholder: with no catalog or roster entry the actor
 //   draws the name's initial and the name (never a stock image); a
 //   placeholder entry keeps its own label (肖像生成中, 無肖像) with the
 //   name's initial in the ring; with no name at all, `ReferenceArtwork`
 //   keeps its own `肖像生成中` card.
 // Decorative art: no focusable element, no pointer events.
+//
+// A new portrait source (webclient-scene-transitions, design D5) — a new
+// image URL, or a switch between an image and a placeholder — crossfades:
+// the artwork is keyed by its source, the new one fades in above the old,
+// and the old one is inert from the commit on. A same-URL refresh keeps the
+// key, so it never fades.
 import { computed } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
+import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
   // A roster portrait or an `art` panel `portrait_catalog` entry, or null.
@@ -30,6 +37,11 @@ const props = defineProps({
   // True while the other side speaks (AppClient derives it from the
   // committed mode and `view.dialogueSpeaker`).
   dimmed: { type: Boolean, default: false },
+  // The EFFECTIVE motion level (`store.view.motionLevel`,
+  // webclient-scene-transitions D1): at `off` the transition has no CSS
+  // phase, so the final state is on screen in the commit's frame (a CSS
+  // phase would outlive the commit by a double frame even at 0s).
+  motionLevel: { type: String, default: "full" },
 });
 
 const shown = computed(() => {
@@ -38,6 +50,16 @@ const shown = computed(() => {
   }
   return props.name ? { placeholder: { kind: "missing", label: props.name } } : null;
 });
+
+const portraitKey = computed(() => {
+  const entry = shown.value;
+  if (entry?.url) {
+    return entry.url;
+  }
+  return entry ? `ph:${entry.placeholder?.label ?? ""}` : "none";
+});
+
+const transitionCss = computed(() => props.motionLevel !== "off");
 </script>
 
 <template>
@@ -47,7 +69,9 @@ const shown = computed(() => {
     :data-side="side"
     :data-speaking="String(!dimmed)"
   >
-    <ReferenceArtwork :portrait="shown" :initial-of="name" />
+    <Transition name="actor-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
+      <ReferenceArtwork :key="portraitKey" :portrait="shown" :initial-of="name" />
+    </Transition>
   </div>
 </template>
 
@@ -61,9 +85,34 @@ const shown = computed(() => {
   height: 100%;
   overflow: visible;
 }
-/* The listener (design D1): one shared dim token, a static state. */
+/* The listener (design D1): one shared dim token. The change of speaker
+   eases (webclient-scene-transitions D5); below `full` it is instant. */
+.stage-actor {
+  transition: filter var(--motion-base) var(--ease-standard);
+}
 .stage-actor[data-speaking="false"] {
   filter: brightness(var(--actor-dim));
+}
+
+/* The portrait crossfade (webclient-scene-transitions, design D5): the new
+   figure fades in above the old one on a fast-rising curve while the old one
+   thins on a slow-starting curve, so the pair never shows the stage through
+   a half-transparent body. The leaving copy is lifted out of flow onto the
+   same box. */
+.stage-actor > .actor-xfade-enter-active {
+  position: relative;
+  z-index: 1;
+  transition: opacity var(--motion-portrait) var(--ease-standard);
+}
+.stage-actor > .actor-xfade-leave-active {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transition: opacity var(--motion-portrait) var(--ease-exit);
+}
+.stage-actor > .actor-xfade-enter-from,
+.stage-actor > .actor-xfade-leave-to {
+  opacity: 0;
 }
 
 /* The figure dissolves into the stage instead of ending in a rectangle (a

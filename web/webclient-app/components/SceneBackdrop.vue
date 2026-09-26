@@ -18,7 +18,18 @@
 // The scene full view (MODIFIED webclient-art-panel): the backdrop's scene
 // control opens a full-screen view on click or Enter, Escape closes it and
 // restores focus to the control.
-import { computed, nextTick, ref, watch } from "vue";
+//
+// The scene crossfade (webclient-scene-transitions, design D2): the image
+// the committed state asks for (`targetImage`) is kept apart from the image
+// on screen (`shownImage`). A new URL is decoded first; until its pixels are
+// ready the previous image stays up, dimmed like a pending scene's prior
+// image (never presented as the current scene), and only then does the new
+// image fade in over it while the previous one fades out, so the fade never
+// passes through an empty frame. The label, alternative text, and
+// placeholder follow the committed state at once. Mount shows its image
+// without a fade, and at the `off` motion level the swap is instant.
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
   // The committed `art` v1 panel payload: `available: true` carries
@@ -31,6 +42,11 @@ const props = defineProps({
   // stage differs per mode and carries the inset vignette, applied by the
   // shell's stage, not the backdrop itself).
   mode: { type: String, default: "exploration" },
+  // The EFFECTIVE motion level (`store.view.motionLevel`,
+  // webclient-scene-transitions D1): at `off` the transition has no CSS
+  // phase, so the final state is on screen in the commit's frame (a CSS
+  // phase would outlive the commit by a double frame even at 0s).
+  motionLevel: { type: String, default: "full" },
 });
 
 // The current mode's gradient stage token (design D7/D10): the always-correct
@@ -91,10 +107,10 @@ const sceneUrl = computed(() => {
   return url ?? null;
 });
 
-// Which image element renders:
+// Which image the committed state asks for:
 // - done + a live URL → the current image
 // - pending + a prior image → the dimmed prior image
-const activeImage = computed(() => {
+const targetImage = computed(() => {
   if (scene.value?.status === "done" && sceneUrl.value && !imageLoadFailed.value) {
     return { url: sceneUrl.value, dimmed: false };
   }
@@ -102,6 +118,90 @@ const activeImage = computed(() => {
     return { url: priorImage.value, dimmed: true };
   }
   return null;
+});
+
+// The image on screen (design D2). Mount takes the target at once: there is
+// nothing to fade from, and mounting plays no transition.
+const shownImage = shallowRef(targetImage.value);
+// The URL whose decode is in flight, or null.
+const decodingUrl = ref(null);
+// The decoder keeps a reference to its `Image` until it settles.
+let decoder = null;
+
+const transitionCss = computed(() => props.motionLevel !== "off");
+
+// A new URL's pixels are ready: `decode()` where the engine has it (a
+// rejection — a broken image — still settles, so the rendered `<img>`'s own
+// error path records the failure). Returns null where there is no decode API
+// (jsdom), so the caller swaps at once.
+function decodeImage(url) {
+  if (typeof Image === "undefined") {
+    return null;
+  }
+  const img = new Image();
+  if (typeof img.decode !== "function") {
+    return null;
+  }
+  img.src = url;
+  decoder = img;
+  return img.decode();
+}
+
+watch(
+  () => [targetImage.value?.url ?? null, targetImage.value?.dimmed ?? false],
+  ([url]) => {
+    const target = targetImage.value;
+    if (!target) {
+      decodingUrl.value = null;
+      decoder = null;
+      shownImage.value = null;
+      return;
+    }
+    if (shownImage.value?.url === url) {
+      // The same bitmap: only the dimmed treatment changes (it eases).
+      decodingUrl.value = null;
+      decoder = null;
+      shownImage.value = target;
+      return;
+    }
+    if (decodingUrl.value === url) {
+      return;
+    }
+    const pending = decodeImage(url);
+    if (!pending) {
+      decodingUrl.value = null;
+      shownImage.value = target;
+      return;
+    }
+    decodingUrl.value = url;
+    const settle = () => {
+      // A newer target replaced this one while it decoded: drop it.
+      if (decodingUrl.value !== url) {
+        return;
+      }
+      decodingUrl.value = null;
+      decoder = null;
+      if (targetImage.value?.url === url) {
+        shownImage.value = targetImage.value;
+      }
+    };
+    pending.then(settle, settle);
+  },
+);
+
+onBeforeUnmount(() => {
+  decodingUrl.value = null;
+  decoder = null;
+});
+
+// What renders: the shown image, dimmed while the next one decodes — the
+// label already names the new scene, so the old bitmap must look stale.
+const activeImage = computed(() => {
+  const shown = shownImage.value;
+  if (!shown) {
+    return null;
+  }
+  return { url: shown.url, dimmed: shown.dimmed || decodingUrl.value !== null };
 });
 
 const showPlaceholder = computed(() => {
@@ -139,16 +239,30 @@ const placeholderKind = computed(() => {
 const sceneLabel = computed(() => scene.value?.label ?? (unavailable.value ? "場景" : ""));
 const sceneAlt = computed(() => scene.value?.alt ?? "");
 
-function onImageLoad(url) {
-  if (url) {
-    priorImage.value = url;
+// The rendered image's own URL: during a crossfade two images are in the
+// DOM, and a late event from the leaving one must not speak for the scene on
+// screen.
+function eventUrl(event) {
+  return event?.currentTarget?.getAttribute?.("src") || null;
+}
+
+function onImageLoad(event) {
+  const url = eventUrl(event);
+  if (!url || url !== shownImage.value?.url) {
+    return;
   }
+  priorImage.value = url;
   imageLoadFailed.value = false;
 }
 
-function onImageError(url) {
-  if (url) {
-    failedUrls.add(url);
+function onImageError(event) {
+  const url = eventUrl(event);
+  if (!url) {
+    return;
+  }
+  failedUrls.add(url);
+  if (url !== shownImage.value?.url) {
+    return;
   }
   priorImage.value = null;
   imageLoadFailed.value = true;
@@ -219,17 +333,23 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   >
     <div v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample" aria-hidden="true"></div>
     <p v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample-label">範例場景 · 非目前地點實際圖片</p>
-    <img
-      v-if="activeImage"
-      class="scene-backdrop__image"
-      data-testid="scene-backdrop-image"
-      :src="activeImage.url"
-      :class="{ 'scene-backdrop__image--dimmed': activeImage.dimmed }"
-      :alt="''"
-      aria-hidden="true"
-      @load="onImageLoad(activeImage.url)"
-      @error="onImageError(activeImage.url)"
-    />
+    <!-- The crossfade (design D2): keyed by URL with no mode, so the
+         entering image fades in above the leaving one, which is inert from
+         the commit on. -->
+    <Transition name="scene-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
+      <img
+        v-if="activeImage"
+        :key="activeImage.url"
+        class="scene-backdrop__image"
+        data-testid="scene-backdrop-image"
+        :src="activeImage.url"
+        :class="{ 'scene-backdrop__image--dimmed': activeImage.dimmed }"
+        :alt="''"
+        aria-hidden="true"
+        @load="onImageLoad($event)"
+        @error="onImageError($event)"
+      />
+    </Transition>
 
     <div
       v-if="showPlaceholder"
@@ -320,18 +440,44 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 
 /* The mode's gradient stage is the always-correct base layer (design D3):
    the backdrop element's background carries the current mode's gradient. */
+/* The dimmed treatment eases in and out on the scene duration. */
 .scene-backdrop .scene-backdrop__image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity var(--motion-scene) var(--ease-standard);
 }
 
 /* A pending scene keeps its prior image visibly dimmed (never presented
-   as current). */
+   as current), and so does the previous image while the next one decodes. */
 .scene-backdrop .scene-backdrop__image--dimmed {
   opacity: 0.45;
+}
+
+/* The scene crossfade (webclient-scene-transitions, design D2). The new
+   painting fades in ABOVE the old one on a fast-rising curve while the old
+   one thins on a slow-starting curve, so the pair never drops through the
+   dark gradient beneath them (no dip in brightness mid-fade). The entering
+   layer also settles from a hair larger than cover — a slight arrival, not a
+   zoom — and only where travel is allowed. */
+.scene-backdrop .scene-xfade-enter-active {
+  z-index: 1;
+  transition:
+    opacity var(--motion-scene) var(--ease-standard),
+    transform var(--motion-scene) var(--ease-standard);
+}
+.scene-backdrop .scene-xfade-leave-active {
+  z-index: 0;
+  transition: opacity var(--motion-scene) var(--ease-exit);
+}
+.scene-backdrop .scene-xfade-enter-from {
+  opacity: 0;
+  transform: scale(calc(1 + 0.025 * var(--motion-travel)));
+}
+.scene-backdrop .scene-xfade-leave-to {
+  opacity: 0;
 }
 
 .scene-backdrop .scene-backdrop__placeholder {

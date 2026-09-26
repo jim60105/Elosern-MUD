@@ -14,7 +14,18 @@
 // below is a group's verbatim state/helper, destructured so the template is
 // unchanged. The scoped stylesheet lives in ./map-lattice.css (included via
 // the style src, same mechanism as CreationOverlay.vue).
-import { computed, ref, useId } from "vue";
+//
+// The minimap pan (webclient-scene-transitions, design D3): with `panOnMove`
+// a move of the current node starts the drawing translated so the node the
+// player left sits where it stood on screen, then eases it to the committed
+// placement (a FLIP offset; `lib/map_pan.js`). Only the drawing's two
+// `.map-lattice__pan` groups move — edges, pin, and axis; the node groups —
+// as one rigid shape, so nodes, names, and click targets carry the new
+// placement from the commit on. The dot field, the fog, and the gutter's
+// edge-direction markers stay put. Travel is multiplied by `--motion-travel`,
+// so the reduced and off levels show the new placement at once.
+import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
+import { panOffset } from "../lib/map_pan.js";
 import {
   useMapLatticeGeometry,
   MARKER_CURRENT_R,
@@ -81,6 +92,14 @@ const props = defineProps({
   // it changes coordinate sourcing ONLY: markers, edges, labels, legend,
   // activation, focus, and accessible names stay the shared wave-1 renderer.
   variant: { type: String, default: "lattice" },
+  // Pan the drawing from the previous current node on a move (the minimap
+  // island only; the full-map overlay owns its own view and never pans).
+  panOnMove: { type: Boolean, default: false },
+  // The EFFECTIVE motion level (`store.view.motionLevel`,
+  // webclient-scene-transitions D1): at `off` the transition has no CSS
+  // phase, so the final state is on screen in the commit's frame (a CSS
+  // phase would outlive the commit by a double frame even at 0s).
+  motionLevel: { type: String, default: "full" },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -154,6 +173,111 @@ const {
   onFocusIn,
 } = mapView;
 
+// ---- the minimap pan (design D3) ----
+
+const svgEl = ref(null);
+let panFrame = null;
+
+function parseViewBox(svg) {
+  const parts = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null;
+  return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+}
+
+function nodeTranslate(svg, id) {
+  if (id == null) return null;
+  const el = [...svg.querySelectorAll("[data-node]")].find((node) => node.getAttribute("data-node") === id);
+  const match = el?.getAttribute("transform")?.match(/translate\(\s*([-\d.e]+)[\s,]+([-\d.e]+)\s*\)/);
+  return match ? { x: Number(match[1]), y: Number(match[2]) } : null;
+}
+
+function panGroups(svg) {
+  return [...svg.querySelectorAll(".map-lattice__pan")];
+}
+
+// The on-screen drawing as the DOM holds it: the node's user-unit position
+// plus any pan still in flight, the viewBox, and the canvas's CSS size.
+function readFrame(svg, id, withInFlight) {
+  const pos = nodeTranslate(svg, id);
+  const viewBox = parseViewBox(svg);
+  const rect = svg.getBoundingClientRect();
+  if (!pos || !viewBox) return null;
+  if (withInFlight) {
+    const group = panGroups(svg)[0];
+    const matrix = group ? getComputedStyle(group).transform : "none";
+    const m = matrix && matrix !== "none" ? matrix.match(/matrix\(([^)]+)\)/) : null;
+    if (m) {
+      const v = m[1].split(",").map(Number);
+      pos.x += v[4] || 0;
+      pos.y += v[5] || 0;
+    }
+  }
+  return { pos, viewBox, size: { width: rect.width, height: rect.height } };
+}
+
+function setPan(el, dx, dy) {
+  const axis = el.classList.contains("map-lattice__pan") ? "pan" : "glide";
+  el.style.setProperty(`--${axis}-x`, `${dx}px`);
+  el.style.setProperty(`--${axis}-y`, `${dy}px`);
+}
+
+// Before the patch: the previous current node where it stands now.
+watch(
+  currentNodeId,
+  (_next, prev) => {
+    panFrame = null;
+    const svg = svgEl.value;
+    if (!props.panOnMove || !svg || props.motionLevel === "off" || prev == null) return;
+    panFrame = { id: prev, frame: readFrame(svg, prev, true) };
+  },
+  { flush: "pre" },
+);
+
+// After the patch: start the drawing where the previous node stood on
+// screen, then release it to the committed placement on the base duration.
+watch(
+  currentNodeId,
+  (nextId) => {
+    const recorded = panFrame;
+    panFrame = null;
+    const svg = svgEl.value;
+    if (!recorded || !svg) return;
+    const offset = panOffset(recorded.frame, readFrame(svg, recorded.id, false));
+    if (!offset) return;
+    const groups = panGroups(svg);
+    // The current-node marker travels the step it stands for: it starts on
+    // the node the player left (in the new placement) and glides to the new
+    // node, while the drawing pans under it. Both share one duration and
+    // curve, so on screen the marker moves in a straight line from where it
+    // was to where it is now.
+    const from = nodeTranslate(svg, recorded.id);
+    const to = nodeTranslate(svg, nextId);
+    const marker = svg.querySelector(".local-map__marker--current");
+    const glides = [];
+    if (marker && from && to) {
+      glides.push([marker, from.x - to.x, from.y - to.y]);
+    }
+    if (Math.abs(offset.dx) >= 0.5 || Math.abs(offset.dy) >= 0.5) {
+      for (const el of groups) glides.push([el, offset.dx, offset.dy]);
+    }
+    for (const [el, dx, dy] of glides) {
+      el.style.transition = "none";
+      setPan(el, dx, dy);
+    }
+    // Commit the start state before the release (FLIP's "invert" step).
+    for (const [el] of glides) void getComputedStyle(el).transform;
+    for (const [el] of glides) {
+      el.style.transition = "";
+      setPan(el, 0, 0);
+    }
+  },
+  { flush: "post" },
+);
+
+onBeforeUnmount(() => {
+  panFrame = null;
+});
+
 defineExpose({
   zoomIn,
   zoomOut,
@@ -181,6 +305,7 @@ defineExpose({
     @focusin="onFocusIn"
   >
   <svg
+    ref="svgEl"
     class="local-map__lattice"
     :class="{ 'local-map__lattice--canvas': overlayChrome }"
     :width="canvasSize ?? canvasWidth"
@@ -242,6 +367,7 @@ defineExpose({
       :fill="`url(#${fogId})`"
       aria-hidden="true"
     />
+    <g class="map-lattice__pan" data-testid="map-lattice__pan">
     <line
       v-for="edge in edgeGeoms"
       :key="`edge-${edge.i}`"
@@ -279,6 +405,7 @@ defineExpose({
     >
       <line :x1="0" :y1="currentPos.y" :x2="canvasWidth" :y2="currentPos.y" />
       <line :x1="currentPos.x" :y1="0" :x2="currentPos.x" :y2="canvasHeight" />
+    </g>
     </g>
     <!-- Edge direction markers (map-02 D3b): remembered places outside the
          in-view extent, claimed by the true current→remote bearing, drawn in
@@ -348,6 +475,7 @@ defineExpose({
         </text>
       </template>
     </g>
+    <g class="map-lattice__pan" data-testid="map-lattice__pan">
     <g
       v-for="node in drawnNodes"
       :key="node.id"
@@ -428,6 +556,7 @@ defineExpose({
       >
         <title>{{ node.label }}</title>{{ visibleNodeLabel(node) }}
       </text>
+    </g>
     </g>
   </svg>
   </div>
