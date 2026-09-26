@@ -23,9 +23,12 @@
   "use strict";
 
   // Version 2 adds the reading preferences (text speed and auto-advance;
-  // OpenSpec change webclient-typewriter-reading-prefs). No migration is
-  // registered: a version-1 wrapper resets to the version-2 default.
-  var CURRENT_LAYOUT_VERSION = 2;
+  // OpenSpec change webclient-typewriter-reading-prefs). Version 3 replaces
+  // the reduced-motion override with the optional motion level (`full` /
+  // `reduced` / `off`; OpenSpec change webclient-motion-level). No migration
+  // is registered: a version-1 or version-2 wrapper resets to the version-3
+  // default.
+  var CURRENT_LAYOUT_VERSION = 3;
   var STORAGE_KEY = "elosern.layout";
   // Stock Evennia pre-project keys are never imported by any version.
   var STOCK_KEYS = [
@@ -50,23 +53,25 @@
   ];
 
   // Only harmless display preferences may be persisted: the prose scale,
-  // the text-to-HTML toggle, the optional reduced-motion override, the
-  // colorblind palette, and (version 2) the reading preferences.
+  // the text-to-HTML toggle, the optional motion level, the colorblind
+  // palette, and (version 2) the reading preferences.
   var PREFERENCE_TYPES = {
     text2html: "boolean",
     fontScale: "number",
-    reducedMotion: "boolean",
+    motionLevel: "enum",
     colorblind: "boolean",
     textSpeed: "enum",
     autoAdvance: "boolean",
   };
 
   // The allowed values of each "enum" preference. This UMD module cannot
-  // import ESM, so it carries its own copy of `TEXT_SPEEDS` from
-  // web/webclient-app/lib/message_reveal.js; a node test asserts the two
-  // lists are equal.
+  // import ESM, so it carries its own copies of `TEXT_SPEEDS` from
+  // web/webclient-app/lib/message_reveal.js and of `MOTION_LEVELS` from
+  // web/webclient-app/lib/motion_level.js; a node test asserts each pair of
+  // lists is equal.
   var PREFERENCE_ENUMS = {
     textSpeed: ["slow", "normal", "fast", "instant"],
+    motionLevel: ["full", "reduced", "off"],
   };
 
   var REQUIRED_SET = {};
@@ -146,8 +151,8 @@
 
   function defaultWrapper() {
     // The default wrapper's preferences carry every default; the
-    // `reducedMotion` key is absent (optional — its absence means "no
-    // override", the OS preference applies).
+    // `motionLevel` key is absent (optional — its absence means nothing is
+    // stored, so the OS preference applies).
     return {
       layout_version: CURRENT_LAYOUT_VERSION,
       dimensions: {},
@@ -494,7 +499,10 @@
     MAX_STORAGE_BYTES: MAX_STORAGE_BYTES,
     REQUIRED_COMPONENTS: REQUIRED_COMPONENTS.slice(),
     PREFERENCE_TYPES: Object.assign({}, PREFERENCE_TYPES),
-    PREFERENCE_ENUMS: { textSpeed: PREFERENCE_ENUMS.textSpeed.slice() },
+    PREFERENCE_ENUMS: {
+      textSpeed: PREFERENCE_ENUMS.textSpeed.slice(),
+      motionLevel: PREFERENCE_ENUMS.motionLevel.slice(),
+    },
     DEFAULT_LAYOUT_CONFIG: clone(DEFAULT_LAYOUT_CONFIG),
     defaultWrapper: defaultWrapper,
     validateWrapper: validateWrapper,
