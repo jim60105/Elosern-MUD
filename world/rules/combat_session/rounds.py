@@ -394,11 +394,6 @@ def _submit_request(
             # keeps per-round agency. The session's simulated/nonlethal
             # policy threads into both entries so upkeep-settled ticks honor
             # the same credit rules as direct damage (fix-dot-kill-credit D4).
-            # One ordinary round also records its own beats inputs
-            # (combat-beats-panel D1): the roster identities and every
-            # participant's stored HP at the round's two boundaries. The
-            # overwhelm opening is not one ordinary round and records nothing.
-            round_identities, round_hp_before = capture_round_hp(battlefield)
             if opening == "overwhelm":
                 provider = _overwhelm_provider(actor, request, battlefield, record)
                 result = resolve_overwhelm(
@@ -417,7 +412,12 @@ def _submit_request(
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:
-                # The default: one ordinary round.
+                # The default: one ordinary round. It also records its own
+                # beats inputs (combat-beats-panel D1): the roster identities
+                # and every participant's stored HP before the round. The
+                # overwhelm opening is not one ordinary round and records
+                # nothing.
+                round_identities, round_hp_before = capture_round_hp(battlefield)
                 provider = _round_provider(actor, request, battlefield, record)
                 logs = run_round(
                     battlefield,
@@ -457,11 +457,13 @@ def _submit_request(
             notifications += _scan_sexual_coercion(actor, battlefield, logs)
             notifications += tuple(grant_notifications)
 
-            # The committed end-of-round HP (combat-beats-panel D1): read after
-            # the scans and before ``_continue_or_settle``, so a terminal
-            # settlement's regeneration, exam restoration, and defeat aftermath
-            # can never move the values the beats are checked against.
-            _, round_hp_after = capture_round_hp(battlefield)
+            if opening == "round":
+                # The committed end-of-round HP (combat-beats-panel D1): read
+                # after the scans and before ``_continue_or_settle``, so a
+                # terminal settlement's regeneration, exam restoration, and
+                # defeat aftermath can never move the values the beats are
+                # checked against.
+                _, round_hp_after = capture_round_hp(battlefield)
 
             knocked = _knocked_out_ids(logs, battlefield)
             new_fled_ids = tuple(
