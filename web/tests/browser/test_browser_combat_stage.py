@@ -31,7 +31,7 @@ VIEWPORTS = ((1920, 1080), (1440, 900), (1280, 720))
 # (components/foe-lineup.js FOE_SCALES).
 SCALES = {1: (1.0,), 2: (0.9, 0.78), 3: (0.8, 0.7, 0.61)}
 
-_FOE_NAMES = ("哥布林", "史萊姆", "狼人", "骷髏兵", "蝙蝠")
+_FOE_NAMES = ("哥布林", "史萊姆", "灰狼妖", "骷髏兵", "蝙蝠")
 
 
 def _foes(count: int, defeated: tuple[int, ...] = ()) -> list:
