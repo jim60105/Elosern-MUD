@@ -24,14 +24,23 @@ export function applyTransport(ctx) {
     if (rs.generation !== prev.generation) {
       ctx.inFlight = null;
       ctx.requestCounter = 0;
+      // A new generation replays nothing (webclient-combat-beat-queue D8):
+      // the reconnect snapshot carries the unavailable `combat_beats` form.
+      ctx.resetBeats();
       // `uncertain` is intentionally NOT cleared here: a mutation whose result
       // was withheld by a mid-flight detach stays flagged across the
       // reconnect (the C3 transport's `clearUncertain` releases it only when
       // the result is observed).
     }
-    if (prev.phase !== "detached" && rs.phase === "detached" && ctx.inFlight) {
-      ctx.uncertain = true;
-      ctx.inFlight = null;
+    if (prev.phase !== "detached" && rs.phase === "detached") {
+      // The presentation is gone with the puppet: end a playing round without
+      // presenting the rest, whatever its dispatch state (webclient-combat-
+      // beat-queue D5's detach rule).
+      ctx.resetBeats();
+      if (ctx.inFlight) {
+        ctx.uncertain = true;
+        ctx.inFlight = null;
+      }
     }
   };
 
@@ -274,6 +283,12 @@ export function applyTransport(ctx) {
     if (!ctx.view.value.connected) {
       return false;
     }
+    // A typed command ends a playing round at once, before its own input line
+    // is appended — the flush rule of "Presentation timing never gates
+    // committed state or input" (webclient-combat-beat-queue D5). It runs
+    // before the bound-freeform borrow dispatches, because `dispatchAction`
+    // itself refuses while the round plays.
+    ctx.flushBeats();
     const value = String(text == null ? "" : text);
     ctx.commandHistory.value.push(value);
     while (ctx.commandHistory.value.length > MAX_COMMAND_HISTORY) {
@@ -320,7 +335,7 @@ export function applyTransport(ctx) {
 
   ctx.dispatchAction = function dispatchAction(actionId, payload, display) {
     const v = ctx.view.value;
-    if (!v.connected || v.mutationsLocked || v.phase !== "active" || ctx.inFlight) {
+    if (!v.connected || v.mutationsLocked || v.phase !== "active" || ctx.inFlight || ctx.beatLocked()) {
       return null;
     }
     const requestId = "session:" + (++ctx.requestCounter);
@@ -332,7 +347,16 @@ export function applyTransport(ctx) {
       action_id: actionId,
       payload: payload === undefined || payload === null ? {} : payload,
     };
-    ctx.inFlight = { requestId, actionId, presentationRevision: null, handledResult: null };
+    ctx.inFlight = {
+      requestId,
+      actionId,
+      presentationRevision: null,
+      handledResult: null,
+      // The response mark this dispatch opens (webclient-combat-beat-queue
+      // D5): filled in right after the transport send, so a completed round
+      // can bind to exactly this request's response.
+      responseMark: null,
+    };
     // `handledResult` is the per-request dedup unit
     // (webclient-action-result-feedback): the fingerprint of the result this
     // in-flight dispatch has already recognized. Re-observation (publishView
@@ -363,7 +387,11 @@ export function applyTransport(ctx) {
         // An echoing dispatch's `in` line receives this same ordinal (one
         // response, not two); a silent dispatch marks its first following
         // reply or error line as the start of a new response.
-        ctx.responseMarks.value.push(ctx.narrativeSeq + 1);
+        const mark = ctx.narrativeSeq + 1;
+        ctx.responseMarks.value.push(mark);
+        // The mark is the ordinal this dispatch's response starts at, so a
+        // completed round binds to exactly this request's response.
+        ctx.inFlight.responseMark = mark;
         // The display command line (webclient-input-narrative): resolve exactly
         // one bounded echo line from the pure catalog and append it as a literal
         // text line; a rejected result leaves the line in place. Intent

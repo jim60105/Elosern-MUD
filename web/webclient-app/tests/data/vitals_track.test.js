@@ -156,6 +156,31 @@ describe("VitalsTrack (H2 vitals island)", () => {
     expect(after.attributes("data-instant")).toBe("false");
   });
 
+
+  it("shows a playing round's displayed hit points in the numerals and the fill", () => {
+    // webclient-combat-beat-queue D7 / "Vitals pair an icon, a label, and
+    // numerals with a trailing damage bar": the displayed value replaces the
+    // committed current, and the fill (and the trailing bar's ratio) follow
+    // the same number.
+    const w = mountTrack({ displayHp: 180 });
+    expect(w.get('[data-testid="status-panel__gauge-value--hp"]').text()).toBe("180 / 405");
+    const track = w.get('[data-testid="status-panel__gauge--hp"] .track');
+    const fill = track.findAll("span.fill");
+    expect(fill[0].attributes("style")).toContain("44.444");
+    // Only hp reads it: the other gauges keep their committed values.
+    expect(w.get('[data-testid="status-panel__gauge-value--mp"]').text()).toBe("139 / 420");
+    expect(w.get('[data-testid="status-panel__gauge-value--sp"]').text()).toBe("68 / 68");
+  });
+
+  it("restores the committed hit points when the round stops displaying one", async () => {
+    const w = mountTrack({ displayHp: 180 });
+    expect(w.get('[data-testid="status-panel__gauge-value--hp"]').text()).toBe("180 / 405");
+    await w.setProps({ displayHp: null });
+    // Snapped to the committed `status` value (the same ratio the ghost
+    // chases), so no displayed value outlives the round.
+    expect(w.get('[data-testid="status-panel__gauge-value--hp"]').text()).toBe("231 / 405");
+  });
+
   it("renders the combat session line as the island's header row", () => {
     const w = mountTrack({
       status: STATUS_PANEL_COMBAT_SAMPLE,

@@ -93,3 +93,17 @@ export const ReducedMotion = {
     },
   },
 };
+
+// A playing combat round's displayed hit points (webclient-combat-beat-queue
+// D7): the numerals, the fill, and the trailing bar's ratio all follow the
+// beat's `hp_after`, and the committed value returns once the round ends.
+export const DisplayedHp = {
+  render: renderVitals,
+  args: {
+    status: statusWith(DAMAGED_RESOURCES, false),
+    lowHp: false,
+    displayHp: 60,
+    revision: 4,
+    epoch: 0,
+  },
+};

@@ -42,6 +42,7 @@ import { applyCombat } from "./elosern/combat.js";
 import { applyCreation } from "./elosern/creation.js";
 import { applyInteraction } from "./elosern/interaction.js";
 import { applyTransport } from "./elosern/transport.js";
+import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
 
 export { resolveLocationLabel };
@@ -148,6 +149,10 @@ export const useElosernStore = defineStore("elosern", () => {
   applyCreation(ctx);
   applyInteraction(ctx);
   applyTransport(ctx);
+  // The combat beat playback (webclient-combat-beat-queue, design D5) sits
+  // between the transport (whose dispatch guard and lifecycle call its
+  // entries) and the view (which publishes its projected slice).
+  applyBeats(ctx);
   applyView(ctx);
 
   // The initial committed view (the original `initialView()`): built before
@@ -185,6 +190,11 @@ export const useElosernStore = defineStore("elosern", () => {
     setPrompt: ctx.setPrompt,
     appendText: ctx.appendText,
     sendText: ctx.sendText,
+    // The combat beat playback (webclient-combat-beat-queue): the message
+    // window reports a shown beat and can end the round; the store owns the
+    // lock both gate.
+    beatShown: ctx.beatShown,
+    skipBeats: ctx.skipBeats,
     clearFreeformTarget: ctx.clearFreeformTarget,
     borrowDialogueCommand: ctx.borrowDialogueCommand,
     dispatchAction: ctx.dispatchAction,

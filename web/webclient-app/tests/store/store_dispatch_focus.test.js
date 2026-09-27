@@ -16,6 +16,9 @@ import { SYNTH_SKILL } from "../support/synthetic-data.mjs";
 // vocabulary owned by the combat model (BASIC_ATTACK_KEY — the root attack
 // opener resolves it); the AREA row is the kit skill with invented prose.
 const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
+// The attack key the beat-queue lock case dispatches (the same model constant):
+// wire vocabulary is never spelled out in the suite (test-data-independence).
+const ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 describe("store dispatch + focus", () => {
   let store;
@@ -185,7 +188,73 @@ describe("store dispatch + focus", () => {
         store.clearUncertain();
         expect(store.view.dispatch.uncertain).toBe(false);
       });
+
+    it("refuses a dispatch while a combat round plays, and accepts one that ends it", () => {
+      // webclient-combat-beat-queue D5 / webclient-combat-menu "A combat round
+      // plays beat by beat": the command panel stays locked in addition to
+      // the declared-revision lock, and unlocks when both have cleared.
+      openSession();
+      const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
+      store.appendText("out", "你擲出了骰子。");
+      store.appendText("out", "你擊中了灰袍盜賊。");
+      store.receive(
+        1,
+        "ui_update",
+        [
+          fx.update({
+            revision: 2,
+            mode: "combat",
+            panels: {
+              context_actions: fx.combatActions(),
+              combat_beats: {
+                schema_version: 1,
+                available: true,
+                round: "s-1/1",
+                beats: [
+                  {
+                    seq: 0,
+                    action: 0,
+                    kind: "roll",
+                    actor: "42",
+                    target: "7",
+                    amount: null,
+                    hp_after: null,
+                    text: "你擲出了骰子。",
+                  },
+                  {
+                    seq: 1,
+                    action: 1,
+                    kind: "damage",
+                    actor: "42",
+                    target: "7",
+                    amount: 12,
+                    hp_after: 68,
+                    text: "你擊中了灰袍盜賊。",
+                  },
+                ],
+              },
+            },
+          }),
+        ],
+        {},
+      );
+      store.receive(
+        1,
+        "ui_action_result",
+        [fx.actionResult({ request_id: requestId, presentation_revision: 2 })],
+        {},
+      );
+      // The revision is accepted, so only the playback lock holds.
+      expect(store.view.dispatch.inFlight).toBe(null);
+      expect(store.view.dispatch.beatLocked).toBe(true);
+      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe(null);
+      expect(sender.sent.actions.length).toBe(1);
+
+      store.skipBeats();
+      expect(store.view.dispatch.beatLocked).toBe(false);
+      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe("session:2");
    });
+  });
 
   describe("text dispatch", () => {
     it("sends ordinary text through the sender and records the command history", () => {

@@ -257,7 +257,11 @@ export function applyCreation(ctx) {
   };
 
   ctx.syncRouterGates = function syncRouterGates() {
-    ctx.router.setMutationInFlight(!!ctx.inFlight);
+    // The command panel stays locked while a combat round plays by itself, in
+    // addition to the declared-revision lock (webclient-combat-beat-queue D5:
+    // "Combat results update canonical panels..." plus "A combat round plays
+    // beat by beat").
+    ctx.router.setMutationInFlight(!!ctx.inFlight || ctx.beatLocked());
     ctx.router.setAwaitingRevision(ctx.inFlight && ctx.inFlight.presentationRevision !== null ? ctx.inFlight.presentationRevision : null);
   };
 

@@ -14,7 +14,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 - **Order on the wire.** The text lines arrive, then the `ui_update` or snapshot, then `ui_action_result`. `ctx.inFlight` (`stores/elosern/transport.js`) lives from dispatch until `releaseIfReady` sees the declared revision.
 - **Response segmentation (C6a).**
   - `dispatchAction` pushes a response mark, `ctx.narrativeSeq + 1`, right after `sendAction`. The response that starts at that mark has `startSeq` equal to it.
-  - `MessageWindow` (C6b, C7, C10c, C11b) keeps `responseKey`, `pageIndex`, typing through `use-typewriter`, the flush on a pending mark or new response, and the `reading-change` signal. It receives `lines`, `marks`, `mode`, `dialogue`, `fontScale`, `textSpeed`, `autoAdvance`, `motionLevel`, and `held`.
+  - `MessageWindow` (C6b, C7, C10c, C11b) keeps the shown response's key (`shownKey`; the key itself is `display`'s `s<startSeq>` / `i<index>` string), `pageIndex`, typing through `use-typewriter`, the flush on a pending mark or new response, and the `reading-change` signal. It receives `lines`, `marks`, `mode`, `dialogue`, `fontScale`, `textSpeed`, `autoAdvance`, `motionLevel`, and `held`.
   - Pages come from `lib/message_pages.js` `paginate(blocks, fits)`.
 - **Lock.**
   - `dispatchAction` refuses while `ctx.inFlight` is set.
@@ -123,7 +123,7 @@ A stale `shown(i)` whose `i !== index` is ignored. The reducer never throws on o
 *Why not bind by timing* (the next response after the panel commits): the text arrives before the panel. The in-flight record is the one thing that links the request, its mark, and its panel.
 
 ### D6. Beat pages in the message window
-`MessageWindow` gains the prop `beatPlayback` (the published slice or null). When `beatPlayback.startSeq === responseKey`:
+`MessageWindow` gains the prop `beatPlayback` (the published slice or null). When `beatPlayback.startSeq` equals the on-screen response's own `startSeq` (the numeric part of `display`'s key):
 - **Pages.**
   - `pages = [...beatPages, ...tailPages]`
   - `beatPages` = for each step, `paginate([beatBlocks(plan)[i]], fits)`, each page tagged `beat: i`
@@ -136,6 +136,7 @@ A stale `shown(i)` whose `i !== index` is ignored. The reducer never throws on o
   - The `▼` / `■` marker is hidden and auto-advance is disarmed, because the queue paces the pages.
 - **After playback** (`phase === "done"` with `auto`): `pageIndex` becomes the first tail page, which starts typing. With no tail, the window stays on the last beat page, fully shown with `■`. Normal reading resumes.
 - **`off`** (`auto: false`): the pages are ordinary reader pages from page 1, with the ordinary controls, marker, and flush. This gives "sequential text pages only", and it never gates input (D4: the state is `done` at start).
+- **An open drawer or the full log does not pause the queue.** The inter-beat pause is the store's `setTimeout` and the in-beat wait is the window's own armed frame wait: neither reads the `held` prop, which pauses only the opt-in auto-advance. A round keeps playing behind an overlay and still ends within its typed length plus one beat pause per beat — and a click or a typed command ends it at once, whatever is on top.
 - **Binding late.** If the response is on screen when the round binds, typically page 1 typing the first log's lines, the window restarts that response at beat 0. This happens within the same delivery batch, so at most a few characters are re-typed.
 - **Flush.** When a new response starts, the window's own flush rules (C7 D8) apply to the beat pages like any pages. The store has already applied `flush`.
 - **Reading signal.** `readingComplete` (C10c) stays false while auto playback runs.
@@ -153,6 +154,7 @@ A stale `shown(i)` whose `i !== index` is ignored. The reducer never throws on o
 
 ### D8. Terminal rounds, fallback, reconnect
 - **Terminal.** The completing snapshot's mode is `exploration`, but the round binds all the same: the in-flight action is combat's. It plays as text under the lock while the exploration surfaces are already committed and visible. The combat stage hold is C13c's.
+  - The participant frame unmounts with that same publication (`context_actions` is the exploration kind), so a terminal round steps no foe numerals: the player's hit points are the ones the vitals show through the playback. A journey must not assert a gone frame.
 - **Fallback.** When the completing publication carries the unavailable form, nothing binds. The response pages as before, `VitalsTrack` animates once to the committed values through its existing transitions, and the lock is the revision rule alone.
 - **Reconnect.** A new epoch resets the slice. The reconnect snapshot carries the unavailable form (C12 D4), and the window's mount rule shows the last page, fully shown. So no round replays.
 

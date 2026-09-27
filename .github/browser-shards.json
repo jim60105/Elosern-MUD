@@ -404,6 +404,17 @@
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade"
       ]
+    },
+    {
+      "index": 18,
+      "name": "beats-18",
+      "files_a": [
+        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_pages_beats_at_off",
+        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced"
+      ],
+      "files_b": [
+        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round"
+      ]
     }
   ]
 }

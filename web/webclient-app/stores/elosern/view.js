@@ -293,11 +293,21 @@ export function applyView(ctx) {
         inFlight: ctx.inFlight ? { requestId: ctx.inFlight.requestId, presentationRevision: ctx.inFlight.presentationRevision } : null,
         uncertain: ctx.uncertain,
         submittedRequestId: ctx.lastSubmittedRequestId,
+        // True while a combat round plays by itself: the command panel's
+        // second lock (webclient-combat-beat-queue D5).
+        beatLocked: ctx.beatLocked(),
         // Whether a mutation was submitted and its result not yet confirmed
         // (the client-local uncertain-marking precondition, exposed for the
         // browser harness).
         mutationSubmitted: ctx.mutationSubmitted,
       },
+
+      // The playing combat round (webclient-combat-beat-queue D5): null, or
+      // the slice the message window pages. `displayHp` is the hit points the
+      // playback shows (null when nothing plays), so every surface snaps to
+      // the committed values the moment the round ends.
+      beatPlayback: ctx.beatPlaybackView(),
+      displayHp: ctx.displayHpView(),
 
       // The live client-local toast queue (webclient-action-feedback D1): the
       // same reactive array reference on every publish; the reducer's
@@ -311,7 +321,14 @@ export function applyView(ctx) {
     const rs = ctx.reducer.getState();
     ctx.handleTransportLifecycle(prev, rs);
     ctx.handleActionResult(rs);
+    // The in-flight record is captured before the release: the round's
+    // completing publication can carry the declared revision, so
+    // `releaseIfReady` may clear `inFlight` in this same pass, and the record
+    // is the only thing that links the request, its response mark, and its
+    // panel (webclient-combat-beat-queue D5).
+    const flight = ctx.inFlight;
     ctx.releaseIfReady(rs);
+    ctx.syncBeatRound(prev, rs, flight);
     ctx.rebuildCreationDock(prev, rs);
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);

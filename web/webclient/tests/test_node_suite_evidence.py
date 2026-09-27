@@ -990,6 +990,44 @@ class CombatBeatsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class CombatBeatQueueEvidenceTest(unittest.TestCase):
+    """webclient-combat-beat-queue: the script-side motion-token reader, the
+    pure round plan / state machine / displayed hit points / page model, the
+    store's bind and lock, and the message window's beat pages are DOM-state
+    contracts jsdom executes, so the change's four Vitest files are their
+    evidence (the browser journeys cover a real server round at `off` and
+    `reduced`)."""
+
+    @covers_requirement(
+        "webclient-combat-menu::a-combat-round-plays-beat-by-beat",
+        "webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input",
+        "webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages",
+    )
+    def test_beat_queue_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/motion_tokens_reader.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/beat_queue.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/beat_playback.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/message_window_beats.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "beat-queue Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 class ModeTransitionsEvidenceTest(unittest.TestCase):
     """webclient-mode-transitions: the live mode-change signal, the inert
     collapsed command region, the decorative flash and veil, the host's inert

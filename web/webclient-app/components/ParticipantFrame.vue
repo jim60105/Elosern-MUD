@@ -19,7 +19,24 @@ const props = defineProps({
   participants: { type: Array, default: () => [] },
   // The committed `art` panel (the portrait catalog source).
   artPanel: { type: Object, default: null },
+  // The hit points a playing combat round displays (`store.view.displayHp`,
+  // webclient-combat-beat-queue D7): a map from catalog key to a Number, or
+  // null when nothing plays. A row whose `portrait_ref` is a key of the map
+  // shows that value in place of its committed `hp_current`; every other row,
+  // and every other field, keeps the committed value.
+  displayHp: { type: Object, default: null },
 });
+
+// The current hit points one row states: the displayed value while a round
+// plays, else the committed one.
+function hpCurrent(participant) {
+  const displayed = props.displayHp;
+  const key = participant.portrait_ref;
+  if (displayed && key != null && typeof displayed[key] === "number") {
+    return displayed[key];
+  }
+  return participant.hp_current;
+}
 
 // Split the participants into the 我方 (party) and 敵方 (foes) groups,
 // preserving the server's order within each group. The combat panel's
@@ -82,7 +99,7 @@ function portraitSrc(portrait) {
           {{ p.token }}
         </span>
         <span class="participant-frame__name">{{ p.display_name }}</span>
-        <span class="participant-frame__hp">{{ p.hp_current }}/{{ p.hp_maximum }}</span>
+        <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
         <span v-if="p.state !== 'active'" class="participant-frame__state">
           {{ stateMarker(p.state) }}
         </span>
@@ -116,7 +133,7 @@ function portraitSrc(portrait) {
           {{ p.token }}
         </span>
         <span class="participant-frame__name">{{ p.display_name }}</span>
-        <span class="participant-frame__hp">{{ p.hp_current }}/{{ p.hp_maximum }}</span>
+        <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
         <span v-if="p.state !== 'active'" class="participant-frame__state">
           {{ stateMarker(p.state) }}
         </span>

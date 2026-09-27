@@ -92,6 +92,19 @@ const hostPortrait = computed(() => {
   const key = dialogueVM.value?.host.portraitRef;
   return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
 });
+// The player's displayed hit points while a combat round plays
+// (webclient-combat-beat-queue D7): the published playback value keyed by the
+// committed actor identity, else null, so the vitals island reads the
+// committed `status` whenever nothing plays.
+const playerDisplayHp = computed(() => {
+  const displayed = store.view.displayHp;
+  const identity = panel("status")?.actor?.identity;
+  if (!displayed || identity == null) {
+    return null;
+  }
+  const value = displayed[identity];
+  return typeof value === "number" ? value : null;
+});
 // The speaking state (design D3): only a conversation with its host on the
 // stage dims anyone (a transiently unavailable panel leaves the player lit).
 const inDialogue = computed(() => store.view.mode === "dialogue");
@@ -161,6 +174,7 @@ function onFoeLineupGone() {
         :text-speed="store.view.textSpeed"
         :auto-advance="store.view.autoAdvance"
         :motion-level="store.view.motionLevel"
+        :beat-playback="store.view.beatPlayback"
         :mode-change="modeChange"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
@@ -186,6 +200,8 @@ function onFoeLineupGone() {
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
         @reading-change="onReadingChange"
+        @beat-shown="store.beatShown"
+        @beat-skip="store.skipBeats"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
@@ -295,6 +311,7 @@ function onFoeLineupGone() {
           :motion-level="store.view.motionLevel"
           :revision="store.view.revision"
           :epoch="store.view.epoch"
+          :display-hp="playerDisplayHp"
         />
         <PartyStrip
           v-if="store.partyAvailable && store.view.mode !== 'creation'"
@@ -332,6 +349,7 @@ function onFoeLineupGone() {
           v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
           :participants="contextActionsPanel.participants"
           :art-panel="panel('art')"
+          :display-hp="store.view.displayHp"
         />
         <!-- The epithet nomination ballot menu (title-epithet-nomination):
              mounted only while the committed `title_ballot` panel carries

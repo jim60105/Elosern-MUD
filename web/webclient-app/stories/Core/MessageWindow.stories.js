@@ -249,3 +249,80 @@ export const Dialogue = {
     textSpeed: "instant",
   },
 };
+
+// A combat round playing beat by beat (webclient-combat-beat-queue design D6):
+// the window's pages are the round's beat pages — each beat paginated alone —
+// followed by the response's own closing line. The round's event lines are
+// replaced by the beats, never paged twice. The published slice paces them;
+// the story stands in for the store by advancing `index` on each
+// `beat-shown` and ending the round on `beat-skip`.
+const COMBAT_ROUND = {
+  round: "s-1/1",
+  startSeq: 2,
+  auto: true,
+  index: 1,
+  count: 3,
+  phase: "text",
+  texts: [
+    "你擲出了骰子，命中判定為 14。",
+    "你擊中了哥布林的肩膀，牠踉蹌後退。",
+    "哥布林發出短促的嘶吼，舉起木棒。",
+  ],
+  coveredLines: 3,
+  terminal: false,
+};
+
+const COMBAT_ROUND_LINES = seqLines(2, [
+  ["in", "attack 哥布林"],
+  ["out", "你擲出了骰子，命中判定為 14。"],
+  ["out", "你擊中了哥布林的肩膀，牠踉蹌後退。"],
+  ["out", "哥布林發出短促的嘶吼，舉起木棒。"],
+  ["out", "行動完成，繼續戰鬥。"],
+]);
+
+// The story's stand-in for the store's playback: the next beat follows the
+// beat pause, and a click on the window ends the round at once.
+const renderCombatRound = (args) => ({
+  setup() {
+    const bound = ref({ ...COMBAT_ROUND });
+    const show = (index) => {
+      bound.value = {
+        ...bound.value,
+        index,
+        phase: index < bound.value.count ? "text" : "done",
+      };
+    };
+    return () =>
+      h(MessageWindow, {
+        ...args,
+        beatPlayback: bound.value,
+        onBeatShown: (index) => globalThis.setTimeout(() => show(index + 1), 400),
+        onBeatSkip: () => show(bound.value.count),
+      });
+  },
+});
+
+export const CombatRound = {
+  render: renderCombatRound,
+  args: { lines: COMBAT_ROUND_LINES, marks: [], textSpeed: "instant" },
+};
+
+// The same round at `off`: presentation ends at once, the command panel is
+// never held, and the beat pages are ordinary pages the reader turns.
+export const CombatRoundOff = {
+  render: renderCombatRound,
+  args: {
+    lines: COMBAT_ROUND_LINES,
+    marks: [],
+    textSpeed: "instant",
+  },
+  parameters: {
+    docs: {
+      description:
+        "At the `off` motion level `--motion-beat` is 0ms and the published " +
+        "round is already done, so the beat pages and the closing line are " +
+        "ordinary pages: the marker renders, a click turns a page, and the " +
+        "command panel is never held.",
+    },
+  },
+};

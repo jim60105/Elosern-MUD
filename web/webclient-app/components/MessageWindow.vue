@@ -16,6 +16,8 @@ import {
   responseLength,
   segmentResponses,
 } from "../lib/message_pages.js";
+import { beatPages, tailBlocks } from "../lib/beat_queue.js";
+import { readMotionMs } from "../lib/motion_tokens.js";
 import { narrativeBlockNodes } from "../lib/narrative_line_nodes.js";
 import {
   TEXT_SPEEDS,
@@ -85,6 +87,17 @@ import { inertWhileLeaving } from "../lib/transition_hooks.js";
 // response's last page is on screen, fully shown, with no pending action
 // mark — so the shell knows when the list may appear. `focusHome()` focuses
 // the page surface.
+//
+// Combat beats (webclient-combat-beat-queue, design D6): while a published
+// round is bound to the response on screen, that response's pages are the
+// round's beat pages — each beat paginated alone — followed by the response's
+// remaining lines. At `full` and `reduced` the queue paces itself: each beat
+// page is revealed at the reader's speed, its last page's completion reports
+// `beat-shown`, and a further page of the same beat waits the beat pause read
+// from `--motion-beat`. A pointer activation, or Enter / Space on the page
+// surface, emits `beat-skip` instead of completing or advancing; the marker is
+// hidden and auto-advance is disarmed, because the queue paces the pages. At
+// `off` the beat pages and the following pages are ordinary reader pages.
 export default {
   name: "MessageWindow",
   props: {
@@ -121,8 +134,13 @@ export default {
     // True across a reconnect's null mode edges (webclient-mode-transitions
     // D2): the name plate then appears and goes with no fade.
     modeHydrating: { type: Boolean, default: false },
+    // The playing combat round (`store.view.beatPlayback`,
+    // webclient-combat-beat-queue D5/D6): null, or the published slice whose
+    // `startSeq` names the response it belongs to. Its `texts` are the beat
+    // pages and `coveredLines` the response lines they replace.
+    beatPlayback: { type: Object, default: null },
   },
-  emits: ["open-full-log", "reading-change"],
+  emits: ["open-full-log", "reading-change", "beat-shown", "beat-skip"],
   setup(props, { emit, expose }) {
     const rootRef = ref(null);
     const surfaceRef = ref(null);
@@ -165,14 +183,72 @@ export default {
         awaiting = true;
       }
       if (index < 0) {
-        return { key: null, blocks: [], awaiting: false };
+        return { key: null, blocks: [], awaiting: false, startSeq: null };
       }
       const response = list[index];
       const key = typeof response.startSeq === "number" ? `s${response.startSeq}` : `i${index}`;
-      return { key, blocks: response.blocks, awaiting };
+      return {
+        key,
+        blocks: response.blocks,
+        awaiting,
+        startSeq: typeof response.startSeq === "number" ? response.startSeq : null,
+      };
+    });
+
+    // The round bound to the response on screen (design D6): the published
+    // slice whose `startSeq` is this response's own start. A round attached to
+    // any other response leaves the window alone.
+    const boundBeats = computed(() => {
+      const bound = props.beatPlayback;
+      if (!bound || typeof bound.startSeq !== "number") {
+        return null;
+      }
+      return bound.startSeq === display.value.startSeq ? bound : null;
+    });
+    // The page list's identity: the response the round belongs to and the
+    // beats it replaces. A rebuild happens only when this changes.
+    const beatBinding = computed(() => {
+      const bound = boundBeats.value;
+      if (!bound) {
+        return null;
+      }
+      const texts = Array.isArray(bound.texts) ? bound.texts : [];
+      return `${bound.startSeq}:${bound.coveredLines}:${texts.join("\u0000")}`;
+    });
+    // A round the queue paces by itself: `off` never plays, and a round that
+    // has ended is read like any other response.
+    const beatPlaying = computed(() => {
+      const bound = boundBeats.value;
+      return !!bound && bound.auto && bound.phase !== "done";
+    });
+    // The playback's identity: the binding, the level, the current beat, and
+    // the phase. The pacing watcher re-evaluates on any of them.
+    const beatSignature = computed(() => {
+      const bound = boundBeats.value;
+      return bound ? `${bound.startSeq}:${bound.auto}:${bound.index}:${bound.phase}` : null;
     });
 
     const pages = shallowRef([]);
+    // The bound round's page layout: each beat's first page, and the first
+    // tail page (-1 when the response has no line after the beats). `layoutSeq`
+    // counts bound re-pages, so the queue repositions itself after one.
+    const beatStarts = shallowRef([]);
+    const beatTailStart = shallowRef(-1);
+    let layoutSeq = 0;
+    let followedLayout = -1;
+    let followedBeat = null;
+    // The beats already reported to the store, and whether the end-of-round
+    // move to the first tail page has run; both belong to one binding.
+    let reportedBeats = new Set();
+    let tailMoved = false;
+    let laidOutFor = null;
+    let wasBeatPlaying = false;
+    // The queue's own in-beat page timer. It is deliberately NOT the
+    // typewriter's armed wait: that one counts only unheld frame time, so an
+    // open drawer or the full log would freeze a multi-page beat and hold the
+    // command panel with it. The queue's pause is held-agnostic, exactly like
+    // the store's inter-beat one.
+    let beatPageTimer = null;
     // The response the pages were cut from (design D3): a new or appended
     // response dirties `display` at once, before the post-flush re-page, so
     // completeness is never read off the previous response's stale pages.
@@ -286,10 +362,130 @@ export default {
       }
     }
 
+    // D6: the bound round's page list. Each beat is paginated alone (a short
+    // beat never shares a page with the next), the response's remaining lines
+    // follow as ordinary pages, and every beat page carries the beat it
+    // belongs to. Before the fonts are measurable each beat is one page: the
+    // provisional presentation stays unpaged, and the queue still steps.
+    function measureBeatPages(blocks, bound) {
+      const ready = measure.ready.value;
+      const fits = ready ? props.pageFit || measure.fits : () => true;
+      const texts = Array.isArray(bound.texts) ? bound.texts : [];
+      try {
+        return beatPages(texts, tailBlocks(blocks, bound.coveredLines), fits);
+      } finally {
+        if (ready && !props.pageFit) {
+          measure.clear();
+        }
+      }
+    }
+
+    // The first page of a bound beat: the layout's own record, clamped so a
+    // stale index can never address a page that is not there.
+    function firstBeatPage(index) {
+      const starts = beatStarts.value;
+      if (starts.length === 0) {
+        return 0;
+      }
+      return starts[Math.max(0, Math.min(index, starts.length - 1))];
+    }
+
+    function clearBeatPageTimer() {
+      if (beatPageTimer !== null) {
+        clearTimeout(beatPageTimer);
+        beatPageTimer = null;
+      }
+    }
+
+    // Arm the wait between two pages of the same beat. Re-arming restarts it.
+    function armBeatPage(ms, onDue) {
+      clearBeatPageTimer();
+      beatPageTimer = setTimeout(() => {
+        beatPageTimer = null;
+        onDue();
+      }, ms);
+    }
+
+    // Reveal a page the queue picked: announce it, then type it (instantly
+    // when nothing can be measured).
+    function showBeatPage(index) {
+      setPage(index);
+      announceCurrentPage({ whole: true });
+      typewriter.start(0);
+      if (!measure.ready.value) {
+        typewriter.complete();
+      }
+    }
+
+    // The bound round's own re-page (design D6): the beat layout owns the page
+    // list, because a beat page's offsets are its own — the ordinary path's
+    // response-space anchor cannot address it. A binding that changes under a
+    // reader on the same response re-announces the page (the beat pages
+    // replaced the response's own lines) and starts the reported-beat record
+    // afresh; later appends to the same response keep the page. The queue then
+    // repositions itself on the new layout's next tick.
+    function repageBeats(shown, bound) {
+      const ready = measure.ready.value;
+      provisional.value = !ready;
+      const layout = measureBeatPages(shown.blocks, bound);
+      pages.value = layout.pages;
+      beatStarts.value = layout.beatStarts;
+      beatTailStart.value = layout.tailStart;
+      layoutSeq += 1;
+      const bindingChanged = shown.key !== laidOutFor;
+      const isNew = shown.key !== shownKey;
+      if (bindingChanged) {
+        laidOutFor = shown.key;
+        reportedBeats = new Set();
+        tailMoved = false;
+        followedBeat = null;
+        followedLayout = -1;
+        announcedEnd = 0;
+        clearBeatPageTimer();
+      }
+      shownBlocks = shown.blocks;
+      shownKey = shown.key;
+      shownLength = responseLength(shown.blocks);
+      const last = Math.max(0, layout.pages.length - 1);
+      let announce = false;
+      if (!initialized) {
+        // A mount opens the last page of the last response, fully read.
+        initialized = true;
+        announcedEnd = shownLength;
+        setPage(last);
+        typewriter.complete();
+        typewriter.disarmAdvance();
+      } else if (isNew && !shown.awaiting) {
+        clearKey.value += 1;
+        announcedEnd = 0;
+        setPage(beatPlaying.value ? firstBeatPage(bound.index) : 0);
+        announce = true;
+        typewriter.start(0);
+      } else {
+        const held = Math.min(pageIndex.value, last);
+        if (held !== pageIndex.value) {
+          setPage(held);
+          typewriter.start(0);
+        } else if (bindingChanged) {
+          announce = true;
+        }
+      }
+      if (!ready) {
+        typewriter.complete();
+      }
+      if (announce) {
+        announceCurrentPage({ whole: true });
+      }
+    }
+
     function repage() {
       generation += 1;
       const shown = display.value;
       pagedBlocks.value = shown.blocks;
+      if (boundBeats.value) {
+        repageBeats(shown, boundBeats.value);
+        return;
+      }
       // Read before the pages are replaced: the anchor is on the old page.
       const anchor = readerAnchor();
       if (!measure.ready.value) {
@@ -382,6 +578,12 @@ export default {
     }
 
     function advance() {
+      if (beatPlaying.value) {
+        // A playing round: this activation ends it at once and changes no
+        // page (design D6).
+        emit("beat-skip");
+        return true;
+      }
       if (provisional.value) {
         return false;
       }
@@ -410,9 +612,13 @@ export default {
     // Auto-advance (design D7): armed on a fully shown page with a next page
     // that is neither oversize nor a map; any change re-evaluates it, so the
     // wait counts from the later of "fully shown" and "a next page exists".
+    // While a combat round plays by itself the queue paces the pages and this
+    // watcher neither arms nor disarms: the queue's own watcher below is the
+    // sole owner of the armed wait then (webclient-combat-beat-queue D6).
     watch(
       () => [
         props.autoAdvance,
+        beatPlaying.value,
         provisional.value,
         typing.value,
         pageIndex.value,
@@ -420,7 +626,10 @@ export default {
       ],
       // An awaiting flush always parks on the last page, so `index` then
       // fails the next-page test and nothing arms.
-      ([auto, unpaged, isTyping, index, list]) => {
+      ([auto, playing, unpaged, isTyping, index, list]) => {
+        if (playing) {
+          return;
+        }
         const page = list[index];
         if (auto && !unpaged && !isTyping && index < list.length - 1 && autoAdvanceAllowed(page)) {
           typewriter.armAdvance(autoAdvanceDelayMs(page), () => advance());
@@ -431,11 +640,90 @@ export default {
       { flush: "post" },
     );
 
+    // The beat queue's pacing (webclient-combat-beat-queue D6). While a round
+    // plays, the store's `index` picks the beat: the page follows it, and once
+    // it is fully shown the next beat follows after the beat pause. A beat
+    // that runs over more than one page waits that same pause between its own
+    // pages, and its last page reports `beat-shown` — once per beat. When the
+    // round ends, the window moves to the page after the beats, or stays on
+    // the last beat page when none follows.
+    watch(
+      () => [beatSignature.value, typing.value, pageIndex.value, pages.value],
+      () => {
+        const bound = boundBeats.value;
+        const playing = !!bound && bound.auto && bound.phase !== "done";
+        // Every pass re-decides the pause; only the same-beat branch re-arms.
+        clearBeatPageTimer();
+        if (playing && !wasBeatPlaying) {
+          // A wait armed before the round bound would end it with no player
+          // action; the queue owns the channel from here.
+          typewriter.disarmAdvance();
+        }
+        wasBeatPlaying = playing;
+        if (!bound || !bound.auto) {
+          return;
+        }
+        if (bound.phase === "done") {
+          if (!tailMoved) {
+            tailMoved = true;
+            const last = Math.max(0, pages.value.length - 1);
+            // With no line after the beats the tail holds no page: stay on
+            // the last beat page, fully shown.
+            const tail = beatTailStart.value;
+            const target = tail >= 0 && tail <= last ? tail : last;
+            if (target !== pageIndex.value) {
+              showBeatPage(target);
+            }
+          }
+          return;
+        }
+        // Follow the store's beat, and reposition after a re-page. When the
+        // page is already the one this beat starts at, pacing continues in
+        // the same pass.
+        if (followedLayout !== layoutSeq || followedBeat !== bound.index) {
+          followedLayout = layoutSeq;
+          followedBeat = bound.index;
+          const start = firstBeatPage(bound.index);
+          if (start !== pageIndex.value) {
+            showBeatPage(start);
+            return;
+          }
+        }
+        if (typing.value) {
+          return;
+        }
+        const page = pages.value[pageIndex.value];
+        const beat = page && typeof page.beat === "number" ? page.beat : bound.index;
+        const next = pages.value[pageIndex.value + 1];
+        if (next && typeof next.beat === "number" && next.beat === beat) {
+          armBeatPage(readMotionMs("--motion-beat"), () => {
+            const current = boundBeats.value;
+            // The round may have ended (or been replaced) while the page
+            // waited: never advance a page the queue no longer owns.
+            if (!current || !current.auto || current.phase === "done") {
+              return;
+            }
+            showBeatPage(pageIndex.value + 1);
+          });
+          return;
+        }
+        typewriter.disarmAdvance();
+        if (!reportedBeats.has(beat)) {
+          reportedBeats.add(beat);
+          emit("beat-shown", beat);
+        }
+      },
+      { flush: "post" },
+    );
+
     watch(
       () => [
         display.value.key,
         display.value.blocks,
         display.value.awaiting,
+        // A round binding to (or leaving) the response on screen re-pages it
+        // (webclient-combat-beat-queue D6).
+        beatBinding.value,
         measure.boxKey.value,
         measure.ready.value,
       ],
@@ -464,7 +752,9 @@ export default {
     // screen and fully shown, with no pending action mark. Pure reader
     // state, never prose. A response with no text has nothing to read.
     const readingComplete = computed(() => {
-      if (!measure.ready.value || provisional.value || display.value.awaiting) {
+      // A playing round is not read yet: the shell's dialogue list waits for
+      // the playback to end (webclient-combat-beat-queue D6).
+      if (!measure.ready.value || provisional.value || display.value.awaiting || beatPlaying.value) {
         return false;
       }
       if (pagedBlocks.value !== display.value.blocks || typing.value) {
@@ -546,7 +836,9 @@ export default {
       const total = pages.value.length;
       const onLast = pageIndex.value >= total - 1;
       const isTyping = typing.value;
-      const showMarker = !provisional.value && total > 0 && !isTyping;
+      // The queue paces a playing round, so it shows no marker of its own
+      // (webclient-combat-beat-queue D6).
+      const showMarker = !provisional.value && total > 0 && !isTyping && !beatPlaying.value;
       const reveals = isTyping && page ? fragmentReveal(page, typewriter.typed.value) : null;
       return h(
         "section",

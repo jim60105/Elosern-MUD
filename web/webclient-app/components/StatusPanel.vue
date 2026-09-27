@@ -36,6 +36,9 @@ const props = defineProps({
   // phase, so the final state is on screen in the commit's frame (a CSS
   // phase would outlive the commit by a double frame even at 0s).
   motionLevel: { type: String, default: "full" },
+  // The hit points a playing combat round displays (webclient-combat-beat-
+  // queue D7), forwarded to the vitals island; null when nothing plays.
+  displayHp: { type: Number, default: null },
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
@@ -49,6 +52,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
         :low-hp="lowHp"
         :revision="revision"
         :epoch="epoch"
+        :display-hp="displayHp"
       />
       <ConditionChips :conditions="status.conditions || []" />
     </div>

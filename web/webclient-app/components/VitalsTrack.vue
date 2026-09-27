@@ -24,6 +24,12 @@ const props = defineProps({
   // resets to the current ratio (no trail across a reconnect).
   revision: { type: [Number, String], default: null },
   epoch: { type: [Number, String], default: null },
+  // The hit points a playing combat round displays instead of the committed
+  // `status.resources.hp.current` (webclient-combat-beat-queue D7): a Number
+  // while the round plays, null otherwise. The numerals, the fill, and the
+  // trailing bar's ratio all follow it, so the bar lags every displayed drop
+  // and every snap. Only hp reads it: a beat carries no other resource.
+  displayHp: { type: Number, default: null },
 });
 
 const GAUGES = [
@@ -35,7 +41,14 @@ const GAUGES = [
 const resources = computed(() => props.status?.resources ?? {});
 function gauge(key) {
   const r = resources.value[key];
-  return r ? { current: r.current, maximum: r.maximum, ratio: gaugeRatio(r) } : null;
+  if (!r) {
+    return null;
+  }
+  // A displayed value replaces the committed current for hp only, and the
+  // ratio is computed from it, so the fill and the trailing bar follow the
+  // same number the numerals show.
+  const current = key === "hp" && props.displayHp != null ? props.displayHp : r.current;
+  return { current, maximum: r.maximum, ratio: gaugeRatio({ current, maximum: r.maximum }) };
 }
 
 // The combat session line (the pre-change `StatusPanel`'s last row) now
