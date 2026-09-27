@@ -50,7 +50,7 @@
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
 // recessed; the mark clears only when no open surface remains.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps({
   // The committed mode value rendered on the shell root. The store's reducer
@@ -73,6 +73,25 @@ const props = defineProps({
 // The open-surface registry drives the `menu-open` mark (design D9): the
 // mark clears only when no surface remains open.
 const menuOpen = computed(() => props.openSurfaces.length > 0);
+
+// The command panel's flip (webclient-mode-transitions D2) is one-shot. The
+// `data-mode-change` attribute persists until the next live change, and a
+// CSS animation plays whenever a matching element is inserted, so keying the
+// flip on it would replay the flip if the dock remounted mid-combat. The
+// flip is keyed on `data-flip` instead: set in the patch of a live change
+// into or out of combat, cleared when the flip's own animation ends.
+const flip = ref(null);
+watch(
+  () => props.modeChange,
+  (change) => {
+    flip.value = change && (change.endsWith("-combat") || change === "combat-exploration") ? change : null;
+  },
+);
+function onFlipEnd(event) {
+  if (event.animationName?.startsWith("elosern-panel-flip")) {
+    flip.value = null;
+  }
+}
 
 defineExpose({ menuOpen });
 </script>
@@ -154,6 +173,8 @@ defineExpose({ menuOpen });
         class="stage-anchor"
         data-anchor="band-command"
         data-testid="anchor-band-command"
+        :data-flip="flip"
+        @animationend="onFlipEnd"
         :inert="mode === 'dialogue' || null"
       >
         <slot name="band-command" />
@@ -452,11 +473,13 @@ defineExpose({ menuOpen });
 /* The command region's content turns over to the committed menu: the combat
    root swings in from one side on entering combat and the exploration
    overview from the other on leaving it. The dock switched its content at
-   the commit and keeps focus throughout; the flip only reveals it. */
-.elosern-stage[data-mode-change$="-combat"] [data-anchor="band-command"] > * {
+   the commit and keeps focus throughout; the flip only reveals it. Keyed on
+   the one-shot `data-flip` (see the script), so a dock remounted later in
+   the same mode never flips again. */
+.elosern-stage [data-anchor="band-command"][data-flip$="-combat"] > * {
   animation: elosern-panel-flip-in var(--motion-panel) var(--ease-enter) 1;
 }
-.elosern-stage[data-mode-change="combat-exploration"] [data-anchor="band-command"] > * {
+.elosern-stage [data-anchor="band-command"][data-flip="combat-exploration"] > * {
   animation: elosern-panel-flip-out var(--motion-panel) var(--ease-enter) 1;
 }
 

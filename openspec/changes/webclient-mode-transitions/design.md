@@ -67,7 +67,7 @@ The shell's `mode` prop is coerced (`store.view.mode || 'exploration'`). A trans
 Consequences:
 - Mounting and a reconnect never set the attribute. A same-mode resync keeps it.
 - The attribute persists until the next live change. Every animation keyed on it has one iteration, so it plays once.
-- Selectors: `[data-mode-change$="-combat"]` for entering combat, and `[data-mode-change="combat-exploration"]` for the flip back.
+- Selectors: `[data-mode-change$="-combat"]` for the flash (its layer is never remounted), and `[data-mode-change]` for the transitions. The flip uses its own one-shot key (below), because a CSS animation plays whenever a matching element is inserted, and the persistent attribute would replay the flip on a later remount of the dock.
 
 **Flash.** A new `<div class="stage-flash" data-testid="stage-flash" aria-hidden="true">` sits above the backdrop and portraits and below the islands (z 3), with `pointer-events: none` and `opacity: 0`.
 - Its fill is a warm white radial (`#fffdf8` at the scene's centre falling to `#f4dcc0` at the edges), so it reads as an impact rather than a blank frame.
@@ -80,8 +80,9 @@ Consequences:
 - The `--stage-combat-veil` token is deepened: a blood-dark ring towards the corners over a faint overall dusk. The H1 value was nearly invisible over a painted backdrop.
 
 **Panel flip.**
-- `[data-mode-change$="-combat"] [data-anchor="band-command"] > *` plays `elosern-panel-flip-in`.
-- `[data-mode-change="combat-exploration"] [data-anchor="band-command"] > *` plays `elosern-panel-flip-out`.
+- `HudFrame` sets a `flip` ref from a watcher on `modeChange`, in the patch of a live change into combat (`*-combat`) or out of it (`combat-exploration`), and renders it as `data-flip` on the `band-command` anchor. An `animationend` for `elosern-panel-flip-*` bubbling to the anchor clears it. So a dock that remounts later in the same mode (its `v-if` briefly false) never flips again. The implementation review found this.
+- `[data-anchor="band-command"][data-flip$="-combat"] > *` plays `elosern-panel-flip-in`.
+- `[data-anchor="band-command"][data-flip="combat-exploration"] > *` plays `elosern-panel-flip-out`.
 - Both run over `--motion-panel` with `--ease-enter`, from `opacity: 0; transform: perspective(1400px) rotateY(calc(∓72deg * var(--motion-travel)))` to rest. The committed menu turns in from nearly edge-on. The combat root turns in from one side and the overview from the other.
 - The dock renders one root (`section#action-dock`), so `> *` is exactly the dock.
 - The dock's content has already switched at commit (the combat root), so the flip reveals the committed menu, and the dock keeps focus throughout.
@@ -115,7 +116,7 @@ The keyframes live in `styles/tokens.css` next to the shared ones.
 Pure CSS keyframes replace the proposed `TransitionGroup`. The rows are ordinary keyed elements, in the DOM, focusable, and clickable from their first frame. A view swap renders new keyed rows, which animate on insertion. Removed rows vanish at once, with no leaving copy. A group's leave copies would carry duplicate row ids for a double frame, and `off` would need a script-side `css` switch.
 - Each row carries `:style="{ '--row-index': index }"` and `animation: elosern-choice-row-in var(--motion-reveal) var(--ease-enter) calc(var(--motion-stagger) * var(--row-index)) backwards`. The keyframe rises from `translateY(calc(var(--motion-shift-sm) * var(--motion-travel)))` at `opacity: 0`. `backwards` holds a row at its start through its delay, and nothing is filled after it, so hover, focus, and active-row styles are untouched.
 - The card (`.dialogue-choices`) and the exits caption fade in (`elosern-choice-card-in`) over `--motion-reveal`. No `choices-card` Transition wraps the list in `AppClient`, and the list vanishes at activation, after C10c D7 has moved focus to the page surface.
-- The rows' scroller is keyed by the view and carries `--row-count`. It plays `elosern-choice-rows-clip` (`overflow-y: hidden`) for `stagger × count + reveal`. The rising rows sit a shift below their rest, which at 1280×720 flashed a scrollbar on and off. The frame review caught it, and the clip covers exactly the entrance.
+- The rows' scroller is keyed by the view and carries `--row-count`. It plays `elosern-choice-rows-clip` (`overflow-y: hidden`) for `stagger × count + reveal`. The rising rows sit a shift below their rest, which at 1280×720 flashed a scrollbar on and off. The frame review caught it, and the clip covers exactly the entrance. This relies on the discrete animation of `overflow-y`, which the target Chromium supports (verified live in the story). A browser without it would only show that brief scrollbar, and `scrollIntoView` on the active row is unaffected (a clipped scroller still scrolls programmatically).
 - The new `entrance` prop (default true; `AppClient` passes `!modeHydrating`) is read once, at mount. A list mounted in the frame a reconnect renders carries `dialogue-choices--still` (the card) and `dialogue-choices--rows-still` (the rows), both `animation: none`. The rows' stillness ends at the first view swap, whose new rows stagger in. The card never refades, and a later prop change never replays the entrance.
 - At `reduced` the stagger and the rise are 0, so the rows fade in together over 150ms. At `off` the `!important` rule zeroes every duration and delay, and the rows show at rest.
 
@@ -132,7 +133,7 @@ Design §9.3 keeps drawers "as today", and C11a already makes them obey the leve
 ### D8. Tests
 - **Vitest** `tests/mode_transitions.test.js`, mounting `AppClient` with `stubs: { transition: false, 'transition-group': false }`:
   - `nextModeChange` for live, null-endpoint, and same-mode cases.
-  - `HudFrame` renders `.stage-flash` and `.stage-combat-veil` `aria-hidden` in every mode, makes the `band-command` anchor `inert` exactly in dialogue, and renders the `modeChange` it is given.
+  - `HudFrame` renders `.stage-flash` and `.stage-combat-veil` `aria-hidden` in every mode, makes the `band-command` anchor `inert` exactly in dialogue, and renders the `modeChange` it is given. `data-flip` is set by a live combat change, cleared by the flip's `animationend` while `data-mode-change` persists, and never set by a dialogue change.
   - `AppClient`: the first snapshot sets no `data-mode-change`, and live changes name themselves. A same-mode resync keeps the change.
   - Leaving dialogue leaves one host copy with `actor-enter-leave-active` and `inert`, and the region's `inert` clears in the same patch.
   - A reconnect mid-dialogue (`beginTransport` and then a resync snapshot on a new epoch) removes the host and the plate at the reset with no leaving copy. It then renders the host, the plate, and the list at rest: no enter classes, and `dialogue-choices--still`.
@@ -171,6 +172,7 @@ Design §9.3 keeps drawers "as today", and C11a already makes them obey the leve
 ## Risks / Trade-offs
 
 - [The sliding panel covers the right third of the widened message text for 250ms] → The page text is capped at `42em` and left-aligned (C10b D7), so the right third of the full-width window holds no text at 1920px. The panel slides over empty window space.
+- [AppShell's focus-rescue watcher still reads the coerced mode, so a reconnect mid-dialogue (`dialogue → null`, seen as `exploration`, then `→ dialogue`) can move focus twice: to the dock, then to the dialogue's home] → This predates this change, and the stage itself plays nothing. Gating that watcher on `modeHydrating` changes where focus rests during an outage for every mode, so it is deferred to a follow-up rather than folded in here.
 - [An element that is `inert` but still painted could confuse sighted keyboard users] → Focus has already moved (D6), and the element is gone within 250ms.
 - [The CSS animation restart depends on alternating names] → Mode sequences always alternate entering and leaving combat. A browser journey asserts a second combat entry flashes again.
 - [Budget] → collapse slide (1.5h), hook, flash, veil, and flip (2h), actor and plate (0.75h), stagger (0.75h), Vitest (1h), browser (1.5h), specs and gates (0.5h). About 8h.

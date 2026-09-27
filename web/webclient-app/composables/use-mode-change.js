@@ -33,7 +33,11 @@ export function nextModeChange(previous, from, to) {
 export function useModeChange(store) {
   const modeChange = ref(null);
   const modeHydrating = ref(store.view.mode == null);
-  // Pre-flush: both refs change in the same patch as the mode itself.
+  // Pre-flush: both refs change in the same patch as the mode itself. This
+  // assumes a transport reset (mode -> null) and its resync snapshot
+  // (null -> mode) land in separate ticks, as the transport delivers them;
+  // a same-tick `X -> null -> Y` would be coalesced into a live-looking
+  // `X -> Y` by the watcher.
   watch(
     () => store.view.mode,
     (to, from) => {

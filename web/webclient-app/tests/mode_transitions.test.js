@@ -63,6 +63,28 @@ describe("HudFrame mode layers", () => {
     });
   }
 
+  it("flips the command panel once per live combat change, never on a later remount", async () => {
+    const wrapper = mount(HudFrame, { props: { mode: "exploration" } });
+    const region = () => wrapper.get('[data-anchor="band-command"]');
+    expect(region().attributes("data-flip")).toBeUndefined();
+    await wrapper.setProps({ mode: "combat", modeChange: "exploration-combat" });
+    expect(region().attributes("data-flip")).toBe("exploration-combat");
+    // The flip's own end clears the one-shot key, while the stage keeps its
+    // persistent `data-mode-change`, so a dock remounted later never flips.
+    const end = new Event("animationend", { bubbles: true });
+    end.animationName = "elosern-panel-flip-in";
+    region().element.dispatchEvent(end);
+    await wrapper.vm.$nextTick();
+    expect(region().attributes("data-flip")).toBeUndefined();
+    expect(wrapper.get('[data-testid="elosern-stage"]').attributes("data-mode-change")).toBe("exploration-combat");
+    await wrapper.setProps({ mode: "exploration", modeChange: "combat-exploration" });
+    expect(region().attributes("data-flip")).toBe("combat-exploration");
+    // A dialogue change flips nothing.
+    await wrapper.setProps({ mode: "dialogue", modeChange: "exploration-dialogue" });
+    expect(region().attributes("data-flip")).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it("renders the mode change it is given on the stage root", async () => {
     const wrapper = mount(HudFrame, { props: { mode: "combat", modeChange: "exploration-combat" } });
     const stage = () => wrapper.get('[data-testid="elosern-stage"]');
