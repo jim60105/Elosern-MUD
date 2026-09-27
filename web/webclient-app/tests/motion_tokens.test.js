@@ -23,6 +23,7 @@ const LEVEL_TOKENS = [
   "--motion-fast",
   "--motion-base",
   "--motion-slow",
+  "--motion-beat",
   "--motion-pulse",
   "--motion-hp-pulse",
   "--motion-spin",
@@ -183,6 +184,10 @@ describe("motion tokens (webclient-motion-level)", () => {
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf-8");
     const root = tokens.match(/:root\s*\{([\s\S]*?)\n\}/)[1];
     for (const declaration of [
+      // The combat beat pause (webclient-combat-beat-queue design D2): only
+      // the script reads it, so it is not a transition duration. Its `full`
+      // and `reduced` value is 400ms and its `off` value is 0ms.
+      "--motion-beat: 400ms;",
       "--motion-travel: 1;",
       "--motion-shift-sm: 12px;",
       "--motion-shift-lg: 32px;",

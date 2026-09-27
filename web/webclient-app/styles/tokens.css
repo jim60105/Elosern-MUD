@@ -130,6 +130,12 @@
   --motion-clear: 150ms; /* message clear */
   --motion-flash: 120ms; /* combat flash */
   --motion-stagger: 40ms; /* choice-row stagger */
+  /* The combat beat pause (webclient-combat-beat-queue design D2, AVG stage
+     design §10.2): the wait between one beat page and the next. Only the
+     script reads it (`lib/motion_tokens.js`), so it drives no transition and
+     stays 400ms at `reduced` — design §9.1 keeps combat beats' "order and
+     pauses" and drops only their motion; `off` resolves it to 0ms. */
+  --motion-beat: 400ms;
   /* The travel multiplier: every translation is `calc(<distance> * this)`, so
      the reduced level keeps the fade and drops the move. */
   --motion-travel: 1;
@@ -655,6 +661,7 @@
   --motion-fast: 0ms;
   --motion-base: 0ms;
   --motion-slow: 0ms;
+  --motion-beat: 400ms;
   --motion-pulse: 0ms;
   --motion-hp-pulse: 0ms;
   --motion-spin: 0ms;
@@ -676,6 +683,7 @@
   --motion-fast: 0ms;
   --motion-base: 0ms;
   --motion-slow: 0ms;
+  --motion-beat: 0ms;
   --motion-pulse: 0ms;
   --motion-hp-pulse: 0ms;
   --motion-spin: 0ms;
@@ -708,6 +716,7 @@
     --motion-fast: 0ms;
     --motion-base: 0ms;
     --motion-slow: 0ms;
+    --motion-beat: 400ms;
     --motion-pulse: 0ms;
     --motion-hp-pulse: 0ms;
     --motion-spin: 0ms;
