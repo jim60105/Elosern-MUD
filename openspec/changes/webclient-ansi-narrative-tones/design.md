@@ -36,7 +36,20 @@ Alternative considered: desaturating the stock values by a formula. Stock `#00ff
 
 ### D2. Cube entries: cap saturation, keep hue and lightness
 
-For each 6×6×6 cube entry, convert to HLS with `colorsys`. If S > 0.62, set S = 0.62, convert back, and round to integers. Then apply the contrast floor. Hue is preserved to within rounding (the test allows ±2° after rounding). The 0.62 cap is the ceiling of the authored table (gold-400 is 0.61). One number for the whole palette makes "no foreground entry is loud" a single testable rule.
+For each 6×6×6 cube entry, convert to HLS with `colorsys`. If S > 0.62, set S = 0.62, convert back, and round inward: ceil channels below lightness, floor channels above lightness, and round a channel exactly at lightness. This avoids nearest-integer rounding increasing saturation beyond the strict cap. Then apply the contrast floor. Hue and lightness preservation are measured at the mapping stage, before that floor: hue within ±2° for chromatic entries and lightness within 1/255. Achromatic hue is undefined and is not compared. The final output must still satisfy saturation ≤0.62 and contrast ≥3.0. The paper blend may shift hue and lightness. The 0.62 cap is the ceiling of the authored table (gold-400 is 0.61).
+
+Application-time numerical clarification (approved during implementation): a
+216-entry probe using inward rounding and the new ink found no saturation,
+contrast, or pre-floor hue violations. Maximum pre-floor hue error was
+0.306123° (index 81); maximum post-floor hue shift was 9.230769° (index 53);
+maximum final cube saturation was 0.618605 (index 26); minimum final cube
+contrast was 3.005100 (index 29). The initial nearest-rounding probe's index 17
+6° and index 53 8.78° were **post-floor**, not mapping errors. This is why both
+the requirement and scenario explicitly name the hue-preservation stage.
+The twelve authored tones were also evaluated against `#141019`: contrasts in
+table order were 4.565587, 6.639522, 8.705749, 6.022688, 6.016206, 6.725923,
+6.324299, 8.475286, 11.585227, 7.434581, 7.609632, and 8.631260. All clear the
+floor unchanged; their saturation values round to the D1 values.
 
 Alternative considered: the review's 45% cap. The theme's own gold accent is 61%, so a 45% cap would forbid the theme's primary accent in narrative text.
 
