@@ -8,7 +8,7 @@
 - [ ] 1.2 Re-confirm design.md Context:
   - `emit_settlement` still sends one message per EventLog: `grep -n "actor.msg" world/rules/combat_result.py`
   - `dispatchAction` still pushes the response mark right after `sendAction`: `grep -n "responseMarks" web/webclient-app/stores/elosern/transport.js`
-  - the MessageWindow reader state still names `responseKey`: `grep -n "responseKey" web/webclient-app/components/MessageWindow.vue`
+  - the MessageWindow reader state still keys the shown response (`shownKey`, the `s<startSeq>` / `i<index>` key of its `display` computed): `grep -n "shownKey" web/webclient-app/components/MessageWindow.vue`
 
 ## 2. Token reader and token
 
@@ -51,7 +51,7 @@
 ## 6. Browser and evidence
 
 - [ ] 6.1 Create `web/tests/browser/test_browser_combat_beats.py` with design D9's three journeys on an isolated managed server, reusing `test_browser_combat_panels.py`'s engage and key helpers (import or share them through `_journey_support.py`). Annotate the journeys as D9 lists, and add them to a shard in `.github/browser-shards.json`.
-- [ ] 6.2 `grep -n "message-page" web/tests/browser/test_browser_combat_*.py`. Update each post-round text read to page through with Enter or to use `narrative_log_text`.
+- [ ] 6.2 `grep -n "message-page" web/tests/browser/test_browser_combat_*.py`. Update each post-round text read to page through with Enter or to use `narrative_log_text`. (Verified: no combat journey reads `message-page` / `message-content`; an unlimited grep over `web/tests/browser/test_browser_combat_*.py` returns nothing, and the journeys that read post-round prose use `narrative_log_text`. Nothing to change.)
 - [ ] 6.3 `web/webclient/tests/test_node_suite_evidence.py`: add `test_beat_queue_vitest_evidence_passes` (design D9).
 - [ ] 6.4 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_beats web.tests.browser.test_browser_combat_panels web.tests.browser.test_browser_combat_menu web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_combat_rejection web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_combat_stage`. All green.
 
