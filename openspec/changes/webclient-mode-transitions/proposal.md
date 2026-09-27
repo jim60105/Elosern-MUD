@@ -20,15 +20,14 @@ This change (C11c, the last C11 slice) delivers those rows. The foes' entrance i
   - **Collapse by slide, not `display:none`.** In dialogue mode `.stage-band` still switches to one column at commit, so the message window widens in one step (coordinator-approved, design D1).
     - `[data-anchor="band-command"]` becomes an absolutely positioned layer over the band's right third. It carries `inert` from the commit's frame, slides right (`translateX(calc(100% * var(--motion-travel)))`), and fades out over `--motion-panel`, then becomes `visibility: hidden`.
     - Leaving dialogue reverses the slide from the commit's frame, and `inert` clears at commit.
-  - **Mode-change hook.** A new `data-mode-change` attribute on the stage root names the last live transition (`exploration-combat`, `combat-exploration`, `exploration-dialogue`, `dialogue-exploration`, …). It is set by a non-immediate watcher, so mount and reconnect never set it.
+  - **Mode-change hook.** A new `data-mode-change` attribute on the stage root names the last live transition (`exploration-combat`, `combat-exploration`, `exploration-dialogue`, `dialogue-exploration`, …). It is computed from the raw committed mode by a new `composables/use-mode-change.js` and passed in as a prop, so mount and reconnect (whose transport reset nulls the mode) never set it. The same composable's `modeHydrating` flag keeps both edges of a reconnect free of Vue transitions.
   - **Combat flash.** A new decorative `.stage-flash` layer (`aria-hidden`, `pointer-events: none`) plays `elosern-stage-flash` once when entering combat: white, peak opacity `--motion-flash-peak`, over `--motion-flash`.
-  - **Veil fade.** The combat veil is always rendered. Its opacity fades in and out over `--motion-reveal`, and it pulses only in combat.
+  - **Veil fade.** The combat veil is always rendered. Its opacity fades in and out over `--motion-actor`, and it pulses only in combat. Its gradient token is deepened so combat reads over a painted backdrop.
   - **Panel flip.** The command region's content plays `elosern-panel-flip-in` when entering combat and `elosern-panel-flip-out` when leaving it: a `rotateY` scaled by `--motion-travel`, with a fade over `--motion-panel`.
-- `web/webclient-app/AppClient.vue`: the host's `StageActor` in `#actor-right` is wrapped in `<Transition name="actor-enter" v-bind="inertWhileLeaving">`. It slides in from the right (`--motion-shift-lg × --motion-travel`) and fades over `--motion-actor`, and it leaves the same way.
+- `web/webclient-app/AppClient.vue`: the host's `StageActor` in `#actor-right` is wrapped in `<Transition name="actor-enter" v-bind="inertWhileLeaving">`. It slides in from the right (`--motion-shift-lg × 1.5 × --motion-travel`), a beat after the panel starts to leave, and fades over `--motion-actor`, and it leaves the same way.
 - `web/webclient-app/components/MessageWindow.vue`: the name plate is wrapped in `<Transition name="plate" v-bind="inertWhileLeaving">`, fading over `--motion-reveal`.
 - `web/webclient-app/components/DialogueChoices.vue` (C10c):
-  - The rows render inside a `<TransitionGroup tag="div" name="choice-row" appear>` that is the `role="menu"` element itself. Each row carries `--row-index`.
-  - A row enters with a fade and a `--motion-shift-sm` rise, delayed by `calc(var(--motion-stagger) * var(--row-index))` over `--motion-reveal`.
+  - Each row carries `--row-index` and a CSS entrance animation (no `TransitionGroup`): a fade and a `--motion-shift-sm` rise, delayed by `calc(var(--motion-stagger) * var(--row-index))` over `--motion-reveal`. A new `entrance` prop keeps a list mounted by a reconnect at rest.
   - The card fades in over `--motion-reveal`.
   - Leaving rows are removed at once.
   - Keys and pointer work from the first frame.
@@ -63,7 +62,7 @@ Out of scope:
 
 - New: `web/tests/browser/test_browser_mode_transitions.py`, Vitest `web/webclient-app/tests/mode_transitions.test.js`.
 - Edited source:
-  - `web/webclient-app/components/{HudFrame,MessageWindow,DialogueChoices,AppShell}.vue`, `web/webclient-app/AppClient.vue`
+  - `web/webclient-app/components/{HudFrame,MessageWindow,DialogueChoices,AppShell}.vue`, `web/webclient-app/AppClient.vue`, new `web/webclient-app/composables/use-mode-change.js` (wired in `use-app-client.js`)
   - `web/webclient-app/styles/tokens.css`, `web/webclient-app/styles/app-shell.css` (if the band's dialogue rules live there, per C10b)
 - Stories: `stories/Core/HudFrame.stories.js`, `stories/Core/DialogueChoices.stories.js`.
 - Tests edited:

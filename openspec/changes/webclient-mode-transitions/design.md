@@ -6,7 +6,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
   - `<html data-motion>` carries the effective level.
   - The tokens `--motion-panel` (250ms), `--motion-actor` (350ms), `--motion-reveal` (250ms), `--motion-flash` (120ms), `--motion-stagger` (40ms), `--motion-flash-peak` (0.85), `--motion-travel`, `--motion-shift-sm` / `--motion-shift-lg`, `--ease-enter`, and `--ease-exit` exist.
   - Under `reduced`: panel, actor, and reveal are 150ms; flash, stagger, travel, and flash-peak are 0. Under `off` everything is 0.
-  - `lib/transition_hooks.js` `inertWhileLeaving` sets `inert` on a leaving element (C11b D1).
+  - `lib/transition_hooks.js` `inertWhileLeaving` sets `inert` on a leaving element (C11b D1). Every stage `<Transition>` binds `:css="motionLevel !== 'off'"` from a threaded `motionLevel` prop (C11b).
   - The requirements "Presentation timing never gates committed state or input" and "A leaving element is out of reach while it animates out" are the contracts.
 - **`HudFrame.vue`**:
   - The stage root `.elosern-stage[data-elosern-mode]` holds `.stage-vignette`, `.stage-combat-veil` (`display:none` outside combat, with `animation: elosern-combat-pulse var(--motion-pulse) … infinite` on its own opacity), the backdrop slot, `actor-left` / `actor-right` (anchors with the class `stage-actor`), the islands, `.stage-band` with `band-message` / `band-command`, the `choices` anchor (C10c), and the `command-line` anchor.
@@ -45,37 +45,45 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
 The band keeps C10b's one-column grid in dialogue, so the message region is the band's full width in the commit's frame. The window's measurer re-pages once. Animating `grid-template-columns` instead would make its ResizeObserver re-page on every frame of the slide (coordinator-approved "the window widens instantly").
 
 `[data-anchor="band-command"]`:
-- **Every mode:** `transition: transform var(--motion-panel) var(--ease-exit), opacity var(--motion-panel) var(--ease-exit), visibility 0s linear 0s`.
 - **Dialogue mode:** the rule replaces C10b's `display:none` with:
   - `position: absolute; top: 0; right: 0; bottom: 0; width: 33.3333%`
   - `transform: translateX(calc(100% * var(--motion-travel)))`, `opacity: 0`, `visibility: hidden`
-  - `transition-delay: 0s, 0s, var(--motion-panel)`, so visibility flips only after the slide
-- **Returning to exploration:** the region is a grid item again at `transform: none; opacity: 1; visibility: visible` with zero delay, so it slides back from the offset it holds, using `--ease-enter`.
-- `.stage-band` gets `overflow: hidden`, so the translated panel never paints outside the band.
+- **Transitions, only under `.elosern-stage[data-mode-change]`** (D2), so a mount or a reconnect renders the final state at once:
+  - leaving (the dialogue rule): `transform var(--motion-panel) var(--ease-exit)`, `opacity calc(var(--motion-panel) * 0.6) var(--ease-standard)`, and `visibility var(--motion-panel) linear`. The panel accelerates away but thins early, so it never sits opaque over the widened window. `visibility` is discrete: with a full-length transition and no delay it stays `visible` until the slide ends. This avoids a literal `0s` delay, which the duration guard rejects.
+  - returning (the base rule): `transform var(--motion-panel) var(--ease-enter)` and `opacity calc(var(--motion-panel) * 0.8) var(--ease-standard)`, with no `visibility` transition. The region is visible, and the dock focusable, in the commit's own frame. A discrete `visibility` transition would hold `hidden` for the first frame and the post-flush focus rescue would miss the dock. The region re-enters the grid at the offset it holds and decelerates home.
+- **No `.stage-band { overflow: hidden }`.** The region sits at the stage's right edge, and the stage root's own `overflow: hidden` already clips the slide. Clipping the band would also clip the dock's verb popover.
 
-`HudFrame` binds `:inert="mode === 'dialogue'"` on the anchor. It flips in the same patch as `data-elosern-mode`, so the region leaves the accessibility tree, the tab order, and hit-testing at commit. `visibility: hidden` at the end also removes it from the accessibility tree while the element stays mounted. `#action-dock` is never remounted, as C10b requires.
+`HudFrame` binds `:inert="mode === 'dialogue' || null"` on the anchor. `null` removes the attribute where the DOM has no `inert` property (jsdom), so it is never rendered as `inert="false"`. It flips in the same patch as `data-elosern-mode`, so the region leaves the accessibility tree, the tab order, and hit-testing at commit. `visibility: hidden` at the end also removes it from the accessibility tree while the element stays mounted. `#action-dock` is never remounted, as C10b requires.
 
 At `reduced`, travel is 0 and the duration is 150ms, so the panel only fades over the widened window. At `off`, the change is instant.
 
-*Why `visibility` and not `display:none` after the slide:* `display` cannot be delayed by a transition, and a script `transitionend` toggle would add a timer path that `off` must bypass. A delayed `visibility` transition is pure CSS and resolves to instant at `off`.
-
 ### D2. The live mode-change hook
-`HudFrame` keeps `modeChange = ref(null)` and sets it in `watch(() => props.mode, (to, from) => { modeChange.value = from && to !== from ? `${from}-${to}` : modeChange.value })`. The watcher has no `immediate`. It renders `:data-mode-change="modeChange"`.
-- Mounting, and a reconnect that remounts the shell, never set the attribute. A resync that commits the same mode does not change it.
+The shell's `mode` prop is coerced (`store.view.mode || 'exploration'`). A transport reset nulls the raw mode, and the resync snapshot sets it again. So a watcher on `HudFrame`'s prop would see `exploration → combat` on a reconnect into combat and flash. The signal is therefore computed from the **raw** committed mode by `composables/use-mode-change.js`, registered first in `use-app-client.js`:
+- `nextModeChange(previous, from, to)` is pure. It returns null when either endpoint is null, `previous` when `from === to`, and otherwise `` `${from}-${to}` ``.
+- A default (pre-flush) watcher on `store.view.mode` sets `modeChange`, so the ref changes in the same patch as the mode.
+- `modeHydrating` is true from **any** null edge (the reset that clears the mode, or a mount before the first snapshot). A post-flush watcher clears it once a `null → mode` arrival has rendered. Both edges of a reconnect mid-dialogue are separate flushes: `dialogue → null`, then `null → dialogue`. The flag covers both, so the host and the plate neither leave nor enter with a fade (plan-review finding).
+- `AppClient` passes `modeChange` and `modeHydrating` to `AppShell`. `AppShell` renders `modeChange` through `HudFrame`'s new `modeChange` prop as `:data-mode-change`, and forwards `modeHydrating` to `MessageWindow`.
+
+Consequences:
+- Mounting and a reconnect never set the attribute. A same-mode resync keeps it.
 - The attribute persists until the next live change. Every animation keyed on it has one iteration, so it plays once.
-- Selectors use suffix and prefix matches:
-  - `[data-mode-change$="-combat"]` for entering combat
-  - `[data-mode-change^="combat-"]` for leaving it
+- Selectors: `[data-mode-change$="-combat"]` for entering combat, and `[data-mode-change="combat-exploration"]` for the flip back.
 
-**Flash.** A new `<div class="stage-flash" data-testid="stage-flash" aria-hidden="true">` sits above the backdrop and portraits and below the islands (z 3). Its CSS is `position: absolute; inset: 0; pointer-events: none; background: #fff; opacity: 0`. `[data-mode-change$="-combat"] .stage-flash { animation: elosern-stage-flash var(--motion-flash) var(--ease-standard) 1 }`, with keyframes `50% { opacity: var(--motion-flash-peak) }`. At `reduced` the peak is 0, and at `off` the duration is 0, so the flash is invisible at both. Design §9.1 lists no flash for reduced, and a white flash is a photosensitivity trigger.
+**Flash.** A new `<div class="stage-flash" data-testid="stage-flash" aria-hidden="true">` sits above the backdrop and portraits and below the islands (z 3), with `pointer-events: none` and `opacity: 0`.
+- Its fill is a warm white radial (`#fffdf8` at the scene's centre falling to `#f4dcc0` at the edges), so it reads as an impact rather than a blank frame.
+- `[data-mode-change$="-combat"] .stage-flash` plays `elosern-stage-flash var(--motion-flash) linear 1`. The keyframes carry their own curves: a hard attack to `var(--motion-flash-peak)` at 20%, then a long, soft release.
+- At `reduced` the peak is 0, and at `reduced` and `off` the duration is 0, so the flash is invisible at both. Design §9.1 lists no flash for reduced, and a white flash is a photosensitivity trigger.
 
-**Veil.** `.stage-combat-veil` is always rendered, `aria-hidden="true"`, with `opacity: 0; transition: opacity var(--motion-reveal) var(--ease-standard)`. Under combat mode it has `opacity: 1`. The pulse moves to a `::before` layer that carries the veil gradient, active only in combat, so the pulse's opacity keyframes and the fade's opacity transition never fight over one property.
+**Veil.** `.stage-combat-veil` is always rendered, `aria-hidden="true"`, at `opacity: 0`, and at `opacity: 1` in combat.
+- Under `[data-mode-change]` it transitions `opacity var(--motion-actor) var(--ease-standard)`: 350ms at `full`, so the scene closes in slightly slower than the 250ms flip, and 150ms at `reduced`.
+- The gradient and the pulse move to a `::before` layer, and the pulse runs only in combat, so the pulse's opacity keyframes and the fade's opacity transition never fight over one property.
+- The `--stage-combat-veil` token is deepened: a blood-dark ring towards the corners over a faint overall dusk. The H1 value was nearly invisible over a painted backdrop.
 
 **Panel flip.**
 - `[data-mode-change$="-combat"] [data-anchor="band-command"] > *` plays `elosern-panel-flip-in`.
-- `[data-mode-change^="combat-"] [data-anchor="band-command"] > *` plays `elosern-panel-flip-out`.
-- Both run over `--motion-panel` with `--ease-enter`: from `transform: perspective(900px) rotateY(calc(±90deg * var(--motion-travel))); opacity: 0` to rest.
-- The two names alternate, because a combat entry is always followed by a combat exit, so each change restarts the animation without a script.
+- `[data-mode-change="combat-exploration"] [data-anchor="band-command"] > *` plays `elosern-panel-flip-out`.
+- Both run over `--motion-panel` with `--ease-enter`, from `opacity: 0; transform: perspective(1400px) rotateY(calc(∓72deg * var(--motion-travel)))` to rest. The committed menu turns in from nearly edge-on. The combat root turns in from one side and the overview from the other.
+- The dock renders one root (`section#action-dock`), so `> *` is exactly the dock.
 - The dock's content has already switched at commit (the combat root), so the flip reveals the committed menu, and the dock keeps focus throughout.
 
 The keyframes live in `styles/tokens.css` next to the shared ones.
@@ -84,31 +92,32 @@ The keyframes live in `styles/tokens.css` next to the shared ones.
 `AppClient` wraps the host actor:
 
 ```
-<Transition name="actor-enter" v-bind="inertWhileLeaving">
-  <StageActor v-if="…" :key="dialogueVm.host.identity" side="right" … />
+<Transition name="actor-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving">
+  <StageActor v-if="…" :key="dialogueVM.host.identity" side="right" … />
 </Transition>
 ```
 
-- Enter from and leave to: `opacity: 0; transform: translateX(calc(var(--motion-shift-lg) * var(--motion-travel)))`.
-- Active: `transition: opacity var(--motion-actor), transform var(--motion-actor)`, with `--ease-enter` on enter and `--ease-exit` on leave.
+- `hostTransitionCss` is `motionLevel !== 'off' && !modeHydrating`. At `off` there is no CSS phase (C11b D1), and across a reconnect the host appears and goes in the commit's frame.
+- Enter from and leave to: `opacity: 0; transform: translateX(calc(var(--motion-shift-lg) * 1.5 * var(--motion-travel)))`, which is 48px at `full`.
+- Enter: opacity over `calc(var(--motion-actor) * 0.8)` with `--ease-standard`, and transform over `--motion-actor` with `--ease-enter`. Both are delayed by `calc(var(--motion-panel) * 0.24 * var(--motion-travel))`, about 60ms at `full` and 0 at `reduced`, so the eye reads the band clearing first and the host arriving second. The opacity rises a little faster than the figure moves, so no half-transparent body hangs in the air.
+- Leave: `position: absolute; inset: 0` on the anchor's box, with opacity over `--motion-actor` (`--ease-standard`) and transform (`--ease-exit`).
 - Keying by host identity makes a host change during a session (a new host, not a new portrait) slide one actor out and the next in, while C11b's crossfade handles a new portrait for the same host.
 - The actor has no focusable element, and `inert` covers pointer hits while it leaves.
 
 ### D4. The name plate
-`MessageWindow` wraps the plate in `<Transition name="plate" v-bind="inertWhileLeaving">`.
-- Enter: opacity 0 → 1 over `--motion-reveal`.
-- Leave: `position: absolute` (so the text area is not held open), opacity → 0 over `--motion-reveal`.
-- The plate takes its 30px row at commit, and the window re-pages once.
+`MessageWindow` wraps the plate in `h(Transition, { name: "plate", css: motionLevel !== "off" && !modeHydrating, ...inertWhileLeaving })`. The Transition stays in the vnode tree, so the text area keeps its position.
+- The plate takes its row at commit, and the window re-pages once.
+- Enter: its content fades over `--motion-reveal` and drifts `--motion-shift-sm × travel` in from the column's side, delayed by `calc(var(--motion-panel) * 0.4 * var(--motion-travel))`, so it arrives just after the host starts to walk on.
+- Leave: `position: absolute; top: 0; left: 0; right: 0` (so the text area is not held open), with opacity over `calc(var(--motion-reveal) * 0.4)` and `--ease-standard`. It drops away before the new page surfaces under it. The frame review showed a slower leave overlapping the new page's first line.
+- `--dialogue-inset` moves from the dialogue-only rule to `.message-window`, so a plate leaving after the commit back to exploration keeps its geometry while it fades.
 
 ### D5. The choices stagger
-- `DialogueChoices`' root becomes `<TransitionGroup tag="div" name="choice-row" appear class="dialogue-choices" role="menu" …>`. The attributes and the keydown listener fall through to the rendered `div`, so the single-tab-stop menu contract of C10c is unchanged.
-- Each row carries `:style="{ '--row-index': index }"`.
-- CSS:
-  - `.choice-row-enter-from { opacity: 0; transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel))) }`
-  - `.choice-row-enter-active { transition: opacity var(--motion-reveal) var(--ease-enter), transform var(--motion-reveal) var(--ease-enter); transition-delay: calc(var(--motion-stagger) * var(--row-index)) }`
-- No leave or move classes, so rows swapped out by `↦ 移動…` or its return are removed at once, and the new view's rows stagger in.
-- `AppClient` wraps `#choices`' `DialogueChoices` in `<Transition name="choices-card">`, with an enter fade over `--motion-reveal` and no leave animation. The list vanishes at activation, after C10c D7 has moved focus to the page surface.
-- Rows are in the DOM from the first frame. C10c D7's focus-on-show and every key and pointer path work immediately, and a digit activates a row still fading in.
+Pure CSS keyframes replace the proposed `TransitionGroup`. The rows are ordinary keyed elements, in the DOM, focusable, and clickable from their first frame. A view swap renders new keyed rows, which animate on insertion. Removed rows vanish at once, with no leaving copy. A group's leave copies would carry duplicate row ids for a double frame, and `off` would need a script-side `css` switch.
+- Each row carries `:style="{ '--row-index': index }"` and `animation: elosern-choice-row-in var(--motion-reveal) var(--ease-enter) calc(var(--motion-stagger) * var(--row-index)) backwards`. The keyframe rises from `translateY(calc(var(--motion-shift-sm) * var(--motion-travel)))` at `opacity: 0`. `backwards` holds a row at its start through its delay, and nothing is filled after it, so hover, focus, and active-row styles are untouched.
+- The card (`.dialogue-choices`) and the exits caption fade in (`elosern-choice-card-in`) over `--motion-reveal`. No `choices-card` Transition wraps the list in `AppClient`, and the list vanishes at activation, after C10c D7 has moved focus to the page surface.
+- The rows' scroller is keyed by the view and carries `--row-count`. It plays `elosern-choice-rows-clip` (`overflow-y: hidden`) for `stagger × count + reveal`. The rising rows sit a shift below their rest, which at 1280×720 flashed a scrollbar on and off. The frame review caught it, and the clip covers exactly the entrance.
+- The new `entrance` prop (default true; `AppClient` passes `!modeHydrating`) is read once, at mount. A list mounted in the frame a reconnect renders carries `dialogue-choices--still` (the card) and `dialogue-choices--rows-still` (the rows), both `animation: none`. The rows' stillness ends at the first view swap, whose new rows stagger in. The card never refades, and a later prop change never replays the entrance.
+- At `reduced` the stagger and the rise are 0, so the rows fade in together over 150ms. At `off` the `!important` rule zeroes every duration and delay, and the rows show at rest.
 
 ### D6. Focus and reach
 - **Entering dialogue.** C10b's pre-flush rescue moves focus from `band-command` to `message-page` before the patch that sets `inert`, so focus never drops to the body.
@@ -121,26 +130,29 @@ The keyframes live in `styles/tokens.css` next to the shared ones.
 Design §9.3 keeps drawers "as today", and C11a already makes them obey the level: every drawer and recession duration is `--motion-base`, which is 0 at `reduced` and `off`. Making the drawer's mount slide actually play would change drawer presentation, which the design's non-goals exclude, so nothing is edited. `OverlayHost` has no transition.
 
 ### D8. Tests
-- **Vitest** `tests/mode_transitions.test.js`, with `stubs: { transition: false, 'transition-group': false }` where hooks matter:
-  - `HudFrame` mounted in combat has no `data-mode-change`. A prop change from exploration to combat gives `exploration-combat`, and a change back gives `combat-exploration`.
-  - The `band-command` anchor is `inert` exactly in dialogue.
-  - `.stage-flash` and `.stage-combat-veil` are `aria-hidden` and rendered in every mode.
-  - In `AppClient`, the host `StageActor` gets `inert` while leaving on the return to exploration.
-  - `DialogueChoices` rows carry `--row-index` 0…N−1, the root keeps `role="menu"` and `tabindex="0"`, and a keydown on the root before any `transitionend` activates a pick.
-  - `tests/hud_frame.test.js`: the dialogue case asserts `inert` plus the one-column band, instead of `display:none`.
-  - `tests/dialogue_choices.test.js` stays green with the group.
-- **Browser** `web/tests/browser/test_browser_mode_transitions.py` at 1920x1080. It polls DOM state and reads computed styles, never elapsed time.
-  - `test_dialogue_enter_and_leave_full` (`motion_level=None`, which is `full`):
-    - after 交談: `band-message` width is the band's width at once, `band-command` has `inert` and a computed `transition-duration` containing `0.25s`, it ends `visibility: hidden`, the host actor's enter transition is `0.35s`, and the plate is present
-    - after 結束對話: the leaving actor is inert, the dock is focused, and `band-command` is not inert in the commit's frame
-  - `test_combat_enter_and_leave_full`: inject combat. The stage has `data-mode-change="exploration-combat"`, `.stage-flash`'s `getAnimations()` shows `elosern-stage-flash` at 120ms, the veil's opacity transition is `0.25s`, and the band-command child runs `elosern-panel-flip-in`. Inject exploration: `combat-exploration`, and no flash animation.
-  - `test_choices_stagger_full`: once the choices show, rows have `transition-delay` `0s`, `0.04s`, `0.08s`, …, the list is focused, and a digit press activates at once.
-  - `test_reload_in_combat_plays_nothing`: after a reload in combat, `data-mode-change` is absent and `.stage-flash` has no animations.
-  - `test_mode_transitions_reduced` (`motion_level="reduced"`): band-command, actor, and plate durations are ≤ `0.15s`, the computed transforms stay identity, the flash's peak resolves to 0, and every row's delay is `0s`.
-  - `test_mode_transitions_off` (default `off`): in the frame after each commit, every surface is in its final state: `visibility: hidden` on the collapsed region, no leaving copy, and the veil at its final opacity.
-  - Annotate all of them with `webclient-contextual-hud::mode-changes-transition-at-the-motion-level`. Also annotate the dialogue journey with the collapse ID and the combat journey with the visibility ID.
-  - Update any `display:none` assertion on the dialogue command region in `test_browser_exploration_dialogue.py`, `test_browser_contextual_hud_stage.py`, and `test_browser_layout.py` to "hidden and inert". Playwright's `is_hidden` already treats `visibility: hidden` as hidden, and the suite's default `off` level makes the state immediate.
-- **Evidence:** `test_node_suite_evidence.py` gains `test_mode_transitions_vitest_evidence_passes`, annotated with the new ID.
+- **Vitest** `tests/mode_transitions.test.js`, mounting `AppClient` with `stubs: { transition: false, 'transition-group': false }`:
+  - `nextModeChange` for live, null-endpoint, and same-mode cases.
+  - `HudFrame` renders `.stage-flash` and `.stage-combat-veil` `aria-hidden` in every mode, makes the `band-command` anchor `inert` exactly in dialogue, and renders the `modeChange` it is given.
+  - `AppClient`: the first snapshot sets no `data-mode-change`, and live changes name themselves. A same-mode resync keeps the change.
+  - Leaving dialogue leaves one host copy with `actor-enter-leave-active` and `inert`, and the region's `inert` clears in the same patch.
+  - A reconnect mid-dialogue (`beginTransport` and then a resync snapshot on a new epoch) removes the host and the plate at the reset with no leaving copy. It then renders the host, the plate, and the list at rest: no enter classes, and `dialogue-choices--still`.
+  - A live entry animates the host and the list. At `off` the host has no CSS phase.
+  - `DialogueChoices` rows carry `--row-index` 0…N−1, the root keeps `role="menu"` and `tabindex="0"`, a digit activates in the first frame, and `entrance: false` holds until a view swap.
+  - Stub-shaped assertions in `tests/app_client_stage_actor.test.js`, `tests/overlays/objective_tracker_integration.test.js`, and `tests/message_window_dialogue.test.js` read through the Transition wrapper. `tests/hud_frame.test.js` asserts `inert`, the absolute collapsed state, and the one-column band instead of `display:none`.
+- **Browser** `web/tests/browser/test_browser_mode_transitions.py` at 1920x1080. Each journey commits a snapshot and reads the stage in the next animation frame inside the same evaluation (computed styles, `getAnimations()`, classes), never elapsed time. Journeys that need the choice list read the live line first (`open_dialogue_choices`).
+  - `test_dialogue_enter_and_leave_full`: the window spans the band at once, and the region is inert, absolute, and transitions for `0.25s`, ending hidden. The host enters with `0.35s`, and the plate enters. On leaving, the host leaves inert, the region is visible and not inert in the commit's frame, the list is gone, and the dock takes focus.
+  - `test_combat_enter_and_leave_full`: `elosern-stage-flash` at 120ms, the flash and the veil `aria-hidden` and `pointer-events: none` and never the hit target, the veil's `0.35s` transition from below 1, and `elosern-panel-flip-in`. Leaving plays no flash and plays `elosern-panel-flip-out`. A second entry flashes again.
+  - `test_choices_stagger_full`: row delays `0s`, `0.04s`, … `0.24s`, the list focused, and a digit dispatching at once.
+  - `test_reload_in_combat_plays_nothing`: a transport reset and a resync on a new epoch, in combat and then in dialogue. No `data-mode-change`, no flash, the veil at 1, no flip, the region hidden in the resync's frame, the host and the plate at rest, and the list's rows unanimated.
+  - `test_mode_transitions_reduced`: every duration is at most `0.15s`, transforms are identity, the flash peak is `0` with no visible flash, and row delays are `0s`.
+  - `test_mode_transitions_off`: final states in the commit's frame (the region hidden or shown, no leaving copy, the veil at its final opacity, the flash at 0, the rows fully opaque).
+  - Annotations: every journey carries `webclient-contextual-hud::mode-changes-transition-at-the-motion-level`. The dialogue journeys add the collapse ID and the leaving-element ID, and the combat journey adds the visibility ID.
+- **Existing browser suites.** These are structural, not wording swaps:
+  - `test_browser_exploration_dialogue.py`: `commandDisplay`/`dockDisplayed` become visibility, `inert`, and a hidden dock. The `full`-level journey's per-frame counter checks `inert` only, because the region is visible for its 250ms slide, and its hidden end state is asserted once the line is read.
+  - `test_browser_contextual_hud_stage.py`: the dialogue command rect's zero width becomes `[inert, 'hidden', 'absolute']`.
+  - `test_browser_layout.py`: `display:none` becomes hidden and `inert`.
+  - `test_browser_contextual_hud_anchors.py`: the overlap check skips a `visibility: hidden` anchor.
+- **Evidence:** `test_node_suite_evidence.py` gains `ModeTransitionsEvidenceTest.test_mode_transitions_vitest_evidence_passes`, annotated with the new ID.
 
 ### D9. Spec strategy, traceability, and archive order
 | Requirement | Written on |

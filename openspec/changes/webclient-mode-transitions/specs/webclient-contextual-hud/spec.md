@@ -8,8 +8,8 @@ pointer hit-testing from the commit's frame; the region SHALL then slide out to 
 the panel duration of the client's motion level, drawn over the widened message region, and SHALL be
 `visibility: hidden` once that slide ends, so it contributes nothing visible. Leaving dialogue SHALL
 bring the region back into reach in the commit's frame and slide it back in from the right. At
-`reduced` the region only fades, within 150ms, and at `off` it hides and returns in the commit's frame. The dock SHALL stay the same mounted `#action-dock`
-element, its router SHALL keep the exploration scene overview as its only frame (the reset on entering
+`reduced` the region only fades, within 150ms, and at `off` it hides and returns in the commit's
+frame. The dock SHALL stay the same mounted `#action-dock` element, its router SHALL keep the exploration scene overview as its only frame (the reset on entering
 dialogue that `webclient-exploration-menu` defines), and leaving dialogue SHALL show that overview
 again with no remount. The dialogue SHALL NOT present any dock frame, and no exploration affordance
 SHALL be removed from the committed `exploration` panel: movement stays reachable through the minimap
