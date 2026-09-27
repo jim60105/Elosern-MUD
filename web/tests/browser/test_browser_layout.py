@@ -587,13 +587,13 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 open_dialogue_choices(page)
                 page.wait_for_timeout(100)
                 self.assertEqual(page.locator("#action-dock").count(), 1, "the dock stays mounted in dialogue")
-                self.assertFalse(page.locator("#action-dock").is_visible(), "the dock is display:none in dialogue")
+                self.assertFalse(page.locator("#action-dock").is_visible(), "the dock is hidden in dialogue")
                 self.assertTrue(
                     page.evaluate(
                         "() => { const el = document.querySelector('[data-anchor=\"band-command\"]'); "
-                        "return !!el && getComputedStyle(el).display === 'none'; }"
+                        "return !!el && el.inert && getComputedStyle(el).visibility === 'hidden'; }"
                     ),
-                    "the command region is display:none in dialogue",
+                    "the command region is hidden and inert in dialogue",
                 )
                 for selector in (
                     '[data-testid="message-window"]',

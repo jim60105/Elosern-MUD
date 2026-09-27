@@ -812,6 +812,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             band: rect('[data-testid="stage-band"]'),
             message: rect('[data-testid="anchor-band-message"]'),
             command: rect('[data-testid="anchor-band-command"]'),
+            commandHidden: (() => {
+              const el = document.querySelector('[data-testid="anchor-band-command"]');
+              const cs = getComputedStyle(el);
+              return [el.inert, cs.visibility, cs.position];
+            })(),
           };
         }"""
         page = self.logged_in_page((1920, 1080))
@@ -890,13 +895,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertAlmostEqual(baseline["band"][3] - baseline["band"][1], 300.24, delta=1.0)
         # Dialogue collapses the command region (webclient-dialogue-stage-
         # actors): the band keeps its box, the message region spans it at the
-        # same height, and the command region renders no box.
+        # same height, and the command region is collapsed out of reach.
         dialogue = states.pop("dialogue")
         for got, want in zip(dialogue["band"], baseline["band"]):
             self.assertAlmostEqual(got, want, delta=1.0, msg="the band moved in the dialogue state")
         for got, want in zip(dialogue["message"], baseline["band"]):
             self.assertAlmostEqual(got, want, delta=1.5, msg="the message region must span the band in dialogue")
-        self.assertEqual(dialogue["command"][2] - dialogue["command"][0], 0, "the command region is not rendered in dialogue")
+        # webclient-mode-transitions: the collapsed region is an inert layer
+        # over the band's right third, `visibility: hidden` once its slide
+        # ends (at once at the suite's `off` level), never a grid cell.
+        self.assertEqual(dialogue["commandHidden"], [True, "hidden", "absolute"], "the command region is collapsed in dialogue")
         for label, state in states.items():
             for key in ("band", "message", "command"):
                 for got, want in zip(state[key], baseline[key]):

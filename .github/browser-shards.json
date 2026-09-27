@@ -344,13 +344,19 @@
         "web.tests.browser.test_browser_layout.ProtocolMismatchTest",
         "web.tests.browser.test_browser_reconnect.ReconnectTest",
         "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_register_and_idempotent_reregister",
-        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_1280x720_keeps_controls_visible"
+        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_1280x720_keeps_controls_visible",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_dialogue_enter_and_leave_full",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_choices_stagger_full"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_duplicate_request_executes_custom_once",
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_custom_preserves_typed_values_and_asks_for_review",
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_revision_returns_stale_without_mutation",
-        "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_1280x720_keeps_creation_essentials_visible_and_literal"
+        "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_1280x720_keeps_creation_essentials_visible_and_literal",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off"
       ]
     },
     {

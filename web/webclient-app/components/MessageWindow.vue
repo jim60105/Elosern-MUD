@@ -118,6 +118,9 @@ export default {
     // True while a drawer, overlay, or the full log is open: the
     // auto-advance wait pauses.
     held: { type: Boolean, default: false },
+    // True across a reconnect's null mode edges (webclient-mode-transitions
+    // D2): the name plate then appears and goes with no fade.
+    modeHydrating: { type: Boolean, default: false },
   },
   emits: ["open-full-log", "reading-change"],
   setup(props, { emit, expose }) {
@@ -560,21 +563,31 @@ export default {
         },
         [
           // The name plate (webclient-dialogue-stage-actors D7): a header row
-          // above the text area while the dialogue panel is available;
-          // otherwise an empty placeholder slot, so the text area below keeps
-          // its vnode position.
-          plated.value
-            ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
-                h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
-                props.dialogue.bondStage == null
-                  ? null
-                  : h(
-                      "span",
-                      { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
-                      ` · 羈絆 ${props.dialogue.bondStage}`,
-                    ),
-              ])
-            : null,
+          // above the text area while the dialogue panel is available. It
+          // fades in and out on a live mode change (webclient-mode-
+          // transitions D4); the Transition stays in the tree either way, so
+          // the text area below keeps its vnode position.
+          h(
+            Transition,
+            {
+              name: "plate",
+              css: props.motionLevel !== "off" && !props.modeHydrating,
+              ...inertWhileLeaving,
+            },
+            () =>
+              plated.value
+                ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
+                    h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
+                    props.dialogue.bondStage == null
+                      ? null
+                      : h(
+                          "span",
+                          { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
+                          ` · 羈絆 ${props.dialogue.bondStage}`,
+                        ),
+                  ])
+                : null,
+          ),
           // The measurer is an untracked DOM node appended after the page
           // surface by use-message-measure.js and must stay the text area's
           // last child, so never add a sibling slot or key a fragment here
@@ -901,9 +914,11 @@ export default {
    reads down from the figure standing above it and the right part of the
    band stays open under the host. The measurer shares the page's classes,
    so it measures the same column. */
-.message-window[data-mode="dialogue"] {
-  /* The player portrait's left inset, less the band region's 18px left
-     padding: the text column starts under the figure's anchor edge. */
+/* The player portrait's left inset, less the band region's 18px left
+   padding: the text column starts under the figure's anchor edge. Declared
+   in every mode, so a name plate leaving after the commit back to
+   exploration keeps its geometry while it fades. */
+.message-window {
   --dialogue-inset: max(24px, calc(var(--actor-left-inset, 6vw) - 18px));
 }
 
@@ -941,6 +956,33 @@ export default {
   background:
     linear-gradient(90deg, transparent, var(--gold-500) calc(var(--dialogue-inset) - 8px), rgba(185, 154, 96, 0.35) 55%, transparent)
     left bottom / 100% 1px no-repeat;
+}
+
+/* The plate's entrance (webclient-mode-transitions D4): it takes its row at
+   the commit, so the page re-measures once, and its content fades in a beat
+   after the host starts to walk on, drifting the last few pixels in from
+   the text column's side. Leaving, it is lifted out of flow onto the
+   window's top edge (the text below takes its row at once) and drops away
+   on a fast-falling curve, gone before the new page surfaces under it. */
+.message-window .plate-enter-active {
+  transition:
+    opacity var(--motion-reveal) var(--ease-standard) calc(var(--motion-panel) * 0.4 * var(--motion-travel)),
+    transform var(--motion-reveal) var(--ease-enter) calc(var(--motion-panel) * 0.4 * var(--motion-travel));
+}
+.message-window .plate-enter-from {
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--motion-shift-sm) * var(--motion-travel)));
+}
+.message-window .plate-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  transition: opacity calc(var(--motion-reveal) * 0.4) var(--ease-standard);
+}
+.message-window .plate-leave-to {
+  opacity: 0;
 }
 
 /* `text-overflow` does not apply to the flex row itself, so the name

@@ -308,8 +308,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
               return {
                 band,
                 message: box('[data-anchor="band-message"]'),
-                commandDisplay: getComputedStyle(document.querySelector('[data-anchor="band-command"]')).display,
-                dockDisplayed: !!dock && dock.getClientRects().length > 0,
+                commandVisibility: getComputedStyle(document.querySelector('[data-anchor="band-command"]')).visibility,
+                commandInert: document.querySelector('[data-anchor="band-command"]').inert,
+                dockHidden: !!dock && getComputedStyle(dock).visibility === 'hidden',
                 dockConnected: !!dock && dock.isConnected,
                 hostSide: document.querySelector('[data-anchor="actor-right"] [data-testid="stage-actor"]').dataset.side,
                 hostSpeaking: document.querySelector('[data-anchor="actor-right"] [data-testid="stage-actor"]').dataset.speaking,
@@ -325,8 +326,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
               };
             }"""
         )
-        self.assertEqual(geometry["commandDisplay"], "none")
-        self.assertFalse(geometry["dockDisplayed"])
+        # webclient-mode-transitions: the collapsed region is inert from the
+        # commit and `visibility: hidden` once its slide ends (instant at the
+        # suite's `off` level), with the dock inside it.
+        self.assertEqual(geometry["commandVisibility"], "hidden")
+        self.assertTrue(geometry["commandInert"])
+        self.assertTrue(geometry["dockHidden"])
         self.assertTrue(geometry["dockConnected"])
         self.assertTrue(
             page.evaluate("(dock) => dock === document.getElementById('action-dock')", dock_handle),
@@ -602,7 +607,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   if (list && win && win.getAttribute('data-typing') === 'true') window.__journey.listWhileUnread += 1;
                   if (document.activeElement === document.body) window.__journey.bodyFocus += 1;
                   const command = document.querySelector('[data-anchor="band-command"]');
-                  if (!command || getComputedStyle(command).display !== 'none') window.__journey.collapsedBroken += 1;
+                  // webclient-mode-transitions: at `full` the region slides out
+                  // for 250ms, so only its reach is checked on every frame;
+                  // its end state is asserted once the line is read.
+                  if (!command || !command.inert) window.__journey.collapsedBroken += 1;
                   if (document.querySelectorAll('[data-testid="stage-actor"]').length !== 2) window.__journey.actorsMissing += 1;
                 }
                 requestAnimationFrame(tick);
@@ -637,6 +645,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             (placement["card"]["left"] + placement["card"]["right"]) / 2, 960, delta=1
         )
         self.assertLessEqual(placement["card"]["bottom"], placement["band"]["top"])
+        # The command region's slide has ended: it is hidden, not merely inert.
+        page.wait_for_function(
+            "() => getComputedStyle(document.querySelector('[data-anchor=\"band-command\"]')).visibility === 'hidden'",
+            timeout=5000,
+        )
 
         # `1`: the first pick, once.
         _press(page, "1")

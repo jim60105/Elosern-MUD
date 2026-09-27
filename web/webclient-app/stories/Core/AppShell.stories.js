@@ -142,6 +142,31 @@ function journeyPanels(stop) {
   };
 }
 
+// The mode-transition journey's host (webclient-mode-transitions): the
+// tavern keeper with a finished portrait, a greeting, and four picks.
+const MODE_JOURNEY_CATALOG = {
+  "7": {
+    subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
+    alt: "店長的肖像", placeholder: null,
+    face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
+  },
+};
+const MODE_JOURNEY_DIALOGUE = {
+  schema_version: 2, available: true, kind: "dialogue",
+  host: { identity: 7, display_name: "店長", portrait_ref: "7" },
+  bond_stage: "熟識",
+  line: "又見面了。今晚爐火正旺，要喝點什麼，還是想打聽些消息？",
+  choices: [
+    { keyword_id: "news", label: "最近有什麼消息？" },
+    { keyword_id: "town", label: "關於這座城鎮" },
+    { keyword_id: "guild", label: "冒險者公會在哪裡？" },
+    { keyword_id: "rest", label: "我想稍作休息" },
+  ],
+};
+const MODE_JOURNEY_DIALOGUE_CLOSED = {
+  schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" },
+};
+
 const renderPlayer = (args) => ({
   setup() {
     const host = ref(null);
@@ -316,6 +341,55 @@ const renderPlayer = (args) => ({
           journeyTimer = setInterval(step, 3600);
         }
       }
+      // The mode-transition journey (webclient-mode-transitions): the real
+      // client walks exploration -> dialogue -> exploration -> combat ->
+      // exploration, one committed revision per step, exactly as the server
+      // commits them. The host exposes `__modeJourney.go(step)` so a
+      // reviewer (or a browser driving the story) takes one step at a time;
+      // `autoplay` walks on its own.
+      if (args.modeJourney) {
+        let revision = 1;
+        const art = { ...ART_PANEL_SAMPLE, scene: stageJourneyScene(STAGE_JOURNEY_STOPS[2]), portrait_catalog: MODE_JOURNEY_CATALOG };
+        const commit = (mode, panels, line) => {
+          revision += 1;
+          store.receive(1, "ui_update", [protocolFixtures.update({ revision, mode, panels })], {});
+          if (line) store.appendText("out", line);
+        };
+        const steps = {
+          talk: () => {
+            store.appendText("in", "與店長交談");
+            commit("dialogue", { art, dialogue: MODE_JOURNEY_DIALOGUE }, `店長說：「${MODE_JOURNEY_DIALOGUE.line}」`);
+          },
+          leave: () => {
+            store.appendText("in", "結束對話");
+            commit("exploration", { dialogue: MODE_JOURNEY_DIALOGUE_CLOSED }, "你向店長點頭致意，轉身離開吧檯。爐火在身後劈啪作響。");
+          },
+          fight: () => {
+            store.appendText("in", "攻擊灰袍盜賊");
+            commit("combat", { context_actions: protocolFixtures.combatActions() }, "灰袍盜賊猛然掀翻木桌，短刀在火光中一閃！");
+          },
+          flee: () => {
+            store.appendText("in", "逃跑");
+            commit("exploration", { context_actions: protocolFixtures.explorationActions() }, "你撞開後門衝進夜色，身後的叫罵聲漸漸遠去。");
+          },
+        };
+        const order = ["talk", "leave", "fight", "flee"];
+        let next = 0;
+        const go = (name) => {
+          const key = name || order[next];
+          next = (order.indexOf(key) + 1) % order.length;
+          steps[key]();
+          return key;
+        };
+        store.receive(1, "ui_update", [protocolFixtures.update({ revision: (revision += 1), mode: "exploration", panels: { art } })], {});
+        store.appendText("out", STAGE_JOURNEY_STOPS[2].line);
+        const journey = { go, store };
+        host.value.__modeJourney = journey;
+        window.__modeJourney = journey;
+        if (args.autoplay) {
+          journeyTimer = setInterval(() => go(), 3200);
+        }
+      }
       if (args.practice) {
         store.openHudDrawer("skill");
         await nextTick();
@@ -325,6 +399,7 @@ const renderPlayer = (args) => ({
     onBeforeUnmount(() => {
       if (journeyTimer !== null) clearInterval(journeyTimer);
       if (window.__stageJourney && host.value?.__stageJourney === window.__stageJourney) delete window.__stageJourney;
+      if (window.__modeJourney && host.value?.__modeJourney === window.__modeJourney) delete window.__modeJourney;
       bridge?.uninstall();
       app?.unmount();
       disposePinia(pinia);
@@ -374,3 +449,12 @@ export const CombatHud = { render: renderPlayer, args: { combat: true } };
 // every few seconds; the host element's `__stageJourney.step()` takes one
 // step on demand.
 export const StageJourney = { render: renderPlayer, args: { journey: true, autoplay: true } };
+// The mode transitions (webclient-mode-transitions): the real client opens a
+// conversation (the command panel slides out over the widened message
+// window, the host walks on from the right, the name plate fades in, and
+// the choices stagger in once the greeting is read), ends it (the reverse),
+// then enters combat (the flash, the veil, the panel flip) and leaves it.
+// It walks on its own every few seconds; the host element's
+// `__modeJourney.go(step)` takes one step on demand
+// (`talk`, `leave`, `fight`, `flee`).
+export const ModeJourney = { render: renderPlayer, args: { modeJourney: true, autoplay: true } };

@@ -164,10 +164,24 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     // The dock stays in the DOM (never remounted); CSS hides it.
     expect(document.getElementById("action-dock")).not.toBe(null);
 
+    // webclient-mode-transitions (design D1): the collapsed region is inert
+    // from the commit (out of the tab order, the accessibility tree, and
+    // hit-testing), slides out as an absolute layer over the band's right
+    // third, and ends `visibility: hidden` instead of `display:none`.
+    expect(dialogue.get('[data-anchor="band-command"]').attributes("inert")).toBeDefined();
     const css = styleBlock("components/HudFrame.vue");
-    expect(
-      extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"]'),
-    ).toContain("display: none");
+    const collapsed = extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"]');
+    expect(collapsed).not.toContain("display: none");
+    for (const declaration of [
+      "position: absolute",
+      "right: 0",
+      "width: 33.3333%",
+      "transform: translateX(calc(100% * var(--motion-travel)))",
+      "opacity: 0",
+      "visibility: hidden",
+    ]) {
+      expect(collapsed).toContain(declaration);
+    }
     expect(extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] .stage-band')).toContain(
       "grid-template-columns: minmax(0, 1fr)",
     );

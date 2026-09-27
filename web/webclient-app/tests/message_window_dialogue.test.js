@@ -50,10 +50,11 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
     document.body.innerHTML = "";
   });
 
-  function mountWindow(props = {}) {
+  function mountWindow(props = {}, global = undefined) {
     const rawLines = props.lines || [{ kind: "out", text: "码头的水声。" }];
     wrapper = mount(MessageWindow, {
       attachTo: document.body,
+      global,
       props: {
         mode: "dialogue",
         dialogue: vm,
@@ -67,7 +68,9 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
   }
 
   it("heads the page with the name plate and renders no reply box, avatar, or speaker line", () => {
-    const w = mountWindow();
+    // The real Transition (webclient-mode-transitions D4) renders no element
+    // of its own, so the plate is the window's first element child.
+    const w = mountWindow({}, { stubs: { transition: false } });
     const plate = w.get('[data-testid="message-name-plate"]');
     expect(plate.text()).toBe("灰婆婆 · 羈絆 親睦");
     expect(plate.get('[data-testid="dialogue-bond"]').element.textContent).toBe(" · 羈絆 親睦");

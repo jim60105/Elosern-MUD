@@ -15,7 +15,10 @@
 //
 // Mode gating (design D2): the committed mode renders on the stage root as
 // `data-elosern-mode`; surface visibility is CSS-only `display:none`, so
-// hidden surfaces leave the accessibility tree and the tab order.
+// hidden surfaces leave the accessibility tree and the tab order. The one
+// exception is the command region in dialogue (webclient-mode-transitions
+// D1): it is inert from the commit and slides out, then `visibility:
+// hidden`.
 //
 // Preserved DOM contract (design D6): `#action-dock` (with `data-mode`,
 // `tabindex` and the listbox composite role, rendered by the dock),
@@ -75,6 +78,13 @@ const props = defineProps({
   textSpeed: { type: String, default: "normal" },
   autoAdvance: { type: Boolean, default: false },
   motionLevel: { type: String, default: "full" },
+  // The live mode-change signal (webclient-mode-transitions D2, from
+  // composables/use-mode-change.js): `modeChange` names the last live
+  // transition and is rendered on the stage root; `modeHydrating` is true
+  // across a reconnect's null edges, so the name plate appears and goes
+  // with no fade there.
+  modeChange: { type: String, default: null },
+  modeHydrating: { type: Boolean, default: false },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -332,7 +342,10 @@ watch(
     if (prevMode === "dialogue") {
       // Leaving dialogue (design D5): the choice list is gone after the
       // flush, so focus held in the message region or the `choices` anchor
-      // (or already dropped to the body) returns to the now-rendered dock.
+      // (or already dropped to the body) returns to the dock. The command
+      // region cleared `inert` in the same patch and is sliding back in
+      // (webclient-mode-transitions D6): an entering element is in reach
+      // from its first frame.
       await nextTick();
       const now = document.activeElement;
       if (
@@ -387,6 +400,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
   >
     <HudFrame
       :mode="mode"
+      :mode-change="modeChange"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
       :command-line-expanded="commandLineExpanded"
@@ -423,6 +437,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :text-speed="props.textSpeed"
           :auto-advance="props.autoAdvance"
           :motion-level="props.motionLevel"
+          :mode-hydrating="props.modeHydrating"
           :held="props.openSurfaces.length > 0"
           @reading-change="(complete) => emit('reading-change', complete)"
           @open-full-log="() => emit('open-full-log')"
