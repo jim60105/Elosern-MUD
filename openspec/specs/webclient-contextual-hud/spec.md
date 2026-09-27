@@ -304,8 +304,10 @@ reference's caption panel
 treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The window
 SHALL never grow into the stage and SHALL never change size with its content. In every mode, dialogue
 included, the window SHALL present exactly one page of the current response at a time, paged as
-`webclient-input-narrative` defines and revealed as its typing requirement defines, and SHALL NOT
-present earlier responses: they remain readable in the full-log surface. The one exception is the clear
+`webclient-input-narrative` defines and revealed as its typing requirement defines — or, while the
+current response carries a combat round the client presents, as that round's beat pages followed by the
+response's remaining lines, as `webclient-combat-menu` "A combat round plays beat by beat" defines — and
+SHALL NOT present earlier responses: they remain readable in the full-log surface. The one exception is the clear
 transition: when a new response replaces the previous one, the previous page MAY remain only as an
 opaque layer over the new page that fades out within the clear duration of the client's motion level
 (at most 150ms, and none at `off`), carries no focusable element, and is outside the accessibility
@@ -317,7 +319,7 @@ per line in every mode, including the whole-band width of dialogue mode.
 The window's lower edge SHALL keep a control strip in which no page text renders. The strip SHALL
 hold a page marker and, at its right end, a labelled `日誌` control beside the command-line toggle.
 The page marker SHALL render only while the page on screen is fully shown, and SHALL be absent while
-the page is typing. When rendered, it SHALL read `▼` while the current response has further pages and
+the page is typing and while a combat round plays by itself. When rendered, it SHALL read `▼` while the current response has further pages and
 `■` on its last page. It SHALL be decorative (hidden from assistive technology), and it SHALL blink
 only through the client's motion tokens, so reduced motion stops the blink. An oversize page SHALL
 scroll inside the window's text area; it SHALL never be truncated and SHALL never grow the window.
@@ -331,9 +333,7 @@ hidden with the message region.
 
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
 carry a name plate above its text area, naming the host with the panel's `display_name` plus
-` · 羈絆 <stage>` only when `bond_stage` is non-null; in dialogue mode the plate and the page text SHALL
-share one left-aligned column whose left edge lines up with the player portrait anchor's left edge (the
-42-character line cap still applies); the window's text area below the plate SHALL
+` · 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
 present the current response's pages — the session line as the narrative delivered it, paged and typed
 like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
 from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
@@ -501,15 +501,17 @@ the same focus-restore path a mode change uses.
 
 ### Requirement: Vitals pair an icon, a label, and numerals with a trailing damage bar
 Each of hp, mp, and sp SHALL render as one vital row carrying an icon, a Traditional Chinese label,
-and the `current / maximum` numerals from `status.resources`, above a track containing a trailing bar
+and the `current / maximum` numerals from `status.resources` — or, for hp while a combat round plays,
+the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines — above a track containing a trailing bar
 and a fill. The numerals SHALL render at every value, so no vital state is conveyed by the coloured
 fill alone. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
 
 The trailing bar SHALL exist to make damage taken visible: it SHALL lag the fill when the ratio falls
 and SHALL be overtaken by the fill when the ratio rises. It SHALL be decorative — hidden from the
 accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already
-carry on the same revision. It SHALL NOT render any value that was not a previously committed ratio of
-that same gauge, SHALL NOT be interpolated or extrapolated from narrative text or an action result,
+carry on the same revision. It SHALL NOT render any value that was not a previously displayed ratio of
+that same gauge, where a displayed ratio comes only from the committed `status` or from a committed
+beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result,
 and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect.
 Its motion SHALL be token-gated so the reduced-motion block disables it.
 
@@ -528,9 +530,15 @@ text marker, never by the recolour alone.
 - **WHEN** a committed revision raises a gauge's ratio
 - **THEN** the fill overtakes the trailing bar and no lagging gap is drawn
 
+#### Scenario: The trailing bar follows a round's displayed hit points
+- **WHEN** a playing combat round shows the player's hp stepping from 40 to 28 and then to 15 of 60
+- **THEN** the numerals and the fill show each displayed value in turn, the trailing bar lags each drop
+  from the previously displayed ratio, and once the round ends the numerals and fill show the committed
+  value
+
 #### Scenario: The trailing bar never shows an uncommitted value
 - **WHEN** the trailing bar renders at any point
-- **THEN** its width corresponds to a ratio that was previously committed for that same gauge, and it is absent from the accessibility tree
+- **THEN** its width corresponds to a ratio that was previously displayed for that same gauge — a committed `status` value, or a committed `combat_beats` beat's `hp_after` during that round's playback — never a value from neither source, and it is absent from the accessibility tree
 
 #### Scenario: A reconnect does not draw a trail across epochs
 - **WHEN** a new epoch's snapshot commits after a reconnect
@@ -998,7 +1006,8 @@ In combat the shell SHALL render a participant frame as a HUD island in the stag
 anchor, where the minimap is hidden in combat, and SHALL NOT place it in either portrait anchor, grouped into the
 player's side and the opposing side using the committed participants' server-authored team values, in
 the presenter's order. Each participant SHALL render its session token, its display name, its current
-and maximum hit points as numerals, and its state; a non-active state SHALL be conveyed by an explicit
+and maximum hit points as numerals — the current value being, while a combat round plays, the displayed
+value that `webclient-combat-menu` "A combat round plays beat by beat" defines — and its state; a non-active state SHALL be conveyed by an explicit
 text marker in addition to any colour. The frame SHALL NOT invent a field the participant descriptor
 does not carry. The frame SHALL list every participant of both sides, including the foes the foe line-up
 does not stand on the stage, and it SHALL remain the only surface that states participant tokens, hit
@@ -2364,12 +2373,17 @@ moment the change commits, and SHALL NOT delay the player's ability to act beyon
 the current motion level. A transition interrupted by a newer committed change SHALL run toward the
 newer state, and SHALL NOT first finish the older one.
 
-Presentation that plays in steps — message pages today, and combat beats when the client plays them —
-SHALL follow three rules. Steps play in the order their data committed, and a step never reorders,
-drops, or alters committed data. A player click or press that advances the presentation shows the
-current step's end state at once. A new player action shows every queued non-combat step's end state
-before its own response starts. Nothing is lost: every stepped text stays in the full log. Any duration
-a stepped presentation waits for SHALL come from the motion tokens, and SHALL resolve to zero at `off`.
+Presentation that plays in steps — message pages, and a combat round's beats as `webclient-combat-menu`
+"A combat round plays beat by beat" defines — SHALL follow three rules. Steps play in the order their
+data committed, and a step never reorders, drops, or alters committed data. A player click or press that
+advances the presentation shows the current step's end state at once; for a playing combat round it
+shows the whole round's end state. A new player action shows every queued step's end state, a playing
+combat round's included, before its own response starts. Nothing is lost: every stepped text stays in
+the full log. Any pause a stepped presentation waits for SHALL come from the motion tokens, read by the
+client's script from the same tokens the styles use, and SHALL resolve to zero at `off`; revealing text
+follows the reader's text speed. The one presentation that holds the player's input is a playing combat
+round: it keeps the command panel locked until it ends, and the player can end it at once with a click
+or press on the message window or a typed command.
 
 #### Scenario: A mode change commits before its transition ends
 - **WHEN** the effective level is `full` and a committed revision changes the mode
@@ -2380,6 +2394,12 @@ a stepped presentation waits for SHALL come from the motion tokens, and SHALL re
 - **WHEN** the effective level is `full` and the player opens a drawer or a new response starts
 - **THEN** the drawer takes focus and the message window accepts Enter at once, without waiting for
   a transition to finish
+
+#### Scenario: A combat round holds the panel only until the player ends it
+- **WHEN** the effective level is `full`, a combat round is playing, and the player clicks the message
+  window
+- **THEN** the command panel accepts activation again as soon as the declared revision is also
+  accepted, and every displayed value is the committed value
 
 #### Scenario: A click shows the step's end state and a new action flushes
 - **WHEN** a page is typing and the player clicks the message window, and later acts while unread

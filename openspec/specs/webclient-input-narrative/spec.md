@@ -436,7 +436,9 @@ action dock's keyboard routing, and a held key's auto-repeat SHALL NOT act. Whil
 else (the action dock, a drawer, an overlay, the command line, or a control in the band), Enter and
 Space SHALL keep their existing meaning and SHALL NOT complete or advance a page. Advancing on a fully
 shown last page SHALL do nothing. How a page is revealed is defined by "A page types in at the
-reader's text speed and auto-advance is opt-in".
+reader's text speed and auto-advance is opt-in". While a combat round plays by itself, as
+`webclient-combat-menu` "A combat round plays beat by beat" defines, the same pointer activation or key
+SHALL instead end the round at once and SHALL NOT complete or advance a page.
 
 The player SHALL be able to act at any time while a page is typing or pages remain. When an action
 records its response mark or appends its input line, the window SHALL stop typing and SHALL stop
@@ -463,6 +465,12 @@ any request.
 - **WHEN** the current response has three pages shown at the `instant` text speed and the player
   clicks the window twice
 - **THEN** the window shows page 2 and then page 3, and the marker reads `■`
+
+#### Scenario: A click during a playing round ends it
+- **WHEN** a combat round is playing its second of three beats and the player presses Enter on the page
+  surface
+- **THEN** the round ends, the window shows the response's page after the beat pages, and no beat page is
+  skipped in the full log
 
 #### Scenario: A press while typing completes the page
 - **WHEN** page 1 of a two-page response is still typing and the player clicks the window, then
