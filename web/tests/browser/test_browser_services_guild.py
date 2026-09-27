@@ -187,7 +187,14 @@ class GuildQuestJourneys(ServicesBrowserTest):
         updated = self._services_panel(page)
         updated["guild"]["quests"] = []
         updated["pagination"]["quest_total"] = 0
-        inject_update(page, {"services": updated})
+        # The quest book reads the dedicated quest_log panel (quest-drawer
+        # split): the committed update must empty that panel too, exactly as
+        # the server's affected-panel set does for a quest mutation.
+        quest_log = dict(
+            (store_state(page)["panels"] or {}).get("quest_log") or {}
+        )
+        quest_log["rows"] = []
+        inject_update(page, {"services": updated, "quest_log": quest_log})
 
         # The quest row drops from the book, and the drawer stays open at unchanged depth.
         page.wait_for_selector('[data-testid="quest-log__empty"]', timeout=5000)

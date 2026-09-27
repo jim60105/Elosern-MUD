@@ -33,6 +33,9 @@ describe("gallery application integration", () => {
     opener.element.focus();
     await opener.trigger("click");
   }
+  // The suite's first test pays the cold-transform cost of mounting the
+  // whole AppClient on CI runners (measured 5.6–5.9s at the default 5s
+  // vitest timeout); it completes in well under a second once warm.
   it("offers a real opener only with committed availability and shows a degradation reason", async () => {
     await snapshot(null);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
@@ -52,7 +55,7 @@ describe("gallery application integration", () => {
     await snapshot({ schema_version: 1, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="gallery-panel"]').text()).toContain("圖庫資料暫時無法使用。");
-  });
+  }, 20000);
   it("confirms deletion through the shared entry and blocks concurrent mutation", async () => {
     await open();
     const rail = wrapper.get('[data-testid="gallery-detail"]');

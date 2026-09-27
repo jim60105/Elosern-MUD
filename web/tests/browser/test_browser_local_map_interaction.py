@@ -467,9 +467,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
         # 5. Pan the current node out of view (drag the content down against
         #    the top clamp), then 置中 brings it back; at the zoomed scale the
-        #    centre lands within 2px of the viewport centre (D3/D4). Zoom to
-        #    the upper bound first so the current node's window can actually
-        #    leave it: one drag of 720px moves it two window-heights down.
+        #    centre lands on the node on the pannable y axis (D3/D4); the
+        #    two-column strip's width underflows the viewport, so the
+        #    centre-on-underflowing-axis clause parks the x axis at the
+        #    canvas-centred clamp and recentre leaves x exactly where the
+        #    clamp had it. Zoom to the upper bound first so the current
+        #    node's window can actually leave it: one drag of 720px moves it
+        #    two window-heights down.
         zoom_in_btn = page.locator('[data-testid="map-overlay-zoom-in"]')
         while zoom_in_btn.get_attribute("aria-disabled") != "true":
             page.keyboard.press("+")
@@ -500,11 +504,31 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             self._inside(recentred["viewport"], cur),
             "recentre must bring the current node back inside the viewport",
         )
-        self.assertLess(abs(cur["cx"] - recentred["viewport"]["cx"]), 2.0)
         # centreOn centres the marker's user-space point; the measured box
         # also carries the label tail below it, so the box centroid sits up
-        # to half a box-height under the viewport centre. cx has no such tail.
+        # to half a box-height under the viewport centre.
         self.assertLess(abs(cur["cy"] - recentred["viewport"]["cy"]), cur["height"] / 2)
+        # Idempotence: a second recentre on the already-centred view must not
+        # move the drawing (the clamp + centreOn converge). This is the
+        # stable x-axis observable: the absolute node-vs-centre offsets on
+        # the near-degenerate x axis depend on the runner's overlay chrome
+        # width (the x span is within a viewport-width of the canvas, so
+        # the edge-vs-centre clamp branch flips between CI and desktop
+        # layouts), and pinning that layout constant would re-anchor the
+        # wrong thing after any chrome change.
+        page.locator('[data-testid="map-overlay-recentre"]').click()
+        page.wait_for_timeout(150)
+        again = self._fit_view_measure(page)
+        self.assertLess(
+            abs(again["nodeBoxes"][current_id]["cx"] - cur["cx"]),
+            0.5,
+            "a recentre on the centred view must be a no-op (x)",
+        )
+        self.assertLess(
+            abs(again["nodeBoxes"][current_id]["cy"] - cur["cy"]),
+            0.5,
+            "a recentre on the centred view must be a no-op (y)",
+        )
 
         # 6. Keyboard reveal: return to the fit bound, then wheel-zoom with
         #    the pointer anchored at the viewport's bottom edge — the window

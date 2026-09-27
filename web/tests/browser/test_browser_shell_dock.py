@@ -123,14 +123,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             activate_overview_chip(page, "wait")
             page.wait_for_selector(".waiting-screen", timeout=15000)
             pane_display = page.evaluate(
-                "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
-                " const v = el && el.firstElementChild;"
+                "() => { const v = document.querySelector('.waiting-screen');"
                 " return v ? getComputedStyle(v).display : null; }"
             )
             self.assertIn(
                 pane_display,
                 ("grid", "block", "flex"),
-                "the frame's variant container uses its pane kind's CSS layout",
+                "the waiting frame's container uses its pane kind's CSS layout",
             )
             # Escape pops exactly one level and returns the dock to the
             # overview with the 等待／休息 chip focused.

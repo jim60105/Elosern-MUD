@@ -104,12 +104,11 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # In the Vue app the exploration dock renders the keyboard router's
-        # hierarchical frame: the root's "移動" entry (key ``move``) opens the
-        # bounded move submenu, whose exit rows are keyed ``exit-<exit_ref>``.
-        # Opening it and clicking the first enabled exit dispatches
-        # ``explore.move`` exactly once.
-        self._click_row(page, "move")
+        # Under the scene-overview dock (webclient-scene-overview-swap) the
+        # root frame renders the room's exits directly as chips keyed
+        # ``exit-<exit_ref>``. Clicking the first enabled exit dispatches
+        # ``explore.move`` exactly once — the identical router-submit path
+        # Enter takes on the same chip.
         move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
         self.assertTrue(move_rows, "expected at least one enabled move row")
         exit_key = "exit-" + str(move_rows[0]["exit_ref"])
@@ -130,14 +129,11 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # The G2 hierarchical exploration dock renders the keyboard-router
-        # frames: the root "互動" entry (key ``interact``) opens the interact
-        # submenu (target rows keyed ``target-<identity>``); selecting the
+        # The scene overview renders the room's people as target chips keyed
+        # ``target-<identity>`` directly at the root; clicking the
         # live-hostile target (the one whose engage affordance is ENABLED —
-        # the defeated fixture monster's is disabled) renders its affordance
-        # menu, whose ``engage`` row (key
-        # ``engage``) dispatches ``explore.engage``.
-        self._click_row(page, "interact")
+        # the defeated fixture monster's is disabled) opens its verb popover,
+        # whose ``engage`` row dispatches ``explore.engage``.
         hostile = next(
             (
                 t
@@ -228,10 +224,9 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         panel = self._wait_exploration_available(page)
 
         # The exploration fixture leaves a defeated wolf beside the living
-        # goblin. In the G2 hierarchical dock the wolf's ``engage`` affordance is
-        # a disabled row (``target_dead``) inside the wolf's target menu, so open
-        # the interact submenu and select the wolf target to render it.
-        self._click_row(page, "interact")
+        # goblin. Under the scene overview the wolf's root person chip opens its
+        # verb popover, whose ``engage`` affordance is a disabled row
+        # (``target_dead``).
         wolf = None
         for t in (panel.get("interact") or []):
             if any(
@@ -244,14 +239,17 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         target_key = "target-" + str(wolf["identity"])
         page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
         self._click_row(page, target_key)
-        # The wolf's target menu renders the disabled ``engage`` row.
-        page.wait_for_selector('[data-item-key="engage"][aria-disabled="true"]', timeout=15000)
+        # The wolf's verb popover renders the disabled ``engage`` row.
+        page.wait_for_selector(
+            '[data-testid="verb-popover"] [data-item-key][aria-disabled="true"]',
+            timeout=15000,
+        )
         disabled_key = page.evaluate(
-            "() => document.querySelector('#action-dock "
+            "() => document.querySelector('[data-testid=\"verb-popover\"] "
             "[data-item-key][aria-disabled=\"true\"]').getAttribute('data-item-key')"
         )
         before = sent_action_count(page)
-        row = page.locator(f'#action-dock [data-item-key="{disabled_key}"]')
+        row = page.locator(f'[data-testid="verb-popover"] [data-item-key="{disabled_key}"]')
         row.scroll_into_view_if_needed()
         row.click(force=True)
         wait_for_store_state(
@@ -260,11 +258,20 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             timeout=5000,
         )
         self.assertEqual(sent_action_count(page), before)
-        detail = page.evaluate(
-            "document.querySelector('[data-testid=\"exploration-detail\"]').innerText"
+        # The row's own accessible description carries the server-authored
+        # reason (the overview's reason strip only explains a focused root
+        # chip, never a popover row).
+        reason = page.evaluate(
+            """() => {
+              const row = document.querySelector(
+                '[data-testid="verb-popover"] [data-item-key="%s"]');
+              const id = row.getAttribute('aria-describedby');
+              const el = id && document.getElementById(id);
+              return el ? el.textContent : '';
+            }""" % disabled_key
         )
-        self.assertGreater(len(detail.strip()), 0, "disabled row must explain")
-        self.assertIn("死亡", detail, "the disabled reason must be readable")
+        self.assertGreater(len(reason.strip()), 0, "disabled row must explain")
+        self.assertIn("死亡", reason, "the disabled reason must be readable")
 
     @covers_requirement(
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate"
@@ -274,14 +281,12 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # The G2 hierarchical dock renders the keyboard-router frame: the root
-        # "移動" entry (key ``move``) opens the bounded move submenu, whose exit
-        # rows are keyed ``exit-<exit_ref>``. Rapidly double-activating the first
-        # exit row submits ``explore.move`` once; the immediate second activation
-        # is rejected (the in-flight lock, or the stale-row guard once the dock
+        # The scene overview renders the room's exits directly as chips keyed
+        # ``exit-<exit_ref>``. Rapidly double-activating the first exit chip
+        # submits ``explore.move`` once; the immediate second activation is
+        # rejected (the in-flight lock, or the stale-row guard once the dock
         # re-renders after the move), so exactly one action crosses the wire and
-        # no duplicated rows ever render.
-        self._click_row(page, "move")
+        # no duplicated chips ever render.
         move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
         self.assertTrue(move_rows, "expected at least one enabled move row")
         exit_key = "exit-" + str(move_rows[0]["exit_ref"])
@@ -315,12 +320,11 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # A genuine browser double-click on the first exit row of the move
-        # submenu (keyed ``exit-<exit_ref>``): the first click (detail 1)
+        # A genuine browser double-click on the first root exit chip (keyed
+        # ``exit-<exit_ref>``): the first click (detail 1)
         # submits ``explore.move`` once; the second click of the gesture is
         # suppressed by the in-flight lock (no second submit), so exactly one
         # action crosses the wire.
-        self._click_row(page, "move")
         move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
         self.assertTrue(move_rows, "expected at least one enabled move row")
         exit_key = "exit-" + str(move_rows[0]["exit_ref"])
@@ -363,16 +367,21 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         before = sent_action_count(page)
         # The overlay intercepts pointer events; a primary click dispatched on
-        # the first root row (key ``move``, the "移動" entry) must not submit
+        # the first root exit chip (keyed ``exit-<exit_ref>``) must not submit
         # anything while the offline overlay is up (the store is disconnected, so
         # dispatchAction is rejected and no OOB action crosses the wire).
+        panel = self._exploration_panel(page)
+        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
+        self.assertTrue(move_rows, "expected at least one enabled move row")
+        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+        self.assertEqual(page.locator(f'[data-item-key="{exit_key}"]').count(), 1)
         page.evaluate(
             """() => {
-              const row = document.querySelector('[data-item-key="move"]');
+              const row = document.querySelector('[data-item-key="EXITKEY"]');
               if (row) {
                 row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
               }
-            }"""
+            }""".replace("EXITKEY", exit_key)
         )
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), before)
@@ -434,11 +443,12 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 install_outbound_recorder(page)
                 panel = self._wait_exploration_available(page)
-                # The exploration root's first cell is the "移動" entry (key
-                # ``move``); opening it renders the bounded move submenu whose
-                # exit rows are keyed ``exit-<exit_ref>``.
-                self.assertEqual(self._rows(page)[0], "move")
-                self._click_row(page, "move")
+                # The scene overview reads the room in section order, so the
+                # root's first chip is an exit (keyed ``exit-<exit_ref>``).
+                self.assertTrue(
+                    self._rows(page)[0].startswith("exit-"),
+                    f"expected an exit chip first, got {self._rows(page)[0]!r}",
+                )
                 move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
                 if move_rows:
                     exit_key = "exit-" + str(move_rows[0]["exit_ref"])

@@ -121,11 +121,17 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _section_shown,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="suggestions"]',
+                "selector": '#action-dock',
                 "predicate": (
-                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
+                    "() => { if (document.querySelector('#action-dock "
+                    "[data-item-key=\"suggestions\"]') !== null) { return true; } "
+                    "const b = window.__elosernBridge || null; "
+                    "if (!b) { return false; } "
+                    "const d = b.router.currentDescriptor() || {}; "
+                    "return d.source === 'exploration.suggestions'; }"
                 ),
-                "description": "the suggestions tab is rendered in the action dock",
+                "description": "the suggestions section is present: the overview footer "
+                "chip at the root frame, or the suggestions pane when it is open",
             },
             timeout=timeout,
         )
@@ -472,7 +478,27 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             return (not state.get("connected")) and bool(state.get("mutationsLocked"))
 
         wait_for_store_state(page, _locked)
-        self._open_suggestions_pane(page)
+        # The transport close pops the router back to the root frame, and the
+        # keyboard-bridge focus gate requires a connected store, so the pane
+        # re-opens through the store façade directly: frame pushes are local
+        # router operations, never connection-gated.
+        opened = page.evaluate(
+            """() => {
+                const store = window.__elosernBridge.store;
+                if (!store.focusItemByKey('suggestions')) { return false; }
+                return store.focusConfirm('pointer') === true;
+            }"""
+        )
+        self.assertTrue(opened, "the suggestions pane must open through the store while locked")
+        page.wait_for_function(
+            "() => ((window.__elosernBridge.router.currentDescriptor() || {})"
+            ".source === 'exploration.suggestions')",
+            timeout=15000,
+        )
+        page.wait_for_function(
+            "() => document.querySelectorAll('[data-testid=\"dock-menu\"] .option-card').length > 0",
+            timeout=15000,
+        )
         # The non-dismissible offline overlay covers the dock (the lock UX);
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what

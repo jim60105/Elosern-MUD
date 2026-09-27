@@ -7,6 +7,8 @@ import json
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_first_overview_exit,
+    activate_overview_chip,
     focus_action_dock,
     fixture_home_node_id,
     install_outbound_recorder,

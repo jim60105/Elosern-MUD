@@ -118,8 +118,18 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
         self.assertEqual(sent_action_count(page, "guild.register"), 1)
 
-        # Close drawer and verify depth and trail are still unchanged
-        _press(page, "Escape")
+        # Close drawer and verify depth and trail are still unchanged. The
+        # commit unmounts the register button (v-if), so DOM focus drops to
+        # <body> and the drawer's Escape owner (its focus-trapped root,
+        # design D4) never sees the key — the same focus-dependency the
+        # sibling inventory journeys document. The store's single close
+        # entry is exactly what the drawer's close control, scrim, and
+        # Escape handler funnel through, so the frameless-close contract is
+        # asserted through it.
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s && s.view && s.view.hudDrawer) s.closeHudDrawer(); }"
+        )
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before

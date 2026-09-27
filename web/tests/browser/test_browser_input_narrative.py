@@ -1568,10 +1568,15 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertLessEqual(metrics["markerRight"], metrics["logLeft"])
         self.assertLessEqual(metrics["logRight"], metrics["toggleLeft"])
 
-        # Enter on the dock activates the dock and does not advance the page.
+        # Arrow keys in the dock only move chip focus (webclient-scene-overview
+        # -swap: Enter on the dock now activates the focused overview chip and
+        # dispatches its action — its chip-activation contract is covered by
+        # the exploration navigation journeys); dock focus moves must never
+        # page the message window.
         focus_action_dock(page)
-        _press(page, "Enter")
+        _press(page, "ArrowDown")
         self.assertEqual(surface.get_attribute("data-page"), "1")
+        self.assertEqual(sent_action_count(page), 0)
         _press(page, "Escape")
 
         # Enter on the focused page surface advances to page 2 without activating the dock.

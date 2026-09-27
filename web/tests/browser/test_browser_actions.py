@@ -87,6 +87,25 @@ class ActionLockingTest(BrowserAcceptanceTest):
     def test_disabled_controls_do_not_send(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        # The scene-overview root (webclient-scene-overview-swap) carries no
+        # disabled chip in this fixture, and Enter on the focused chip now
+        # legitimately activates it — so the "controls must not send" half is
+        # demonstrated on the deterministic lock: the reload-required
+        # protocol error locks every dock control (frames and the connection
+        # stay intact), so keyboard activation of any chip must refuse.
+        generation = store_state(page)["generation"]
+        accepted = page.evaluate(
+            """(args) => window.__elosernBridge.store.receive(
+              args.generation, 'ui_protocol_error', [{
+                protocol_version: 1,
+                code: 'unsupported_version',
+                message: '不支援的協定版本',
+                reload_required: true,
+              }], {})""",
+            {"generation": generation},
+        )
+        self.assertTrue(accepted["accepted"])
+        self.assertTrue(store_state(page)["mutationsLocked"])
         focus_action_dock(page)
         for key in ("ArrowDown", "Enter", " "):
             page.keyboard.press(key)
