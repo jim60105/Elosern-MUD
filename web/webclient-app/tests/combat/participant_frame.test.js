@@ -54,6 +54,47 @@ describe("ParticipantFrame (task 6.9)", () => {
     expect(hp).toEqual(["80/100", "0/90", "45/45", "120/120"]);
   });
 
+
+  it("shows a playing round's displayed hit points for the keys it names", () => {
+    // webclient-combat-beat-queue D7: a row whose `portrait_ref` is a key of
+    // the displayed map states that value instead of its committed
+    // `hp_current`; every other row keeps the committed value.
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(ParticipantFrame, {
+      attachTo: host,
+      props: {
+        participants,
+        artPanel,
+        displayHp: { portrait_gob: 18, portrait_mei: 27 },
+      },
+    });
+    const hp = wrapper.findAll(".participant-frame__hp").map((h) => h.text());
+    expect(hp).toEqual(["80/100", "27/90", "18/45", "120/120"]);
+  });
+
+  it("restores every committed value when the round stops displaying one", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(ParticipantFrame, {
+      attachTo: host,
+      props: { participants, artPanel, displayHp: { portrait_gob: 18 } },
+    });
+    expect(wrapper.findAll(".participant-frame__hp").map((h) => h.text())).toEqual([
+      "80/100",
+      "0/90",
+      "18/45",
+      "120/120",
+    ]);
+    await wrapper.setProps({ displayHp: null });
+    expect(wrapper.findAll(".participant-frame__hp").map((h) => h.text())).toEqual([
+      "80/100",
+      "0/90",
+      "45/45",
+      "120/120",
+    ]);
+  });
+
   it("renders the explicit state marker (never colour-only)", () => {
     const w = mountFrame(participants, artPanel);
     const states = w.findAll(".participant-frame__state").map((s) => s.text());

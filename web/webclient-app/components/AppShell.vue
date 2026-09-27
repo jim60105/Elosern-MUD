@@ -78,6 +78,11 @@ const props = defineProps({
   textSpeed: { type: String, default: "normal" },
   autoAdvance: { type: Boolean, default: false },
   motionLevel: { type: String, default: "full" },
+  // The playing combat round (`store.view.beatPlayback`,
+  // webclient-combat-beat-queue), forwarded to MessageWindow: its beat pages,
+  // and the queue's own report of a shown beat and of the player ending the
+  // round.
+  beatPlayback: { type: Object, default: null },
   // The live mode-change signal (webclient-mode-transitions D2, from
   // composables/use-mode-change.js): `modeChange` names the last live
   // transition and is rendered on the stage root; `modeHydrating` is true
@@ -143,6 +148,8 @@ const emit = defineEmits([
   "open-full-log",
   "focus-lost",
   "reading-change",
+  "beat-shown",
+  "beat-skip",
   "switch-character",
   "create-character",
 ]);
@@ -442,6 +449,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :motion-level="props.motionLevel"
           :mode-hydrating="props.modeHydrating"
           :held="props.openSurfaces.length > 0"
+          :beat-playback="props.beatPlayback"
+          @beat-shown="(index) => emit('beat-shown', index)"
+          @beat-skip="() => emit('beat-skip')"
           @reading-change="(complete) => emit('reading-change', complete)"
           @open-full-log="() => emit('open-full-log')"
         />

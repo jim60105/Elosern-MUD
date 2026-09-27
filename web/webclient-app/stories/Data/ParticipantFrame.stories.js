@@ -77,3 +77,19 @@ export const UnavailableArtPanel = {
     artPanel: { schema_version: 1, available: false, reason: { code: "art_unavailable", message: "藝術面板目前無法顯示" }, portrait_catalog: null },
   },
 };
+
+// A playing combat round's displayed hit points (webclient-combat-beat-queue
+// D7): the rows the map names state the beat's `hp_after` instead of their
+// committed `hp_current`; every other row and field is unchanged.
+export const DisplayedHp = {
+  render: renderFrame,
+  args: {
+    participants: [
+      { identity: 1, token: "P1", display_name: "林楓", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: "p1" },
+      { identity: 2, token: "E1", display_name: "哥布林", team: "foes", state: "active", hp_current: 40, hp_maximum: 60, portrait_ref: "e1" },
+      { identity: 3, token: "E2", display_name: "巨魔", team: "foes", state: "active", hp_current: 120, hp_maximum: 200, portrait_ref: "e2" },
+    ],
+    artPanel: ART_PANEL,
+    displayHp: { e1: 18 },
+  },
+};
