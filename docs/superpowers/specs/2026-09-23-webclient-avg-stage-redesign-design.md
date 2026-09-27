@@ -1,7 +1,8 @@
 # WebClient AVG Stage Redesign — Design
 
 Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
-the OpenSpec proposals, §15)
+the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
+line-up geometry, §10.2)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -630,11 +631,12 @@ durations are read from the `--motion-*` tokens and are 0 at `off`.
 
 **Foe line-up (`FoeLineup`, C13a).** At most three foes stand in `actor-right`,
 in presenter order, in a row that grows leftward: each later foe is offset by
-65% of a slot and stands behind the one before, scaled 1 / 0.9 / 0.8 for one /
-two / three foes, staying right of the stage centre and clear of the player at
-1920 and 1280. Further foes appear only in the participant frame, which stays
-the complete numbers panel (no "+N" plate). Foes slide in on a live change into
-combat and fade out on leaving it; a reload plays nothing. Each slot carries
+46% of a slot and stands behind the one before, scaled front to back 1 for
+one foe, 0.9 / 0.78 for two, and 0.8 / 0.7 / 0.61 for three, staying right of
+the stage centre and clear of the player at 1920 and 1280. Further foes
+appear only in the participant frame, which stays the complete numbers panel
+(no "+N" plate). Foes slide in on a live change into combat and fade out on
+leaving it; a reload plays nothing. Each slot carries
 `data-portrait-ref` so beats can address it. During a round, a committed
 defeated foe stays on stage until its own defeat beat, and each foe shows a
 decorative HP gauge with a trailing bar (hidden from assistive technology).
