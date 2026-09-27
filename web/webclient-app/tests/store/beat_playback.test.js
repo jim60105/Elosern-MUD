@@ -25,6 +25,20 @@ const FOE_REF = "7";
 const PLAYER_REF = "42";
 const ROUND = "s-1/1";
 const PAUSE_MS = 400;
+// The stage gestures' tokens (webclient-combat-beat-choreography D1): each
+// step's act lasts its longest gesture before the pause starts. Both of the
+// round's beats open an action by the player, so each acts for the step.
+const STEP_MS = 240;
+const MOTION_TOKENS = {
+  "--motion-beat": PAUSE_MS,
+  "--motion-beat-step": STEP_MS,
+  "--motion-beat-hit": 180,
+  "--motion-beat-float": 600,
+  "--motion-beat-defeat": 350,
+};
+const readToken = (name) => MOTION_TOKENS[name] ?? 0;
+// One beat's act and pause.
+const BEAT_MS = STEP_MS + PAUSE_MS;
 
 // The round's two beats: one roll and one damage beat whose `action` is the
 // 0-based ordinal of its source EventLog, so the round's own lines are the
@@ -158,7 +172,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     // store; every case starts from nothing stored.
     window.localStorage.clear();
     vi.useFakeTimers();
-    vi.mocked(readMotionMs).mockReturnValue(PAUSE_MS);
+    vi.mocked(readMotionMs).mockImplementation(readToken);
     setActivePinia(createPinia());
     store = useElosernStore();
     sender = fx.createFakeSender();
@@ -234,9 +248,9 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
     // The round ends by itself and the dock accepts again.
     store.beatShown(0);
-    vi.advanceTimersByTime(PAUSE_MS);
+    vi.advanceTimersByTime(BEAT_MS);
     store.beatShown(1);
-    vi.advanceTimersByTime(PAUSE_MS);
+    vi.advanceTimersByTime(BEAT_MS);
     expect(playback().phase).toBe("done");
     expect(store.view.dispatch.beatLocked).toBe(false);
     expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
@@ -246,6 +260,14 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     openCombat();
     settleRound();
     store.beatShown(0);
+    // The step's gesture plays first: the player's step toward the centre
+    // (webclient-combat-beat-choreography D2), read from its token.
+    expect(readMotionMs).toHaveBeenCalledWith("--motion-beat-step");
+    expect(playback().phase).toBe("act");
+    expect(store.view.beatStage.gestures).toEqual({ [PLAYER_REF]: { gesture: "lunge", amount: null } });
+    vi.advanceTimersByTime(STEP_MS - 1);
+    expect(playback().phase).toBe("act");
+    vi.advanceTimersByTime(1);
     expect(readMotionMs).toHaveBeenCalledWith("--motion-beat");
     expect(playback().phase).toBe("pause");
     expect(playback().index).toBe(0);
@@ -258,9 +280,48 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     vi.advanceTimersByTime(1);
     expect(playback().index).toBe(1);
     expect(playback().phase).toBe("text");
-    // The damage beat applies its `hp_after` the moment it is fully shown.
+    // The next step clears the last one's gestures.
+    expect(store.view.beatStage.gestures).toEqual({});
+    // The damage beat applies its `hp_after` the moment it is fully shown,
+    // as its gesture starts: the player steps and the foe is hit.
     store.beatShown(1);
+    expect(playback().phase).toBe("act");
     expect(store.view.displayHp).toEqual({ [FOE_REF]: 68 });
+    expect(store.view.beatStage.gestures).toEqual({
+      [PLAYER_REF]: { gesture: "lunge", amount: null },
+      [FOE_REF]: { gesture: "hit", amount: 12 },
+    });
+  });
+
+  it("publishes the stage for the playing round and clears it at the end", () => {
+    openCombat();
+    settleRound();
+    const stage = store.view.beatStage;
+    expect(stage.key).toBe(`${ROUND}:0`);
+    expect(stage.foes.map((row) => row.portrait_ref)).toEqual([FOE_REF]);
+    expect(stage.gestures).toEqual({});
+    expect(store.view.beatHold).toBe(false);
+    // A skip mid-act ends the round, disarms the act timer, and clears the
+    // stage.
+    store.beatShown(0);
+    expect(playback().phase).toBe("act");
+    store.skipBeats();
+    expect(store.view.beatStage).toBeNull();
+    vi.advanceTimersByTime(BEAT_MS * 4);
+    expect(playback().phase).toBe("done");
+    expect(playback().index).toBe(0);
+  });
+
+  it("goes straight to the pause for a step whose gestures last 0ms", () => {
+    vi.mocked(readMotionMs).mockImplementation((name) => (name === "--motion-beat" ? PAUSE_MS : 0));
+    openCombat();
+    settleRound();
+    store.beatShown(0);
+    // The reduced level's step and hit are 0ms: no act timer, the pause
+    // starts in the same pass.
+    expect(playback().phase).toBe("pause");
+    vi.advanceTimersByTime(PAUSE_MS);
+    expect(playback().index).toBe(1);
   });
 
   it("never reads the beat token at off: nothing plays and no timer is armed", () => {
@@ -428,6 +489,19 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     expect(store.view.mode).toBe("exploration");
     expect(store.view.combatParticipants).toEqual([]);
     expect(store.view.displayHp).toEqual({ [FOE_REF]: 80 });
+    // The terminal-round hold (webclient-combat-beat-choreography D6): the
+    // stage keeps the pre-round foe while the committed roster is empty, and
+    // releases when the round ends.
+    expect(store.view.beatHold).toBe(true);
+    expect(store.view.beatStage.foes.map((row) => row.portrait_ref)).toEqual([FOE_REF]);
+    store.beatShown(0);
+    vi.advanceTimersByTime(BEAT_MS);
+    expect(store.view.beatHold).toBe(true);
+    store.beatShown(1);
+    vi.advanceTimersByTime(BEAT_MS);
+    expect(playback().phase).toBe("done");
+    expect(store.view.beatHold).toBe(false);
+    expect(store.view.beatStage).toBeNull();
   });
 
   it("plays a stale outcome's round under the still-held revision lock", () => {
@@ -468,9 +542,9 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     expect(store.view.dispatch.inFlight).toBeNull();
     expect(store.view.dispatch.beatLocked).toBe(true);
     store.beatShown(0);
-    vi.advanceTimersByTime(PAUSE_MS);
+    vi.advanceTimersByTime(BEAT_MS);
     store.beatShown(1);
-    vi.advanceTimersByTime(PAUSE_MS);
+    vi.advanceTimersByTime(BEAT_MS);
     expect(playback().phase).toBe("done");
     expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
   });

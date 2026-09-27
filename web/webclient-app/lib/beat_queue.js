@@ -100,10 +100,20 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
     }
   }
 
+  // The foes that stand on the stage while the round plays
+  // (webclient-combat-beat-choreography D3): the pre-round active foes, in
+  // presenter order. The committed roster may already have lost a foe the
+  // round defeats; it stays on the stage until its own defeat beat.
+  const foes = (Array.isArray(roster) ? roster : []).filter(
+    (row) => row && row.team === "foes" && row.state === "active",
+  );
+
   return {
     round: typeof panel.round === "string" ? panel.round : "",
     startSeq: typeof startSeq === "number" ? startSeq : null,
     terminal: !!terminal,
+    playerKey: playerKey == null ? null : String(playerKey),
+    foes,
     // `off` never waits, so it never plays by itself (D2's 0ms token, D4's
     // start-at-done rule).
     auto: level !== "off",
@@ -114,16 +124,20 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
 }
 
 // How many steps' hit points are in effect: the step being shown applies its
-// HP once it is fully shown (`shown`), so the pause phase has applied it.
+// HP once it is fully shown (`shown`), as its gesture starts
+// (webclient-combat-beat-choreography D2), so the act and pause phases have
+// applied it.
 function appliedCount(state) {
-  if (state.phase === "pause") {
+  if (state.phase === "act" || state.phase === "pause") {
     return state.index + 1;
   }
   return state.index;
 }
 
 // D4: the state machine. `state` is `{plan, index, phase}` with
-// `phase ∈ {text, pause, done}`, or null for "no round". No event throws and
+// `phase ∈ {text, act, pause, done}`, or null for "no round". Each step reads
+// `text` (its page types), `act` (its stage gesture plays;
+// webclient-combat-beat-choreography D2), then `pause` (the beat pause). No event throws and
 // no event moves a state backwards, so a late timer or a double click cannot
 // corrupt it.
 export function beatReducer(state, event) {
@@ -152,6 +166,12 @@ export function beatReducer(state, event) {
   if (type === "shown") {
     // A stale `shown(i)` for a beat that is no longer current is ignored.
     if (state.phase !== "text" || event.index !== state.index) {
+      return state;
+    }
+    return { ...state, phase: "act" };
+  }
+  if (type === "acted") {
+    if (state.phase !== "act") {
       return state;
     }
     return { ...state, phase: "pause" };
@@ -187,6 +207,113 @@ export function displayHpFor(state) {
     }
   }
   return displayed;
+}
+
+// webclient-combat-beat-choreography D3: the stage while a round plays.
+//
+// The foe line-up shows at most this many foes (components/foe-lineup.js
+// FOE_LINEUP_MAX); a foe beyond it has no stage actor, so it plays no gesture.
+const STAGE_FOES = 3;
+
+// The motion token each gesture lasts (design D1/D2).
+export const GESTURE_TOKENS = Object.freeze({
+  lunge: "--motion-beat-step",
+  hit: "--motion-beat-hit",
+  defeat: "--motion-beat-defeat",
+});
+
+const PLAYING = new Set(["text", "act", "pause"]);
+
+function foeKey(row) {
+  return row.portrait_ref == null ? null : String(row.portrait_ref);
+}
+
+// The stage slice, or null whenever no round plays by itself (at `off`, and
+// once the round has ended by itself, by a skip, or by a flush), so every
+// surface returns to the committed state.
+//
+// - `foes`: the plan's pre-round active foes minus every foe whose defeat
+//   beat has played. A foe's defeat beat plays in its step's act and pause
+//   phases while the foe still stands (with the `defeat` gesture); it leaves
+//   the list at the next step. A leaving line-up slot is never patched
+//   again, so the gesture must render before the slot leaves: the slot then
+//   leaves already faded.
+// - `gestures`: key -> `{gesture, amount}` for the current step, in its act
+//   and pause phases (the rising number runs on into the pause), for the
+//   stage actors that stand on the stage only: the player and the first
+//   three foes. The player never plays `defeat`.
+// - `key`: `<round>:<step>`, so a new step restarts a gesture on the same
+//   figure.
+export function stageFor(state) {
+  if (!state || !state.plan || !state.plan.auto || !PLAYING.has(state.phase)) {
+    return null;
+  }
+  const { plan, index } = state;
+  const steps = plan.steps;
+  const rosterKeys = new Set((plan.foes || []).map(foeKey).filter((key) => key !== null));
+  const defeated = [];
+  for (let i = 0; i < index && i < steps.length; i += 1) {
+    const step = steps[i];
+    if (step.kind === "target_defeated" && rosterKeys.has(step.target) && !defeated.includes(step.target)) {
+      defeated.push(step.target);
+    }
+  }
+  const foes = (plan.foes || []).filter((row) => !defeated.includes(foeKey(row)));
+  const onStage = new Set(
+    foes
+      .slice(0, STAGE_FOES)
+      .map(foeKey)
+      .filter((key) => key !== null),
+  );
+  const foeKeys = new Set(onStage);
+  if (plan.playerKey != null) {
+    onStage.add(plan.playerKey);
+  }
+
+  const gestures = {};
+  const step = steps[index];
+  if (step && (state.phase === "act" || state.phase === "pause")) {
+    if (step.firstOfAction && step.actor !== null && onStage.has(step.actor)) {
+      gestures[step.actor] = { gesture: "lunge", amount: null };
+    }
+    if (step.target !== null && onStage.has(step.target)) {
+      if (step.kind === "damage") {
+        gestures[step.target] = { gesture: "hit", amount: step.amount };
+      } else if (step.kind === "target_defeated" && foeKeys.has(step.target)) {
+        gestures[step.target] = { gesture: "defeat", amount: null };
+      }
+    }
+  }
+
+  return {
+    key: `${plan.round}:${index}`,
+    step: index,
+    foes,
+    defeated,
+    gestures,
+  };
+}
+
+// How long the current step's act phase lasts: the longest gesture it plays,
+// each read through `read` (the store passes `readMotionMs`). 0 when the step
+// plays none, so the pause follows at once.
+export function actMs(state, read) {
+  const stage = stageFor(state);
+  if (!stage) {
+    return 0;
+  }
+  let longest = 0;
+  for (const { gesture } of Object.values(stage.gestures)) {
+    const ms = Number(read(GESTURE_TOKENS[gesture])) || 0;
+    longest = Math.max(longest, ms);
+  }
+  return longest;
+}
+
+// D6: the terminal-round hold. True while a round whose publication already
+// committed another mode plays by itself.
+export function beatHoldFor(state) {
+  return !!state && !!state.plan && state.plan.terminal && state.plan.auto && PLAYING.has(state.phase);
 }
 
 // D6: one plain-text `out` block per beat. The token stream is built directly
