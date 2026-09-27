@@ -1,7 +1,7 @@
 <script setup>
 // AppShell (H1 contextual HUD, webclient-hud-01-shell-and-scene): the
 // full-bleed cinematic stage (design D1). `HudFrame` is a
-// `position:relative; overflow:hidden` stage with named anchors: the place
+// `position:absolute; overflow:clip` stage with named anchors: the place
 // card (`place`, holding PlaceCard — location and world time,
 // webclient-avg-place-card-top-bar design D3), the island anchors `vitals`
 // and `map` (webclient-avg-stage-hud-anchors design D1), the portrait
@@ -201,9 +201,12 @@ function restoreFocusHome() {
     });
     return;
   }
+  // `preventScroll`: leaving dialogue focuses the dock while its region still
+  // starts its slide back from beyond the stage's right edge; the focus must
+  // never scroll an ancestor towards it (the stage clips, never scrolls).
   const dock = document.getElementById("action-dock");
   if (dock && typeof dock.focus === "function") {
-    dock.focus();
+    dock.focus({ preventScroll: true });
   }
 }
 
@@ -528,12 +531,14 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
 </template>
 
 <style>
+/* `overflow: clip` (like the stage's): the shell clips but is never a scroll
+   container, so no focus move or `scrollIntoView` can shift it sideways. */
 .elosern-app-shell {
   position: relative;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* The stage (HudFrame) fills the shell; its anchors are positioned from the

@@ -54,7 +54,7 @@ export function useRestWait(store, { dispatchIntent }) {
 
   function onRestFormClose() {
     restFormOpen.value = false;
-    document.querySelector(".action-dock")?.focus();
+    document.querySelector(".action-dock")?.focus({ preventScroll: true });
   }
 
   function onRestFormError(message) {

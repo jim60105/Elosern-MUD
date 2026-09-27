@@ -148,6 +148,33 @@ _INSTALL_READER = """() => {
 }"""
 
 
+# Samples, every animation frame until stopped, the horizontal scroll state
+# of the stage, each element that contains it, and the document's scrolling
+# element: the largest scroll offset and the largest scrollable overflow
+# (scrollWidth - clientWidth) seen, with the element that showed it.
+_START_SCROLL_SAMPLER = """() => {
+  const stage = document.querySelector('[data-testid="elosern-stage"]');
+  const chain = [];
+  for (let el = stage; el; el = el.parentElement) chain.push(el);
+  chain.push(document.scrollingElement);
+  const name = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.classList.length ? '.' + [...el.classList].join('.') : '');
+  const worst = { frames: 0, scrollLeft: 0, overflow: 0, at: null };
+  window.__c11cScroll = { worst, running: true };
+  const tick = () => {
+    worst.frames += 1;
+    for (const el of chain) {
+      if (el.scrollLeft > worst.scrollLeft) { worst.scrollLeft = el.scrollLeft; worst.at = name(el); }
+      const overflow = el.scrollWidth - el.clientWidth;
+      if (overflow > worst.overflow) { worst.overflow = overflow; worst.at = name(el); }
+    }
+    if (window.__c11cScroll.running) requestAnimationFrame(tick);
+  };
+  tick();
+}"""
+
+_STOP_SCROLL_SAMPLER = """() => { window.__c11cScroll.running = false; return window.__c11cScroll.worst; }"""
+
+
 def _identity(transform: str) -> bool:
     return transform in ("none", "matrix(1, 0, 0, 1, 0, 0)")
 
@@ -220,6 +247,60 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertFalse(state["list"])
         self._wait(page, "s.dockFocused")
         self._wait(page, "s.hosts.length === 0 && s.command.opacity === 1 && s.plates.length === 0")
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::mode-changes-transition-at-the-motion-level",
+        "webclient-contextual-hud::the-command-region-collapses-in-dialogue-mode-and-the-message-window-spans-the-band",
+    )
+    def test_no_stage_ancestor_scrolls_horizontally_full(self):
+        """The command region slides past the stage's right edge, yet in no
+        frame of entering or leaving dialogue or combat does the stage, an
+        ancestor, or the document gain a horizontal scroll offset or a
+        scrollable width beyond its own: the stage clips instead of scrolling,
+        so focusing the returning dock never drags the stage sideways."""
+        page = self._page(None)
+        page.evaluate("() => document.getElementById('action-dock').focus()")
+        self._wait(page, "s.dockFocused")
+
+        def sampled(commit, settled: str) -> dict:
+            page.evaluate(_START_SCROLL_SAMPLER)
+            commit()
+            self._wait(page, settled)
+            # A few frames past the settled state catch a late scroll.
+            page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+            return page.evaluate(_STOP_SCROLL_SAMPLER)
+
+        steps = {
+            "enter dialogue": sampled(lambda: self._enter_dialogue(page), "s.command.visibility === 'hidden'"),
+        }
+        # Parked in dialogue, the stage is not a scroll container: a script
+        # (or a focus or scrollIntoView) cannot move it either.
+        forced = page.evaluate(
+            """() => { const stage = document.querySelector('[data-testid="elosern-stage"]');
+              stage.scrollLeft = 400; return { left: stage.scrollLeft, width: stage.scrollWidth, client: stage.clientWidth }; }"""
+        )
+        self.assertEqual(forced["left"], 0)
+        self.assertLessEqual(forced["width"], forced["client"])
+        open_dialogue_choices(page)
+        self._wait(page, "s.list && s.listFocused")
+        steps["leave dialogue"] = sampled(
+            lambda: self._leave_dialogue(page), "s.dockFocused && s.command.opacity === 1 && s.hosts.length === 0"
+        )
+        steps["enter combat"] = sampled(
+            lambda: self._commit(page, "combat", {"context_actions": _combat_panel()}),
+            "s.veil.opacity === 1 && s.dockAnimations.length === 0",
+        )
+        steps["leave combat"] = sampled(
+            lambda: self._commit(page, "exploration", _exploration_panels()),
+            "s.veil.opacity === 0 && s.dockAnimations.length === 0",
+        )
+        for step, worst in steps.items():
+            with self.subTest(step=step):
+                self.assertGreater(worst["frames"], 1)
+                self.assertEqual(worst["scrollLeft"], 0, worst)
+                self.assertLessEqual(worst["overflow"], 0, worst)
+        self.assertTrue(self._read(page)["dockFocused"])
         page.close()
 
     @covers_requirement(

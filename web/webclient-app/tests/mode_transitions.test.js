@@ -9,7 +9,7 @@
 // - the dialogue choice rows carry their stagger index, keep the one-tab-stop
 //   menu contract, and take a digit before any animation ends.
 import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
@@ -168,6 +168,35 @@ describe("AppClient live mode changes", () => {
     expect(leaving).toHaveLength(1);
     expect(leaving[0].element.inert).toBe(true);
     expect(leaving[0].classes()).toContain("actor-enter-leave-active");
+  });
+
+  it("leaving dialogue focuses the returning dock without scrolling any ancestor", async () => {
+    // The command region starts its return beyond the stage's right edge, so
+    // a plain focus() would scroll an ancestor towards it and drag the whole
+    // stage sideways; the dock takes focus with `preventScroll`.
+    store.setMotionLevel("full");
+    await nextTick();
+    commit("dialogue", { dialogue: DIALOGUE });
+    await nextTick();
+    await nextTick();
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    try {
+      commit("exploration", { dialogue: { schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" } } });
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      const dock = document.getElementById("action-dock");
+      expect(document.activeElement).toBe(dock);
+      const dockCalls = focus.mock.contexts
+        .map((context, index) => [context, focus.mock.calls[index]])
+        .filter(([context]) => context === dock);
+      expect(dockCalls.length).toBeGreaterThan(0);
+      for (const [, args] of dockCalls) {
+        expect(args[0]).toEqual({ preventScroll: true });
+      }
+    } finally {
+      focus.mockRestore();
+    }
   });
 
   it("a reconnect mid-dialogue plays nothing on either edge", async () => {

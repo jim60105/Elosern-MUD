@@ -1,7 +1,7 @@
 <script setup>
 // HudFrame (H1, webclient-hud-01-shell-and-scene; AVG stage shell,
 // webclient-avg-stage-shell design D1/D3/D4/D7): the full-bleed cinematic
-// stage. A `position:relative; overflow:hidden` root with named anchors:
+// stage. A `position:absolute; overflow:clip` root with named anchors:
 // - the `place` anchor (webclient-avg-place-card-top-bar design D4): the
 //   place card at the stage box's top-left, at the fixed `--place-h`;
 // - the island anchors named by their content
@@ -192,10 +192,17 @@ defineExpose({ menuOpen });
 </template>
 
 <style>
+/* `overflow: clip`, not `hidden`: the stage clips its layers the same way but
+   is never a scroll container. With `hidden` the stage stays programmatically
+   scrollable, so the command region parked off the right edge in dialogue
+   (webclient-mode-transitions D1) widened its scroll area by a whole panel,
+   and focusing the returning dock scrolled the entire stage sideways, then
+   dragged it back as the slide shrank the overflow. A clip container has no
+   scroll position for a focus move or `scrollIntoView` to change. */
 .elosern-stage {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* The scene backdrop (the `backdrop` slot content) is the lowest stage
@@ -365,6 +372,12 @@ defineExpose({ menuOpen });
   background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
   border-top: var(--line);
   box-shadow: 0 -14px 34px -24px #000;
+  /* The command region's dialogue slide travels past the band's right edge
+     (webclient-mode-transitions D1). Clip it horizontally here so it never
+     adds to the stage's scrollable width; `clip` (unlike `hidden`) leaves
+     the vertical axis `visible`, so whatever overhangs the band's top edge
+     (the name plate, the dock's popovers) still shows. */
+  overflow-x: clip;
 }
 /* The two band regions are in-flow grid cells (overriding the anchors'
    absolute default): they share the band's top edge and height by
@@ -422,7 +435,8 @@ defineExpose({ menuOpen });
    `inert`), slides out to the right and fades over the widened message
    region, then turns `visibility: hidden` — which also keeps the still-
    mounted `#action-dock` out of the accessibility tree. The stage root's
-   own `overflow: hidden` clips the slide at the stage edge. */
+   own `overflow: clip` clips the slide at the stage edge without making the
+   stage scrollable, so no focus move can scroll the stage towards it. */
 .elosern-stage[data-elosern-mode="dialogue"] .stage-band {
   grid-template-columns: minmax(0, 1fr);
 }

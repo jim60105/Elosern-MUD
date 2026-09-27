@@ -1,4 +1,5 @@
 import { h, onBeforeUnmount, onMounted, ref } from "vue";
+import HudFrame from "../../components/HudFrame.vue";
 import SceneBackdrop from "../../components/SceneBackdrop.vue";
 import {
   ART_PANEL_PENDING_SAMPLE,
@@ -17,6 +18,16 @@ function scenePanel(overrides) {
     ...overrides,
   };
 }
+
+// The shared fixture names a generated scene under `/art/scenes/`, which
+// Storybook does not serve, so the "done" stories would degrade to the
+// failed-load fallback. They show a redesign sample painting instead,
+// served under `/art/showcase/` (Storybook only), through the same `/art/`
+// URL vocabulary the art validator accepts.
+const SHOWCASE_SCENE_URL = "/art/showcase/sample-forest.webp";
+const DONE = scenePanel({
+  scene: { ...ART_PANEL_SAMPLE.scene, url: SHOWCASE_SCENE_URL, label: "北岸大道", alt: "林蔭覆蓋的河岸大道" },
+});
 
 const PENDING_WITHOUT_PRIOR = scenePanel({
   scene: {
@@ -51,11 +62,33 @@ const FAILED = scenePanel({
   },
 });
 
+// The stage the backdrop lives on. In the app the backdrop is the lowest
+// layer of the HudFrame stage, which fills the viewport under the 48px top
+// band, and the shell's rules (app-shell.css) size it to the stage box —
+// from the top band's lower edge to the bottom band's upper edge — and
+// centre the caption plate between the portraits. A fixed short wrapper
+// leaves that box a few pixels tall (the band alone is `--band-h`), so each
+// story renders the real stage: a viewport-sized frame (pulled up over the
+// preview's top-band padding) holding HudFrame, with the backdrop in its
+// `backdrop` slot and the band chrome drawn below it.
+function stage(mode, backdrop) {
+  return h(
+    "div",
+    { style: "position: relative; height: 100vh; margin-top: calc(-1 * var(--header-h));" },
+    [h(HudFrame, { mode }, { backdrop })],
+  );
+}
+
 const renderBackdrop = (args) => ({
-  render: () => h("div", { style: "position: relative; width: 100%; height: 320px; overflow: hidden;" }, [
-    h(SceneBackdrop, args),
-  ]),
+  render: () => stage(args.mode, () => h(SceneBackdrop, args)),
 });
+
+// The next scene is still generating: the panel names it, and the painting
+// of the scene before it stays on stage, dimmed, under the pending notice.
+const PENDING_AFTER_DONE = {
+  ...ART_PANEL_PENDING_SAMPLE,
+  scene: { ...ART_PANEL_PENDING_SAMPLE.scene, label: "北岸大道", alt: "林蔭覆蓋的河岸大道" },
+};
 
 // The pending-with-prior story seeds the prior image through the exposed
 // method, so the dimmed prior image renders with the generating label.
@@ -64,15 +97,12 @@ function renderPendingWithPrior() {
     setup() {
       const backdrop = ref(null);
       onMounted(() => {
-        backdrop.value?.setPriorImage(ART_PANEL_SAMPLE.scene.url);
+        backdrop.value?.setPriorImage(SHOWCASE_SCENE_URL);
       });
-      return {
-        backdrop,
-        render: () =>
-          h("div", { style: "position: relative; width: 100%; height: 320px; overflow: hidden;" }, [
-            h(SceneBackdrop, { ref: "backdrop", art: ART_PANEL_PENDING_SAMPLE, mode: "exploration" }),
-          ])
-      };
+      return () =>
+        stage("exploration", () =>
+          h(SceneBackdrop, { ref: backdrop, art: PENDING_AFTER_DONE, mode: "exploration" }),
+        );
     },
   };
 }
@@ -88,7 +118,10 @@ export default {
           "as the lowest stage layer; a pending scene keeps its prior image " +
           "dimmed with the `目前場景圖片生成中` label; every degraded state renders " +
           "the mode's gradient stage with a truthful placeholder label. The " +
-          "scene label and alt render as text outside the bitmap.",
+          "scene label and alt render as text outside the bitmap, on the " +
+          "one-line caption plate centred on the stage floor. Each story " +
+          "renders the backdrop in the real HudFrame stage, so the stage box, " +
+          "the band, and the caption sit where they do in the app.",
       },
     },
   },
@@ -96,12 +129,12 @@ export default {
 
 export const DoneExploration = {
   render: renderBackdrop,
-  args: { art: ART_PANEL_SAMPLE, mode: "exploration" },
+  args: { art: DONE, mode: "exploration" },
 };
 
 export const DoneCombat = {
   render: renderBackdrop,
-  args: { art: ART_PANEL_SAMPLE, mode: "combat" },
+  args: { art: DONE, mode: "combat" },
 };
 
 export const PendingWithoutPrior = {
@@ -156,9 +189,7 @@ function renderSceneChange() {
         const art = scenePanel({
           scene: { ...ART_PANEL_SAMPLE.scene, url: shown.url, label: shown.label, alt: shown.alt },
         });
-        return h("div", { style: "position: relative; width: 100%; height: 540px; overflow: hidden;" }, [
-          h(SceneBackdrop, { art, mode: "exploration" }),
-        ]);
+        return stage("exploration", () => h(SceneBackdrop, { art, mode: "exploration" }));
       };
     },
   };

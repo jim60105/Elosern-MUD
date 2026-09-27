@@ -2411,7 +2411,10 @@ Only a live mode change animates: mounting the client, reconnecting, and a resyn
 mode SHALL play none of these transitions. Every leaving element SHALL be out of reach as "A leaving
 element is out of reach while it animates out" requires. No transition SHALL delay a committed value or
 the player's input beyond its own duration: the choice list takes focus and handles keys and pointer from
-its first frame, and the dock is focusable from the first frame of its return. The flash, the veil, and
+its first frame, and the dock is focusable from the first frame of its return. A mode change SHALL NOT
+scroll the stage or any element that contains it: a surface that slides past the stage's edge SHALL be
+clipped without widening any ancestor's scrollable area, and no focus move during a mode change SHALL
+scroll an ancestor toward its target, so the stage never shifts sideways. The flash, the veil, and
 the flip SHALL be decorative, absent from the accessibility tree, and SHALL never intercept a pointer.
 At `reduced`, the slides, the flip's rotation, and the rise SHALL NOT move anything, the fades SHALL last
 at most 150ms, the flash SHALL NOT be visible, and the stagger SHALL be zero. At `off`, every mode change
@@ -2429,6 +2432,13 @@ SHALL render its final state in the commit's frame.
 - **THEN** the host's stage actor leaves toward the right and is inert while it leaves, the message
   region returns to two thirds of the band in the commit's frame, the command region is in reach at
   once and slides back in, and focus is on the action dock
+
+#### Scenario: No stage ancestor scrolls horizontally during a mode change
+- **WHEN** the effective level is `full` and focus is on the action dock while the player enters and
+  leaves dialogue, then enters and leaves combat
+- **THEN** in every frame of every transition the stage, each element that contains it, and the
+  document keep a horizontal scroll offset of zero and a scrollable width no larger than their visible
+  width, and the dock takes focus on the return without moving the stage
 
 #### Scenario: Entering combat flashes, fades the veil, and flips the panel
 - **WHEN** the effective level is `full` and a committed revision changes the mode from exploration to

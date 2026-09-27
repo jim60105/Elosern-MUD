@@ -250,6 +250,7 @@
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_1280x720",
+        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
         "web.tests.browser.test_browser_layout.LayoutMigrationTest"
       ]
     },
@@ -347,6 +348,7 @@
         "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_1280x720_keeps_controls_visible",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_dialogue_enter_and_leave_full",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full",
+        "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_no_stage_ancestor_scrolls_horizontally_full",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_choices_stagger_full"
       ],
       "files_b": [

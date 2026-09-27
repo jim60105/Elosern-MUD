@@ -53,7 +53,7 @@ export default {
     docs: {
       description: {
         component:
-          "The full-bleed stage: a `position:relative; overflow:hidden` root " +
+          "The full-bleed stage: a `position:absolute; overflow:clip` root " +
           "with named anchors — the place card (`place`, top-left, fixed " +
           "`--place-h`), the island anchors (`vitals` below it; `map` at the " +
           "top-right: the minimap, then the one-line objective), the " +
