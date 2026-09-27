@@ -10,6 +10,9 @@ import {
   ART_PANEL_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
   COMMAND_HISTORY_SAMPLE,
+  FOE_PORTRAIT_CATALOG,
+  PARTY_PARTICIPANTS,
+  foeParticipants,
   NARRATIVE_SAMPLE,
   OBJECTIVES_PANEL_SAMPLE,
   PARTY_PANEL_SAMPLE,
@@ -167,6 +170,13 @@ const MODE_JOURNEY_DIALOGUE_CLOSED = {
   schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" },
 };
 
+// The combat panel with `foes` active foes (webclient-combat-foes-on-stage):
+// the player's side, then the foes in presenter order, each with a catalog
+// portrait; `overrides` edits a foe by identity (a defeat, a missing ref).
+const combatPanelWith = (foes, overrides = {}) =>
+  protocolFixtures.combatActions({ participants: [...PARTY_PARTICIPANTS, ...foeParticipants(foes, overrides)] });
+const combatArt = (art) => ({ ...art, portrait_catalog: { ...(art.portrait_catalog || {}), ...FOE_PORTRAIT_CATALOG } });
+
 const renderPlayer = (args) => ({
   setup() {
     const host = ref(null);
@@ -199,7 +209,7 @@ const renderPlayer = (args) => ({
             // party v1 carries no bound portrait (`portrait_ref` null).
             party: { ...PARTY_PANEL_SAMPLE, slots: PARTY_PANEL_SAMPLE.slots.map((s) => ({ ...s, portrait_ref: null })) },
             objectives: OBJECTIVES_PANEL_SAMPLE,
-            art: ART_PANEL_SAMPLE,
+            art: args.combat ? combatArt(ART_PANEL_SAMPLE) : ART_PANEL_SAMPLE,
           } : {}),
           exploration: protocolFixtures.explorationPanel({
             // Exits labelled by direction, as the server labels them: the
@@ -218,7 +228,7 @@ const renderPlayer = (args) => ({
               ] },
             ],
           }),
-          context_actions: args.combat ? protocolFixtures.combatActions() : protocolFixtures.explorationActions({
+          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat) : protocolFixtures.explorationActions({
             suggestions: { status: "ready", cards: [
               { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
               { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
@@ -349,7 +359,8 @@ const renderPlayer = (args) => ({
       // `autoplay` walks on its own.
       if (args.modeJourney) {
         let revision = 1;
-        const art = { ...ART_PANEL_SAMPLE, scene: stageJourneyScene(STAGE_JOURNEY_STOPS[2]), portrait_catalog: MODE_JOURNEY_CATALOG };
+        const art = { ...ART_PANEL_SAMPLE, scene: stageJourneyScene(STAGE_JOURNEY_STOPS[2]), portrait_catalog: { ...MODE_JOURNEY_CATALOG, ...FOE_PORTRAIT_CATALOG } };
+        const foes = args.modeJourneyFoes || 3;
         const commit = (mode, panels, line) => {
           revision += 1;
           store.receive(1, "ui_update", [protocolFixtures.update({ revision, mode, panels })], {});
@@ -366,14 +377,20 @@ const renderPlayer = (args) => ({
           },
           fight: () => {
             store.appendText("in", "攻擊灰袍盜賊");
-            commit("combat", { context_actions: protocolFixtures.combatActions() }, "灰袍盜賊猛然掀翻木桌，短刀在火光中一閃！");
+            commit("combat", { context_actions: combatPanelWith(foes) }, "灰袍盜賊猛然掀翻木桌，短刀在火光中一閃！");
+          },
+          // Inside combat (webclient-combat-foes-on-stage): the front foe is
+          // defeated, fades where it stands, and the others step forward.
+          defeat: () => {
+            store.appendText("in", "攻擊灰袍盜賊");
+            commit("combat", { context_actions: combatPanelWith(foes, { 31: { state: "defeated", hp_current: 0 } }) }, "灰袍盜賊踉蹌倒地，再也沒有起來。");
           },
           flee: () => {
             store.appendText("in", "逃跑");
             commit("exploration", { context_actions: protocolFixtures.explorationActions() }, "你撞開後門衝進夜色，身後的叫罵聲漸漸遠去。");
           },
         };
-        const order = ["talk", "leave", "fight", "flee"];
+        const order = ["talk", "leave", "fight", "defeat", "flee"];
         let next = 0;
         const go = (name) => {
           const key = name || order[next];
@@ -441,6 +458,10 @@ export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
 // Combat: the minimap and the objective line are hidden, and the participant
 // frame takes the `map` anchor.
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
+// The foe line-up (webclient-combat-foes-on-stage) with one foe, and with
+// five, of whom three stand on the stage while the frame lists all five.
+export const CombatOneFoe = { render: renderPlayer, args: { combat: 1 } };
+export const CombatFiveFoes = { render: renderPlayer, args: { combat: 5 } };
 // The stage transitions (webclient-scene-transitions): a walk down a short
 // street. Each step crossfades the scene once the next painting is decoded,
 // slides the place card's new heading in, pans the minimap from the node the
@@ -453,8 +474,10 @@ export const StageJourney = { render: renderPlayer, args: { journey: true, autop
 // conversation (the command panel slides out over the widened message
 // window, the host walks on from the right, the name plate fades in, and
 // the choices stagger in once the greeting is read), ends it (the reverse),
-// then enters combat (the flash, the veil, the panel flip) and leaves it.
+// then enters combat (the flash, the veil, the panel flip, and the foes
+// stepping in as the flash releases), defeats the front foe (it fades and
+// the others step forward), and leaves combat (the foes fade out).
 // It walks on its own every few seconds; the host element's
 // `__modeJourney.go(step)` takes one step on demand
-// (`talk`, `leave`, `fight`, `flee`).
+// (`talk`, `leave`, `fight`, `defeat`, `flee`).
 export const ModeJourney = { render: renderPlayer, args: { modeJourney: true, autoplay: true } };

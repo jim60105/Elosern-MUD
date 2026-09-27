@@ -605,7 +605,9 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   white-space: nowrap;
 }
 .scene-backdrop .scene-backdrop__scene-label {
-  flex: 0 1 auto;
+  /* The label gives way last: in a narrow caption (combat, between the
+     player and the foe line-up) the alt text truncates first. */
+  flex: 0 0 auto;
   max-width: 55%;
   color: var(--paper-100);
   font: 14px/1.5 var(--f-serif);

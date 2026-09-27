@@ -180,6 +180,16 @@
   --actor-h: min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h)));
   --actor-left-inset: max(6vw, calc(var(--left-column) + 8px - var(--actor-h) / 3));
   --actor-right-inset: max(6vw, calc(280px - var(--actor-h) / 3));
+  /* In combat the right-hand island is the participant frame, which spans
+     the `map` anchor's whole `--right-column - 28px` width (its left edge
+     `--right-column - 12px` from the stage's right edge) — much wider than
+     the minimap card. The foe line-up (webclient-combat-foes-on-stage) steps
+     in until its front foe's face (the slot's centre) stands 24px clear of
+     that edge: its inset is
+     `max(var(--actor-right-inset), var(--foe-face-clear) - <front slot width> / 2)`,
+     written where the front foe's scale is known (FoeLineup.vue and the
+     scene caption's rule in app-shell.css). */
+  --foe-face-clear: calc(var(--right-column) + 12px);
 
   /* ---- shape & chrome ---- */
   --radius: 7px;
@@ -227,6 +237,16 @@
       the store level. */
    --z-surface-modal: 3000;
    --z-offline: 9000;
+}
+
+/* Short viewports (the stage box is 412px tall at 1280x720): a full
+   encounter's participant frame reaches down to the stage floor, so the foe
+   line-up steps in further, until the front foe's floor gauge — not only its
+   face — clears the frame (webclient-combat-foes-on-stage). */
+@media (max-height: 820px) {
+  :root {
+    --foe-face-clear: calc(var(--right-column) + 48px);
+  }
 }
 
 /* H5: colorblind-safe status palette. The settings surface's colorblind

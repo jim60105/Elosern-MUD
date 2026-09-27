@@ -6,6 +6,7 @@
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
     "Core/StageActor",
+    "Core/FoeLineup",
     "Core/DialogueChoices",
     "Core/CharacterSwitcher",
     "Core/ConnectOverlay",

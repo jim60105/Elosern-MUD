@@ -21,6 +21,7 @@
 //   objectives_panels.js  — objectives panel family
 //   lore_codex_panels.js  — `lore_codex` panel v1 family
 //   quest_log_panels.js   — `quest_log` panel read-model family
+//   combat_stage.js       — the foe line-up's participants and catalog
 
 export * from './fixtures/core.js';
 export * from './fixtures/action_dock.js';
@@ -37,3 +38,4 @@ export * from './fixtures/objectives_panels.js';
 export * from './fixtures/lore_codex_panels.js';
 export * from './fixtures/quest_log_panels.js';
 export * from './fixtures/stage_journey.js';
+export * from './fixtures/combat_stage.js';
