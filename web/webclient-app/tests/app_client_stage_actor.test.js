@@ -114,6 +114,49 @@ describe("the stage actors in the portrait anchors", () => {
     expect(wrapper.get('[data-testid="anchor-actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
   });
 
+  it("stands only the active foes in actor-right in combat, from the committed catalog", async () => {
+    // webclient-combat-foes-on-stage D1: the active foes in presenter order;
+    // party members and non-active foes stay in the participant frame.
+    const participants = [
+      { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null },
+      { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 40, hp_maximum: 60, portrait_ref: "7" },
+      { identity: 9, token: "e2", display_name: "逃兵", team: "foes", state: "fled", hp_current: 10, hp_maximum: 60, portrait_ref: null },
+      { identity: 10, token: "e3", display_name: "哥布林", team: "foes", state: "active", hp_current: 30, hp_maximum: 30, portrait_ref: null },
+    ];
+    const response = store.receive(
+      1,
+      "ui_snapshot",
+      [fx.snapshot({ revision, mode: "combat", panels: { ...basePanels(), context_actions: fx.combatActions({ participants }) } })],
+      {},
+    );
+    expect(response.accepted).toBe(true);
+    revision += 1;
+    await nextTick();
+    const right = wrapper.get('[data-testid="anchor-actor-right"]');
+    const slots = right.findAll('[data-testid="foe-slot"]');
+    expect(slots.map((s) => s.attributes("data-portrait-ref"))).toEqual(["7", ""]);
+    expect(slots[0].get("img").attributes("src")).toBe("/art/portraits/npc_7.webp");
+    expect(slots[1].get(".reference-artwork__placeholder-label").text()).toBe("哥布林");
+    for (const actor of right.findAll('[data-testid="stage-actor"]')) {
+      expect(actor.attributes("data-speaking")).toBe("true");
+    }
+    expect(right.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
+    // The player still stands, lit, in actor-left.
+    expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
+
+    commit("exploration");
+    await nextTick();
+    expect(right.findAll('[data-testid="foe-lineup"]')).toHaveLength(0);
+  });
+
+  it("stands no foe line-up in dialogue, where the host stands", async () => {
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+    const right = wrapper.get('[data-testid="anchor-actor-right"]');
+    expect(right.findAll('[data-testid="foe-lineup"]')).toHaveLength(0);
+    expect(right.findAll('[data-testid="stage-actor"]')).toHaveLength(1);
+  });
+
   it("falls back to the host's name placeholder when the key is null or names no entry", async () => {
     commit("dialogue", dialoguePanel(null));
     await nextTick();

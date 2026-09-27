@@ -400,12 +400,27 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     const rule = extractRule(shellCss, ".elosern-root .scene-backdrop .scene-backdrop__caption");
     expect(rule).toContain("bottom: calc(var(--command-line-h) + 12px);");
     expect(rule).toContain("left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px);");
-    expect(rule).toContain("right: calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px);");
+    // The right side clears the right anchor box, or, while the foe line-up
+    // stands (webclient-combat-foes-on-stage), its leftmost foe.
+    expect(rule).toContain("calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px),");
+    expect(rule).toContain("var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px");
+    expect(rule).toContain("var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3");
+    expect(rule).toContain("transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);");
     expect(shellCss).not.toMatch(/scene-backdrop[^{]*\{[^}]*\d+vh/);
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
     expect(tokens).toContain(
       "--stage-caption-top: calc(var(--stage-content-bottom) + 12px + var(--scene-caption-h));",
     );
+  });
+
+  it("lets the foe line-up reach past actor-right's box in combat only", () => {
+    // webclient-combat-foes-on-stage D2: the anchor keeps its box; in combat
+    // it shows the row that grows leftward beyond it.
+    const frameCss = readFileSync(join(APP_ROOT, "components/HudFrame.vue"), "utf8");
+    const rule = extractRule(frameCss, '.elosern-stage[data-elosern-mode="combat"] [data-anchor="actor-right"]');
+    expect(rule).toContain("overflow: visible;");
+    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
+    expect(tokens).toContain("--foe-face-clear: calc(var(--right-column) + 12px);");
   });
 
   it("places the portrait anchors after the combat veil so the player paints above it", () => {

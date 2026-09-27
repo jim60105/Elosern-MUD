@@ -488,6 +488,34 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+    )
+    def test_foe_lineup_vitest_evidence_passes(self):
+        """The foe line-up component, its geometry, and its wiring in the
+        client (active foes only, live-only entrance, inert leaving copies)."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/core/foe_lineup.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_stage_actor.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/mode_transitions.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "foe line-up Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-contextual-hud::the-objective-tracker-island-presents-the-committed-objectives-only",
     )
     def test_objective_tracker_node_suite_passes(self):

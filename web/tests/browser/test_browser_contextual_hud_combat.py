@@ -65,6 +65,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         placeholders = frame.locator('[data-testid="participant-portrait-placeholder"]')
         self.assertEqual(imgs.count(), 2, "resolvable portrait references render the catalog image")
         self.assertEqual(placeholders.count(), 0, "a null portrait_ref renders no placeholder card")
+        # actor-right holds only the foe line-up's decorative actors
+        # (webclient-combat-foes-on-stage): the active foes, no frame content.
+        right = page.locator('[data-anchor="actor-right"]')
+        self.assertEqual(right.locator('[data-testid="foe-lineup"]').count(), 1)
+        self.assertEqual(right.locator('[data-testid="foe-slot"]').count(), 2)
+        self.assertEqual(right.locator('[data-testid="participant-frame"]').count(), 0)
+        self.assertNotIn("/", right.inner_text(), "actor-right states no hit-point numerals")
         # While the participant frame is mounted, no separate portrait strip renders.
         self.assertEqual(
             page.locator('[data-testid="art-panel"]').count(),

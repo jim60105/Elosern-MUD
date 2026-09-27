@@ -159,7 +159,11 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
     );
     expect(w.find('[data-anchor="map"] [data-testid="participant-frame"]').exists()).toBe(true);
     expect(w.find('[data-anchor="actor-right"] [data-testid="participant-frame"]').exists()).toBe(false);
-    // The host Transition (webclient-mode-transitions D3) holds no actor.
-    expect(w.get('[data-anchor="actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
+    // actor-right holds only the foe line-up's decorative actors
+    // (webclient-combat-foes-on-stage): one per active foe, no frame content.
+    const actorRight = w.get('[data-anchor="actor-right"]');
+    expect(actorRight.findAll('[data-testid="foe-lineup"]')).toHaveLength(1);
+    expect(actorRight.findAll('[data-testid="stage-actor"]')).toHaveLength(1);
+    expect(actorRight.text()).not.toMatch(/\d+\s*\/\s*\d+/);
   });
 });
