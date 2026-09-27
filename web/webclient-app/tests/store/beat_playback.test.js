@@ -13,8 +13,13 @@ import { createPinia, setActivePinia } from "pinia";
 vi.mock("../../lib/motion_tokens.js", () => ({ readMotionMs: vi.fn(() => 400) }));
 
 import { readMotionMs } from "../../lib/motion_tokens.js";
+import CombatMenu from "../../lib/combat_menu.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
+
+// The attack key is wire vocabulary owned by the combat model (the root
+// attack opener resolves it), never a literal in the suite.
+const ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 const FOE_REF = "7";
 const PLAYER_REF = "42";
@@ -104,7 +109,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
   // The wire order: the round's lines, then the publication carrying its
   // panel, then the result.
   function settleRound({ panel = beatPanel(), revision = 2, action = "combat.cast", result = true } = {}) {
-    const requestId = store.dispatchAction(action, { skill_key: "basic_attack" });
+    const requestId = store.dispatchAction(action, ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
     }
@@ -195,7 +200,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     openCombat();
     // The panel publication alone (before the result) binds the round and
     // leaves the revision lock held.
-    const requestId = store.dispatchAction("combat.cast", { skill_key: "basic_attack" });
+    const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
     }
@@ -297,7 +302,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
     // A second action whose publication carries the SAME round id never
     // replays it (a retained panel included).
-    store.dispatchAction("combat.cast", { skill_key: "basic_attack" });
+    store.dispatchAction("combat.cast", ATTACK_KEY);
     store.appendText("out", "你擲出了骰子。");
     store.receive(
       1,
@@ -337,7 +342,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
   it("binds nothing for the unavailable panel form", () => {
     openCombat();
-    store.dispatchAction("combat.cast", { skill_key: "basic_attack" });
+    store.dispatchAction("combat.cast", ATTACK_KEY);
     store.appendText("out", "你等待了一陣。");
     store.receive(
       1,
@@ -364,7 +369,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
   it("binds a terminal snapshot's round from the pre-round roster and status", () => {
     openCombat();
-    const requestId = store.dispatchAction("combat.cast", { skill_key: "basic_attack" });
+    const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
     }

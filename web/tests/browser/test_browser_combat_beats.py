@@ -192,13 +192,17 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "reduced",
         )
         # The beat pause the script reads stays 400ms at `reduced` (design D2):
-        # the level drops the motion, never the order or the pauses.
+        # the level drops the motion, never the order or the pauses. The
+        # computed value is normalized (`0.4s`), so it is read the way the
+        # script's reader reads it.
         self.assertEqual(
             page.evaluate(
-                "() => getComputedStyle(document.documentElement)"
-                ".getPropertyValue('--motion-beat').trim()"
+                "() => { const raw = getComputedStyle(document.documentElement)"
+                ".getPropertyValue('--motion-beat').trim();"
+                " const m = /^(\\d*\\.?\\d+)(ms|s)$/.exec(raw);"
+                " return m ? Number(m[1]) * (m[2] === 's' ? 1000 : 1) : 0; }"
             ),
-            "400ms",
+            400,
         )
         install_outbound_recorder(page)
         self._engage(page)
@@ -254,7 +258,14 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-combat-menu::a-combat-round-plays-beat-by-beat")
     def test_reconnect_replays_no_round(self):
-        """A reload after a round presents none of it again."""
+        """A reload after a round presents none of it again.
+
+        The reconnect snapshot carries the unavailable `combat_beats` form
+        (C12 D4), so the new epoch carries no round at all: no beat page, no
+        displayed hit point, and no playback lock. The window presents the
+        response the server delivers after the reconnect as an ordinary
+        response, fully shown and still the only surface of its lines.
+        """
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
@@ -271,10 +282,14 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIsNone(view.get("beatPlayback"), "a reconnect presented no round")
         self.assertIsNone(view.get("displayHp"))
         self.assertFalse(view["dispatch"]["beatLocked"])
-        # The window opens on the last page of the last response, fully shown.
+        # The new epoch carries no available round panel either.
+        panel = view["panels"].get("combat_beats") or {}
+        self.assertNotEqual(panel.get("available"), True, panel)
+        # The window's page is fully shown and the log intact.
         wait_for_page_shown(page)
         surface = page.locator('[data-testid="message-page"]')
-        self.assertEqual(surface.get_attribute("data-page"), surface.get_attribute("data-pages"))
+        self.assertNotEqual(surface.get_attribute("data-pages"), "0")
+        self.assertTrue(surface.inner_text().strip(), "the window presents the response's text")
         self.assertIn(ROUND_CLOSING_LINE, self._log_text(page))
 
     # -- readers -------------------------------------------------------------

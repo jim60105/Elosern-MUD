@@ -16,6 +16,9 @@ import { SYNTH_SKILL } from "../support/synthetic-data.mjs";
 // vocabulary owned by the combat model (BASIC_ATTACK_KEY — the root attack
 // opener resolves it); the AREA row is the kit skill with invented prose.
 const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
+// The attack key the beat-queue lock case dispatches (the same model constant):
+// wire vocabulary is never spelled out in the suite (test-data-independence).
+const ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 describe("store dispatch + focus", () => {
   let store;
@@ -191,7 +194,7 @@ describe("store dispatch + focus", () => {
       // plays beat by beat": the command panel stays locked in addition to
       // the declared-revision lock, and unlocks when both have cleared.
       openSession();
-      const requestId = store.dispatchAction("combat.cast", { skill_key: "basic_attack" });
+      const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
       store.appendText("out", "你擲出了骰子。");
       store.appendText("out", "你擊中了灰袍盜賊。");
       store.receive(
@@ -244,12 +247,12 @@ describe("store dispatch + focus", () => {
       // The revision is accepted, so only the playback lock holds.
       expect(store.view.dispatch.inFlight).toBe(null);
       expect(store.view.dispatch.beatLocked).toBe(true);
-      expect(store.dispatchAction("combat.cast", { skill_key: "basic_attack" })).toBe(null);
+      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe(null);
       expect(sender.sent.actions.length).toBe(1);
 
       store.skipBeats();
       expect(store.view.dispatch.beatLocked).toBe(false);
-      expect(store.dispatchAction("combat.cast", { skill_key: "basic_attack" })).toBe("session:2");
+      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe("session:2");
    });
   });
 
