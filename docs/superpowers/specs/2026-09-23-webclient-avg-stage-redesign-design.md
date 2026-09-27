@@ -781,7 +781,7 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C10c | `webclient-dialogue-choices-overlay` | visual | archived |
 | C11a | `webclient-motion-level` | logic | archived |
 | C11b | `webclient-scene-transitions` | visual | archived |
-| C11c | `webclient-mode-transitions` | visual | proposed |
+| C11c | `webclient-mode-transitions` | visual | archived |
 | C12 | `combat-beats-panel` | logic | archived (server; parallel-safe) |
 | C13a | `webclient-combat-foes-on-stage` | visual | proposed |
 | C13b | `webclient-combat-beat-queue` | logic | proposed |
