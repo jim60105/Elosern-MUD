@@ -122,7 +122,22 @@ const hostTransitionCss = computed(
 const combatFoes = computed(() =>
   contextActionsPanel.value?.kind === "combat" ? activeFoes(contextActionsPanel.value.participants) : [],
 );
-const foesOnStage = computed(() => store.view.mode === "combat" && combatFoes.value.length > 0);
+// While a combat round plays by itself (webclient-combat-beat-choreography
+// D5/D6), the line-up stands the round's pre-round foes until each one's own
+// defeat beat; the round that ended the fight keeps them on the stage
+// (`beatHold`, inert) after the committed mode has already left combat.
+const beatStage = computed(() => store.view.beatStage || null);
+const beatHold = computed(() => !!store.view.beatHold);
+const lineupFoes = computed(() => (beatStage.value ? beatStage.value.foes : combatFoes.value));
+const foesOnStage = computed(
+  () => (store.view.mode === "combat" || beatHold.value) && lineupFoes.value.length > 0,
+);
+// The player's own beat gesture, keyed by the committed actor identity.
+const playerGesture = computed(() => {
+  const identity = panel("status")?.actor?.identity;
+  const entry = identity == null ? null : beatStage.value?.gestures?.[identity];
+  return entry || null;
+});
 // How far the row reaches left of the anchor, in anchor widths, and its
 // front foe's scale (which sets the row's inset), exposed on the client root
 // as `--foe-lineup-span` and `--foe-front-scale` so the scene caption stays
@@ -130,7 +145,7 @@ const foesOnStage = computed(() => store.view.mode === "combat" && combatFoes.va
 // once; a row that shrinks (a foe fell or fled) keeps its room until the
 // leaving foe has faded; and a row that leaves the stage keeps it until the
 // whole row has faded, so the caption never slides under a fading figure.
-const foeLineupCount = computed(() => (foesOnStage.value ? Math.min(combatFoes.value.length, FOE_LINEUP_MAX) : 0));
+const foeLineupCount = computed(() => (foesOnStage.value ? Math.min(lineupFoes.value.length, FOE_LINEUP_MAX) : 0));
 const foeLineupReach = ref({ span: 0, front: 1 });
 function reachFor(count) {
   return count > 0 ? { span: foeLineupSpan(count), front: foeSlots(count)[0].scale } : { span: 0, front: 1 };
@@ -176,6 +191,7 @@ function onFoeLineupGone() {
         :motion-level="store.view.motionLevel"
         :beat-playback="store.view.beatPlayback"
         :mode-change="modeChange"
+        :beat-hold="beatHold"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
         :offline="!store.view.connected"
@@ -240,6 +256,9 @@ function onFoeLineupGone() {
             :name="currentCharacter?.name || ''"
             :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
             :motion-level="store.view.motionLevel"
+            :gesture="playerGesture?.gesture ?? null"
+            :gesture-key="beatStage?.key ?? null"
+            :float-amount="playerGesture?.amount ?? null"
           />
         </template>
         <!-- The dialogue host's standing portrait (webclient-dialogue-stage-
@@ -274,6 +293,9 @@ function onFoeLineupGone() {
             <FoeLineup
               v-if="foesOnStage"
               :foes="combatFoes"
+              :stage="beatStage"
+              :display-hp="store.view.displayHp"
+              :inert="beatHold || null"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
               @settled="onFoeLineupSettled"

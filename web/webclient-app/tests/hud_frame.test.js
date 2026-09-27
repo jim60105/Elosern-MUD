@@ -423,6 +423,34 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     expect(tokens).toContain("--foe-face-clear: calc(var(--right-column) + 12px);");
   });
 
+  it("holds the combat veil only while the round that ended the fight plays", async () => {
+    // webclient-combat-beat-choreography D6: `data-beat-hold` renders only
+    // with the prop; the mode attribute follows the committed mode.
+    const wrapper = mount(HudFrame, { props: { mode: "exploration", modeChange: "combat-exploration" } });
+    const stage = wrapper.get('[data-testid="elosern-stage"]');
+    expect(stage.attributes("data-beat-hold")).toBeUndefined();
+    await wrapper.setProps({ beatHold: true });
+    expect(stage.attributes("data-beat-hold")).toBe("combat");
+    expect(stage.attributes("data-elosern-mode")).toBe("exploration");
+    expect(wrapper.get('[data-testid="stage-combat-veil"]').attributes("aria-hidden")).toBe("true");
+    await wrapper.setProps({ beatHold: false });
+    expect(stage.attributes("data-beat-hold")).toBeUndefined();
+
+    const frameCss = styleBlock("components/HudFrame.vue");
+    expect(extractRule(frameCss, '.elosern-stage[data-beat-hold="combat"] .stage-combat-veil')).toContain(
+      "opacity: 1;",
+    );
+    // The pulse runs on unbroken across the flip (the same animation).
+    expect(extractRule(frameCss, '.elosern-stage[data-beat-hold="combat"] .stage-combat-veil::before')).toContain(
+      "elosern-combat-pulse var(--motion-pulse)",
+    );
+    // The release fades on the combat exit's own veil transition.
+    expect(extractRule(frameCss, ".elosern-stage[data-mode-change] .stage-combat-veil")).toContain(
+      "transition: opacity var(--motion-actor)",
+    );
+    wrapper.unmount();
+  });
+
   it("places the portrait anchors after the combat veil so the player paints above it", () => {
     const wrapper = mount(HudFrame, { props: { mode: "combat" } });
     const stage = wrapper.get('[data-testid="elosern-stage"]').element;

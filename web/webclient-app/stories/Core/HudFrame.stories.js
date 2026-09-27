@@ -157,3 +157,49 @@ export const CombatEnter = {
   render: renderModeLoop,
   args: { target: "combat", commandLineExpanded: false },
 };
+
+// The terminal-round hold (webclient-combat-beat-choreography D6): the
+// round that ended the fight has committed exploration — the mode attribute
+// and every committed surface are exploration's — while its beats still
+// play in front of the combat stage: the veil keeps its combat opacity and
+// pulse, and the foe line-up stays, inert. Every few seconds the round ends
+// and the veil fades out on the combat exit's transition, then the loop
+// replays the hold.
+const renderHoldLoop = (args) => ({
+  setup() {
+    const hold = ref(true);
+    let timer = null;
+    onMounted(() => {
+      timer = setInterval(() => {
+        hold.value = !hold.value;
+      }, 2400);
+    });
+    onBeforeUnmount(() => clearInterval(timer));
+    return () =>
+      h(HudFrame, { ...args, beatHold: hold.value }, {
+        "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
+        "actor-right": () =>
+          hold.value
+            ? h(FoeLineup, {
+                foes: foeParticipants(2),
+                artPanel: { portrait_catalog: FOE_PORTRAIT_CATALOG },
+                inert: true,
+              })
+            : null,
+        place: () => sample("place · 地點卡"),
+        vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
+        map: () => [
+          sample("map · 小地圖（已回到探索）", "width:218px;height:200px;align-self:flex-end;"),
+          sample("map · 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
+        ],
+        "band-message": () => sample("band-message · 訊息視窗（最後的節拍）"),
+        "band-command": () => sample("band-command · 指令面板（探索，鎖定中）"),
+        "command-line": () => sample("command-line · 指令列"),
+      });
+  },
+});
+
+export const TerminalRoundHold = {
+  render: renderHoldLoop,
+  args: { mode: "exploration", modeChange: "combat-exploration", commandLineExpanded: false },
+};

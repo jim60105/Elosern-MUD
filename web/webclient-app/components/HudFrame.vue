@@ -71,6 +71,11 @@ const props = defineProps({
   // The last live mode change (webclient-mode-transitions D2), or null when
   // none happened since the last mount or reconnect.
   modeChange: { type: String, default: null },
+  // The terminal-round hold (webclient-combat-beat-choreography D6,
+  // `view.beatHold`): while the round that ended the fight still plays, the
+  // decorative combat veil stays; every committed surface has already
+  // followed the committed mode.
+  beatHold: { type: Boolean, default: false },
 });
 
 // The open-surface registry drives the `menu-open` mark (design D9): the
@@ -107,6 +112,7 @@ defineExpose({ menuOpen });
     :data-menu-open="menuOpen"
     :data-lowhp="lowhp ? 'true' : 'false'"
     :data-mode-change="modeChange"
+    :data-beat-hold="beatHold ? 'combat' : null"
   >
     <div class="stage-vignette" data-testid="stage-vignette"></div>
     <!-- Decorative: always rendered, faded by opacity (design D2). -->
@@ -245,6 +251,18 @@ defineExpose({ menuOpen });
   opacity: 1;
 }
 .elosern-stage[data-elosern-mode="combat"] .stage-combat-veil::before {
+  animation: elosern-combat-pulse var(--motion-pulse) ease-in-out infinite;
+}
+/* The terminal-round hold (webclient-combat-beat-choreography D6): the
+   round that ended the fight still plays in front of the combat stage, so
+   the veil keeps its combat opacity and its pulse (the same animation, so it
+   runs on unbroken across the mode flip) until the round ends; then it fades
+   out on the combat exit's own veil transition. The veil is decorative and
+   `aria-hidden`; nothing committed waits for it. */
+.elosern-stage[data-beat-hold="combat"] .stage-combat-veil {
+  opacity: 1;
+}
+.elosern-stage[data-beat-hold="combat"] .stage-combat-veil::before {
   animation: elosern-combat-pulse var(--motion-pulse) ease-in-out infinite;
 }
 

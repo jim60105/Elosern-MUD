@@ -89,6 +89,9 @@ const props = defineProps({
   // across a reconnect's null edges, so the name plate appears and goes
   // with no fade there.
   modeChange: { type: String, default: null },
+  // The terminal-round hold (`store.view.beatHold`,
+  // webclient-combat-beat-choreography D6), forwarded to HudFrame.
+  beatHold: { type: Boolean, default: false },
   modeHydrating: { type: Boolean, default: false },
   connectionStatus: {
     type: String,
@@ -411,6 +414,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
     <HudFrame
       :mode="mode"
       :mode-change="modeChange"
+      :beat-hold="beatHold"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
       :command-line-expanded="commandLineExpanded"
