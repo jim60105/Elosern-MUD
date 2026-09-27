@@ -96,12 +96,13 @@ The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key 
   - `[data-beat="hit"]`: `elosern-beat-hit var(--motion-beat-hit) linear 1`.
   - `[data-beat="defeat"]`: `elosern-beat-defeat var(--motion-beat-defeat) var(--ease-exit) 1 forwards`.
 - The float is `<span v-if="gesture === 'hit' && floatAmount !== null" class="stage-actor__float" aria-hidden="true" :key="`float:${gestureKey}`">−{{ floatAmount }}</span>`:
-  - absolutely positioned at 30% from the top and centred, in the seal colour, bold, at the message text size
+  - absolutely positioned at 30% from the top, in the seal colour, bold, at 1.5 times the message text size, with an ink outline painted under the fill, so it reads over pale and dark art
+  - anchored at the figure's face and leaning toward the stage centre by side (`--float-x`), so it stays clear of the vitals column on the left and the participant frame on the right
   - `animation: elosern-beat-float var(--motion-beat-float) var(--ease-exit) 1 forwards`
   - At `off` and `reduced` the duration is 0, so it ends invisible at once. The amount is in the beat's text and the HP numerals, so nothing is lost.
 - Nothing becomes focusable, and every layer stays in the anchor's `pointer-events: none`.
 
-*Why a keyed wrapper and not a class toggle:* two consecutive `hit`s on the same foe (a multi-hit skill) need the animation to restart. Re-keying one wrapper per step is the only pure-CSS restart, with no forced reflow in script.
+*Why a keyed wrapper and not a class toggle:* two consecutive `hit`s on the same foe (a multi-hit skill) need the animation to restart. Re-keying one wrapper per step is the only pure-CSS restart, with no forced reflow in script. The re-key remounts the portrait inside it, too. A remounted `<img>` whose URL is already loaded is `complete` when it is inserted (checked in Chromium with the looping `BeatHit` story), so it paints in its first frame and nothing pops.
 
 ### D5. The line-up during a round
 `FoeLineup` gains `stage` (the `view.beatStage` slice or null) and `displayHp`.
