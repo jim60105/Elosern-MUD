@@ -243,6 +243,12 @@ export default {
     let tailMoved = false;
     let laidOutFor = null;
     let wasBeatPlaying = false;
+    // The queue's own in-beat page timer. It is deliberately NOT the
+    // typewriter's armed wait: that one counts only unheld frame time, so an
+    // open drawer or the full log would freeze a multi-page beat and hold the
+    // command panel with it. The queue's pause is held-agnostic, exactly like
+    // the store's inter-beat one.
+    let beatPageTimer = null;
     // The response the pages were cut from (design D3): a new or appended
     // response dirties `display` at once, before the post-flush re-page, so
     // completeness is never read off the previous response's stale pages.
@@ -384,6 +390,22 @@ export default {
       return starts[Math.max(0, Math.min(index, starts.length - 1))];
     }
 
+    function clearBeatPageTimer() {
+      if (beatPageTimer !== null) {
+        clearTimeout(beatPageTimer);
+        beatPageTimer = null;
+      }
+    }
+
+    // Arm the wait between two pages of the same beat. Re-arming restarts it.
+    function armBeatPage(ms, onDue) {
+      clearBeatPageTimer();
+      beatPageTimer = setTimeout(() => {
+        beatPageTimer = null;
+        onDue();
+      }, ms);
+    }
+
     // Reveal a page the queue picked: announce it, then type it (instantly
     // when nothing can be measured).
     function showBeatPage(index) {
@@ -419,6 +441,7 @@ export default {
         followedBeat = null;
         followedLayout = -1;
         announcedEnd = 0;
+        clearBeatPageTimer();
       }
       shownBlocks = shown.blocks;
       shownKey = shown.key;
@@ -629,6 +652,8 @@ export default {
       () => {
         const bound = boundBeats.value;
         const playing = !!bound && bound.auto && bound.phase !== "done";
+        // Every pass re-decides the pause; only the same-beat branch re-arms.
+        clearBeatPageTimer();
         if (playing && !wasBeatPlaying) {
           // A wait armed before the round bound would end it with no player
           // action; the queue owns the channel from here.
@@ -671,7 +696,13 @@ export default {
         const beat = page && typeof page.beat === "number" ? page.beat : bound.index;
         const next = pages.value[pageIndex.value + 1];
         if (next && typeof next.beat === "number" && next.beat === beat) {
-          typewriter.armAdvance(readMotionMs("--motion-beat"), () => {
+          armBeatPage(readMotionMs("--motion-beat"), () => {
+            const current = boundBeats.value;
+            // The round may have ended (or been replaced) while the page
+            // waited: never advance a page the queue no longer owns.
+            if (!current || !current.auto || current.phase === "done") {
+              return;
+            }
             showBeatPage(pageIndex.value + 1);
           });
           return;

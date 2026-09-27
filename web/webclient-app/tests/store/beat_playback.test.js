@@ -146,7 +146,17 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     return store.view.beatPlayback;
   }
 
+  // The `off` level (design D2/D4): the store's own preference, applied to
+  // <html data-motion> exactly as the live client applies it.
+  function scaleToOff() {
+    store.setMotionLevel("off");
+    expect(store.view.motionLevel).toBe("off");
+  }
+
   beforeEach(() => {
+    // The presentation preferences persist through the versioned layout
+    // store; every case starts from nothing stored.
+    window.localStorage.clear();
     vi.useFakeTimers();
     vi.mocked(readMotionMs).mockReturnValue(PAUSE_MS);
     setActivePinia(createPinia());
@@ -155,6 +165,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     vi.useRealTimers();
     vi.clearAllMocks();
   });
@@ -250,6 +261,19 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     // The damage beat applies its `hp_after` the moment it is fully shown.
     store.beatShown(1);
     expect(store.view.displayHp).toEqual({ [FOE_REF]: 68 });
+  });
+
+  it("never reads the beat token at off: nothing plays and no timer is armed", () => {
+    vi.mocked(readMotionMs).mockReturnValue(PAUSE_MS);
+    openCombat();
+    // The level is read when the round binds: `off` is already in effect.
+    scaleToOff();
+    settleRound();
+    expect(readMotionMs).not.toHaveBeenCalled();
+    expect(playback().auto).toBe(false);
+    expect(playback().phase).toBe("done");
+    expect(store.view.dispatch.beatLocked).toBe(false);
+    expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
   });
 
   it("never holds the lock when the token is unset (the reader's 0ms)", () => {

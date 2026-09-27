@@ -262,9 +262,8 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         The reconnect snapshot carries the unavailable `combat_beats` form
         (C12 D4), so the new epoch carries no round at all: no beat page, no
-        displayed hit point, and no playback lock. The window presents the
-        response the server delivers after the reconnect as an ordinary
-        response, fully shown and still the only surface of its lines.
+        displayed hit point, and no playback lock, and the round's lines are
+        gone with the old epoch rather than presented again.
         """
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -285,12 +284,14 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The new epoch carries no available round panel either.
         panel = view["panels"].get("combat_beats") or {}
         self.assertNotEqual(panel.get("available"), True, panel)
-        # The window's page is fully shown and the log intact.
+        # The window presents the response the server delivered after the
+        # reconnect, fully shown; the pre-reload log is gone with the epoch, so
+        # no line of the round survives to be paged again.
         wait_for_page_shown(page)
         surface = page.locator('[data-testid="message-page"]')
         self.assertNotEqual(surface.get_attribute("data-pages"), "0")
         self.assertTrue(surface.inner_text().strip(), "the window presents the response's text")
-        self.assertIn(ROUND_CLOSING_LINE, self._log_text(page))
+        self.assertNotIn(ROUND_CLOSING_LINE, self._log_text(page))
 
     # -- readers -------------------------------------------------------------
 
