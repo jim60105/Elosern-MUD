@@ -54,7 +54,8 @@ focusable element and SHALL NOT intercept pointer events, and they MAY sit behin
 The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
 box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
 SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
-command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+scene caption row that stands on the command-line row, so it never meets the scene caption or the
+expanded command line; when its content is taller
 than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
 command-line row, or the bottom band.
 
@@ -210,7 +211,8 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 actor in `actor-left` SHALL present the current roster character's portrait. The dialogue host's stage
 actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry named by the
 committed `dialogue` panel's `host.portrait_ref` — the image with its face-rect crop when the entry
-carries one, and the entry's own placeholder card when the entry is a placeholder. When `portrait_ref`
+carries one, and the entry's own placeholder card — its own label, with the host display name's
+initial as the card's glyph — when the entry is a placeholder. When `portrait_ref`
 is `null` or names no catalog entry, the host's stage actor SHALL render the truthful placeholder: the
 host display name's initial and the display name, never a stock or guessed image. The client SHALL
 NOT construct a catalog key from the host identity or any other field. Each foe's stage actor in the foe
@@ -219,14 +221,16 @@ line-up SHALL present the committed `art` panel's `portrait_catalog` entry named
 entry's own placeholder card for a placeholder entry, and the truthful placeholder built from the
 participant's display name when the reference is `null` or names no entry.
 
-While the committed mode is `dialogue` the stage actors SHALL carry a speaking state. The speaker SHALL
+While the committed mode is `dialogue` and the host's stage actor renders, the stage actors SHALL carry
+a speaking state. The speaker SHALL
 render at full brightness and the other side SHALL render dimmed to 60% brightness, from one shared
 dim token. The host SHALL be the speaker, except while a `explore.talk_scripted` or
 `explore.talk_freeform` action the player submitted is in flight — from its dispatch until its result
 is handled and its declared presentation revision is accepted, or until it is rejected — during which
-the player SHALL be the speaker. The speaking state SHALL be derived from the dispatch state and the
-committed mode only, never from narrative prose. Outside dialogue mode no stage actor SHALL be dimmed,
-and a foe's stage actor SHALL never be dimmed.
+the player SHALL be the speaker. The speaking state SHALL be derived from the dispatch state, the
+committed mode, and the panel's availability only, never from narrative prose. Outside dialogue mode,
+and in dialogue mode while the `dialogue` panel is unavailable, no stage actor SHALL be dimmed, and a
+foe's stage actor SHALL never be dimmed.
 The dim SHALL NOT be the only indication of who is speaking: the name plate names the host, and the
 speaking state SHALL be exposed on each stage actor as a data attribute for tests. The stage actors are
 decorative art and SHALL carry no focusable element; this requirement covers static states only, and
@@ -238,7 +242,7 @@ any transition between them is owned by the motion layer.
 
 #### Scenario: A pending or missing portrait shows the truthful placeholder
 - **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安·衛登` opens a conversation
-- **THEN** the first stage actor shows the entry's placeholder card and label, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
+- **THEN** the first stage actor shows the entry's placeholder card with its own label and the host's initial, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
 
 #### Scenario: The host speaks and the player is dimmed
 - **WHEN** a conversation opens and the host's greeting commits
@@ -266,7 +270,10 @@ and maximum hit points as numerals, and its state; a non-active state SHALL be c
 text marker in addition to any colour. The frame SHALL NOT invent a field the participant descriptor
 does not carry. The frame SHALL list every participant of both sides, including the foes the foe line-up
 does not stand on the stage, and it SHALL remain the only surface that states participant tokens, hit
-points, and states: the foe line-up in `actor-right` carries decorative portraits only.
+points, and states: the foe line-up in `actor-right` carries decorative portraits and decorative
+hit-point gauges without numerals only. A display name longer than the frame's width SHALL end in an
+ellipsis on screen while its full text stays in the DOM, and the frame's rows SHALL be compact enough
+that a frame of six participants ends above the foe line-up's gauges at 1920x1080 and 1440x900.
 
 Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
 up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
@@ -297,7 +304,88 @@ dock's target frame.
 
 #### Scenario: The frame sits in the map anchor, not on a portrait anchor
 - **WHEN** a combat session commits participants at 1440x900 and 1280x720
-- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
+- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and gauges and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
+
+### Requirement: The scene backdrop renders the art payload truthfully behind the stage
+The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with
+cover-style cropping when the scene status is `done`; the previously rendered image visibly dimmed and
+labelled `目前場景圖片生成中` when the scene is pending and a prior image exists; and the mode's
+gradient stage otherwise — for a missing, failed, or invalid asset, for a pending scene with no prior
+image, and when the `art` panel is unavailable. A bundled decorative sample MAY accompany this
+fallback only with a visible caption distinguishing it from an actual scene image, while retaining
+the authoritative missing/pending/unavailable label. Samples SHALL NOT enter the art catalog or
+change its status, and SHALL disappear when an actual or labelled prior scene renders.
+Decorative portrait samples SHALL likewise be labelled separately from the current subject;
+an available committed player-roster portrait takes precedence, and a load failure returns to
+an explicitly labelled sample instead of attributing that sample to the player.
+The backdrop SHALL NOT present an invented image as authoritative and
+SHALL NOT present a stale image as current. The scene label, its alternative text, and any truthful
+placeholder label SHALL be rendered as text outside the bitmap, so no required information exists only
+inside an image. The gradient stage SHALL differ per mode (exploration, dialogue, combat) and SHALL
+carry an inset vignette. The backdrop's image SHALL be cover-cropped to the stage box (from the top
+band's lower edge to the bottom band's upper edge), so no part of the scene the crop keeps is hidden
+behind the bottom band.
+
+The backdrop's own floating caption elements (the truthful-placeholder card, the `目前場景圖片生成中`
+pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
+positioned so that none of them overlaps the bottom band, the action dock's, or the command line's
+rendered content, at 1920x1080, 1440x900, and 1280x720 — extending the sibling stage requirement's
+general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
+stage anchors but are absolutely positioned within the same full-bleed stage.
+The scene label, the alternative text, the pending notice, and the full-view control SHALL render as
+one caption row on the stage box's lower edge, standing just above the command-line row docked on the
+band's top edge, and centred in the open stage between the `actor-left` and `actor-right` anchor boxes —
+or, while the foe line-up stands in combat, between the `actor-left` anchor box and the line-up's
+leftmost foe, until a leaving line-up has faded — so no portrait anchor (which paints above the
+backdrop), no foe, and no other HUD surface covers any part of it in any mode. The alternative text SHALL
+give way before the scene label when the row is too narrow for both. The row SHALL stay one line tall: a label or alternative text longer than the row SHALL end
+in an ellipsis on screen while its full text stays in the DOM, and the dialogue choice list SHALL stop
+above the row.
+
+#### Scenario: A done scene paints the stage
+- **WHEN** the committed art panel carries a `done` scene with a same-origin URL
+- **THEN** the backdrop renders that image cover-cropped to the stage box behind every HUD surface, and the scene label and alternative text render as text outside the bitmap
+
+#### Scenario: A missing scene degrades to the mode gradient
+- **WHEN** the committed art panel carries a missing, failed, or invalid scene
+- **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as text, and no image element carries a URL
+
+#### Scenario: An unavailable art panel is indistinguishable from an ungenerated scene
+- **WHEN** the `art` panel commits its unavailable form
+- **THEN** the backdrop renders the mode gradient stage exactly as for a missing asset, with no broken image frame and no gameplay surface blocked
+
+#### Scenario: A pending scene keeps its prior image labelled
+- **WHEN** the scene is pending and a prior scene image is already rendered
+- **THEN** the backdrop keeps that image visibly dimmed with the explicit `目前場景圖片生成中` label, and never presents it as the current scene
+
+#### Scenario: The combat stage is visually distinct
+- **WHEN** the committed mode is combat and no scene image is available
+- **THEN** the backdrop renders the combat gradient stage, visually distinct from the exploration stage
+
+#### Scenario: The truthful-placeholder caption never intrudes on the action dock
+- **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the truthful-placeholder
+  card renders
+- **THEN** the placeholder card's rendered bounding box intersects neither the bottom band's nor the
+  command line's rendered bounding box at 1920x1080, 1440x900, or 1280x720
+
+#### Scenario: The scene label, alt text, and full-view control clear the dock at both viewports
+- **WHEN** the scene label, alternative-text caption, pending notice, or full-view control render above
+  the band
+- **THEN** each one's rendered bounding box stays above the bottom band's top edge and above the
+  command-line row, at 1920x1080, 1440x900, and 1280x720
+
+#### Scenario: The scene caption stands on the stage floor between the portraits
+- **WHEN** the scene label, alternative text, and full-view control render with the command line expanded
+  at 1920x1080, 1440x900, and 1280x720
+- **THEN** their caption row's bottom edge lies at most 16px above the command-line row's top edge, the
+  row is horizontally centred between the `actor-left` and `actor-right` anchor boxes (±1.5px), and each
+  part lies between those boxes with no other surface painted over it
+
+#### Scenario: The scene caption clears the foe line-up
+- **WHEN** a combat snapshot commits one, two, and three active foes with the command line expanded at
+  1920x1080, 1440x900, and 1280x720
+- **THEN** the caption row lies between the `actor-left` anchor box and the leftmost foe's box, horizontally
+  centred between them (±1.5px), with no foe painted over any of its parts
 
 ## ADDED Requirements
 
@@ -305,48 +393,65 @@ dock's target frame.
 While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor
 for each committed combat participant whose team is the opposing side and whose state is active, in the
 presenter's order, at most three. Foes beyond the third SHALL NOT stand on the stage; the participant
-frame lists them. Party members other than the player SHALL NOT stand on the stage; the player alone
-stands in `actor-left`. When no foe is active the line-up SHALL render nothing.
+frame lists them, and no "+N" count is drawn. Party members other than the player SHALL NOT stand on the
+stage; the player alone stands in `actor-left`. When no foe is active the line-up SHALL render nothing.
 
-The line-up SHALL stand on the band: every foe's stage actor SHALL be bottom-aligned to the band's upper
-edge. The first foe SHALL stand at the `actor-right` anchor's position — its right edge inset 6% of the
-stage width from the stage's right edge — and each later foe SHALL stand further toward the stage's
-centre, overlapping the foe before it and drawn behind it. With one, two, or three foes shown, each
-foe's height SHALL be 100%, 90%, or 80% of the player's stage actor's height. At 1920x1080, 1440x900,
-and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or intersect the player's
-stage actor. Each foe's stage actor SHALL expose that participant's portrait reference as a data
-attribute for tests and for the beat presentation. The line-up is decorative art: it SHALL carry no
-focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit points, or states,
-which remain the participant frame's.
+The line-up SHALL be a depth-staged row that grows leftward. The first foe SHALL stand in front, nearest
+the stage's right edge, and each later foe SHALL stand behind the one before it: further toward the
+stage's centre, overlapping that foe and drawn behind it, smaller, and standing a little higher (up-stage)
+than it. With one, two, or three foes shown, the foes' heights SHALL be, front to back, 100%; 90% and 78%;
+or 80%, 70%, and 61% of the player's stage actor's height, and every later foe SHALL show 46% of its width
+past the foe in front of it. The front foe SHALL stand on the band's upper edge, and each foe behind SHALL
+stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
+be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
+lies at least 24px left of the participant frame's column, which spans the `map` anchor's width in combat.
+At 1920x1080, 1440x900, and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or
+intersect the player's stage actor.
 
-A live change of the committed mode into `combat` SHALL bring the line-up in from the right with a fade
-over the actor duration of the client's motion level (350ms at `full`), and a live change out of `combat`
-SHALL fade it out. Within combat, a foe that leaves the active set SHALL fade out, a foe that joins SHALL
-enter the same way, and the remaining foes SHALL move to their new places. Every leaving copy SHALL be
-out of reach as "A leaving element is out of reach while it animates out" requires. Mounting the client
-in combat, a reload, and a reconnect SHALL play no entrance. At `reduced` the line-up SHALL only fade,
-within 150ms, and at `off` every change SHALL render its final state in the commit's frame.
+Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
+and for the beat presentation. Each foe SHALL carry a decorative hit-point gauge: a slim track centred
+under the figure on the scene caption's baseline, above the command-line row, filled to the committed
+`hp_current` over `hp_maximum`, with a trailing bar that follows a drop after the vitals' trail delay so
+the damage shows as a gap. The line-up is decorative art: it SHALL be hidden from assistive technology,
+SHALL carry no focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point
+numerals, or states, which remain the participant frame's.
+
+A live change of the committed mode into `combat` SHALL bring the line-up in: after half the flash's
+duration it SHALL fade in over the actor duration of the client's motion level (350ms at `full`) while
+each foe slides in from the right, the front foe furthest. A live change out of `combat` SHALL fade it out
+while the foes drift a step to the right. Within combat, a foe that leaves the active set SHALL fade out
+where it stands, a foe that joins SHALL slide and fade in, and the remaining foes SHALL glide to their new
+places and sizes. Every leaving copy SHALL be out of reach as "A leaving element is out of reach while it
+animates out" requires. Mounting the client in combat, a reload, and a reconnect SHALL play no entrance.
+At `reduced` the line-up SHALL only fade, within 150ms, and nothing in it SHALL move or glide; at `off`
+every change SHALL render its final state in the commit's frame. No change SHALL scroll the stage or any
+element that contains it.
 
 #### Scenario: One foe stands opposite the player
 - **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1920x1080
 - **THEN** `actor-right` renders one foe stage actor with that image, its bottom edge on the band's top
-  edge, its right edge 6% of the stage width from the stage's right edge, its height equal to the
-  player's stage actor's height (±1px), and no focusable element
+  edge, its height equal to the player's stage actor's height (±1px), its horizontal centre at least 24px
+  left of the participant frame's left edge, a gauge under it, and no focusable element
 
-#### Scenario: Three foes overlap toward the centre
+#### Scenario: Three foes stand in depth toward the centre
 - **WHEN** a combat snapshot commits three active foes at 1920x1080, 1440x900, and 1280x720
-- **THEN** three foe stage actors render in presenter order, each 80% of the player's height (±1px),
-  each later one further left and behind the one before it, and none crosses the stage's centre line or
-  intersects the player's stage actor
+- **THEN** three foe stage actors render in presenter order at 80%, 70%, and 61% of the player's height
+  (±1px), each later one further left, higher, and behind the one before it, and none crosses the stage's
+  centre line or intersects the player's stage actor
 
 #### Scenario: Foes beyond three stay in the participant frame
 - **WHEN** a combat snapshot commits five active foes
 - **THEN** the line-up shows the first three in presenter order, and the participant frame lists all five
   foes with their tokens and hit points
 
+#### Scenario: The gauge follows the committed hit points
+- **WHEN** a committed update lowers an active foe's `hp_current`
+- **THEN** that foe's gauge fill shrinks to the new ratio, its trailing bar follows after the trail delay,
+  and neither the gauge nor the line-up states a numeral
+
 #### Scenario: Only active foes stand on the stage
-- **WHEN** a committed update changes one of two foes to defeated
-- **THEN** that foe's stage actor fades out and is inert while it leaves, the other foe moves to the first
+- **WHEN** a committed update changes the first of two foes to defeated
+- **THEN** that foe's stage actor fades out and is inert while it leaves, the other foe glides to the front
   place, and the participant frame still lists the defeated foe with its text marker
 
 #### Scenario: A missing portrait shows the truthful placeholder
@@ -357,8 +462,9 @@ within 150ms, and at `off` every change SHALL render its final state in the comm
 #### Scenario: Entering combat brings the foes in
 - **WHEN** the effective level is `full` and a committed revision changes the mode from exploration to
   combat with two active foes
-- **THEN** the line-up enters from the right with a 350ms fade, and after a later change back to
-  exploration it fades out and is inert while it leaves
+- **THEN** the line-up fades in over 350ms while its foes slide in from the right, and after a later change
+  back to exploration it fades out and is inert while it leaves, and at no frame does any stage ancestor
+  scroll horizontally
 
 #### Scenario: A reload in combat plays no entrance
 - **WHEN** the client reloads or reconnects while the committed mode is combat

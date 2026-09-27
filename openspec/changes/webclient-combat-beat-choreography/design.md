@@ -9,7 +9,8 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
   - The round binds even when the committed mode is already `exploration` (a terminal round).
 - **The line-up (C13a).**
   - `FoeLineup.vue` renders up to three `StageActor`s from committed active foes in a `TransitionGroup name="foe"` (leave: fade over `--motion-actor`, inert).
-  - Each slot carries `data-portrait-ref`.
+  - Each slot carries `data-portrait-ref` and a decorative HP gauge (`.foe-lineup__gauge`, `data-testid="foe-gauge"`, fill and trailing bar on `--motion-slow`, `--motion-trail`, `--motion-trail-delay`) from the committed `hp_current / hp_maximum` (`foeHpPercent` in `components/foe-lineup.js`).
+  - The row is depth-staged (front foe largest, each foe behind smaller and higher), and its geometry lives in `components/foe-lineup.js`. `AppClient` keeps the caption clear through `--foe-lineup-span` / `--foe-front-scale`, released in the `foes-enter` `after-leave`.
   - `AppClient` mounts it in `#actor-right` inside `<Transition name="foes-enter">` while `mode === 'combat'`.
 - **`StageActor.vue`** (C10b, C11b): the root `[data-testid="stage-actor"][data-side][data-speaking]` holds the `actor-xfade` transition around `ReferenceArtwork`, and the dim filter eases over `--motion-fast`.
 - **`HudFrame.vue`** (C11c):
@@ -105,10 +106,8 @@ The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key 
 `FoeLineup` gains `stage` (the `view.beatStage` slice or null) and `displayHp`.
 - `shown = (stage ? stage.foes : foes).slice(0, 3)`. So during a round the row stands the pre-round foes. A foe whose defeat beat has played leaves the `TransitionGroup`: its own `defeat` animation runs first, then C13a's leave fade. That is design §10.2's "fades and drops out".
 - At `done`, `stage` is `null` and the committed foes take over. On a skip, every foe defeated in the round leaves at once through the ordinary leave.
-- Each slot gains `<div class="foe-lineup__gauge" aria-hidden="true">`:
-  - a 6px track, 60% of the slot's width, centred 10px above the band edge
-  - a ghost and a fill with `VitalsTrack`'s transitions (`--motion-slow`, `--motion-trail`, `--motion-trail-delay`)
-  - width = `(displayHp?.[ref] ?? row.hp_current) / row.hp_maximum`
+- Each slot's gauge (shipped by C13a) reads the displayed value:
+  - width = `(displayHp?.[ref] ?? row.hp_current) / row.hp_maximum`; the fill and the trailing bar keep C13a's look and transitions
   - The numerals remain the participant frame's only. The gauge is the stage's reading of "that target's HP bar animates to `hp_after`" (design §10.2), and it is visible during the terminal hold, when the frame is gone.
 - Each slot's actor receives `gesture`, `gestureKey`, and `floatAmount` from `stage.gestures[portrait_ref]`. `AppClient` passes the player's from `stage.gestures[status.actor.identity]`.
 

@@ -41,7 +41,7 @@ C12 (`combat-beats-panel` D3) requires a terminal round's beats to play before C
 - `web/webclient-app/components/FoeLineup.vue` (C13a):
   - New props `displayHp` and `stage`.
   - While a round plays, the row stands the round's pre-round active foes, minus those whose defeat beat has played (that foe drops out through the `foe` leave). Otherwise it stands the committed active foes.
-  - Each slot gains a slim decorative HP gauge (`aria-hidden`, no numerals) with a fill and a trailing bar, driven by the displayed HP.
+  - Each slot's decorative HP gauge (shipped by C13a from the committed HP) follows the displayed HP during a round.
 - `web/webclient-app/components/HudFrame.vue` (C11c):
   - A new prop `beatHold` renders `data-beat-hold="combat"` on the stage root.
   - While it is set, the combat veil keeps its combat opacity, without the pulse. It fades out over `--motion-reveal` when the hold ends.
@@ -73,7 +73,7 @@ Out of scope:
 - `webclient-contextual-hud`:
   - MODIFIED "The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces" (C13a text). `actor-right` keeps the line-up during a held terminal round.
   - MODIFIED "Surface visibility is gated by the committed game mode" (C13a text). The terminal-round hold is the exception for the decorative veil and line-up.
-  - MODIFIED "Foes stand opposite the player during combat" (C13a ADDED). The pre-round roster during playback, and a decorative gauge per foe.
+  - MODIFIED "Foes stand opposite the player during combat" (C13a ADDED). The pre-round roster during playback, and the gauges following the displayed HP.
   - MODIFIED "Vitals pair an icon, a label, and numerals with a trailing damage bar" (C13b text). The trailing bar follows 300ms behind the fill.
   - ADDED "Combat beats are choreographed on the stage at the motion level".
 - `webclient-combat-menu`: MODIFIED "A combat round plays beat by beat" (C13b ADDED). Each beat plays its stage gesture before the pause.

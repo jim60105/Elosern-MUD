@@ -56,7 +56,8 @@ focusable element and SHALL NOT intercept pointer events, and they MAY sit behin
 The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
 box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
 SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
-command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+scene caption row that stands on the command-line row, so it never meets the scene caption or the
+expanded command line; when its content is taller
 than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
 command-line row, or the bottom band.
 
@@ -217,56 +218,71 @@ collapse the command line, so leaving creation never reveals an expanded row.
 While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor
 for each committed combat participant whose team is the opposing side and whose state is active, in the
 presenter's order, at most three. Foes beyond the third SHALL NOT stand on the stage; the participant
-frame lists them. Party members other than the player SHALL NOT stand on the stage; the player alone
-stands in `actor-left`. When no foe is active the line-up SHALL render nothing.
+frame lists them, and no "+N" count is drawn. Party members other than the player SHALL NOT stand on the
+stage; the player alone stands in `actor-left`. When no foe is active the line-up SHALL render nothing.
 
-The line-up SHALL stand on the band: every foe's stage actor SHALL be bottom-aligned to the band's upper
-edge. The first foe SHALL stand at the `actor-right` anchor's position — its right edge inset 6% of the
-stage width from the stage's right edge — and each later foe SHALL stand further toward the stage's
-centre, overlapping the foe before it and drawn behind it. With one, two, or three foes shown, each
-foe's height SHALL be 100%, 90%, or 80% of the player's stage actor's height. At 1920x1080, 1440x900,
-and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or intersect the player's
-stage actor. Each foe's stage actor SHALL expose that participant's portrait reference as a data
-attribute for tests and for the beat presentation. The line-up is decorative art: it SHALL carry no
-focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point numerals, or
-states, which remain the participant frame's. Each foe SHALL carry a slim decorative hit-point gauge,
-hidden from assistive technology, whose fill shows that foe's current hit points (the displayed value
-while a combat round plays) over its maximum, with a trailing bar like the vitals'.
+The line-up SHALL be a depth-staged row that grows leftward. The first foe SHALL stand in front, nearest
+the stage's right edge, and each later foe SHALL stand behind the one before it: further toward the
+stage's centre, overlapping that foe and drawn behind it, smaller, and standing a little higher (up-stage)
+than it. With one, two, or three foes shown, the foes' heights SHALL be, front to back, 100%; 90% and 78%;
+or 80%, 70%, and 61% of the player's stage actor's height, and every later foe SHALL show 46% of its width
+past the foe in front of it. The front foe SHALL stand on the band's upper edge, and each foe behind SHALL
+stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
+be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
+lies at least 24px left of the participant frame's column, which spans the `map` anchor's width in combat.
+At 1920x1080, 1440x900, and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or
+intersect the player's stage actor.
+
+Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
+and for the beat presentation. Each foe SHALL carry a decorative hit-point gauge: a slim track centred
+under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current
+hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so
+the damage shows as a gap. The line-up is decorative art: it SHALL be hidden from assistive technology,
+SHALL carry no focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point
+numerals, or states, which remain the participant frame's.
 
 While a combat round plays by itself, the line-up SHALL stand the foes that were active before the round,
 in the presenter's order, and a foe SHALL leave it only when its own defeat beat plays; when the round
 ends, by itself or because the player ended it, the line-up SHALL stand the committed active foes.
 
-A live change of the committed mode into `combat` SHALL bring the line-up in from the right with a fade
-over the actor duration of the client's motion level (350ms at `full`), and a live change out of `combat`
-SHALL fade it out. Within combat, a foe that leaves the active set SHALL fade out, a foe that joins SHALL
-enter the same way, and the remaining foes SHALL move to their new places. Every leaving copy SHALL be
-out of reach as "A leaving element is out of reach while it animates out" requires. Mounting the client
-in combat, a reload, and a reconnect SHALL play no entrance. At `reduced` the line-up SHALL only fade,
-within 150ms, and at `off` every change SHALL render its final state in the commit's frame.
+A live change of the committed mode into `combat` SHALL bring the line-up in: after half the flash's
+duration it SHALL fade in over the actor duration of the client's motion level (350ms at `full`) while
+each foe slides in from the right, the front foe furthest. A live change out of `combat` SHALL fade it out
+while the foes drift a step to the right. Within combat, a foe that leaves the active set SHALL fade out
+where it stands, a foe that joins SHALL slide and fade in, and the remaining foes SHALL glide to their new
+places and sizes. Every leaving copy SHALL be out of reach as "A leaving element is out of reach while it
+animates out" requires. Mounting the client in combat, a reload, and a reconnect SHALL play no entrance.
+At `reduced` the line-up SHALL only fade, within 150ms, and nothing in it SHALL move or glide; at `off`
+every change SHALL render its final state in the commit's frame. No change SHALL scroll the stage or any
+element that contains it.
 
 #### Scenario: One foe stands opposite the player
 - **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1920x1080
 - **THEN** `actor-right` renders one foe stage actor with that image, its bottom edge on the band's top
-  edge, its right edge 6% of the stage width from the stage's right edge, its height equal to the
-  player's stage actor's height (±1px), and no focusable element
+  edge, its height equal to the player's stage actor's height (±1px), its horizontal centre at least 24px
+  left of the participant frame's left edge, a gauge under it, and no focusable element
 
-#### Scenario: Three foes overlap toward the centre
+#### Scenario: Three foes stand in depth toward the centre
 - **WHEN** a combat snapshot commits three active foes at 1920x1080, 1440x900, and 1280x720
-- **THEN** three foe stage actors render in presenter order, each 80% of the player's height (±1px),
-  each later one further left and behind the one before it, and none crosses the stage's centre line or
-  intersects the player's stage actor
+- **THEN** three foe stage actors render in presenter order at 80%, 70%, and 61% of the player's height
+  (±1px), each later one further left, higher, and behind the one before it, and none crosses the stage's
+  centre line or intersects the player's stage actor
 
 #### Scenario: Foes beyond three stay in the participant frame
 - **WHEN** a combat snapshot commits five active foes
 - **THEN** the line-up shows the first three in presenter order, and the participant frame lists all five
   foes with their tokens and hit points
 
+#### Scenario: The gauge follows the committed hit points
+- **WHEN** a committed update lowers an active foe's `hp_current`
+- **THEN** that foe's gauge fill shrinks to the new ratio, its trailing bar follows after the trail delay,
+  and neither the gauge nor the line-up states a numeral
+
 #### Scenario: Only active foes stand on the stage
-- **WHEN** a committed update that carries no playable round changes one of two foes to defeated, and
-  later a playing round defeats the other foe
+- **WHEN** a committed update that carries no playable round changes the first of two foes to defeated,
+  and later a playing round defeats the other foe
 - **THEN** the first foe's stage actor fades out at the commit and is inert while it leaves, the other
-  foe moves to the first place, the second foe stays on the stage until its defeat beat plays, and the
+  foe glides to the front place, the second foe stays on the stage until its defeat beat plays, and the
   participant frame still lists both defeated foes with their text markers
 
 #### Scenario: A missing portrait shows the truthful placeholder
@@ -277,8 +293,9 @@ within 150ms, and at `off` every change SHALL render its final state in the comm
 #### Scenario: Entering combat brings the foes in
 - **WHEN** the effective level is `full` and a committed revision changes the mode from exploration to
   combat with two active foes
-- **THEN** the line-up enters from the right with a 350ms fade, and after a later change back to
-  exploration it fades out and is inert while it leaves
+- **THEN** the line-up fades in over 350ms while its foes slide in from the right, and after a later change
+  back to exploration it fades out and is inert while it leaves, and at no frame does any stage ancestor
+  scroll horizontally
 
 #### Scenario: A reload in combat plays no entrance
 - **WHEN** the client reloads or reconnects while the committed mode is combat

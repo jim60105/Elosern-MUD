@@ -267,7 +267,10 @@
       "files_b": [
         "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest",
-        "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end"
+        "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_beyond_three_stay_in_the_frame"
       ]
     },
     {
@@ -396,7 +399,10 @@
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_confirm_shows_refreshed_server_text_when_withdrawn",
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_reset_requires_confirmation_and_clears_the_draft",
-        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest"
+        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_enter_and_leave_full",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade"
       ]
     }
   ]

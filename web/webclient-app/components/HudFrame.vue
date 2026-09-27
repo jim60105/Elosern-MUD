@@ -11,7 +11,10 @@
 //   participant frame, and the title ballot);
 // - the portrait anchors `actor-left` (the player's stage actor) and
 //   `actor-right` (the dialogue host's stage actor while the mode is
-//   dialogue), standing on the bottom band's top edge;
+//   dialogue, the foe line-up while it is combat —
+//   webclient-combat-foes-on-stage), standing on the bottom band's top edge.
+//   In combat `actor-right` keeps its box and lets the line-up's row reach
+//   left beyond it;
 // - the `choices` anchor (webclient-dialogue-choices-overlay D6): the
 //   dialogue choice list, centred over the stage between the portraits and
 //   above the expanded command-line row, rendered only in dialogue mode;
@@ -328,6 +331,12 @@ defineExpose({ menuOpen });
    1920x1080). */
 .elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); }
 .elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
+/* The foe line-up (webclient-combat-foes-on-stage D2) grows leftward from
+   this box's right edge and steps in to the combat inset; the anchor keeps
+   its box and shows what reaches past it. */
+.elosern-stage[data-elosern-mode="combat"] [data-anchor="actor-right"] {
+  overflow: visible;
+}
 
 /* choices (webclient-dialogue-choices-overlay D6): the dialogue choice
    list, horizontally centred on the stage at `min(560px, 40%)` wide and

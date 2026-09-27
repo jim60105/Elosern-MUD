@@ -35,7 +35,7 @@
   - the `stage` and `displayHp` props
   - the pre-round roster during a round
   - per-slot gestures
-  - the decorative gauge with fill and ghost on `--motion-slow`, `--motion-trail`, and `--motion-trail-delay`
+  - the gauge C13a ships reads `displayHp` during a round (its look and transitions are C13a's)
 
   Extend `tests/core/foe_lineup.test.js`, and add a `RoundInProgress` story.
 - [ ] 4.3 `web/webclient-app/components/HudFrame.vue` and `web/webclient-app/AppClient.vue` per design D6:

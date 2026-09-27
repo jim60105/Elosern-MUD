@@ -119,11 +119,14 @@ const transitionCss = computed(() => props.motionLevel !== "off");
    generated portrait carries its own flat backdrop): an elliptical mask
    centred on the figure, nudged towards the stage centre and mirrored with
    the side, intersected with a long fade at the feet into the band it
-   stands on. The placeholder card takes the same silhouette. */
+   stands on. The ellipse is exactly as wide as the box and the vertical
+   fade opens with a short rise at the top, so no edge of the box survives
+   as a visible seam — on a dark scene, or where the combat foes overlap one
+   another. The placeholder card takes the same silhouette. */
 .stage-actor .reference-artwork img,
 .stage-actor .reference-artwork__placeholder {
-  --actor-mask-shape: radial-gradient(ellipse 54% 60% at 52% 46%, #000 60%, transparent 100%);
-  --actor-mask-feet: linear-gradient(#000 70%, transparent 97%);
+  --actor-mask-shape: radial-gradient(ellipse 50% 62% at 51% 46%, #000 58%, transparent 100%);
+  --actor-mask-feet: linear-gradient(transparent, #000 5%, #000 70%, transparent 97%);
   -webkit-mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
   -webkit-mask-composite: source-in;
   mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
@@ -131,7 +134,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 }
 .stage-actor[data-side="right"] .reference-artwork img,
 .stage-actor[data-side="right"] .reference-artwork__placeholder {
-  --actor-mask-shape: radial-gradient(ellipse 54% 60% at 48% 46%, #000 60%, transparent 100%);
+  --actor-mask-shape: radial-gradient(ellipse 50% 62% at 49% 46%, #000 58%, transparent 100%);
 }
 .stage-actor .reference-artwork img {
   object-position: center 12%;

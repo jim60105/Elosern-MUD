@@ -1,5 +1,7 @@
 import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import HudFrame from "../../components/HudFrame.vue";
+import FoeLineup from "../../components/FoeLineup.vue";
+import { FOE_PORTRAIT_CATALOG, foeParticipants } from "../fixtures.js";
 
 // HudFrame (H1, webclient-hud-01-shell-and-scene; webclient-avg-stage-shell):
 // the full-bleed cinematic stage with named anchors. Deterministic offline
@@ -26,7 +28,14 @@ const renderFrame = (args) => ({
   render: () =>
     h(HudFrame, args, {
       "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
-      "actor-right": () => (args.mode === "dialogue" ? sample("actor-right · 對話對象立繪", "background:#1a1d2099;") : null),
+      // In combat `actor-right` holds the foe line-up
+      // (webclient-combat-foes-on-stage), reaching left beyond its box.
+      "actor-right": () =>
+        args.mode === "dialogue"
+          ? sample("actor-right · 對話對象立繪", "background:#1a1d2099;")
+          : args.mode === "combat"
+            ? h(FoeLineup, { foes: foeParticipants(3), artPanel: { portrait_catalog: FOE_PORTRAIT_CATALOG } })
+            : null,
       // The dialogue choice list's card (webclient-dialogue-choices-overlay
       // D6): a sample of its height, centred in the `choices` anchor's span.
       choices: () =>
@@ -142,7 +151,8 @@ export const DialogueEnter = {
 };
 
 // Exploration <-> combat: the flash, the veil, and the command region's
-// content flipping to the combat root, then back.
+// content flipping to the combat root, with the foe line-up standing in
+// `actor-right` (its entrance is AppClient's), then back.
 export const CombatEnter = {
   render: renderModeLoop,
   args: { target: "combat", commandLineExpanded: false },

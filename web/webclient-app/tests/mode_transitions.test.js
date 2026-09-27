@@ -12,6 +12,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import { foeLineupSpan } from "../components/foe-lineup.js";
 import AppClient from "../AppClient.vue";
 import HudFrame from "../components/HudFrame.vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
@@ -137,7 +138,20 @@ describe("AppClient live mode changes", () => {
   }
 
   const stage = () => wrapper.get('[data-testid="elosern-stage"]');
-  const hosts = () => wrapper.findAll('[data-anchor="actor-right"] [data-testid="stage-actor"]');
+  // The host is actor-right's own child; the foe line-up's actors sit
+  // inside its row (webclient-combat-foes-on-stage).
+  const hosts = () => wrapper.findAll('[data-anchor="actor-right"] > [data-testid="stage-actor"]');
+  const lineups = () => wrapper.findAll('[data-anchor="actor-right"] > [data-testid="foe-lineup"]');
+  const clientRoot = () => wrapper.get('[data-testid="elosern-client-root"]').element;
+  const twoFoes = (defeatFirst = false) => ({
+    context_actions: fx.combatActions({
+      participants: [
+        { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: defeatFirst ? "defeated" : "active", hp_current: defeatFirst ? 0 : 40, hp_maximum: 60, portrait_ref: null },
+        { identity: 9, token: "e2", display_name: "盜賊頭目", team: "foes", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null },
+        { identity: 8, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
+      ],
+    }),
+  });
 
   it("the first snapshot sets no mode change; live changes name themselves", async () => {
     expect(stage().attributes("data-mode-change")).toBeUndefined();
@@ -243,6 +257,91 @@ describe("AppClient live mode changes", () => {
     expect(hosts()[0].classes()).toContain("actor-enter-enter-active");
     const list = wrapper.get('[data-anchor="choices"] [data-testid="dialogue-choices"]');
     expect(list.classes()).not.toContain("dialogue-choices--still");
+  });
+
+  it("a live entry into combat slides the foe line-up in; leaving fades it out inert", async () => {
+    // webclient-combat-foes-on-stage D3.
+    store.setMotionLevel("full");
+    await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    expect(lineups()).toHaveLength(1);
+    const row = lineups()[0];
+    expect(row.classes()).toContain("foes-enter-enter-active");
+    expect(row.findAll('[data-testid="foe-slot"]').map((s) => s.attributes("data-portrait-ref"))).toEqual(["", ""]);
+    // Party members never stand on the stage; the frame still lists them.
+    expect(row.text()).not.toContain("同行劍士");
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).not.toBe("0");
+
+    commit("exploration");
+    await nextTick();
+    const leaving = lineups();
+    expect(leaving).toHaveLength(1);
+    expect(leaving[0].element.inert).toBe(true);
+    expect(leaving[0].classes()).toContain("foes-enter-leave-active");
+    // The caption keeps clearing the row until the fade has ended.
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).not.toBe("0");
+  });
+
+  it("a foe defeated inside combat leaves the row inert while the other steps forward", async () => {
+    store.setMotionLevel("full");
+    await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    await nextTick();
+    const heldSpan = clientRoot().style.getPropertyValue("--foe-lineup-span");
+    commit("combat", twoFoes(true));
+    await nextTick();
+    // The caption keeps the two-foe room until the fallen foe has faded.
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(heldSpan);
+    const slots = lineups()[0].findAll('[data-testid="foe-slot"]');
+    const leaving = slots.filter((s) => s.element.inert);
+    expect(leaving).toHaveLength(1);
+    expect(leaving[0].classes()).toContain("foe-leave-active");
+    const staying = slots.filter((s) => !s.element.inert);
+    expect(staying).toHaveLength(1);
+    expect(staying[0].element.style.right).toBe("0%");
+    expect(lineups()[0].attributes("data-count")).toBe("1");
+    expect(wrapper.get('[data-testid="participant-frame"]').text()).toContain("已敗退");
+  });
+
+  it("a reconnect mid-combat mounts the line-up at rest", async () => {
+    store.setMotionLevel("full");
+    await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    await nextTick();
+    generation = 2;
+    store.beginTransport(generation);
+    await nextTick();
+    expect(lineups()).toHaveLength(0);
+    store.setConnected(true);
+    epoch = fx.EPOCH_B;
+    revision = 1;
+    commit("combat", twoFoes());
+    await nextTick();
+    expect(lineups()).toHaveLength(1);
+    expect(lineups()[0].classes()).not.toContain("foes-enter-enter-active");
+  });
+
+  it("at the off level the line-up comes and goes in the commit's frame", async () => {
+    store.setMotionLevel("off");
+    await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(String(foeLineupSpan(2)));
+    // A fallen foe leaves at once, and so does the room it held.
+    commit("combat", twoFoes(true));
+    await nextTick();
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe("1");
+    commit("combat", twoFoes());
+    await nextTick();
+    expect(lineups()).toHaveLength(1);
+    expect(lineups()[0].classes()).not.toContain("foes-enter-enter-active");
+    commit("exploration");
+    await nextTick();
+    expect(lineups()).toHaveLength(0);
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe("0");
   });
 
   it("at the off level the host has no CSS phase and goes in the commit's frame", async () => {

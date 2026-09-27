@@ -185,6 +185,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The dialogue stage actor (webclient-dialogue-stage-actors), the
     # standing portrait that wraps Core/ReferenceArtwork on the stage.
     "Core/StageActor",
+    # The foe line-up (webclient-combat-foes-on-stage), the combat foes
+    # standing opposite the player on the stage.
+    "Core/FoeLineup",
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",

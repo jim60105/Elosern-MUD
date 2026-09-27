@@ -5,7 +5,7 @@
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model). The behavior
 // groups live in ./composables/ (each watch stays with the state it mutates).
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { useAppClient } from "./composables/use-app-client.js";
 import AppShell from "./components/AppShell.vue";
@@ -44,6 +44,8 @@ import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
+import FoeLineup from "./components/FoeLineup.vue";
+import { FOE_LINEUP_MAX, activeFoes, foeLineupSpan, foeSlots } from "./components/foe-lineup.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
@@ -100,10 +102,52 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
 const hostTransitionCss = computed(
   () => store.view.motionLevel !== "off" && !modeHydrating.value,
 );
+// The foe line-up (webclient-combat-foes-on-stage D1/D3): the committed
+// combat panel's active foes, in presenter order, stand in `actor-right`
+// while the mode is combat. It enters and leaves on the same live-only rule
+// as the host (`hostTransitionCss`).
+const combatFoes = computed(() =>
+  contextActionsPanel.value?.kind === "combat" ? activeFoes(contextActionsPanel.value.participants) : [],
+);
+const foesOnStage = computed(() => store.view.mode === "combat" && combatFoes.value.length > 0);
+// How far the row reaches left of the anchor, in anchor widths, and its
+// front foe's scale (which sets the row's inset), exposed on the client root
+// as `--foe-lineup-span` and `--foe-front-scale` so the scene caption stays
+// clear of it (styles/app-shell.css). A row that grows takes its room at
+// once; a row that shrinks (a foe fell or fled) keeps its room until the
+// leaving foe has faded; and a row that leaves the stage keeps it until the
+// whole row has faded, so the caption never slides under a fading figure.
+const foeLineupCount = computed(() => (foesOnStage.value ? Math.min(combatFoes.value.length, FOE_LINEUP_MAX) : 0));
+const foeLineupReach = ref({ span: 0, front: 1 });
+function reachFor(count) {
+  return count > 0 ? { span: foeLineupSpan(count), front: foeSlots(count)[0].scale } : { span: 0, front: 1 };
+}
+watch(
+  foeLineupCount,
+  (count) => {
+    const next = reachFor(count);
+    if (count > 0 && next.span >= foeLineupReach.value.span) {
+      foeLineupReach.value = next;
+    }
+  },
+  { immediate: true },
+);
+function onFoeLineupSettled() {
+  foeLineupReach.value = reachFor(foeLineupCount.value);
+}
+function onFoeLineupGone() {
+  if (!foesOnStage.value) {
+    foeLineupReach.value = reachFor(0);
+  }
+}
 </script>
 
 <template>
-  <div class="elosern-root" data-testid="elosern-client-root">
+  <div
+    class="elosern-root"
+    data-testid="elosern-client-root"
+    :style="{ '--foe-lineup-span': foeLineupReach.span, '--foe-front-scale': foeLineupReach.front }"
+  >
       <AppShell
         ref="shellRef"
         :mode="store.view.mode || 'exploration'"
@@ -199,6 +243,24 @@ const hostTransitionCss = computed(
               :name="dialogueVM.host.displayName"
               :dimmed="store.view.dialogueSpeaker === 'player'"
               :motion-level="store.view.motionLevel"
+            />
+          </Transition>
+          <!-- The foe line-up (webclient-combat-foes-on-stage D1/D3): the
+               active foes stand opposite the player in combat. It slides in
+               as the combat flash releases on a live entry, fades on leaving
+               (inert), and mounts in place on a reload or reconnect. -->
+          <Transition
+            name="foes-enter"
+            :css="hostTransitionCss"
+            v-bind="inertWhileLeaving"
+            @after-leave="onFoeLineupGone"
+          >
+            <FoeLineup
+              v-if="foesOnStage"
+              :foes="combatFoes"
+              :art-panel="panel('art')"
+              :motion-level="store.view.motionLevel"
+              @settled="onFoeLineupSettled"
             />
           </Transition>
         </template>
@@ -601,6 +663,38 @@ const hostTransitionCss = computed(
 [data-anchor="actor-right"] > .actor-enter-leave-to {
   opacity: 0;
   transform: translateX(calc(var(--motion-shift-lg) * 1.5 * var(--motion-travel)));
+}
+
+/* The foe line-up's entrance (webclient-combat-foes-on-stage D3; AVG stage
+   design §9.3 "foes enter"): the row emerges as the combat flash releases —
+   it waits half the flash, then fades in while each foe decelerates in from
+   the right, the front foe travelling furthest (parallax). The row and its
+   foes share one duration and delay, so Vue, which times the transition on
+   the row alone, never ends a foe's slide early. Leaving combat, the row
+   fades while the foes drift a step back out. Every distance and the delay
+   scale with the travel and flash tokens, so `reduced` is a plain fade and
+   `off` has no CSS phase at all. */
+[data-anchor="actor-right"] > .foes-enter-enter-active {
+  transition: opacity var(--motion-actor) var(--ease-standard) calc(var(--motion-flash) * 0.5);
+}
+[data-anchor="actor-right"] > .foes-enter-enter-active > .foe-lineup__slot {
+  transition: transform var(--motion-actor) var(--ease-enter) calc(var(--motion-flash) * 0.5);
+}
+[data-anchor="actor-right"] > .foes-enter-enter-from > .foe-lineup__slot {
+  transform: translateX(calc(var(--motion-shift-lg) * (1.5 - 0.25 * var(--foe-index, 0)) * var(--motion-travel)));
+}
+[data-anchor="actor-right"] > .foes-enter-leave-active {
+  transition: opacity var(--motion-actor) var(--ease-exit);
+}
+[data-anchor="actor-right"] > .foes-enter-leave-active > .foe-lineup__slot {
+  transition: transform var(--motion-actor) var(--ease-exit);
+}
+[data-anchor="actor-right"] > .foes-enter-leave-to > .foe-lineup__slot {
+  transform: translateX(calc(var(--motion-shift-sm) * var(--motion-travel)));
+}
+[data-anchor="actor-right"] > .foes-enter-enter-from,
+[data-anchor="actor-right"] > .foes-enter-leave-to {
+  opacity: 0;
 }
 
 /* Carry the mount container's viewport height down to the shell so the
