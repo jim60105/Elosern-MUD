@@ -440,9 +440,10 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     expect(extractRule(frameCss, '.elosern-stage[data-beat-hold="combat"] .stage-combat-veil')).toContain(
       "opacity: 1;",
     );
-    // The pulse runs on unbroken across the flip (the same animation).
-    expect(extractRule(frameCss, '.elosern-stage[data-beat-hold="combat"] .stage-combat-veil::before')).toContain(
-      "elosern-combat-pulse var(--motion-pulse)",
+    // The pulse runs on unbroken across the flip: one rule serves both the
+    // combat mode and the hold, so its resolved value cannot drift apart.
+    expect(frameCss).toMatch(
+      /\.elosern-stage\[data-elosern-mode="combat"\] \.stage-combat-veil::before,\s*\.elosern-stage\[data-beat-hold="combat"\] \.stage-combat-veil::before\s*\{\s*animation: elosern-combat-pulse var\(--motion-pulse\)/,
     );
     // The release fades on the combat exit's own veil transition.
     expect(extractRule(frameCss, ".elosern-stage[data-mode-change] .stage-combat-veil")).toContain(

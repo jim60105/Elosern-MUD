@@ -174,6 +174,14 @@ describe("FoeLineup", () => {
       expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2"]);
     });
 
+    it("steps a fourth pre-round foe onto the stage once a front foe's defeat has played", async () => {
+      const round = [foe(1), foe(2), foe(3), foe(4)];
+      wrapper = mount(FoeLineup, { props: { foes: [foe(2), foe(3), foe(4)], stage: stage(round), artPanel: ART } });
+      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["1", "2", "3"]);
+      await wrapper.setProps({ stage: stage(round.slice(1)) });
+      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2", "3", "4"]);
+    });
+
     it("follows the displayed hit points on each gauge, with no numerals", async () => {
       wrapper = mount(FoeLineup, {
         props: {

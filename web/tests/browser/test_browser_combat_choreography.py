@@ -104,6 +104,11 @@ _SWALLOW_ACTIONS = """() => {
   };
 }"""
 
+# These scripts hand-build `ui_snapshot` / `ui_update` / `ui_action_result`
+# envelopes (the panel builders are the shared schema-valid ones). A change to
+# the envelope or the panel contract must be mirrored here: nothing else in
+# this file would fail as loudly as the reducer's rejection message.
+#
 # Commits one full snapshot, stamped from the live view, and waits a frame.
 _COMMIT = """async ([env]) => {
   const store = window.__elosernBridge.store;

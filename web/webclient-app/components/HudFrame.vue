@@ -250,18 +250,17 @@ defineExpose({ menuOpen });
 .elosern-stage[data-elosern-mode="combat"] .stage-combat-veil {
   opacity: 1;
 }
-.elosern-stage[data-elosern-mode="combat"] .stage-combat-veil::before {
-  animation: elosern-combat-pulse var(--motion-pulse) ease-in-out infinite;
-}
 /* The terminal-round hold (webclient-combat-beat-choreography D6): the
    round that ended the fight still plays in front of the combat stage, so
-   the veil keeps its combat opacity and its pulse (the same animation, so it
-   runs on unbroken across the mode flip) until the round ends; then it fades
-   out on the combat exit's own veil transition. The veil is decorative and
-   `aria-hidden`; nothing committed waits for it. */
+   the veil keeps its combat opacity and its pulse until the round ends; then
+   it fades out on the combat exit's own veil transition. The pulse is one
+   rule for both states, so its resolved value never changes across the mode
+   flip and the running animation continues unbroken. The veil is decorative
+   and `aria-hidden`; nothing committed waits for it. */
 .elosern-stage[data-beat-hold="combat"] .stage-combat-veil {
   opacity: 1;
 }
+.elosern-stage[data-elosern-mode="combat"] .stage-combat-veil::before,
 .elosern-stage[data-beat-hold="combat"] .stage-combat-veil::before {
   animation: elosern-combat-pulse var(--motion-pulse) ease-in-out infinite;
 }
