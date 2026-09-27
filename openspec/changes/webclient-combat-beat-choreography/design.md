@@ -90,7 +90,7 @@ The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key 
   - `gesture` (String or null)
   - `gestureKey` (String, `"<round>:<step>"`)
   - `floatAmount` (Number or null)
-- The template wraps the existing `actor-xfade` transition in `<div class="stage-actor__beat" :key="gesture ? gestureKey || gesture : 'rest'" :data-beat="gesture || null">`. Re-keying restarts a CSS animation cleanly for a new step, and a key of `rest` renders the idle state.
+- The template wraps the existing `actor-xfade` transition in `<div class="stage-actor__beat" :key="beatKey" :data-beat="gesture || null">`. `beatKey` is the step's `gestureKey` while a gesture plays. At rest it keeps the last gesture's key (`rest` before the first one), so the wrapper is re-keyed once per gesture and never just for a rest phase. Re-keying restarts a CSS animation cleanly for a new step, and dropping `data-beat` renders the idle state.
 - CSS, written against `[data-testid="stage-actor"]` as C11b D5 does:
   - `[data-beat="lunge"][data-side="left"]`: `animation: elosern-beat-lunge-right var(--motion-beat-step) var(--ease-standard) 1`. The right side uses `-left`, so both step toward the centre.
   - `[data-beat="hit"]`: `elosern-beat-hit var(--motion-beat-hit) linear 1`.

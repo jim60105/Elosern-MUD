@@ -284,6 +284,11 @@ function onFoeLineupGone() {
                active foes stand opposite the player in combat. It slides in
                as the combat flash releases on a live entry, fades on leaving
                (inert), and mounts in place on a reload or reconnect. -->
+          <!-- While the round that ended the fight is held
+               (webclient-combat-beat-choreography D6) the line-up is inert.
+               It is already mounted from combat when the hold begins; a
+               fresh mount would run `inertWhileLeaving`'s enter hook, which
+               clears `inert`, so the hold relies on that ordering. -->
           <Transition
             name="foes-enter"
             :css="hostTransitionCss"

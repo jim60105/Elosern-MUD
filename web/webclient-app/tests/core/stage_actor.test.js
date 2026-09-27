@@ -124,10 +124,17 @@ describe("StageActor", () => {
       await wrapper.setProps({ gestureKey: "s-1/1:2", floatAmount: 18 });
       expect(beat().element).not.toBe(first);
       expect(beat().attributes("data-beat")).toBe("hit");
-      // Back to rest.
+      // Back to rest: the attribute drops, and the wrapper (with the portrait
+      // inside it) is kept rather than remounted for the rest phase.
+      const hit = beat().element;
       await wrapper.setProps({ gesture: null, gestureKey: null, floatAmount: null });
       expect(beat().attributes("data-beat")).toBeUndefined();
+      expect(beat().element).toBe(hit);
       expect(wrapper.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
+      // The next gesture re-keys it again.
+      await wrapper.setProps({ gesture: "lunge", gestureKey: "s-1/1:4" });
+      expect(beat().element).not.toBe(hit);
+      expect(beat().attributes("data-beat")).toBe("lunge");
     });
 
     it("raises a decorative damage number on a hit only", async () => {

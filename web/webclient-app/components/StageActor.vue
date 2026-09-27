@@ -31,7 +31,7 @@
 // and distance is a motion token, so `reduced` keeps only the defeat fade
 // and `off` never plays one. Decorative: the number is `aria-hidden`, and
 // the beat's page and the numerals carry every value.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
@@ -81,6 +81,21 @@ const portraitKey = computed(() => {
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
+
+// The gesture wrapper's key (webclient-combat-beat-choreography D4): a new
+// step's gesture re-keys it, so the animation restarts. Returning to rest
+// keeps the last key: the finished animation simply drops with `data-beat`,
+// and the portrait inside is not remounted for the rest phase.
+const restKey = ref("rest");
+watch(
+  () => (props.gesture ? props.gestureKey || props.gesture : null),
+  (key) => {
+    if (key) {
+      restKey.value = key;
+    }
+  },
+);
+const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gesture : restKey.value));
 </script>
 
 <template>
@@ -91,7 +106,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
     :data-speaking="String(!dimmed)"
   >
     <div
-      :key="gesture ? gestureKey || gesture : 'rest'"
+      :key="beatKey"
       class="stage-actor__beat"
       :data-beat="gesture || null"
     >
