@@ -785,8 +785,8 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C11b | `webclient-scene-transitions` | visual | archived |
 | C11c | `webclient-mode-transitions` | visual | archived |
 | C12 | `combat-beats-panel` | logic | archived (server; parallel-safe) |
-| C13a | `webclient-combat-foes-on-stage` | visual | proposed |
-| C13b | `webclient-combat-beat-queue` | logic | proposed |
+| C13a | `webclient-combat-foes-on-stage` | visual | archived |
+| C13b | `webclient-combat-beat-queue` | logic | archived |
 | C13c | `webclient-combat-beat-choreography` | visual | proposed |
 
 Archive order: C1 → C2 → C3 → C4a → C4b → C4c → C5 → C6a → C6b → C6c → C7 →
