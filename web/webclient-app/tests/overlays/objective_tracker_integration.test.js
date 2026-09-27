@@ -159,6 +159,7 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
     );
     expect(w.find('[data-anchor="map"] [data-testid="participant-frame"]').exists()).toBe(true);
     expect(w.find('[data-anchor="actor-right"] [data-testid="participant-frame"]').exists()).toBe(false);
-    expect(w.get('[data-anchor="actor-right"]').element.children.length).toBe(0);
+    // The host Transition (webclient-mode-transitions D3) holds no actor.
+    expect(w.get('[data-anchor="actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
   });
 });

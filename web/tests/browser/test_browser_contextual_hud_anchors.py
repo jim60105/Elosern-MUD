@@ -22,6 +22,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
               return ids.map((id) => {
                 const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };
+                // The collapsed command region in dialogue is an inert,
+                // `visibility: hidden` layer over the band (webclient-mode-
+                // transitions): it occupies nothing a player can see or hit.
+                if (getComputedStyle(el).visibility === 'hidden') return { id, rect: null };
                 return { id, rect: el.getBoundingClientRect() };
               });
             }"""

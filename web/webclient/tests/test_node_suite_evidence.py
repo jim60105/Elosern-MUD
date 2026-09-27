@@ -962,5 +962,35 @@ class CombatBeatsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class ModeTransitionsEvidenceTest(unittest.TestCase):
+    """webclient-mode-transitions: the live mode-change signal, the inert
+    collapsed command region, the decorative flash and veil, the host's inert
+    exit, the reconnect that plays nothing, and the choice rows' stagger index
+    are DOM-state contracts jsdom can execute, so the Vitest file is their
+    evidence (the browser file covers computed durations and animations)."""
+
+    @covers_requirement("webclient-contextual-hud::mode-changes-transition-at-the-motion-level")
+    def test_mode_transitions_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/mode_transitions.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "mode-transitions Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

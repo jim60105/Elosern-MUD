@@ -94,7 +94,8 @@ describe("the stage actors in the portrait anchors", () => {
     expect(actorLeft.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
     // Exactly one stage portrait, and none left behind in the backdrop.
     expect(wrapper.findAll('[data-testid="elosern-stage"] [data-testid="reference-artwork"]')).toHaveLength(1);
-    expect(wrapper.get('[data-testid="anchor-actor-right"]').element.children).toHaveLength(0);
+    // The host Transition (webclient-mode-transitions D3) holds no actor.
+    expect(wrapper.get('[data-testid="anchor-actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
   });
 
   it("stands the host in actor-right from the catalog entry the committed key names, only in dialogue", async () => {
@@ -109,7 +110,8 @@ describe("the stage actors in the portrait anchors", () => {
 
     commit("exploration");
     await nextTick();
-    expect(wrapper.get('[data-testid="anchor-actor-right"]').element.children).toHaveLength(0);
+    // The host Transition (webclient-mode-transitions D3) holds no actor.
+    expect(wrapper.get('[data-testid="anchor-actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
   });
 
   it("falls back to the host's name placeholder when the key is null or names no entry", async () => {
