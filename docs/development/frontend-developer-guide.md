@@ -77,3 +77,20 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 ## 前端相關需求的可追溯性
 
 瀏覽器測試與最上層契約測試皆帶有 `@covers_requirement(...)` 標註（從 `tools.spec_traceability` 匯入）；請參閱 [`spec-test-traceability.md`](spec-test-traceability.md)。A2 閘門由 `tests/test_frontend_toolchain_contract.py`（pnpm 執行）、`tests/test_browser_verification_contract.py`（工作流程與靜態檢查）以及 `web/tests/browser/test_vue_foundation.py`（瀏覽器行為）所涵蓋。
+
+## Narrative palette showcase
+
+`Core/MessageWindow/NarrativeTones` renders the generated ANSI palette on the
+message-band gradient and opens the same markup in the real full-log overlay.
+Storybook imports `web/static/webclient/css/ansi_palette.css`; do not add a
+story-local palette. Regenerate that stylesheet with
+`uv run --locked python tools/gen_ansi_palette.py`.
+
+Foreground mapping uses twelve authored ANSI tones and an inward-rounded
+0.62 cube saturation cap before the existing paper contrast floor against
+`#141019`. Backgrounds remain raw. Hue/lightness preservation is a pre-floor
+invariant; the paper blend can shift both. The 3:1 floor does not establish
+WCAG AA for normal-sized grayscale/cube prose or arbitrary artwork behind
+the translucent band. Inspect both surfaces at their actual font sizes.
+The change's [verification record](../../openspec/changes/webclient-ansi-narrative-tones/design.md)
+includes measured contrast and the tested viewport/motion matrix.

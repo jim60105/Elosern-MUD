@@ -2,6 +2,7 @@ import { h } from "vue";
 import "../web/webclient-app/styles/tokens.css";
 import "../web/webclient-app/styles/fonts.css";
 import "../web/webclient-app/styles/app-shell.css";
+import "../web/static/webclient/css/ansi_palette.css";
 
 export const decorators = [
   (story, context) => ({

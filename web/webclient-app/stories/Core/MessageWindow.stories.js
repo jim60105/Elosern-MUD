@@ -1,5 +1,6 @@
 import { h, onMounted, ref } from "vue";
 import MessageWindow from "../../components/MessageWindow.vue";
+import FullLogOverlay from "../../components/FullLogOverlay.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
 import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
 
@@ -66,6 +67,7 @@ const bandRegion = (story, context) => ({
         style: {
           position: "relative",
           width: context?.args?.mode === "dialogue" ? "1920px" : "1280px",
+          maxWidth: "100vw",
           height: "300px",
           boxSizing: "border-box",
           padding: "10px 12px 12px 18px",
@@ -143,6 +145,52 @@ export default {
 export const SinglePage = {
   render: renderWindow,
   args: { lines: ARRIVAL, marks: [], textSpeed: "instant" },
+};
+
+// The same server-shaped markup through the real message and full-log
+// renderers. No local palette or renderer duplicates the generated CSS.
+const ANSI_PROSE = seqLines(1, [
+  ["out", '<span class="color-001">紅封蠟</span>　<span class="color-009">爐火微光</span>　' +
+    '<span class="color-002">苔蘚</span>　<span class="color-010">林間新葉</span><br>' +
+    '<span class="color-003">舊羊皮紙</span>　<span class="color-011">金色徽記</span>　' +
+    '<span class="color-004">暮色</span>　<span class="color-012">遠山</span><br>' +
+    '<span class="color-005">紫布</span>　<span class="color-013">晚霞</span>　' +
+    '<span class="color-006">河影</span>　<span class="color-014">晨霧</span><br>' +
+    '<span class="color-232">石階陰影</span>　<span class="color-244">灰色路標</span>　' +
+    '<span class="color-255">銀白月光</span>　<span class="color-011 blink">燈火</span>'],
+]);
+
+export const NarrativeTones = {
+  render: (args) => ({
+    setup() {
+      const open = ref(false);
+      const fullLog = ref(null);
+      return () => [
+        h(MessageWindow, { ...args, onOpenFullLog: () => { open.value = true; } }),
+        h("button", {
+          type: "button",
+          style: "position: absolute; right: 60px; bottom: 18px;",
+          onClick: () => { open.value = true; },
+        }, "完整日誌"),
+        open.value ? h(FullLogOverlay, {
+          ref: fullLog,
+          onVnodeMounted: () => fullLog.value?.focusSelf(),
+          lines: args.lines,
+          onClose: () => { open.value = false; },
+        }) : null,
+      ];
+    },
+  }),
+  args: { lines: ANSI_PROSE, marks: [], textSpeed: "instant" },
+  parameters: {
+    docs: {
+      description: {
+        story: "Authored normal/bright ANSI pairs, grayscale and blink on the actual band gradient. " +
+          "Open the full log to compare the same markup at normal text size. The 3:1 palette " +
+          "floor is not a claim of 4.5:1 normal-text WCAG AA for every grayscale/cube entry.",
+      },
+    },
+  },
 };
 
 // A long response that has just arrived: page 1 of several (▼). The window
