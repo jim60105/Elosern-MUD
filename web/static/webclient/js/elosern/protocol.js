@@ -36,6 +36,7 @@ var art = require("./protocol/panels/art.js");
 var titles = require("./protocol/panels/titles.js");
 var misc = require("./protocol/panels/misc.js");
 var exotic = require("./protocol/panels/exotic.js");
+var combat_beats = require("./protocol/panels/combat_beats.js");
 
 (function (root, factory) {
   "use strict";
@@ -226,6 +227,14 @@ var exotic = require("./protocol/panels/exotic.js");
     QUEST_LOG_SCHEMA_VERSION: C.QUEST_LOG_SCHEMA_VERSION,
     QUEST_LOG_MAX_ROWS: C.QUEST_LOG_MAX_ROWS,
     validateQuestLogPanel: misc.validateQuestLogPanel,
+    validateCombatBeatsPanel: combat_beats.validateCombatBeatsPanel,
+    COMBAT_BEATS_SCHEMA_VERSION: C.COMBAT_BEATS_SCHEMA_VERSION,
+    COMBAT_BEATS_MAX_BEATS: C.COMBAT_BEATS_MAX_BEATS,
+    COMBAT_BEATS_MAX_TEXT: C.COMBAT_BEATS_MAX_TEXT,
+    COMBAT_BEATS_MAX_ROUND: C.COMBAT_BEATS_MAX_ROUND,
+    COMBAT_BEATS_MAX_BYTES: C.COMBAT_BEATS_MAX_BYTES,
+    COMBAT_BEATS_MAX_REF: C.COMBAT_BEATS_MAX_REF,
+    COMBAT_BEATS_KINDS: C.COMBAT_BEATS_KINDS.slice(),
     PARTY_MAX_DISPLAY_NAME: C.PARTY_MAX_DISPLAY_NAME,
     validateCreationPanel: creation.validateCreationPanel,
     validateCreationPersona: creation.validateCreationPersona,

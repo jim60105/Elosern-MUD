@@ -15,6 +15,7 @@ from world.rules import combat
 from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
 from world.rules.action_preview import revalidate_submission
 from world.rules.combat import Battlefield, run_round
+from world.rules.combat_beats import RoundRecord, capture_round_hp
 from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
     _context_for,
@@ -352,6 +353,15 @@ def _submit_request(
     ``"overwhelm"`` compression is ``submit_opening_action()``. This body
     never consults ``classify_overwhelm()`` to choose; ``first_actor`` is
     forwarded to whichever entry the opening selects.
+
+    The ``"round"`` path also attaches the frozen
+    :class:`~world.rules.combat_beats.RoundRecord` of that round as
+    ``result["round_record"]`` (round and terminal results alike): the roster
+    identities, every participant's stored HP before the round and at its
+    committed end, the round's own event logs, and the round number. The
+    ``"overwhelm"`` opening is not one ordinary round and attaches nothing.
+    The slot is internal: the presentation layer reads it into the read
+    context and the result normalizer drops it before any send.
     """
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
@@ -402,7 +412,12 @@ def _submit_request(
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:
-                # The default: one ordinary round.
+                # The default: one ordinary round. It also records its own
+                # beats inputs (combat-beats-panel D1): the roster identities
+                # and every participant's stored HP before the round. The
+                # overwhelm opening is not one ordinary round and records
+                # nothing.
+                round_identities, round_hp_before = capture_round_hp(battlefield)
                 provider = _round_provider(actor, request, battlefield, record)
                 logs = run_round(
                     battlefield,
@@ -441,6 +456,14 @@ def _submit_request(
             notifications = _scan_friendly_fire(actor, battlefield, logs)
             notifications += _scan_sexual_coercion(actor, battlefield, logs)
             notifications += tuple(grant_notifications)
+
+            if opening == "round":
+                # The committed end-of-round HP (combat-beats-panel D1): read
+                # after the scans and before ``_continue_or_settle``, so a
+                # terminal settlement's regeneration, exam restoration, and
+                # defeat aftermath can never move the values the beats are
+                # checked against.
+                _, round_hp_after = capture_round_hp(battlefield)
 
             knocked = _knocked_out_ids(logs, battlefield)
             new_fled_ids = tuple(
@@ -507,6 +530,18 @@ def _submit_request(
             result = _continue_or_settle(
                 actor, new_record, battlefield, logs, notification_count=len(notifications)
             )
+            if opening == "round":
+                # Internal slot only: the dispatcher reads it into the
+                # presentation context and ``_normalize_result`` drops it, so
+                # it never reaches the wire (combat-beats-panel D2).
+                result["round_record"] = RoundRecord(
+                    session_id=record.session_id,
+                    number=new_record.rounds_elapsed,
+                    logs=tuple(logs),
+                    identities=round_identities,
+                    hp_before=round_hp_before,
+                    hp_after=round_hp_after,
+                )
     except Exception:
         # A defeat settled inside this transaction armed its undo; run it
         # BEFORE the round restore below so the pre-round values win (the

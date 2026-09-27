@@ -57,6 +57,7 @@ _PANEL_MODULES = (
     ("possession_banner", "possession_banner.py"),
     ("lore_codex", "lore_codex.py"),
     ("quest_log", "quest_log.py"),
+    ("combat_beats", "combat_beats.py"),
 )
 
 
@@ -174,6 +175,99 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "js PARTY_MAX_DISPLAY_NAME",
         )}
         self.assertEqual(len(names), 1, f"display-name bound drifted: {extracted}")
+
+    @covers_requirement(
+        "webclient-combat-beats::the-client-protocol-mirrors-the-combat-beats-schema",
+    )
+    def test_combat_beats_bounds_are_pinned(self):
+        # combat-beats-panel: the rules bounds, the panel's own byte budget and
+        # opaque-key bound, and the closed kind set are shared with the client
+        # mirror under the same dual-direction contract as every other panel's
+        # bounds.
+        rules_source = (REPO_ROOT / "world/rules/combat_beats.py").read_text(
+            encoding="utf-8"
+        )
+        presenter_source = (
+            REPO_ROOT / "web/webclient/presentation/combat_beats.py"
+        ).read_text(encoding="utf-8")
+        js_source = protocol_client_source()
+        numbers = {
+            "rules MAX_BEATS": re.search(
+                r"^MAX_BEATS\s*=\s*([0-9_]+)", rules_source, re.MULTILINE
+            ),
+            "rules MAX_BEAT_TEXT": re.search(
+                r"^MAX_BEAT_TEXT\s*=\s*([0-9_]+)", rules_source, re.MULTILINE
+            ),
+            "rules MAX_ROUND_ID": re.search(
+                r"^MAX_ROUND_ID\s*=\s*([0-9_]+)", rules_source, re.MULTILINE
+            ),
+            "presenter COMBAT_BEATS_MAX_BYTES": re.search(
+                r"^COMBAT_BEATS_MAX_BYTES\s*=\s*([0-9_]+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_BEAT_REF": re.search(
+                r"^MAX_BEAT_REF\s*=\s*([0-9_]+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "js COMBAT_BEATS_MAX_BEATS": re.search(
+                r"^var COMBAT_BEATS_MAX_BEATS\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js COMBAT_BEATS_MAX_TEXT": re.search(
+                r"^var COMBAT_BEATS_MAX_TEXT\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js COMBAT_BEATS_MAX_ROUND": re.search(
+                r"^var COMBAT_BEATS_MAX_ROUND\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js COMBAT_BEATS_MAX_BYTES": re.search(
+                r"^var COMBAT_BEATS_MAX_BYTES\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js COMBAT_BEATS_MAX_REF": re.search(
+                r"^var COMBAT_BEATS_MAX_REF\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+        }
+        self.assertNotIn(
+            None,
+            [match for match in numbers.values()],
+            {key: (match.group(1) if match else None) for key, match in numbers.items()},
+        )
+
+        def value(key):
+            return numbers[key].group(1).replace("_", "")
+
+        for python_key, js_key in (
+            ("rules MAX_BEATS", "js COMBAT_BEATS_MAX_BEATS"),
+            ("rules MAX_BEAT_TEXT", "js COMBAT_BEATS_MAX_TEXT"),
+            ("rules MAX_ROUND_ID", "js COMBAT_BEATS_MAX_ROUND"),
+            ("presenter COMBAT_BEATS_MAX_BYTES", "js COMBAT_BEATS_MAX_BYTES"),
+            ("presenter MAX_BEAT_REF", "js COMBAT_BEATS_MAX_REF"),
+        ):
+            self.assertEqual(
+                value(python_key), value(js_key), f"{python_key} drifted"
+            )
+        python_kinds = re.search(
+            r"^BEAT_KINDS\s*=\s*\((.*?)\)", rules_source, re.MULTILINE | re.DOTALL
+        )
+        js_kinds = re.search(
+            r"^var COMBAT_BEATS_KINDS\s*=\s*\[(.*?)\];", js_source, re.MULTILINE
+        )
+        self.assertIsNotNone(python_kinds, "rules BEAT_KINDS vanished")
+        self.assertIsNotNone(js_kinds, "js COMBAT_BEATS_KINDS vanished")
+        self.assertEqual(
+            re.findall(r'"([a-z_]+)"', python_kinds.group(1)),
+            re.findall(r'"([a-z_]+)"', js_kinds.group(1)),
+        )
 
     @staticmethod
     def _registry_reference(source, panel_name):

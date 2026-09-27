@@ -368,6 +368,19 @@ var QUEST_LOG_MAX_DETAIL = 512;
 var QUEST_LOG_MAX_REWARD_LINE = 128;
 var QUEST_LOG_MAX_TRACK_LABEL = 64;
 
+// combat_beats panel bounds (mirror of world.rules.combat_beats and
+// web.webclient.presentation.combat_beats, combat-beats-panel): the closed
+// beat-kind set, the beat/text/round bounds, the opaque decimal catalog-key
+// bound, and the panel's own canonical-JSON byte budget. These constants are
+// shared with the server through a dual-direction parity test.
+var COMBAT_BEATS_SCHEMA_VERSION = 1;
+var COMBAT_BEATS_MAX_BEATS = 64;
+var COMBAT_BEATS_MAX_TEXT = 256;
+var COMBAT_BEATS_MAX_ROUND = 160;
+var COMBAT_BEATS_MAX_BYTES = 12288;
+var COMBAT_BEATS_MAX_REF = 32;
+var COMBAT_BEATS_KINDS = ["roll", "damage", "target_defeated", "other"];
+
 // Dialogue panel bounds (mirror of web.webclient.presentation.dialogue,
 // webclient-align-10; schema version 2 adds the host's opaque art catalog
 // key — dialogue-panel-host-portrait): the choice cap mirrors
@@ -418,6 +431,7 @@ var PANEL_ALLOWLIST = {
   possession_banner: 1,
   lore_codex: 1,
   quest_log: 1,
+  combat_beats: 1,
 };
 
 var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -619,6 +633,13 @@ module.exports = {
   QUEST_LOG_MAX_DETAIL: QUEST_LOG_MAX_DETAIL,
   QUEST_LOG_MAX_REWARD_LINE: QUEST_LOG_MAX_REWARD_LINE,
   QUEST_LOG_MAX_TRACK_LABEL: QUEST_LOG_MAX_TRACK_LABEL,
+  COMBAT_BEATS_SCHEMA_VERSION: COMBAT_BEATS_SCHEMA_VERSION,
+  COMBAT_BEATS_MAX_BEATS: COMBAT_BEATS_MAX_BEATS,
+  COMBAT_BEATS_MAX_TEXT: COMBAT_BEATS_MAX_TEXT,
+  COMBAT_BEATS_MAX_ROUND: COMBAT_BEATS_MAX_ROUND,
+  COMBAT_BEATS_MAX_BYTES: COMBAT_BEATS_MAX_BYTES,
+  COMBAT_BEATS_MAX_REF: COMBAT_BEATS_MAX_REF,
+  COMBAT_BEATS_KINDS: COMBAT_BEATS_KINDS,
   DIALOGUE_SCHEMA_VERSION: DIALOGUE_SCHEMA_VERSION,
   DIALOGUE_MAX_CHOICES: DIALOGUE_MAX_CHOICES,
   DIALOGUE_MAX_KEYWORD_ID: DIALOGUE_MAX_KEYWORD_ID,

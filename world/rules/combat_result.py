@@ -56,6 +56,8 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
 # webclient-align-06: a settlement round can also advance a tracked quest
 # (DEFEAT planner), and the objectives panel always publishes together with
 # its paired services rows, so both ride the same partial update.
+# combat-beats-panel: an ordinary round also carries the ``combat_beats``
+# panel (the round's structured beats) in the same update as ``status``.
 AFFECTED_PANELS = (
     "status",
     "context_actions",
@@ -64,6 +66,7 @@ AFFECTED_PANELS = (
     "services",
     "objectives",
     "quest_log",
+    "combat_beats",
 )
 
 
@@ -82,6 +85,13 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
     services, local_map, status, context_actions, art) must be replaced with
     post-settlement canonical state. Non-terminal rounds keep the small
     four-panel update.
+
+    A success result that carries the completing action's frozen round record
+    (``result["round_record"]``, attached by the ordinary-round path of
+    ``_submit_request``) copies it into the INTERNAL slot ``combat_round``
+    (combat-beats-panel D2). The slot is not wire data: the dispatcher reads it
+    into the read-only presentation context and ``_normalize_result`` drops it,
+    so no result envelope ever carries a round record.
     """
     if result["outcome"] == "rejected":
         reason = result.get("reason")
@@ -93,19 +103,24 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
         )
         return {"outcome": "rejected", "code": code, "message": message}
     outcome = result["outcome"]
+    round_record = result.get("round_record")
     if outcome in _ROUND_CODES:
-        return {
+        oob = {
             "outcome": "success",
             "code": "round",
             "message": CONTINUE_MESSAGE,
             "affected_panels": AFFECTED_PANELS,
         }
-    return {
-        "outcome": "success",
-        "code": outcome,
-        "message": terminal_outcome_message(outcome),
-        "affected_panels": (),
-    }
+    else:
+        oob = {
+            "outcome": "success",
+            "code": outcome,
+            "message": terminal_outcome_message(outcome),
+            "affected_panels": (),
+        }
+    if round_record is not None:
+        oob["combat_round"] = round_record
+    return oob
 
 
 def emit_narrative(actor: Any, result: dict[str, Any]) -> None:

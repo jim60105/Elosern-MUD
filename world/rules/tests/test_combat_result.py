@@ -67,9 +67,27 @@ class CombatResultRenderingTests(unittest.TestCase):
                 "services",
                 "objectives",
                 "quest_log",
+                "combat_beats",
             ),
         )
         self.assertNotIn("logs", result)
+        self.assertNotIn("combat_round", result)
+
+    def test_oob_result_carries_the_internal_round_slot_only_when_present(self):
+        record = object()
+        for outcome in ("round", "victory"):
+            with self.subTest(outcome=outcome):
+                result = settle_to_oob_result(
+                    {"outcome": outcome, "round_record": record}
+                )
+                self.assertIs(result["combat_round"], record)
+        # No record on the facade result: no slot at all.
+        self.assertNotIn("combat_round", settle_to_oob_result({"outcome": "round"}))
+        # A rejected outcome never carries the slot, record or not.
+        rejected = settle_to_oob_result(
+            {"outcome": "rejected", "round_record": record}
+        )
+        self.assertNotIn("combat_round", rejected)
 
     def test_oob_terminal_result_declares_no_affected_panels(self):
         result = settle_to_oob_result({"outcome": "fled"})

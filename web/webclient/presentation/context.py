@@ -124,6 +124,11 @@ class PresentationContext:
             ``None``); the creation panel renders it as the optional
             ``proposal`` key only while the slot holds a proposal for the
             rendering puppet.
+        combat_round: The completing combat action's frozen ``RoundRecord``
+            (or ``None``). Only the dispatcher's completion publication for an
+            admitted action that settled an ordinary round supplies it; every
+            other publication path builds its context without one, so the
+            beats panel is available exactly once per settled round.
     """
 
     actor: Any
@@ -133,6 +138,7 @@ class PresentationContext:
     options_fingerprint: str | None = field(default=None)
     proposal: ProposalSnapshot | None = field(default=None)
     gallery_subject: str | None = field(default=None)
+    combat_round: Any = field(default=None)
 
 
 __all__ = [

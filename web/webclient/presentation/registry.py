@@ -163,6 +163,10 @@ def build_production_registry() -> PresentationRegistry:
         CHARACTER_SCHEMA_VERSION,
         character_presenter,
     )
+    from web.webclient.presentation.combat_beats import (
+        COMBAT_BEATS_SCHEMA_VERSION,
+        combat_beats_presenter,
+    )
     from web.webclient.presentation.combat_panel import (
         CONTEXT_ACTIONS_SCHEMA_VERSION,
         context_actions_presenter,
@@ -384,6 +388,16 @@ def build_production_registry() -> PresentationRegistry:
             # form (shared reason and semantics), not a bespoke reason.
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=quest_log_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="combat_beats",
+            schema_version=COMBAT_BEATS_SCHEMA_VERSION,
+            # The delta pins the panel to the registered COMMON unavailable
+            # form (shared reason and semantics), not a bespoke reason.
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=combat_beats_presenter,
         )
     )
     return registry

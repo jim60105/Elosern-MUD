@@ -81,7 +81,7 @@ A beat's `actor` / `target` is `portrait_catalog_key(dbref)` when the entry's ke
 ### D7. `hp_after`: damage-only projection with the knockout floor, checked
 For each participant, keep a running value that starts from `hp_before`. Each `damage` beat sets `hp = max(floor, hp - amount)`. The floor is 1 when the round contains a `target_knocked_out` entry naming that target, else 0. That beat's `hp_after` is the new value. Every non-damage beat has `hp_after: null` and `amount: null`.
 
-After the build, for every target of at least one `damage` beat, the last `hp_after` must equal the recorded end-of-round HP. Otherwise the build raises, and the presenter raises `PanelUnavailableError`, which yields the non-internal unavailable form and a `log_warn("combat_beats_hp_mismatch", context={...})` line.
+After the build, for every target of at least one `damage` beat, the last `hp_after` must equal the recorded end-of-round HP. Otherwise the build raises, and the presenter raises `PanelUnavailableError`, which yields the non-internal unavailable form and one `log_warn("combat_beats_unavailable", context={"char": ..., "reason": <bounded code>})` line — the mismatch arrives as the bounded reason code `hp_mismatch`, so one event covers every unavailable round while the reason stays exact.
 
 This check catches HP changes that carry no damage entry: `heal`, `self_heal`, drain `gauge_transfer`, `damage_divert`, silent unattributed upkeep ticks, and item heals. Those rounds fall back (design §10.2) and are never shown with wrong numbers.
 
