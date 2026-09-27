@@ -55,7 +55,11 @@ Alternative considered: the review's 45% cap. The theme's own gold accent is 61%
 
 ### D3. The band's ink is the floor's reference
 
-`INK` becomes `#141019`, the lighter end of the band's gradient, which is the worst case for contrast. The paper blend target stays `#ece7db`. Every current tone clears 3.0 against it without blending (D1 table).
+`INK` becomes `#141019`, the band's opaque ink reference. The paper blend
+target stays `#ece7db`. Every authored tone clears 3.0 against it without
+blending (D1 table). This reference is not a worst-case guarantee for the
+translucent upper gradient over arbitrary scene art; background composition
+remains outside this foreground-only change.
 
 
 
@@ -69,3 +73,74 @@ Alternative considered: the review's 45% cap. The theme's own gold accent is 61%
 ## Delivery boundary
 
 One engineer-day covers the named surface, focused regression work and visual smoke. The matrix explicitly assigns all report findings, including rejected suggested fixes. Keyboard and pointer behavior remain supported; no gamepad mapping is added because the current client has no gamepad contract. Reduced/off motion, truthful unavailable state and native browser zoom remain required.
+
+## Application verification (2026-09-28)
+
+The pure generator was executed with
+`uv run --locked python tools/gen_ansi_palette.py`; it wrote
+`web/static/webclient/css/ansi_palette.css`. Focused verification:
+
+| Command | Observed result |
+|---|---|
+| `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_ansi_palette` (Bash env `MUD_TEST_SETTINGS=1`) | 8 tests passed, 0.011s |
+| `pnpm exec vitest run web/webclient-app/tests/message_window.test.js web/webclient-app/tests/full_log_overlay.test.js web/webclient-app/tests/narrative_line_nodes.test.js` | 3 files, 41 tests passed |
+| `node --test web/static/webclient/js/tests/narrative_markup.test.js` | 20 tests passed |
+| `openspec validate webclient-ansi-narrative-tones --strict` | Change is valid |
+| `uv run --locked python -m tools.spec_traceability check` | 1722 requirements covered, 6740 associations, 0 uncovered, 0 errors |
+
+The traceability CLI has no capability filter; its static `check` is the
+available local gate, not the CI-only evidence verification. `list
+--json-output` supplied the existing canonical palette requirement identifier
+used by the substantive numerical tests. No test modules or browser methods
+were added/moved, so shard manifests are unchanged: the existing palette
+module belongs to `web.webclient.tests` in `webclient-evidence`.
+
+Storybook ran with `pnpm exec storybook dev -p 6011 --ci --no-open`.
+`agent-browser --session ansi-tones open
+'http://127.0.0.1:6011/iframe.html?id=core-messagewindow--narrative-tones&viewMode=story'`
+loaded the real MessageWindow and FullLogOverlay, with generated CSS imported
+by preview.js. `set viewport` and `screenshot` exercised 1280×720, 1440×900,
+and 1920×1080. The band text measured 20px, 23.337px, and 28.0044px; the full
+log measured 15.5px. Screenshots were inspected: normal/bright pairs remain
+distinct, gold is the accent, the dark grayscale is visibly dimmer, and all
+fixture text fits without page-level horizontal overflow. Clicking the log
+button focuses the dialog; Escape removes it and returns focus to the opener.
+The story now calls the overlay's existing `focusSelf` lifecycle, as the
+application does, rather than leaving its focus trap uninitialized.
+
+Computed foreground colors from the rendered full log yielded these ratios:
+
+| Entry | Band reference `#141019` | Full log `#0b0d10` |
+|---|---:|---:|
+| Normal red 001 (minimum chromatic tone) | 4.5656 | 4.7289 |
+| Bright red 009 | 6.3243 | 6.5506 |
+| Gold 011 | 11.5852 | 11.9998 |
+| Dark grayscale 232 | 3.1410 | 3.2534 |
+| Middle grayscale 244 | 4.7564 | 4.9266 |
+| Light grayscale 255 | 16.1910 | 16.7703 |
+
+All twelve chromatic entries exceed 4.5:1 on these references, including the
+normal-sized full-log text. The 3:1 contract for the complete cube/ramp is
+**not** WCAG AA for all normal-sized text. A deliberate white-backdrop probe
+of the existing translucent band sampled RGB(32,33,38) at screenshot
+coordinate (1000,65): red was 3.9052 and grayscale 232 was 2.6867 there.
+At (1000,138) the opaque `#141019` sample restored 4.5656 and 3.1410.
+Backdrop-independent legibility would require a separate band-compositing
+decision; this change neither changes backgrounds nor claims that guarantee.
+
+Browser `eval` on the actual `.blink` span reported `blink-animation` at
+`data-motion=full`; both `reduced` and `off` reported `animationName=none`,
+`textDecorationLine=underline`, `textDecorationStyle=dotted`.
+`agent-browser --session ansi-tones set media dark reduced-motion`, with the
+root attribute removed, also reported that same static indicator and a true
+OS media query. Existing committed browser tests
+`test_os_reduced_motion_resolves_to_reduced` and `test_motion_off_is_instant`
+retain computed-style regression coverage; the redundant CSS-source-string
+test was removed, and the standard cube level is covered numerically.
+Those managed browser tests were not run here; this local browser proof used
+Storybook and agent-browser, without building or booting the game server.
+
+The existing `core-messagewindow--oversize-map` story was also opened and
+visually inspected. All 17 rendered box-drawing rows measured x=54.90625 and
+width=211.640625 at 1920×1080, using the existing monospace map renderer;
+the page had no horizontal overflow. No renderer/font/map behavior changed.
