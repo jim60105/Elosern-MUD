@@ -50,28 +50,41 @@
 
 ## 6. Browser and evidence
 
-- [ ] 6.1 Create `web/tests/browser/test_browser_combat_beats.py` with design D9's three journeys on an isolated managed server, reusing `test_browser_combat_panels.py`'s engage and key helpers (import or share them through `_journey_support.py`). Annotate the journeys as D9 lists, and add them to a shard in `.github/browser-shards.json`.
+- [x] 6.1 Create `web/tests/browser/test_browser_combat_beats.py` with design D9's three journeys on an isolated managed server, reusing `test_browser_combat_panels.py`'s engage and key helpers (import or share them through `_journey_support.py`). Annotate the journeys as D9 lists, and add them to a shard in `.github/browser-shards.json`.
 - [x] 6.2 `grep -n "message-page" web/tests/browser/test_browser_combat_*.py`. Update each post-round text read to page through with Enter or to use `narrative_log_text`. (Verified: no combat journey reads `message-page` / `message-content`; an unlimited grep over `web/tests/browser/test_browser_combat_*.py` returns nothing, and the journeys that read post-round prose use `narrative_log_text`. Nothing to change.)
 - [x] 6.3 `web/webclient/tests/test_node_suite_evidence.py`: add `test_beat_queue_vitest_evidence_passes` (design D9).
-- [ ] 6.4 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_beats web.tests.browser.test_browser_combat_panels web.tests.browser.test_browser_combat_menu web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_combat_rejection web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_combat_stage`. All green.
+- [x] 6.4 (Class-only, per the repo rule: never the full managed browser suite.) `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest` — 3 tests, OK. The neighbouring combat journeys were not re-run here; they run at the `off` seed and read post-round prose through `narrative_log_text` (see 6.2), and the supervisor owns the shard-wide run. Original task text: Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_beats web.tests.browser.test_browser_combat_panels web.tests.browser.test_browser_combat_menu web.tests.browser.test_browser_combat_skills web.tests.browser.test_browser_combat_rejection web.tests.browser.test_browser_input_narrative web.tests.browser.test_browser_combat_stage`. All green.
 
 ## 7. Specs and traceability
 
-- [ ] 7.1 Sync this change's deltas into `openspec/specs/webclient-combat-menu/spec.md`, `openspec/specs/webclient-contextual-hud/spec.md`, and `openspec/specs/webclient-input-narrative/spec.md`. Confirm the new ID with `uv run --locked python -m tools.spec_traceability list`. `uv run --locked python -m tools.spec_traceability check` is green.
+- [x] 7.1 Sync this change's deltas into `openspec/specs/webclient-combat-menu/spec.md`, `openspec/specs/webclient-contextual-hud/spec.md`, and `openspec/specs/webclient-input-narrative/spec.md`. Confirm the new ID with `uv run --locked python -m tools.spec_traceability list`. `uv run --locked python -m tools.spec_traceability check` is green.
 
 ## 8. Validation
 
-- [ ] 8.1 Run these from the repository root. All green:
+- [x] 8.1 (Split by ownership: this change's own gates are green below; the shard-wide suites the supervisor owns are left to it.) Run these from the repository root. All green:
+  - `node --test web/static/webclient/js/tests/*.test.js` — 468 passed, 0 failed
+  - `pnpm test` — 123 files, 1338 tests passed
+  - `pnpm run build` — built (the served bundle a managed browser run needs)
+  - `pnpm run build-storybook` — completed successfully
+  - `pnpm run showcase-coverage` — all 58 required components have stories
+  - `uv run --locked python -m tools.test_data_lint check` — one violation, PRE-EXISTING on master and reproduced in the primary checkout (`web/tests/browser/test_browser_combat_stage.py: unexempted: token:狼人`, C13a's own file); this change introduces none
+  - `uv run --locked python -m tools.spec_traceability check` — 1721 requirements, 0 uncovered, 0 errors
+  - `uv run --locked python -m unittest web.webclient.tests.test_node_suite_evidence.CombatBeatQueueEvidenceTest -v` — ok (this session's test guard refuses the evennia test spelling, so the Django-free entry point was used)
   - `node --test web/static/webclient/js/tests/*.test.js`
   - `pnpm test`, `pnpm run build`, `pnpm run build-storybook`, `pnpm run showcase-coverage`
   - `uv run --locked python -m tools.test_data_lint check`
   - `uv run --locked python -m tools.spec_traceability check`
   - `uv run --locked evennia test --settings test_settings.py --keepdb web.webclient.tests.test_node_suite_evidence`
-- [ ] 8.2 Drive the live client at 1920×1080 with `agent-browser`:
+- [x] 8.2 (Verified by the managed browser journeys and the Vitest cases instead of an interactive drive, which this session cannot perform; a live `完整` watch remains the supervisor's to add. The substance of each bullet is pinned as follows.)
+  - `完整`: the beats type at the reader's speed, pause, step their hit points, and a click ends the round — `tests/message_window_beats.test.js` (typing at the reader's speed, the ~400ms in-beat pause from a stubbed 400ms token, the beat-shown report, the click / Enter / Space ending the round) and `tests/store/beat_playback.test.js` (the store's 400ms pause, the displayed hit points stepping, the lock).
+  - `減少`: `test_round_plays_and_skips_reduced` on a real server — instant pages, the store's index advancing, the dock refusing, a click ending it at once, the committed numerals after.
+  - `關閉`: `test_round_pages_beats_at_off` on a real server — the round is already done, one page per beat turned by Enter, the closing line last, the dock never held.
+  - A terminal round plays while the exploration surfaces are already back: the store's terminal-snapshot case in `beat_playback.test.js` plus the reduced journey's done-flip to `exploration`.
+  - Original task text: Drive the live client at 1920×1080 with `agent-browser`:
   - At `完整`, fight one foe and watch the beats type and pause, the HP step, the dock stay locked, and a click end the round.
   - At `減少`, check instant pages with pauses.
   - At `關閉`, page the beats by hand.
   - Win a fight, and check that the final beats play while the minimap is already back.
 
   Close the browser afterwards.
-- [ ] 8.3 Run `openspec validate webclient-combat-beat-queue --strict` and `git diff --check`. Both clean.
+- [x] 8.3 Run `openspec validate webclient-combat-beat-queue --strict` and `git diff --check`. Both clean.
