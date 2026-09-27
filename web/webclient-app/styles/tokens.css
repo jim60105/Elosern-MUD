@@ -410,22 +410,24 @@
   }
 }
 
-/* The damage number: rises from the figure and thins away. */
+/* The damage number: rises from the figure and thins away. `--float-x` is
+   the element's own horizontal anchor (StageActor leans it toward the stage
+   centre by side). */
 @keyframes elosern-beat-float {
   0% {
     opacity: 0;
-    transform: translate(-50%, 0) scale(0.92);
+    transform: translate(var(--float-x, -50%), 0) scale(0.92);
   }
   12% {
     opacity: 1;
-    transform: translate(-50%, calc(-0.12 * var(--motion-beat-rise) * var(--motion-travel))) scale(1);
+    transform: translate(var(--float-x, -50%), calc(-0.12 * var(--motion-beat-rise) * var(--motion-travel))) scale(1);
   }
   60% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, calc(-1 * var(--motion-beat-rise) * var(--motion-travel))) scale(1);
+    transform: translate(var(--float-x, -50%), calc(-1 * var(--motion-beat-rise) * var(--motion-travel))) scale(1);
   }
 }
 

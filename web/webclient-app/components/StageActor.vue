@@ -194,6 +194,15 @@ const transitionCss = computed(() => props.motionLevel !== "off");
   pointer-events: none;
   animation: elosern-beat-float var(--motion-beat-float) var(--ease-exit) 1 forwards;
 }
+/* The number leans toward the stage centre from the figure's face, so it
+   stays in the open stage and clear of the island column on the figure's
+   own side (the vitals on the left, the participant frame on the right). */
+.stage-actor[data-side="left"] > .stage-actor__float {
+  --float-x: -20%;
+}
+.stage-actor[data-side="right"] > .stage-actor__float {
+  --float-x: -80%;
+}
 
 /* The figure dissolves into the stage instead of ending in a rectangle (a
    generated portrait carries its own flat backdrop): an elliptical mask
