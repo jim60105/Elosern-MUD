@@ -779,10 +779,10 @@ server changes (C10a, C12) can run in parallel with the client chain.
 | C10a | `dialogue-panel-host-portrait` | logic | archived (server; parallel-safe) |
 | C10b | `webclient-dialogue-stage-actors` | visual | archived |
 | C10c | `webclient-dialogue-choices-overlay` | visual | archived |
-| C11a | `webclient-motion-level` | logic | proposed |
-| C11b | `webclient-scene-transitions` | visual | proposed |
+| C11a | `webclient-motion-level` | logic | archived |
+| C11b | `webclient-scene-transitions` | visual | archived |
 | C11c | `webclient-mode-transitions` | visual | proposed |
-| C12 | `combat-beats-panel` | logic | proposed (server; parallel-safe) |
+| C12 | `combat-beats-panel` | logic | archived (server; parallel-safe) |
 | C13a | `webclient-combat-foes-on-stage` | visual | proposed |
 | C13b | `webclient-combat-beat-queue` | logic | proposed |
 | C13c | `webclient-combat-beat-choreography` | visual | proposed |
