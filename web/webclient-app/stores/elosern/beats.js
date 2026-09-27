@@ -14,7 +14,14 @@
 // before the panel, so timing cannot bind it). A round seen in any other way
 // — a reconnect, a retained panel, another player's action — is never
 // presented, and no round is presented twice.
-import { beatReducer, displayHpFor, planRound } from "../../lib/beat_queue.js";
+import {
+  actMs,
+  beatHoldFor,
+  beatReducer,
+  displayHpFor,
+  planRound,
+  stageFor,
+} from "../../lib/beat_queue.js";
 import { readMotionMs } from "../../lib/motion_tokens.js";
 
 // The player's own actions a completed round can belong to (C12 D3).
@@ -26,7 +33,8 @@ export function applyBeats(ctx) {
   // The last (epoch, round) this client has seen, so a retained panel or a
   // replay never plays a round twice. Recorded even when nothing binds.
   ctx.lastBeatRound = { epoch: null, round: null };
-  // The single pending inter-beat pause timer.
+  // The single pending timer: the current step's act (its stage gesture,
+  // webclient-combat-beat-choreography D2) or its beat pause.
   let beatTimer = null;
 
   function clearBeatTimer() {
@@ -66,6 +74,18 @@ export function applyBeats(ctx) {
   // surfaces then read the committed values).
   ctx.displayHpView = function displayHpView() {
     return displayHpFor(ctx.beatState);
+  };
+
+  // The stage while a round plays (webclient-combat-beat-choreography D3):
+  // the gestures, the pre-round foes, and the defeated keys, or null.
+  ctx.beatStageView = function beatStageView() {
+    return stageFor(ctx.beatState);
+  };
+
+  // The terminal-round hold (D6): true while a round whose publication
+  // already committed another mode plays by itself.
+  ctx.beatHoldView = function beatHoldView() {
+    return beatHoldFor(ctx.beatState);
   };
 
   // A new transport generation or a detach ends the round without presenting
@@ -131,17 +151,38 @@ export function applyBeats(ctx) {
     }
     ctx.beatState = next;
     clearBeatTimer();
-    if (next.phase === "pause") {
-      // The wait is read when it starts, so a level change applies from the
-      // next wait, and a missing token resolves to 0 (never holds the lock).
-      beatTimer = setTimeout(() => {
-        beatTimer = null;
-        ctx.beatState = beatReducer(ctx.beatState, { type: "paused" });
-        ctx.publishView();
-      }, readMotionMs("--motion-beat"));
+    if (next.phase === "act") {
+      // The step's gesture plays; the pause starts once the longest one has
+      // played (D2). A step that plays none goes straight to its pause.
+      const wait = actMs(next, readMotionMs);
+      if (wait > 0) {
+        beatTimer = setTimeout(() => {
+          beatTimer = null;
+          ctx.beatState = beatReducer(ctx.beatState, { type: "acted" });
+          armPause();
+          ctx.publishView();
+        }, wait);
+      } else {
+        ctx.beatState = beatReducer(ctx.beatState, { type: "acted" });
+        armPause();
+      }
     }
     ctx.publishView();
   };
+
+  // Arms the beat pause once the state is in its pause phase. The wait is
+  // read when it starts, so a level change applies from the next wait, and a
+  // missing token resolves to 0 (never holds the lock).
+  function armPause() {
+    if (!ctx.beatState || ctx.beatState.phase !== "pause") {
+      return;
+    }
+    beatTimer = setTimeout(() => {
+      beatTimer = null;
+      ctx.beatState = beatReducer(ctx.beatState, { type: "paused" });
+      ctx.publishView();
+    }, readMotionMs("--motion-beat"));
+  }
 
   function endRound(type) {
     if (!ctx.beatState) {

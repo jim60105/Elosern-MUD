@@ -413,7 +413,8 @@
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round"
+        "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
+        "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest"
       ]
     }
   ]

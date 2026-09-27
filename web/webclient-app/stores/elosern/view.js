@@ -308,6 +308,13 @@ export function applyView(ctx) {
       // the committed values the moment the round ends.
       beatPlayback: ctx.beatPlaybackView(),
       displayHp: ctx.displayHpView(),
+      // The stage while the round plays (webclient-combat-beat-choreography
+      // D3): each step's gestures and the pre-round foes, null outside a
+      // round that plays by itself; and the terminal-round hold (D6), true
+      // while a round whose publication already committed another mode
+      // still plays.
+      beatStage: ctx.beatStageView(),
+      beatHold: ctx.beatHoldView(),
 
       // The live client-local toast queue (webclient-action-feedback D1): the
       // same reactive array reference on every publish; the reducer's

@@ -24,6 +24,11 @@ const LEVEL_TOKENS = [
   "--motion-base",
   "--motion-slow",
   "--motion-beat",
+  // The combat beat gestures (webclient-combat-beat-choreography design D1).
+  "--motion-beat-step",
+  "--motion-beat-hit",
+  "--motion-beat-float",
+  "--motion-beat-defeat",
   "--motion-pulse",
   "--motion-hp-pulse",
   "--motion-spin",
@@ -188,6 +193,17 @@ describe("motion tokens (webclient-motion-level)", () => {
       // the script reads it, so it is not a transition duration. Its `full`
       // and `reduced` value is 400ms and its `off` value is 0ms.
       "--motion-beat: 400ms;",
+      // The combat beat gestures and distances (webclient-combat-beat-
+      // choreography design D1) and the trail's 300ms delay (AVG stage
+      // design §10.2).
+      "--motion-beat-step: 240ms;",
+      "--motion-beat-hit: 180ms;",
+      "--motion-beat-float: 600ms;",
+      "--motion-beat-defeat: 350ms;",
+      "--motion-beat-lunge: 24px;",
+      "--motion-beat-shake: 6px;",
+      "--motion-beat-rise: 48px;",
+      "--motion-trail-delay: 300ms;",
       "--motion-travel: 1;",
       "--motion-shift-sm: 12px;",
       "--motion-shift-lg: 32px;",

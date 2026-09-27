@@ -54,7 +54,9 @@ portrait was before this requirement, with the truthful placeholder when no imag
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
 actor while the committed mode is `dialogue` and the committed `dialogue` panel is available, SHALL carry
 the foe line-up that "Foes stand opposite the player during combat" defines while the committed mode is
-`combat` and at least one foe is active, and SHALL carry no content in every other state. The foe
+`combat` and at least one foe is active, or while a round that ended the fight still plays as "Combat
+beats are choreographed on the stage at the motion level" defines, and SHALL carry no content in every
+other state. The foe
 line-up MAY extend leftward beyond the `actor-right` anchor's own box, within the bounds that
 requirement sets. Every stage actor follows "Stage actors present the player and the dialogue host with
 a speaking state". The portrait anchors are non-interactive art: they SHALL carry no
@@ -141,7 +143,11 @@ removed from rendering with `display:none` — never dimmed, never merely visual
 the accessibility tree and the tab order. The one exception is the band's command region in dialogue
 mode, which animates out as "The command region collapses in dialogue mode and the message window spans
 the band" defines: it leaves the accessibility tree, the tab order, and pointer hit-testing at the
-commit, and is `visibility: hidden` once its slide ends. The matrix SHALL be:
+commit, and is `visibility: hidden` once its slide ends. The second exception is the combat stage
+hold: while a round whose publication already committed another mode still plays, as "Combat beats are
+choreographed on the stage at the motion level" defines, the decorative combat veil and the foe line-up
+MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, until
+the round ends; every other surface follows the committed mode at the commit. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
@@ -154,7 +160,7 @@ commit, and is `visibility: hidden` once its slide ends. The matrix SHALL be:
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
 | player standing portrait (`actor-left`) | visible | visible | visible (dimmed while the host speaks) | hidden |
 | dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
-| foe line-up (`actor-right`, at most three active foes) | not rendered | while at least one foe is active | not rendered | not rendered |
+| foe line-up (`actor-right`, at most three active foes) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
 | action dock (band command region) | visible | visible | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
@@ -182,8 +188,10 @@ collapse the command line, so leaving creation never reveals an expanded row.
 - **THEN** the minimap island is absent from the DOM layout and from the tab order, and it is not merely dimmed, while the participant frame renders in the `map` anchor and the foe line-up renders in `actor-right`
 
 #### Scenario: The minimap returns on leaving combat
-- **WHEN** the committed mode changes from combat back to exploration
-- **THEN** the minimap island renders again with the committed `local_map` payload
+- **WHEN** the committed mode changes from combat back to exploration, including by a round whose beats
+  are still playing
+- **THEN** the minimap island renders again with the committed `local_map` payload at the commit, and any
+  held foe line-up or veil is inert and outside the accessibility tree
 
 #### Scenario: Focus is rescued before its surface is hidden
 - **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip when the incoming mode is dialogue
@@ -513,7 +521,8 @@ carry on the same revision. It SHALL NOT render any value that was not a previou
 that same gauge, where a displayed ratio comes only from the committed `status` or from a committed
 beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result,
 and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect.
-Its motion SHALL be token-gated so the reduced-motion block disables it.
+Its motion SHALL be token-gated so the reduced-motion block disables it. At the `full` motion level the
+trailing bar SHALL start following a drop 300ms after the fill moves.
 
 A vital at or below the client's display threshold SHALL be marked by both a recolour and an explicit
 text marker, never by the recolour alone.
@@ -1068,11 +1077,15 @@ intersect the player's stage actor.
 
 Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
 and for the beat presentation. Each foe SHALL carry a decorative hit-point gauge: a slim track centred
-under the figure on the scene caption's baseline, above the command-line row, filled to the committed
-`hp_current` over `hp_maximum`, with a trailing bar that follows a drop after the vitals' trail delay so
+under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current
+hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so
 the damage shows as a gap. The line-up is decorative art: it SHALL be hidden from assistive technology,
 SHALL carry no focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point
 numerals, or states, which remain the participant frame's.
+
+While a combat round plays by itself, the line-up SHALL stand the foes that were active before the round,
+in the presenter's order, and a foe SHALL leave it only when its own defeat beat plays; when the round
+ends, by itself or because the player ended it, the line-up SHALL stand the committed active foes.
 
 A live change of the committed mode into `combat` SHALL bring the line-up in: after half the flash's
 duration it SHALL fade in over the actor duration of the client's motion level (350ms at `full`) while
@@ -1108,9 +1121,11 @@ element that contains it.
   and neither the gauge nor the line-up states a numeral
 
 #### Scenario: Only active foes stand on the stage
-- **WHEN** a committed update changes the first of two foes to defeated
-- **THEN** that foe's stage actor fades out and is inert while it leaves, the other foe glides to the front
-  place, and the participant frame still lists the defeated foe with its text marker
+- **WHEN** a committed update that carries no playable round changes the first of two foes to defeated,
+  and later a playing round defeats the other foe
+- **THEN** the first foe's stage actor fades out at the commit and is inert while it leaves, the other
+  foe glides to the front place, the second foe stays on the stage until its defeat beat plays, and the
+  participant frame still lists both defeated foes with their text markers
 
 #### Scenario: A missing portrait shows the truthful placeholder
 - **WHEN** an active foe's portrait reference is `null`, and another's names no catalog entry
@@ -2600,3 +2615,73 @@ SHALL render its final state in the commit's frame.
 - **THEN** in the commit's frame each surface holds its final state: the command region hidden or
   shown, the host present or absent, the veil at its final opacity, the flash invisible, and every
   choice row fully shown
+
+### Requirement: Combat beats are choreographed on the stage at the motion level
+While a combat round plays by itself, as `webclient-combat-menu` "A combat round plays beat by beat"
+defines, each beat SHALL play one stage gesture once its page is fully shown, on the stage actors that the
+beat names and that stand on the stage (the player in `actor-left`, a foe in the foe line-up), taking every
+duration and distance from the client's motion tokens:
+- **The first beat of each action:** the acting stage actor steps 24px toward the stage's centre and back
+  within 240ms.
+- **`damage`:** the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a
+  decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points
+  move to the beat's `hp_after` as the gesture starts, in the vitals or the foe's gauge and in the
+  participant frame, with the trailing bar following.
+- **`target_defeated`:** a foe's stage actor fades and drops out of the line-up. The player's stage actor
+  never leaves the stage.
+- **`roll` and `other`:** no gesture.
+
+The next beat's pause SHALL start when the gesture has played. A beat that names a participant with no
+stage actor (a party member other than the player, or a foe beyond the third) SHALL play no gesture. The
+gestures, the rising number, and the flash SHALL be decorative: absent from the accessibility tree,
+never intercepting a pointer, and never the only carrier of any value, which the beat's page and the
+numerals already state.
+
+When the round's publication has already committed a mode other than `combat` (the round that ends the
+fight), the combat veil SHALL stay at its combat opacity and the foe line-up SHALL stay on the stage,
+inert, while the round plays by itself; when the round ends, by itself or because the player ended it,
+the veil SHALL fade out and the line-up SHALL leave as a live change out of combat does. The mode
+attribute, every mode-gated surface, the command region's content, focus, and the accessibility tree
+SHALL follow the committed mode at the commit, and the committed flash and flip SHALL play at the commit
+as "Mode changes transition at the motion level" defines.
+
+At `reduced`, no step, shake, flash, rise, or drop SHALL move or brighten anything; a defeated foe SHALL
+only fade, within 150ms, and the pauses SHALL be kept. At `off`, no round plays by itself, so no gesture
+and no stage hold SHALL occur.
+
+#### Scenario: The actor steps and the target reacts
+- **WHEN** the effective level is `full` and a playing round shows the player's roll beat and then its
+  damage beat on a foe on the stage
+- **THEN** the player's stage actor plays one 240ms step toward the centre on the roll beat, and on the
+  damage beat the foe's stage actor plays one 180ms shake with a flash, a number naming the damage rises
+  from it over 600ms, and the foe's gauge and frame numerals move to the beat's `hp_after`
+
+#### Scenario: The trailing bar follows 300ms later
+- **WHEN** the effective level is `full` and a damage beat lowers the player's displayed hit points
+- **THEN** the vitals fill moves at once and the trailing bar starts following 300ms later
+
+#### Scenario: A defeated foe drops out on its own beat
+- **WHEN** the effective level is `full` and a playing round's defeat beat names a foe on the stage
+- **THEN** that foe stays on the stage until the defeat beat plays, then fades and drops out and is inert
+  while it leaves
+
+#### Scenario: The round that ends the fight plays in front of the combat stage
+- **WHEN** the effective level is `reduced` and an accepted attack defeats the last foe, committing mode
+  `exploration`
+- **THEN** in the commit's frame the stage's mode attribute is `exploration` and the minimap is visible,
+  while the combat veil keeps its combat opacity and the foe line-up stays on the stage, inert, until the
+  round's beats have played, after which the veil fades out and the line-up leaves
+
+#### Scenario: Ending the round releases the stage
+- **WHEN** a round that ended the fight is playing and the player clicks the message window
+- **THEN** the veil starts fading out and the foe line-up leaves at once
+
+#### Scenario: Reduced keeps the rhythm without motion
+- **WHEN** the effective level is `reduced` and a round with a roll, a damage, and a defeat beat plays
+- **THEN** no stage actor translates, shakes, or brightens, no number rises, the defeated foe only fades
+  within 150ms, and each beat still follows the 400ms pause
+
+#### Scenario: Off plays no gesture and holds nothing
+- **WHEN** the effective level is `off` and an accepted attack defeats the last foe
+- **THEN** no gesture plays, the combat veil and the foe line-up are gone in the commit's frame, and the
+  round's beats are read as text pages

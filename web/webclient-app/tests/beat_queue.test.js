@@ -207,12 +207,16 @@ describe("beatReducer (design D4)", () => {
     expect(beatReducer(null, { type: "start", plan: null })).toBeNull();
   });
 
-  it("walks text -> pause -> next text and ends done after the last beat", () => {
+  it("walks text -> act -> pause -> next text and ends done after the last beat", () => {
     let state = beatReducer(null, { type: "start", plan: plan() });
     for (let index = 0; index < 4; index += 1) {
       expect(state.phase).toBe("text");
       expect(state.index).toBe(index);
       state = stepTo(state, { type: "shown", index });
+      // The step's stage gesture plays before its pause
+      // (webclient-combat-beat-choreography D2).
+      expect(state.phase).toBe("act");
+      state = stepTo(state, { type: "acted" });
       expect(state.phase).toBe("pause");
       state = stepTo(state, { type: "paused" });
     }
@@ -223,17 +227,26 @@ describe("beatReducer (design D4)", () => {
   it("ignores a stale or out-of-order shown", () => {
     const state = beatReducer(null, { type: "start", plan: plan() });
     expect(stepTo(state, { type: "shown", index: 2 })).toBe(state);
-    const paused = stepTo(state, { type: "shown", index: 0 });
-    expect(paused.phase).toBe("pause");
-    // A second shown for the same beat, and a paused while not pausing.
-    expect(stepTo(paused, { type: "shown", index: 0 })).toBe(paused);
+    const acting = stepTo(state, { type: "shown", index: 0 });
+    expect(acting.phase).toBe("act");
+    // A second shown for the same beat, a paused while acting, and an acted
+    // or a paused while not in that phase.
+    expect(stepTo(acting, { type: "shown", index: 0 })).toBe(acting);
+    expect(stepTo(acting, { type: "paused" })).toBe(acting);
+    expect(stepTo(state, { type: "acted" })).toBe(state);
     expect(stepTo(state, { type: "paused" })).toBe(state);
+    const paused = stepTo(acting, { type: "acted" });
+    expect(paused.phase).toBe("pause");
+    expect(stepTo(paused, { type: "acted" })).toBe(paused);
   });
 
   it("skips and flushes from every phase and is idempotent", () => {
     const phases = [
       beatReducer(null, { type: "start", plan: plan() }), // text
-      beatReducer(beatReducer(null, { type: "start", plan: plan() }), { type: "shown", index: 0 }), // pause
+      beatReducer(beatReducer(null, { type: "start", plan: plan() }), { type: "shown", index: 0 }), // act
+      beatReducer(beatReducer(beatReducer(null, { type: "start", plan: plan() }), { type: "shown", index: 0 }), {
+        type: "acted",
+      }), // pause
       beatReducer(null, { type: "start", plan: plan(undefined, { level: "off" }) }), // done
     ];
     for (const state of phases) {
@@ -265,9 +278,15 @@ describe("displayHpFor (design D3)", () => {
     expect(displayHpFor(state)).toEqual({ "3": 30 });
     state = beatReducer(state, { type: "shown", index: 0 }); // roll: no damage
     expect(displayHpFor(state)).toEqual({ "3": 30 });
+    state = beatReducer(state, { type: "acted" });
     state = beatReducer(state, { type: "paused" });
     expect(displayHpFor(state)).toEqual({ "3": 30 });
+    // The damage applies as its act starts (webclient-combat-beat-
+    // choreography D2), so the gauge and the fill move with the shake.
     state = beatReducer(state, { type: "shown", index: 1 }); // 30 -> 18
+    expect(state.phase).toBe("act");
+    expect(displayHpFor(state)).toEqual({ "3": 18 });
+    state = beatReducer(state, { type: "acted" });
     expect(displayHpFor(state)).toEqual({ "3": 18 });
     state = beatReducer(state, { type: "paused" });
     expect(displayHpFor(state)).toEqual({ "3": 18 });

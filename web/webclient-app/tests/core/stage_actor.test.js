@@ -98,4 +98,76 @@ describe("StageActor", () => {
     wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "灰婆婆" } });
     expect(wrapper.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
   });
+
+  // webclient-combat-beat-choreography (design D4): the combat beat gestures.
+  describe("beat gestures", () => {
+    const beat = () => wrapper.get('[data-testid="stage-actor"] > .stage-actor__beat');
+
+    it("renders the rest state with no gesture", () => {
+      wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, side: "right" } });
+      expect(beat().attributes("data-beat")).toBeUndefined();
+      expect(wrapper.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
+      // The portrait still stands inside the wrapper.
+      expect(beat().find('[data-testid="reference-artwork"] img').exists()).toBe(true);
+    });
+
+    it("re-keys the gesture wrapper per step, so the same gesture restarts", async () => {
+      wrapper = mount(StageActor, {
+        props: { portrait: HOST_ENTRY, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
+      });
+      const first = beat().element;
+      expect(beat().attributes("data-beat")).toBe("hit");
+      // The same step keeps its element (the animation runs once).
+      await wrapper.setProps({ floatAmount: 12 });
+      expect(beat().element).toBe(first);
+      // The next step's hit on the same figure is a new element.
+      await wrapper.setProps({ gestureKey: "s-1/1:2", floatAmount: 18 });
+      expect(beat().element).not.toBe(first);
+      expect(beat().attributes("data-beat")).toBe("hit");
+      // Back to rest: the attribute drops, and the wrapper (with the portrait
+      // inside it) is kept rather than remounted for the rest phase.
+      const hit = beat().element;
+      await wrapper.setProps({ gesture: null, gestureKey: null, floatAmount: null });
+      expect(beat().attributes("data-beat")).toBeUndefined();
+      expect(beat().element).toBe(hit);
+      expect(wrapper.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
+      // The next gesture re-keys it again.
+      await wrapper.setProps({ gesture: "lunge", gestureKey: "s-1/1:4" });
+      expect(beat().element).not.toBe(hit);
+      expect(beat().attributes("data-beat")).toBe("lunge");
+    });
+
+    it("raises a decorative damage number on a hit only", async () => {
+      wrapper = mount(StageActor, {
+        props: { portrait: HOST_ENTRY, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
+      });
+      const float = wrapper.get('[data-testid="stage-actor-float"]');
+      expect(float.text()).toBe("−12");
+      expect(float.attributes("aria-hidden")).toBe("true");
+      await wrapper.setProps({ gesture: "lunge" });
+      expect(wrapper.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
+      expect(wrapper.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
+    });
+
+    it("steps toward the centre by side and takes every duration from the beat tokens", () => {
+      const source = readFileSync(join(APP_ROOT, "components/StageActor.vue"), "utf-8");
+      const rule = (selector) => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const match = source.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
+        return match ? match[1] : "";
+      };
+      expect(rule('.stage-actor[data-side="left"] > [data-beat="lunge"]')).toContain(
+        "elosern-beat-lunge-right var(--motion-beat-step)",
+      );
+      expect(rule('.stage-actor[data-side="right"] > [data-beat="lunge"]')).toContain(
+        "elosern-beat-lunge-left var(--motion-beat-step)",
+      );
+      expect(rule('.stage-actor > [data-beat="hit"]')).toContain("elosern-beat-hit var(--motion-beat-hit)");
+      expect(rule('.stage-actor > [data-beat="defeat"]')).toMatch(
+        /elosern-beat-defeat var\(--motion-beat-defeat\)[^;]*forwards/,
+      );
+      expect(rule(".stage-actor__float")).toMatch(/elosern-beat-float var\(--motion-beat-float\)[^;]*forwards/);
+      expect(rule(".stage-actor__float")).toContain("pointer-events: none");
+    });
+  });
 });

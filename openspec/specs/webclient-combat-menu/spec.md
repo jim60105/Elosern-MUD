@@ -301,8 +301,10 @@ event lines in that response's pages: the response's first lines, one per event 
 not paged again, and every later line of the response (the round's closing line, a fight's outcome and
 aftermath) SHALL follow the beat pages as ordinary pages. The log keeps every line unchanged. While the
 effective motion level is `full` or `reduced`, the round SHALL play by itself: each beat page is revealed
-at the reader's text speed (instant below `full`), and once it is fully shown the next beat follows after
-the beat pause of the client's motion tokens (400ms at `full` and at `reduced`). At `off`, the round SHALL
+at the reader's text speed (instant below `full`); once it is fully shown, the beat's stage gesture plays
+as `webclient-contextual-hud` "Combat beats are choreographed on the stage at the motion level" defines,
+and the next beat follows after that gesture and the beat pause of the client's motion tokens (400ms at
+`full` and at `reduced`). At `off`, the round SHALL
 NOT play by itself: its beat pages and the following pages are ordinary pages the reader turns, and
 presentation of the round ends at once.
 
