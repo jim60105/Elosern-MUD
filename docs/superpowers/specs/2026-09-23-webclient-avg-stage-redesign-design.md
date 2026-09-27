@@ -2,7 +2,8 @@
 
 Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
 the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
-line-up geometry, §10.2)
+line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
+follow-up series, §16)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -794,3 +795,58 @@ C8a → C8b → C8c → C9a → C9b → C10a → C10b → C10c → C11a → C11b
 The "component first, swap second" pairs (C6b/C6c, C8a/C8b) follow the
 showcase rule that a component is never wired into the live application
 before its story exists.
+
+## 16. Aesthetic follow-up series (proposed 2026-09-28)
+
+A UI/UX review of the shipped AVG shell (live client and Storybook at the
+acceptance viewports, plus 2560×1440) produced 57 findings, dispositioned with
+owners in `openspec/changes/webclient-type-scale-tokens/review-plan.md`. The
+follow-up work is proposed as 19 one-engineer-day OpenSpec changes, all
+proposal-only and strict-validated, committed on master. Queue 1–3 are
+parallel-safe; the rest form one serial chain (shared `AppClient.vue`,
+`AppShell.vue`, `styles/app-shell.css`, `styles/tokens.css`, stories, and the
+same main-spec files). Each proposal carries its own `depends-on` line. The
+queue is the apply order.
+
+| # | Change | Profile | Depends on |
+|---|---|---|---|
+| A1 | `webclient-ansi-narrative-tones` | logic | none |
+| A2 | `art-default-portraits-transparent` | logic + asset generation | none |
+| A3 | `webclient-type-scale-tokens` | visual | none |
+| A4 | `webclient-stage-caption-and-hold-backdrop` | logic | A3 |
+| A5 | `webclient-stage-actor-grounding` | visual | A4, A2 |
+| A6 | `webclient-combat-participant-polish` | visual | A5 |
+| A7 | `webclient-band-material-pass` | visual | A6 |
+| A8 | `webclient-message-typesetting` | visual | A7, A1 |
+| A9 | `webclient-combat-command-window` | visual | A8 (amends the §7 combat-root horizontal tab-bar presentation to a vertical command list; the resolver hierarchy, keys, and confirmation routes are unchanged) |
+| A10 | `webclient-drawer-frame-unification` | visual | A9 |
+| A11 | `webclient-drawer-content-polish` | visual | A10 |
+| A12 | `webclient-map-legibility` | visual | A11 |
+| A13 | `webclient-chrome-navigation-polish` | visual | A12 |
+| A14 | `webclient-settings-reading-preview` | visual | A13 |
+| A15 | `webclient-full-log-frame` | visual | A14 |
+| A16 | `webclient-zh-tw-copy-and-labels` | logic | A15 |
+| A17 | `webclient-creation-display-labels` | logic | A16 |
+| A18 | `webclient-creation-screen-redesign` | visual | A17 |
+| A19 | `webclient-proportional-ui-scale` | visual | A18 (implements decision 2's proportional 2560×1440 scaling as one chrome factor above the 1080px reference, without double-scaling vh-derived prose or stage art) |
+
+Standing notes:
+
+- A2 regenerates the six committed default portraits through the existing
+  runtime seams (`SDWebUIClient.generate` on the `prompts/art.yaml` portrait
+  prompts → `world/art/cutout.remove_background` → `world.art.formats.encode`)
+  via a one-shot tool; the permissive `isnet-anime` cutout model is pinned for
+  the committed output, and `FALLBACK_FACE_RECTS` is re-authored against the
+  new pixels. No runtime pipeline change.
+- A9 deliberately amends the current horizontal combat-root contracts
+  (`webclient-combat-menu`, `webclient-contextual-hud`,
+  `webclient-pointer-activation`); the approved keyboard hierarchy of the
+  combat design stands, only the root's presentation reverses.
+- The terminal-hold backdrop finding is recorded as an observation with a
+  source-supported hypothesis; A4 keeps combat decoration through terminal
+  playback without ever freezing canonical scene identity (§10.2's hold rule
+  is unchanged in intent).
+- The whole batch passed one rubber-duck critique before the commits; its
+  blocking findings (orphaned combat-root contracts, the two local-map delta
+  scenario restorations, and the 2560-scaling viewport qualifications) are
+  applied in the artifacts.
