@@ -160,6 +160,8 @@ describe("FoeLineup", () => {
       expect(style.bottom).toBe(`${geometry[index].lift * 100}%`);
       expect(Number(style.zIndex)).toBe(3 - index);
       expect(style.getPropertyValue("--foe-index")).toBe(String(index));
+      // Every foe but the rearmost casts the depth shadow on the one behind.
+      expect(slot.classes("foe-lineup__slot--before")).toBe(index < 2);
     });
     expect(wrapper.get('[data-testid="foe-lineup"]').element.style.getPropertyValue("--foe-front-scale")).toBe(
       String(geometry[0].scale),
@@ -178,6 +180,7 @@ describe("FoeLineup", () => {
     expect(leaving.isConnected).toBe(true);
     expect(leaving.inert).toBe(true);
     expect(leaving.classList.contains("foe-leave-active")).toBe(true);
+    expect(wrapper.emitted("settled")).toBeUndefined();
     // The remaining foe re-slots into the front place.
     const remaining = wrapper.findAll('[data-testid="foe-slot"]').filter((s) => !s.element.inert);
     expect(remaining).toHaveLength(1);
@@ -194,6 +197,9 @@ describe("FoeLineup", () => {
     await wrapper.setProps({ foes: [foe(2)] });
     await nextTick();
     expect(slots()).toHaveLength(1);
+    // The leave has settled, and the row says so.
+    expect(wrapper.emitted("settled")).toHaveLength(1);
+    expect(slots()[0].classes("foe-lineup__slot--before")).toBe(false);
   });
 
   it("names every duration through the motion tokens and never FLIPs the re-slotting", () => {
@@ -203,6 +209,16 @@ describe("FoeLineup", () => {
     expect(slotRule).toContain("right calc(var(--motion-actor) * var(--motion-travel))");
     expect(slotRule).toContain("height calc(var(--motion-actor) * var(--motion-travel))");
     expect(slotRule).not.toMatch(/transition:[^;]*transform/);
+    // The trailing bar lags the fill on the vitals' own trail tokens (the
+    // bar shares its box rule with the fill, so every rule the selector opens
+    // is read, not just the first, and only a rule it opens counts).
+    const rulesFor = (pattern) => [...source.matchAll(pattern)].map((match) => match[0]).join("\n");
+    expect(rulesFor(/(?:^|\})\s*\.foe-lineup__ghost \{[^}]*\}/g)).toContain(
+      "transition: width var(--motion-trail) ease var(--motion-trail-delay);",
+    );
+    expect(rulesFor(/(?:^|\})\s*\.foe-lineup__fill \{[^}]*\}/g)).toContain(
+      "transition: width var(--motion-slow) var(--ease-standard);",
+    );
   });
 });
 

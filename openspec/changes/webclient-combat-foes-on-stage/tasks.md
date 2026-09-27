@@ -11,7 +11,7 @@
 
 - [x] 2.1 Create `web/webclient-app/components/foe-lineup.js` (the scales, the exposed share, the lift, `foeSlots`, `foeLineupSpan`, `activeFoes`, `foeHpPercent`) and `web/webclient-app/components/FoeLineup.vue` per design D1–D3 and D5:
   - the `foes`, `artPanel`, and `motionLevel` props, the cap of three, and `entryFor`
-  - the `TransitionGroup name="foe"` with `:css="motionLevel !== 'off'"`, bound to `inertWhileLeaving`
+  - the `TransitionGroup name="foe"` with `:css="motionLevel !== 'off'"`, bound to `inertWhileLeaving`, emitting `settled` after a leave
   - `data-testid="foe-lineup"`, `data-count`, `aria-hidden`, the `foe-slot` wrappers with `--foe-index`, `--foe-scale`, `--foe-lift`, and `data-portrait-ref`
   - the depth geometry and the row inset from `--foe-face-clear` and the front foe's scale
   - the decorative gauge (fill and trailing bar) on the scene caption's baseline
@@ -25,8 +25,8 @@
 
 - [x] 3.1 `web/webclient-app/AppClient.vue`:
   - add `combatFoes` (`activeFoes` of the committed combat panel) and `foesOnStage`
-  - render `<Transition name="foes-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving" @after-leave="onFoeLineupGone"><FoeLineup v-if="foesOnStage" …/></Transition>` in `#actor-right` beside the host, with the `foes-enter` CSS (design D3)
-  - bind `--foe-lineup-span` and `--foe-front-scale` on `.elosern-root`, released after a leaving row has faded (design D6)
+  - render `<Transition name="foes-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving" @after-leave="onFoeLineupGone"><FoeLineup v-if="foesOnStage" … @settled="onFoeLineupSettled"/></Transition>` in `#actor-right` beside the host, with the `foes-enter` CSS (design D3)
+  - bind `--foe-lineup-span` and `--foe-front-scale` on `.elosern-root`, holding a shrunk row's room until its leaving foe has faded and releasing it after a leaving row has faded (design D6)
 - [x] 3.2 `web/webclient-app/components/HudFrame.vue`: in combat, `[data-anchor="actor-right"]` gets `overflow: visible`, and the header comment names the line-up. `styles/tokens.css` gains `--foe-face-clear` (and its short-viewport value).
 - [x] 3.3 `styles/app-shell.css`: the scene caption's right side clears the row and glides with it; `SceneBackdrop.vue`: the label gives way last.
 - [x] 3.4 Visual refinements (design D4, D5, D7): the `StageActor.vue` mask reaches zero at the box's edges; foes use a tighter mask; the participant frame's product rules in `styles/app-shell.css` are denser, ellipsise long names, and gain a compact short-viewport variant.

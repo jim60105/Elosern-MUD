@@ -111,6 +111,7 @@ _INSTALL_READER = """() => {
       frameText: frame ? frame.innerText : '',
       commandLine: box(q('[data-anchor="command-line"]')),
       plate: box(q('.scene-backdrop__plate')),
+      span: getComputedStyle(q('.elosern-root')).getPropertyValue('--foe-lineup-span').trim(),
       rows: rows.map((row) => ({
         inert: row.inert,
         count: row.getAttribute('data-count'),
@@ -280,13 +281,20 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(leaving[0]["ref"], "11")
         self.assertTrue(leaving[0]["inert"])
         self.assertIn("已敗退", s["frameText"])
+        # The caption keeps the two-foe room until the fallen foe has faded.
+        self.assertNotEqual(s["span"], "1")
         self._wait(page, "s.rows[0].slots.length === 1")
+        self._wait(page, "s.span === '1'")
 
         s = self._commit(page, "exploration", _exploration_panels())
         self.assertEqual(len(s["rows"]), 1)
         self.assertTrue(s["rows"][0]["leaving"])
         self.assertTrue(s["rows"][0]["inert"])
+        # The row keeps its room while it fades; releasing it is the fade's end.
+        self.assertEqual(s["span"], "1")
         self._wait(page, "s.rows.length === 0")
+        # The row's room is released once it has faded.
+        self._wait(page, "s.span === '0'")
         worst = page.evaluate(_STOP_SCROLL_SAMPLER)
         self.assertGreater(worst["frames"], 1)
         self.assertEqual(worst["scrollLeft"], 0, worst)
@@ -322,6 +330,10 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             for duration in slot["duration"].split(", "):
                 self.assertLessEqual(float(duration.rstrip("s")), 0.15)
             self.assertTrue(_identity(slot["transform"]))
+        self._wait(page, "s.rows[0].slots.length === 1 && s.span === '1'")
+        s = self._commit(page, "exploration", _exploration_panels())
+        self.assertTrue(s["rows"][0]["leaving"])
+        self._wait(page, "s.rows.length === 0 && s.span === '0'")
         page.close()
 
     @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")

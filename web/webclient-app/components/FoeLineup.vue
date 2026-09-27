@@ -37,6 +37,10 @@ const props = defineProps({
   max: { type: Number, default: FOE_LINEUP_MAX },
 });
 
+// `settled` fires when a foe that left the row has finished fading (at `off`,
+// in the commit's frame), so the client can release the room it held.
+const emit = defineEmits(["settled"]);
+
 const shown = computed(() => props.foes.slice(0, Math.min(props.max, FOE_LINEUP_MAX)));
 const slots = computed(() => foeSlots(shown.value.length));
 
@@ -77,11 +81,17 @@ function gaugeWidth(participant) {
     :style="{ '--foe-front-scale': slots[0]?.scale ?? 1 }"
     aria-hidden="true"
   >
-    <TransitionGroup name="foe" :css="motionLevel !== 'off'" v-bind="inertWhileLeaving">
+    <TransitionGroup
+      name="foe"
+      :css="motionLevel !== 'off'"
+      v-bind="inertWhileLeaving"
+      @after-leave="emit('settled')"
+    >
       <div
         v-for="(p, i) in shown"
         :key="p.identity"
         class="foe-lineup__slot"
+        :class="{ 'foe-lineup__slot--before': i < shown.length - 1 }"
         data-testid="foe-slot"
         :data-portrait-ref="p.portrait_ref ?? ''"
         :style="slotStyle(i)"
@@ -140,7 +150,7 @@ function gaugeWidth(participant) {
 }
 /* Depth: a foe that stands in front of another casts a soft shadow onto it,
    so overlapping figures separate even when their art shares a backdrop. */
-.foe-lineup__slot:not(:last-child) .reference-artwork {
+.foe-lineup__slot--before .reference-artwork {
   filter: drop-shadow(-14px 0 18px rgba(4, 3, 6, 0.55));
 }
 

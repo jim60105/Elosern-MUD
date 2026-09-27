@@ -113,22 +113,31 @@ const foesOnStage = computed(() => store.view.mode === "combat" && combatFoes.va
 // How far the row reaches left of the anchor, in anchor widths, and its
 // front foe's scale (which sets the row's inset), exposed on the client root
 // as `--foe-lineup-span` and `--foe-front-scale` so the scene caption stays
-// clear of it (styles/app-shell.css). It follows the row at once while the row is
-// on stage, and is released only when a leaving row has finished fading, so
-// the caption never slides under a fading foe.
+// clear of it (styles/app-shell.css). A row that grows takes its room at
+// once; a row that shrinks (a foe fell or fled) keeps its room until the
+// leaving foe has faded; and a row that leaves the stage keeps it until the
+// whole row has faded, so the caption never slides under a fading figure.
+const foeLineupCount = computed(() => (foesOnStage.value ? Math.min(combatFoes.value.length, FOE_LINEUP_MAX) : 0));
 const foeLineupReach = ref({ span: 0, front: 1 });
+function reachFor(count) {
+  return count > 0 ? { span: foeLineupSpan(count), front: foeSlots(count)[0].scale } : { span: 0, front: 1 };
+}
 watch(
-  () => (foesOnStage.value ? Math.min(combatFoes.value.length, FOE_LINEUP_MAX) : 0),
+  foeLineupCount,
   (count) => {
-    if (count > 0) {
-      foeLineupReach.value = { span: foeLineupSpan(count), front: foeSlots(count)[0].scale };
+    const next = reachFor(count);
+    if (count > 0 && next.span >= foeLineupReach.value.span) {
+      foeLineupReach.value = next;
     }
   },
   { immediate: true },
 );
+function onFoeLineupSettled() {
+  foeLineupReach.value = reachFor(foeLineupCount.value);
+}
 function onFoeLineupGone() {
   if (!foesOnStage.value) {
-    foeLineupReach.value = { span: 0, front: 1 };
+    foeLineupReach.value = reachFor(0);
   }
 }
 </script>
@@ -251,6 +260,7 @@ function onFoeLineupGone() {
               :foes="combatFoes"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
+              @settled="onFoeLineupSettled"
             />
           </Transition>
         </template>

@@ -12,6 +12,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import { foeLineupSpan } from "../components/foe-lineup.js";
 import AppClient from "../AppClient.vue";
 import HudFrame from "../components/HudFrame.vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
@@ -288,8 +289,11 @@ describe("AppClient live mode changes", () => {
     commit("combat", twoFoes());
     await nextTick();
     await nextTick();
+    const heldSpan = clientRoot().style.getPropertyValue("--foe-lineup-span");
     commit("combat", twoFoes(true));
     await nextTick();
+    // The caption keeps the two-foe room until the fallen foe has faded.
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(heldSpan);
     const slots = lineups()[0].findAll('[data-testid="foe-slot"]');
     const leaving = slots.filter((s) => s.element.inert);
     expect(leaving).toHaveLength(1);
@@ -323,6 +327,13 @@ describe("AppClient live mode changes", () => {
   it("at the off level the line-up comes and goes in the commit's frame", async () => {
     store.setMotionLevel("off");
     await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(String(foeLineupSpan(2)));
+    // A fallen foe leaves at once, and so does the room it held.
+    commit("combat", twoFoes(true));
+    await nextTick();
+    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe("1");
     commit("combat", twoFoes());
     await nextTick();
     expect(lineups()).toHaveLength(1);
