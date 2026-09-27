@@ -520,6 +520,54 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         ][-1]["ui_snapshot"][0][0]
         self.assertFalse(forfeit_snapshot["panels"]["combat_beats"]["available"])
 
+    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
+    def test_a_live_combat_sync_after_a_round_never_replays_the_beats(self):
+        """The record reaches only the completing publication.
+
+        A mid-combat ``ui_sync`` on the same live coordinator — the one path
+        that could leak a cached record — renders the unavailable form, and the
+        session stays in combat mode, so the snapshot is a live-combat sync and
+        not a post-settlement one.
+        """
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        from web.webclient.presentation.ingress import synchronize_session
+
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.cast",
+                    {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        round_update = [
+            call for call in self.session.sent if "ui_update" in call
+        ][-1]["ui_update"][0][0]
+        self.assertTrue(round_update["panels"]["combat_beats"]["available"])
+        self.assertEqual(
+            round_update["panels"]["combat_beats"]["round"], f"{session_id}/1"
+        )
+        with patch("server.option_proposal_service.schedule_action_options"):
+            self.assertTrue(synchronize_session(self.session, self.player))
+        sync_snapshot = [
+            call for call in self.session.sent if "ui_snapshot" in call
+        ][-1]["ui_snapshot"][0][0]
+        self.assertEqual(sync_snapshot["mode"], "combat")
+        self.assertIsNotNone(read_session(self.player), "the session is still live")
+        self.assertFalse(sync_snapshot["panels"]["combat_beats"]["available"])
+        self.assertEqual(
+            sync_snapshot["panels"]["combat_beats"]["reason"]["code"],
+            "presentation_unavailable",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -147,7 +147,13 @@ def _identity_of(identities: Mapping[str, int], key: str | None) -> str | None:
 
 
 def _knockout_floors(record: RoundRecord) -> dict[int, int]:
-    """The per-dbref projection floor: 1 for a knocked-out target, else 0."""
+    """The per-dbref projection floor: 1 for a knocked-out target, else 0.
+
+    The crossing entry carries both the roster key in ``target`` and the dbref
+    in ``data["target_id"]``; this reads the same ``target`` field every other
+    identity read in the module uses, so the floor and the beat identities can
+    never disagree about which participant an entry names.
+    """
     floors = {dbref: 0 for dbref in record.identities.values()}
     for event_log in record.logs:
         for entry in event_log.entries:

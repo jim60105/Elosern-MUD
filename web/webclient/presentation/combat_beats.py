@@ -60,7 +60,10 @@ COMBAT_BEATS_MAX_BYTES = 12_288
 MAX_BEAT_REF = 32
 
 # The bounded diagnostic reasons this presenter may log: the rules builder's
-# stable codes plus its two presentation-side classes.
+# stable codes plus its two presentation-side classes. ``build_failed`` is
+# deliberate belt-and-braces, not an expected path: every raise site in the
+# rules builder passes one of the other codes, so it exists only so an
+# unforeseen future code can never put free text in a log context.
 _BOUNDED_REASONS = frozenset(
     {
         "too_many_beats",
