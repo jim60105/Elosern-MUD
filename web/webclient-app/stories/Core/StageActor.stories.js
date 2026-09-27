@@ -10,7 +10,9 @@ import StageActor from "../../components/StageActor.vue";
 // built-in fallbacks under `/art/defaults/` stand in for generated art.
 //
 // Props: portrait (a roster portrait or an `art` panel catalog entry, or
-// null), name, side ("left" | "right"), dimmed. Emits nothing (decorative
+// null), name, side ("left" | "right"), dimmed, motionLevel, and the combat
+// beat gesture (gesture: null | "lunge" | "hit" | "defeat", gestureKey,
+// floatAmount). Emits nothing (decorative
 // art: no focusable element, no pointer events).
 
 export default {
@@ -20,6 +22,7 @@ export default {
   argTypes: {
     side: { control: "inline-radio", options: ["left", "right"] },
     dimmed: { control: "boolean" },
+    gesture: { control: "inline-radio", options: [null, "lunge", "hit", "defeat"] },
   },
 };
 
@@ -129,4 +132,49 @@ export const AppearanceChange = {
       '<div style="width:420px;height:630px;padding:0;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
       '<StageActor :portrait="APPEARANCES[Math.floor(tick / 2) % APPEARANCES.length]" name="艾莉亞" side="left" :dimmed="tick % 2 === 1" /></div>',
   }),
+};
+
+// The combat beat gestures (webclient-combat-beat-choreography design D4):
+// the figure replays its gesture every beat, keyed by the step so each
+// replay restarts the animation, with a rest beat in between. Durations and
+// distances are the motion tokens, so the toolbar's reduced-motion
+// preference shows the reduced level (only the defeat fade survives).
+const renderBeatLoop = ({ gesture, floatAmount, ...args }) => ({
+  components: { StageActor },
+  setup() {
+    const step = ref(0);
+    let timer = null;
+    onMounted(() => {
+      timer = setInterval(() => {
+        step.value += 1;
+      }, 900);
+    });
+    onBeforeUnmount(() => clearInterval(timer));
+    return { args, step, gesture, floatAmount };
+  },
+  template:
+    '<div style="width:420px;height:630px;padding:0;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
+    '<StageActor v-bind="args" :gesture="step % 2 === 0 ? gesture : null" :gesture-key="`story:${step}`"' +
+    ' :float-amount="step % 2 === 0 ? floatAmount : null" /></div>',
+});
+
+// The first beat of an action: the player steps toward the stage centre and
+// back (right, from `actor-left`).
+export const BeatLunge = {
+  render: renderBeatLoop,
+  args: { portrait: PLAYER_PORTRAIT, side: "left", dimmed: false, gesture: "lunge", floatAmount: null },
+};
+
+// A damage beat on a foe: the figure shakes with a brief flash while the
+// damage number rises from it and fades.
+export const BeatHit = {
+  render: renderBeatLoop,
+  args: { portrait: HOST_ENTRY, name: "灰婆婆", side: "right", dimmed: false, gesture: "hit", floatAmount: 12 },
+};
+
+// A foe's defeat beat: the figure fades and sinks out (it stays gone until
+// the rest beat brings it back for the replay).
+export const BeatDefeat = {
+  render: renderBeatLoop,
+  args: { portrait: HOST_ENTRY, name: "灰婆婆", side: "right", dimmed: false, gesture: "defeat", floatAmount: null },
 };

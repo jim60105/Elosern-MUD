@@ -150,6 +150,70 @@ describe("FoeLineup", () => {
     expect(wrapper.findAll(".foe-lineup__fill")[0].element.style.width).toBe("75%");
   });
 
+  // webclient-combat-beat-choreography (design D5): while a round plays, the
+  // row stands the round's pre-round foes and follows the displayed hit
+  // points; each foe plays its own beat gesture.
+  describe("while a combat round plays", () => {
+    const stage = (foes, gestures = {}, key = "s-1/1:2") => ({ key, step: 2, foes, defeated: [], gestures });
+
+    it("keeps a foe the committed roster has lost until its defeat beat", async () => {
+      // The committed state already lost foe 1; the round has not shown its
+      // defeat yet.
+      wrapper = mount(FoeLineup, {
+        props: { foes: [foe(2)], stage: stage([foe(1), foe(2)]), artPanel: ART },
+      });
+      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["1", "2"]);
+      // The defeat beat plays on it while it still stands.
+      await wrapper.setProps({ stage: stage([foe(1), foe(2)], { 1: { gesture: "defeat", amount: null } }) });
+      expect(slots()[0].attributes("data-beat")).toBe("defeat");
+      expect(slots()[0].get('[data-testid="stage-actor"] > .stage-actor__beat').attributes("data-beat")).toBe(
+        "defeat",
+      );
+      // The round ends: the committed foes take over.
+      await wrapper.setProps({ stage: null });
+      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2"]);
+    });
+
+    it("follows the displayed hit points on each gauge, with no numerals", async () => {
+      wrapper = mount(FoeLineup, {
+        props: {
+          foes: [foe(1, { hp_current: 0 })],
+          stage: stage([foe(1, { hp_current: 60, hp_maximum: 60 })]),
+          displayHp: { 1: 30 },
+          artPanel: ART,
+        },
+      });
+      expect(wrapper.get(".foe-lineup__fill").element.style.width).toBe("50%");
+      expect(wrapper.get(".foe-lineup__ghost").element.style.width).toBe("50%");
+      // A foe with no displayed value reads its pre-round row.
+      await wrapper.setProps({ displayHp: {} });
+      expect(wrapper.get(".foe-lineup__fill").element.style.width).toBe("100%");
+      expect(wrapper.text()).not.toMatch(/\d/);
+    });
+
+    it("hands each foe its gesture, key, and damage number", () => {
+      wrapper = mount(FoeLineup, {
+        props: {
+          foes: [foe(1), foe(2)],
+          stage: stage([foe(1), foe(2)], {
+            1: { gesture: "hit", amount: 12 },
+            2: { gesture: "lunge", amount: null },
+          }),
+          artPanel: ART,
+        },
+      });
+      const [first, second] = slots();
+      expect(first.get(".stage-actor__beat").attributes("data-beat")).toBe("hit");
+      expect(first.get('[data-testid="stage-actor-float"]').text()).toBe("−12");
+      expect(second.get(".stage-actor__beat").attributes("data-beat")).toBe("lunge");
+      expect(second.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
+      // The float is decorative and the row stays hidden from assistive
+      // technology.
+      expect(first.get('[data-testid="stage-actor-float"]').attributes("aria-hidden")).toBe("true");
+      expect(wrapper.get('[data-testid="foe-lineup"]').attributes("aria-hidden")).toBe("true");
+    });
+  });
+
   it("places each slot from the geometry helper, the front foe above the ones behind", () => {
     wrapper = mount(FoeLineup, { props: { foes: [foe(1), foe(2), foe(3)], artPanel: ART } });
     const geometry = foeSlots(3);

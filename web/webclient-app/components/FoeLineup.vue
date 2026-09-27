@@ -18,6 +18,10 @@
 // - A foe joining or leaving the active set inside combat enters or fades
 //   (`TransitionGroup name="foe"`); the others glide to their new places.
 //   The leaving slot is inert from the commit on.
+// - While a combat round plays (webclient-combat-beat-choreography D5), the
+//   row stands the round's pre-round foes (`stage.foes`), so a foe the round
+//   defeats stays until its own defeat beat; each foe plays its beat gesture
+//   (`stage.gestures`), and each gauge follows the displayed hit points.
 // Decorative art: no focusable element, no pointer events, hidden from
 // assistive technology (the frame is the accessible list of participants).
 import { computed } from "vue";
@@ -35,13 +39,21 @@ const props = defineProps({
   motionLevel: { type: String, default: "full" },
   // The cap (three); stories and tests pass it only to show the cap.
   max: { type: Number, default: FOE_LINEUP_MAX },
+  // The playing round's stage (`view.beatStage`), or null: its `foes` stand
+  // instead of `foes`, and its `gestures` animate them.
+  stage: { type: Object, default: null },
+  // The hit points the playing round displays (`view.displayHp`), keyed by
+  // portrait reference, or null.
+  displayHp: { type: Object, default: null },
 });
 
 // `settled` fires when a foe that left the row has finished fading (at `off`,
 // in the commit's frame), so the client can release the room it held.
 const emit = defineEmits(["settled"]);
 
-const shown = computed(() => props.foes.slice(0, Math.min(props.max, FOE_LINEUP_MAX)));
+const shown = computed(() =>
+  (props.stage ? props.stage.foes : props.foes).slice(0, Math.min(props.max, FOE_LINEUP_MAX)),
+);
 const slots = computed(() => foeSlots(shown.value.length));
 
 // The raw catalog entry the participant's `portrait_ref` names: a pending
@@ -68,8 +80,19 @@ function slotStyle(index) {
   };
 }
 
+// The gauge reads the displayed value while a round plays, else the
+// committed one.
 function gaugeWidth(participant) {
-  return `${foeHpPercent(participant) ?? 0}%`;
+  const ref = participant.portrait_ref;
+  const displayed = ref == null ? undefined : props.displayHp?.[ref];
+  const row = typeof displayed === "number" ? { ...participant, hp_current: displayed } : participant;
+  return `${foeHpPercent(row) ?? 0}%`;
+}
+
+// The foe's beat gesture for the current step, or null.
+function gestureFor(participant) {
+  const ref = participant.portrait_ref;
+  return (ref != null && props.stage?.gestures?.[ref]) || null;
 }
 </script>
 
@@ -94,6 +117,7 @@ function gaugeWidth(participant) {
         :class="{ 'foe-lineup__slot--before': i < shown.length - 1 }"
         data-testid="foe-slot"
         :data-portrait-ref="p.portrait_ref ?? ''"
+        :data-beat="gestureFor(p)?.gesture ?? null"
         :style="slotStyle(i)"
       >
         <StageActor
@@ -102,6 +126,9 @@ function gaugeWidth(participant) {
           side="right"
           :dimmed="false"
           :motion-level="motionLevel"
+          :gesture="gestureFor(p)?.gesture ?? null"
+          :gesture-key="stage?.key ?? null"
+          :float-amount="gestureFor(p)?.amount ?? null"
         />
         <div class="foe-lineup__gauge" data-testid="foe-gauge">
           <span class="foe-lineup__ghost" :style="{ width: gaugeWidth(p) }"></span>
@@ -211,6 +238,14 @@ function gaugeWidth(participant) {
   background: linear-gradient(90deg, #7c2026, #b8342e 45%, var(--vit-hp));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: width var(--motion-slow) var(--ease-standard);
+}
+
+/* A defeated foe's gauge thins away with its figure
+   (webclient-combat-beat-choreography D5), so the slot that leaves after
+   the defeat beat is already empty. */
+.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__gauge {
+  opacity: 0;
+  transition: opacity var(--motion-beat-defeat) var(--ease-exit);
 }
 
 /* Membership inside combat (design D3): a joining foe slides in from the

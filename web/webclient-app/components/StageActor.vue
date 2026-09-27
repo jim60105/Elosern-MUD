@@ -20,6 +20,17 @@
 // the artwork is keyed by its source, the new one fades in above the old,
 // and the old one is inert from the commit on. A same-URL refresh keeps the
 // key, so it never fades.
+//
+// The combat beat gestures (webclient-combat-beat-choreography design D4;
+// AVG stage design §10.2): while a combat round plays, the figure acts out
+// its beat — `lunge` steps toward the stage centre and back, `hit` shakes
+// with a brief flash while a decorative `−N` rises from it, and `defeat`
+// fades and drops the figure. The gesture lives on an inner wrapper keyed by
+// the step (`gestureKey`), so a new step restarts its animation (two hits in
+// a row on one foe each shake) with no script-side reflow. Every duration
+// and distance is a motion token, so `reduced` keeps only the defeat fade
+// and `off` never plays one. Decorative: the number is `aria-hidden`, and
+// the beat's page and the numerals carry every value.
 import { computed } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
@@ -42,6 +53,16 @@ const props = defineProps({
   // phase, so the final state is on screen in the commit's frame (a CSS
   // phase would outlive the commit by a double frame even at 0s).
   motionLevel: { type: String, default: "full" },
+  // The combat beat gesture this figure plays (`view.beatStage`), or null.
+  gesture: {
+    type: String,
+    default: null,
+    validator: (value) => value === null || value === "lunge" || value === "hit" || value === "defeat",
+  },
+  // `<round>:<step>`: a new step restarts the gesture on the same figure.
+  gestureKey: { type: String, default: null },
+  // The damage the rising number names (a `hit` only), or null.
+  floatAmount: { type: Number, default: null },
 });
 
 const shown = computed(() => {
@@ -69,9 +90,22 @@ const transitionCss = computed(() => props.motionLevel !== "off");
     :data-side="side"
     :data-speaking="String(!dimmed)"
   >
-    <Transition name="actor-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
-      <ReferenceArtwork :key="portraitKey" :portrait="shown" :initial-of="name" />
-    </Transition>
+    <div
+      :key="gesture ? gestureKey || gesture : 'rest'"
+      class="stage-actor__beat"
+      :data-beat="gesture || null"
+    >
+      <Transition name="actor-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
+        <ReferenceArtwork :key="portraitKey" :portrait="shown" :initial-of="name" />
+      </Transition>
+    </div>
+    <span
+      v-if="gesture === 'hit' && floatAmount !== null"
+      :key="`float:${gestureKey}`"
+      class="stage-actor__float"
+      data-testid="stage-actor-float"
+      aria-hidden="true"
+    >−{{ floatAmount }}</span>
   </div>
 </template>
 
@@ -81,7 +115,11 @@ const transitionCss = computed(() => props.motionLevel !== "off");
   height: 100%;
   pointer-events: none;
 }
-.stage-actor > .reference-artwork {
+.stage-actor__beat {
+  position: relative;
+  height: 100%;
+}
+.stage-actor__beat > .reference-artwork {
   height: 100%;
   overflow: visible;
 }
@@ -99,20 +137,62 @@ const transitionCss = computed(() => props.motionLevel !== "off");
    thins on a slow-starting curve, so the pair never shows the stage through
    a half-transparent body. The leaving copy is lifted out of flow onto the
    same box. */
-.stage-actor > .actor-xfade-enter-active {
+.stage-actor__beat > .actor-xfade-enter-active {
   position: relative;
   z-index: 1;
   transition: opacity var(--motion-portrait) var(--ease-standard);
 }
-.stage-actor > .actor-xfade-leave-active {
+.stage-actor__beat > .actor-xfade-leave-active {
   position: absolute;
   inset: 0;
   z-index: 0;
   transition: opacity var(--motion-portrait) var(--ease-exit);
 }
-.stage-actor > .actor-xfade-enter-from,
-.stage-actor > .actor-xfade-leave-to {
+.stage-actor__beat > .actor-xfade-enter-from,
+.stage-actor__beat > .actor-xfade-leave-to {
   opacity: 0;
+}
+
+/* The combat beat gestures (webclient-combat-beat-choreography D4): each
+   plays once per step on the keyed wrapper. The step leans toward the stage
+   centre, so the player (left) steps right and a foe (right) steps left. */
+.stage-actor[data-side="left"] > [data-beat="lunge"] {
+  animation: elosern-beat-lunge-right var(--motion-beat-step) var(--ease-standard) 1;
+}
+.stage-actor[data-side="right"] > [data-beat="lunge"] {
+  animation: elosern-beat-lunge-left var(--motion-beat-step) var(--ease-standard) 1;
+}
+.stage-actor > [data-beat="hit"] {
+  animation: elosern-beat-hit var(--motion-beat-hit) linear 1;
+}
+.stage-actor > [data-beat="defeat"] {
+  animation: elosern-beat-defeat var(--motion-beat-defeat) var(--ease-exit) 1 forwards;
+}
+/* The rising damage number: the seal red of a wound, set large in the
+   display face, with an ink outline painted under the fill and a dark halo,
+   so it reads over pale robes and dark art alike. It starts and ends
+   invisible, so at `reduced` and `off` (0ms) it never shows; the beat's page
+   and the numerals carry the value. */
+.stage-actor__float {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  z-index: 2;
+  opacity: 0;
+  color: var(--seal-400);
+  font-family: var(--f-display);
+  font-size: calc(var(--message-text) * 1.5);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  -webkit-text-stroke: 4px rgba(14, 8, 10, 0.92);
+  paint-order: stroke fill;
+  text-shadow:
+    0 2px 12px rgba(10, 6, 8, 0.9),
+    0 0 26px var(--seal-glow);
+  pointer-events: none;
+  animation: elosern-beat-float var(--motion-beat-float) var(--ease-exit) 1 forwards;
 }
 
 /* The figure dissolves into the stage instead of ending in a rectangle (a

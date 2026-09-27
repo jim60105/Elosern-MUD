@@ -1,3 +1,4 @@
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
 import { FOE_PORTRAIT_CATALOG, foeParticipants } from "../fixtures.js";
 
@@ -10,7 +11,10 @@ import { FOE_PORTRAIT_CATALOG, foeParticipants } from "../fixtures.js";
 // the participant frame. Each slot exposes `data-portrait-ref`.
 //
 // Props: foes (the committed active foes, presenter order), artPanel (the
-// committed `art` panel), motionLevel, max (the cap; stories only). Emits
+// committed `art` panel), motionLevel, max (the cap; stories only), and,
+// while a combat round plays (webclient-combat-beat-choreography D5), stage
+// (`view.beatStage`: the pre-round foes and each step's gestures) and
+// displayHp (`view.displayHp`). Emits
 // nothing (decorative art: no focusable element, no pointer events,
 // hidden from assistive technology).
 //
@@ -115,4 +119,62 @@ export const MissingEntry = {
     artPanel: ART_PANEL,
     motionLevel: "full",
   },
+};
+
+// A combat round in progress (webclient-combat-beat-choreography D5): the
+// committed roster already lost the assassin, but the row keeps the
+// round's pre-round foes while the beats play. The front foe steps in, the
+// assassin is hit twice (each hit restarts the shake, the gauge and its
+// trailing bar follow the displayed hit points), then drops out on its own
+// defeat beat; the round then ends and the committed foes stand again.
+const ROUND_FOES = foeParticipants(3);
+const COMMITTED_FOES = foeParticipants(3).filter((foe) => foe.identity !== 33);
+// One entry per beat phase: [step, gestures, displayed hit points, defeated].
+const ROUND_SCRIPT = [
+  [0, { 31: { gesture: "lunge", amount: null } }, { 33: 18 }, []],
+  [1, { 33: { gesture: "hit", amount: 10 } }, { 33: 8 }, []],
+  [2, { 33: { gesture: "hit", amount: 8 } }, { 33: 0 }, []],
+  [3, { 33: { gesture: "defeat", amount: null } }, { 33: 0 }, []],
+  [4, {}, { 33: 0 }, ["33"]],
+  null,
+];
+
+const renderRound = (args) => ({
+  components: { FoeLineup },
+  setup() {
+    const tick = ref(0);
+    let timer = null;
+    onMounted(() => {
+      timer = setInterval(() => {
+        tick.value += 1;
+      }, 1000);
+    });
+    onBeforeUnmount(() => clearInterval(timer));
+    const entry = computed(() => ROUND_SCRIPT[tick.value % ROUND_SCRIPT.length]);
+    const stage = computed(() => {
+      const current = entry.value;
+      if (!current) {
+        return null;
+      }
+      const [step, gestures, , defeated] = current;
+      return {
+        key: `story:${Math.floor(tick.value / ROUND_SCRIPT.length)}:${step}`,
+        step,
+        foes: ROUND_FOES.filter((foe) => !defeated.includes(foe.portrait_ref)),
+        defeated,
+        gestures,
+      };
+    });
+    const displayHp = computed(() => (entry.value ? entry.value[2] : null));
+    return { args, stage, displayHp, COMMITTED_FOES };
+  },
+  template: renderLineup(args).template.replace(
+    '<FoeLineup v-bind="args" />',
+    '<FoeLineup v-bind="args" :foes="COMMITTED_FOES" :stage="stage" :display-hp="displayHp" />',
+  ),
+});
+
+export const RoundInProgress = {
+  render: renderRound,
+  args: { artPanel: ART_PANEL, motionLevel: "full" },
 };
