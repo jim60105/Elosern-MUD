@@ -1,4 +1,4 @@
-import { h, onMounted, ref } from "vue";
+import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import DialogueChoices from "../../components/DialogueChoices.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
 import { overviewExits } from "../../composables/use-dialogue-choices.js";
@@ -144,4 +144,27 @@ export const Overflowing = {
   decorators: [
     (story) => ({ render: () => h("div", { style: { height: "300px", display: "flex", flexDirection: "column" } }, [h(story())]) }),
   ],
+};
+
+// The entrance (webclient-mode-transitions): the card fades in and the rows
+// fade and rise one stagger step apart. The list remounts every few seconds
+// so the entrance replays; it takes focus and keys from its first frame.
+export const Stagger = {
+  render: (args) => ({
+    setup() {
+      const list = ref(null);
+      const generation = ref(0);
+      let timer = null;
+      onMounted(() => {
+        list.value?.focus();
+        timer = setInterval(() => {
+          generation.value += 1;
+          requestAnimationFrame(() => list.value?.focus());
+        }, 2600);
+      });
+      onBeforeUnmount(() => clearInterval(timer));
+      return () => h(DialogueChoices, { ...args, key: generation.value, ref: list });
+    },
+  }),
+  args: { picks: PICKS, exits: EXITS, localMap: LOCAL_MAP },
 };

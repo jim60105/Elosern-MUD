@@ -13,12 +13,16 @@ import { useRestWait } from "./use-rest-wait.js";
 import { useOverlays } from "./use-overlays.js";
 import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
+import { useModeChange } from "./use-mode-change.js";
 
 export function useAppClient(store, shellRef, sceneBackdropRef) {
   // The single dispatch seam (webclient-action-feedback): every surface's
   // emitted intent routes through the one store entry.
   const { dispatchIntent } = useDispatchIntent(store);
   const { panel, panelAvailable } = usePanelView(store);
+  // The live mode-change signal (webclient-mode-transitions D2): registered
+  // first, so every later pre-flush watcher already sees this change's value.
+  const modeChangeSignal = useModeChange(store);
   useResync(store);
   useShellFocus(store, shellRef, sceneBackdropRef);
   useBackdropBridge(sceneBackdropRef);
@@ -28,6 +32,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     dispatchIntent,
     panel,
     panelAvailable,
+    ...modeChangeSignal,
     ...scene,
     ...useDialogueChoices(store, shellRef, scene.dialogueVM),
     ...restWait,

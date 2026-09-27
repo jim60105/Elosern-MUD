@@ -1,4 +1,4 @@
-import { h } from "vue";
+import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import HudFrame from "../../components/HudFrame.vue";
 
 // HudFrame (H1, webclient-hud-01-shell-and-scene; webclient-avg-stage-shell):
@@ -67,7 +67,8 @@ export default {
           "place card, the message region, and both island anchors, and the " +
           "command region spans the whole band; the objective line shows only " +
           "in exploration; dialogue collapses the command region " +
-          "(display:none, the dock stays mounted) so the message region " +
+          "(inert at once, then a slide out over the widened message region " +
+          "ending `visibility: hidden`; the dock stays mounted) so the message region " +
           "spans the band, `actor-right` carries the dialogue host, and the " +
           "`choices` anchor centres the dialogue choice list over the stage, " +
           "above the expanded command-line row. The " +
@@ -111,4 +112,38 @@ export const DialogueCommandLine = {
 export const MenuOpenRecession = {
   render: renderFrame,
   args: { mode: "exploration", openSurfaces: ["full-log"] },
+};
+
+// The mode transitions (webclient-mode-transitions): the frame alternates
+// between exploration and `target` every few seconds, with the live
+// `modeChange` the client computes, so each change plays its transition.
+const renderModeLoop = (args) => ({
+  setup() {
+    const mode = ref("exploration");
+    const modeChange = ref(null);
+    let timer = null;
+    onMounted(() => {
+      timer = setInterval(() => {
+        const next = mode.value === "exploration" ? args.target : "exploration";
+        modeChange.value = `${mode.value}-${next}`;
+        mode.value = next;
+      }, 2400);
+    });
+    onBeforeUnmount(() => clearInterval(timer));
+    return () => h(renderFrame({ ...args, mode: mode.value, modeChange: modeChange.value }));
+  },
+});
+
+// Exploration <-> dialogue: the message region widens at once while the
+// command region slides out over it, then back.
+export const DialogueEnter = {
+  render: renderModeLoop,
+  args: { target: "dialogue", commandLineExpanded: false },
+};
+
+// Exploration <-> combat: the flash, the veil, and the command region's
+// content flipping to the combat root, then back.
+export const CombatEnter = {
+  render: renderModeLoop,
+  args: { target: "combat", commandLineExpanded: false },
 };

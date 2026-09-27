@@ -16,6 +16,15 @@
 // pass through untouched. A pointer activation focuses the list and runs
 // the same activation path as Enter.
 //
+// The entrance (webclient-mode-transitions D5; AVG stage design §9.3): the
+// card fades in, and each row fades and rises into place one stagger step
+// after the one above it. Pure CSS keyframes on elements that are in the
+// DOM, focusable, and clickable from their first frame, so no key or
+// pointer ever waits for the animation. A view swap (`↦ 移動…` and back)
+// renders new rows, which stagger in the same way; the rows they replace
+// are removed at once. A list mounted in the frame a reconnect renders
+// (`entrance` false) shows at rest.
+//
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
@@ -35,6 +44,9 @@ const props = defineProps({
   locked: { type: Boolean, default: false },
   // Called before every emitted activation.
   beforeActivate: { type: Function, default: null },
+  // Whether the list animates in when it mounts (false in the frame a
+  // reconnect renders, webclient-mode-transitions D2). Read once, at mount.
+  entrance: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["pick", "freeform", "move", "leave"]);
@@ -44,6 +56,11 @@ const scrollRef = ref(null);
 const idPrefix = useId();
 const view = ref("choices");
 const activeIndex = ref(0);
+// The entrance is decided once, at mount (a later prop change must never
+// re-apply the animation and replay it). The rows' stillness ends at the
+// first view swap, whose new rows stagger in.
+const cardStill = !props.entrance;
+const rowsStill = ref(!props.entrance);
 
 const rows = computed(() => {
   if (view.value === "exits") {
@@ -112,6 +129,7 @@ function setActive(index) {
 }
 
 function showView(next, index) {
+  rowsStill.value = false;
   view.value = next;
   setActive(index);
 }
@@ -216,6 +234,7 @@ defineExpose({ focus });
   <div
     ref="listRef"
     class="dialogue-choices"
+    :class="{ 'dialogue-choices--still': cardStill, 'dialogue-choices--rows-still': rowsStill }"
     role="menu"
     :aria-label="view === 'exits' ? '移動：選擇出口' : '對話選項'"
     tabindex="0"
@@ -225,7 +244,7 @@ defineExpose({ focus });
     @keydown="onKeydown"
   >
     <div v-if="view === 'exits'" class="dialogue-choices__caption" aria-hidden="true">移動</div>
-    <div ref="scrollRef" class="dialogue-choices__rows">
+    <div :key="view" ref="scrollRef" class="dialogue-choices__rows" :style="{ '--row-count': rows.length }">
     <div
       v-for="(row, index) in rows"
       :id="rowId(index)"
@@ -242,6 +261,7 @@ defineExpose({ focus });
       :data-testid="row.testId"
       :data-keyword-id="row.keywordId"
       :data-active="index === activeIndex ? 'true' : 'false'"
+      :style="{ '--row-index': index }"
       :aria-disabled="row.enabled ? null : 'true'"
       :aria-describedby="row.reason ? reasonId(index) : null"
       @click="onRowClick(index)"
@@ -297,6 +317,56 @@ defineExpose({ focus });
   backdrop-filter: blur(6px);
   outline: none;
   pointer-events: auto;
+}
+
+/* The entrance (webclient-mode-transitions D5). The card surfaces first;
+   the rows follow one stagger step apart, each fading up as it rises the
+   small shift into place on a decelerating curve. `backwards` holds a row at
+   its starting pose through its delay; after the animation nothing is
+   filled, so hover, focus, and the active row's styles are untouched. The
+   reduced level keeps the fades (stagger and rise are 0); the off level
+   resolves every duration and delay to 0. */
+.dialogue-choices {
+  animation: elosern-choice-card-in var(--motion-reveal) var(--ease-standard) backwards;
+}
+.dialogue-choices__row {
+  animation: elosern-choice-row-in var(--motion-reveal) var(--ease-enter)
+    calc(var(--motion-stagger) * var(--row-index, 0)) backwards;
+}
+/* While the rows rise, the last ones sit a shift below their rest, which a
+   tight stage (1280x720) would turn into a scrollbar flashing on and off;
+   the scroller clips instead for exactly the entrance's length. */
+.dialogue-choices__rows {
+  animation: elosern-choice-rows-clip
+    calc(var(--motion-stagger) * var(--row-count, 1) + var(--motion-reveal)) linear;
+}
+.dialogue-choices--still,
+.dialogue-choices--rows-still .dialogue-choices__rows,
+.dialogue-choices--rows-still .dialogue-choices__row {
+  animation: none;
+}
+.dialogue-choices__caption {
+  animation: elosern-choice-card-in var(--motion-reveal) var(--ease-standard) backwards;
+}
+
+@keyframes elosern-choice-rows-clip {
+  from,
+  to {
+    overflow-y: hidden;
+  }
+}
+
+@keyframes elosern-choice-card-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes elosern-choice-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));
+  }
 }
 
 /* The exits view's quiet caption: it names what the rows now are. */

@@ -45,6 +45,7 @@ import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
 import DialogueChoices from "./components/DialogueChoices.vue";
+import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
 const store = useElosernStore();
 const currentCharacter = computed(
@@ -59,7 +60,7 @@ const sceneBackdropRef = ref(null);
 // The behavior groups composed in use-app-client.js: every binding below is
 // a group's verbatim state/handler, destructured so the template is unchanged.
 const {
-  panel, panelAvailable, dispatchIntent,
+  panel, panelAvailable, dispatchIntent, modeChange, modeHydrating,
   dialogueVM, onDialoguePick, onDialogueFreeform, onDialogueLeave,
   onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
   completionCandidates, possessionBanner, contextAffordances, releaseAffordance,
@@ -92,6 +93,13 @@ const hostPortrait = computed(() => {
 // The speaking state (design D3): only a conversation with its host on the
 // stage dims anyone (a transiently unavailable panel leaves the player lit).
 const inDialogue = computed(() => store.view.mode === "dialogue");
+// The host's entrance and exit (webclient-mode-transitions D3) animate only
+// on a live mode change: at `off` there is no CSS phase (a CSS phase would
+// outlive the commit by a double frame even at 0s), and across a reconnect
+// (`modeHydrating`) the host appears and goes in the commit's frame.
+const hostTransitionCss = computed(
+  () => store.view.motionLevel !== "off" && !modeHydrating.value,
+);
 </script>
 
 <template>
@@ -109,6 +117,8 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
         :text-speed="store.view.textSpeed"
         :auto-advance="store.view.autoAdvance"
         :motion-level="store.view.motionLevel"
+        :mode-change="modeChange"
+        :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
         :offline="!store.view.connected"
         :uncertain="store.view.dispatch.uncertain"
@@ -176,14 +186,21 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
              actors D2): only while the mode is dialogue and the committed
              panel is available; empty in every other state. -->
         <template #actor-right>
-          <StageActor
-            v-if="inDialogue && dialogueVM"
-            side="right"
-            :portrait="hostPortrait"
-            :name="dialogueVM.host.displayName"
-            :dimmed="store.view.dialogueSpeaker === 'player'"
-            :motion-level="store.view.motionLevel"
-          />
+          <!-- The host enters from the right and leaves to it
+               (webclient-mode-transitions D3), keyed by identity so a new
+               host during a session hands over; a new portrait for the same
+               host is StageActor's own crossfade. -->
+          <Transition name="actor-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving">
+            <StageActor
+              v-if="inDialogue && dialogueVM"
+              :key="dialogueVM.host.identity"
+              side="right"
+              :portrait="hostPortrait"
+              :name="dialogueVM.host.displayName"
+              :dimmed="store.view.dialogueSpeaker === 'player'"
+              :motion-level="store.view.motionLevel"
+            />
+          </Transition>
         </template>
         <!-- The dialogue choice list (webclient-dialogue-choices-overlay
              D4/D5), centred over the stage: only in dialogue with the panel
@@ -192,6 +209,7 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
         <template #choices>
           <DialogueChoices
             v-if="choicesShown"
+            :entrance="!modeHydrating"
             :picks="dialogueVM.picks"
             :exits="dialogueExits"
             :local-map="store.view.localMapModel"
@@ -554,6 +572,37 @@ const inDialogue = computed(() => store.view.mode === "dialogue");
 </template>
 
 <style>
+/* The dialogue host's entrance (webclient-mode-transitions D3; AVG stage
+   design §9.3): the figure walks in from the right edge of the stage. It
+   starts a beat after the command panel begins to leave, so the eye reads
+   the band clearing first and the host arriving second; it decelerates into
+   place while its opacity rises a little faster than it moves, so no
+   half-transparent body hangs in the air. Leaving mirrors it: an
+   accelerating slide back out while it thins. Every distance is multiplied
+   by the travel token and the beat scales with it, so the reduced level is
+   a plain fade and the off level has no CSS phase at all. The leaving copy
+   is lifted onto the anchor's box, so a host handing over to another never
+   stacks two figures in flow. */
+[data-anchor="actor-right"] > .actor-enter-enter-active {
+  transition:
+    opacity calc(var(--motion-actor) * 0.8) var(--ease-standard) calc(var(--motion-panel) * 0.24 * var(--motion-travel)),
+    transform var(--motion-actor) var(--ease-enter) calc(var(--motion-panel) * 0.24 * var(--motion-travel)),
+    filter var(--motion-base) var(--ease-standard);
+}
+[data-anchor="actor-right"] > .actor-enter-leave-active {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity var(--motion-actor) var(--ease-standard),
+    transform var(--motion-actor) var(--ease-exit),
+    filter var(--motion-base) var(--ease-standard);
+}
+[data-anchor="actor-right"] > .actor-enter-enter-from,
+[data-anchor="actor-right"] > .actor-enter-leave-to {
+  opacity: 0;
+  transform: translateX(calc(var(--motion-shift-lg) * 1.5 * var(--motion-travel)));
+}
+
 /* Carry the mount container's viewport height down to the shell so the
    shell grid's 1fr row clamps to the available space (the root div broke
    the 100% height chain, letting the shell grow to its content height). */
