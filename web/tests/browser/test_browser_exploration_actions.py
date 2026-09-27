@@ -109,6 +109,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # 休息 N 小時 is the third card of the shipped row (stores/elosern.js
         # resolves exploration.wait with gridCols: 3): two ArrowRight steps
         # reach it.
+        # The rejection leaves the dock inside the wait submenu frame, so
+        # normalise back to the scene overview before re-opening it.
+        self._reset_root(page)
         activate_overview_chip(page, "wait")  # 等待／休息 footer chip
         _press(page, "ArrowRight")  # 睡眠至完全恢復
         _press(page, "ArrowRight")  # 休息 N 小時
