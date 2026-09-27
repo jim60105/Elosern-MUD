@@ -1028,6 +1028,40 @@ class CombatBeatQueueEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class BeatChoreographyEvidenceTest(unittest.TestCase):
+    """webclient-combat-beat-choreography: which figure plays which gesture
+    on each step, the pre-round line-up, the act's wait, the terminal-round
+    hold, and the gesture wrapper and floating number are DOM-state contracts
+    jsdom executes, so the change's Vitest files are their evidence (the
+    browser journeys cover the computed animations per level and the hold)."""
+
+    @covers_requirement(
+        "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
+    )
+    def test_beat_choreography_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/beat_choreography.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/core/stage_actor.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/core/foe_lineup.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "beat-choreography Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 class ModeTransitionsEvidenceTest(unittest.TestCase):
     """webclient-mode-transitions: the live mode-change signal, the inert
     collapsed command region, the decorative flash and veil, the host's inert
