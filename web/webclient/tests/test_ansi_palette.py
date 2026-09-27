@@ -121,14 +121,15 @@ class AnsiPaletteTest(unittest.TestCase):
     )
     def test_muted_ansi_pairs_keep_brightness_order_and_gold_anchor(self):
         generator = _load_generator()
+        self.assertEqual(generator.INK, (0x14, 0x10, 0x19))
         palette = dict(generator.build_palette())
         for index in range(1, 7):
             normal = generator.narrative_foreground(index, palette[index])
             bright = generator.narrative_foreground(index + 8, palette[index + 8])
             with self.subTest(index=index):
-                self.assertGreater(generator.contrast_ratio(bright, (20, 16, 25)),
-                                   generator.contrast_ratio(normal, (20, 16, 25)))
-                self.assertGreaterEqual(generator.contrast_ratio(normal, (20, 16, 25)), 4.5)
+                self.assertGreater(generator.contrast_ratio(bright, generator.INK),
+                                   generator.contrast_ratio(normal, generator.INK))
+                self.assertGreaterEqual(generator.contrast_ratio(normal, generator.INK), 4.5)
                 self.assertNotEqual(bright, palette[index + 8])
         tokens = (REPO_ROOT / "web/webclient-app/styles/tokens.css").read_text()
         gold = re.search(r"--gold-400:\s*(#[0-9a-f]{6})", tokens).group(1)

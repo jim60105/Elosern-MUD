@@ -144,3 +144,38 @@ The existing `core-messagewindow--oversize-map` story was also opened and
 visually inspected. All 17 rendered box-drawing rows measured x=54.90625 and
 width=211.640625 at 1920×1080, using the existing monospace map renderer;
 the page had no horizontal overflow. No renderer/font/map behavior changed.
+
+## Review dispositions
+
+The pre-implementation review required an executed numeric pass before the
+artifact clarification and explicit stage qualification in the requirement
+as well as its scenario. Both were adopted. Authored-tone contrast estimates
+were measured, inward-rounding/achromatic semantics documented, and the
+existing raw palette retained. The alleged missing blink regression was
+checked against the existing committed computed-style browser tests; those
+tests remain. Shard ownership was inspected rather than changing unchanged
+test ownership. The translucent-band concern was measured and accepted by
+the requester as a known limitation owned by the later band-material change.
+
+The post-implementation review found **no blocking issues** and two
+non-blocking findings:
+
+- Adopted: bind the authored-tone contrast test to the required ink reference
+  explicitly, then use `generator.INK` for the ratios, so a future reference
+  change cannot silently diverge from those checks. The same focused Evennia
+  palette command was rerun after this review fix: 8 tests passed in 0.010s.
+- Rejected the proposed restoration of CSS-source-string assertions, which
+  conflicts with the test policy against incidental source-text tests.
+  The underlying concern is valid: the existing OS browser regression also
+  sets `data-motion=reduced`, so it does not independently pin the CSS-only
+  OS fallback in CI. This change leaves that fallback untouched and exercised
+  it in the actual Storybook browser with the root attribute absent. A
+  dedicated CI behavioral assertion for the rollback branch is deferred;
+  no claim of independent automated OS-only coverage is made here.
+
+The review's return-type suggestion was inapplicable: `narrative_foreground`
+already declares `tuple[int, int, int]`. Its suggestion to adopt the full
+application overlay composable if this story grows is deferred: the small
+story's mounted-ref focus lifecycle was exercised at all three viewports,
+and adding the store-bound composable would duplicate unrelated application
+state. All review findings are dispositioned without widening runtime scope.
