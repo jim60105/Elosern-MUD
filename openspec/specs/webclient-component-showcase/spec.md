@@ -10,7 +10,7 @@ single-file component and SHALL have at least one Storybook story that documents
 events/actions it emits, and its primary states. At the completion of the contextual HUD
 redesign the required manifest SHALL enumerate at minimum: the header; the place card; the message window; the command line; the action dock with its menu,
 submenu, and choice-card frames, its scene overview, and the scene overview's verb popover; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
-local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait on the stage, and the dialogue choice list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
+local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
 only data sourced from the OOB panel allowlist (art, status, context_actions, local_map, services,
 creation, exploration, character, dialogue) or the transport text stream; a surface with no backing read
@@ -32,8 +32,9 @@ every story of that component family.
   pending-action, and dialogue name-plate states, the scene overview's story with its full-room, empty-rows,
   disabled-exit, and overflowing states, the verb popover's story with its dialogue-host,
   hostile-target, and look-only states, and the stage actor's story with its player, host-image,
-  host-pending-placeholder, host-missing-entry, speaking, and dimmed states, and the dialogue choice
-  list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
+  host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story
+  with its one-foe, two-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
+  dialogue choice list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
 
 #### Scenario: A story documents contract and primary states
 - **WHEN** a component story is rendered

@@ -29,7 +29,7 @@ every story of that component family.
   disabled-exit, and overflowing states, the verb popover's story with its dialogue-host,
   hostile-target, and look-only states, and the stage actor's story with its player, host-image,
   host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story
-  with its one-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
+  with its one-foe, two-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
   dialogue choice list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
 
 #### Scenario: A story documents contract and primary states

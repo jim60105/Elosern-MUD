@@ -200,7 +200,10 @@ value that `webclient-combat-menu` "A combat round plays beat by beat" defines â
 text marker in addition to any colour. The frame SHALL NOT invent a field the participant descriptor
 does not carry. The frame SHALL list every participant of both sides, including the foes the foe line-up
 does not stand on the stage, and it SHALL remain the only surface that states participant tokens, hit
-points, and states: the foe line-up in `actor-right` carries decorative portraits only.
+points, and states: the foe line-up in `actor-right` carries decorative portraits and decorative
+hit-point gauges without numerals only. A display name longer than the frame's width SHALL end in an
+ellipsis on screen while its full text stays in the DOM, and the frame's rows SHALL be compact enough
+that a frame of six participants ends above the foe line-up's gauges at 1920x1080 and 1440x900.
 
 Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
 up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
@@ -231,4 +234,4 @@ dock's target frame.
 
 #### Scenario: The frame sits in the map anchor, not on a portrait anchor
 - **WHEN** a combat session commits participants at 1440x900 and 1280x720
-- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
+- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and gauges and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
