@@ -25,7 +25,7 @@ C12 (`combat-beats-panel` D3) requires a terminal round's beats to play before C
   - A new `act` phase between `text` and `pause`, lasting the longest gesture the step plays, read through `readMotionMs`.
   - HP now applies when the act starts.
   - `stageFor(state)` returns:
-    - the current step's `gesture` per catalog key (`lunge`, `hit`, `defeat`) and its `amount`
+    - the current step's `gesture` per catalog key (`lunge`, `hit`, `defeat`) and its `amount`, through the step's act and pause
     - a `foes` roster, taken from the plan's pre-round active foes
     - the keys whose defeat beat has played
 - `web/webclient-app/stores/elosern/beats.js` and `view.js`:
@@ -44,7 +44,7 @@ C12 (`combat-beats-panel` D3) requires a terminal round's beats to play before C
   - Each slot's decorative HP gauge (shipped by C13a from the committed HP) follows the displayed HP during a round.
 - `web/webclient-app/components/HudFrame.vue` (C11c):
   - A new prop `beatHold` renders `data-beat-hold="combat"` on the stage root.
-  - While it is set, the combat veil keeps its combat opacity, without the pulse. It fades out over `--motion-reveal` when the hold ends.
+  - While it is set, the combat veil keeps its combat opacity and its pulse (the same running animation, so nothing jumps at the flip). It fades out on the combat exit's own veil transition (`--motion-actor`) when the hold ends.
   - The flash, the flip, and every mode-gated surface still follow the committed mode at commit.
 - `web/webclient-app/AppClient.vue`:
   - It passes each stage actor its gesture from `view.beatStage`: the player by `status.actor.identity`, and each foe by `portrait_ref` inside `FoeLineup`.
@@ -54,7 +54,7 @@ C12 (`combat-beats-panel` D3) requires a terminal round's beats to play before C
   - `stories/Core/StageActor.stories.js` gains `BeatLunge`, `BeatHit`, and `BeatDefeat`.
   - `stories/Core/FoeLineup.stories.js` gains `RoundInProgress`.
   - `stories/Core/HudFrame.stories.js` gains `TerminalRoundHold`.
-- Browser: new `web/tests/browser/test_browser_combat_choreography.py`. It covers a full-motion computed-style check, a reduced run, and the terminal hold at `off` and `reduced`.
+- Browser: new `web/tests/browser/test_browser_combat_choreography.py`. It plays a synthetic round through the live client's store and covers a full-motion computed-style check, a reduced run, and the terminal hold at `off` and `reduced`.
 - No OOB schema, presenter, server, persistence, or component-manifest change. No component is added or deleted.
 
 Out of scope:

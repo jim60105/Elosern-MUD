@@ -48,7 +48,7 @@
 
 ## 5. Browser and evidence
 
-- [ ] 5.1 Create `web/tests/browser/test_browser_combat_choreography.py` with design D7's four journeys, reusing C13b's isolated-server helpers. For the terminal journeys, pick the defeat setup the way `test_browser_combat_panels.py` reaches a terminal outcome (`grep -n "defeat\|victory\|terminal" web/tests/browser/test_browser_combat_panels.py`). Annotate the journeys as D7 lists, and add them to a shard in `.github/browser-shards.json`.
+- [ ] 5.1 Create `web/tests/browser/test_browser_combat_choreography.py` with design D7's four journeys, each playing a synthetic round through the live client's store (C13a's injection style), because no real-server journey reaches a one-attack defeat. Annotate the journeys as D7 lists, and add them to a shard in `.github/browser-shards.json`.
 - [ ] 5.2 `web/webclient/tests/test_node_suite_evidence.py`: add `test_beat_choreography_vitest_evidence_passes`, which runs `tests/beat_choreography.test.js` and is annotated with the new ID.
 - [ ] 5.3 Run `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_choreography web.tests.browser.test_browser_combat_beats web.tests.browser.test_browser_combat_stage web.tests.browser.test_browser_mode_transitions web.tests.browser.test_browser_combat_panels`. All green.
 

@@ -14,7 +14,7 @@ See proposal.md (Why). The state below comes from the code and from the earlier 
   - `AppClient` mounts it in `#actor-right` inside `<Transition name="foes-enter">` while `mode === 'combat'`.
 - **`StageActor.vue`** (C10b, C11b): the root `[data-testid="stage-actor"][data-side][data-speaking]` holds the `actor-xfade` transition around `ReferenceArtwork`, and the dim filter eases over `--motion-fast`.
 - **`HudFrame.vue`** (C11c):
-  - `.stage-combat-veil` is always rendered and `aria-hidden`. It is `opacity: 0` with `transition: opacity var(--motion-reveal)`, and `opacity: 1` in combat mode, with the pulse on a `::before` layer active only in combat.
+  - `.stage-combat-veil` is always rendered and `aria-hidden`. It is `opacity: 0`, and `opacity: 1` in combat mode, with the pulse on a `::before` layer active only in combat. Under `[data-mode-change]` it transitions its opacity over `--motion-actor`.
   - `data-mode-change` drives the flash and the flip once per live change.
 - **`VitalsTrack.vue`** (C11a, C13b): the fill runs `width var(--motion-slow)`, and the ghost runs `width var(--motion-trail) ease var(--motion-trail-delay)` (600ms after 250ms). `displayHp` drives the hp row during playback.
 - **Motion levels** (C11a): `reduced` allows no translation, no shake, no flash, and only fades of at most 150ms. At `off` everything is 0.
@@ -60,7 +60,7 @@ The reducer's step becomes `text` → `act` → `pause`:
 - `shown(i)` enters `act`. The step's HP applies now, so the fill and the gauge move with the shake.
 - `acted` enters `pause`.
 
-The store waits `actMs(step)` between `act` and `acted`: the maximum of the gestures the step plays, read through `readMotionMs`.
+The store waits `actMs(state)` between `act` and `acted`: the maximum of the gestures the step plays (D3's `gestures`), read through `readMotionMs`. When it is 0 (a step with no gesture, or the `reduced` level's 0ms step and hit), `acted` applies in the same pass, so the pause starts at once as it did before this change.
 - `--motion-beat-step` when `firstOfAction && actorKnown`
 - `--motion-beat-hit` for a known `damage` target
 - `--motion-beat-defeat` for a known `target_defeated` foe
@@ -72,13 +72,14 @@ The float and the trailing bar run on into the pause. They are decorative and no
 ### D3. The stage slice
 `stageFor(state)` returns `null` unless `state.phase ∈ {text, act, pause}` and `plan.auto`. Otherwise it returns:
 - `step`: the current index
-- `gestures`: a map from key to `{ gesture, amount }`, filled only during `act`:
+- `key`: `"<round>:<step>"`, which each stage actor uses as its `gestureKey`
+- `gestures`: a map from key to `{ gesture, amount }`, filled during the step's `act` and `pause` and empty during `text`. The rising number (600ms) runs on into the pause, and clearing the map at `pause` would re-key the wrapper and remove the number mid-rise. Only keys that stand on the stage get one (the player, and the first three foes of `foes`):
   - the actor gets `lunge` when `firstOfAction`
   - a damage target gets `hit` with `amount`
   - a defeat target that is a foe gets `defeat`
   - the player never gets `defeat`
 - `foes`: the plan's pre-round active foe rows, `roster.filter(team === "foes" && state === "active")`, minus the keys in `defeated`
-- `defeated`: every foe key whose `target_defeated` step index is ≤ the current step while in `act` or `pause`, or < it while in `text`
+- `defeated`: every pre-round foe key whose `target_defeated` step index is < the current step, in every phase. The defeated foe therefore still stands during its own defeat step's `act` and `pause`, where it plays `defeat`, and leaves the list at the next step (or at `done`). A child that leaves a `TransitionGroup` is unmounted and never patched again, so if the foe left in the same patch that assigned its gesture, `data-beat="defeat"` would never render. Leaving afterwards, the slot keeps its unpatched faded DOM (the keyframe ends at `opacity: 0` with `forwards`), so C13a's leave fade is invisible.
 
 The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key the plan does not know gets no gesture (design §12). A step that names a foe not on stage (the fourth or later) animates nothing on stage, and only its frame numerals change (C13b).
 
@@ -89,12 +90,12 @@ The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key 
   - `gesture` (String or null)
   - `gestureKey` (String, `"<round>:<step>"`)
   - `floatAmount` (Number or null)
-- The template wraps the existing `actor-xfade` transition in `<div class="stage-actor__beat" :key="gestureKey || 'rest'" :data-beat="gesture || null">`. Re-keying restarts a CSS animation cleanly for a new step, and a key of `rest` renders the idle state.
+- The template wraps the existing `actor-xfade` transition in `<div class="stage-actor__beat" :key="gesture ? gestureKey || gesture : 'rest'" :data-beat="gesture || null">`. Re-keying restarts a CSS animation cleanly for a new step, and a key of `rest` renders the idle state.
 - CSS, written against `[data-testid="stage-actor"]` as C11b D5 does:
   - `[data-beat="lunge"][data-side="left"]`: `animation: elosern-beat-lunge-right var(--motion-beat-step) var(--ease-standard) 1`. The right side uses `-left`, so both step toward the centre.
   - `[data-beat="hit"]`: `elosern-beat-hit var(--motion-beat-hit) linear 1`.
   - `[data-beat="defeat"]`: `elosern-beat-defeat var(--motion-beat-defeat) var(--ease-exit) 1 forwards`.
-- The float is `<span v-if="floatAmount !== null" class="stage-actor__float" aria-hidden="true" :key="gestureKey">−{{ floatAmount }}</span>`:
+- The float is `<span v-if="gesture === 'hit' && floatAmount !== null" class="stage-actor__float" aria-hidden="true" :key="`float:${gestureKey}`">−{{ floatAmount }}</span>`:
   - absolutely positioned at 30% from the top and centred, in the seal colour, bold, at the message text size
   - `animation: elosern-beat-float var(--motion-beat-float) var(--ease-exit) 1 forwards`
   - At `off` and `reduced` the duration is 0, so it ends invisible at once. The amount is in the beat's text and the HP numerals, so nothing is lost.
@@ -109,11 +110,11 @@ The view publishes it as `view.beatStage`, next to C13b's `beatPlayback`. A key 
 - Each slot's gauge (shipped by C13a) reads the displayed value:
   - width = `(displayHp?.[ref] ?? row.hp_current) / row.hp_maximum`; the fill and the trailing bar keep C13a's look and transitions
   - The numerals remain the participant frame's only. The gauge is the stage's reading of "that target's HP bar animates to `hp_after`" (design §10.2), and it is visible during the terminal hold, when the frame is gone.
-- Each slot's actor receives `gesture`, `gestureKey`, and `floatAmount` from `stage.gestures[portrait_ref]`. `AppClient` passes the player's from `stage.gestures[status.actor.identity]`.
+- Each slot's actor receives `gesture`, `gestureKey`, and `floatAmount` from `stage.gestures[portrait_ref]`. The slot also carries the gesture as `data-beat`, so a defeated foe's gauge fades out with its figure over `--motion-beat-defeat` instead of floating on alone until the slot leaves. `AppClient` passes the player's from `stage.gestures[status.actor.identity]`.
 
 ### D6. The terminal-round hold
 - `HudFrame` gains the `beatHold` prop and renders `:data-beat-hold="beatHold ? 'combat' : null"` on `.elosern-stage`.
-- CSS: `.elosern-stage[data-beat-hold="combat"] .stage-combat-veil { opacity: 1 }`. The veil's existing transition fades it out when the attribute goes away. The pulse `::before` stays combat-mode only.
+- CSS: `.elosern-stage[data-beat-hold="combat"] .stage-combat-veil { opacity: 1 }`, and the `::before` pulse runs during the hold too. It is the same animation, so the running pulse continues unbroken across the mode flip instead of jumping to full opacity. When the attribute goes away, the veil fades out on the combat exit's own transition (`[data-mode-change] .stage-combat-veil`, `--motion-actor`), because `data-mode-change` is still `combat-exploration`.
 - `AppClient` renders the line-up while `store.view.mode === 'combat' || store.view.beatHold`, from `beatStage.foes`, and binds `:inert="store.view.beatHold"` on it. The foes are art whose committed state no longer exists, so they must be out of reach even though they are on screen.
 - When the hold ends, the `foes-enter` leave (C13a) fades the line-up out beside the veil. That is §9.3's "foes fade out, veil fades out".
 
@@ -134,15 +135,20 @@ What the hold does not do:
 - `tests/core/foe_lineup.test.js`: a stage slice keeps a committed-defeated foe until its step, the gauge width follows `displayHp`, and there are no numerals.
 - `tests/hud_frame.test.js`: `data-beat-hold` renders only with the prop.
 - `tests/beat_queue.test.js` and `tests/store/beat_playback.test.js` gain the `act` row, with the act timer stubbed. `tests/motion_tokens.test.js` requires the four new tokens.
-- **Browser** `web/tests/browser/test_browser_combat_choreography.py`, on an isolated managed server with C13b's helpers:
-  - `test_beat_gestures_full_motion` (`motion_level=None`). It fights with a basic attack and polls `view.beatStage` for each gesture. On the matching actor it reads:
-    - `data-beat="lunge"` with `getAnimations()` naming `elosern-beat-lunge-right` at 240ms on the player
+- **Browser** `web/tests/browser/test_browser_combat_choreography.py`, on the shared server. The synthetic kit's monsters have 200 HP and no browser journey reaches a one-attack defeat on a real server, so every journey plays a synthetic round through the live client's own store:
+  - it commits a combat snapshot with its own participants and art catalog
+  - it dispatches `combat.cast` with the outbound `ui_action` swallowed, so the server never sees it
+  - it appends the round's lines, then commits the completing publication (a `ui_update` in combat, or a full `ui_snapshot` in `exploration` for a terminal round) with the `combat_beats` panel, and then the action's result
+
+  The store binds and plays that round exactly as it does a live one, and C13b's real-server journeys keep the end-to-end binding covered. Gestures are read from the computed `animation-name` and `animation-duration` on the gesture wrapper, polled per animation frame. `getAnimations()` is not used, because a finished animation without a fill drops out of it while `data-beat` stays through the pause.
+  - `test_beat_gestures_full_motion` (`motion_level=None`). It plays a roll and a damage beat. On the matching actor it reads:
+    - `data-beat="lunge"` with `elosern-beat-lunge-right` at 240ms on the player
     - `data-beat="hit"` with `elosern-beat-hit` at 180ms on the foe, and a `.stage-actor__float` with `elosern-beat-float` at 600ms
     - the vitals ghost's computed `transition-delay` `0.3s`
 
     It never asserts elapsed time.
   - `test_beat_gestures_reduced` (`motion_level="reduced"`): the lunge and hit durations are 0s, the float is not visible, and the defeat animation is ≤ 0.15s with an identity transform.
-  - `test_terminal_round_holds_the_stage` (`motion_level="reduced"`): the fight is set up so that one attack defeats the last foe (the synthetic kit's weakest monster, as `test_browser_combat_panels.py` does for terminal outcomes). Right after the snapshot:
+  - `test_terminal_round_holds_the_stage` (`motion_level="reduced"`): the synthetic round defeats the last foe and commits `exploration`. Right after the snapshot:
     - `data-elosern-mode` is `exploration`, the minimap island is visible, and `data-beat-hold` is `combat`
     - the veil's computed opacity is 1, and the line-up is present and `inert`
     - a click on the message window then removes `data-beat-hold`, and the line-up is eventually gone
