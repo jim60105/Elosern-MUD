@@ -246,6 +246,8 @@ const placeholderKind = computed(() => {
 // The scene label + alt always render as text outside the bitmap.
 const sceneLabel = computed(() => scene.value?.label ?? (unavailable.value ? "場景" : ""));
 const sceneAlt = computed(() => scene.value?.alt ?? "");
+const generating = computed(() => scene.value?.status === "pending" && !!priorImage.value);
+const hasControl = computed(() => !unavailable.value && !!scene.value);
 
 // The rendered image's own URL: during a crossfade two images are in the
 // DOM, and a late event from the leaving one must not speak for the scene on
@@ -379,38 +381,49 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
       </p>
     </div>
 
-    <p
-      v-if="scene?.status === 'pending' && priorImage"
-      class="scene-backdrop__generating"
-      data-testid="scene-backdrop-generating"
-    >
-      目前場景圖片生成中
-    </p>
-
-    <!-- The scene label and alternative text render as text outside the
+    <!-- The scene caption: one single-line plate holding the pending
+         notice, the scene label, the alternative text, and the full-view
+         control. A label or alt text longer than the row truncates with an
+         ellipsis (the full text stays in the DOM and in `title`), so the row
+         keeps the fixed `--scene-caption-h` the dialogue choice list stops
+         above. The label and alt render as text outside the
          bitmap (MODIFIED webclient-art-panel): no required information
          exists only inside the image. -->
-    <p v-if="sceneLabel" class="scene-backdrop__scene-label" data-testid="scene-backdrop-label">
-      {{ sceneLabel }}
-    </p>
-    <p v-if="sceneAlt" class="scene-backdrop__scene-alt" data-testid="scene-backdrop-alt">
-      {{ sceneAlt }}
-    </p>
-
-    <!-- The scene control opens the full view (MODIFIED art-panel: click or
-         Enter on the control; Escape closes and restores focus). -->
-    <button
-      v-if="!unavailable && scene"
-      ref="controlEl"
-      type="button"
-      class="scene-backdrop__fullview-control"
-      data-testid="scene-backdrop-control"
-      aria-label="開啟場景全圖"
-      @click="openFullView"
-      @keydown="onControlKeydown"
+    <div
+      v-if="generating || sceneLabel || sceneAlt || hasControl"
+      class="scene-backdrop__caption"
+      data-testid="scene-backdrop-caption"
     >
-      全圖
-    </button>
+      <div class="scene-backdrop__plate">
+        <p
+          v-if="generating"
+          class="scene-backdrop__generating"
+          data-testid="scene-backdrop-generating"
+        >
+          目前場景圖片生成中
+        </p>
+        <p v-if="sceneLabel" class="scene-backdrop__scene-label" data-testid="scene-backdrop-label" :title="sceneLabel">
+          {{ sceneLabel }}
+        </p>
+        <p v-if="sceneAlt" class="scene-backdrop__scene-alt" data-testid="scene-backdrop-alt" :title="sceneAlt">
+          {{ sceneAlt }}
+        </p>
+        <!-- The scene control opens the full view (MODIFIED art-panel: click
+             or Enter on the control; Escape closes and restores focus). -->
+        <button
+          v-if="hasControl"
+          ref="controlEl"
+          type="button"
+          class="scene-backdrop__fullview-control"
+          data-testid="scene-backdrop-control"
+          aria-label="開啟場景全圖"
+          @click="openFullView"
+          @keydown="onControlKeydown"
+        >
+          全圖
+        </button>
+      </div>
+    </div>
 
     <div
       v-if="fullViewOpen"
@@ -525,65 +538,101 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   color: var(--paper-300);
 }
 
-.scene-backdrop .scene-backdrop__generating {
-  position: absolute;
-  left: 50%;
-  bottom: calc(var(--stage-content-bottom) + 56px);
-  transform: translateX(-50%);
-  z-index: 2;
-  margin: 0;
-  padding: 2px var(--sp-3);
-  background: var(--panel);
-  backdrop-filter: blur(8px);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
-  color: var(--warn);
-  font-size: var(--text-sm);
-}
-
-.scene-backdrop .scene-backdrop__scene-label {
+/* The scene caption block: one plate (the pending notice, the label, the
+   alt text, and the full-view control). Standalone, it sits at the stage's
+   lower left clear of the band and the command-line row; the shell
+   (app-shell.css) centres it in the open stage between the portraits. The
+   block itself is pointer-transparent; only its children take pointer
+   events, so it never blocks the stage beside them. */
+.scene-backdrop .scene-backdrop__caption {
   position: absolute;
   left: 16px;
-  bottom: calc(var(--stage-content-bottom) + 12px);
-  z-index: 2;
-  margin: 0;
-  padding: 4px var(--sp-3);
-  background: var(--panel);
-  backdrop-filter: blur(8px);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-100);
-  font-size: var(--text-sm);
-}
-
-.scene-backdrop .scene-backdrop__scene-alt {
-  position: absolute;
-  left: 16px;
-  bottom: calc(var(--stage-content-bottom) + 44px);
-  z-index: 2;
-  margin: 0;
-  padding: 4px var(--sp-3);
-  background: var(--panel);
-  backdrop-filter: blur(8px);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-500);
-  font-size: var(--text-sm);
-}
-
-.scene-backdrop .scene-backdrop__fullview-control {
-  position: absolute;
   right: 16px;
   bottom: calc(var(--stage-content-bottom) + 12px);
   z-index: 2;
-  background: var(--ink-780);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.scene-backdrop .scene-backdrop__caption > * {
+  pointer-events: auto;
+}
+
+/* The pending notice leads the plate in the warning tone, split from the
+   label by the same gold hairline the alt text uses. */
+.scene-backdrop .scene-backdrop__generating {
+  flex: none;
+  margin: 0;
+  white-space: nowrap;
+  padding-right: 12px;
+  border-right: 1px solid rgba(202, 183, 138, 0.3);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+}
+
+/* The plate reads as a museum caption for the painting: the label in the
+   serif display face, the alt text as its quieter description after a gold
+   hairline, and the full-view control as a small trailing chip. It is one
+   line at the fixed `--scene-caption-h`: within the caption block's width
+   the label takes at most 55% and the alt text the rest, each ending in an
+   ellipsis; the notice and the control never shrink. */
+.scene-backdrop .scene-backdrop__plate {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  column-gap: 12px;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: var(--scene-caption-h);
+  padding: 5px 6px 5px 14px;
+  background: rgba(11, 13, 16, 0.74);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(202, 183, 138, 0.22);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.scene-backdrop .scene-backdrop__scene-label,
+.scene-backdrop .scene-backdrop__scene-alt {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scene-backdrop .scene-backdrop__scene-label {
+  flex: 0 1 auto;
+  max-width: 55%;
+  color: var(--paper-100);
+  font: 14px/1.5 var(--f-serif);
+  letter-spacing: 0.12em;
+}
+
+.scene-backdrop .scene-backdrop__scene-alt {
+  flex: 0 1 auto;
+  padding-left: 12px;
+  border-left: 1px solid rgba(202, 183, 138, 0.3);
+  color: var(--paper-500);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+}
+
+.scene-backdrop .scene-backdrop__fullview-control {
+  flex: none;
+  margin-left: 2px;
+  background: transparent;
   border: 1px solid var(--ink-600);
   border-radius: var(--radius-sm);
   color: var(--paper-300);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-family: var(--f-sans);
-  padding: 4px var(--sp-3);
+  letter-spacing: 0.08em;
+  padding: 2px 9px;
   cursor: pointer;
 }
 

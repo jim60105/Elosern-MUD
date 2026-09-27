@@ -141,24 +141,23 @@ body {
   font-size: 11px;
 }
 .elosern-root .scene-backdrop__placeholder-kind { display: none; }
-/* These captions are positioned inside the backdrop box, whose lower edge
-   is already the band's top edge: they clear only the command-line row that
-   overlays the box's bottom strip (design D8). The selectors carry the
-   `.scene-backdrop` class so they outrank SceneBackdrop.vue's standalone
-   base rules, which load later at equal specificity. */
-.elosern-root .scene-backdrop .scene-backdrop__scene-label,
-.elosern-root .scene-backdrop .scene-backdrop__scene-alt,
-.elosern-root .scene-backdrop .scene-backdrop__generating {
-  left: calc(var(--left-column) + 16px);
-  max-width: calc(100% - var(--left-column) - var(--right-column) - 80px);
-  bottom: calc(var(--command-line-h) + 28vh + 44px);
-  transform: none;
+/* The scene caption sits at the stage box's lower edge, centred in the open
+   stage between the two portrait anchors' boxes. The backdrop box already
+   ends at the band's top edge, so the block clears only the command-line
+   row docked over the box's bottom strip (design D8). The portraits paint
+   above the backdrop, so the block's sides are their anchor boxes' inner
+   edges (the tokens.css portrait geometry, `aspect-ratio: 2 / 3`) plus a
+   16px gutter: no caption ever slips under a figure, whether or not the
+   right-hand anchor is occupied in the current mode. The selectors carry
+   the `.scene-backdrop` class so they outrank SceneBackdrop.vue's
+   standalone base rules, which load later at equal specificity. */
+.elosern-root .scene-backdrop .scene-backdrop__caption {
+  left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px);
+  right: calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px);
+  bottom: calc(var(--command-line-h) + 12px);
+  align-items: center;
 }
-.elosern-root .scene-backdrop .scene-backdrop__scene-alt { bottom: calc(var(--command-line-h) + 28vh + 76px); }
-.elosern-root .scene-backdrop .scene-backdrop__fullview-control {
-  right: calc(var(--right-column) + 12px);
-  bottom: calc(var(--command-line-h) + 28vh + 44px);
-}
+.elosern-root .scene-backdrop .scene-backdrop__plate { justify-content: center; }
 /* The standing portraits' soft edge masks live in StageActor.vue
    (webclient-dialogue-stage-actors D1), shared by both portrait anchors. */
 /* The portrait's caption reads as a small name plate at the figure's lower

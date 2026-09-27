@@ -46,6 +46,20 @@ describe("SceneBackdrop (H1 D3/D8)", () => {
     expect(w.get('[data-testid="scene-backdrop"]').attributes("data-available")).toBe("true");
   });
 
+  it("keeps the label, the alt text, and the full-view control on one caption plate", () => {
+    const w = mountBackdrop();
+    const plate = w.get('[data-testid="scene-backdrop-caption"] .scene-backdrop__plate');
+    for (const id of ["scene-backdrop-label", "scene-backdrop-alt", "scene-backdrop-control"]) {
+      expect(plate.find(`[data-testid="${id}"]`).exists()).toBe(true);
+    }
+    // The one-line plate may end a long label or alt in an ellipsis; the
+    // full text stays in the DOM and in the hover title.
+    expect(plate.get('[data-testid="scene-backdrop-label"]').attributes("title")).toBe("河畔清晨");
+    expect(plate.get('[data-testid="scene-backdrop-alt"]').attributes("title")).toBe("河畔清晨的場景");
+    // The pending notice renders only for a pending scene with a prior image.
+    expect(plate.find('[data-testid="scene-backdrop-generating"]').exists()).toBe(false);
+  });
+
   it("degrades the pending scene without a prior image to the truthful placeholder (no invented image)", () => {
     const w = mountBackdrop({ art: ART_PANEL_PENDING_SAMPLE });
     // No scene bitmap: the frame carries the payload's own missing/placeholder wording.

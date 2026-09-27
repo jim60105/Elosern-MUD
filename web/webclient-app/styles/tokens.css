@@ -213,6 +213,12 @@
        above the band derives its offset from this single token, never
        re-deriving the command line's height by hand. */
     --stage-content-bottom: calc(var(--band-h) + var(--command-line-h));
+    /* The scene caption row (SceneBackdrop's plate: the scene label, its
+       alt text, and the full-view control on one line) sits 12px above the
+       command-line row, centred between the portraits. `--stage-caption-top`
+       is its upper edge, which the dialogue choice list stops above. */
+    --scene-caption-h: 34px;
+    --stage-caption-top: calc(var(--stage-content-bottom) + 12px + var(--scene-caption-h));
    /* ---- z-index scale ----
       Every full-screen surface consumes --z-surface-modal (or a value derived
       from it); nothing but the offline overlay may exceed --z-offline.

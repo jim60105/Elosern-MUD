@@ -61,7 +61,8 @@ focusable element and SHALL NOT intercept pointer events, and they MAY sit behin
 The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
 box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
 SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
-command-line row's upper edge, so it never meets the expanded command line; when its content is taller
+scene caption row that stands on the command-line row, so it never meets the scene caption or the
+expanded command line; when its content is taller
 than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
 command-line row, or the bottom band.
 
@@ -237,6 +238,13 @@ positioned so that none of them overlaps the bottom band, the action dock's, or 
 rendered content, at 1920x1080, 1440x900, and 1280x720 — extending the sibling stage requirement's
 general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
 stage anchors but are absolutely positioned within the same full-bleed stage.
+The scene label, the alternative text, the pending notice, and the full-view control SHALL render as
+one caption row on the stage box's lower edge, standing just above the command-line row docked on the
+band's top edge, and centred in the open stage between the `actor-left` and `actor-right` anchor boxes,
+so no portrait anchor (which paints above the backdrop) and no other HUD surface covers any part of it
+in any mode. The row SHALL stay one line tall: a label or alternative text longer than the row SHALL end
+in an ellipsis on screen while its full text stays in the DOM, and the dialogue choice list SHALL stop
+above the row.
 
 #### Scenario: A done scene paints the stage
 - **WHEN** the committed art panel carries a `done` scene with a same-origin URL
@@ -269,6 +277,13 @@ stage anchors but are absolutely positioned within the same full-bleed stage.
   the band
 - **THEN** each one's rendered bounding box stays above the bottom band's top edge and above the
   command-line row, at 1920x1080, 1440x900, and 1280x720
+
+#### Scenario: The scene caption stands on the stage floor between the portraits
+- **WHEN** the scene label, alternative text, and full-view control render with the command line expanded
+  at 1920x1080, 1440x900, and 1280x720
+- **THEN** their caption row's bottom edge lies at most 16px above the command-line row's top edge, the
+  row is horizontally centred between the `actor-left` and `actor-right` anchor boxes (±1.5px), and each
+  part lies between those boxes with no other surface painted over it
 
 ### Requirement: The message window presents the current response one page at a time in the band's message region
 The narrative SHALL render as a message window that fills the bottom band's message region — the left

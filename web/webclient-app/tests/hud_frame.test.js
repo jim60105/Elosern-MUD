@@ -315,12 +315,12 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     });
   });
 
-  it("gates the choices anchor to dialogue mode and bounds it above the command-line row", () => {
+  it("gates the choices anchor to dialogue mode and bounds it above the scene caption row", () => {
     const css = styleBlock("components/HudFrame.vue");
     const anchor = extractRule(css, '.elosern-stage [data-anchor="choices"]');
     expect(anchor).toMatch(/width: min\(560px, 40%\)/);
     expect(anchor).toMatch(/left: calc\(50% - min\(280px, 20%\)\)/);
-    expect(anchor).toMatch(/bottom: calc\(var\(--stage-content-bottom\) \+ var\(--stage-inset-y\)\)/);
+    expect(anchor).toMatch(/bottom: calc\(var\(--stage-caption-top\) \+ 8px\)/);
     expect(anchor).toMatch(/z-index: 4/);
     expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
     const frame = mount(HudFrame, { props: { mode: "dialogue" }, slots: { choices: () => h("div", { class: "probe" }) } });
@@ -391,6 +391,21 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
     expect(shellCss).not.toContain("--dock-h");
     expect(shellCss).not.toContain("stage-portrait");
+  });
+
+  it("stands the scene caption on the stage floor between the portrait anchors", () => {
+    // The backdrop box already ends at the band's top edge, so the caption
+    // clears only the command-line row: no band-sized offset on top.
+    const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    const rule = extractRule(shellCss, ".elosern-root .scene-backdrop .scene-backdrop__caption");
+    expect(rule).toContain("bottom: calc(var(--command-line-h) + 12px);");
+    expect(rule).toContain("left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px);");
+    expect(rule).toContain("right: calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px);");
+    expect(shellCss).not.toMatch(/scene-backdrop[^{]*\{[^}]*\d+vh/);
+    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
+    expect(tokens).toContain(
+      "--stage-caption-top: calc(var(--stage-content-bottom) + 12px + var(--scene-caption-h));",
+    );
   });
 
   it("places the portrait anchors after the combat veil so the player paints above it", () => {

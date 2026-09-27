@@ -64,6 +64,73 @@ def _boxes_overlap(a, b):
     )
 
 
+_CAPTION_GEOMETRY_JS = """() => {
+  const box = (el) => {
+    if (!el) { return null; }
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+  };
+  const q = (sel) => document.querySelector(sel);
+  const parts = {};
+  for (const id of ["scene-backdrop-label", "scene-backdrop-alt", "scene-backdrop-control"]) {
+    const el = q('[data-testid="' + id + '"]');
+    if (!el) { continue; }
+    const b = box(el);
+    // The element painted at the part's centre is the part itself (or its
+    // text), so no HUD surface above the backdrop covers it.
+    const hit = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+    parts[id] = { box: b, onTop: !!hit && (hit === el || el.contains(hit)) };
+  }
+  return {
+    parts,
+    plate: box(q(".scene-backdrop__plate")),
+    backdrop: box(q('[data-testid="scene-backdrop"]')),
+    band: box(q('[data-testid="stage-band"]')),
+    commandLine: box(q('[data-anchor="command-line"]')),
+    actorLeft: box(q('[data-anchor="actor-left"]')),
+    actorRight: box(q('[data-anchor="actor-right"]')),
+  };
+}"""
+
+
+def assert_scene_caption_on_stage_floor(test, page, viewport):
+    """The scene caption plate (label, alt text, full-view control) sits on
+    the stage box's lower edge, 12px above the expanded command-line row,
+    centred in the open stage between the two portrait anchors' boxes, and
+    no portrait or HUD surface paints over any of its parts. The portraits
+    are pointer-transparent, so their clearance is a box check; every other
+    surface is caught by the hit test.
+    """
+    geo = page.evaluate(_CAPTION_GEOMETRY_JS)
+    size = "%dx%d" % viewport
+    test.assertIn("scene-backdrop-label", geo["parts"], "the scene label renders at %s" % size)
+    plate = geo["plate"]
+    cmd = geo["commandLine"]
+    band = geo["band"]
+    test.assertIsNotNone(plate, "the caption plate renders at %s" % size)
+    # The backdrop box ends at the band's top edge; the plate stands just
+    # above the command-line row docked on that edge (not a band-height up).
+    test.assertAlmostEqual(geo["backdrop"]["bottom"], band["top"], delta=1.0)
+    test.assertAlmostEqual(cmd["bottom"], band["top"], delta=1.0)
+    gap = cmd["top"] - plate["bottom"]
+    test.assertGreaterEqual(gap, 0, "the caption intrudes into the command line at %s" % size)
+    test.assertLessEqual(gap, 16, "the caption floats %.0fpx above the command line at %s" % (gap, size))
+    # Centred in the open stage between the portrait anchors' boxes.
+    left_edge = geo["actorLeft"]["right"]
+    right_edge = geo["actorRight"]["left"]
+    test.assertAlmostEqual(
+        (plate["left"] + plate["right"]) / 2, (left_edge + right_edge) / 2, delta=1.5,
+        msg="the caption is not centred between the portraits at %s" % size,
+    )
+    for testid, part in geo["parts"].items():
+        b = part["box"]
+        test.assertGreater(b["width"], 0, "%s is rendered at %s" % (testid, size))
+        test.assertGreaterEqual(b["left"], left_edge, "%s slips under the player portrait at %s" % (testid, size))
+        test.assertLessEqual(b["right"], right_edge, "%s slips under the right portrait at %s" % (testid, size))
+        test.assertLessEqual(b["bottom"], cmd["top"], "%s intrudes into the command line at %s" % (testid, size))
+        test.assertTrue(part["onTop"], "%s is covered by another surface at %s" % (testid, size))
+
+
 def _art_portrait_ready(state: dict) -> bool:
     """A portrait tile renders only when the art panel is available and its catalog has entries."""
     art = (state.get("panels") or {}).get("art") or {}
@@ -210,6 +277,21 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), SCENE_LABEL)
         self.assertTrue(page.locator('[data-testid="scene-backdrop-alt"]').inner_text().strip())
         self.assertTrue(page.locator('[data-testid="scene-backdrop"]').is_visible())
+
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
+    def test_scene_caption_sits_on_the_stage_floor_between_the_portraits(self):
+        """The done scene's caption plate stands on the stage's lower edge just
+        above the expanded command-line row, centred between the portraits and
+        covered by nothing, at every supported viewport."""
+        page = self.logged_in_page((1920, 1080))
+        open_command_line(page)
+        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
+                page.wait_for_function(
+                    "([w, h]) => innerWidth === w && innerHeight === h", arg=list(viewport), timeout=5000
+                )
+                assert_scene_caption_on_stage_floor(self, page, viewport)
 
 
 
@@ -396,7 +478,9 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         """Every rendered scene-backdrop caption (the truthful placeholder, the
         scene label, the alternative text, and the full-view control) stays above
         the action dock's top edge and the command line's top edge at both
-        supported viewports (fix-webclient-scene-backdrop-placeholder-overlap).
+        supported viewports (fix-webclient-scene-backdrop-placeholder-overlap),
+        and the caption plate stands on the stage floor between the portraits
+        rather than a band-height up the stage.
         """
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
@@ -450,6 +534,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                         _boxes_overlap(box, cmd_line),
                         "%s box intersects the command line at %dx%d" % (testid, viewport[0], viewport[1]),
                     )
+                assert_scene_caption_on_stage_floor(self, page, viewport)
                 # The message window sits in the band's left two thirds beside
                 # the action dock and below the expanded command line, intersecting neither.
                 feed = _rect(page, '[data-testid="message-window"]')

@@ -325,14 +325,15 @@ defineExpose({ menuOpen });
 /* choices (webclient-dialogue-choices-overlay D6): the dialogue choice
    list, horizontally centred on the stage at `min(560px, 40%)` wide and
    vertically centred in the span between the top band's inset and the
-   expanded command-line row (`--stage-content-bottom`), so the list clears
-   the place card, the islands, the band, and the borrowed command line at
-   every supported viewport. The anchor itself is pointer-transparent; the
+   scene caption row that sits on the expanded command-line row
+   (`--stage-caption-top`), so the list clears the place card, the islands,
+   the scene caption, the band, and the borrowed command line at every
+   supported viewport. The anchor itself is pointer-transparent; the
    list inside it takes pointer events and scrolls when it is taller than
    the span. No transform, so the text never lands on half pixels. */
 .elosern-stage [data-anchor="choices"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
-  bottom: calc(var(--stage-content-bottom) + var(--stage-inset-y));
+  bottom: calc(var(--stage-caption-top) + 8px);
   left: calc(50% - min(280px, 20%));
   width: min(560px, 40%);
   z-index: 4;

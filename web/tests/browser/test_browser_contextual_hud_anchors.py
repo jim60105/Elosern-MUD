@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import open_dialogue_choices, valid_local_map_panel
 from ._journey_support import (
+    _art_panel,
     _local_map_unavailable_panel,
     _inject_snapshot,
     _wait_mode,
@@ -145,10 +146,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 {"keyword_id": "road", "label": "路上安全嗎？"},
             ],
         }
+        # A committed scene whose label and alt text are far longer than the
+        # caption row between the portraits: the row stays one line, so the
+        # list still stops above it.
+        art = _art_panel([])
+        art["scene"] = {
+            **art["scene"],
+            "label": "伊洛瑟恩外城南門外的石板市集廣場與遠方的鐘樓" * 2,
+            "alt": "午後陽光斜斜落在石板上，市集的紅色遮篷在風裡輕輕鼓動，遠處鐘樓的影子橫過廣場。" * 3,
+        }
         for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
-                _inject_snapshot(page, {"local_map": valid_local_map_panel(), "dialogue": dialogue}, mode="dialogue")
+                _inject_snapshot(
+                    page,
+                    {"local_map": valid_local_map_panel(), "dialogue": dialogue, "art": art},
+                    mode="dialogue",
+                )
                 _wait_mode(page, "dialogue")
                 # The window may still hold unread pages of the session's
                 # latest response: read them first (webclient-dialogue-choices-overlay).
@@ -165,6 +179,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         card: r('[data-testid="dialogue-choices"]'),
                         band: r('[data-testid="stage-band"]'),
                         commandLine: r('[data-anchor="command-line"]'),
+                        caption: r('.scene-backdrop__plate'),
                         rows: document.querySelectorAll('[data-testid="dialogue-choices"] [role="menuitem"]').length,
                         scrollable: rows.scrollHeight > rows.clientHeight + 1,
                         width: innerWidth,
@@ -178,6 +193,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertGreaterEqual(geo["card"]["top"], 48)
                 self.assertLessEqual(geo["card"]["bottom"], geo["commandLine"]["top"], "the list clears the expanded command line")
                 self.assertLessEqual(geo["anchor"]["bottom"], geo["commandLine"]["top"])
+                # The list stops above the scene caption row standing on the
+                # command line, so the caption is never painted over; the
+                # over-long label and alt keep that row one line tall.
+                self.assertIsNotNone(geo["caption"], "the committed scene's caption renders")
+                self.assertLessEqual(geo["caption"]["bottom"] - geo["caption"]["top"], 34.5)
+                self.assertLessEqual(geo["card"]["bottom"], geo["caption"]["top"], "the list covers the scene caption")
+                self.assertLessEqual(geo["caption"]["bottom"], geo["commandLine"]["top"])
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap with the choice list at {viewport}")
                 # The seven rows of a four-pick conversation fit unscrolled
                 # at every supported viewport.
