@@ -102,3 +102,4 @@ Thumbs.db
 .idea/
 .claude/worktrees/
 .worktrees/
+server/.rembg/models/

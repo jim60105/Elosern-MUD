@@ -31,14 +31,14 @@ Alternatives considered:
 
 ### D3. The permissive cutout model for committed output
 
-`ART_REMBG_MODEL` defaults to `bria-rmbg`, whose weights are BRIA-licensed (non-commercial). The committed images must not depend on that licence, so the regeneration run sets `ART_REMBG_MODEL=isnet-anime` (permissively licensed, tuned for this illustration style) and either pre-places the model artifact in `server/.rembg` or runs with `ART_REMBG_DOWNLOAD_ENABLED` set for the session. The tool refuses to run when the resolved model is `bria-rmbg` unless explicitly overridden with `--allow-bria` (there is no reason to; the guard documents the constraint). The runtime stage keeps its own configurable default.
+`ART_REMBG_MODEL` defaults to `bria-rmbg`, whose weights are BRIA-licensed (non-commercial). The committed images must not depend on that licence, so the tool pins `isnet-anime` at the call site using `override_settings`, independently of ambient configuration. Only explicit `--allow-bria` selects the ambient configured model instead; this escape hatch is not used for committed defaults. Before generation, the tool checks both backend-supported model-cache layouts. Missing weights require both `--allow-download` and enabled `ART_REMBG_DOWNLOAD_ENABLED`; otherwise it refuses before contacting sd-webui. The runtime stage keeps its own configurable default.
 
 ### D4. The contract test samples fixed regions, not a mask
 
 The test decodes each file with Pillow and asserts:
 - the mode carries alpha (`RGBA`),
 - every pixel in the four 24×24 corner squares has alpha 0 (the prompt demands a flat backdrop and head-to-feet framing, so corners are backdrop),
-- the mean alpha of the centre column band (x from 40% to 60%, y from 20% to 80%) is at least 250, where the torso stands.
+- the mean alpha over the figure's eroded interior is at least 250: binarize the alpha at 128, erode with a 9×9 minimum filter, and average the raw alpha only over the surviving pixel cores. A fixed geometric crop cannot separate a shredded silhouette from legitimate see-through gaps (a sash at the waist, the gap between arm and torso) or from antialiased edge pixels, so the measure follows the figure's own mask instead.
 
 These regions follow the composition the prompt template fixes, not pixel-exact output, so re-running the tool with a newer model passes as long as the cut is sane.
 
@@ -47,6 +47,26 @@ Alternative considered: a pixel-exact golden file. It would be brittle across mo
 ### D5. Face rectangles are re-authored, not preserved
 
 Regenerated figures are new renders on a 768×1024 canvas; the old rectangles were authored against 920×1536 pixels and make no claim about the new composition. After the six images are committed, each key's `FALLBACK_FACE_RECTS` entry is re-measured on the new pixels (normalized unit-square rects, same structure as today). The existing face-rect shape tests keep passing because only the numeric values change.
+
+### D6. User-directed prompt correction
+
+Live authoring exposed figures that were too small, dark and yellow. The user
+identified the shared portrait wrapper, not the subject sentence, as the cause.
+Correct `art.portrait_prompt` centrally: near-edge head/feet framing with a clear
+margin, bright neutral daylight and fill, and true-to-life colors. The user withdrew
+the experimental `,full body,` tag; full-body framing stays natural-language prose.
+All image-level framing, size, lighting and palette instructions
+belong only in the shared template; authored descriptions carry identity, clothing
+and pose, without per-character color or image-size overrides. Both character and monster runtime
+generation use `render_prompt_pair` and inherit this fix; scenes retain their
+existing positive prompt. Following the requested image-prompt-builder-nl skill,
+the portrait template is one folded natural-language paragraph, and exclusion
+instructions live in `art.negative_prompt`, not the positive portrait prose.
+The shared negative already forbids text and watermarks; explicit readable-text
+and lettering negatives clarify that same constraint for both subject kinds.
+Visual review of real generated output establishes the result,
+not tests pinning incidental prose. Existing literal-word tests are removed,
+while request and cutout-setting behavior tests remain.
 
 ## Risks / Trade-offs
 

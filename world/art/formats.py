@@ -69,13 +69,16 @@ def build_parameters_text(
     value is OMITTED entirely (never a ``None``/sentinel token): the ``Seed:``
     entry disappears when the server reported no seed, the optional
     sampler/scheduler entries only when configured, and the ``Model:`` entry
-    only when a checkpoint is configured.
+    only when a checkpoint is configured. Field names follow the
+    A1111/Forge-infotext vocabulary (``Sampler``, ``Schedule type``) so
+    sd-webui readers restore them into the sampling controls instead of
+    silently resetting them to the defaults.
     """
     fields = [f"Steps: {steps}"]
     if sampler:
-        fields.append(f"Sampler name: {sampler}")
+        fields.append(f"Sampler: {sampler}")
     if scheduler:
-        fields.append(f"Scheduler: {scheduler}")
+        fields.append(f"Schedule type: {scheduler}")
     fields.append(f"CFG scale: {cfg_scale:g}")
     if seed is not None:
         fields.append(f"Seed: {seed}")
@@ -145,6 +148,7 @@ def encode(
     output_format: str,
     quality: int,
     preserve_metadata: bool,
+    infotext: str | None = None,
 ) -> tuple[bytes, str]:
     """Convert transport PNG bytes to the configured output format.
 
@@ -155,6 +159,14 @@ def encode(
     re-save (pixel-identical) that ignores it. Any transport-decode failure,
     non-PNG container, or encoder failure raises ``SDError`` with the bounded
     code ``sd_format_error`` before any output is produced.
+
+    Metadata source: when ``infotext`` carries the server's own
+    generation-parameters text (extracted from the returned PNG), it is
+    embedded VERBATIM — it describes what the server actually applied
+    (expanded styles, resolved sampler/scheduler spellings, module entries).
+    Only when it is absent does preservation fall back to the
+    request-reconstructed parameters text. ``preserve_metadata=False`` stays
+    provably metadata-free whatever ``infotext`` carries.
     """
     try:
         save_format = _PILLOW_SAVE_FORMAT[output_format]
@@ -167,7 +179,7 @@ def encode(
 
     parameters: str | None = None
     if preserve_metadata:
-        parameters = build_parameters_text(
+        parameters = infotext or build_parameters_text(
             prompt=prompt,
             negative_prompt=negative_prompt,
             steps=steps,
@@ -198,6 +210,14 @@ def encode(
                 save_image = image.convert("RGB")
                 save_image.info = {}
             save_kwargs: dict[str, object] = {"quality": quality}
+            if save_format == "WEBP":
+                # Pillow's default, written explicitly: the lossy VP8 quality
+                # knob must never bleed into the alpha plane, which the AVG
+                # stage composites directly. The committed defaults further
+                # floor matte noise below full transparency (see
+                # tools/regenerate_default_art.py); the encoder only promises
+                # to carry the matte it is handed unmodified.
+                save_kwargs["alpha_quality"] = 100
             if parameters is not None:
                 save_kwargs["exif"] = _exif_bytes(parameters)
             save_image.save(buffer, format=save_format, **save_kwargs)

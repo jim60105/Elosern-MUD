@@ -64,15 +64,18 @@ _AGE_BANDS: dict[str, dict[str, object]] = {
 }
 
 # The fixed per-key face-rectangle map, authored against the committed
-# full-body images (normalized unit-square rects). A key without its own
-# entry falls back to the shared ``DEFAULT_FACE_RECT``.
+# full-body images (normalized unit-square rects): each rect frames the
+# head (hairline to chin, ears to ears, with a hair of margin), measured
+# from the alpha silhouette of the current 864x1536 defaults. A key
+# without its own entry falls back to the shared ``DEFAULT_FACE_RECT``.
 FALLBACK_FACE_RECTS: dict[str, dict[str, float]] = {
-    "man": {"x": 0.33, "y": 0.02, "w": 0.34, "h": 0.22},
-    "woman": {"x": 0.33, "y": 0.02, "w": 0.34, "h": 0.22},
-    "boy": {"x": 0.33, "y": 0.03, "w": 0.34, "h": 0.22},
-    "girl": {"x": 0.33, "y": 0.03, "w": 0.34, "h": 0.22},
-    "elder": {"x": 0.33, "y": 0.02, "w": 0.34, "h": 0.22},
-    "monster_anon": {"x": 0.33, "y": 0.02, "w": 0.34, "h": 0.22},
+    "man": {"x": 0.37, "y": 0.02, "w": 0.26, "h": 0.16},
+    "woman": {"x": 0.36, "y": 0.03, "w": 0.28, "h": 0.16},
+    "boy": {"x": 0.35, "y": 0.03, "w": 0.30, "h": 0.17},
+    "girl": {"x": 0.36, "y": 0.02, "w": 0.28, "h": 0.16},
+    "elder": {"x": 0.36, "y": 0.03, "w": 0.28, "h": 0.16},
+    # The hooded void: the rect frames the hood opening, not a face.
+    "monster_anon": {"x": 0.36, "y": 0.02, "w": 0.28, "h": 0.18},
 }
 
 # Entity-carried provenance attribute names written by the spawning/activation

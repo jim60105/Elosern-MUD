@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
+from PIL import Image, ImageFilter
 
 from world.art.fallback_keys import (
     FALLBACK_DEFAULTS_DIRECTORY,
@@ -101,6 +102,46 @@ def _entity(sex="other", apparent_age=30, **attributes):
 
 
 class ClosedVocabularyContractTests(unittest.TestCase):
+    @covers_requirement(
+        "art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background",
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key",
+    )
+    def test_every_default_has_a_transparent_background(self):
+        for key in FALLBACK_KEYS:
+            path = DEFAULTS_DIR / f"{key}{FALLBACK_EXTENSION}"
+            with self.subTest(file=path.name):
+                self.assertLess(path.stat().st_size, FALLBACK_MAX_FILE_BYTES)
+                with Image.open(path) as image:
+                    image.load()
+                    self.assertEqual(image.mode, "RGBA")
+                    width, height = image.size
+                    self.assertGreaterEqual(width, 48)
+                    self.assertGreaterEqual(height, 48)
+                    alpha = image.getchannel("A")
+                    for x, y in ((0, 0), (width - 24, 0),
+                                 (0, height - 24), (width - 24, height - 24)):
+                        self.assertEqual(
+                            alpha.crop((x, y, x + 24, y + 24)).getextrema(),
+                            (0, 0),
+                        )
+                    # The figure's own interior, not a fixed crop: erode the
+                    # silhouette mask and average alpha only over the pixel
+                    # cores, so the body must be solidly opaque while
+                    # antialiased edge pixels and legitimate see-through gaps
+                    # (a sash at the waist, the gap between arm and torso)
+                    # neither inflate the measure nor fail it.
+                    interior = alpha.point(
+                        lambda value: 255 if value >= 128 else 0
+                    ).filter(ImageFilter.MinFilter(9))
+                    core = [
+                        value
+                        for mask, value in zip(
+                            interior.tobytes(), alpha.tobytes()
+                        )
+                        if mask == 255
+                    ]
+                    self.assertGreaterEqual(sum(core) / len(core), 250)
+
     @covers_requirement("art-gallery-fallback::the-built-in-fallback-set-is-a-closed-vocabulary-committed-to-the-repository")
     def test_every_key_has_exactly_one_committed_file_within_the_bound(self):
         files = sorted(p.name for p in DEFAULTS_DIR.iterdir() if p.is_file())

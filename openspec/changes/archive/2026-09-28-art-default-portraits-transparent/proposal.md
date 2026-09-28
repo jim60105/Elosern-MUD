@@ -29,7 +29,9 @@ The fix is to do for the six static defaults what the runtime does for every gen
 
 Out of scope:
 - The stage's own treatment of transparent art (drop shadow, ground shadow, and the mask only for images without alpha): `webclient-stage-actor-grounding`.
-- Generated portraits: they already go through the cutout stage.
+- Runtime generated-portrait pipeline changes: it already applies cutout.
+  The shared portrait prompt correction requested during implementation does
+  also apply to future runtime renders.
 - Scene backdrops: scenes are never cut out.
 
 ## Capabilities
@@ -43,6 +45,15 @@ Out of scope:
 - `art-gallery-fallback`: ADDED "The built-in fallback images carry a transparent background".
 
 ## Impact
+
+- User-directed scope amendment during implementation: correct the shared
+  `art.portrait_prompt` in `prompts/art.yaml` to request a frame-filling figure,
+  bright neutral fill lighting and balanced colors rather than warm lighting
+  and deep shadows. Express full-body framing in natural language; the user
+  subsequently withdrew the experimental `,full body,` tag.
+  Runtime character and monster generation inherits the same correction;
+  scene positive prompts and runtime pipeline code are unchanged. Explicit
+  readable-text/lettering exclusions move into the existing shared negative prompt.
 
 - Assets: `web/static/art/defaults/*.webp` (six binary files replaced).
 - New: `tools/regenerate_default_art.py`.
