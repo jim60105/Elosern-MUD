@@ -248,7 +248,11 @@ const renderPlayer = (args) => ({
                 name: "艾莉亞",
                 current: true,
                 pending: false,
-                portrait: {
+                portrait: args.grounding ? {
+                  subject_key: "char_1", status: args.grounding,
+                  url: null, aspect_ratio: null, alt: "艾莉亞的肖像",
+                  placeholder: { kind: "missing", label: "無肖像" }, face_rect: null,
+                } : {
                   subject_key: "char_1",
                   status: "done",
                   url: "/art/defaults/man.webp",
@@ -461,6 +465,9 @@ export const CombatHud = { render: renderPlayer, args: { combat: true } };
 // The foe line-up (webclient-combat-foes-on-stage) with one foe, and with
 // five, of whom three stand on the stage while the frame lists all five.
 export const CombatOneFoe = { render: renderPlayer, args: { combat: 1 } };
+export const GroundedOneFoe = { render: renderPlayer, args: { combat: 1, grounding: "missing" } };
+export const GroundedTwoFoes = { render: renderPlayer, args: { combat: 2, grounding: "pending" } };
+export const GroundedThreeFoes = { render: renderPlayer, args: { combat: 3, grounding: "failed" } };
 export const CombatFiveFoes = { render: renderPlayer, args: { combat: 5 } };
 // The stage transitions (webclient-scene-transitions): a walk down a short
 // street. Each step crossfades the scene once the next painting is decoded,

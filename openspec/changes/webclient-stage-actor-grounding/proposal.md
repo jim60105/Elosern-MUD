@@ -19,6 +19,7 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 ### Modified Capabilities
 
 - `webclient-contextual-hud`: Add bounded observable presentation requirements.
+- `webclient-art-panel`: Scope existing cover-fit behavior to the unchanged drawer variant; stage images preserve complete contours.
 
 ## Impact
 

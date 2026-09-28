@@ -681,6 +681,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
 
     @covers_requirement(
         "webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state",
+        "webclient-contextual-hud::standing-portraits-retain-contours-and-truthful-grounded-fallbacks",
     )
     def test_stage_actor_vitest_evidence_passes(self):
         result = subprocess.run(

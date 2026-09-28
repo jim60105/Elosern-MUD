@@ -108,7 +108,7 @@ describe("FoeLineup", () => {
     expect(missing.find("img").exists()).toBe(false);
     expect(missing.attributes("data-portrait-ref")).toBe("9");
     expect(missing.get(".reference-artwork__placeholder-glyph").text()).toBe("蒙");
-    expect(missing.get(".reference-artwork__placeholder-label").text()).toBe("蒙面刺客");
+    expect(missing.get("figcaption").text()).toBe("蒙面刺客，無肖像");
   });
 
   it("shows the name placeholder for a null reference and builds no URL", () => {
@@ -118,7 +118,7 @@ describe("FoeLineup", () => {
     const slot = slots()[0];
     expect(slot.attributes("data-portrait-ref")).toBe("");
     expect(slot.find("img").exists()).toBe(false);
-    expect(slot.get(".reference-artwork__placeholder-label").text()).toBe("哥布林");
+    expect(slot.get("figcaption").text()).toBe("哥布林，無肖像");
     expect(wrapper.html()).not.toContain("npc_4");
   });
 
@@ -144,7 +144,7 @@ describe("FoeLineup", () => {
     expect(gauges[0].get(".foe-lineup__fill").element.style.width).toBe("25%");
     expect(gauges[0].get(".foe-lineup__ghost").element.style.width).toBe("25%");
     expect(gauges[1].get(".foe-lineup__fill").element.style.width).toBe("0%");
-    expect(wrapper.text()).not.toMatch(/\d/);
+    expect(gauges.map((gauge) => gauge.text()).join("")).not.toMatch(/\d/);
     expect(wrapper.text()).not.toContain("e1");
     await wrapper.setProps({ foes: [foe(1, { hp_current: 45, hp_maximum: 60 }), foe(2)] });
     expect(wrapper.findAll(".foe-lineup__fill")[0].element.style.width).toBe("75%");
@@ -196,7 +196,7 @@ describe("FoeLineup", () => {
       // A foe with no displayed value reads its pre-round row.
       await wrapper.setProps({ displayHp: {} });
       expect(wrapper.get(".foe-lineup__fill").element.style.width).toBe("100%");
-      expect(wrapper.text()).not.toMatch(/\d/);
+      expect(wrapper.get('[data-testid="foe-gauge"]').text()).not.toMatch(/\d/);
     });
 
     it("hands each foe its gesture, key, and damage number", () => {

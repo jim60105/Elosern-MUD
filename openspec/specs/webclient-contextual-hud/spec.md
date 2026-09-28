@@ -2227,15 +2227,15 @@ and Enter and Space on the focused page surface keep their reading meaning.
 Each standing portrait on the stage SHALL be rendered by one stage-actor component. The player's stage
 actor in `actor-left` SHALL present the current roster character's portrait. The dialogue host's stage
 actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry named by the
-committed `dialogue` panel's `host.portrait_ref` — the image with its face-rect crop when the entry
-carries one, and the entry's own placeholder card — its own label, with the host display name's
-initial as the card's glyph — when the entry is a placeholder. When `portrait_ref`
+committed `dialogue` panel's `host.portrait_ref` — the complete image bottom-aligned
+with contain fit, and a grounded silhouette with the host identity and authoritative
+availability state when the entry is a placeholder. When `portrait_ref`
 is `null` or names no catalog entry, the host's stage actor SHALL render the truthful placeholder: the
 host display name's initial and the display name, never a stock or guessed image. The client SHALL
 NOT construct a catalog key from the host identity or any other field. Each foe's stage actor in the foe
 line-up SHALL present the committed `art` panel's `portrait_catalog` entry named by that participant's
-`portrait_ref` in the committed combat panel, under the same rule: the entry's image with its crop, the
-entry's own placeholder card for a placeholder entry, and the truthful placeholder built from the
+`portrait_ref` in the committed combat panel, under the same rule: the complete entry image, the
+grounded silhouette for a placeholder entry, and the truthful placeholder built from the
 participant's display name when the reference is `null` or names no entry.
 
 While the committed mode is `dialogue` and the host's stage actor renders, the stage actors SHALL carry
@@ -2255,11 +2255,11 @@ any transition between them is owned by the motion layer.
 
 #### Scenario: The host portrait comes from the art catalog
 - **WHEN** the committed `dialogue` panel names `portrait_ref` `"41"` and the committed `art` panel's catalog entry `"41"` carries an image URL and a face rectangle
-- **THEN** the host's stage actor renders that image with the face-rect crop, and no other image source is requested
+- **THEN** the host's stage actor renders that complete image bottom-aligned with contain fit, and no other image source is requested
 
 #### Scenario: A pending or missing portrait shows the truthful placeholder
 - **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安·衛登` opens a conversation
-- **THEN** the first stage actor shows the entry's placeholder card with its own label and the host's initial, and the second shows the initial `葛` with the label `葛里安·衛登`, and neither renders an image
+- **THEN** the first stage actor shows a grounded silhouette with the host identity and pending state, and the second shows the initial `葛`, identity `葛里安·衛登` and missing state, and neither renders an image
 
 #### Scenario: The host speaks and the player is dimmed
 - **WHEN** a conversation opens and the host's greeting commits
@@ -2727,3 +2727,18 @@ A terminal combat hold SHALL retain combat gradient, sample selection and veil o
 #### Scenario: Playback is reset
 - **WHEN** a held terminal round is skipped, flushed or reset on reconnect
 - **THEN** combat decoration is released and no held foe/veil remains after the existing lifecycle clears it
+
+### Requirement: Standing portraits retain contours and truthful grounded fallbacks
+Standing portraits SHALL retain their supplied image contours and align their feet or silhouette base with the stage floor. Missing artwork SHALL use a standing silhouette with the subject name and truthful availability state, without inventing generation or a URL. Repeated visual image captions SHALL be suppressed only on the stage; accessible identity and state SHALL remain available.
+
+#### Scenario: Unavailable portrait is not generating
+- **WHEN** an actor has missing or failed art
+- **THEN** a grounded silhouette states the subject and missing or failed state once, and no generating shimmer runs
+
+#### Scenario: Pending motion respects preference
+- **WHEN** pending art renders at full, reduced and off motion
+- **THEN** only full motion animates the silhouette; the pending label remains readable at every level
+
+#### Scenario: Compact stage preserves labels
+- **WHEN** the player silhouette, vitals and command line render at 1280x720
+- **THEN** the silhouette identity and state are not occluded by vitals or the command line and all HUD controls remain reachable

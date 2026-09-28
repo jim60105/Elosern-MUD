@@ -105,7 +105,6 @@ describe("the stage actors in the portrait anchors", () => {
     expect(host.exists()).toBe(true);
     expect(host.attributes("data-side")).toBe("right");
     expect(host.get("img").attributes("src")).toBe("/art/portraits/npc_7.webp");
-    expect(host.get("img").element.style.objectPosition).toBe("50% 31%");
     expect(host.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
 
     commit("exploration");
@@ -136,7 +135,7 @@ describe("the stage actors in the portrait anchors", () => {
     const slots = right.findAll('[data-testid="foe-slot"]');
     expect(slots.map((s) => s.attributes("data-portrait-ref"))).toEqual(["7", ""]);
     expect(slots[0].get("img").attributes("src")).toBe("/art/portraits/npc_7.webp");
-    expect(slots[1].get(".reference-artwork__placeholder-label").text()).toBe("哥布林");
+    expect(slots[1].get("figcaption").text()).toBe("哥布林，無肖像");
     for (const actor of right.findAll('[data-testid="stage-actor"]')) {
       expect(actor.attributes("data-speaking")).toBe("true");
     }
@@ -163,13 +162,13 @@ describe("the stage actors in the portrait anchors", () => {
     let host = actorIn("actor-right");
     expect(host.find("img").exists()).toBe(false);
     expect(host.get(".reference-artwork__placeholder-glyph").text()).toBe("店");
-    expect(host.get(".reference-artwork__placeholder-label").text()).toBe("店長");
+    expect(host.get("figcaption").text()).toBe("店長，無肖像");
 
     commit("dialogue", dialoguePanel("999"));
     await nextTick();
     host = actorIn("actor-right");
     expect(host.find("img").exists()).toBe(false);
-    expect(host.get(".reference-artwork__placeholder-label").text()).toBe("店長");
+    expect(host.get("figcaption").text()).toBe("店長，無肖像");
   });
 
   it("renders no host actor while the dialogue panel is unavailable", async () => {

@@ -489,9 +489,20 @@ when the host is not in the catalog. The client never constructs a catalog key.
   otherwise `"host"`. The non-speaking `StageActor` is dimmed with
   `--actor-dim: 0.6`.
 - **Portraits:** `actor-left` holds the player; `actor-right` holds the host's
-  catalog entry looked up by `host.portrait_ref`. A still-generating portrait
-  shows its own placeholder; a missing one shows the name's initial and the
-  name.
+  catalog entry looked up by `host.portrait_ref`. The stage-only artwork
+  variant uses bottom-aligned contain fit, a contour shadow and decorative
+  ground ellipse without cropping alpha hair or equipment. Opaque inputs keep
+  their supplied backgrounds; the browser never infers alpha or makes a cutout.
+  Unavailable art uses an inline standing silhouette with identity and the
+  authoritative missing, pending, failed or load-failed state in its chest.
+  Only pending/full motion shimmers. A single visually hidden caption carries
+  accessible identity/state; the visible chest copy is decorative. Drawer
+  cover cropping and visible captions remain unchanged.
+  The player chest label reserves the vitals column's horizontal footprint
+  without moving the actor anchor. Offline `Core/StageActor` stories cover
+  alpha/opaque images and every fallback, while `Core/AppShell/GroundedOneFoe`,
+  `GroundedTwoFoes` and `GroundedThreeFoes` exercise the real client with vitals
+  and an expandable command line at 1280x720, 1440x900 and 1920x1080.
 - **Free-form borrow:** the free row expands the command line; a refused send
   keeps the dialogue target; a successful send returns focus to the choice
   list.
