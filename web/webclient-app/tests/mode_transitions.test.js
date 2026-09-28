@@ -355,6 +355,50 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     expect(hosts()).toHaveLength(0);
   });
+
+  it("holds combat backdrop decoration during terminal beat hold without freezing canonical scene identity", async () => {
+    store.setMotionLevel("full");
+    await nextTick();
+
+    commit("combat", {
+      ...twoFoes(),
+    });
+
+    const requestId = store.dispatchAction("combat.flee", "flee");
+    store.appendText("out", "你擲出了骰子。");
+    store.appendText("out", "灰袍盜賊倒下了。");
+
+    // Terminal round publishes exploration mode with combat beats still playing.
+    commit("exploration", {
+      combat_beats: {
+        schema_version: 1,
+        available: true,
+        round: "s-1/1",
+        beats: [
+          { seq: 0, action: 0, kind: "roll", actor: "42", target: "7", amount: null, hp_after: null, text: "你擲出了骰子。" },
+          { seq: 1, action: 1, kind: "damage", actor: "42", target: "7", amount: 40, hp_after: 0, text: "灰袍盜賊倒下了。" },
+        ],
+      },
+      context_actions: fx.explorationActions(),
+      art: {
+        ...ART_PANEL_SAMPLE,
+        scene: {
+          ...ART_PANEL_SAMPLE.scene,
+          url: "/art/scenes/new_town.png",
+          label: "新城鎮",
+          alt: "新城鎮的景象",
+        },
+      },
+    });
+    store.receive(generation, "ui_action_result", [fx.actionResult({ request_id: requestId, presentation_revision: revision - 1 })], {});
+    await nextTick();
+    // Stage mode committed is exploration, beatHold is active.
+    expect(store.view.beatHold).toBe(true);
+    // Backdrop receives combat stage mode while art panel carries newly committed scene identity
+    const backdrop = wrapper.getComponent({ name: "SceneBackdrop" });
+    expect(backdrop.props("mode")).toBe("combat");
+    expect(wrapper.get('[data-testid="scene-backdrop-label"]').text()).toBe("新城鎮");
+  });
 });
 
 describe("DialogueChoices stagger", () => {

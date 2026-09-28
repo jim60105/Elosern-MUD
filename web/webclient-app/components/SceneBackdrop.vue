@@ -243,6 +243,11 @@ const placeholderKind = computed(() => {
   return (imageLoadFailed.value ? "load_failed" : (scene.value?.placeholder?.kind ?? "unavailable"));
 });
 
+const statusBadgeText = computed(() => {
+  const isSample = showPlaceholder.value && props.mode !== "creation";
+  return isSample ? `範例場景 · ${placeholderLabel.value}` : placeholderLabel.value;
+});
+
 // The scene label + alt always render as text outside the bitmap.
 const sceneLabel = computed(() => scene.value?.label ?? (unavailable.value ? "場景" : ""));
 const sceneAlt = computed(() => scene.value?.alt ?? "");
@@ -348,7 +353,6 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
     :style="{ background: stageGradient }"
   >
     <div v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample" aria-hidden="true"></div>
-    <p v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample-label">範例場景 · 非目前地點實際圖片</p>
     <!-- The crossfade (design D2): keyed by URL with no mode, so the
          entering image fades in above the leaving one, which is inert from
          the commit on. -->
@@ -373,11 +377,8 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
       data-testid="scene-backdrop-placeholder"
       :data-kind="placeholderKind"
     >
-      <span class="scene-backdrop__placeholder-kind" data-testid="scene-backdrop-placeholder-kind">
-        {{ placeholderKind }}
-      </span>
       <p class="scene-backdrop__placeholder-label" data-testid="scene-backdrop-placeholder-label">
-        {{ placeholderLabel }}
+        {{ statusBadgeText }}
       </p>
     </div>
 
@@ -390,7 +391,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
          bitmap (MODIFIED webclient-art-panel): no required information
          exists only inside the image. -->
     <div
-      v-if="generating || sceneLabel || sceneAlt || hasControl"
+      v-if="activeImage"
       class="scene-backdrop__caption"
       data-testid="scene-backdrop-caption"
     >
@@ -405,13 +406,13 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
         <p v-if="sceneLabel" class="scene-backdrop__scene-label" data-testid="scene-backdrop-label" :title="sceneLabel">
           {{ sceneLabel }}
         </p>
-        <p v-if="sceneAlt" class="scene-backdrop__scene-alt" data-testid="scene-backdrop-alt" :title="sceneAlt">
+        <p v-if="sceneAlt && sceneAlt !== sceneLabel" class="scene-backdrop__scene-alt" data-testid="scene-backdrop-alt" :title="sceneAlt">
           {{ sceneAlt }}
         </p>
         <!-- The scene control opens the full view (MODIFIED art-panel: click
              or Enter on the control; Escape closes and restores focus). -->
         <button
-          v-if="hasControl"
+          v-if="hasControl && activeImage"
           ref="controlEl"
           type="button"
           class="scene-backdrop__fullview-control"
@@ -451,7 +452,6 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
         :src="activeImage.url"
         :alt="sceneAlt"
       />
-      <div v-else class="scene-backdrop__fullview-gradient" data-testid="scene-backdrop-fullview-gradient"></div>
       <p v-if="sceneLabel" class="scene-backdrop__fullview-label">{{ sceneLabel }}</p>
     </div>
   </div>
@@ -519,18 +519,11 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   padding: var(--sp-2) var(--sp-4);
   background: var(--panel);
   backdrop-filter: blur(8px);
-  border: 1px dashed var(--seal-600);
+  border: 1px solid rgba(202, 183, 138, 0.25);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   font-size: var(--text-sm);
   color: var(--paper-300);
-}
-
-.scene-backdrop .scene-backdrop__placeholder-kind {
-  font-family: var(--f-sans);
-  font-size: max(var(--text-xs), 0.8em);
-  text-transform: uppercase;
-  color: var(--paper-500);
 }
 
 .scene-backdrop .scene-backdrop__placeholder-label {
@@ -627,6 +620,9 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__fullview-control {
   flex: none;
   margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--ink-600);
   border-radius: var(--radius-sm);

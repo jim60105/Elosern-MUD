@@ -132,6 +132,11 @@ const lineupFoes = computed(() => (beatStage.value ? beatStage.value.foes : comb
 const foesOnStage = computed(
   () => (store.view.mode === "combat" || beatHold.value) && lineupFoes.value.length > 0,
 );
+const stageMode = computed(() =>
+  beatHold.value && (store.view.mode === "exploration" || store.view.mode === "combat")
+    ? "combat"
+    : store.view.mode || "exploration",
+);
 // The player's own beat gesture, keyed by the committed actor identity.
 const playerGesture = computed(() => {
   const identity = panel("status")?.actor?.identity;
@@ -240,7 +245,7 @@ function onFoeLineupGone() {
           <SceneBackdrop
             ref="sceneBackdropRef"
             :art="panel('art') || {}"
-            :mode="store.view.mode || 'exploration'"
+            :mode="stageMode"
             :motion-level="store.view.motionLevel"
           />
         </template>

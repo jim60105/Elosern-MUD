@@ -71,11 +71,11 @@ const FAILED = scenePanel({
 // story renders the real stage: a viewport-sized frame (pulled up over the
 // preview's top-band padding) holding HudFrame, with the backdrop in its
 // `backdrop` slot and the band chrome drawn below it.
-function stage(mode, backdrop) {
+function stage(mode, backdrop, frameProps = {}) {
   return h(
     "div",
     { style: "position: relative; height: 100vh; margin-top: calc(-1 * var(--header-h));" },
-    [h(HudFrame, { mode }, { backdrop })],
+    [h(HudFrame, { mode, ...frameProps }, { backdrop })],
   );
 }
 
@@ -197,4 +197,17 @@ function renderSceneChange() {
 
 export const SceneChange = {
   render: renderSceneChange,
+};
+
+// The terminal round hold: exploration mode is committed while beatHold keeps
+// combat decoration (gradient, combat sample wash, and veil) active on the stage.
+export const TerminalCombatHold = {
+  render: () => ({
+    render: () =>
+      stage(
+        "exploration",
+        () => h(SceneBackdrop, { art: PENDING_WITHOUT_PRIOR, mode: "combat" }),
+        { beatHold: true },
+      ),
+  }),
 };
