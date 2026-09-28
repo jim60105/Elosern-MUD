@@ -1002,6 +1002,7 @@ class CombatBeatQueueEvidenceTest(unittest.TestCase):
         "webclient-combat-menu::a-combat-round-plays-beat-by-beat",
         "webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input",
         "webclient-input-narrative::the-message-window-s-reading-controls-advance-pages-and-a-new-action-flushes-unread-pages",
+        "webclient-contextual-hud::held-combat-decoration-never-holds-canonical-scene-identity",
     )
     def test_beat_queue_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -1066,10 +1067,15 @@ class ModeTransitionsEvidenceTest(unittest.TestCase):
     """webclient-mode-transitions: the live mode-change signal, the inert
     collapsed command region, the decorative flash and veil, the host's inert
     exit, the reconnect that plays nothing, and the choice rows' stagger index
-    are DOM-state contracts jsdom can execute, so the Vitest file is their
-    evidence (the browser file covers computed durations and animations)."""
+    and the held terminal-round backdrop (combat decoration without a frozen
+    scene identity) are DOM-state contracts jsdom can execute, so the Vitest
+    file is their evidence (the browser file covers computed durations and
+    animations; the beat-queue bridge covers the hold's release lifecycle)."""
 
     @covers_requirement("webclient-contextual-hud::mode-changes-transition-at-the-motion-level")
+    @covers_requirement(
+        "webclient-contextual-hud::held-combat-decoration-never-holds-canonical-scene-identity"
+    )
     def test_mode_transitions_vitest_evidence_passes(self):
         result = subprocess.run(
             [
