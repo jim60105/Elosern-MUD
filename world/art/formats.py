@@ -148,6 +148,7 @@ def encode(
     output_format: str,
     quality: int,
     preserve_metadata: bool,
+    infotext: str | None = None,
 ) -> tuple[bytes, str]:
     """Convert transport PNG bytes to the configured output format.
 
@@ -158,6 +159,14 @@ def encode(
     re-save (pixel-identical) that ignores it. Any transport-decode failure,
     non-PNG container, or encoder failure raises ``SDError`` with the bounded
     code ``sd_format_error`` before any output is produced.
+
+    Metadata source: when ``infotext`` carries the server's own
+    generation-parameters text (extracted from the returned PNG), it is
+    embedded VERBATIM — it describes what the server actually applied
+    (expanded styles, resolved sampler/scheduler spellings, module entries).
+    Only when it is absent does preservation fall back to the
+    request-reconstructed parameters text. ``preserve_metadata=False`` stays
+    provably metadata-free whatever ``infotext`` carries.
     """
     try:
         save_format = _PILLOW_SAVE_FORMAT[output_format]
@@ -170,7 +179,7 @@ def encode(
 
     parameters: str | None = None
     if preserve_metadata:
-        parameters = build_parameters_text(
+        parameters = infotext or build_parameters_text(
             prompt=prompt,
             negative_prompt=negative_prompt,
             steps=steps,

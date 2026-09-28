@@ -63,6 +63,15 @@ _READ_CHUNK_BYTES = 65536
 _OPTIONS_MAX_ITEMS = 100
 _OPTIONS_TIMEOUT_SECONDS = 10.0
 
+# The PNG text keyword every A1111-family server (sd-webui, Forge, reforge)
+# writes its generation infotext under, and the keyword-bearing text chunks
+# the extractor parses (zTXt never carries the parameters entry).
+_PARAMETERS_KEYWORD = b"parameters"
+_PNG_TEXT_CHUNKS = (b"tEXt", b"iTXt")
+# An infotext longer than this is not a generation block but a hostile or
+# corrupt body; it is refused rather than carried toward the store.
+_INFOTEXT_MAX_BYTES = 65536
+
 # The fixed Forge companion setting for forge_additional_modules, verbatim
 # from the verified reference plugin.
 _FORGE_UNET_STORAGE_DTYPE = "Automatic (fp16 LoRA)"
@@ -92,10 +101,19 @@ class GeneratedImage:
     prompt library, so metadata can never describe a different generation
     than the bytes it ships with. The defaults exist so test doubles and
     seedless fixtures construct unchanged; the real client always fills them.
+
+    ``infotext`` is the server's own generation-parameters text copied
+    verbatim out of the returned PNG's ``parameters`` text chunk when the
+    server embeds one (the A1111/Forge default). It is the authoritative
+    provenance for the stored artifact — it carries what the server actually
+    applied (expanded prompt styles, resolved sampler/scheduler spellings,
+    module and model entries), which the request-side fields cannot. ``None``
+    when the server embedded nothing or the chunk is unparsable.
     """
 
     data: bytes
     seed: int | None
+    infotext: str | None = None
     prompt: str = ""
     negative_prompt: str = ""
     steps: int = 0
@@ -463,6 +481,51 @@ def _decode_image(response: dict[str, Any]) -> bytes:
     return png
 
 
+def _extract_infotext(png: bytes) -> str | None:
+    """The server's verbatim generation infotext from the PNG, or ``None``.
+
+    Walks the chunk table and returns the body of the FIRST ``parameters``
+    text chunk (``tEXt``: keyword-NUL-text; ``iTXt``: keyword-NUL, compression
+    flag, method, optional language tag, optional translated keyword, then the
+    UTF-8 text — the parameters entry is always stored uncompressed). Every
+    shape problem (truncated table, bad length, undecodable text, keyword not
+    in the response cap) yields ``None``: a missing infotext degrades to the
+    request-reconstructed parameters text, it never fails the generation.
+    """
+    try:
+        position = len(_PNG_MAGIC)
+        while position + 8 <= len(png):
+            length = struct.unpack(">I", png[position:position + 4])[0]
+            kind = png[position + 4:position + 8]
+            body_start = position + 8
+            body_end = body_start + length
+            if body_end + 4 > len(png):
+                return None
+            body = png[body_start:body_end]
+            if kind in _PNG_TEXT_CHUNKS and len(body) <= _INFOTEXT_MAX_BYTES:
+                keyword, _, remainder = body.partition(b"\x00")
+                if keyword == _PARAMETERS_KEYWORD:
+                    if kind == b"iTXt":
+                        # Compression flag and method are two fixed single
+                        # bytes (no separators); the parameters entry never
+                        # compresses, and a compressed entry is not our
+                        # provenance source.
+                        if len(remainder) < 2 or remainder[0] != 0:
+                            return None
+                        remainder = remainder[2:]
+                        # Optional language tag, then optional translated
+                        # keyword, each NUL-terminated; the text is the rest.
+                        _, _, remainder = remainder.partition(b"\x00")
+                        _, _, remainder = remainder.partition(b"\x00")
+                    return remainder.decode("utf-8")
+            if kind == b"IEND":
+                return None
+            position = body_end + 4
+    except (IndexError, struct.error, UnicodeDecodeError):
+        return None
+    return None
+
+
 def _parse_seed(response: dict[str, Any]) -> int | None:
     """Defensively extract ``info.seed`` from an envelope; never raises.
 
@@ -579,6 +642,7 @@ class SDWebUIClient:
             return GeneratedImage(
                 data=data,
                 seed=_parse_seed(response),
+                infotext=_extract_infotext(data),
                 prompt=str(request["prompt"]),
                 negative_prompt=str(request["negative_prompt"]),
                 steps=int(request["steps"]),

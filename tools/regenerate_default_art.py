@@ -121,6 +121,7 @@ def main() -> None:
                 steps=image.steps, cfg_scale=image.cfg_scale, sampler=image.sampler,
                 scheduler=image.scheduler, width=image.width, height=image.height,
                 seed=image.seed, checkpoint=image.checkpoint, output_format="webp",
+                infotext=image.infotext,
                 quality=int(settings.ART_SD_OUTPUT_QUALITY),
                 preserve_metadata=bool(settings.ART_SD_PRESERVE_GENERATION_METADATA),
             )

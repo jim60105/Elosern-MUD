@@ -266,6 +266,7 @@ def _settle_one(
             height=image.height,
             seed=image.seed,
             checkpoint=image.checkpoint,
+            infotext=image.infotext,
             output_format=str(settings.ART_SD_OUTPUT_FORMAT),
             quality=int(settings.ART_SD_OUTPUT_QUALITY),
             preserve_metadata=bool(settings.ART_SD_PRESERVE_GENERATION_METADATA),
