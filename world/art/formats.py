@@ -69,13 +69,16 @@ def build_parameters_text(
     value is OMITTED entirely (never a ``None``/sentinel token): the ``Seed:``
     entry disappears when the server reported no seed, the optional
     sampler/scheduler entries only when configured, and the ``Model:`` entry
-    only when a checkpoint is configured.
+    only when a checkpoint is configured. Field names follow the
+    A1111/Forge-infotext vocabulary (``Sampler``, ``Schedule type``) so
+    sd-webui readers restore them into the sampling controls instead of
+    silently resetting them to the defaults.
     """
     fields = [f"Steps: {steps}"]
     if sampler:
-        fields.append(f"Sampler name: {sampler}")
+        fields.append(f"Sampler: {sampler}")
     if scheduler:
-        fields.append(f"Scheduler: {scheduler}")
+        fields.append(f"Schedule type: {scheduler}")
     fields.append(f"CFG scale: {cfg_scale:g}")
     if seed is not None:
         fields.append(f"Seed: {seed}")
