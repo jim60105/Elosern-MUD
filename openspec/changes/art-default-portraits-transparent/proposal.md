@@ -49,9 +49,11 @@ Out of scope:
 - User-directed scope amendment during implementation: correct the shared
   `art.portrait_prompt` in `prompts/art.yaml` to request a frame-filling figure,
   bright neutral fill lighting and balanced colors rather than warm lighting
-  and deep shadows. Include the explicitly requested `,full body,` tag.
+  and deep shadows. Express full-body framing in natural language; the user
+  subsequently withdrew the experimental `,full body,` tag.
   Runtime character and monster generation inherits the same correction;
-  scene prompts and runtime pipeline code are unchanged.
+  scene positive prompts and runtime pipeline code are unchanged. Explicit
+  readable-text/lettering exclusions move into the existing shared negative prompt.
 
 - Assets: `web/static/art/defaults/*.webp` (six binary files replaced).
 - New: `tools/regenerate_default_art.py`.

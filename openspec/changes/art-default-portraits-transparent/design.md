@@ -53,12 +53,18 @@ Regenerated figures are new renders on a 768×1024 canvas; the old rectangles we
 Live authoring exposed figures that were too small, dark and yellow. The user
 identified the shared portrait wrapper, not the subject sentence, as the cause.
 Correct `art.portrait_prompt` centrally: near-edge head/feet framing with a clear
-margin, bright neutral daylight and fill, true-to-life colors, and the requested
-`,full body,` tag. All image-level framing, size, lighting and palette instructions
+margin, bright neutral daylight and fill, and true-to-life colors. The user withdrew
+the experimental `,full body,` tag; full-body framing stays natural-language prose.
+All image-level framing, size, lighting and palette instructions
 belong only in the shared template; authored descriptions carry identity, clothing
 and pose, without per-character color or image-size overrides. Both character and monster runtime
 generation use `render_prompt_pair` and inherit this fix; scenes retain their
-existing prompt. Visual review of real generated output establishes the result,
+existing positive prompt. Following the requested image-prompt-builder-nl skill,
+the portrait template is one folded natural-language paragraph, and exclusion
+instructions live in `art.negative_prompt`, not the positive portrait prose.
+The shared negative already forbids text and watermarks; explicit readable-text
+and lettering negatives clarify that same constraint for both subject kinds.
+Visual review of real generated output establishes the result,
 not tests pinning incidental prose. Existing literal-word tests are removed,
 while request and cutout-setting behavior tests remain.
 

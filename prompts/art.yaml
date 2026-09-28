@@ -24,23 +24,22 @@ prompts:
   # Positive prompt template for character and monster portraits. {description}
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
-  art.portrait_prompt: |-
-    A large full-body illustration of a fantasy figure — {description} — standing
-    upright at a slight three-quarter angle, centered and filling the vertical 3:4
-    frame from head near the top edge to feet near the bottom edge, with a narrow
-    clear margin around the complete silhouette. Eye-level view, detailed digital
-    illustration with clean linework, readable clothing and natural skin colors.
-    Bright neutral daylight with soft even fill lighting keeps the face and clothing
-    clearly visible, including the shaded side. Balanced neutral white light and
-    clear true-to-life colors with varied blue, teal, lavender and silver-gray
-    clothing accents, without yellow tint or sepia grading. Flat pure white
-    backdrop, simple background, white background, isolated figure, no cast shadow on the backdrop.
-    No readable text, no letters, no watermark. ,full body,
+  art.portrait_prompt: >-
+    A clean-lined full-body digital fantasy illustration of a single standing figure,
+    shown from head to feet at eye level and filling almost the entire vertical 3:4
+    frame, with only a small clear margin above the head and below the boots.
+    {description} The centered silhouette stands against a flat pure white backdrop.
+    Broad neutral daylight from the front and soft fill from both sides illuminate
+    the face and clothing evenly. Gentle cel shading describes woven fabric and
+    worn leather; a small stitched seam provides a quiet handmade detail.
+    Natural skin tones and a balanced palette of blue, teal, lavender and silver-gray
+    remain clear and luminous. The simple background remains a uniform white background.
   # Shared negative prompt for every art generation request. Plain text with no
   # placeholders.
   art.negative_prompt: |-
     lowres, jpeg artifacts, blurry, deformed, disfigured, bad anatomy, extra limbs,
-    missing limbs, cropped, out of frame, watermark, signature, text, letters, logo,
+    missing limbs, cropped, out of frame, watermark, signature, text, readable text,
+    letters, lettering, logo,
     duplicate, mutilated, mutated hands, fused fingers, poorly drawn face, bad proportions,
     oversaturated, cluttered background, detailed background, scenery, landscape, furniture,
     gradient background, background shadow, close-up, portrait crop, cropped legs, cropped feet

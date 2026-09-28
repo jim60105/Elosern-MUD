@@ -14,7 +14,8 @@
 
 - [ ] 2.0 Apply the user-directed shared portrait-template correction: bright neutral lighting,
   frame-filling complete figures, image-level color/size instructions only in the template,
-  and the literal `,full body,` tag. Verify the rendered request and real generated pixels;
+  and natural-language full-body framing (the user withdrew the experimental tag).
+  Verify the rendered request and real generated pixels;
   run the focused SD-worker and prompt-loader tests.
 
 - [ ] 2.1 Operator prerequisite: sd-webui reachable at `ART_SD_BASE_URL`; place the `isnet-anime` model artifact in `server/.rembg` (or export `ART_REMBG_MODEL=isnet-anime` plus the download switch for the session). Run `ART_REMBG_MODEL=isnet-anime uv run --locked python tools/regenerate_default_art.py`. Verify for each file: `uv run --locked python -c "from PIL import Image; im=Image.open('web/static/art/defaults/<key>.webp'); print(im.mode, im.size)"` prints `RGBA` at the configured `ART_SD_PORTRAIT_*` canvas, and `stat -c %s` for each file is below `FALLBACK_MAX_FILE_BYTES` (409,600 bytes) — a lossy-alpha WebP over the bound must be re-encoded at lower quality before commit.
