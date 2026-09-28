@@ -5,10 +5,17 @@ runtime's non-commercial BRIA weights. Run from the repository with uv run
 --locked python tools/regenerate_default_art.py. Missing weights require both
 --allow-download and ART_REMBG_DOWNLOAD_ENABLED=true. --allow-bria deliberately
 uses the configured model instead and must not be used for committed defaults.
+
+Repository settings come from the environment: the operator .env (the worktree
+file first, then the primary checkout's) is loaded before Django starts and
+real exported variables always win over file entries, so ART_SD_STYLES,
+ART_SD_MODULES and the other ART_SD_* knobs reach the request builder exactly
+as they do in a composed deployment.
 """
 
 import argparse
 import io
+import subprocess
 import os
 from pathlib import Path
 import sys
@@ -16,13 +23,52 @@ import tempfile
 
 
 DESCRIPTIONS = {
-    "man": ("character", "An adult human man with short hair, wearing a travel-worn floor-length coat closed over a tunic and boots, standing with feet together and arms at his sides."),
-    "woman": ("character", "An adult human woman with long hair, wearing a modest ankle-length traveling dress and boots, standing with arms at her sides."),
-    "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length coat, tunic, trousers and boots, standing with feet together and arms at his sides."),
-    "girl": ("character", "A young human girl with braided hair, fully clothed in a modest ankle-length dress and boots, standing with arms at her sides."),
-    "elder": ("character", "An elderly human with a lined face, wearing ankle-length layered robes and boots, standing with arms at their sides."),
-    "monster_anon": ("monster", "An anonymous humanoid monster with a mysterious face beneath a hood, wearing a closed ankle-length cloak, standing with arms beneath the cloak."),
+    "man": ("character", "An adult human man with short hair, wearing a travel-worn floor-length coat closed over a tunic and boots."),
+    "woman": ("character", "An adult human woman with long hair, wearing a modest ankle-length traveling dress and boots."),
+    "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length coat, tunic, trousers and boots."),
+    "girl": ("character", "A young human girl with braided hair, fully clothed in a modest ankle-length dress and boots."),
+    "elder": ("character", "An elderly human with a lined face, wearing ankle-length layered robes and boots."),
+    "monster_anon": ("monster", "An anonymous humanoid monster with void face beneath a hood, wearing a closed long hooded cloak."),
 }
+
+
+def _load_repository_env(root: Path) -> None:
+    """Seed ``os.environ`` from the operator .env before Django settings load.
+
+    The compose deployment injects .env through ``env_file``; a bare tool run
+    gets nothing unless it loads the file itself. A worktree checkout has no
+    .env of its own, so the primary checkout's file is the fallback (the git
+    common dir's parent is the primary worktree root). ``setdefault`` keeps a
+    real exported variable authoritative, mirroring the documented precedence.
+    """
+    candidates = [root / ".env"]
+    probed = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probed.returncode == 0:
+        common = os.path.normpath(
+            os.path.join(root, probed.stdout.strip())
+        )
+        candidates.append(Path(common).parent / ".env")
+    for path in candidates:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            name, _, value = stripped.partition("=")
+            name = name.removeprefix("export ").strip()
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            if name:
+                os.environ.setdefault(name, value)
+        return
 
 
 def main() -> None:
@@ -35,6 +81,7 @@ def main() -> None:
 
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
+    _load_repository_env(root)
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
     import django
 

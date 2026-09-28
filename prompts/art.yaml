@@ -12,7 +12,7 @@ prompts:
   # deterministic scene sentence from the scene-archetype registry; the
   # surrounding text is authored per the image-prompt-builder-nl skill.
   art.scene_prompt: |-
-    A wide establishing shot of a fantasy scene — {description} — rendered as a detailed
+    masterpiece, very aesthetic, best quality, A wide establishing shot of a fantasy scene — {description} — rendered as a detailed
     digital painting in the style of classic illustrated storybooks, with confident
     painterly brushwork, soft edges, and layered atmospheric depth. Warm golden light from
     the dominant light source shapes the foreground and cools toward shadowed corners;
@@ -20,26 +20,12 @@ prompts:
     with clear foreground, midground, and background planes in a 16:9 cinematic frame at
     eye level, anchored by one small narrative detail such as a drifting wisp of smoke or a
     tarnished object catching the light. Any signage or lettering bears no readable text,
-    no watermark.
+    no watermark., (official art)
   # Positive prompt template for character and monster portraits. {description}
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
   art.portrait_prompt: >-
-    A clean-lined full-body digital fantasy illustration of a single standing figure,
-    shown from head to feet at eye level and filling almost the entire vertical 3:4
-    frame, with only a small clear margin above the head and below the boots.
-    {description} The centered silhouette stands against a flat pure white backdrop.
-    Broad neutral daylight from the front and soft fill from both sides illuminate
-    the face and clothing evenly. Gentle cel shading describes woven fabric and
-    worn leather; a small stitched seam provides a quiet handmade detail.
-    Natural skin tones and a balanced palette of blue, teal, lavender and silver-gray
-    remain clear and luminous. The simple background remains a uniform white background.
+    masterpiece, very aesthetic, best quality, {description}, facing viewer, looking at viewer, clean lineart, RPG character illustration, simple black background, rim light on clothes, solo, full body, standing, pose, fantasy, medieval fantasy, (official art),
   # Shared negative prompt for every art generation request. Plain text with no
   # placeholders.
-  art.negative_prompt: |-
-    lowres, jpeg artifacts, blurry, deformed, disfigured, bad anatomy, extra limbs,
-    missing limbs, cropped, out of frame, watermark, signature, text, readable text,
-    letters, lettering, logo,
-    duplicate, mutilated, mutated hands, fused fingers, poorly drawn face, bad proportions,
-    oversaturated, cluttered background, detailed background, scenery, landscape, furniture,
-    gradient background, background shadow, close-up, portrait crop, cropped legs, cropped feet
+  art.negative_prompt: "worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia, watermark, signature"
