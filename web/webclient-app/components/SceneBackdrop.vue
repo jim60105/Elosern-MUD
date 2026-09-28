@@ -628,6 +628,12 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   border-radius: var(--radius-sm);
   color: var(--paper-300);
   font-size: var(--text-xs);
+  /* The chip's normal line box (17px at --text-xs) plus padding and border
+     makes it 23px tall, overflowing the plate's fixed --scene-caption-h row
+     by 1px; an explicit 1.25 leading keeps the chip inside the one-line
+     token, the same way .ui-btn pins its leading instead of letting the
+     inherited normal line box drive a fixed control's height. */
+  line-height: 1.25;
   font-family: var(--f-sans);
   letter-spacing: 0.08em;
   padding: 2px 9px;
