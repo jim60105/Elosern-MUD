@@ -146,8 +146,10 @@ the band" defines: it leaves the accessibility tree, the tab order, and pointer 
 commit, and is `visibility: hidden` once its slide ends. The second exception is the combat stage
 hold: while a round whose publication already committed another mode still plays, as "Combat beats are
 choreographed on the stage at the motion level" defines, the decorative combat veil and the foe line-up
-MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, until
-the round ends; every other surface follows the committed mode at the commit. The matrix SHALL be:
+MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, and the
+scene backdrop SHALL keep presenting the combat stage (its combat gradient and, where a bundled sample
+wash accompanies a degraded scene, the combat sample), until the round ends; every other surface
+follows the committed mode at the commit. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
@@ -165,7 +167,7 @@ the round ends; every other surface follows the committed mode at the commit. Th
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
 | command line (row on the message region's top edge) | while expanded | while expanded | while expanded | hidden |
-| scene backdrop | visible (exploration stage) | visible (combat stage) | visible (unchanged art) | visible |
+| scene backdrop | visible (exploration stage; the combat stage while a round that ended the fight still plays) | visible (combat stage) | visible (unchanged art) | visible |
 
 While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
 exploration art truthfully — the dialogue's focus is carried by the stage actors, the name plate, and
@@ -192,6 +194,13 @@ collapse the command line, so leaving creation never reveals an expanded row.
   are still playing
 - **THEN** the minimap island renders again with the committed `local_map` payload at the commit, and any
   held foe line-up or veil is inert and outside the accessibility tree
+
+#### Scenario: A held round keeps the combat backdrop
+- **WHEN** the committed art panel carries no usable scene image, a round that ends the fight by a flee
+  commits mode `exploration` while its beats still play, and later the round ends
+- **THEN** during the hold the scene backdrop keeps the combat gradient and the combat sample wash
+  behind the held foe line-up and veil, and only when the hold ends does it return to the exploration
+  stage, crossfading over the scene duration at `full` and switching in one frame at `off`
 
 #### Scenario: Focus is rescued before its surface is hidden
 - **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip when the incoming mode is dialogue
@@ -231,11 +240,18 @@ labelled `目前場景圖片生成中` when the scene is pending and a prior ima
 gradient stage otherwise — for a missing, failed, or invalid asset, for a pending scene with no prior
 image, and when the `art` panel is unavailable. A bundled decorative sample MAY accompany this
 fallback only with a visible caption distinguishing it from an actual scene image, while retaining
-the authoritative missing/pending/unavailable label. Samples SHALL NOT enter the art catalog or
+the authoritative missing/pending/unavailable label; the sample caption and that label SHALL share one
+status badge, so the stage shows at most one status badge at a time, and the badge SHALL NOT show a
+raw placeholder kind code or an error-styled (dashed seal-red) frame. Samples SHALL NOT enter the art catalog or
 change its status, and SHALL disappear when an actual or labelled prior scene renders.
 Decorative portrait samples SHALL likewise be labelled separately from the current subject;
 an available committed player-roster portrait takes precedence, and a load failure returns to
 an explicitly labelled sample instead of attributing that sample to the player.
+While the combat hold of "Surface visibility is gated by the committed game mode" is playing, the
+backdrop MAY keep presenting the combat gradient stage (and the combat sample wash where a degraded
+scene carries one), yet it SHALL NOT hold the pre-terminal scene's identity: a newer committed scene
+image, pending state, or truthful degradation follows the rules above beneath the held decoration at
+its commit, and the scene caption row names the newly committed scene, never the held combat one.
 The backdrop SHALL NOT present an invented image as authoritative and
 SHALL NOT present a stale image as current. The scene label, its alternative text, and any truthful
 placeholder label SHALL be rendered as text outside the bitmap, so no required information exists only
@@ -244,12 +260,17 @@ carry an inset vignette. The backdrop's image SHALL be cover-cropped to the stag
 band's lower edge to the bottom band's upper edge), so no part of the scene the crop keeps is hidden
 behind the bottom band.
 
-The backdrop's own floating caption elements (the truthful-placeholder card, the `目前場景圖片生成中`
+The backdrop's own floating caption elements (the status badge, the `目前場景圖片生成中`
 pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
 positioned so that none of them overlaps the bottom band, the action dock's, or the command line's
 rendered content, at 1920x1080, 1440x900, and 1280x720 — extending the sibling stage requirement's
 general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
 stage anchors but are absolutely positioned within the same full-bleed stage.
+The scene caption row SHALL render only while an actual scene image is on the stage — a `done` scene
+image, or the dimmed prior image of a pending scene — and SHALL NOT render for a missing, failed,
+invalid, or unavailable scene, whose truthful label the status badge already states. Within the row the
+alternative text SHALL be omitted when it is identical to the scene label, and the full-view control
+SHALL be an icon button whose accessible name is `開啟場景全圖`.
 The scene label, the alternative text, the pending notice, and the full-view control SHALL render as
 one caption row on the stage box's lower edge, standing just above the command-line row docked on the
 band's top edge, and centred in the open stage between the `actor-left` and `actor-right` anchor boxes —
@@ -268,6 +289,16 @@ above the row.
 - **WHEN** the committed art panel carries a missing, failed, or invalid scene
 - **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as text, and no image element carries a URL
 
+#### Scenario: A degraded scene shows one status badge and no caption row
+- **WHEN** the `art` panel is unavailable, or the scene is missing, and the bundled sample wash renders
+- **THEN** exactly one status badge renders, stating both the sample caption and the truthful
+  placeholder label, without a raw kind code, and no scene caption row, scene label, alternative text,
+  or full-view control renders
+
+#### Scenario: An alternative text equal to the label is not repeated
+- **WHEN** a `done` scene's alternative text is identical to its label
+- **THEN** the caption row renders the label once and no alternative-text element
+
 #### Scenario: An unavailable art panel is indistinguishable from an ungenerated scene
 - **WHEN** the `art` panel commits its unavailable form
 - **THEN** the backdrop renders the mode gradient stage exactly as for a missing asset, with no broken image frame and no gameplay surface blocked
@@ -281,9 +312,9 @@ above the row.
 - **THEN** the backdrop renders the combat gradient stage, visually distinct from the exploration stage
 
 #### Scenario: The truthful-placeholder caption never intrudes on the action dock
-- **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the truthful-placeholder
-  card renders
-- **THEN** the placeholder card's rendered bounding box intersects neither the bottom band's nor the
+- **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the status badge
+  renders
+- **THEN** the status badge's rendered bounding box intersects neither the bottom band's nor the
   command line's rendered bounding box at 1920x1080, 1440x900, or 1280x720
 
 #### Scenario: The scene label, alt text, and full-view control clear the dock at both viewports
@@ -2685,3 +2716,14 @@ and no stage hold SHALL occur.
 - **WHEN** the effective level is `off` and an accepted attack defeats the last foe
 - **THEN** no gesture plays, the combat veil and the foe line-up are gone in the commit's frame, and the
   round's beats are read as text pages
+
+### Requirement: Held combat decoration never holds canonical scene identity
+A terminal combat hold SHALL retain combat gradient, sample selection and veil only. It SHALL NOT freeze committed art identity or other canonical HUD state. Completion, skip, flush and epoch reset SHALL release decorative hold through the existing playback lifecycle.
+
+#### Scenario: Terminal outcome changes scene
+- **WHEN** a terminal round is playing while a newer committed art panel names another scene
+- **THEN** the new scene follows the normal truthful image/pending rules beneath held combat decoration; the prior combat scene is not mislabelled current
+
+#### Scenario: Playback is reset
+- **WHEN** a held terminal round is skipped, flushed or reset on reconnect
+- **THEN** combat decoration is released and no held foe/veil remains after the existing lifecycle clears it
