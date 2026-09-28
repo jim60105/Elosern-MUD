@@ -25,15 +25,17 @@ prompts:
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
   art.portrait_prompt: |-
-    A full-body illustration of a fantasy figure — {description} — standing at a
-    three-quarter angle with the whole figure from head to feet inside the frame,
-    rendered as a detailed digital illustration with confident brushwork, soft shading,
-    and clean linework. Soft warm key light from the upper left with a gentle rim light
-    on the far side; a rich harmonious palette with deep shadow tones. Vertical 3:4
-    composition against a flat white backdrop at eye level, anchored by one small
-    narrative detail such as a stray lock of hair or a worn accessory. No readable text,
-    no letters, no watermark. simple background, white background, plain white backdrop,
-    isolated on white
+    A large full-body illustration of a fantasy figure — {description} — standing
+    upright at a slight three-quarter angle, centered and filling the vertical 3:4
+    frame from head near the top edge to feet near the bottom edge, with a narrow
+    clear margin around the complete silhouette. Eye-level view, detailed digital
+    illustration with clean linework, readable clothing and natural skin colors.
+    Bright neutral daylight with soft even fill lighting keeps the face and clothing
+    clearly visible, including the shaded side. Balanced neutral white light and
+    clear true-to-life colors with varied blue, teal, lavender and silver-gray
+    clothing accents, without yellow tint or sepia grading. Flat pure white
+    backdrop, simple background, white background, isolated figure, no cast shadow on the backdrop.
+    No readable text, no letters, no watermark. ,full body,
   # Shared negative prompt for every art generation request. Plain text with no
   # placeholders.
   art.negative_prompt: |-

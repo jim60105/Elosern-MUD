@@ -102,7 +102,10 @@ def _entity(sex="other", apparent_age=30, **attributes):
 
 
 class ClosedVocabularyContractTests(unittest.TestCase):
-    @covers_requirement("art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background")
+    @covers_requirement(
+        "art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background",
+        "internal-art-worker::portrait-prompts-compose-a-full-body-figure-on-a-backdrop-the-cutout-stage-can-key",
+    )
     def test_every_default_has_a_transparent_background(self):
         for key in FALLBACK_KEYS:
             path = DEFAULTS_DIR / f"{key}{FALLBACK_EXTENSION}"

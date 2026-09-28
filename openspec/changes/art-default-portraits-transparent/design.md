@@ -48,6 +48,20 @@ Alternative considered: a pixel-exact golden file. It would be brittle across mo
 
 Regenerated figures are new renders on a 768×1024 canvas; the old rectangles were authored against 920×1536 pixels and make no claim about the new composition. After the six images are committed, each key's `FALLBACK_FACE_RECTS` entry is re-measured on the new pixels (normalized unit-square rects, same structure as today). The existing face-rect shape tests keep passing because only the numeric values change.
 
+### D6. User-directed prompt correction
+
+Live authoring exposed figures that were too small, dark and yellow. The user
+identified the shared portrait wrapper, not the subject sentence, as the cause.
+Correct `art.portrait_prompt` centrally: near-edge head/feet framing with a clear
+margin, bright neutral daylight and fill, true-to-life colors, and the requested
+`,full body,` tag. All image-level framing, size, lighting and palette instructions
+belong only in the shared template; authored descriptions carry identity, clothing
+and pose, without per-character color or image-size overrides. Both character and monster runtime
+generation use `render_prompt_pair` and inherit this fix; scenes retain their
+existing prompt. Visual review of real generated output establishes the result,
+not tests pinning incidental prose. Existing literal-word tests are removed,
+while request and cutout-setting behavior tests remain.
+
 ## Risks / Trade-offs
 
 - [The model eats a thin edge, such as hair strands or the monster's ragged cloak hem] → Task 2.2 has a person check each output on a dark (`#0b0d10`) and a light (`#e7e0d1`) background. A bad edge is re-run with `--key` (new seed); the prompt already bans backdrop shadows and detailed backgrounds, so regeneration is the first remedy. If repeated seeds keep failing, that one file is touched up by hand, and the contract test still guards the result.

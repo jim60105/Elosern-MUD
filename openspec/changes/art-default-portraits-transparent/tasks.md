@@ -1,6 +1,6 @@
 ## 1. Tool
 
-- [ ] 1.1 Create `tools/regenerate_default_art.py` per design D1–D3:
+- [x] 1.1 Create `tools/regenerate_default_art.py` per design D1–D3:
   - a module docstring stating that it is a one-shot maintenance script, that its output is committed, and why the run pins the permissive `isnet-anime` cutout model
   - bootstrap Django the way `tools/test_data_lint.py` does (`DJANGO_SETTINGS_MODULE=server.conf.settings` default + `django.setup()`) before importing `world.art.*`
   - module-level mapping from each `FALLBACK_KEYS` key to `(ArtSubject kind, authored English description sentence)` per design D2 (character kind for `man`/`woman`/`boy`/`girl`/`elder`, monster kind for `monster_anon`)
@@ -11,6 +11,11 @@
   Verify: `DJANGO_SETTINGS_MODULE=server.conf.settings uv run --locked python tools/regenerate_default_art.py --help` prints usage without contacting sd-webui or loading a model.
 
 ## 2. Assets
+
+- [ ] 2.0 Apply the user-directed shared portrait-template correction: bright neutral lighting,
+  frame-filling complete figures, image-level color/size instructions only in the template,
+  and the literal `,full body,` tag. Verify the rendered request and real generated pixels;
+  run the focused SD-worker and prompt-loader tests.
 
 - [ ] 2.1 Operator prerequisite: sd-webui reachable at `ART_SD_BASE_URL`; place the `isnet-anime` model artifact in `server/.rembg` (or export `ART_REMBG_MODEL=isnet-anime` plus the download switch for the session). Run `ART_REMBG_MODEL=isnet-anime uv run --locked python tools/regenerate_default_art.py`. Verify for each file: `uv run --locked python -c "from PIL import Image; im=Image.open('web/static/art/defaults/<key>.webp'); print(im.mode, im.size)"` prints `RGBA` at the configured `ART_SD_PORTRAIT_*` canvas, and `stat -c %s` for each file is below `FALLBACK_MAX_FILE_BYTES` (409,600 bytes) — a lossy-alpha WebP over the bound must be re-encoded at lower quality before commit.
 - [ ] 2.2 Check each of the six outputs by eye, composited on `#0b0d10` and on `#e7e0d1` (for example with a throwaway Pillow composite in the scratchpad, never committed). No backdrop fragments may remain, and no hair, hand, or cloak edge may be eaten. Re-run any failing key with `--key <key>` (new seed). Record in the commit message which keys needed re-runs.
