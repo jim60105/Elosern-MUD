@@ -27,10 +27,12 @@ const placeholderGlyph = computed(() => portraitGlyph(props.initialOf || placeho
 const stageState = computed(() => {
   if (portraitUrl.value) return "done";
   if (props.portrait?.url === failedUrl.value && failedUrl.value) return "load-failed";
+  if (!props.portrait?.status && props.portrait?.placeholder?.kind === "unavailable") return "unavailable";
   return ["pending", "failed"].includes(props.portrait?.status) ? props.portrait.status : "missing";
 });
 const stageLabel = computed(() => ({
   pending: "肖像生成中", failed: "肖像生成失敗", "load-failed": "肖像載入失敗", missing: "無肖像",
+  unavailable: props.portrait?.placeholder?.label || "無法提供",
 })[stageState.value] || "");
 const stageName = computed(() => props.initialOf || props.portrait?.context?.name || props.portrait?.alt || "");
 function onImageError() {
@@ -169,6 +171,6 @@ function onImageError() {
 }
 @keyframes actor-pending { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) {
-  .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette svg { animation: none; }
+  :root:not([data-motion]) .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette svg { animation: none; }
 }
 </style>

@@ -119,6 +119,16 @@ describe("StageActor", () => {
     expect(wrapper.get("figure").attributes("data-status")).toBe("done");
   });
 
+  it("preserves a degraded catalog's authoritative unavailable reason", () => {
+    wrapper = mount(StageActor, { props: {
+      name: "旅人",
+      portrait: { status: null, url: null, placeholder: { kind: "unavailable", label: "無法提供" } },
+    } });
+    expect(wrapper.get("figure").attributes("data-status")).toBe("unavailable");
+    expect(wrapper.get("figcaption").text()).toBe("旅人，無法提供");
+    expect(wrapper.find("img").exists()).toBe(false);
+  });
+
   // webclient-combat-beat-choreography (design D4): the combat beat gestures.
   describe("beat gestures", () => {
     const beat = () => wrapper.get('[data-testid="stage-actor"] > .stage-actor__beat');

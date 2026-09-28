@@ -14,7 +14,12 @@
 
 ## Verification evidence
 
-- `pnpm test web/webclient-app/tests/core/stage_actor.test.js web/webclient-app/tests/core/reference_artwork.test.js web/webclient-app/tests/core/foe_lineup.test.js web/webclient-app/tests/app_client_stage_actor.test.js`: 45 passed across 4 files. Initial run exposed seven obsolete crop/identity/gauge assertions; updated consumer contracts and reran the same focused files.
+All commands and evidence paths below are relative to the change worktree root
+`/var/home/jim60105/repos/MUD/.worktrees/webclient-stage-actor-grounding`,
+not `web/webclient-app`. The evidence was captured from the offline production
+showcase using headless agent-browser session `a5`.
+
+- `pnpm test web/webclient-app/tests/core/stage_actor.test.js web/webclient-app/tests/core/reference_artwork.test.js web/webclient-app/tests/core/foe_lineup.test.js web/webclient-app/tests/app_client_stage_actor.test.js`: 46 passed across 4 files after the post-review fixes (the run exposing seven obsolete crop/identity/gauge assertions led to updated consumer contracts and a rerun of the same focused files).
 - `pnpm run build-storybook`: passed; served `.storybook-out` locally.
 - Headless `agent-browser --session a5`: all nine combinations of 1280x720,
   1440x900, 1920x1080 and 1–3 foes, with vitals and command line expanded.
@@ -29,6 +34,17 @@
   pending SVG's computed animation to `actor-pending` → `none` → `none` →
   `actor-pending`. Missing foe lineup inspected at 1280x720 with readable
   front/back labels: `.storybook-out/a5-foe-missing.png`.
+- Dialogue host with a pending placeholder at 1280x720
+  (`core-appshell--dialogue-host-pending`): the chest label's rendered ink
+  ends at x=1040.66, clear of the map island's left edge x=1046, with no
+  internal overflow and document 1280x720 equal to the viewport; the label
+  reads cleanly in `.storybook-out/a5-dialogue-host-1280-check.png`.
+- With the OS reduced-motion preference emulated
+  (`agent-browser set media light reduced-motion`) on
+  `core-stageactor--host-pending-placeholder`, the pending shimmer computes
+  `none` while `<html>` carries no `data-motion` attribute and `actor-pending`
+  once `data-motion="full"` is stored, matching the tokens.css
+  `:root:not([data-motion])` fallback convention.
 - `openspec validate webclient-stage-actor-grounding --strict`: passed.
 - `uv run --locked python -m tools.spec_traceability list --json-output .storybook-out/a5-requirements.json`
   supplied the canonical ID; the existing substantive actor evidence bridge
@@ -36,3 +52,33 @@
   The checker has no capability selector; no test suite or evidence sweep ran.
 - Browser observations are retained in `.storybook-out/a5-evidence.json`.
   Screenshot paths are local ignored build artifacts, not committed assets.
+
+## Review dispositions
+
+Pre-implementation review required reconciliation of stage crop specifications
+and explicit acceptance of supplied opaque backgrounds; both are recorded in
+the deltas and design. Stage-only error text, a single accessible caption,
+unchanged anchor ratios, vitals reservation, and overlapping-foe readability
+were adopted and verified. Data-status, prop-based motion gating and grapheme
+initial reuse were adopted.
+
+The mandatory post-implementation review found no blockers. Its four concerns:
+
+- Fixed OS-reduced fallback precedence to follow the existing
+  `:root:not([data-motion])` convention, preserving explicit full preference.
+- Preserved the degraded server `unavailable` reason and added a focused
+  regression for the real null-status placeholder shape.
+- Clarified root-relative evidence paths above and replaced the stock
+  static-assets README beside the screenshots with a two-line provenance
+  header naming the serve/observe commands, session `a5` and date.
+- Added compact dialogue-host verification alongside the combat-player matrix.
+
+Its three suggestions are dispositioned without expanding scope:
+
+- Kept foe identity type at the shared readable token: observed three-foe
+  fallback labels fit; shrinking text further is unnecessary.
+- Kept ground ellipses inside each crossfading artwork: they follow each
+  portrait's opacity, and no observed artifact warrants a new shared layer.
+- Rejected source-selector assertions for animation: they pin implementation
+  text without proving motion. Actual browser computed animations exercise
+  preference transitions; component tests establish truthful state transitions.
