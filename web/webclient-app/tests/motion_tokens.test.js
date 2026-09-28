@@ -32,6 +32,7 @@ const LEVEL_TOKENS = [
   "--motion-pulse",
   "--motion-hp-pulse",
   "--motion-spin",
+  "--motion-pending",
   "--motion-trail",
   "--motion-trail-delay",
   "--motion-scene",

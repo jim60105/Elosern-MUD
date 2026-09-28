@@ -167,7 +167,7 @@ function onImageError() {
   white-space: nowrap;
 }
 .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette svg {
-  animation: actor-pending 2.4s ease-in-out infinite;
+  animation: actor-pending var(--motion-pending) ease-in-out infinite;
 }
 @keyframes actor-pending { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) {

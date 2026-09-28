@@ -126,6 +126,7 @@
   --motion-pulse: 3.2s; /* looping pulses: veil */
   --motion-hp-pulse: 1.1s; /* looping pulses: low hp */
   --motion-spin: 1.2s; /* looping spinners */
+  --motion-pending: 2.4s; /* looping pending silhouette shimmer */
   --motion-trail: 600ms; /* vitals trailing (ghost) bar */
   --motion-trail-delay: 300ms; /* vitals and foe gauge trailing bar's delay */
   --motion-scene: 500ms; /* backdrop crossfade */
@@ -758,7 +759,7 @@
  *
  * A looping animation whose duration is 0 stops at its end state, which for
  * every loop here (the veil and hp pulses, the marker bob, the spinners, the
- * palette's blink) is the static indicator.
+ * pending silhouette shimmer, the palette's blink) is the static indicator.
  */
 :root[data-motion="reduced"] {
   --motion-fast: 0ms;
@@ -772,6 +773,7 @@
   --motion-pulse: 0ms;
   --motion-hp-pulse: 0ms;
   --motion-spin: 0ms;
+  --motion-pending: 0ms;
   --motion-trail: 0ms;
   --motion-trail-delay: 0ms;
   --motion-scene: 150ms;
@@ -798,6 +800,7 @@
   --motion-pulse: 0ms;
   --motion-hp-pulse: 0ms;
   --motion-spin: 0ms;
+  --motion-pending: 0ms;
   --motion-trail: 0ms;
   --motion-trail-delay: 0ms;
   --motion-scene: 0ms;
@@ -835,6 +838,7 @@
     --motion-pulse: 0ms;
     --motion-hp-pulse: 0ms;
     --motion-spin: 0ms;
+    --motion-pending: 0ms;
     --motion-trail: 0ms;
     --motion-trail-delay: 0ms;
     --motion-scene: 150ms;
