@@ -62,12 +62,15 @@ describe("SceneBackdrop (H1 D3/D8)", () => {
 
   it("degrades the pending scene without a prior image to the truthful placeholder (no invented image)", () => {
     const w = mountBackdrop({ art: ART_PANEL_PENDING_SAMPLE });
-    // No scene bitmap: the frame carries the payload's own missing/placeholder wording.
+    // No scene bitmap: exactly one status badge renders stating both sample and truthful placeholder label, with no raw kind code.
     expect(w.find('[data-testid="scene-backdrop-image"]').exists()).toBe(false);
     const placeholder = w.get('[data-testid="scene-backdrop-placeholder"]');
     expect(placeholder.attributes("data-kind")).toBe("missing");
-    expect(w.get('[data-testid="scene-backdrop-placeholder-kind"]').text()).toBe("missing");
-    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("場景圖像尚未生成");
+    expect(w.find('[data-testid="scene-backdrop-placeholder-kind"]').exists()).toBe(false);
+    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 · 場景圖像尚未生成");
+    // No scene caption row rendered without an actual image.
+    expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(false);
+    expect(w.find('[data-testid="scene-backdrop-control"]').exists()).toBe(false);
   });
 
   it("keeps the prior scene image with a generating note when the scene is pending", async () => {
@@ -80,15 +83,39 @@ describe("SceneBackdrop (H1 D3/D8)", () => {
     expect(img.attributes("src")).toBe("/art/scenes/scene_river_dawn_prev.png");
     expect(img.classes()).toContain("scene-backdrop__image--dimmed");
     expect(w.get('[data-testid="scene-backdrop-generating"]').text()).toBe("目前場景圖片生成中");
+    expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(true);
   });
 
   it("degrades the OOB-unavailable channel to the truthful gradient placeholder", () => {
     const w = mountBackdrop({ art: ART_PANEL_UNAVAILABLE_SAMPLE });
     const frame = w.get('[data-testid="scene-backdrop-placeholder"]');
     expect(frame.attributes("data-kind")).toBe("art_unavailable");
-    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("場景圖像目前無法顯示");
+    expect(w.find('[data-testid="scene-backdrop-placeholder-kind"]').exists()).toBe(false);
+    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 · 場景圖像目前無法顯示");
     expect(w.get('[data-testid="scene-backdrop"]').attributes("data-available")).toBe("false");
     expect(w.find('[data-testid="scene-backdrop-image"]').exists()).toBe(false);
+    expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(false);
+  });
+
+  it("omits the alternative text when it is identical to the scene label", () => {
+    const w = mountBackdrop({
+      art: {
+        ...ART_PANEL_SAMPLE,
+        scene: {
+          ...ART_PANEL_SAMPLE.scene,
+          label: "神秘森林",
+          alt: "神秘森林",
+        },
+      },
+    });
+    expect(w.get('[data-testid="scene-backdrop-label"]').text()).toBe("神秘森林");
+    expect(w.find('[data-testid="scene-backdrop-alt"]').exists()).toBe(false);
+  });
+
+  it("does not render full-view control or caption row for empty gradient / missing scene", () => {
+    const w = mountBackdrop({ art: { available: true, scene: { status: "missing" } } });
+    expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(false);
+    expect(w.find('[data-testid="scene-backdrop-control"]').exists()).toBe(false);
   });
 
   it("remembers a failed image URL so it is not re-fetched until a new URL or reload (task 4.7)", async () => {

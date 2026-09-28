@@ -187,8 +187,8 @@
      blood-dark ring that deepens towards the corners over a faint overall
      dusk, so combat reads at a glance without hiding the art. */
   --stage-combat-veil:
-    radial-gradient(118% 96% at 50% 44%, transparent 38%, rgba(110, 16, 22, 0.3) 74%, rgba(46, 6, 12, 0.62) 100%),
-    linear-gradient(rgba(12, 6, 10, 0.14), rgba(12, 6, 10, 0.14));
+    radial-gradient(118% 96% at 50% 44%, transparent 38%, rgba(110, 16, 22, 0.35) 74%, rgba(46, 6, 12, 0.72) 100%),
+    linear-gradient(rgba(12, 6, 10, 0.18), rgba(12, 6, 10, 0.18));
   --vignette: inset 0 0 220px 40px rgba(0, 0, 0, 0.6);
   --vignette-lowhp: inset 0 0 260px 70px rgba(150, 20, 24, 0.42);
   --menu-open-filter: brightness(0.5) blur(1.5px);
