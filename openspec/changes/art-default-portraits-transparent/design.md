@@ -31,7 +31,7 @@ Alternatives considered:
 
 ### D3. The permissive cutout model for committed output
 
-`ART_REMBG_MODEL` defaults to `bria-rmbg`, whose weights are BRIA-licensed (non-commercial). The committed images must not depend on that licence, so the regeneration run sets `ART_REMBG_MODEL=isnet-anime` (permissively licensed, tuned for this illustration style) and either pre-places the model artifact in `server/.rembg` or runs with `ART_REMBG_DOWNLOAD_ENABLED` set for the session. The tool refuses to run when the resolved model is `bria-rmbg` unless explicitly overridden with `--allow-bria` (there is no reason to; the guard documents the constraint). The runtime stage keeps its own configurable default.
+`ART_REMBG_MODEL` defaults to `bria-rmbg`, whose weights are BRIA-licensed (non-commercial). The committed images must not depend on that licence, so the tool pins `isnet-anime` at the call site using `override_settings`, independently of ambient configuration. Only explicit `--allow-bria` selects the ambient configured model instead; this escape hatch is not used for committed defaults. Before generation, the tool checks both backend-supported model-cache layouts. Missing weights require both `--allow-download` and enabled `ART_REMBG_DOWNLOAD_ENABLED`; otherwise it refuses before contacting sd-webui. The runtime stage keeps its own configurable default.
 
 ### D4. The contract test samples fixed regions, not a mask
 

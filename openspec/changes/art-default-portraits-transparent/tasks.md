@@ -5,7 +5,7 @@
   - bootstrap Django the way `tools/test_data_lint.py` does (`DJANGO_SETTINGS_MODULE=server.conf.settings` default + `django.setup()`) before importing `world.art.*`
   - module-level mapping from each `FALLBACK_KEYS` key to `(ArtSubject kind, authored English description sentence)` per design D2 (character kind for `man`/`woman`/`boy`/`girl`/`elder`, monster kind for `monster_anon`)
   - per key: `resolve_sd_client().generate(subject, description)` → `cutout.remove_background(image.data)` → `formats.encode(...)` with the same WebP quality/metadata arguments the worker passes in `world/art/worker.py::_settle_one`; write `web/static/art/defaults/<key>.webp` only when the decoded image carries alpha and is below `FALLBACK_MAX_FILE_BYTES`, otherwise refuse and name the key
-  - `--key <key>` regenerates one file; the tool overrides the cutout model at the call site (`override_settings(ART_REMBG_MODEL="isnet-anime")`, not an ambient env assumption) and refuses any other resolved model unless `--allow-bria`
+  - `--key <key>` regenerates one file; the tool overrides the cutout model at the call site (`override_settings(ART_REMBG_MODEL="isnet-anime")`, not an ambient env assumption); only explicit `--allow-bria` selects the ambient configured model instead (never used for committed defaults)
   - refuses to start generation when the resolved cutout model is unavailable offline unless `--allow-download` is passed and `ART_REMBG_DOWNLOAD_ENABLED` is honored (operator pre-places the artifact otherwise)
 
   Verify: `DJANGO_SETTINGS_MODULE=server.conf.settings uv run --locked python tools/regenerate_default_art.py --help` prints usage without contacting sd-webui or loading a model.
