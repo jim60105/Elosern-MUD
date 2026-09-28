@@ -162,22 +162,10 @@ body {
   transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
 }
 .elosern-root .scene-backdrop .scene-backdrop__plate { justify-content: center; }
-/* The standing portraits' soft edge masks live in StageActor.vue
-   (webclient-dialogue-stage-actors D1), shared by both portrait anchors. */
-/* The portrait's caption reads as a small name plate at the figure's lower
-   left, clear of the command-line row that starts at the island column. */
-.elosern-root [data-anchor="actor-left"] .reference-artwork figcaption {
-  left: 17%;
-  right: auto;
-  bottom: calc(var(--command-line-h) * .35);
-  max-width: calc(var(--left-column) - 6vw - 17% - 12px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-  color: var(--paper-100);
-  font: var(--text-xs) var(--f-serif);
-  letter-spacing: .12em;
+/* Reserve the vitals island's horizontal footprint for the chest label;
+   keep the actor anchor and its feet fixed on the stage floor. */
+.elosern-root [data-anchor="actor-left"] {
+  --actor-label-left: max(18%, calc(var(--left-column) - var(--actor-left-inset)));
 }
 /* The island stacks at the column widths (webclient-avg-stage-hud-anchors
    design D1). vitals begins below the place card

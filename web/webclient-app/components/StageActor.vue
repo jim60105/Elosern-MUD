@@ -3,16 +3,13 @@
 // portrait on the stage. It wraps `ReferenceArtwork` (which stays the plain
 // frame of the drawer's art slot) and adds the stage's own concerns:
 // - the side it stands on (`left` for the player, `right` for the dialogue
-//   host), exposed as `data-side` so the soft edge masks can mirror;
+//   host), exposed as `data-side` for directional beat gestures;
 // - the speaking state: the listener is dimmed through the shared
 //   `--actor-dim` token and `data-speaking` names the state for tests. The
 //   dim is never the only cue (the message window's name plate names the
 //   host); it eases on the motion tokens (instant below `full`);
-// - the truthful placeholder: with no catalog or roster entry the actor
-//   draws the name's initial and the name (never a stock image); a
-//   placeholder entry keeps its own label (肖像生成中, 無肖像) with the
-//   name's initial in the ring; with no name at all, `ReferenceArtwork`
-//   keeps its own `肖像生成中` card.
+// - stage-only artwork preserves contours and uses a grounded silhouette
+//   with identity and authoritative availability when no image is available.
 // Decorative art: no focusable element, no pointer events.
 //
 // A new portrait source (webclient-scene-transitions, design D5) — a new
@@ -65,15 +62,8 @@ const props = defineProps({
   floatAmount: { type: Number, default: null },
 });
 
-const shown = computed(() => {
-  if (props.portrait) {
-    return props.portrait;
-  }
-  return props.name ? { placeholder: { kind: "missing", label: props.name } } : null;
-});
-
 const portraitKey = computed(() => {
-  const entry = shown.value;
+  const entry = props.portrait;
   if (entry?.url) {
     return entry.url;
   }
@@ -111,7 +101,7 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
       :data-beat="gesture || null"
     >
       <Transition name="actor-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
-        <ReferenceArtwork :key="portraitKey" :portrait="shown" :initial-of="name" />
+        <ReferenceArtwork :key="portraitKey" :portrait="portrait" :initial-of="name" stage :motion-level="motionLevel" />
       </Transition>
     </div>
     <span
@@ -220,74 +210,4 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
   --float-x: -80%;
 }
 
-/* The figure dissolves into the stage instead of ending in a rectangle (a
-   generated portrait carries its own flat backdrop): an elliptical mask
-   centred on the figure, nudged towards the stage centre and mirrored with
-   the side, intersected with a long fade at the feet into the band it
-   stands on. The ellipse is exactly as wide as the box and the vertical
-   fade opens with a short rise at the top, so no edge of the box survives
-   as a visible seam — on a dark scene, or where the combat foes overlap one
-   another. The placeholder card takes the same silhouette. */
-.stage-actor .reference-artwork img,
-.stage-actor .reference-artwork__placeholder {
-  --actor-mask-shape: radial-gradient(ellipse 50% 62% at 51% 46%, #000 58%, transparent 100%);
-  --actor-mask-feet: linear-gradient(transparent, #000 5%, #000 70%, transparent 97%);
-  -webkit-mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
-  -webkit-mask-composite: source-in;
-  mask-image: var(--actor-mask-shape), var(--actor-mask-feet);
-  mask-composite: intersect;
-}
-.stage-actor[data-side="right"] .reference-artwork img,
-.stage-actor[data-side="right"] .reference-artwork__placeholder {
-  --actor-mask-shape: radial-gradient(ellipse 50% 62% at 49% 46%, #000 58%, transparent 100%);
-}
-.stage-actor .reference-artwork img {
-  object-position: center 12%;
-}
-
-/* The truthful placeholder at stage scale: a quiet ink silhouette field with
-   the initial set large in the display face inside a hairline gold ring, and
-   the label under it — it reads as "someone stands here", never as art. */
-.stage-actor .reference-artwork__placeholder {
-  place-content: center stretch;
-  gap: 18px;
-  background:
-    radial-gradient(46% 34% at 50% 40%, rgba(185, 154, 96, 0.14), transparent 72%),
-    radial-gradient(70% 60% at 50% 58%, #1c1a1f, #0f1013 78%);
-}
-.stage-actor .reference-artwork__placeholder-glyph {
-  display: grid;
-  place-items: center;
-  width: clamp(88px, 11vh, 132px);
-  aspect-ratio: 1;
-  margin: 0 auto;
-  border: 1px solid rgba(185, 154, 96, 0.55);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 6px rgba(185, 154, 96, 0.08),
-    inset 0 0 28px rgba(0, 0, 0, 0.55);
-  color: var(--gold-400);
-  font-family: var(--f-display);
-  font-size: clamp(44px, 5.6vh, 66px);
-  line-height: 1;
-  text-shadow: 0 0 18px var(--gold-glow);
-}
-.stage-actor .reference-artwork__placeholder-label {
-  max-width: 78%;
-  margin: 0 auto;
-  text-align: center;
-  color: var(--paper-300);
-  font-family: var(--f-serif);
-  font-size: var(--text-md);
-  letter-spacing: 0.24em;
-  overflow-wrap: anywhere;
-}
-/* The placeholder already states its label on the figure itself; the host's
-   caption is the message window's name plate, so in a conversation neither
-   figure carries a caption. */
-.stage-actor .reference-artwork figcaption[data-sample="true"],
-.stage-actor[data-side="right"] .reference-artwork figcaption,
-[data-elosern-mode="dialogue"] .stage-actor .reference-artwork figcaption {
-  display: none;
-}
 </style>

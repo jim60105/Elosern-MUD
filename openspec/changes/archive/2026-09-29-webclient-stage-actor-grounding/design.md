@@ -14,6 +14,13 @@ Architectural sources: `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.m
 
 Use a stage-only variant of ReferenceArtwork: alpha images retain their full contour, an ink ground ellipse and restrained drop shadow seat them on the band, and captions remain available to assistive technology rather than visually floating below the actor. Drawer artwork is unchanged. Do not infer alpha from filename or attempt a client cutout; the art-default proposal supplies transparent defaults. Do not apply the report's tighter ellipse to all portraits: it clips already-correct alpha hair and equipment.
 
+The stage uses bottom-aligned contain fit, replacing its former face-rectangle
+crop. Reconcile the existing contextual-HUD actor requirement accordingly and
+scope the art-panel cover-fit requirement to the default drawer variant.
+Opaque inputs retain their supplied rectangular background: this is an explicit
+trade-off, verified in the opaque story, rather than a guessed client cutout or
+a universal mask that erases alpha contours.
+
 For missing, pending, failed and load-failed art, use one local inline SVG standing silhouette sized to the actor box, feet at the band. Show the name/initial and authoritative state once in the chest region. Only pending art shimmers, only at full motion; missing art must not promise generation. Offline gameplay, speaking dim and beat gestures stay intact.
 
 Keep existing portrait-anchor/foe ratios. Resolve the reported 1280x720 vitals collision by reserving the island's horizontal footprint for the player's readable silhouette label, not by moving data under an island. Ground shadows are decoration, inert and outside the accessibility tree.

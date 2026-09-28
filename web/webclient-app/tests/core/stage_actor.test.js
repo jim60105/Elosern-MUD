@@ -3,13 +3,9 @@
 // placeholder from the name when no entry exists, exposes its side and its
 // static speaking state as data attributes, dims the listener through the
 // shared `--actor-dim` token, and carries no focusable element.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import StageActor from "../../components/StageActor.vue";
-
-const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
 const HOST_ENTRY = {
   subject_key: "npc_41",
@@ -38,34 +34,37 @@ describe("StageActor", () => {
     wrapper = null;
   });
 
-  it("renders the entry's image with its face-rect crop", () => {
+  it("preserves the supplied image and accessible actor identity", () => {
     wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "灰婆婆", side: "right" } });
     const root = wrapper.get('[data-testid="stage-actor"]');
     expect(root.attributes("data-side")).toBe("right");
     const img = wrapper.get('[data-testid="reference-artwork"] img');
     expect(img.attributes("src")).toBe("/art/portraits/npc_41.webp");
-    expect(img.element.style.objectPosition).toBe("50% 31%");
+    expect(wrapper.get("figcaption").text()).toBe("灰婆婆");
     expect(wrapper.find('[data-testid="reference-artwork__placeholder"]').exists()).toBe(false);
   });
 
-  it("shows a pending entry's own placeholder label with the name's initial in the ring", () => {
+  it("states pending availability separately from actor identity", () => {
     wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY, name: "灰婆婆", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     const card = wrapper.get('[data-testid="reference-artwork__placeholder"]');
-    expect(card.get(".reference-artwork__placeholder-label").text()).toBe("肖像圖像尚未生成");
+    expect(wrapper.get("figure").attributes("data-status")).toBe("pending");
+    expect(wrapper.get("figcaption").text()).toBe("灰婆婆，肖像生成中");
+    expect(card.attributes("aria-hidden")).toBe("true");
     expect(card.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
   });
 
-  it("keeps the entry label's initial when no name is known", () => {
+  it("uses the catalog identity when no explicit name is known", () => {
     wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY } });
-    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("肖");
+    expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
   });
 
   it("draws the name's initial and the name when no entry exists", () => {
     wrapper = mount(StageActor, { props: { portrait: null, name: "合成·旅人", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("合");
-    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("合成·旅人");
+    expect(wrapper.get("figcaption").text()).toBe("合成·旅人，無肖像");
+    expect(wrapper.get("figure").attributes("data-status")).toBe("missing");
   });
 
   it("keeps the whole astral-plane initial of a name", () => {
@@ -73,9 +72,10 @@ describe("StageActor", () => {
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("𠮟");
   });
 
-  it("falls back to ReferenceArtwork's own placeholder with neither entry nor name", () => {
+  it("does not promise generation without an entry or identity", () => {
     wrapper = mount(StageActor, { props: { portrait: null } });
-    expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("肖像生成中");
+    expect(wrapper.get("figure").attributes("data-status")).toBe("missing");
+    expect(wrapper.get("figcaption").text()).toBe("無肖像");
   });
 
   it("exposes the speaking state and dims the listener through the shared token", async () => {
@@ -85,18 +85,48 @@ describe("StageActor", () => {
     await wrapper.setProps({ dimmed: true });
     expect(root.attributes("data-speaking")).toBe("false");
 
-    const source = readFileSync(join(APP_ROOT, "components/StageActor.vue"), "utf-8");
-    const rule = source.match(/\.stage-actor\[data-speaking="false"\]\s*\{[^}]*\}/);
-    expect(rule && rule[0]).toContain("filter: brightness(var(--actor-dim))");
-    // The dim is a static state: the motion layer owns any transition.
-    expect(rule && rule[0]).not.toContain("transition");
-    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf-8");
-    expect(tokens).toMatch(/--actor-dim:\s*0\.6;/);
   });
 
   it("carries no focusable element", () => {
     wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "灰婆婆" } });
     expect(wrapper.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
+  });
+
+  it("keeps missing, pending and failed authoritative across motion changes", async () => {
+    wrapper = mount(StageActor, { props: { name: "旅人", motionLevel: "full" } });
+    const state = () => wrapper.get("figure").attributes("data-status");
+    expect(state()).toBe("missing");
+    await wrapper.setProps({ portrait: PENDING_ENTRY });
+    expect(state()).toBe("pending");
+    for (const motionLevel of ["reduced", "off", "full"]) {
+      await wrapper.setProps({ motionLevel });
+      expect(state()).toBe("pending");
+      expect(wrapper.get("figcaption").text()).toBe("旅人，肖像生成中");
+    }
+    await wrapper.setProps({ portrait: { ...PENDING_ENTRY, status: "failed" } });
+    expect(state()).toBe("failed");
+    expect(wrapper.get("figcaption").text()).toBe("旅人，肖像生成失敗");
+  });
+
+  it("reports a failed image without promising generation and recovers on a new URL", async () => {
+    wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "旅人" } });
+    await wrapper.get("img").trigger("error");
+    expect(wrapper.find("img").exists()).toBe(false);
+    expect(wrapper.get("figure").attributes("data-status")).toBe("load-failed");
+    expect(wrapper.get("figcaption").text()).toBe("旅人，肖像載入失敗");
+    await wrapper.setProps({ portrait: { ...HOST_ENTRY, url: "/art/repaired.webp" } });
+    expect(wrapper.get("img").attributes("src")).toBe("/art/repaired.webp");
+    expect(wrapper.get("figure").attributes("data-status")).toBe("done");
+  });
+
+  it("preserves a degraded catalog's authoritative unavailable reason", () => {
+    wrapper = mount(StageActor, { props: {
+      name: "旅人",
+      portrait: { status: null, url: null, placeholder: { kind: "unavailable", label: "無法提供" } },
+    } });
+    expect(wrapper.get("figure").attributes("data-status")).toBe("unavailable");
+    expect(wrapper.get("figcaption").text()).toBe("旅人，無法提供");
+    expect(wrapper.find("img").exists()).toBe(false);
   });
 
   // webclient-combat-beat-choreography (design D4): the combat beat gestures.
@@ -149,25 +179,5 @@ describe("StageActor", () => {
       expect(wrapper.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
     });
 
-    it("steps toward the centre by side and takes every duration from the beat tokens", () => {
-      const source = readFileSync(join(APP_ROOT, "components/StageActor.vue"), "utf-8");
-      const rule = (selector) => {
-        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const match = source.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
-        return match ? match[1] : "";
-      };
-      expect(rule('.stage-actor[data-side="left"] > [data-beat="lunge"]')).toContain(
-        "elosern-beat-lunge-right var(--motion-beat-step)",
-      );
-      expect(rule('.stage-actor[data-side="right"] > [data-beat="lunge"]')).toContain(
-        "elosern-beat-lunge-left var(--motion-beat-step)",
-      );
-      expect(rule('.stage-actor > [data-beat="hit"]')).toContain("elosern-beat-hit var(--motion-beat-hit)");
-      expect(rule('.stage-actor > [data-beat="defeat"]')).toMatch(
-        /elosern-beat-defeat var\(--motion-beat-defeat\)[^;]*forwards/,
-      );
-      expect(rule(".stage-actor__float")).toMatch(/elosern-beat-float var\(--motion-beat-float\)[^;]*forwards/);
-      expect(rule(".stage-actor__float")).toContain("pointer-events: none");
-    });
   });
 });

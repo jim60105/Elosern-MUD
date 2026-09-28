@@ -22,6 +22,7 @@ export default {
   argTypes: {
     side: { control: "inline-radio", options: ["left", "right"] },
     dimmed: { control: "boolean" },
+    motionLevel: { control: "inline-radio", options: ["full", "reduced", "off"] },
     gesture: { control: "inline-radio", options: [null, "lunge", "hit", "defeat"] },
   },
 };
@@ -90,6 +91,23 @@ export const HostPendingPlaceholder = {
 export const HostMissingEntry = {
   render: renderActor,
   args: { portrait: null, name: "合成·旅人", side: "right", dimmed: false },
+};
+
+export const Failed = {
+  render: renderActor,
+  args: { portrait: { ...HOST_PENDING_ENTRY, status: "failed" }, name: "灰婆婆" },
+};
+export const LoadFailed = {
+  render: renderActor,
+  args: { portrait: { ...HOST_ENTRY, url: "/art/does-not-exist.webp" }, name: "灰婆婆" },
+};
+// Deliberately opaque input: preserve its supplied background, never guess a cutout.
+export const Opaque = {
+  render: renderActor,
+  args: {
+    portrait: { ...HOST_ENTRY, url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="400" height="600" fill="#686a70"/><circle cx="200" cy="95" r="50" fill="#202027"/><path d="M150 155h100l45 440H105Z" fill="#202027"/></svg>')}` },
+    name: "合成·旅人",
+  },
 };
 
 // The speaker: full brightness, `data-speaking="true"`.

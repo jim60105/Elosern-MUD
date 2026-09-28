@@ -181,12 +181,6 @@ function gestureFor(participant) {
   filter: drop-shadow(-14px 0 18px rgba(4, 3, 6, 0.55));
 }
 
-/* A foe is a figure among figures: its portrait's flat backdrop gives way
-   sooner than the player's, so neighbours overlap as bodies rather than as
-   pale cards. */
-.foe-lineup .stage-actor .reference-artwork img {
-  --actor-mask-shape: radial-gradient(ellipse 48% 58% at 49% 45%, #000 46%, transparent 100%);
-}
 
 /* The placeholder at the slot's scale: the ring and the initial shrink with
    the figure, so a back foe's placeholder never looks larger than its body. */

@@ -275,7 +275,7 @@ entries, and are outside this requirement.
 - **THEN** each cover-cropped image applies the shared mapping to that entry's rectangle rather than a fixed center crop
 
 ### Requirement: The reference artwork frame presents a portrait entry truthfully through cover fit and rect crop
-The `World/ReferenceArtwork` component SHALL render a portrait catalog entry as one cover-fitted image
+The default drawer variant of the `World/ReferenceArtwork` component SHALL render a portrait catalog entry as one cover-fitted image
 whose crop follows the entry's `face_rect`, with no invented frame: a `null` entry or a placeholder
 entry (null URL) SHALL render the truthfully labelled placeholder and no image element; a media load
 that fails SHALL degrade that frame to the labelled placeholder; and a subsequent entry whose URL
@@ -284,7 +284,7 @@ surface. The component SHALL be manifest-listed in the re-frozen required set an
 deterministic component-coverage gate.
 
 #### Scenario: A resolved entry renders the cropped image
-- **WHEN** the frame receives an entry carrying a media URL and a well-formed rectangle
+- **WHEN** the default drawer frame receives an entry carrying a media URL and a well-formed rectangle
 - **THEN** it renders exactly that URL cover-fitted with the shared rect crop and no placeholder
 
 #### Scenario: A placeholder entry renders no image
