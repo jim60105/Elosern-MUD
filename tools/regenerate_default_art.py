@@ -36,7 +36,15 @@ DESCRIPTIONS = {
     "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length hooded cloak clasped shut at the throat over a tunic, with trousers and boots."),
     "girl": ("character", "A young human girl with braided hair, fully clothed in a modest ankle-length dress and boots."),
     "elder": ("character", "An elderly human with a lined face, wearing ankle-length layered robes and boots."),
-    "monster_anon": ("monster", "An anonymous humanoid monster with void face beneath a hood, wearing a closed long hooded cloak."),
+    # Dark, loose, faceless: a deep-navy shroud with a void-black hood and
+    # no visible body or hands, per the operator's reference. The earlier
+    # "closed hooded cloak" phrasing rendered a light fitted catsuit with
+    # clawed hands, which reads as a costume, not a monster.
+    # Seed 4272130381 matched the reference's mood but added ornate white
+    # trim and a clasp the reference lacks; plain/unadorned/matte wording
+    # steers to the bare shroud, and cowl+silhouette wording keeps a solid
+    # dark-on-dark edge for the cutout stage.
+    "monster_anon": ("monster", "An anonymous humanoid monster concealed beneath a loose floor-length deep navy hooded shroud of plain unadorned matte fabric, the deep cowl hood filled with impenetrable void darkness, no face visible, the heavy fabric pooling on the ground with tattered melting hem edges, ominous solid silhouette."),
 }
 
 
