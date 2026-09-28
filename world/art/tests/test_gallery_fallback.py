@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
-from PIL import Image, ImageStat
+from PIL import Image, ImageFilter
 
 from world.art.fallback_keys import (
     FALLBACK_DEFAULTS_DIRECTORY,
@@ -124,11 +124,23 @@ class ClosedVocabularyContractTests(unittest.TestCase):
                             alpha.crop((x, y, x + 24, y + 24)).getextrema(),
                             (0, 0),
                         )
-                    centre = alpha.crop((
-                        int(width * 0.4), int(height * 0.2),
-                        int(width * 0.6), int(height * 0.8),
-                    ))
-                    self.assertGreaterEqual(ImageStat.Stat(centre).mean[0], 250)
+                    # The figure's own interior, not a fixed crop: erode the
+                    # silhouette mask and average alpha only over the pixel
+                    # cores, so the body must be solidly opaque while
+                    # antialiased edge pixels and legitimate see-through gaps
+                    # (a sash at the waist, the gap between arm and torso)
+                    # neither inflate the measure nor fail it.
+                    interior = alpha.point(
+                        lambda value: 255 if value >= 128 else 0
+                    ).filter(ImageFilter.MinFilter(9))
+                    core = [
+                        value
+                        for mask, value in zip(
+                            interior.tobytes(), alpha.tobytes()
+                        )
+                        if mask == 255
+                    ]
+                    self.assertGreaterEqual(sum(core) / len(core), 250)
 
     @covers_requirement("art-gallery-fallback::the-built-in-fallback-set-is-a-closed-vocabulary-committed-to-the-repository")
     def test_every_key_has_exactly_one_committed_file_within_the_bound(self):

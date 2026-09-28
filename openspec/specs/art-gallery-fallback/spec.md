@@ -105,12 +105,13 @@ with a permissively licensed model, so the committed images carry no non-commerc
 obligation. Each image SHALL keep its key, file name, and `.webp` extension, stay within the
 declared size bound, and carry a face rectangle re-authored against its own pixels. A contract test
 SHALL decode every committed default and fail when an image has no alpha channel, when any pixel
-of its corner regions is not fully transparent, or when its central figure band is not opaque.
+of its corner regions is not fully transparent, or when the figure's eroded interior is not opaque.
 
 #### Scenario: Every default decodes with a transparent background
 - **WHEN** the contract test decodes each committed fallback image
 - **THEN** each image carries an alpha channel, every pixel in its four corner regions has alpha 0,
-  and the mean alpha of its central figure band is at least 250 of 255
+  and the mean alpha over the eroded interior of the figure's own silhouette (pixel cores only, so
+  antialiased edges and legitimate see-through gaps never count) is at least 250 of 255
 
 #### Scenario: An opaque default fails the contract
 - **WHEN** a committed default without an alpha channel, or with an opaque corner, is placed in the

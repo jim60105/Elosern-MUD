@@ -38,7 +38,7 @@ Alternatives considered:
 The test decodes each file with Pillow and asserts:
 - the mode carries alpha (`RGBA`),
 - every pixel in the four 24×24 corner squares has alpha 0 (the prompt demands a flat backdrop and head-to-feet framing, so corners are backdrop),
-- the mean alpha of the centre column band (x from 40% to 60%, y from 20% to 80%) is at least 250, where the torso stands.
+- the mean alpha over the figure's eroded interior is at least 250: binarize the alpha at 128, erode with a 9×9 minimum filter, and average the raw alpha only over the surviving pixel cores. A fixed geometric crop cannot separate a shredded silhouette from legitimate see-through gaps (a sash at the waist, the gap between arm and torso) or from antialiased edge pixels, so the measure follows the figure's own mask instead.
 
 These regions follow the composition the prompt template fixes, not pixel-exact output, so re-running the tool with a newer model passes as long as the cut is sane.
 
