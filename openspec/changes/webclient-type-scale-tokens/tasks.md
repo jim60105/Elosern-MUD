@@ -1,6 +1,6 @@
 ## 1. Implement the bounded surface
 
-- [ ] 1.1 Declare shared type/numeral tokens and migrate existing literal sizes and obsolete token uses, excluding map geometry; verify no unresolved token references with a throwaway inventory.
+- [ ] 1.1 Declare shared type/numeral tokens and migrate existing literal sizes and obsolete token uses; preserve map anchors (drawing and chrome) with identical local fixed sizes under the approved 2026-09-28 deferral to A12 `webclient-map-legibility`; verify no unresolved token references with a throwaway inventory.
 - [ ] 1.2 Migrate non-code numerals and ordinary UI away from monospace while preserving keycaps/maps/input; inspect changing vitals and prices.
 - [ ] 1.3 Remove existing incidental CSS/source-text assertions rather than re-pin them; add only browser regression checks for floor/clipping and aligned numeric columns.
 - [ ] 1.4 Inspect representative dense HUD, drawer and creation stories at 1920x1080, 1440x900 and 1280x720; correct overflow with bounded layout, not unreadable shrinking.
