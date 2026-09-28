@@ -8,6 +8,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import open_dialogue_choices, valid_local_map_panel
 from ._journey_support import (
     _art_panel,
+    _SCENE_PNG_BYTES,
     _local_map_unavailable_panel,
     _inject_snapshot,
     _wait_mode,
@@ -158,6 +159,17 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
+                # The caption row renders only with an actual scene image on
+                # the stage (webclient-stage-caption-and-hold-backdrop), so
+                # serve the done-scene URL like the sibling stage journeys do:
+                # an unserved fixture URL 404s and trips the load-failure
+                # path, leaving no caption row for the list to stop above.
+                page.route(
+                    "**/art/*.png",
+                    lambda route: route.fulfill(
+                        status=200, content_type="image/png", body=_SCENE_PNG_BYTES
+                    ),
+                )
                 _inject_snapshot(
                     page,
                     {"local_map": valid_local_map_panel(), "dialogue": dialogue, "art": art},
@@ -170,6 +182,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 # The borrowed command line open under the list.
                 page.evaluate("() => document.querySelector('[data-testid=\"command-line-toggle\"]').click()")
                 page.wait_for_selector('[data-anchor="command-line"][data-expanded="true"]', timeout=5000)
+                # The caption row mounts once the scene image decodes; gate on
+                # it before the single geometry read (the choice-list anchor
+                # depends on the caption existing to stop above it).
+                page.wait_for_selector('[data-testid="scene-backdrop-caption"]', timeout=5000)
                 geo = page.evaluate(
                     """() => {
                       const r = (sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; };

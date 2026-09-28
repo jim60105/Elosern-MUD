@@ -475,12 +475,14 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
 
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_scene_backdrop_captions_clear_dock_and_command_line(self):
-        """Every rendered scene-backdrop caption (the truthful placeholder, the
-        scene label, the alternative text, and the full-view control) stays above
-        the action dock's top edge and the command line's top edge at both
-        supported viewports (fix-webclient-scene-backdrop-placeholder-overlap),
-        and the caption plate stands on the stage floor between the portraits
-        rather than a band-height up the stage.
+        """The degraded scene renders exactly one status badge, and that badge
+        stays clear of the bottom band, the action dock, and the command line
+        at both supported viewports (fix-webclient-scene-backdrop-placeholder-overlap).
+        Under the caption-consolidation contract (webclient-stage-caption-and-hold-backdrop)
+        no scene caption row, label, alternative text, or full-view control
+        renders at all while no scene image is on the stage; the caption plate
+        standing on the stage floor is the done-scene journey's assertion
+        (test_scene_caption_sits_on_the_stage_floor_between_the_portraits).
         """
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
@@ -505,6 +507,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                 open_command_line(page)
                 dock = _rect(page, '[data-testid="action-dock"]')
                 cmd_line = _rect(page, '[data-testid="command-line"]')
+                band = _rect(page, '[data-testid="stage-band"]')
                 self.assertIsNotNone(dock, "the action dock panel is rendered")
                 self.assertIsNotNone(cmd_line, "the command line is rendered")
                 for testid in (
@@ -526,6 +529,11 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                         cmd_line["top"],
                         "%s intrudes into the command line at %dx%d" % (testid, viewport[0], viewport[1]),
                     )
+                    self.assertLessEqual(
+                        box["bottom"],
+                        band["top"],
+                        "%s intrudes into the bottom band at %dx%d" % (testid, viewport[0], viewport[1]),
+                    )
                     self.assertFalse(
                         _boxes_overlap(box, dock),
                         "%s box intersects the action dock at %dx%d" % (testid, viewport[0], viewport[1]),
@@ -534,7 +542,25 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
                         _boxes_overlap(box, cmd_line),
                         "%s box intersects the command line at %dx%d" % (testid, viewport[0], viewport[1]),
                     )
-                assert_scene_caption_on_stage_floor(self, page, viewport)
+                # The caption-consolidation contract: the degraded scene renders
+                # exactly one status badge (checked post-expansion, where the
+                # DOM-readiness gate above only proves the pre-expansion frame)
+                # and no scene caption row at all.
+                self.assertEqual(
+                    page.locator('[data-testid="scene-backdrop-caption"]').count(),
+                    0,
+                    "a degraded scene renders no scene caption row at %dx%d"
+                    % (viewport[0], viewport[1]),
+                )
+                self.assertEqual(
+                    page.locator(
+                        '[data-testid="scene-backdrop"] '
+                        '[data-testid="scene-backdrop-placeholder"]'
+                    ).count(),
+                    1,
+                    "the degraded scene renders exactly one status badge at %dx%d"
+                    % (viewport[0], viewport[1]),
+                )
                 # The message window sits in the band's left two thirds beside
                 # the action dock and below the expanded command line, intersecting neither.
                 feed = _rect(page, '[data-testid="message-window"]')
