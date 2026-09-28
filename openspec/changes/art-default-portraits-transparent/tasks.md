@@ -18,11 +18,11 @@
 
 ## 3. Contract test
 
-- [ ] 3.1 In `world/art/tests/test_gallery_fallback.py`, add `test_every_default_has_a_transparent_background` to `ClosedVocabularyContractTests`, per design D4 (RGBA mode, 24×24 corner squares with alpha 0, mean alpha ≥ 250 in the centre band). Assert the geometry against `FALLBACK_MAX_FILE_BYTES` and the decode itself, not a hardcoded pixel size (the canvas is settings-driven). Annotate with `@covers_requirement("art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background")` (confirm the ID with `uv run --locked python -m tools.spec_traceability list`).
-- [ ] 3.2 Prove that the new test fails on an opaque image: point it at the pre-change file (`git show HEAD:web/static/art/defaults/man.webp > <scratchpad>/man.webp`) via a temporary directory override. Observe the failure, then revert.
+- [x] 3.1 In `world/art/tests/test_gallery_fallback.py`, add `test_every_default_has_a_transparent_background` to `ClosedVocabularyContractTests`, per design D4 (RGBA mode, 24×24 corner squares with alpha 0, mean alpha ≥ 250 in the centre band). Assert the geometry against `FALLBACK_MAX_FILE_BYTES` and the decode itself, not a hardcoded pixel size (the canvas is settings-driven). Annotate with `@covers_requirement("art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background")` (confirm the ID with `uv run --locked python -m tools.spec_traceability list`).
+- [x] 3.2 Prove that the new test fails on an opaque image: point it at the pre-change file (`git show HEAD:web/static/art/defaults/man.webp > <scratchpad>/man.webp`) via a temporary directory override. Observe the failure, then revert.
 - [ ] 3.3 Run `uv run --locked evennia test --settings test_settings.py --keepdb world.art.tests.test_gallery_fallback world.art.tests.test_presenter` (with `MUD_TEST_SETTINGS=1` passed through the Bash tool's `env` input). All green.
 
 ## 4. Specs and validation
 
-- [ ] 4.1 Sync the delta into `openspec/specs/art-gallery-fallback/spec.md`. `uv run --locked python -m tools.spec_traceability check` is green.
-- [ ] 4.2 `openspec validate art-default-portraits-transparent --strict` passes.
+- [x] 4.1 Sync the delta into `openspec/specs/art-gallery-fallback/spec.md`. `uv run --locked python -m tools.spec_traceability check` is green.
+- [x] 4.2 `openspec validate art-default-portraits-transparent --strict` passes.
