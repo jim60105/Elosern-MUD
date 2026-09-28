@@ -210,6 +210,14 @@ def encode(
                 save_image = image.convert("RGB")
                 save_image.info = {}
             save_kwargs: dict[str, object] = {"quality": quality}
+            if save_format == "WEBP":
+                # Pillow's default, written explicitly: the lossy VP8 quality
+                # knob must never bleed into the alpha plane, which the AVG
+                # stage composites directly. The committed defaults further
+                # floor matte noise below full transparency (see
+                # tools/regenerate_default_art.py); the encoder only promises
+                # to carry the matte it is handed unmodified.
+                save_kwargs["alpha_quality"] = 100
             if parameters is not None:
                 save_kwargs["exif"] = _exif_bytes(parameters)
             save_image.save(buffer, format=save_format, **save_kwargs)

@@ -8,9 +8,11 @@ uses the configured model instead and must not be used for committed defaults.
 
 Repository settings come from the environment: the operator .env (the worktree
 file first, then the primary checkout's) is loaded before Django starts and
-real exported variables always win over file entries, so ART_SD_STYLES,
-ART_SD_MODULES and the other ART_SD_* knobs reach the request builder exactly
-as they do in a composed deployment.
+file values OVERRIDE inherited environment variables: this tool's contract is
+"regenerate with the operator .env", and a stale exported ART_SD_* knob in a
+long-lived shell would otherwise silently replace the file's configuration.
+The one deliberate override is --base-url, for host-side runs against a
+.env whose SD_WEBUI_BASE_URL names a container-internal host.
 """
 
 import argparse
@@ -67,14 +69,43 @@ def _load_repository_env(root: Path) -> None:
             if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
                 value = value[1:-1]
             if name:
-                os.environ.setdefault(name, value)
+                os.environ[name] = value
         return
+
+
+MATTE_ALPHA_FLOOR = 8
+
+
+def _floor_matte(png_bytes: bytes) -> bytes:
+    """Zero rembg's faint matte noise while keeping every real edge pixel.
+
+    isnet-anime leaves alpha 1-2 haze (observed at the frame corners of
+    every default, and elsewhere as a faint halo). Lossy WebP faithfully
+    carries it, so the committed defaults would never satisfy the exact
+    transparent-corner contract. Values below the floor are far under any
+    visible edge (a 3% pixel cannot composite), while real anti-aliased
+    edge pixels stay untouched: the matte keeps the soft shape rembg
+    inferred, exactly like the runtime pipeline stores it. Only the tool
+    applies the floor: the runtime pipeline stores the backend matte
+    as-is.
+    """
+    from PIL import Image  # noqa: PLC0415 - same lazy-image idiom as main()
+    image = Image.open(io.BytesIO(png_bytes))
+    image.load()
+    alpha = image.getchannel("A").point(
+        lambda value: 0 if value < MATTE_ALPHA_FLOOR else value
+    )
+    image.putalpha(alpha)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def main() -> None:
     """Generate selected defaults through the runtime seams, then publish them."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--key", choices=tuple(DESCRIPTIONS))
+    parser.add_argument("--base-url", help="Override SD_WEBUI_BASE_URL for host-side runs")
     parser.add_argument("--allow-bria", action="store_true", help="Use the ambient model instead of the permissive pin; not for committed defaults")
     parser.add_argument("--allow-download", action="store_true", help="Consent to missing model downloads when enabled in settings")
     args = parser.parse_args()
@@ -82,6 +113,8 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
     _load_repository_env(root)
+    if args.base_url:
+        os.environ["SD_WEBUI_BASE_URL"] = args.base_url
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
     import django
 
@@ -98,6 +131,15 @@ def main() -> None:
 
     if set(DESCRIPTIONS) != set(FALLBACK_KEYS):
         parser.error("authored descriptions do not match the closed fallback vocabulary")
+    print(
+        "Effective config: "
+        f"{settings.ART_SD_PORTRAIT_WIDTH}x{settings.ART_SD_PORTRAIT_HEIGHT} "
+        f"ckpt={settings.ART_SD_CHECKPOINT} styles={settings.ART_SD_STYLES} "
+        f"modules={settings.ART_SD_MODULES} "
+        f"sampler={settings.ART_SD_SAMPLER}/{settings.ART_SD_SCHEDULER} "
+        f"url={settings.ART_SD_BASE_URL}",
+        flush=True,
+    )
     model = str(settings.ART_REMBG_MODEL) if args.allow_bria else "isnet-anime"
     download = args.allow_download and bool(settings.ART_REMBG_DOWNLOAD_ENABLED)
     model_dir = Path(settings.ART_REMBG_MODEL_DIR)
@@ -115,7 +157,22 @@ def main() -> None:
             log_info("default_art_generation_started", context={"key": key, "model": model})
             print(f"Generating {key} with {model}", flush=True)
             image = client.generate(subject, description)
-            png = cutout.remove_background(image.data)
+            # The server writes its own Size/Model fields into the response
+            # infotext, so the echo proves what actually rendered. Drift here
+            # (a shared server left on another checkpoint or a snapped size)
+            # must fail the run loudly instead of publishing wrong art.
+            echo = image.infotext or ""
+            if not echo:
+                raise ValueError(f"{key}: server returned no infotext to verify")
+            expected_size = (
+                f"Size: {settings.ART_SD_PORTRAIT_WIDTH}x{settings.ART_SD_PORTRAIT_HEIGHT}"
+            )
+            if expected_size not in echo:
+                raise ValueError(f"{key}: server echo lacks {expected_size!r}")
+            checkpoint_stem = str(settings.ART_SD_CHECKPOINT).rsplit("/", 1)[-1]
+            if checkpoint_stem and checkpoint_stem.removesuffix(".safetensors") not in echo:
+                raise ValueError(f"{key}: server echo lacks checkpoint {checkpoint_stem!r}")
+            png = _floor_matte(cutout.remove_background(image.data))
             encoded, _extension = formats.encode(
                 png, prompt=image.prompt, negative_prompt=image.negative_prompt,
                 steps=image.steps, cfg_scale=image.cfg_scale, sampler=image.sampler,
