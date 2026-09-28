@@ -32,8 +32,9 @@ DESCRIPTIONS = {
     # hanging panels, which rembg then strips together with the cloak's back
     # side, shredding the silhouette (observed with seeds 4192013969 and
     # 886151869, which drew the coat open despite "buttoned"). The clasped
-    # cloak phrasing is the one monster_anon proves renders solid.
-    "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length hooded cloak clasped shut at the throat over a tunic, with trousers and boots."),
+    # cloak phrasing is the one monster_anon proves renders solid; the
+    # operator wants the boy's face shown, so the cloak stays hoodless.
+    "boy": ("character", "A young human boy with short hair, fully clothed in a hoodless floor-length cloak clasped shut at the throat over a tunic, with trousers and boots."),
     "girl": ("character", "A young human girl with braided hair, fully clothed in a modest ankle-length dress and boots."),
     "elder": ("character", "An elderly human with a lined face, wearing ankle-length layered robes and boots."),
     # Dark, loose, faceless: a deep-navy shroud with a void-black hood and
