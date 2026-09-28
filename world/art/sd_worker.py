@@ -521,7 +521,7 @@ def _extract_infotext(png: bytes) -> str | None:
             if kind == b"IEND":
                 return None
             position = body_end + 4
-    except (IndexError, struct.error, UnicodeDecodeError):
+    except (IndexError, struct.error, UnicodeDecodeError):  # observability: ignore R2: malformed PNG text chunks -> None infotext; the caller degrades to reconstructed parameters, the image remains valid
         return None
     return None
 
