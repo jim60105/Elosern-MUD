@@ -527,8 +527,8 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 }
 
 .scene-backdrop .scene-backdrop__placeholder-kind {
-  font-family: var(--f-mono);
-  font-size: 0.8em;
+  font-family: var(--f-sans);
+  font-size: max(var(--text-xs), 0.8em);
   text-transform: uppercase;
   color: var(--paper-500);
 }
@@ -569,7 +569,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   padding-right: 12px;
   border-right: 1px solid rgba(202, 183, 138, 0.3);
   color: var(--warn);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   letter-spacing: 0.04em;
 }
@@ -610,7 +610,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   flex: 0 0 auto;
   max-width: 55%;
   color: var(--paper-100);
-  font: 14px/1.5 var(--f-serif);
+  font: var(--text-md)/1.5 var(--f-serif);
   letter-spacing: 0.12em;
 }
 
@@ -619,7 +619,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   padding-left: 12px;
   border-left: 1px solid rgba(202, 183, 138, 0.3);
   color: var(--paper-500);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   letter-spacing: 0.04em;
 }

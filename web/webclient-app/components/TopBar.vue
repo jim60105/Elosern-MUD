@@ -77,7 +77,7 @@ defineEmits({
   left: 16px;
   z-index: 4;
   font-family: var(--f-display);
-  font-size: 20px;
+  font-size: var(--text-xl);
   letter-spacing: 0.18em;
   color: var(--paper-50);
   background: var(--panel);
@@ -109,14 +109,14 @@ defineEmits({
   border-radius: 999px;
   padding: 6px 13px;
   box-shadow: var(--shadow);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--paper-300);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .topbar-meta .meta-conn {
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
 }
 
 .topbar-meta.connected .meta-conn {
@@ -138,7 +138,7 @@ defineEmits({
   border: 1px solid rgba(175, 122, 197, 0.6);
   border-radius: var(--radius-sm, 4px);
   color: #e8daef;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   letter-spacing: 0.5px;
   pointer-events: none;

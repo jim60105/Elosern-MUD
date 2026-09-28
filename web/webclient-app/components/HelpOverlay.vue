@@ -54,7 +54,7 @@ const controlSection = controlsReferenceSection();
   padding-bottom: 16px;
   border-bottom: var(--line);
   font-family: var(--f-serif);
-  font-size: 24px;
+  font-size: var(--text-2xl);
   color: var(--gold-400);
 }
 
@@ -83,7 +83,7 @@ const controlSection = controlsReferenceSection();
 
 .help-controls__label {
   font-family: var(--f-sans);
-  font-size: var(--text-body);
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--paper-50);
 }

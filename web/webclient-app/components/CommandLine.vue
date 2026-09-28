@@ -432,13 +432,13 @@ defineExpose({ focusField });
 .cmdfield .pt {
   font-family: var(--f-mono);
   color: var(--seal-400);
-  font-size: calc(16px * var(--prose-scale));
+  font-size: calc(var(--text-base) * var(--prose-scale));
   flex: none;
 }
 
 .cmdfield__prompt-html {
   font-family: var(--f-mono);
-  font-size: calc(13px * var(--prose-scale));
+  font-size: calc(var(--text-sm) * var(--prose-scale));
   color: var(--paper-500);
 }
 
@@ -473,8 +473,8 @@ defineExpose({ focusField });
   margin: 0;
   display: grid;
   place-items: center;
-  font-family: var(--f-mono);
-  font-size: 14px;
+  font-family: var(--f-sans);
+  font-size: var(--text-md);
   color: var(--paper-50);
   background: var(--seal-600);
   border: 1px solid var(--seal-400);
@@ -488,7 +488,7 @@ defineExpose({ focusField });
 
 .hint {
   flex: none;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--paper-700);
   white-space: nowrap;
 }

@@ -368,7 +368,7 @@ watch(
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--paper-100);
   cursor: pointer;
 }
@@ -381,9 +381,10 @@ watch(
 }
 .dock-menu__skill-cost {
   margin-left: auto;
-  font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--vit-mp);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .dock-menu__skill-check {
   color: var(--ok);
@@ -403,7 +404,7 @@ watch(
   display: grid;
   place-items: center;
   font-family: var(--f-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   color: var(--paper-100);
@@ -428,8 +429,8 @@ watch(
 }
 .dock-menu__scale {
   flex: 1;
-  font-family: var(--f-mono);
-  font-size: 12px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   padding: 7px;
   border-radius: 8px;
   background: var(--ink-780);
@@ -440,6 +441,7 @@ watch(
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .dock-menu__scale--on {
   background: var(--gold-glow);
@@ -447,7 +449,7 @@ watch(
   color: var(--paper-50);
 }
 .dock-menu__scale-cost {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
@@ -461,13 +463,13 @@ watch(
 }
 .dock-menu__confirm-title {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--seal-400);
 }
 .dock-menu__confirm-note {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
 }
 .dock-menu__confirm-buttons {
@@ -483,7 +485,7 @@ watch(
   border-radius: 8px;
   color: var(--paper-300);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .dock-menu__confirm-btn--primary {
   background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
@@ -523,7 +525,7 @@ watch(
 .dock-menu-item--focused::before {
   content: "▶";
   color: var(--gold-400);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
 }
 .dock-menu-item--disabled {
   color: var(--paper-500);
@@ -538,7 +540,7 @@ watch(
 }
 .dock-menu-item__unavailable {
   color: var(--paper-700);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 .visually-hidden {
   position: absolute;

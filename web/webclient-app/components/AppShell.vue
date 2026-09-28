@@ -581,7 +581,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
   border: 1px solid var(--ink-600);
   border-radius: 99px;
   color: var(--paper-300);
-  font: 12px/1 var(--f-sans);
+  font: var(--text-xs)/1 var(--f-sans);
   letter-spacing: 0;
   cursor: pointer;
 }
@@ -606,7 +606,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
   border-radius: var(--radius-sm);
   background: var(--panel-solid);
   color: var(--paper-300);
-  font: 14px/1 var(--f-mono);
+  font: var(--text-md)/1 var(--f-sans);
   cursor: pointer;
 }
 

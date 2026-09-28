@@ -70,5 +70,5 @@ function confirmDelete() {
 .gallery-detail__default, .gallery-detail__generate { width: 100%; margin-bottom: 10px; }
 .gallery-detail__generate { margin-top: 18px; }
 .gallery-detail__confirm { margin-top: 14px; }
-.gallery-detail .gallery-actions button { padding: 7px; font-size: 12px; }
+.gallery-detail .gallery-actions button { padding: 7px; font-size: var(--text-xs); }
 </style>

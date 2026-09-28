@@ -323,7 +323,7 @@ onUnmounted(() => {
   border-radius: 999px;
   padding: 4px 10px 4px 5px;
   box-shadow: var(--shadow);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--paper-200);
   cursor: pointer;
   max-width: 170px;
@@ -365,7 +365,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__thumb-placeholder {
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--paper-400);
   font-family: var(--f-display);
@@ -381,7 +381,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__caret {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--paper-400);
   margin-left: 2px;
 }
@@ -407,7 +407,7 @@ onUnmounted(() => {
 
 .character-switcher__lock-note {
   padding: var(--sp-2) var(--sp-3);
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--warn);
   background: rgba(239, 68, 68, 0.1);
   border-radius: var(--radius-sm);
@@ -432,7 +432,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   background: transparent;
   color: var(--paper-200);
-  font-size: 12px;
+  font-size: var(--text-xs);
   cursor: pointer;
   text-align: left;
   transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
@@ -474,7 +474,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__row-thumb-placeholder {
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--paper-400);
 }
@@ -487,7 +487,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__pending-badge {
-  font-size: 10px;
+  font-size: var(--text-xs);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   background: rgba(59, 130, 246, 0.15);
@@ -498,7 +498,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__current-badge {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--gold-400);
   font-weight: 600;
   margin-left: auto;
@@ -521,7 +521,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--paper-300);
-  font-size: 12px;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
 }
@@ -541,7 +541,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__capacity-reason {
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
   margin-left: auto;
 }
@@ -554,7 +554,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__confirm-message {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--paper-300);
   line-height: 1.5;
   margin: 0;
@@ -568,7 +568,7 @@ onUnmounted(() => {
 
 .character-switcher__confirm-cancel {
   padding: 4px 10px;
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   border: var(--line);
   border-radius: var(--radius-sm);
   background: var(--paper-800);
@@ -578,7 +578,7 @@ onUnmounted(() => {
 
 .character-switcher__confirm-submit {
   padding: 4px 10px;
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
   background: var(--gold-600);

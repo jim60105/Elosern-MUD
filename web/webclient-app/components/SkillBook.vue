@@ -405,7 +405,7 @@ function castText(row) {
   background: transparent;
   border: 0;
   outline: none;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-family: var(--f-sans);
 }
 
@@ -429,7 +429,7 @@ function castText(row) {
 .skill-book__category-summary {
   cursor: pointer;
   color: var(--paper-100);
-  font-size: 0.95em;
+  font-size: max(var(--text-xs), 0.95em);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -447,10 +447,11 @@ function castText(row) {
 
 .skill-book__category-count {
   margin-left: auto;
-  font-family: var(--f-mono);
-  font-size: 11px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-500);
   flex: none;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .skill-book__category-chevron {
@@ -468,7 +469,7 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
    the label carries the `.grp` margin itself. */
 .skill-book__group-label {
   margin: var(--sp-3) var(--sp-1) var(--sp-1);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: .08em;
   color: var(--paper-500);
   display: flex;
@@ -505,7 +506,7 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   gap: var(--sp-2);
   padding: 2px var(--sp-1);
   border-radius: var(--radius-sm);
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
 }
 
 .skill-book__skill-name {
@@ -522,18 +523,19 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
 .skill-book__target,
 .skill-book__cast {
   color: var(--paper-500);
-  font-family: var(--f-mono);
-  font-size: 0.85em;
+  font-family: var(--f-sans);
+  font-size: max(var(--text-xs), 0.85em);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .skill-book__cost {
   color: var(--vit-mp);
-  font-family: var(--f-mono);
-  font-size: 0.85em;
+  font-family: var(--f-num);
+  font-size: max(var(--text-xs), 0.85em);
   margin-left: auto;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .skill-book__cost.mp {
@@ -553,7 +555,7 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
    parent's `gap` already provides 8px of spacing). */
 .skill-book__ooc {
   flex: none;
-  font-size: 9px;
+  font-size: var(--text-xs);
   letter-spacing: .04em;
   color: var(--ok);
   border: 1px solid rgba(112, 150, 122, 0.5);
@@ -564,15 +566,16 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
 /* The reference's `.srow .prf`: passive-tab rows carry a visible 被動 badge
    with its own text, never a bare colour swatch. */
 .skill-book__passive-badge {
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-700);
   flex: none;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The reference's `.log` legend, rendered above the active-tab list. */
 .skill-book__legend {
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--paper-500);
   margin-bottom: var(--sp-1);

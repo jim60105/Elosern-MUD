@@ -80,7 +80,7 @@ defineEmits(["dismiss"]);
   border-radius: 9px;
   padding: 14px 42px 14px 16px;
   box-shadow: var(--shadow);
-  font-size: 12px;
+  font-size: var(--text-xs);
   pointer-events: auto;
   cursor: pointer;
   overflow-wrap: anywhere;
@@ -102,7 +102,7 @@ defineEmits(["dismiss"]);
 }
 .toast .ts {
   color: var(--paper-300);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .toast.crit {
@@ -125,7 +125,7 @@ defineEmits(["dismiss"]);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--paper-300);
-  font-size: 20px;
+  font-size: var(--text-xl);
   cursor: pointer;
 }
 .toast__dismiss:hover { color: var(--gold-400); background: var(--gold-glow); }

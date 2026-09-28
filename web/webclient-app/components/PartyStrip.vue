@@ -130,7 +130,7 @@ function onActivate() {
 }
 
 .comps .clab {
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.14em;
   color: var(--paper-500);
   margin-bottom: 8px;
@@ -140,8 +140,9 @@ function onActivate() {
 
 .comps .clab .c {
   margin-left: auto;
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   color: var(--paper-500);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* Four tracks of at most 40px that shrink together, so a full party fits
@@ -175,7 +176,7 @@ function onActivate() {
   border-radius: 8px;
   background: linear-gradient(160deg, #2a2431, #16131b);
   font-family: var(--f-display);
-  font-size: 17px;
+  font-size: var(--text-lg);
   line-height: 1;
   color: var(--gold-400);
   transition: border-color var(--motion-base) var(--ease-standard);
@@ -212,7 +213,7 @@ function onActivate() {
   border-radius: 4px;
   background: var(--ink-950);
   font-family: var(--f-mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 700;
   line-height: 1.1;
   color: var(--vit-mp);

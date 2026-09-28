@@ -319,7 +319,6 @@ describe("SkillBook (B3 data family)", () => {
     expect(pill.text()).toBe("combat");
     const cs = window.getComputedStyle(pill.element);
     expect(cs.borderRadius).toBe("4px");
-    expect(cs.fontSize).toBe("9px");
     expect(cs.color).toContain("var(--ok)");
   });
 

@@ -336,7 +336,7 @@ function confirmAbandonNow() {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -353,7 +353,7 @@ function confirmAbandonNow() {
   margin: 0;
   color: var(--seal-400);
   font-family: var(--f-display);
-  font-size: 0.95em;
+  font-size: max(var(--text-xs), 0.95em);
 }
 
 .quest-log__row {
@@ -380,31 +380,31 @@ function confirmAbandonNow() {
 
 .quest-log__state {
   color: var(--gold-400);
-  font-family: var(--f-mono);
-  font-size: 0.85em;
+  font-family: var(--f-sans);
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .quest-log__issuer {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .quest-log__issuer-kind {
   color: var(--gold-400);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
 }
 
 .quest-log__settlement {
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
 }
 
 .quest-log__row-objective,
 .quest-log__reward {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .quest-log__stage,
@@ -412,7 +412,7 @@ function confirmAbandonNow() {
 .quest-log__deadline {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .quest-log__actions {
@@ -429,7 +429,7 @@ function confirmAbandonNow() {
   border: 1px solid var(--seal-600);
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
 }
 
@@ -447,8 +447,8 @@ function confirmAbandonNow() {
 
 .quest-log__reason {
   color: var(--warn);
-  font-size: 0.85em;
-  font-family: var(--f-mono);
+  font-size: max(var(--text-xs), 0.85em);
+  font-family: var(--f-sans);
 }
 
 .quest-log__confirm {
@@ -464,7 +464,7 @@ function confirmAbandonNow() {
 .quest-log__confirm-text {
   margin: 0;
   color: var(--paper-100);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   line-height: 1.5;
 }
 

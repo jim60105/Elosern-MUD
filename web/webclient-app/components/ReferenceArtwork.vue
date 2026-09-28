@@ -73,12 +73,12 @@ function onImageError() {
 .reference-artwork__placeholder-glyph {
   color: var(--gold-600, #8a6d3b);
   font-family: var(--f-serif, serif);
-  font-size: 42px;
+  font-size: var(--text-initial);
   text-align: center;
 }
 .reference-artwork__placeholder-label {
   color: var(--paper-400, #9a958c);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: .08em;
   text-align: center;
 }
@@ -88,7 +88,7 @@ function onImageError() {
   left: 16px;
   right: 16px;
   color: var(--paper-300);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: .08em;
   text-align: center;
   text-shadow: 0 1px 4px #000;

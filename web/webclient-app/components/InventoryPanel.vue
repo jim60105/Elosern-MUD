@@ -496,7 +496,7 @@ watch(confirming, (open) => {
   align-items: center;
   gap: 8px;
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -507,7 +507,7 @@ watch(confirming, (open) => {
   letter-spacing: 0.03em;
   text-transform: none;
   color: var(--paper-700);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 /* The mock's `.statrow`: label left, grouped mono gold value right. */
@@ -522,20 +522,20 @@ watch(confirming, (open) => {
 }
 
 .inventory-panel__statrow-label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--paper-100);
 }
 
 .inventory-panel__statrow-unit {
   color: var(--paper-700);
   margin-left: 6px;
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .inventory-panel__wallet-value {
   margin-left: auto;
-  font-family: var(--f-mono);
-  font-size: 13px;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   color: var(--gold-400);
 }
 
@@ -543,7 +543,7 @@ watch(confirming, (open) => {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -551,7 +551,7 @@ watch(confirming, (open) => {
 .inventory-panel__absent {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 /* The responsive held-item grid (the reference's `.itgrid`): auto-fill
@@ -600,9 +600,10 @@ watch(confirming, (open) => {
   position: absolute;
   bottom: 2px;
   right: 4px;
-  font-family: var(--f-mono);
-  font-size: 9px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The non-colour equipped state: a check glyph, not a colour cue. */
@@ -621,7 +622,7 @@ watch(confirming, (open) => {
   position: absolute;
   top: 2px;
   right: 4px;
-  font-size: 9px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
@@ -630,7 +631,7 @@ watch(confirming, (open) => {
   bottom: 2px;
   left: 4px;
   right: 20px;
-  font-size: 9px;
+  font-size: var(--text-xs);
   line-height: 1.15;
   color: var(--paper-300);
   word-break: break-word;
@@ -667,7 +668,7 @@ watch(confirming, (open) => {
 .inventory-panel__ceiling {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
 }
 
 /* Item details remain non-interactive and follow the same hover/focus state. */
@@ -679,7 +680,7 @@ watch(confirming, (open) => {
   border-radius: 11px;
   box-shadow: var(--shadow);
   padding: 13px 15px;
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   pointer-events: none;
   animation: inventory-inspector-in var(--motion-fast) var(--ease-standard);
 }
@@ -702,14 +703,14 @@ watch(confirming, (open) => {
 }
 
 .inventory-panel__inspector-name {
-  font-size: 14px;
+  font-size: var(--text-md);
   color: var(--paper-50);
   font-weight: 600;
   min-width: 0;
 }
 
 .inventory-panel__inspector-rarity {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--gold-400);
   flex: none;
 }
@@ -731,7 +732,7 @@ watch(confirming, (open) => {
 }
 
 .inventory-panel__inspector-kind {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
   margin-bottom: 7px;
 }
@@ -747,7 +748,7 @@ watch(confirming, (open) => {
    the muted token; bag-only items render no element at all. */
 .inventory-panel__inspector-adjustment {
   color: var(--paper-500);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   margin-top: 4px;
   overflow-wrap: anywhere;
@@ -757,14 +758,14 @@ watch(confirming, (open) => {
   display: flex;
   justify-content: space-between;
   color: var(--paper-300);
-  font-family: var(--f-mono);
-  font-size: 11.5px;
+  font-family: var(--f-sans);
+  font-size: var(--text-xs);
   margin-top: 3px;
 }
 
 .inventory-panel__inspector-reason {
   color: var(--gold-400);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   margin-top: 5px;
 }
 
@@ -800,14 +801,14 @@ watch(confirming, (open) => {
 .inventory-confirm__title {
   margin: 0 0 8px;
   color: var(--paper-50);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
 .inventory-confirm__text {
   margin: 0 0 16px;
   color: var(--paper-300);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -821,7 +822,7 @@ watch(confirming, (open) => {
 .inventory-confirm__ok {
   border-radius: 8px;
   padding: 7px 16px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 

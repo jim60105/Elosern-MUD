@@ -136,7 +136,7 @@ const drawerKeys = { character: "status", inventory: "inventory", bag: "inventor
   border-radius: 0 0 6px 6px;
   background: transparent;
   color: var(--paper-500);
-  font: 14px var(--f-serif);
+  font: var(--text-md) var(--f-serif);
   letter-spacing: .08em;
   cursor: pointer;
 }

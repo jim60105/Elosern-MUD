@@ -177,7 +177,7 @@ function portraitSrc(portrait) {
 }
 
 .participant-frame__group-label {
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   color: var(--paper-500);
   margin-bottom: 2px;
@@ -204,7 +204,7 @@ function portraitSrc(portrait) {
   display: grid;
   place-items: center;
   font-family: var(--f-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   color: var(--paper-100);
@@ -220,20 +220,21 @@ function portraitSrc(portrait) {
 }
 
 .participant-frame__name {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--paper-50);
   font-weight: 500;
 }
 
 .participant-frame__hp {
-  font-family: var(--f-mono);
-  font-size: 11px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-500);
   margin-left: auto;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .participant-frame__state {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--warn);
   white-space: nowrap;
 }
@@ -259,7 +260,7 @@ function portraitSrc(portrait) {
   background: var(--ink-780);
   border: 1px dashed var(--ink-600);
   color: var(--paper-500);
-  font-size: 9px;
+  font-size: var(--text-xs);
   padding: 4px;
   text-align: center;
   line-height: 1.2;

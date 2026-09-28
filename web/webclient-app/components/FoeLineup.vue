@@ -195,7 +195,7 @@ function gestureFor(participant) {
   font-size: calc(clamp(44px, 5.6vh, 66px) * var(--foe-scale, 1));
 }
 .foe-lineup .stage-actor .reference-artwork__placeholder-label {
-  font-size: calc(14px * max(0.86, var(--foe-scale, 1)));
+  font-size: calc(var(--text-md) * max(0.86, var(--foe-scale, 1)));
 }
 
 /* The decorative hit-point gauge (design D5; AVG stage design §10.2): a slim

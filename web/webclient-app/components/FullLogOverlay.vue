@@ -132,7 +132,7 @@ export default {
   background: var(--ink-950);
   color: var(--paper-100);
   font-family: var(--f-serif);
-  font-size: calc(var(--text-narrative) * var(--prose-scale));
+  font-size: calc(var(--text-base) * var(--prose-scale));
   line-height: var(--lh-narrative);
   padding: var(--sp-6);
   outline: none;
@@ -190,7 +190,7 @@ export default {
 
 .fulllog-overlay .narrative-line.sys {
   font-family: var(--f-sans);
-  font-size: calc(13px * var(--prose-scale));
+  font-size: calc(var(--text-sm) * var(--prose-scale));
   color: var(--paper-500);
   font-style: normal;
 }

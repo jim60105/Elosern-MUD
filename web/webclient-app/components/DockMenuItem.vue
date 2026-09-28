@@ -116,14 +116,14 @@ function onActivate() {
 .dock-menu-item--focused::before {
   content: "▶";
   color: var(--gold-400);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
 }
 
 /* The AREA selection marker: a green check prefix on a selected candidate,
    distinct from the gold focus caret (not color alone — it's a glyph). */
 .dock-menu-item__checked {
   color: var(--ok);
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
   font-weight: 700;
 }
 
@@ -139,12 +139,12 @@ function onActivate() {
 
 .dock-menu-item__glyph {
   color: var(--gold-400);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
 }
 
 .dock-menu-item__unavailable {
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .visually-hidden {

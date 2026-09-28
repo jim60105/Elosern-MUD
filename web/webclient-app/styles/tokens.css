@@ -77,17 +77,23 @@
   --f-serif: "Noto Serif TC", "Iansui", serif;
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
   --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
+  --f-num: var(--f-sans);
+  --text-xs: 12px;
   --text-sm: 13px;
-  --text-xs: 11px;
-  --text-body: 15px;
-   --text-narrative: 15.5px;
-   --text-dialog: 16px;
+  --text-md: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
+  --text-4xl: 32px;
+  --text-initial: 44px;
    --lh-narrative: 1.82;
    --lh-dialog: 1.78;
    /* H5 (webclient-hud-05-overlays-and-command-line, design D13): the
       narrative prose scale. Multiplied into the three prose targets only —
       the narrative caption's lines, the full-log surface's lines and the
-      command-line prompt line — never into `--text-sm` / `--text-body` or
+      command-line prompt line — never into `--text-sm` / `--text-base` or
       any HUD, dock, drawer or overlay chrome. */
    --prose-scale: 1;
    /* The AVG message window's page text (design §5.1/§6.2;
@@ -464,7 +470,7 @@
   border: var(--line);
   border-radius: var(--radius-sm);
   padding: 2px var(--sp-2);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   font-size: var(--text-sm);
 }
 

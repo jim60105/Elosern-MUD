@@ -16,6 +16,8 @@ Use the existing draft scale mapping (12/13/14/16/18/20/24/28/32px plus 44px dec
 
 Keep monospace for command input, ASCII/box-drawing maps and key names, not general UI or numerals. Map SVG label geometry is owned by webclient-map-legibility; its title/readout migrate there. This is a mechanical type-only sweep, not a layout redesign. Surface-specific redesigns and radius/scaling follow separately.
 
+Approved scope clarification (2026-09-28): the 12px chrome floor excludes the complete map island and full-map anchors until A12 `webclient-map-legibility`. A3 replaces their shared type-token references with local fixed values of identical size so removing obsolete global tokens does not restyle deferred map content. Keep the existing map type-ladder browser test unchanged during this named deferral. Prose-scale reader targets retain their sizing contract at every preference step; the chrome floor does not apply to prose.
+
 Reject the proposed literal-font-size/source guard and exact token-list tests: they pin implementation spelling rather than consumer behavior. Use a throwaway inventory to guide the sweep, delete stale CSS/source-wording tests, and retain focused browser checks for readable text, no clipping and numeric alignment. The report's 24-size/84-use counts and interrupted proposal's different counts are observations from separate inventories, not a new measurement claimed here.
 
 ## Risks / Trade-offs

@@ -373,7 +373,7 @@ defineExpose({ focus });
 .dialogue-choices__caption {
   flex: none;
   padding: 12px 20px 0;
-  font: 12px/1.4 var(--f-sans);
+  font: var(--text-xs)/1.4 var(--f-sans);
   letter-spacing: 0.3em;
   color: var(--gold-500);
   text-align: center;
@@ -488,12 +488,12 @@ defineExpose({ focus });
   border-radius: 6px;
   background: rgba(185, 154, 96, 0.08);
   color: var(--gold-400);
-  font: 14px/1 var(--f-mono);
+  font: var(--text-md)/1 var(--f-mono);
 }
 
 /* The glyph badges (↦ ✕, exit arrows) read better in the sans face. */
 .dialogue-choices__row:not(.dialogue-choices__row--pick) .dialogue-choices__badge {
-  font: 15px/1 var(--f-sans);
+  font: var(--text-base)/1 var(--f-sans);
 }
 
 .dialogue-choices__badge-icon {
@@ -532,7 +532,7 @@ defineExpose({ focus });
 
 .dialogue-choices__reason {
   font-family: var(--f-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--seal-400);
 }
@@ -573,7 +573,7 @@ defineExpose({ focus });
   top: 50%;
   transform: translateY(-50%);
   color: var(--gold-400);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .dialogue-choices:focus .dialogue-choices__row--active .dialogue-choices__badge {

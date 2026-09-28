@@ -207,7 +207,7 @@ function onPaneActivate(payload) {
   flex: none;
   margin: 0;
   padding: 2px 8px 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--paper-700);
   font-family: var(--f-sans);
   white-space: nowrap;

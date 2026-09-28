@@ -16,7 +16,8 @@
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_field_is_focusable_without_an_opening_action",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_settings_prose_scale_is_a_client_local_preference",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_slash_focuses_the_always_present_field",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest"
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest",
+        "web.tests.browser.test_vue_typography.VueTypographyBrowserTest"
       ]
     },
     {

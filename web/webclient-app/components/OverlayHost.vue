@@ -231,14 +231,14 @@ onBeforeUnmount(() => {
 .overlay-host__title {
   margin: 0;
   font-family: var(--f-display);
-  font-size: 22px;
+  font-size: var(--text-2xl);
   letter-spacing: 0.04em;
   color: var(--gold-400);
   overflow-wrap: anywhere;
 }
 
 .overlay-host__subtitle {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--paper-300);
 }
 
@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 700px) {
   .overlay-host__header { gap: 8px; padding: 12px 16px; }
-  .overlay-host__title { font-size: 18px; max-width: calc(100% - 80px); }
+  .overlay-host__title { font-size: var(--text-lg); max-width: calc(100% - 80px); }
   .overlay-host__subtitle { order: 1; width: 100%; }
   .overlay-host__body { padding: 16px; }
 }
