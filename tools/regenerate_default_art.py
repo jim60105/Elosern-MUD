@@ -27,7 +27,13 @@ import tempfile
 DESCRIPTIONS = {
     "man": ("character", "An adult human man with short hair, wearing a travel-worn floor-length coat closed over a tunic and boots."),
     "woman": ("character", "An adult human woman with long hair, wearing a modest ankle-length traveling dress and boots."),
-    "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length coat, tunic, trousers and boots."),
+    # The cloak renders FASTENED SHUT at the throat on purpose: an open coat
+    # lets the model paint flat grey background between the legs and the
+    # hanging panels, which rembg then strips together with the cloak's back
+    # side, shredding the silhouette (observed with seeds 4192013969 and
+    # 886151869, which drew the coat open despite "buttoned"). The clasped
+    # cloak phrasing is the one monster_anon proves renders solid.
+    "boy": ("character", "A young human boy with short hair, fully clothed in a floor-length hooded cloak clasped shut at the throat over a tunic, with trousers and boots."),
     "girl": ("character", "A young human girl with braided hair, fully clothed in a modest ankle-length dress and boots."),
     "elder": ("character", "An elderly human with a lined face, wearing ankle-length layered robes and boots."),
     "monster_anon": ("monster", "An anonymous humanoid monster with void face beneath a hood, wearing a closed long hooded cloak."),
