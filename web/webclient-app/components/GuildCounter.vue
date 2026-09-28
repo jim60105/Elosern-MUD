@@ -184,7 +184,7 @@ const hasNextStep = computed(
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -195,7 +195,7 @@ const hasNextStep = computed(
   align-items: center;
   gap: var(--sp-2);
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .guild-counter__section {
@@ -210,7 +210,7 @@ const hasNextStep = computed(
   margin: 0;
   color: var(--seal-400);
   font-family: var(--f-display);
-  font-size: 0.95em;
+  font-size: max(var(--text-xs), 0.95em);
 }
 
 .guild-counter__row {
@@ -237,15 +237,16 @@ const hasNextStep = computed(
 
 .guild-counter__row-rank {
   color: var(--gold-400);
-  font-family: var(--f-mono);
-  font-size: 0.85em;
+  font-family: var(--f-num);
+  font-size: max(var(--text-xs), 0.85em);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .guild-counter__row-objective,
 .guild-counter__row-reward {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .guild-counter__action {
@@ -256,7 +257,7 @@ const hasNextStep = computed(
   border: 1px solid var(--seal-600);
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
 }
 
@@ -274,19 +275,20 @@ const hasNextStep = computed(
 
 .guild-counter__reason {
   color: var(--warn);
-  font-size: 0.85em;
-  font-family: var(--f-mono);
+  font-size: max(var(--text-xs), 0.85em);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .guild-counter__rank {
   margin: 0;
   color: var(--paper-50);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .guild-counter__merit {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 </style>

@@ -358,7 +358,7 @@ function declineBallot() {
 .codex-panel__full-title {
   min-width: 0;
   font-family: var(--f-serif);
-  font-size: 18px;
+  font-size: var(--text-lg);
   letter-spacing: 0.05em;
   color: var(--gold-400);
   overflow-wrap: anywhere;
@@ -366,9 +366,10 @@ function declineBallot() {
 .codex-panel__counter {
   margin-left: auto;
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   font-size: var(--text-sm);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 /* Block tabs reuse the shell's pill chrome at gold selection. */
 .codex-panel__tabs {
@@ -466,7 +467,7 @@ function declineBallot() {
 .codex-epithet__name {
   min-width: 0;
   font-family: var(--f-serif);
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--paper-50);
   overflow-wrap: anywhere;
 }
@@ -588,7 +589,7 @@ function declineBallot() {
 .codex-ballot__name {
   min-width: 0;
   font-family: var(--f-serif);
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--paper-50);
   overflow-wrap: anywhere;
 }

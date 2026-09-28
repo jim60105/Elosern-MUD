@@ -389,7 +389,7 @@ function onInviteCurrentNpc() {
 
 .party-drawer__intro {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   color: var(--paper-500);
   line-height: 1.6;
 }
@@ -420,7 +420,7 @@ function onInviteCurrentNpc() {
   display: grid;
   place-items: center;
   font-family: var(--f-display);
-  font-size: 24px;
+  font-size: var(--text-2xl);
   color: var(--gold-400);
   border: 1px solid var(--ink-600);
   overflow: hidden;
@@ -448,7 +448,7 @@ function onInviteCurrentNpc() {
 
 .compbig .nm {
   font-family: var(--f-serif);
-  font-size: 16px;
+  font-size: var(--text-base);
   color: var(--paper-50);
   overflow-wrap: anywhere;
 }
@@ -458,7 +458,7 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .bondrow {
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--gold-500);
   margin: var(--sp-1) 0 6px;
 }
@@ -484,13 +484,13 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .meta {
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
   margin-top: var(--sp-2);
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-1) var(--sp-3);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .compbig .meta .ko {
@@ -510,7 +510,7 @@ function onInviteCurrentNpc() {
 
 .compbig .acts button {
   font-family: var(--f-sans);
-  font-size: 12px;
+  font-size: var(--text-xs);
   min-height: 28px;
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
@@ -556,7 +556,7 @@ function onInviteCurrentNpc() {
 
 .quest .qh {
   font-family: var(--f-serif);
-  font-size: 14px;
+  font-size: var(--text-md);
   letter-spacing: 0.04em;
   color: var(--gold-400);
   margin-bottom: var(--sp-2);
@@ -571,7 +571,7 @@ function onInviteCurrentNpc() {
 }
 
 .quest .objs .o {
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   color: var(--paper-300);
   line-height: 1.6;
 }
@@ -590,7 +590,7 @@ function onInviteCurrentNpc() {
   color: var(--gold-400);
 }
 .party-drawer__release-text {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 .btn-release {
@@ -598,7 +598,7 @@ function onInviteCurrentNpc() {
   border: 1px solid var(--gold-500);
   color: var(--gold-400);
   font-family: var(--f-sans);
-  font-size: 12px;
+  font-size: var(--text-xs);
   min-height: 28px;
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
@@ -618,7 +618,7 @@ function onInviteCurrentNpc() {
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .btn-possess:disabled {
   opacity: 0.45;
@@ -626,7 +626,7 @@ function onInviteCurrentNpc() {
 }
 /* The disabled-reason hint reads as a caution, not an error. */
 .act-reason {
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--warn);
   min-width: 0;
   overflow-wrap: anywhere;
@@ -638,7 +638,7 @@ function onInviteCurrentNpc() {
   .compbig .av {
     width: 42px;
     height: 42px;
-    font-size: 20px;
+    font-size: var(--text-xl);
   }
 }
 </style>

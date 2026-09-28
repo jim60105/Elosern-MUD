@@ -163,7 +163,7 @@ function onTabClick(tab) {
   border-radius: 10px;
   color: var(--paper-300);
   font-family: var(--f-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: all var(--motion-fast);
 }
@@ -206,9 +206,10 @@ function onTabClick(tab) {
   place-items: center;
   background: var(--seal-500);
   border-radius: 99px;
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: #fff;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 </style>

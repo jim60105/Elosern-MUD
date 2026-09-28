@@ -275,6 +275,9 @@ function onIslandClick(event) {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   font-family: var(--f-sans);
+  /* A3 defers map typography unchanged to A12 (2026-09-28). */
+  font-size: 15px;
+  font-variant-numeric: normal;
   /* Draft `.mini` affordance (webclient-map-01-draft-chrome D5): the whole
      island reads as clickable because the body click opens the full map;
      the interactive descendants keep their own cursors. */

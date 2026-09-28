@@ -186,7 +186,7 @@ function nodeMeter(node) {
   padding: 0 0 18px;
   border-bottom: var(--line);
   font-family: var(--f-serif);
-  font-size: 24px;
+  font-size: var(--text-2xl);
   color: var(--gold-400);
 }
 
@@ -236,7 +236,7 @@ function nodeMeter(node) {
 .lineage-chain__label {
   overflow-wrap: anywhere;
   font-family: var(--f-serif);
-  font-size: 18px;
+  font-size: var(--text-lg);
   color: var(--paper-50);
 }
 
@@ -248,7 +248,7 @@ function nodeMeter(node) {
 .lineage-chain__percent {
   color: var(--paper-500);
   font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .lineage-chain__meter {
@@ -303,7 +303,7 @@ function nodeMeter(node) {
 
 .lineage-node__meter {
   color: var(--paper-300);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .lineage-node__prereq {

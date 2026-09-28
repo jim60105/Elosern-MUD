@@ -198,14 +198,14 @@ watch(
   color: var(--seal-400);
   border: 1px dashed var(--seal-600);
   border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .vital .vh {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   margin-bottom: 4px;
 }
 
@@ -224,13 +224,14 @@ watch(
 
 .vital .vh .num {
   margin-left: auto;
-  font-family: var(--f-mono);
-  font-size: 11px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .low-mark {
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   color: var(--crit);
   font-weight: 700;
 }
@@ -326,7 +327,7 @@ watch(
   .vital .vh .lbl {
     grid-column: 1;
     grid-row: 1;
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .vital .track {
@@ -338,7 +339,7 @@ watch(
   .vital .vh .num {
     grid-column: 3;
     grid-row: 1;
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .low-mark {

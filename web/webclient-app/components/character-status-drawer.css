@@ -18,7 +18,7 @@
   margin: 0;
   color: var(--gold-400);
   font-family: var(--f-display);
-  font-size: 0.95em;
+  font-size: max(var(--text-xs), 0.95em);
   overflow-wrap: anywhere;
 }
 
@@ -29,7 +29,7 @@
   background: none;
   border: var(--line);
   border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
 }
 
@@ -50,7 +50,7 @@
    `.clab` uses, copied (not imported) per this component's convention. */
 .character-status-drawer__section-label {
   margin: 0 0 4px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.14em;
   color: var(--paper-500);
   text-transform: uppercase;
@@ -85,15 +85,16 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--paper-100);
 }
 
 .character-status-drawer__statrow-value {
   margin-left: auto;
-  font-family: var(--f-mono);
-  font-size: 13px;
+  font-family: var(--f-num);
+  font-size: var(--text-sm);
   color: var(--gold-400);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The breakdown chip row (render-equipment-breakdown-webclient D1): the
@@ -115,7 +116,7 @@
   gap: 4px;
   min-width: 0;
   max-width: 100%;
-  font-size: 10px;
+  font-size: var(--text-xs);
   padding: 1px 8px;
   border-radius: 99px;
   border: 1px solid var(--ink-600);
@@ -129,7 +130,8 @@
 }
 
 .character-status-drawer__layer-amount {
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* Source tints reuse the existing design tokens (same non-colour-alone
@@ -175,8 +177,8 @@
 
 .character-status-drawer__vital-danger {
   color: var(--crit);
-  font-family: var(--f-mono);
-  font-size: 0.8em;
+  font-family: var(--f-sans);
+  font-size: max(var(--text-xs), 0.8em);
   font-weight: 700;
 }
 
@@ -196,7 +198,7 @@
   gap: 0 5px;
   min-width: 0;
   max-width: 100%;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 3px 11px;
   border-radius: 99px;
   border: 1px solid var(--ink-600);
@@ -215,9 +217,10 @@
   align-items: baseline;
   gap: 0 5px;
   margin-left: 5px;
-  font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--paper-500);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .character-status-drawer__condition-severity {
@@ -234,7 +237,7 @@
 .character-status-drawer__section-reason {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   padding: var(--sp-1) var(--sp-2);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
@@ -244,7 +247,7 @@
   display: flex;
   justify-content: space-between;
   gap: var(--sp-2);
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
 }
 
 .character-status-drawer__equipment-slot {
@@ -293,14 +296,14 @@
 .character-status-drawer__disguise-description {
   margin: 0 0 var(--sp-1);
   color: var(--paper-500);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
   line-height: 1.5;
 }
 
 .character-status-drawer__disguise-row {
   display: flex;
   gap: var(--sp-2);
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
 }
 
 .character-status-drawer__disguise-key {
@@ -310,32 +313,34 @@
 
 .character-status-drawer__disguise-true {
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .character-status-drawer__disguise-displayed {
   margin-left: auto;
   color: var(--warn);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .character-status-drawer__disguise-note {
   margin: var(--sp-1) 0 0;
   color: var(--paper-300);
-  font-size: 0.75em;
+  font-size: max(var(--text-xs), 0.75em);
 }
 
 .character-status-drawer__disguise-inactive {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
   line-height: 1.5;
 }
 
 .character-status-drawer__persona-background {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   line-height: 1.6;
 }
 
@@ -351,7 +356,7 @@
 .character-status-drawer__persona-empty {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   font-style: italic;
 }
 
@@ -362,7 +367,7 @@
 .character-status-drawer__persona-editor textarea {
   width: 100%;
   font: inherit;
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   color: var(--paper-300);
   background: var(--ink-820);
   border: 1px solid var(--ink-600);
@@ -403,5 +408,5 @@
 .character-status-drawer__intimate-hint {
   margin: 0 0 7px;
   color: var(--paper-500);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
 }

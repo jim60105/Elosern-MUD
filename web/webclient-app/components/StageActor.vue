@@ -195,7 +195,8 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
   z-index: 2;
   opacity: 0;
   color: var(--seal-400);
-  font-family: var(--f-display);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
   font-size: calc(var(--message-text) * 1.5);
   font-weight: 700;
   line-height: 1;
@@ -277,7 +278,7 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
   text-align: center;
   color: var(--paper-300);
   font-family: var(--f-serif);
-  font-size: 14px;
+  font-size: var(--text-md);
   letter-spacing: 0.24em;
   overflow-wrap: anywhere;
 }

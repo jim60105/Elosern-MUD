@@ -1157,7 +1157,7 @@ export default {
   position: absolute;
   right: 104px;
   bottom: 12px;
-  font-size: 14px;
+  font-size: var(--text-md);
   line-height: 1;
   color: var(--gold-400);
   text-shadow: 0 0 8px var(--gold-glow);
@@ -1169,7 +1169,7 @@ export default {
 }
 
 .message-window__marker[data-state="end"] {
-  font-size: 10px;
+  font-size: var(--text-xs);
   bottom: 14px;
   color: var(--gold-500);
   text-shadow: none;
@@ -1295,7 +1295,7 @@ export default {
   white-space: pre;
   color: var(--paper-500);
   font-family: var(--f-sans);
-  font-size: max(12px, 0.46em);
+  font-size: max(var(--text-xs), 0.46em);
   letter-spacing: 0.12em;
 }
 </style>

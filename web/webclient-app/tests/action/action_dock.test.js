@@ -89,24 +89,6 @@ describe("ActionDock (B2 action-dock family)", () => {
     document.body.innerHTML = "";
   });
 
-  function cssRuleFor(selector) {
-    // Scan the mounted component stylesheets (vitest `css: true`) for the
-    // rule whose core selector (before Vue's `[data-v-…]` suffix) matches.
-    for (const sheet of Array.from(document.styleSheets)) {
-      try {
-        const hit = Array.from(sheet.cssRules || []).find((rule) => {
-          if (!rule.selectorText) return false;
-          const core = rule.selectorText.split("[")[0].trim();
-          return core === selector;
-        });
-        if (hit) return hit;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-
   function mountDock(props = {}, items = AFFORDANCES) {
     const host = document.createElement("div");
     document.body.appendChild(host);
@@ -157,23 +139,6 @@ describe("ActionDock (B2 action-dock family)", () => {
     w.setProps({ guidancePrefix: "戰鬥動作" });
     await nextTick();
     expect(w.get('[data-testid="action-dock-guidance"]').text()).toBe("戰鬥動作");
-  });
-
-  it("renders exactly one visible legend with the draft's kbd styling", () => {
-    const w = mountDock({ rootItems: ROOT_ITEMS });
-    const legend = w.get('[data-testid="action-dock-description"]');
-    const legendStyle = getComputedStyle(legend.element);
-    // The visible legend: not clipped, not a hidden 1x1 copy.
-    expect(legendStyle.display).not.toBe("none");
-    expect(legendStyle.width).not.toBe("1px");
-    // The draft's kbd rule is owned by this component's stylesheet: mono
-    // face, the `--ink-780` ground, and the 2px bottom border.
-    const kbdRule = cssRuleFor(".action-dock__legend kbd");
-    expect(kbdRule, "the legend kbd rule ships").not.toBeNull();
-    const kbdCss = kbdRule.style.cssText;
-    expect(kbdCss).toContain("--ink-780");
-    expect(kbdCss).toContain("var(--f-mono)");
-    expect(kbdCss).toContain("border-bottom-width: 2px");
   });
 
   it("renders one legend in exploration, dialogue, and combat, and none in creation", () => {

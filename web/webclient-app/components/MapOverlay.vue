@@ -285,6 +285,9 @@ function handleMove(payload) {
 .map-overlay-body {
   height: 100%;
   min-height: 360px;
+  /* A3 defers map typography unchanged to A12 (2026-09-28). */
+  font-size: 15px;
+  font-variant-numeric: normal;
 }
 
 .map-overlay__unavailable {
@@ -295,7 +298,7 @@ function handleMove(payload) {
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
   font-family: var(--f-mono);
-  font-size: var(--text-sm);
+  font-size: 13px;
 }
 
 /* The fitted-view body layout (design D7): guide row, the viewport taking
@@ -328,13 +331,13 @@ function handleMove(payload) {
   margin: 0;
   color: var(--paper-100);
   font-family: var(--f-serif);
-  font-size: var(--text-body);
+  font-size: 15px;
   letter-spacing: 0.06em;
 }
 
 .map-overlay__guide span {
   color: var(--paper-500);
-  font-size: var(--text-xs);
+  font-size: 11px;
   letter-spacing: 0.04em;
 }
 
@@ -397,7 +400,7 @@ function handleMove(payload) {
   background: transparent;
   color: var(--paper-200);
   font-family: var(--f-sans);
-  font-size: var(--text-sm);
+  font-size: 13px;
   letter-spacing: 0.08em;
   line-height: 1;
   cursor: pointer;
@@ -532,7 +535,7 @@ function handleMove(payload) {
   /* Visible lead-in only; the list's aria-label already names it. */
   content: "記得的地點" / "";
   color: var(--paper-500);
-  font-size: var(--text-xs);
+  font-size: 11px;
   letter-spacing: 0.12em;
 }
 
@@ -552,7 +555,7 @@ function handleMove(payload) {
 .map-overlay__remembered-label {
   color: var(--paper-300);
   font-family: var(--f-sans);
-  font-size: var(--text-sm);
+  font-size: 13px;
   letter-spacing: 0.04em;
 }
 </style>

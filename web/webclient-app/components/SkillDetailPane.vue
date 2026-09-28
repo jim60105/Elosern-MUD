@@ -96,7 +96,7 @@ function onScale(entry) {
 }
 
 .skill-detail-pane__name {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--paper-50);
   font-weight: 600;
   display: flex;
@@ -105,14 +105,14 @@ function onScale(entry) {
 }
 
 .skill-detail-pane__rank {
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   color: var(--gold-400);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   font-weight: 400;
 }
 
 .skill-detail-pane__desc {
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
   margin: 6px 0 11px;
   line-height: 1.5;
@@ -120,7 +120,7 @@ function onScale(entry) {
 
 .skill-detail-pane__label {
   display: block;
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.1em;
   color: var(--paper-500);
   margin-bottom: 6px;
@@ -128,14 +128,14 @@ function onScale(entry) {
 
 .skill-detail-pane__cost,
 .skill-detail-pane__target {
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--paper-300);
   margin-bottom: 8px;
 }
 
 .skill-detail-pane__disabled {
   color: var(--warn);
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-top: 8px;
 }
 
@@ -147,8 +147,8 @@ function onScale(entry) {
 
 .skill-detail-pane__scale {
   flex: 1;
-  font-family: var(--f-mono);
-  font-size: 12px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   padding: 7px;
   border-radius: 8px;
   background: var(--ink-780);
@@ -159,6 +159,7 @@ function onScale(entry) {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .skill-detail-pane__scale--on {
@@ -168,7 +169,7 @@ function onScale(entry) {
 }
 
 .skill-detail-pane__scale-cost {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
 }
 </style>

@@ -202,7 +202,7 @@ watch(
   padding-top: 7px;
   color: var(--gold-400);
   font-family: var(--f-serif);
-  font-size: 13px;
+  font-size: var(--text-sm);
   letter-spacing: 0.12em;
   white-space: nowrap;
 }
@@ -239,7 +239,7 @@ watch(
   min-height: 32px;
   max-width: 100%;
   padding: 4px 10px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.35;
 }
 
@@ -259,7 +259,7 @@ watch(
   margin: 0;
   padding: 6px 10px;
   color: var(--paper-300);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   border-left: 2px solid var(--seal-500);
   background: var(--ink-900);

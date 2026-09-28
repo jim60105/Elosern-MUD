@@ -21,7 +21,7 @@
   margin: 0;
   color: var(--paper-50);
   font-family: var(--f-display);
-  font-size: 22px;
+  font-size: var(--text-2xl);
   letter-spacing: 0.05em;
 }
 
@@ -121,12 +121,12 @@
 .creation-preset-card__name {
   color: var(--paper-50);
   font-family: var(--f-display);
-  font-size: var(--text-body);
+  font-size: var(--text-base);
 }
 
 .creation-preset-card__race {
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   font-size: var(--text-sm);
 }
 
@@ -152,8 +152,9 @@
   background: var(--panel-hi);
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .creation-overlay__field {
@@ -202,8 +203,9 @@
 .creation-allocation-total {
   margin: 0;
   color: var(--paper-300);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .creation-affinity {
@@ -318,7 +320,7 @@
   margin: 0;
   color: var(--paper-50);
   font-family: var(--f-serif);
-  font-size: 17px;
+  font-size: var(--text-lg);
 }
 
 .creation-confirm-actions {

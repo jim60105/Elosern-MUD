@@ -1,6 +1,7 @@
-import { h } from "vue";
+import { h, ref } from "vue";
 import VitalsTrack from "../../components/VitalsTrack.vue";
-import { STATUS_PANEL_SAMPLE } from "../fixtures.js";
+import ShopPanel from "../../components/ShopPanel.vue";
+import { SERVICES_PANEL_SAMPLE, STATUS_PANEL_SAMPLE } from "../fixtures.js";
 
 // VitalsTrack (H2, webclient-hud-02-status-islands, design D4/D5): the
 // vitals island stories — full / damaged / low / empty for each of hp/mp/sp,
@@ -106,4 +107,43 @@ export const DisplayedHp = {
     revision: 4,
     epoch: 0,
   },
+};
+
+// Real resource and price updates, including unequal digit counts. No timers:
+// reviewers can compare both states under full, reduced, or off motion.
+export const ChangingNumerals = {
+  render: () => ({
+    setup() {
+      const changed = ref(false);
+      return () => {
+        const resources = {
+          hp: { current: changed.value ? 139 : 9, maximum: 405 },
+          mp: { current: changed.value ? 888 : 111, maximum: 999 },
+          sp: { current: changed.value ? 88 : 11, maximum: 99 },
+        };
+        const services = {
+          ...SERVICES_PANEL_SAMPLE,
+          shop: {
+            ...SERVICES_PANEL_SAMPLE.shop,
+            stock: SERVICES_PANEL_SAMPLE.shop.stock.map((row, index) => ({
+              ...row,
+              buy_copper: changed.value ? (index ? 888 : 1399) : (index ? 111 : 9),
+              sell_copper: changed.value ? 88 : 11,
+            })),
+          },
+        };
+        return h("section", { style: "max-width: 680px; padding: 16px;" }, [
+          h("button", {
+            class: "ui-btn",
+            "data-testid": "change-numerals",
+            onClick: () => { changed.value = !changed.value; },
+          }, "Change values"),
+          h("div", { style: "width: 262px; margin: 16px 0;" }, [
+            h(VitalsTrack, { status: statusWith(resources), revision: changed.value ? 2 : 1, epoch: 0 }),
+          ]),
+          h(ShopPanel, { services }),
+        ]);
+      };
+    },
+  }),
 };

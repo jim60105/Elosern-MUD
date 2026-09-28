@@ -149,7 +149,7 @@ function activate() {
 
 .option-card-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--text-md);
   color: var(--paper-50);
   font-weight: 600;
   line-height: 1.5;
@@ -157,7 +157,7 @@ function activate() {
 
 .option-card-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--paper-300);
   margin-top: 4px;
   line-height: 1.6;

@@ -68,7 +68,7 @@ function onBack() {
   overflow-wrap: anywhere;
   gap: 8px;
   flex: none;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
@@ -80,7 +80,7 @@ function onBack() {
   background: transparent;
   border: 0;
   color: var(--paper-300);
-  font-size: 18px;
+  font-size: var(--text-lg);
   line-height: 1;
   min-width: 36px;
   min-height: 36px;

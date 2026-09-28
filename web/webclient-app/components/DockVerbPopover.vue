@@ -139,7 +139,7 @@ function onLayerPress(event) {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--ink-700);
   color: var(--gold-400);
-  font: 15px/1.4 var(--f-serif);
+  font: var(--text-base)/1.4 var(--f-serif);
   letter-spacing: 0.06em;
   overflow-wrap: anywhere;
 }

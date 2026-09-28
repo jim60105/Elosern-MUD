@@ -220,7 +220,7 @@ function onScrimClick() {
   margin: 0;
   color: var(--paper-100);
   font-family: var(--f-display);
-  font-size: 20px;
+  font-size: var(--text-xl);
   letter-spacing: .04em;
   flex: 1;
 }
@@ -230,7 +230,7 @@ function onScrimClick() {
 .hud-drawer__subtitle {
   margin: 0;
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 /* The head icon (the reference's `.dhead .ic`, index.html:409-410). */
@@ -264,7 +264,7 @@ function onScrimClick() {
 .hud-drawer__cast-hint {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 /* The body is the drawer's only scrolling region; the head and foot are

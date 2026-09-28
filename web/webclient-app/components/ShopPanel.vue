@@ -273,7 +273,7 @@ function sellNow(row) {
 .shop-panel__title {
   margin: 0;
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -282,7 +282,7 @@ function sellNow(row) {
 .shop-panel__open {
   margin: 0;
   color: var(--ok);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .shop-panel__open[data-open="false"] {
@@ -293,7 +293,7 @@ function sellNow(row) {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -301,13 +301,13 @@ function sellNow(row) {
 .shop-panel__shop-absent {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .shop-panel__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, max-content);
+  gap: var(--sp-2) var(--sp-3);
   min-width: 0;
   padding: var(--sp-3);
   background: linear-gradient(130deg, rgba(34, 36, 38, 0.44), rgba(16, 18, 21, 0.75));
@@ -316,28 +316,28 @@ function sellNow(row) {
 }
 
 .shop-panel__section-title {
+  grid-column: 1 / -1;
   margin: 0;
   padding-bottom: var(--sp-2);
   border-bottom: var(--line);
   color: var(--gold-400);
   font-family: var(--f-serif);
-  font-size: 15px;
+  font-size: var(--text-base);
   letter-spacing: 0.04em;
 }
 
-/* The row is a fluid grid: the item name owns the flexible track
-   (`minmax(0, 1fr)`); prices/stock are content-sized mono cells; the
-   quantity + action pair rides the second line's trailing edge. Everything
-   fits the drawer without horizontal overflow. */
+/* Shared numeric columns align across rows as prices and counts change.
+   The item name wraps; quantity and action stay on the second line. */
 .shop-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   gap: var(--sp-1) var(--sp-3);
   align-items: center;
   min-width: 0;
   padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--ink-700);
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
 }
 
 .shop-row__name {
@@ -349,15 +349,19 @@ function sellNow(row) {
 
 .shop-row__price {
   color: var(--paper-300);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: right;
 }
 
 .shop-row__stock,
 .shop-row__held {
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: right;
 }
 
 /* The quantity editor rides with the action at the row's trailing edge. */
@@ -378,9 +382,10 @@ function sellNow(row) {
   background: var(--ink-820);
   border: var(--line);
   border-radius: var(--radius-sm);
-  font-family: var(--f-mono);
-  font-size: 0.9em;
+  font-family: var(--f-num);
+  font-size: max(var(--text-xs), 0.9em);
   text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* Buy/sell are the row's decisive actions: gold emphasis chrome, riding the
@@ -397,7 +402,7 @@ function sellNow(row) {
   border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -419,7 +424,7 @@ function sellNow(row) {
 /* Disabled reasons are cautionary guidance, not errors: warn tone. */
 .shop-row__reason {
   color: var(--warn);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   min-width: 0;
   overflow-wrap: anywhere;
 }

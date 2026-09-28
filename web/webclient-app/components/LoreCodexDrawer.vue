@@ -217,14 +217,14 @@ const selectedEntry = computed(
 .lore-codex-drawer__title {
   margin: 0;
   font-family: var(--f-serif);
-  font-size: 18px;
+  font-size: var(--text-lg);
   letter-spacing: 0.06em;
   color: var(--gold-400);
 }
 
 .lore-codex-drawer__sub {
   min-width: 0;
-  font-size: 0.78em;
+  font-size: max(var(--text-xs), 0.78em);
   color: var(--paper-500);
 }
 
@@ -264,8 +264,9 @@ const selectedEntry = computed(
 
 .lore-codex-drawer__pill-count {
   color: var(--paper-500);
-  font-family: var(--f-mono);
-  font-size: 0.9em;
+  font-family: var(--f-num);
+  font-size: max(var(--text-xs), 0.9em);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The entry list is the scroll region: bounded so a long codex never pushes
@@ -328,7 +329,7 @@ const selectedEntry = computed(
 .lore-codex-drawer__entry-category {
   flex: none;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 /* The selected entry's card: gold serif title over mono-styled field rows. */
@@ -350,7 +351,7 @@ const selectedEntry = computed(
   border-bottom: var(--line);
   color: var(--gold-400);
   font-family: var(--f-serif);
-  font-size: 16px;
+  font-size: var(--text-base);
   letter-spacing: 0.05em;
   overflow-wrap: anywhere;
 }
@@ -392,7 +393,7 @@ const selectedEntry = computed(
 .lore-codex-drawer__note {
   margin: 0;
   color: var(--paper-700);
-  font-size: 0.75em;
+  font-size: max(var(--text-xs), 0.75em);
   line-height: 1.6;
 }
 </style>

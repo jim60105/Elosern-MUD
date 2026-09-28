@@ -79,14 +79,14 @@ defineProps({
 
 .connect-overlay__brand {
   font-family: var(--f-serif);
-  font-size: 20px;
+  font-size: var(--text-xl);
   letter-spacing: 0.2em;
   color: var(--paper-50);
 }
 
 .connect-overlay__status {
-  font-family: var(--f-mono);
-  font-size: var(--text-body);
+  font-family: var(--f-sans);
+  font-size: var(--text-base);
   margin-top: 24px;
   color: var(--gold-400);
   border: var(--line);

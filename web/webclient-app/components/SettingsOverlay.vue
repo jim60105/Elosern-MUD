@@ -241,14 +241,14 @@ function onAutoAdvanceChange(event) {
 .settings-intro h4 {
   margin: 0 0 12px;
   color: var(--paper-50);
-  font: 26px/1.5 var(--f-serif);
+  font: var(--text-3xl)/1.5 var(--f-serif);
 }
 
 .settings-intro p,
 .settings-footnote {
   margin: 0;
   color: var(--paper-300);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
 }
 
@@ -265,7 +265,7 @@ function onAutoAdvanceChange(event) {
   padding-bottom: 18px;
   border-bottom: var(--line);
   color: var(--gold-400);
-  font: 20px var(--f-serif);
+  font: var(--text-xl) var(--f-serif);
 }
 
 .settings-row {
@@ -276,13 +276,13 @@ function onAutoAdvanceChange(event) {
   gap: var(--sp-3);
   padding: 22px 0;
   font-family: var(--f-sans);
-  font-size: var(--text-body);
+  font-size: var(--text-base);
   color: var(--paper-100);
 }
 
 .settings-row__label {
   color: var(--paper-100);
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 
 .settings-row__copy {
@@ -294,7 +294,7 @@ function onAutoAdvanceChange(event) {
   display: block;
   margin: 8px 0 0;
   color: var(--paper-300);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
 }
 
@@ -319,7 +319,7 @@ function onAutoAdvanceChange(event) {
   background: transparent;
   border: var(--line);
   border-radius: var(--radius-sm);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   font-size: var(--text-sm);
   cursor: pointer;
 }
@@ -353,6 +353,6 @@ function onAutoAdvanceChange(event) {
 @media (max-width: 850px) {
   .settings-overlay-body { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .settings-section { padding: 18px; }
-  .settings-intro h4 { font-size: 21px; }
+  .settings-intro h4 { font-size: var(--text-xl); }
 }
 </style>

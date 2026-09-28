@@ -104,7 +104,7 @@ function declineBallot() {
   margin: 0;
   color: var(--gold-400);
   font-family: var(--f-serif);
-  font-size: 18px;
+  font-size: var(--text-lg);
 }
 
 .title-ballot__list {
@@ -143,7 +143,7 @@ function declineBallot() {
 .title-ballot__basis {
   margin: 0;
   color: var(--paper-300);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
 }
 
@@ -156,7 +156,7 @@ function declineBallot() {
   border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
   font-family: inherit;
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
 }
 
@@ -173,7 +173,7 @@ function declineBallot() {
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
   font-family: inherit;
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   cursor: pointer;
 }
 

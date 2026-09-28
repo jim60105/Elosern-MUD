@@ -112,7 +112,7 @@ function isDone(row) {
   flex: none;
   padding-right: 9px;
   border-right: 1px solid #bda47740;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.2;
   letter-spacing: 0.18em;
   color: var(--gold-400);
@@ -146,16 +146,16 @@ function isDone(row) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.3;
   letter-spacing: 0.04em;
 }
 
 .pr {
   flex: none;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums lining-nums;
   color: var(--gold-400);
 }
 
@@ -164,9 +164,10 @@ function isDone(row) {
   padding: 2px 6px;
   border: 1px solid #bda47738;
   border-radius: 99px;
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   line-height: 1.2;
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 </style>

@@ -165,7 +165,7 @@ function onChipKeydown(event) {
 
 .clab {
   margin: 0 0 7px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.14em;
   color: var(--paper-500);
 }
@@ -173,7 +173,7 @@ function onChipKeydown(event) {
 .empty {
   margin: 0;
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .chips {
@@ -193,11 +193,11 @@ function onChipKeydown(event) {
   padding: 0;
   background: transparent;
   cursor: default;
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
 }
 
 .chip .glyph {
-  font-size: 17px;
+  font-size: var(--text-lg);
   line-height: 1;
 }
 
@@ -238,14 +238,15 @@ function onChipKeydown(event) {
   position: absolute;
   bottom: -3px;
   right: -3px;
-  font-family: var(--f-mono);
-  font-size: 9px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   font-weight: 700;
   background: var(--ink-900);
   border: 1px solid var(--ink-600);
   border-radius: 99px;
   padding: 0 4px;
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The `+N` overflow chip opens a bounded, scrollable disclosure inside the
@@ -255,7 +256,7 @@ function onChipKeydown(event) {
   min-width: 34px;
   background: var(--ink-780);
   color: var(--paper-300);
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 0 8px;
   cursor: pointer;
 }
@@ -281,7 +282,7 @@ function onChipKeydown(event) {
   align-items: center;
   gap: 4px;
   padding: 3px 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--paper-100);
 }
 
@@ -291,13 +292,15 @@ function onChipKeydown(event) {
 }
 
 .disclosure-timer {
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .disclosure-mod {
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   color: var(--paper-300);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The focus/hover detail line: the label, duration, and modifier text the
@@ -309,7 +312,7 @@ function onChipKeydown(event) {
   color: var(--paper-300);
   border: var(--line);
   border-radius: var(--radius-sm);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   font-size: var(--text-sm);
 }
 
@@ -336,7 +339,7 @@ function onChipKeydown(event) {
   }
 
   .chip .glyph {
-    font-size: 14px;
+    font-size: var(--text-md);
   }
 
   .chip.more {

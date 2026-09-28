@@ -314,7 +314,7 @@ const duplicateRows = computed(() => {
   align-items: center;
   gap: 8px;
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -325,14 +325,14 @@ const duplicateRows = computed(() => {
   letter-spacing: 0.03em;
   text-transform: none;
   color: var(--paper-700);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .equipment-doll__unavailable {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -352,7 +352,7 @@ const duplicateRows = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--paper-300);
   overflow-wrap: break-word;
@@ -408,7 +408,7 @@ const duplicateRows = computed(() => {
 .equipment-doll__slot-empty {
   margin: 0;
   color: var(--paper-700);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 /* The binding design's `.dslot .cap`: the visible slot caption below the
@@ -416,7 +416,7 @@ const duplicateRows = computed(() => {
    square cells never grow to fit long names. */
 .equipment-doll__caption {
   margin: 0;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--paper-500);
   text-align: center;
 }
@@ -425,9 +425,10 @@ const duplicateRows = computed(() => {
    mono numerals. */
 .equipment-doll__accessory-count {
   margin: 0;
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-num);
+  font-size: var(--text-xs);
   color: var(--gold-400);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The retained accessory detail group, now inside the description column
@@ -451,7 +452,7 @@ const duplicateRows = computed(() => {
 .equipment-doll__section-title {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .equipment-doll__row {
@@ -459,7 +460,7 @@ const duplicateRows = computed(() => {
   align-items: center;
   gap: var(--sp-2);
   padding: 2px 0;
-  font-size: 0.9em;
+  font-size: max(var(--text-xs), 0.9em);
 }
 
 .equipment-doll__accessories .equipment-doll__row {
@@ -476,7 +477,7 @@ const duplicateRows = computed(() => {
 
 .equipment-doll__row-slot {
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 
 .equipment-doll__row-name {
@@ -486,8 +487,9 @@ const duplicateRows = computed(() => {
 
 .equipment-doll__row-held {
   color: var(--paper-500);
-  font-family: var(--f-mono);
+  font-family: var(--f-num);
   text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* The verbatim server-generated adjustment summary (render-equipment-
@@ -497,7 +499,7 @@ const duplicateRows = computed(() => {
   grid-column: 1 / -1;
   display: block;
   color: var(--paper-500);
-  font-size: 0.8em;
+  font-size: max(var(--text-xs), 0.8em);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -505,6 +507,6 @@ const duplicateRows = computed(() => {
 .equipment-doll__empty {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: max(var(--text-xs), 0.85em);
 }
 </style>

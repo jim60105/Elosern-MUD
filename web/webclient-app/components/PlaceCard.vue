@@ -87,14 +87,14 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 }
 .place-card__location {
   grid-area: 1 / 1;
-  font: 400 20px/1.25 var(--f-serif);
+  font: 400 var(--text-xl)/1.25 var(--f-serif);
   letter-spacing: 0.12em;
   color: #ead8b9;
   text-shadow: 0 1px 6px #000c;
 }
 .place-card__time {
   grid-area: 2 / 1;
-  font: 12px/1.4 var(--f-serif);
+  font: var(--text-xs)/1.4 var(--f-serif);
   letter-spacing: 0.08em;
   color: var(--paper-300);
 }
