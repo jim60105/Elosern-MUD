@@ -53,6 +53,20 @@ export const GLYPHS = {
   // Participant teams (the combat participant frame, task 6.1).
   allies: "M12 2l4 4 4-1 1 4 4 4-4 3 1 4-4 1-3 4-3-4-4-1 1-4-4-3-4-4 1-4 4-1 3-4 3 4z",
   foes: "M3 3l18 18M21 3L3 21",
+  // Reference-surface keys (webclient-drawer-frame-unification): the top
+  // navigation's map/settings controls and its 工具 group draw these, and the
+  // shared DrawerHeader draws the same key for the surface each one opens, so
+  // a header always matches its opener. Circles and the ellipse are written
+  // as two-arc subpaths so every glyph is a single `d` string. `shop` is the
+  // storefront awning of the 商店 drawer head.
+  map: "m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2ZM9 3v16M15 5v16",
+  settings: "m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3ZM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8",
+  lineage: "M9.8 5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0 M3.3 18.5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0 M16.3 18.5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0 M12 7.2v4.3M12 11.5 6.6 16.6M12 11.5l5.4 5.1",
+  lore: "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0 M8.2 12a3.8 8.5 0 1 0 7.6 0a3.8 8.5 0 1 0 -7.6 0 M3.5 12h17",
+  codex: "M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z M5 17h14 M12 7l.9 1.9 2.1.3-1.5 1.5.4 2-1.9-1-1.9 1 .4-2L9 9.2l2.1-.3z",
+  gallery: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M7 8.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0 M21 15l-5-5L5 21",
+  help: "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0 M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-.7 1.3-.7 2.3M12 16h.01",
+  shop: "M4 9h16l-1.6-5H5.6L4 9Z M4 9c0 1.7 1.8 2.5 4 2.5S12 10.7 12 9c0 1.7 1.8 2.5 4 2.5S20 10.7 20 9 M5 11.3V20h14v-8.7 M10 20v-5h4v5",
   // The drawer chrome's close glyph (the reference's `.closebtn` X,
   // docs/design/elosern-redesign/index.html).
   close: "M6 6l12 12M18 6 6 18",
@@ -69,6 +83,12 @@ const STROKE_ATTRS = {
   flee: { "stroke-linecap": "round" },
   // The close X must render with rounded caps, matching the reference.
   close: { "stroke-linecap": "round" },
+  lineage: { "stroke-linecap": "round" },
+  lore: { "stroke-linecap": "round" },
+  codex: { "stroke-linecap": "round", "stroke-linejoin": "round" },
+  gallery: { "stroke-linejoin": "round" },
+  help: { "stroke-linecap": "round" },
+  shop: { "stroke-linejoin": "round" },
 };
 
 // Return the reference's per-key stroke attributes for a stable key, or an

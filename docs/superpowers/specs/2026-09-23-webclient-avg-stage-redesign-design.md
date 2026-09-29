@@ -227,6 +227,7 @@ the name in the switcher.
 | `DialogueChoices` (new) | The centred dialogue choice list (§8.2). |
 | `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
 | `CommandLine` | Collapsible (§5.5). |
+| `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay and gallery editor: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
 
 This series is a governed redesign wave: every component added or deleted
 updates `component-manifest.json`, its Storybook story, and the
@@ -260,6 +261,17 @@ button is deleted. Every tool is one click, or one Tab stop plus Enter, away.
 The party drawer stays reachable with an empty party through a
 `同伴 · 隊伍` control in the character-status drawer. Drawers and overlays
 open exactly as before.
+
+Framing (A10, `webclient-drawer-frame-unification`): drawers and utility
+overlays share one workspace — 12px under the top bar, 16px side insets,
+`--workspace-bottom` (one command-line row + 12px) above the viewport
+bottom — so they cover the stage, the band and the command-line row and
+leave only the band's lowest control strip exposed. The panel is fully
+opaque ink; the scrim alone recesses what lies behind (blur is optional
+decoration). A drawer's scrim covers the whole viewport and closes it; an
+overlay's scrim starts under the top bar and only absorbs pointer input, so
+the navigation still switches overlays. The gallery's own title is gone; its
+nested editors are narrower right-hand sheets in the same workspace.
 
 ### 5.5 Command line
 

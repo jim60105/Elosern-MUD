@@ -7,6 +7,7 @@ Unify reference drawer and overlay framing without moving their modal boundary. 
 ## What Changes
 
 - Unify reference drawer and overlay framing without moving their modal boundary.
+- One presentational `DrawerHeader` (registry glyph, serif title, subtitle, 36px close) for drawers, overlays and the gallery; opaque panels over a scrim; navigation glyphs moved into the shared registry so headers and navigation agree.
 - Apply the concrete decisions in `design.md`, preserving server authority, offline play and existing action payloads unless the explicit creation-schema cutover says otherwise.
 - Update affected stories and behavioral acceptance checks; implementation tasks remain unchecked in this proposal.
 
@@ -18,7 +19,7 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 
 ### Modified Capabilities
 
-- `webclient-contextual-hud`: Add bounded observable presentation requirements.
+- `webclient-contextual-hud`: Add the shared opaque reference-surface frame; restate the drawer and overlay workspace bounds to the shipped geometry (covering the band and command-line row, above the band's lowest control strip).
 
 ## Impact
 

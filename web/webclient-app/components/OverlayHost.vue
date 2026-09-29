@@ -1,10 +1,12 @@
 <script setup>
-// OverlayHost (H5, webclient-hud-05-overlays-and-command-line, design D7):
-// the shared overlay workspace. The shell leaves the navigation visible
-// above it and a strip of the bottom band below it (since the AVG stage
-// shell the command line sits on the band's top edge, so an open overlay
-// covers it, like the drawers); the header row carries the
-// icon slot, the overlay title, the subtitle, and a labelled close control.
+// OverlayHost (H5, webclient-hud-05-overlays-and-command-line, design D7;
+// framing unified by webclient-drawer-frame-unification): the shared
+// overlay workspace — the same opaque ink panel and bounds as the reference
+// drawers, under the shared DrawerHeader (registry glyph, title, subtitle,
+// labelled close control). A scrim below the top navigation recesses the
+// band's exposed control strip and absorbs pointer activation without
+// closing the overlay; the navigation stays operable above it, so another
+// trigger still replaces the open overlay.
 // Focus is trapped through H4's shared `focus-trap.js` (one trap, not a
 // second one). The opener element is captured at open time by the caller;
 // when the open overlay name changes (one overlay replaces another) the
@@ -13,6 +15,7 @@
 // Escape closes the surface and restores focus to its trigger on every path.
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
+import DrawerHeader from "./DrawerHeader.vue";
 
 const props = defineProps({
   // The single open-overlay name (design D8): map | settings | help | lineage | codex.
@@ -44,6 +47,21 @@ function titleFor(name) {
   if (name === "lineage") return "技能系譜";
   if (name === "codex") return "稱號冊";
   if (name === "gallery") return "角色肖像圖庫";
+  return "說明";
+}
+
+// The header glyph is the registry key of the navigation control that opens
+// the overlay, so header and opener always agree.
+const OVERLAY_ICONS = {
+  map: "map",
+  settings: "settings",
+  lineage: "lineage",
+  codex: "codex",
+  gallery: "gallery",
+  help: "help",
+};
+function iconFor(name) {
+  return OVERLAY_ICONS[name] || null;
 }
 
 function subtitleFor(name) {
@@ -114,6 +132,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <div class="overlay-host-scrim" data-testid="overlay-host-scrim" aria-hidden="true"></div>
   <section
     ref="hostRef"
     class="overlay-host"
@@ -124,72 +143,14 @@ onBeforeUnmount(() => {
     :data-elosern-overlay="overlay"
     @keydown="onKeydown"
   >
-    <header class="overlay-host__header" data-testid="overlay-host-header">
-      <slot name="icon">
-        <svg
-          v-if="overlay === 'map'"
-          class="overlay-host__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          aria-hidden="true"
-        >
-          <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z" />
-          <circle cx="12" cy="10" r="2.5" />
-        </svg>
-        <svg
-          v-else-if="overlay === 'settings'"
-          class="overlay-host__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z" />
-        </svg>
-        <svg
-          v-else-if="overlay === 'gallery'"
-          class="overlay-host__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          aria-hidden="true"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="9" cy="9" r="2" />
-          <path d="m3 18 6-5 4 3 4-6 4 6" />
-        </svg>
-        <svg
-          v-else
-          class="overlay-host__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-1 .4-1 1.2-1 2.2M12 17h.01" stroke-linecap="round" />
-        </svg>
-      </slot>
-      <h3 class="overlay-host__title">{{ titleFor(overlay) }}</h3>
-      <span class="overlay-host__subtitle">{{ subtitleFor(overlay) }}</span>
-      <button
-        type="button"
-        class="overlay-host__close"
-        data-testid="overlay-host-close"
-        aria-label="關閉"
-        @click="onClose"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M6 6l12 12M18 6 6 18" stroke-linecap="round" />
-        </svg>
-      </button>
-    </header>
+    <DrawerHeader
+      data-testid="overlay-host-header"
+      surface="overlay-host"
+      :icon="iconFor(overlay)"
+      :title="titleFor(overlay)"
+      :subtitle="subtitleFor(overlay)"
+      @close="onClose"
+    />
     <div class="overlay-host__body" data-testid="overlay-host-body">
       <slot :overlay="overlay" :map-model="mapModel" :mapModel="mapModel"></slot>
     </div>
@@ -197,80 +158,36 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* The scrim covers everything below the top navigation behind the overlay:
+   its fill alone recesses the band's exposed control strip (blur is
+   optional decoration), and it absorbs pointer activation without closing
+   the overlay. It starts at the navigation's bottom edge, so the navigation
+   stays uncovered and operable; it sits one step under the overlay's tier. */
+.overlay-host-scrim {
+  position: fixed;
+  inset: var(--header-h) 0 0;
+  z-index: 91;
+  background: var(--surface-scrim);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .overlay-host-scrim { backdrop-filter: blur(2px) saturate(.8); }
+}
+
+/* The reference workspace, shared with the drawers: 12px under the top
+   navigation, 16px side insets, `--workspace-bottom` above the viewport
+   bottom, a fully opaque ink panel. The tier stays 92 (below the modal
+   tier) so the gallery's teleported nested editors stack above it. */
 .overlay-host {
   position: fixed;
-  inset: calc(var(--header-h) + 12px) 16px calc(var(--command-line-h) + 12px);
+  inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom);
   z-index: 92;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #bca57966;
   border-radius: 8px;
-  background: linear-gradient(120deg, #17191df5, #0b0d10fa 70%);
-  box-shadow: 0 12px 60px #0009, inset 0 1px 0 #e8d8aa12;
-}
-
-.overlay-host__header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 18px 26px;
-  border-bottom: var(--line);
-  background: linear-gradient(110deg, #27251e70, #111419);
-}
-
-.overlay-host__icon {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  color: var(--gold-400);
-}
-
-.overlay-host__title {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: var(--text-2xl);
-  letter-spacing: 0.04em;
-  color: var(--gold-400);
-  overflow-wrap: anywhere;
-}
-
-.overlay-host__subtitle {
-  font-size: var(--text-xs);
-  color: var(--paper-300);
-}
-
-.overlay-host__close {
-  flex: none;
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  color: var(--paper-300);
-  background: var(--ink-820);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.overlay-host__close svg {
-  width: 16px;
-  height: 16px;
-}
-
-.overlay-host__close:hover {
-  color: var(--gold-400);
-  border-color: var(--gold-500);
-}
-
-.overlay-host__close:focus-visible {
-  color: var(--gold-400);
-  border-color: var(--gold-400);
+  background: var(--surface-panel);
+  box-shadow: 0 16px 64px #000a, inset 0 1px 0 #e8d8aa14;
 }
 
 .overlay-host__body {
@@ -290,20 +207,9 @@ onBeforeUnmount(() => {
 /* The full map is a picture, not a reading column: it takes the surface's
    whole width so the fitted view spends the room on the drawing. */
 .overlay-host[data-elosern-overlay="map"] .overlay-host__body { max-width: none; }
-.overlay-host[data-elosern-overlay="gallery"] { left: 292px; }
 .overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
-.overlay-host[data-elosern-overlay="gallery"] .overlay-host__header { position: absolute; top: 8px; right: 8px; z-index: 1; padding: 0; border: 0; background: none; }
-.overlay-host[data-elosern-overlay="gallery"] .overlay-host__title,
-.overlay-host[data-elosern-overlay="gallery"] .overlay-host__subtitle,
-.overlay-host[data-elosern-overlay="gallery"] .overlay-host__icon { display: none; }
-@media (max-width: 1100px) {
-  .overlay-host[data-elosern-overlay="gallery"] { left: 16px; }
-}
 
 @media (max-width: 700px) {
-  .overlay-host__header { gap: 8px; padding: 12px 16px; }
-  .overlay-host__title { font-size: var(--text-lg); max-width: calc(100% - 80px); }
-  .overlay-host__subtitle { order: 1; width: 100%; }
   .overlay-host__body { padding: 16px; }
 }
 </style>

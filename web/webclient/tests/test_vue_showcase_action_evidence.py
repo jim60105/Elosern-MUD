@@ -133,7 +133,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/CharacterSwitcher",
                 "Core/CommandLine", "Core/HudFrame",
                 "Core/SceneBackdrop",
-                "Core/FullLogOverlay", "Core/HudDrawer",
+                "Core/FullLogOverlay", "Core/HudDrawer", "Core/DrawerHeader",
                 *ACTION_FAMILY_KEYS,
                 "Action/RestForm", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",

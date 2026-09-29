@@ -198,6 +198,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Action/SkillDetailPane",
       "Data/ParticipantFrame",
       "Core/HudDrawer",
+      // The shared reference-surface header (webclient-drawer-frame-unification).
+      "Core/DrawerHeader",
       "Data/EquipmentDoll",
       "Data/CharacterStatusDrawer",
       "World/MapLattice",

@@ -18,6 +18,19 @@ export function useDrawers(store, { panel, panelAvailable }) {
     party: "同伴 · 隊伍",
   };
   const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
+  // The drawer head glyph (webclient-drawer-frame-unification): a
+  // `dock-icons.js` registry key per drawer — the same key the navigation
+  // control that opens it draws, so the header and its opener agree.
+  const DRAWER_ICONS = {
+    skill: "skills",
+    inventory: "inventory",
+    shop: "shop",
+    quest: "quests",
+    lore: "lore",
+    status: "character",
+    party: "party",
+  };
+  const drawerIcon = computed(() => DRAWER_ICONS[store.view.hudDrawer] || null);
 
   // The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
   // opens the codex reference drawer through the store's single open-drawer
@@ -130,6 +143,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
   return {
     SKILL_CAST_HINT,
     drawerTitle,
+    drawerIcon,
     inventoryWalletCopper,
     inventoryWalletSubtitle,
     onHudDrawerClose,

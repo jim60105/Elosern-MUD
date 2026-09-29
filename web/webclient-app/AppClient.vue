@@ -71,7 +71,7 @@ const {
   waitOpen, skipDisabled, activateWait, practiceOpen, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
-  drawerTitle, onOpenDrawer, onHudDrawerClose, questServicesPanel,
+  drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose, questServicesPanel,
   questGuildAvailable, questServicesUnavailable, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_CAST_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
@@ -498,7 +498,7 @@ function onFoeLineupGone() {
       :open="true"
       :title="practiceOpen && store.view.hudDrawer === 'skill' ? '修煉' : drawerTitle"
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
-      :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : (store.view.hudDrawer === 'party' ? 'party' : null))"
+      :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       @close="onHudDrawerClose"
     >

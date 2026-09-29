@@ -1256,17 +1256,20 @@ without ending the session.
 - **THEN** exactly one forfeit action is emitted carrying the current session identifier
 
 ### Requirement: Reference surfaces render in a right-anchored drawer with one modal contract
-The client's reference surfaces SHALL render in a wide workspace bounded inside both stage edges,
-below the top navigation and above the persistent command line. A fine border and charcoal
-background SHALL distinguish the workspace from the stage. The existing modal drawer lifecycle
-and shared motion tokens SHALL be retained over a dimmed scrim. Between its header and optional
-footer, a decorative art column MAY accompany the scrolling content body; only the content body
-scrolls. The head SHALL render the title in the display face at the shared workspace scale with
-slight tracking, and the subtitle as the small muted line beside it. A drawer
-MAY declare one leading head icon (a decorative, `aria-hidden` glyph rendered before its title); a
-drawer that declares none renders its title with no icon, unchanged. The drawer's close control SHALL
-carry an accessible name (e.g. an `aria-label`) but MAY be rendered icon-only, with no visible text
-node — "labelled" in this requirement means an accessible name, not necessarily visible text.
+The client's reference surfaces SHALL render in a wide workspace 12px below the top navigation's
+bottom edge, 16px inside each side of the viewport, and one command-line row height plus 12px above the
+viewport bottom, so the workspace covers the stage, the bottom band, and the command-line row whether or
+not that row is expanded, and only the band's lowest control strip stays exposed beneath it. A fine
+border and a fully opaque charcoal ink panel SHALL distinguish the workspace from the stage. The existing
+modal drawer lifecycle and shared motion tokens SHALL be retained over a dimmed scrim covering the whole
+viewport behind the drawer. Between its header and optional footer, a decorative art column MAY
+accompany the scrolling content body; only the content body scrolls. The head SHALL be the shared
+reference-surface header: the title in the serif heading face at the shared workspace scale with slight
+tracking, and the subtitle as the small muted line beside it. Every reference drawer SHALL declare one
+leading head icon (a decorative, `aria-hidden` glyph from the shared glyph registry rendered before its
+title). The drawer's close control SHALL carry an accessible name (e.g. an `aria-label`) but MAY be
+rendered icon-only, with no visible text node — "labelled" in this requirement means an accessible name,
+not necessarily visible text.
 
 At most one drawer SHALL be open at any time; opening a second SHALL close the first. While a drawer
 is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation.
@@ -1288,11 +1291,11 @@ sub-screen replaced.
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
-- **THEN** the workspace is bounded below the navigation and above the command line over a dimmed scrim, its content body is the only scrolling region, and the stage behind it carries the recession mark
+- **THEN** the workspace is bounded below the navigation and above the band's lowest control strip, covering the command-line row, as an opaque panel over a dimmed scrim, its content body is the only scrolling region, and the stage behind it carries the recession mark
 
 #### Scenario: The head carries the reference display type scale
 - **WHEN** a reference drawer renders its head
-- **THEN** the title renders in the display face with slight tracking and the subtitle renders as the small muted line beside it
+- **THEN** the title renders in the serif heading face with slight tracking and the subtitle renders as the small muted line beside it
 
 #### Scenario: Only one drawer is open at a time
 - **WHEN** a drawer is open and the player opens a different one
@@ -1661,10 +1664,17 @@ line SHALL name a key, gesture or affordance that has no implementation behind i
 - **THEN** both move through the same command-history walk in the same order, the draft is preserved across the walk, and neither submits
 
 ### Requirement: A full-screen overlay is one focus-trapped surface, and only one is open at a time
-A full-screen overlay SHALL render as one shared surface laid over the stage, carrying a header naming
-the surface and a labelled close control, with its body as its only scrolling region. The surface is fixed
-from the stage's 46px command-line height (`top:46px; left:0; right:0; bottom:0`), so the command line
-stays visible and usable underneath it. While an overlay
+A full-screen overlay SHALL render as one shared surface laid over the stage, carrying the shared
+reference-surface header naming the surface and a labelled close control, with its body as its only
+scrolling region. Utility overlays SHALL use the same opaque reference workspace as the reference
+drawers: 12px below the top navigation's bottom edge, 16px inside each side of the viewport, and one
+command-line row height plus 12px above the viewport bottom, so the workspace covers the stage, the
+bottom band, and the command-line row whether or not that row is expanded, and only the band's lowest
+control strip stays exposed beneath it. A scrim SHALL cover everything below the top navigation behind
+the overlay, recessing that exposed strip, and SHALL absorb pointer activation without closing the
+overlay, so no command control behind the overlay is reachable by pointer; the scrim starts at the top
+navigation's bottom edge and does not cover it, so the navigation stays operable and activating another
+overlay or drawer trigger replaces the open overlay as below. The mode-owned creation workspace is excluded from these utility-frame bounds. While an overlay
 is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation. It
 SHALL close on Escape and on activation of its close control, and both paths SHALL restore focus to the
 control that opened it. It SHALL use the shared focus trap the client already owns rather than a second
@@ -2835,3 +2845,34 @@ While combat playback locks mutation controls, the command region SHALL communic
 #### Scenario: Skip settles the lock
 - **WHEN** the player skips a locked playing round
 - **THEN** the cue clears with playback and the existing canonical command state becomes available
+
+### Requirement: Reference surfaces share an opaque accessible frame
+Reference drawers and full-screen overlays SHALL present one shared header: a decorative leading glyph,
+the surface title, an optional subtitle, and one icon-only close control of at least 36x36px carrying an
+accessible name, in the same order and position on every surface. The header SHALL be presentational
+only: it SHALL emit a close request and own no focus trap, Escape handling, opener record, or
+open-surface registration, all of which stay with the drawer or overlay host that renders it. The
+header glyph SHALL come from the same glyph registry the top navigation draws its entries from, so a
+surface opened from a navigation control shows that control's glyph, and every reference drawer and
+every utility overlay SHALL declare one; no surface SHALL fall back to a generic placeholder glyph. A
+surface whose body used to render its own title and close control SHALL render them only through the
+shared header, so each surface carries exactly one title and one close control.
+
+The body of every reference drawer and utility overlay SHALL be a fully opaque ink panel over a
+stage-dimming scrim, so no stage, band, or command-line text shows through it; a backdrop blur MAY
+decorate the scrim, but opacity SHALL NOT depend on `backdrop-filter` support. The recession and the
+scrim SHALL dim only what lies behind the panel, never the panel itself. Existing modal focus, close,
+and restore behavior SHALL remain unchanged, and the workspace bounds SHALL remain those of the
+reference drawer and overlay requirements.
+
+#### Scenario: Blur is unavailable
+- **WHEN** a reference surface opens in a browser without backdrop-filter
+- **THEN** stage text is still invisible through the opaque panel and body content remains readable
+
+#### Scenario: One owner handles closing
+- **WHEN** a gallery nested editor closes and then the gallery closes
+- **THEN** each close is handled by its existing modal owner, focus returns to the correct opener and no duplicate header or focus trap is introduced
+
+#### Scenario: Headers agree
+- **WHEN** the same tool is opened from navigation
+- **THEN** the header uses the matching glyph and has one named close control in the shared position

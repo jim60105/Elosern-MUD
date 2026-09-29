@@ -281,6 +281,17 @@
        webclient-collapsible-command-line design D4). HudFrame's
        [data-anchor="command-line"] rule and the stage clearance consume it. */
     --command-line-h: 44px;
+    /* The reference workspace's bottom inset (drawers and utility overlays,
+       webclient-drawer-frame-unification): one command-line row plus 12px
+       above the viewport bottom. The workspace covers the stage, the band
+       and the command-line row, leaving only the band's lowest control
+       strip exposed under the scrim. */
+    --workspace-bottom: calc(var(--command-line-h) + 12px);
+    /* The reference surfaces' scrim and opaque ink panel. The scrim's fill
+       alone recesses what lies behind; blur is optional decoration. The
+       panel has no alpha anywhere, so nothing shows through it. */
+    --surface-scrim: rgba(5, 6, 8, 0.64);
+    --surface-panel: linear-gradient(115deg, #111418, #0c0e11 62%);
     /* The edge every stage surface above the band clears: the band plus the
        command-line row docked on its top edge. Every surface positioned
        above the band derives its offset from this single token, never
@@ -296,8 +307,9 @@
       Every full-screen surface consumes --z-surface-modal (or a value derived
       from it); nothing but the offline overlay may exceed --z-offline.
       OverlayHost's full-screen overlay stays deliberately outside this scale
-      (z-index: 92) because the drawer/overlay pair is mutually exclusive at
-      the store level. */
+      (z-index: 92, its scrim 91) because the drawer/overlay pair is mutually
+      exclusive at the store level, and so the gallery overlay's teleported
+      nested editor drawers (modal tier) stack above it. */
    --z-surface-modal: 3000;
    --z-offline: 9000;
 }

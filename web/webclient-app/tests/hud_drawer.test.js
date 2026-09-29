@@ -28,7 +28,7 @@ describe("HudDrawer (H4 D1)", () => {
 
   it("renders the leading head icon only when the icon prop is set and resolvable", () => {
     const w = mountDrawer({ icon: "skills" });
-    const icon = w.find(".hud-drawer__icon");
+    const icon = w.find(".drawer-header__icon");
     expect(icon.exists()).toBe(true);
     // The `skills` glyph path from the shared table.
     expect(icon.find("path").attributes("d")).toBe(
@@ -36,10 +36,10 @@ describe("HudDrawer (H4 D1)", () => {
     );
     // Unset (the default): no icon, the head renders exactly as before.
     const w2 = mountDrawer();
-    expect(w2.find(".hud-drawer__icon").exists()).toBe(false);
+    expect(w2.find(".drawer-header__icon").exists()).toBe(false);
     // An unknown glyph key degrades to no icon (an unset-key is a no-op).
     const w3 = mountDrawer({ icon: "not-a-glyph" });
-    expect(w3.find(".hud-drawer__icon").exists()).toBe(false);
+    expect(w3.find(".drawer-header__icon").exists()).toBe(false);
   });
 
   it("renders the close control icon-only with its accessible name preserved", () => {

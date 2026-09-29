@@ -1,15 +1,12 @@
 <script setup>
-// HudDrawer (H4, webclient-hud-04-reference-drawers, design D1): the
-// right-anchored drawer chrome shared by the six reference drawers. Fixed
-// to the stage's right edge, its top edge inset one `--command-line-h`
-// (44px, webclient-collapsible-command-line design D4) below the stage top
-// and its
-// bottom at the stage bottom, bounded to a width that
-// never exceeds the viewport (`min(560px, 94vw)`), drawn on the solid panel
-// background with a left border and a left-cast shadow so it reads as a
-// surface laid over the stage, not a region of it. The head / body / foot
-// are one column and the body is the drawer's only scrolling region. The
-// enter/leave is a horizontal slide over a blurred scrim, both expressed
+// HudDrawer (H4, webclient-hud-04-reference-drawers; framing unified by
+// webclient-drawer-frame-unification): the drawer chrome shared by the
+// reference drawers and the gallery's nested editors. It fills the reference
+// workspace (under the top navigation, inside both side insets, above the
+// band's lowest control strip) as a fully opaque ink panel, so it reads as a
+// surface laid over the stage, not a region of it. The shared DrawerHeader /
+// body / foot are one column and the body is the drawer's only scrolling
+// region. The enter/leave is a horizontal slide over a dark scrim, both expressed
 // through the `--motion-*` / `--ease-*` tokens so the motion level's
 // `reduced` and `off` blocks resolve the transition to 0ms while the open
 // state still applies. At most one drawer is open at a time (structural: the store
@@ -18,7 +15,7 @@
 // the control that opened it.
 import { onMounted, ref } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
-import { glyphAttrs, glyphPath } from "./dock-icons.js";
+import DrawerHeader from "./DrawerHeader.vue";
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -27,27 +24,27 @@ const props = defineProps({
   // The drawer's `data-testid` identity key (the drawer name) so browser
   // assertions can target the open drawer.
   drawerKey: { type: String, default: "" },
-  // Optional leading head icon: a `dock-icons.js` glyph key. Unset (the
-  // default) renders no icon — the other five drawers keep today's head.
+  // The leading head glyph: a `dock-icons.js` registry key, drawn by the
+  // shared DrawerHeader. Every reference drawer declares one.
   icon: { type: String, default: null },
 });
 
 const emit = defineEmits(["close"]);
 
 const drawerEl = ref(null);
-const closeBtnEl = ref(null);
+const headerRef = ref(null);
 let trap = null;
 
 // The parent (`AppClient`) mounts this component only while a drawer is open
 // (`v-if="store.view.hudDrawer"`, `:open="true"`), so a fresh mount means a
 // drawer has just opened. By the time `onMounted` runs the template refs
-// (`drawerEl` / `closeBtnEl`) are assigned, so create the shared focusable-
+// (`drawerEl` / the header's exposed `closeButton`) are assigned, so create the shared focusable-
 // query trap here (design D5) and move focus into the drawer; the close
 // control is the natural first target.
 onMounted(() => {
   if (drawerEl.value) {
     trap = createFocusTrap(drawerEl.value, {
-      initialFocusEl: closeBtnEl.value || drawerEl.value,
+      initialFocusEl: headerRef.value?.closeButton || drawerEl.value,
       openerEl: document.activeElement,
     });
     trap.enter();
@@ -100,7 +97,7 @@ function onScrimClick() {
   ></div>
 
   <!-- The drawer chrome is kept mounted so both the enter and leave slides
-       play (a `translateX(100%)` -> `translateX(0)` slide). While closed it
+       play (an off-screen-right -> `translateX(0)` slide). While closed it
        sits off-screen; the close control leaves the tab order via a
        dynamic `tabindex`. The body content (the reference surface) is
        `v-if`'d by the parent, so a closed drawer holds no surface in the
@@ -116,46 +113,15 @@ function onScrimClick() {
     :data-open="String(open)"
     @keydown="onKeydown"
   >
-    <div class="hud-drawer__head">
-      <svg
-        v-if="icon && glyphPath(icon)"
-        class="hud-drawer__icon"
-        aria-hidden="true"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <path
-          :d="glyphPath(icon)"
-          stroke="currentColor"
-          stroke-width="1.8"
-          v-bind="glyphAttrs(icon)"
-        />
-      </svg>
-      <h3 class="hud-drawer__title" data-testid="hud-drawer__title">
-        {{ title }}
-      </h3>
-      <p v-if="subtitle" class="hud-drawer__subtitle">{{ subtitle }}</p>
-      <button
-        ref="closeBtnEl"
-        type="button"
-        class="hud-drawer__close"
-        data-testid="hud-drawer-close"
-        :tabindex="open ? 0 : -1"
-        aria-label="關閉"
-        @click="close"
-      >
-        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none">
-          <path
-            :d="glyphPath('close')"
-            stroke="currentColor"
-            stroke-width="1.8"
-            v-bind="glyphAttrs('close')"
-          />
-        </svg>
-      </button>
-    </div>
+    <DrawerHeader
+      ref="headerRef"
+      surface="hud-drawer"
+      :icon="icon"
+      :title="title"
+      :subtitle="subtitle"
+      :close-tabindex="open ? 0 : -1"
+      @close="close"
+    />
     <div class="hud-drawer__workspace">
       <aside v-if="$slots.art" class="hud-drawer__art">
         <slot name="art" />
@@ -171,93 +137,44 @@ function onScrimClick() {
 </template>
 
 <style>
-/* The blurred scrim over the whole stage (the draft's `.draw` scrim). */
+/* The scrim over the whole viewport. Its dark fill alone recesses what lies
+   behind the drawer; the blur is progressive decoration only
+   (webclient-drawer-frame-unification), so a browser without
+   backdrop-filter shows the same opaque panel over the same dark scrim. */
 .hud-drawer-scrim {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-surface-modal) - 100);
-  background: rgba(8, 7, 10, 0.5);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: var(--surface-scrim);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .hud-drawer-scrim { backdrop-filter: blur(2px) saturate(.8); }
 }
 
-/* The right-anchored drawer (the draft's `.draw` chrome). The top edge is
-   inset one command-line strip height from the stage top, reproducing the
-   reference's top clearance (index.html:404) through the shared 44px
-   token; the scrim keeps covering the whole stage. */
+/* The reference workspace (webclient-drawer-frame-unification): 12px under
+   the top navigation, 16px inside each side, `--workspace-bottom` above the
+   viewport bottom — over the stage, the band and the command-line row. A
+   fully opaque ink panel with a fine gold-tinted border; it slides in from
+   the right edge through the motion tokens. */
 .hud-drawer {
   position: fixed;
-  top: var(--command-line-h);
-  right: 0;
-  bottom: 0;
-  width: min(560px, 94vw);
+  inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom) 16px;
   z-index: var(--z-surface-modal);
   display: flex;
   flex-direction: column;
-  background: var(--panel-solid);
-  border-left: var(--line);
-  box-shadow: -18px 0 44px -26px rgba(0, 0, 0, 0.9);
-  transform: translateX(100%);
+  overflow: hidden;
+  background: var(--surface-panel);
+  border: 1px solid #bca57966;
+  border-radius: 8px;
+  box-shadow: 0 16px 64px #000a, inset 0 1px 0 #e8d8aa14;
+  /* Fully off-screen while closed, shadow included. */
+  transform: translateX(calc(100% + 96px));
   transition: transform var(--motion-base) var(--ease-standard);
   outline: none;
 }
 
 .hud-drawer.open {
   transform: translateX(0);
-}
-
-.hud-drawer__head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-4) var(--sp-3);
-  border-bottom: var(--line);
-}
-
-/* The head title (the reference's `.dhead h3`: 20px display type with
-   `.04em` tracking, index.html:410). */
-.hud-drawer__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: var(--text-xl);
-  letter-spacing: .04em;
-  flex: 1;
-}
-
-/* The head subtitle (the reference's `.dhead .sub`: 11px muted,
-   index.html:411). */
-.hud-drawer__subtitle {
-  margin: 0;
-  color: var(--paper-500);
-  font-size: var(--text-xs);
-}
-
-/* The head icon (the reference's `.dhead .ic`, index.html:409-410). */
-.hud-drawer__icon {
-  width: 20px;
-  height: 20px;
-  color: var(--gold-400);
-  flex: none;
-}
-
-/* The icon-only close control (the reference's `.closebtn`, 34x34 square). */
-.hud-drawer__close {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  color: var(--paper-300);
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  border-radius: 9px;
-  cursor: pointer;
-}
-
-.hud-drawer__close:hover {
-  border-color: var(--seal-500);
-  color: var(--paper-50);
 }
 
 /* The skill drawer's static cast-syntax hint (the reference's footer copy). */
