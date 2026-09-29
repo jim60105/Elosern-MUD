@@ -121,7 +121,7 @@ describe("the collapsed dock keeps its ordinary form", () => {
       props: { mode: "dialogue", rootItems: ROOT_ITEMS, view: VIEW },
       slots: { default: () => [h(SceneOverview, { menu: OVERVIEW })] },
     });
-    expect(wrapper.find(".dock-tab-bar").exists()).toBe(false);
+    expect(wrapper.find('[data-pane-kind="commands"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(true);
     const legends = wrapper.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);

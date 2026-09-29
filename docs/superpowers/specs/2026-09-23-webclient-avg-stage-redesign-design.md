@@ -202,7 +202,8 @@ the name in the switcher.
   region's right edge. It keeps that geometry in every mode, so in dialogue it
   never covers the host.
 - The narrow command panel reflows its frames: the waiting screen becomes one
-  column; the combat skill detail pane uses `min(220px, 45%)`.
+  column; the combat detail pane uses `min(220px, 45%)`, and the combat
+  command list scrolls on its own above the legend strip.
 
 ### 5.2 Components
 
@@ -222,9 +223,9 @@ the name in the switcher.
 | `LocalMap` | Fixed square island (§11). |
 | `MessageWindow` (new) | Replaces `NarrativeFeed` in `band-message` (§6). |
 | `SceneOverview`, `DockVerbPopover` (new) | The exploration root of the command panel (§7). |
-| `DockTabBar` | Kept for the combat root only. |
+| `DockTabBar` | Deleted (A9, `webclient-combat-command-window`): the combat root renders through `DockMenu`'s vertical `commands` form. |
 | `DialogueChoices` (new) | The centred dialogue choice list (§8.2). |
-| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip. |
+| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
 | `CommandLine` | Collapsible (§5.5). |
 
 This series is a governed redesign wave: every component added or deleted
@@ -426,8 +427,22 @@ built from the committed `exploration` panel (no new server data):
 - The shortcut legend moves out of the tab bar into one strip owned by
   `ActionDock` (`數字鍵 1–9 · Enter 執行 · Esc 返回`). The exploration tab bar
   (`移動 / 查看 / 互動 / 等待 / 建議`), the move/look/interact submenus, the
-  interaction workspace, and the exit-outlet pane are deleted. `DockTabBar`
-  remains only for the combat root.
+  interaction workspace, and the exit-outlet pane are deleted.
+- **Combat command window** (A9, `webclient-combat-command-window`): the
+  combat root is a JRPG command window — one vertical list of glyph + label
+  rows (the resolver's attack, skills, items, 背包, defend, flee, forfeit in
+  order; the recovery root keeps only forfeit), Up/Down wrapping and
+  Left/Right inert, with the 技能 row's exact descriptor count as neutral
+  inline text. The highlighted row's detail sits beside it: client-local copy
+  of what a root command opens or does, a category's or group's label and
+  count, or the current skill on its skill, scale and target frames — never
+  a skill left behind. Categories, groups, and the single-target / self /
+  none frames are the same single column (targets marked by side); the AREA
+  frame keeps its token grid. A deeper frame replaces the root list. Basic
+  attack opens focused on the first enabled foe the server listed (focus
+  only; order untouched). While a round plays by itself the list recedes
+  under a 回合演出中 veil with the existing skip and a decorative sweep that
+  is still at reduced and off.
 
 ## 8. Dialogue stage
 

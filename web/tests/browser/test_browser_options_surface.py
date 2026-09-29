@@ -325,8 +325,8 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         # The generating push changed only the suggestions content: the
         # exploration menu subtree and the keyboard router must be untouched.
-        # H3: the active row container carries `data-testid="dock-menu"`, which
-        # is the tab bar at depth 1 (the exploration root). A suggestions-only
+        # H3: the active row container carries `data-testid="dock-menu"` (the
+        # scene overview at depth 1, the exploration root). A suggestions-only
         # update must not rebuild that container.
         captured = page.evaluate(
             """() => {

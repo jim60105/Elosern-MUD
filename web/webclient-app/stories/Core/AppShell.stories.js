@@ -13,6 +13,7 @@ import {
   COMMAND_HISTORY_SAMPLE,
   FOE_PORTRAIT_CATALOG,
   PARTY_PARTICIPANTS,
+  combatSkills,
   foeParticipants,
   NARRATIVE_SAMPLE,
   OBJECTIVES_PANEL_SAMPLE,
@@ -175,7 +176,8 @@ const MODE_JOURNEY_DIALOGUE_CLOSED = {
 // the player's side, then the foes in presenter order, each with a catalog
 // portrait; `overrides` edits a foe by identity (a defeat, a missing ref).
 const combatPanelWith = (foes, overrides = {}) =>
-  protocolFixtures.combatActions({ participants: [...PARTY_PARTICIPANTS, ...foeParticipants(foes, overrides)] });
+  protocolFixtures.combatActions({ ...combatRoster([...PARTY_PARTICIPANTS, ...foeParticipants(foes, overrides)]) });
+const combatRoster = (participants) => ({ participants, skills: combatSkills(participants) });
 const combatArt = (art) => ({ ...art, portrait_catalog: { ...(art.portrait_catalog || {}), ...FOE_PORTRAIT_CATALOG } });
 
 const renderPlayer = (args) => ({

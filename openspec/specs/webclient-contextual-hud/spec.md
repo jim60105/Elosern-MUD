@@ -808,54 +808,36 @@ existing per-node movement submission SHALL be unchanged.
   graph variant — and in neither case does the island offer a second tab stop beyond its full-map
   affordance
 
-### Requirement: The combat dock's root frame renders as an icon tab bar with a truthful skills badge
-In combat mode the dock's root menu frame SHALL render as a horizontal tab bar, one tab per combat root
-item, each carrying a decorative glyph and its label. The focused or open root entry's tab SHALL be
-marked with the accent fill, and the marking SHALL NOT be the only indication of state. When the router
-is at the combat root frame the tab bar SHALL be the surface's row container: it SHALL carry the
-listbox role, be the surface's single tab stop, name the focused tab through an active-descendant
-association, and carry each root item's preserved row identity attribute and row id. When a deeper
-combat frame is open the tab bar SHALL become inert ancestor chrome that marks which root entry is open
-and SHALL NOT be a second tab stop. No other mode SHALL render a root tab bar: the exploration and
-dialogue root is the scene overview.
-
-The 技能 tab SHALL carry a count badge equal to the number of skill descriptors the committed combat
-panel lists across its categories and groups, and SHALL carry no badge when that number is zero; no
-other combat tab carries a badge, and a badge SHALL NEVER be rendered from an estimate or from a value
-the panel does not carry.
-
-The combat root's focus geometry SHALL match the rendered tab order: its column count SHALL equal its
-item count, so the horizontal arrow keys traverse the visible tabs and the vertical arrow keys are a
-no-op on the root.
-
-A tab's decorative glyph SHALL match the icon `docs/design/elosern-redesign/index.html` (the binding
-visual reference) draws for that same tab concept, for every combat-root key the reference draws an
-icon for. A key with no counterpart in the reference (a client-local entry such as the bag drawer row)
-SHALL carry whatever glyph best represents it.
+### Requirement: The combat dock root renders as a vertical command window with a truthful skills count
+In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. It SHALL preserve the existing resolver item order, identities, availability and confirmation routes. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. Up/Down SHALL traverse and wrap in rendered order; Left/Right SHALL be no-ops at root. At deeper levels the root list SHALL be replaced by the current frame, with the existing breadcrumb/back path and only one active row container. No other mode SHALL render this combat root. Glyphs SHALL retain the existing concept mapping.
 
 #### Scenario: The combat root renders as tabs and owns the listbox
 - **WHEN** the dock is at the combat root frame
-- **THEN** each root item renders as a tab with a glyph and its label, the tab bar carries the listbox role with a single tab stop and an active-descendant reference, and each tab carries its preserved row identity attribute
+- **THEN** each root item renders as a vertical list row with a glyph and its label, the list carries the listbox role with a single tab stop and an active-descendant reference, and each row carries its preserved row identity attribute
 
 #### Scenario: A combat tab glyph matches the reference design's icon for the same concept
-- **WHEN** the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 tabs
-- **THEN** each tab's glyph is the same pictogram `docs/design/elosern-redesign/index.html` draws for that tab's concept
+- **WHEN** the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 rows
+- **THEN** each row's glyph is the same pictogram `docs/design/elosern-redesign/index.html` draws for that concept's tab
 
 #### Scenario: The skills badge equals the committed skill count
 - **WHEN** the committed combat panel lists three skill descriptors across its categories, and later a panel with none
-- **THEN** the 技能 tab shows the badge `3`, then no badge at all, and no other combat tab shows a badge
+- **THEN** the 技能 row shows the neutral inline count `3`, then no count at all, and no other combat row shows a count or alert badge
 
 #### Scenario: Combat tab focus geometry matches the rendered order
-- **WHEN** the player presses the horizontal arrow keys on the combat root frame
-- **THEN** focus moves through the tabs in their rendered order and wraps at the ends, and the vertical arrow keys move focus nowhere
+- **WHEN** the player presses the arrow keys on the combat root frame
+- **THEN** focus moves through the rows in their rendered order with the vertical arrow keys and wraps at the ends, and the horizontal arrow keys move focus nowhere
 
 #### Scenario: An open deeper combat frame leaves the tab bar inert
 - **WHEN** a deeper combat frame is open
-- **THEN** the tab bar marks which root entry is open, the deeper frame's row container is the surface's only listbox and only tab stop, and no tab is reachable by sequential keyboard navigation
+- **THEN** the root list is replaced by the current frame, the deeper frame's row container is the surface's only listbox and only tab stop, and no root row is reachable by sequential keyboard navigation
 
 #### Scenario: Exploration renders no root tab bar
 - **WHEN** the dock renders in exploration or dialogue mode at any depth
-- **THEN** no tab bar is rendered, and no 移動, 查看, 互動, or 建議 tab exists anywhere in the dock
+- **THEN** no combat root list is rendered, and no 移動, 查看, 互動, or 建議 root row exists anywhere in the dock
+
+#### Scenario: Recovery root is bounded
+- **WHEN** the resolver supplies only the recovery Forfeit path
+- **THEN** one root row renders and still requires its existing explicit confirmation
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
 The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the
@@ -867,7 +849,7 @@ and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` a
 The legend renders
 with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
 The legend SHALL render exactly once as visible content and SHALL be the only element carrying the
-legend's test hook; no tab bar SHALL carry a second copy. The dock SHALL NOT carry a dialogue-mode
+legend's test hook; no root command list or pane SHALL carry a second copy. The dock SHALL NOT carry a dialogue-mode
 legend variant.
 
 The legend SHALL NOT name a key, gesture, or affordance this client does not implement or that no
@@ -894,7 +876,7 @@ through to the text / command-history path.
 #### Scenario: The legend renders once
 - **WHEN** the dock renders in exploration or combat mode, at the overview, in a child frame, or at the combat root, and later the mode changes to dialogue
 - **THEN** exactly one element carries the shortcut-legend text and test hook, it is the dock's
-  legend strip, no tab bar or pane renders a duplicate copy, and in dialogue mode the strip is hidden
+  legend strip, no root command list or pane renders a duplicate copy, and in dialogue mode the strip is hidden
   with the command region and no other element shows a legend
 
 #### Scenario: The legend matches the reference wording and kbd structure
@@ -2070,7 +2052,7 @@ no surface outside the band SHALL be positioned from the frame the dock currentl
 mode the command region is collapsed and the dock SHALL be hidden with `display:none` together with it,
 as "The command region collapses in dialogue mode and the message window spans the band" states; it
 SHALL NOT be rendered anywhere else in that mode. The
-content column SHALL be laid out as fixed chrome — the combat root's tab bar in combat mode and no bar
+content column SHALL be laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar
 in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the
 bottom — around one remaining region that holds the current frame's rows or chips; that region SHALL
 be the surface's only scrolling area, so no dock content is ever pushed outside the command region.
@@ -2096,7 +2078,7 @@ as well as their gold or warm-red emphasis.
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
-- **THEN** the row region scrolls internally, the dock's chrome (the combat tab bar, the breadcrumb,
+- **THEN** the row region scrolls internally, the dock's chrome (the combat root list, the breadcrumb,
   and the legend strip) stays fixed, and no row or chip is rendered outside the command region
 
 #### Scenario: One dock element persists across a mode change
@@ -2113,9 +2095,9 @@ as well as their gold or warm-red emphasis.
 
 #### Scenario: The band's background matches the reference's shadowed gradient
 - **WHEN** the bottom band renders in any mode
-- **THEN** the band element's background gradient, top border, and box-shadow are the same values
-  `docs/design/elosern-redesign/index.html` draws for its dock surface, and the `#action-dock`
-  content column itself paints no background, border, or shadow
+- **THEN** the band element paints a background gradient and a box-shadow, its top edge is the
+  seam's fine gold line drawn by the band's own decoration, and the `#action-dock` content column
+  itself paints no background, border, or shadow
 
 ### Requirement: The place card names the current location and the world time
 The stage SHALL carry a place card in its `place` anchor, at the stage box's top-left corner below the
@@ -2816,3 +2798,40 @@ When an eligible dialogue choice list first opens through pointer interaction, i
 #### Scenario: A disabled first exit is skipped
 - **WHEN** the player opens `↦ 移動…` and the first exit is disabled while a later one is enabled
 - **THEN** the first enabled exit is active and nothing is dispatched
+
+### Requirement: Combat details follow the active command frame
+The combat command window SHALL show detail for the currently highlighted root command, category, group or skill, never a stale previously selected skill. Root detail MAY be client-local explanatory copy of what the command opens or does, never a gameplay value; category and group detail SHALL name that row's committed label and descriptor count. Command rows SHALL scroll inside a bounded region above the persistent legend. The Skills count SHALL remain the exact committed descriptor count rendered as neutral secondary text.
+
+#### Scenario: Category does not show an old attack
+- **WHEN** the player backs out of a skill and highlights a category
+- **THEN** the detail shows that category label/count and no stale attack target or cost
+
+#### Scenario: Last row stays reachable
+- **WHEN** the player navigates beyond the visible list
+- **THEN** the focused row scrolls into view above the unchanged hint strip
+
+### Requirement: Basic attack starts focused on an eligible opposing candidate
+Opening basic attack SINGLE targeting SHALL initially focus the first enabled opposing candidate already supplied by the server, without changing candidate order or legal explicit selection. If none exists it SHALL use the first enabled candidate, or the existing disabled explanatory focus when none is enabled.
+
+#### Scenario: An ally precedes a foe
+- **WHEN** the server lists an ally before an enabled foe for basic attack
+- **THEN** the foe initially has focus, the ally remains selectable if allowed, and no request is sent before confirmation
+
+#### Scenario: Opening Attack sends nothing
+- **WHEN** the player activates Attack once
+- **THEN** the target frame opens focused on the first enabled foe and no `combat.cast` is emitted until the player confirms a target
+
+#### Scenario: No eligible opposing candidate exists
+- **WHEN** all opposing candidates are disabled or absent
+- **THEN** focus falls back without constructing a candidate or dispatching
+
+### Requirement: Playback lock is visible without inventing progress
+While combat playback locks mutation controls, the command region SHALL communicate that it is waiting and expose the existing skip interaction clearly. A decorative activity line SHALL NOT imply a server completion percentage and SHALL be static at reduced/off.
+
+#### Scenario: The cue appears only while playback locks the commands
+- **WHEN** a combat round starts playing by itself at `full` motion, and later at `off`
+- **THEN** the command region shows the waiting cue with a skip control while the round plays, and at `off`, where nothing locks, no cue appears
+
+#### Scenario: Skip settles the lock
+- **WHEN** the player skips a locked playing round
+- **THEN** the cue clears with playback and the existing canonical command state becomes available

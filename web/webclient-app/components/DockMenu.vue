@@ -1,10 +1,10 @@
 <script setup>
 // DockMenu (H3 webclient-hud-03-action-dock, task 5.8): the pane host. One
 // row container carries the listbox role, the single tab stop,
-// `aria-activedescendant`, and `data-testid="dock-menu"` at depth ≥ 2 (the
-// tab bar carries the hook at depth 1, task 1.1). The pane renders its rows
-// by pane kind (task 5.1): `cards` / `skills` / `targets` / `scales` /
-// `confirm` / `plain`. The exploration root is not a DockMenu frame at all —
+// `aria-activedescendant`, and `data-testid="dock-menu"`. The pane renders
+// its rows by pane kind (task 5.1): `commands` (the combat root, category,
+// and group lists — webclient-combat-command-window) / `cards` / `skills` /
+// `targets` / `scales` / `confirm` / `plain`. The exploration root is not a DockMenu frame at all —
 // it is the scene overview component (webclient-scene-overview-swap), whose
 // exit chips replaced the retired move frame's exit outlet; a target's
 // affordances render in the verb popover component, not here
@@ -16,6 +16,7 @@
 // testid (task 5.8).
 import { computed, nextTick, watch } from "vue";
 import { classifyPane } from "./dock-panes.js";
+import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 import OptionCard from "./OptionCard.vue";
 
@@ -30,8 +31,7 @@ const props = defineProps({
   // When a dedicated `SkillDetailPane` owns the `combat-detail` testid, the
   // generic detail aside is suppressed so exactly one `combat-detail` exists.
   hideGenericDetail: { type: Boolean, default: false },
-  // The router's menu depth: the pane container carries `dock-menu` at
-  // depth ≥ 2 (the tab bar owns the hook at depth 1).
+  // The router's menu depth (kept for the hosts that pass it).
   depth: { type: Number, default: 1 },
 });
 
@@ -46,8 +46,15 @@ const rows = computed(() =>
     rowId: `${props.idPrefix}-${index}`,
     intent: actionIntentForItem(props.items[index]),
     reason: disabledReasonText(props.items[index]),
+    glyph: props.items[index].command ? glyphPath(key) : null,
   })),
 );
+
+// The detail's next-key hint: a row that submits "executes"; a row that
+// opens a frame, a drawer, or a confirmation "opens".
+function actionHint(item) {
+  return item.action_id && !String(item.action_id).startsWith("open-") ? "執行" : "開啟";
+}
 
 const focusedRow = computed(
   () => rows.value.find((row) => row.key === props.focusedKey) ?? null,
@@ -133,11 +140,51 @@ watch(
       tabindex="0"
       :aria-activedescendant="focusedRow ? focusedRow.rowId : null"
       :style="gridCols ? { 'grid-template-columns': 'repeat(' + gridCols + ', 1fr)' } : {}"
-      v-bind="depth >= 2 ? { 'data-testid': 'dock-menu' } : {}"
+      data-testid="dock-menu"
+      :data-pane-kind="paneKind"
     >
+      <!-- COMMANDS (webclient-combat-command-window): the combat root,
+           category, and group frames as one vertical list — a glyph slot,
+           the label, and a neutral inline count; the focused row carries the
+           muted-gold fill and the leading caret. -->
+      <div v-if="paneKind === 'commands'" class="dock-menu__commands">
+        <button
+          v-for="row in rows"
+          :id="row.rowId"
+          :key="row.key"
+          type="button"
+          role="option"
+          :aria-selected="row.key === focusedKey"
+          class="dock-menu__command"
+          :class="{
+            'dock-menu__command--on': row.key === focusedKey,
+            'dock-menu__command--disabled': row.item.enabled === false,
+          }"
+          :aria-disabled="row.item.enabled === false"
+          :data-item-key="row.key"
+          tabindex="-1"
+          @click="onCellClick(row)"
+        >
+          <svg
+            v-if="row.glyph"
+            class="dock-menu__command-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path :d="row.glyph" stroke="currentColor" stroke-width="1.8" v-bind="glyphAttrs(row.key)" />
+          </svg>
+          <span v-else class="dock-menu__command-mark" aria-hidden="true"></span>
+          <span class="dock-menu__command-label">{{ row.item.label }}</span>
+          <span v-if="row.item.count" class="dock-menu__command-count">{{ row.item.count }}</span>
+          <span v-if="row.item.enabled === false" class="dock-menu__command-unavailable" aria-hidden="true">無法使用</span>
+          <span v-if="row.item.enabled === false && row.reason" class="visually-hidden">{{ row.reason }}</span>
+        </button>
+      </div>
+
       <!-- CARDS: the suggestions frame (task 5.7): the `.sug` card in row
            mode (`role="option"` + row id) — a card is a listbox option. -->
-      <div v-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
+      <div v-else-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
         <template v-for="row in rows" :key="row.key">
           <OptionCard
             v-if="row.intent"
@@ -273,6 +320,7 @@ watch(
           :aria-disabled="row.item.enabled === false"
           data-testid="dock-item"
           :data-item-key="row.key"
+          :data-team="row.item.team || null"
           tabindex="-1"
           @click="onCellClick(row)"
         >
@@ -290,12 +338,26 @@ watch(
     <aside
       v-if="(props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage"
       class="dock-detail"
+      :class="{ 'dock-detail--command': paneKind === 'commands' }"
       :data-testid="props.detailTestId"
       tabindex="-1"
       aria-label="項目詳情"
     >
       <template v-if="props.detailMessage">
         <div class="dock-detail__disabled">{{ props.detailMessage }}</div>
+      </template>
+      <template v-else-if="paneKind === 'commands'">
+        <div class="dock-detail__label dock-detail__label--command">{{ focusedRow.item.label }}</div>
+        <div v-if="focusedRow.item.count" class="dock-detail__count">共 {{ focusedRow.item.count }} 項技能</div>
+        <div v-if="focusedRow.item.description" class="dock-detail__desc">
+          {{ focusedRow.item.description }}
+        </div>
+        <div v-if="focusedRow.item.enabled === false" class="dock-detail__disabled">
+          {{ focusedRow.reason || "（無法使用）" }}
+        </div>
+        <div v-else class="dock-detail__action">
+          <kbd>Enter</kbd> {{ actionHint(focusedRow.item) }}
+        </div>
       </template>
       <template v-else>
         <div class="dock-detail__label">{{ focusedRow.item.label }}</div>
@@ -341,6 +403,123 @@ watch(
 .dock-menu__card-nav[aria-selected="true"] {
   color: var(--gold-400);
   border-color: var(--gold-500);
+}
+
+/* COMMANDS (webclient-combat-command-window): the JRPG command window — a
+   single column of glyph + label rows set in the serif face, the focused row
+   in a muted-gold wash with a gold caret, a neutral tabular count. */
+.dock-menu__commands {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dock-menu__command {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 2px 12px 2px 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--paper-300);
+  font-family: var(--f-serif);
+  font-size: var(--text-base);
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.dock-menu__command:hover {
+  color: var(--paper-50);
+  background: rgba(255, 255, 255, 0.03);
+}
+.dock-menu__command--on {
+  color: var(--paper-50);
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.24), rgba(185, 154, 96, 0.05) 75%, transparent);
+  border-color: rgba(185, 154, 96, 0.42);
+}
+.dock-menu__command--on::before {
+  content: "▸";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold-400);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+}
+.dock-menu__command-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--gold-500);
+}
+.dock-menu__command--on .dock-menu__command-icon {
+  color: var(--gold-400);
+}
+/* Rows without a concept glyph (背包, a category, a group) keep the glyph
+   column with a small lozenge, so every label starts on one edge. */
+.dock-menu__command-mark {
+  justify-self: center;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--gold-600);
+  transform: rotate(45deg);
+}
+.dock-menu__command--on .dock-menu__command-mark {
+  border-color: var(--gold-400);
+  background: rgba(222, 189, 129, 0.35);
+}
+/* A command label never breaks: the trailing count or suffix yields first. */
+.dock-menu__command-label {
+  white-space: nowrap;
+}
+.dock-menu__command-count {
+  justify-self: end;
+  min-width: 2ch;
+  text-align: right;
+  font-family: var(--f-num);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  color: var(--paper-500);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.dock-menu__command--on .dock-menu__command-count {
+  color: var(--paper-300);
+}
+.dock-menu__command--disabled {
+  color: var(--paper-500);
+  cursor: default;
+}
+.dock-menu__command--disabled .dock-menu__command-icon {
+  opacity: 0.5;
+}
+.dock-menu__command--disabled.dock-menu__command--on {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--ink-600);
+  border-style: dashed;
+}
+.dock-menu__command--disabled.dock-menu__command--on::before {
+  color: var(--paper-500);
+}
+.dock-menu__command-unavailable {
+  grid-column: 3;
+  justify-self: end;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper-700);
+  font-family: var(--f-sans);
+  font-size: var(--text-xs);
+  letter-spacing: 0;
 }
 
 /* CARDS (task 5.7): the `.sug` card in row mode (OptionCard). */
@@ -583,5 +762,68 @@ watch(
 }
 .dock-detail__disabled {
   color: var(--seal-400);
+}
+
+/* The command window's detail (webclient-combat-command-window): the
+   highlighted command, category, or group — its name over a short gold
+   rule, the committed count, the local explanation, and the next key. */
+.dock-detail--command {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(24, 25, 29, 0.78), rgba(12, 13, 16, 0.55));
+  border: 1px solid rgba(185, 154, 96, 0.22);
+}
+.dock-detail__label--command {
+  position: relative;
+  margin: 0;
+  padding-bottom: 8px;
+  font-family: var(--f-serif);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--paper-50);
+}
+.dock-detail__label--command::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold-400), transparent);
+}
+.dock-detail__count {
+  font-family: var(--f-num);
+  font-size: var(--text-sm);
+  color: var(--gold-400);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.dock-detail--command .dock-detail__desc {
+  margin: 0;
+  font-family: var(--f-serif);
+  font-size: var(--text-md);
+  line-height: 1.7;
+  color: var(--paper-300);
+}
+.dock-detail--command .dock-detail__disabled {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--warn);
+}
+.dock-detail--command .dock-detail__action {
+  margin-top: auto;
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+}
+.dock-detail__action kbd {
+  font-family: var(--f-mono);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--paper-300);
 }
 </style>

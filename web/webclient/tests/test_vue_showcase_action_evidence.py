@@ -135,7 +135,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/SceneBackdrop",
                 "Core/FullLogOverlay", "Core/HudDrawer",
                 *ACTION_FAMILY_KEYS,
-                "Action/RestForm", "Action/DockTabBar", "Action/DockBreadcrumb",
+                "Action/RestForm", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",
                 "Data/StatusPanel",
                 "Data/VitalsTrack", "Data/SkillBook",

@@ -82,13 +82,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             for keyword in ("數字鍵 1–9", "Enter 執行", "Esc 返回"):
                 self.assertIn(keyword, description)
             # The exploration root is the scene overview: one frame of chips
-            # (exits, people, objects, and the footer) and NO tab bar. The
+            # (exits, people, objects, and the footer) and NO combat list. The
             # chip count varies with the room's exits and occupants, so only
             # the floor is pinned.
             self.assertEqual(
-                page.locator("#action-dock .dock-tab-bar").count(),
+                page.locator('#action-dock [data-pane-kind="commands"]').count(),
                 0,
-                "exploration renders the overview, never a tab bar",
+                "exploration renders the overview, never the combat command list",
             )
             self.assertEqual(
                 page.locator('[data-testid="scene-overview"]').count(),

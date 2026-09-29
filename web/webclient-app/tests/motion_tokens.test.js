@@ -44,6 +44,7 @@ const LEVEL_TOKENS = [
   "--motion-flash",
   "--motion-stagger",
   "--motion-marker-bob",
+  "--motion-playback-sweep",
   "--motion-travel",
   "--motion-flash-peak",
 ];

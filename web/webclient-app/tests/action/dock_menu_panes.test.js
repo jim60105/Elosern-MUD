@@ -206,4 +206,48 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     w.unmount();
     document.body.innerHTML = "";
   });
+
+  // webclient-combat-command-window: the combat root / category / group
+  // lists render as one vertical column — glyph, label, neutral count — and
+  // the detail names the highlighted row only.
+  const commandItems = [
+    { key: "attack", surface: "attack", label: "攻擊", enabled: true, command: true, navigation: true, description: "選擇一名目標，以普通攻擊出手。" },
+    { key: "skills", surface: "skills", label: "技能", enabled: true, command: true, navigation: true, count: 3, description: "從已習得的技能中選擇施展。" },
+    { key: "defend", surface: "defend", label: "防禦", enabled: false, command: true, navigation: true, disabled_reason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
+    { key: "flee", label: "逃跑", enabled: true, command: true, action_id: "combat.flee", params: {} },
+  ];
+
+  it("renders the command list with the reference glyphs and only the skills count", () => {
+    const w = mountMenu(commandItems);
+    expect(w.get('[data-testid="dock-menu"]').attributes("data-pane-kind")).toBe("commands");
+    assertRowsInOrder(w, commandItems, "combat-row");
+    // Per-key stroke attributes: attack/flee have a round cap, the star none.
+    const path = (key) => w.get(`[data-item-key="${key}"] .dock-menu__command-icon path`);
+    expect(path("attack").attributes("stroke-linecap")).toBe("round");
+    expect(path("flee").attributes("stroke-linecap")).toBe("round");
+    expect(path("skills").attributes("stroke-linecap")).toBeUndefined();
+    const counts = w.findAll(".dock-menu__command-count");
+    expect(counts).toHaveLength(1);
+    expect(counts[0].text()).toBe("3");
+    expect(counts[0].element.closest("[data-item-key]").getAttribute("data-item-key")).toBe("skills");
+    // A disabled command stays a row with its reason available.
+    const defend = w.get('[data-item-key="defend"]');
+    expect(defend.attributes("aria-disabled")).toBe("true");
+    expect(defend.text()).toContain("防禦功能尚未開放。");
+  });
+
+  it("details the highlighted command, its count, reason, and next key", async () => {
+    const w = mountMenu(commandItems);
+    await w.setProps({ focusedKey: "skills", detailTestId: "combat-detail" });
+    let detail = w.get('[data-testid="combat-detail"]');
+    expect(detail.text()).toContain("技能");
+    expect(detail.text()).toContain("共 3 項技能");
+    expect(detail.text()).toContain("開啟");
+    await w.setProps({ focusedKey: "defend" });
+    detail = w.get('[data-testid="combat-detail"]');
+    expect(detail.text()).toContain("防禦功能尚未開放。");
+    expect(detail.text()).not.toContain("Enter");
+    await w.setProps({ focusedKey: "flee" });
+    expect(w.get('[data-testid="combat-detail"]').text()).toContain("執行");
+  });
 });

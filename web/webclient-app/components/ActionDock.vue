@@ -8,15 +8,18 @@
 // `max-width:1180px` centering and the fixed-chrome / scrolling-body layout
 // (the draft's `.dock`). The preserved `#action-dock` element keeps its
 // `tabindex`, `data-mode`, and its role as the surface's documented focus
-// target. The row container carrying `data-testid="dock-menu"` is the combat
-// root's tab bar (depth 1, combat only) or the pane (every other frame).
+// target. The row container carrying `data-testid="dock-menu"` is always in
+// the pane: the combat root renders there as a vertical command list
+// (webclient-combat-command-window), and a deeper frame replaces it.
 //
-// The chrome (webclient-scene-overview-swap D3) is, top to bottom: the
-// optional guidance line, the combat root's tab bar (only while `tabBar`),
-// the breadcrumb, the scrolling body, and the shortcut-legend strip. The
-// legend lives here, not in the tab bar, so it renders in exploration,
-// dialogue, and combat mode alike; it is the single element carrying the
-// `action-dock-description` hook.
+// The chrome is, top to bottom: the optional guidance line, the breadcrumb,
+// the scrolling body, and the shortcut-legend strip. The legend is the
+// single element carrying the `action-dock-description` hook.
+//
+// While a combat round plays by itself and locks the commands (`playback`),
+// the body carries a waiting cue over its top edge: a label, the existing
+// skip (the same `store.skipBeats` a click on the message window runs), and a
+// decorative sweep that states no progress and stands still at reduced/off.
 //
 // The body is `position: relative`, so an `overlay` child positioned
 // `absolute; inset: 0` covers exactly the visible pane box — that is how a
@@ -29,33 +32,25 @@
 // `suggestions-section` element.
 import { computed } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
-import DockTabBar from "./DockTabBar.vue";
 
 const props = defineProps({
   // The contextual dock mode slice (exploration/combat/...), rendered as the
   // preserved `#action-dock` data-mode attribute.
   mode: { type: String, default: "exploration" },
-  // The root frame's items (the stable hierarchical root or the combat root),
-  // rendered as the tab bar's tabs (task 4.3).
+  // The root frame's items; the chrome renders only while a root exists.
   rootItems: { type: Array, default: () => [] },
-  // Whether the root frame renders as the icon tab bar (webclient-scene-
-  // overview-swap D3): only the combat root does. The exploration and
-  // dialogue root is the scene overview, which renders in the pane.
-  tabBar: { type: Boolean, default: false },
-  // The committed view slice: the tab bar's badges derive from the committed
-  // payload only (task 4.4), and the crumb reads `dockTrail`/`dockDepth`
+  // The committed view slice: the crumb reads `dockTrail`/`dockDepth`
   // (task 3.1/3.2).
   view: { type: Object, default: null },
-  // The focused key (the store's committed focus) — the open/focused tab
-  // carries the seal-red gradient fill.
-  focusedKey: { type: String, default: null },
   // The per-surface guidance prefix (legacy dock chrome), shown beside the
-  // crumb trail (the shortcut legend lives in the tab bar's trailing hint
-  // slot, task 4.7).
+  // crumb trail.
   guidancePrefix: { type: String, default: null },
+  // True while a combat round plays by itself and locks the commands
+  // (`store.view.dispatch.beatLocked`, webclient-combat-beat-queue D5).
+  playback: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["action", "tab-click", "back"]);
+const emit = defineEmits(["action", "back", "skip"]);
 
 // Creation mode renders the panel with no bar and no crumb (task 4.8):
 // exactly one `#action-dock` persists across every mode change.
@@ -71,13 +66,6 @@ const showCrumb = computed(
   () => showChrome.value && props.view?.dockSource !== "exploration.target",
 );
 
-
-function onTabClick(key) {
-  // Non-current tab click (task 4.5): the store pops to the root frame,
-  // focuses that item, and confirms it ("pointer") — one deliberate
-  // activation, no stray `ui_action` (task 8.7).
-  emit("tab-click", key);
-}
 
 function onBack() {
   // The crumb's back chevron pops exactly one router level (task 4.6/8.6).
@@ -108,14 +96,6 @@ function onPaneActivate(payload) {
     <div v-if="guidancePrefix" class="action-dock__guidance" data-testid="action-dock-guidance">
       {{ guidancePrefix }}
     </div>
-    <DockTabBar
-      v-if="tabBar && showChrome"
-      :items="rootItems"
-      :focused-key="focusedKey"
-      :view="view"
-      :depth="depth"
-      @tab-click="onTabClick"
-    />
     <DockBreadcrumb
       v-if="showCrumb"
       :trail="trail"
@@ -128,7 +108,25 @@ function onPaneActivate(payload) {
          target/skill/scale/confirm frame); the named `overlay` slot renders
          after it and covers exactly the pane's visible box (the verb
          popover). -->
-    <div class="action-dock__body">
+    <div class="action-dock__body" :class="{ 'action-dock__body--playback': playback }">
+      <!-- The waiting cue (webclient-combat-command-window): it veils the
+           body, so the rows never move when playback starts or ends. The button is a real control, so its own Enter / Space never
+           reach the dock's key routing. -->
+      <div v-if="playback" class="action-dock__playback" data-testid="action-dock-playback">
+        <!-- Only the words are the live region; the button stays outside it,
+             so the mount announces the wait, not the control's label. -->
+        <span class="action-dock__playback-label" role="status">回合演出中</span>
+        <span class="action-dock__playback-hint">點擊訊息視窗亦可跳過</span>
+        <button
+          type="button"
+          class="action-dock__playback-skip"
+          data-testid="action-dock-playback-skip"
+          @keydown.enter.stop
+          @keydown.space.stop
+          @click="emit('skip')"
+        >跳過演出</button>
+        <span class="action-dock__playback-line" aria-hidden="true"></span>
+      </div>
       <div class="action-dock__pane">
         <slot />
       </div>
@@ -185,10 +183,12 @@ function onPaneActivate(payload) {
   box-shadow: none;
 }
 
+/* Its right edge sits on the column's own edge: an outset there would count
+   as horizontal overflow of the dock (webclient-combat-command-window). */
 .action-dock::after {
   content: "";
   position: absolute;
-  inset: -4px -6px -4px -2px;
+  inset: -4px 0 -4px -2px;
   border-radius: var(--radius-sm);
   pointer-events: none;
   opacity: 0;
@@ -219,6 +219,83 @@ function onPaneActivate(payload) {
   position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* The waiting cue: a veil over the whole body while a round plays, so the
+   rows never move and the wait reads at once. The decorative sweep is a
+   gold hairline whose highlight travels on `--motion-playback-sweep`; at
+   reduced and off that token is 0ms, so the line stands still and never
+   implies progress. */
+.action-dock__playback {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 10px;
+  background: radial-gradient(70% 90% at 50% 50%, rgba(10, 11, 14, 0.9), rgba(10, 11, 14, 0.62));
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+}
+.action-dock__playback-label {
+  font-family: var(--f-serif);
+  font-size: var(--text-lg);
+  letter-spacing: 0.24em;
+  color: var(--gold-400);
+}
+.action-dock__playback-hint {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  justify-self: center;
+  font-size: var(--text-xs);
+  color: var(--paper-500);
+}
+.action-dock__playback-skip {
+  padding: 5px 14px;
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-600);
+  border-radius: 4px;
+  color: var(--gold-400);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.action-dock__playback-skip:hover {
+  color: var(--paper-50);
+  border-color: var(--gold-400);
+}
+.action-dock__playback-skip:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
+}
+.action-dock__playback-line {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: stretch;
+  height: 1px;
+  background:
+    linear-gradient(90deg, transparent, var(--gold-400), transparent) 0 0 / 35% 100% no-repeat,
+    linear-gradient(90deg, transparent, rgba(185, 154, 96, 0.45), transparent);
+  animation: action-dock-playback-sweep var(--motion-playback-sweep) linear infinite;
+}
+@keyframes action-dock-playback-sweep {
+  from {
+    background-position: -55% 0, 0 0;
+  }
+  to {
+    background-position: 155% 0, 0 0;
+  }
+}
+/* The locked rows stay readable but recede under the cue. */
+.action-dock__body--playback .action-dock__pane {
+  opacity: 0.5;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 
 /* The scrolling pane (task 4.1): bounded height with internal scroll. Its

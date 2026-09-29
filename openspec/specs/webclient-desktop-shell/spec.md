@@ -66,7 +66,7 @@ contextual-HUD place-card requirement states - never in the top bar, and never a
 place of location. The top bar SHALL be 48px tall. The action dock SHALL render as the approved command surface: a
 panel filling the bottom band's command region (the band's right third), whose exploration root
 renders as the scene overview (chip rows for exits, people, and objects, and a footer) and whose
-combat root renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold
+combat root renders as a vertical list of icon-and-label command rows with the focused entry marked by a muted-gold
 fill, and whose remaining region renders the current frame's rows or chips. The dock SHALL carry the
 shortcut legend the contextual-HUD legend requirement defines. The focused row or chip SHALL be marked
 by a muted-gold fill plus a leading glyph, unfocused rows bordered, and disabled rows dimmed
@@ -84,7 +84,7 @@ from one shared band-height token and never depends on the frame the dock carrie
 the narrative: the scene overview, a target's verb popover, the waiting frame, the combat frames, and an empty
 pane host all render inside the same command-region box, so the message window and the action dock never
 overlap and neither clips the other at a supported viewport. A frame whose rows exceed the region
-SHALL scroll inside the pane host while the dock's chrome (the combat tab bar, the breadcrumb, and
+SHALL scroll inside the pane host while the dock's chrome (the breadcrumb and
 the legend strip) stays fixed around it. In dialogue
 mode the message window SHALL span the whole band at the band's fixed height and carry the host's name
 plate and the paged line, reachable at 1280x720 by paging inside the window, never by growing it; the
@@ -138,7 +138,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a tab bar with the open tab in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
+- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
 
 #### Scenario: A tall frame grows the band without touching the narrative
 - **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1440x900 or 1280x720
@@ -146,7 +146,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 
 #### Scenario: Pane content scrolls inside the band
 - **WHEN** the active frame's rows exceed the command region's height
-- **THEN** the rows scroll within the pane host, the dock's chrome (the combat tab bar, the breadcrumb, and the legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
+- **THEN** the rows scroll within the pane host, the dock's chrome (the breadcrumb and the legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1280x720
@@ -235,8 +235,8 @@ the bare keys `exit-<exit_ref>` for exits, `target-<identity>` for interact targ
 `wait`, and — whenever the committed `suggestions` envelope is not `unavailable` — `suggestions` for
 the footer, in the overview's reading order and navigated by its row-of-chips geometry; it SHALL
 carry no `character`, `quests`, or `inventory` entry - the top navigation bar carries them as the sole
-keyboard-visible stop. The combat root SHALL declare a column count equal to its item count, so its
-horizontal arrow geometry matches its rendered tab order. This root replaces the legacy B2 flat `context_actions` affordance list,
+keyboard-visible stop. The combat root SHALL declare a single column, so its
+vertical arrow geometry matches its rendered list order and the horizontal arrow keys are no-ops. This root replaces the legacy B2 flat `context_actions` affordance list,
 whose items were keyed `action-<action_id>` / `action-<surface>` (e.g. `action-guild`). The
 B2 key-derivation contract is preserved only as the isolated Node gate
 (`web/webclient-app/tests/action/dock_items.test.js`), not as the live exploration focus frame.

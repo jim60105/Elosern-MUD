@@ -79,6 +79,70 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "while the participant frame is mounted, no separate portrait strip renders",
         )
 
+    @covers_requirement("webclient-contextual-hud::combat-details-follow-the-active-command-frame")
+    @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    def test_command_window_scrolls_its_rows_and_details_the_current_frame(self):
+        """At 1280x720 the vertical combat list walks with Up/Down, keeps its
+        last row reachable above the legend, and details only the current
+        frame's highlighted row (webclient-combat-command-window)."""
+        page = self.logged_in_page((1280, 720))
+        install_outbound_recorder(page)
+        _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
+        _wait_mode(page, "combat")
+        focus_action_dock(page)
+
+        def focus_key():
+            return store_state(page)["focus"]["key"]
+
+        # Horizontal keys are no-ops on the vertical root.
+        _press(page, "ArrowRight")
+        self.assertEqual(focus_key(), "attack")
+        self.assertIn("選擇一名目標", page.locator('[data-testid="combat-detail"]').inner_text())
+
+        # Walk to the last row: it is scrolled into view inside the list,
+        # above the unchanged legend strip, and the page itself never scrolls.
+        legend_before = page.locator('[data-testid="action-dock-description"]').bounding_box()
+        for _ in range(6):
+            _press(page, "ArrowDown")
+        self.assertEqual(focus_key(), "forfeit")
+        geometry = page.evaluate(
+            """() => {
+              const list = document.querySelector('#action-dock [data-testid="dock-menu"]');
+              const row = list.querySelector('[data-item-key="forfeit"]').getBoundingClientRect();
+              const box = list.getBoundingClientRect();
+              const legend = document.querySelector('[data-testid="action-dock-description"]').getBoundingClientRect();
+              return { rowTop: row.top, rowBottom: row.bottom, listTop: box.top, listBottom: box.bottom,
+                       legendTop: legend.top, page: document.scrollingElement.scrollTop };
+            }"""
+        )
+        self.assertGreaterEqual(geometry["rowTop"], geometry["listTop"] - 1, geometry)
+        self.assertLessEqual(geometry["rowBottom"], geometry["listBottom"] + 1, geometry)
+        self.assertLessEqual(geometry["rowBottom"], geometry["legendTop"], geometry)
+        self.assertEqual(geometry["page"], 0)
+        legend_after = page.locator('[data-testid="action-dock-description"]').bounding_box()
+        self.assertEqual(round(legend_after["y"]), round(legend_before["y"]), "the legend never moves")
+        # Down from the last row wraps to the first.
+        _press(page, "ArrowDown")
+        self.assertEqual(focus_key(), "attack")
+
+        # Open 強化術's skill frame (one sub-group), then back out: the
+        # category list details the category, never the skill left behind.
+        _press(page, "ArrowDown")
+        _press(page, "Enter")
+        _press(page, "ArrowDown")
+        _press(page, "Enter")
+        self.assertIn("護盾術", page.locator('[data-testid="combat-detail"]').inner_text())
+        _press(page, "Escape")
+        self.assertEqual(focus_key(), "skill-cat-1")
+        detail = page.locator('[data-testid="combat-detail"]')
+        self.assertEqual(detail.count(), 1)
+        detail_text = detail.inner_text()
+        self.assertIn("強化術", detail_text)
+        self.assertIn("共 1 項技能", detail_text)
+        self.assertNotIn("護盾術", detail_text)
+        self.assertNotIn("MP", detail_text)
+        self.assertEqual(sent_action_count(page), 0, "navigation submits nothing")
+
     @covers_requirement(
         "webclient-contextual-hud::combat-skills-are-chosen-through-a-bounded-master-detail"
     )
@@ -90,8 +154,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _wait_mode(page, "combat")
         focus_action_dock(page)
 
-        # Open the Skills tab (second root item) -> the category frame.
-        _press(page, "ArrowRight")
+        # Open the Skills row (second root item) -> the category frame.
+        _press(page, "ArrowDown")
         _press(page, "Enter")
         page.wait_for_timeout(150)
         self.assertEqual(_dock_depth(page), 2, "the skills tab opens the category frame")
@@ -105,7 +169,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         # Navigate to the single-group category (強化術) and open it: the skill
         # frame opens directly (no pointless single-choice group level).
-        _press(page, "ArrowRight")
+        _press(page, "ArrowDown")
         _press(page, "Enter")
         page.wait_for_timeout(150)
         self.assertEqual(_dock_depth(page), 3, "the single-group category opens the skill frame directly")
@@ -131,10 +195,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _wait_mode(page, "combat")
         focus_action_dock(page)
 
-        # The combat root is a single-row tab bar; Forfeit is the last tab.
-        tab_count = page.evaluate("document.querySelectorAll('#action-dock [data-item-key]').length")
-        for _ in range(tab_count - 1):
-            _press(page, "ArrowRight")
+        # The combat root is one vertical list; Forfeit is the last row.
+        row_count = page.evaluate("document.querySelectorAll('#action-dock [data-item-key]').length")
+        for _ in range(row_count - 1):
+            _press(page, "ArrowDown")
         _press(page, "Enter")  # open the Forfeit confirmation frame
         page.wait_for_timeout(150)
 

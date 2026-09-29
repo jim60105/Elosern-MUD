@@ -1,4 +1,4 @@
-"""Contextual HUD action-dock acceptance (webclient-contextual-hud): the dock in the band's command region, tab-bar count badges, the router breadcrumb, digit-row activation, and per-kind pane vocabulary.
+"""Contextual HUD action-dock acceptance (webclient-contextual-hud): the dock in the band's command region, the combat root's vertical command list and its count, the router breadcrumb, digit-row activation, and per-kind pane vocabulary.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             regionBottom: r.bottom, regionWidth: r.width,
             dockLeft: d.left, dockRight: d.right, dockTop: d.top, dockBottom: d.bottom,
             bandBackgroundImage: bandStyle.backgroundImage,
-            bandBorderTopWidth: bandStyle.borderTopWidth,
+            bandEdgeImage: getComputedStyle(band, '::after').backgroundImage,
             bandBoxShadow: bandStyle.boxShadow,
             dockBackgroundImage: dockStyle.backgroundImage,
             dockBorderTopWidth: dockStyle.borderTopWidth,
@@ -134,7 +134,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertLessEqual(geometry["dockBottom"], geometry["regionBottom"] + 0.5)
             # The band paints the draft's chrome; the content column paints nothing.
             self.assertIn("gradient", geometry["bandBackgroundImage"])
-            self.assertTrue(geometry["bandBorderTopWidth"].startswith("1px"))
+            # The top edge is the seam's fine gold line (webclient-band-
+            # material-pass), drawn by the band's decorative `::after`.
+            self.assertIn("gradient", geometry["bandEdgeImage"])
             self.assertNotEqual(geometry["bandBoxShadow"], "none")
             self.assertEqual(geometry["dockBackgroundImage"], "none")
             self.assertEqual(geometry["dockBorderTopWidth"], "0px")
@@ -201,12 +203,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-combat-dock-s-root-frame-renders-as-an-icon-tab-bar-with-a-truthful-skills-badge"
+        "webclient-contextual-hud::the-combat-dock-root-renders-as-a-vertical-command-window-with-a-truthful-skills-count"
     )
-    def test_combat_dock_root_tab_bar_truthful_skills_badge(self):
-        """The COMBAT root renders as an icon tab bar with a truthful 技能
-        badge; exploration renders the scene overview and no tab bar at all
-        (webclient-scene-overview-swap)."""
+    def test_combat_dock_root_vertical_list_truthful_skills_count(self):
+        """The COMBAT root renders as one vertical icon-and-label list with a
+        neutral, truthful 技能 count (webclient-combat-command-window);
+        exploration renders the scene overview and no combat list at all."""
         page = self.logged_in_page()
         # The combat panel's 技能 badge equals the committed skill-descriptor
         # count (the fixture's flattened categories/groups).
@@ -227,42 +229,57 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "combat")
 
-        # The combat root tab bar (depth 1) carries the listbox composite +
-        # the dock-menu testid, a single tab stop, and the active-descendant.
-        tab_bar = page.locator('[data-testid="dock-menu"]')
-        self.assertEqual(tab_bar.count(), 1, "the combat root tab bar carries the dock-menu hook at depth 1")
-        self.assertEqual(tab_bar.get_attribute("role"), "listbox")
-        self.assertEqual(tab_bar.get_attribute("tabindex"), "0")
-        self.assertIsNotNone(tab_bar.get_attribute("aria-activedescendant"))
-        tabs = page.locator("#action-dock .dock-tab-bar [data-item-key]")
-        self.assertGreaterEqual(tabs.count(), 5, "the combat root renders one tab per root item")
-
-        # The 技能 tab carries the exact committed count; no other combat tab
-        # carries a badge.
-        skills_badge = page.locator("#dock-tab-skills .dock-tab-bar__badge")
-        self.assertEqual(skills_badge.count(), 1, "the 技能 tab carries a badge")
+        # The combat root list (depth 1) is the pane's one row container: the
+        # listbox composite, a single tab stop, and the active-descendant.
+        menu = page.locator('[data-testid="dock-menu"]')
+        self.assertEqual(menu.count(), 1, "the combat root list carries the dock-menu hook at depth 1")
+        self.assertEqual(menu.get_attribute("role"), "listbox")
+        self.assertEqual(menu.get_attribute("tabindex"), "0")
+        self.assertEqual(menu.get_attribute("data-pane-kind"), "commands")
+        self.assertIsNotNone(menu.get_attribute("aria-activedescendant"))
+        rows = menu.locator("[data-item-key]")
+        keys = [rows.nth(i).get_attribute("data-item-key") for i in range(rows.count())]
         self.assertEqual(
-            skills_badge.inner_text(),
+            keys,
+            ["attack", "skills", "items", "bag", "defend", "flee", "forfeit"],
+            "the root list renders the resolver's items in order",
+        )
+        # One column: every row shares the list's left edge and stacks below
+        # the previous one.
+        boxes = [rows.nth(i).bounding_box() for i in range(rows.count())]
+        self.assertEqual(len({round(box["x"]) for box in boxes}), 1, "the root rows share one column")
+        self.assertTrue(
+            all(boxes[i + 1]["y"] > boxes[i]["y"] for i in range(len(boxes) - 1)),
+            "the root rows stack vertically in rendered order",
+        )
+
+        # The 技能 row carries the exact committed count as neutral inline
+        # text; no other root row carries a count.
+        counts = menu.locator(".dock-menu__command-count")
+        self.assertEqual(counts.count(), 1, "exactly one root row carries a count")
+        self.assertEqual(
+            counts.first.evaluate("el => el.closest('[data-item-key]').dataset.itemKey"), "skills"
+        )
+        self.assertEqual(
+            counts.first.inner_text(),
             str(skill_count),
-            "the 技能 badge equals the committed skill-descriptor count",
+            "the 技能 count equals the committed skill-descriptor count",
         )
-        for key in ("attack", "items", "defend", "flee", "forfeit", "bag"):
-            self.assertEqual(
-                page.locator("#dock-tab-%s .dock-tab-bar__badge" % key).count(),
-                0,
-                "no combat tab other than 技能 carries a badge (%s)" % key,
-            )
-
-        # Each tab carries a leading glyph + its server-authored label.
-        focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
+        # Neutral: no filled alert bubble behind the count.
         self.assertEqual(
-            focused.locator("svg.dock-tab-bar__icon").count(),
-            1,
-            "each tab carries a decorative glyph",
+            counts.first.evaluate("el => getComputedStyle(el).backgroundColor"),
+            "rgba(0, 0, 0, 0)",
         )
 
-        # Exploration renders no root tab bar: the scene overview owns the
-        # dock's rows instead.
+        # Each concept row carries a leading glyph.
+        self.assertEqual(
+            menu.locator('[data-item-key="attack"] svg.dock-menu__command-icon').count(),
+            1,
+            "a root row carries a decorative glyph",
+        )
+
+        # Exploration renders no combat root list: the scene overview owns
+        # the dock's rows instead.
         exploration = _exploration_panel([_interact_target(11, "小販")])
         _inject_snapshot(
             page,
@@ -275,9 +292,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
         self.assertEqual(
-            page.locator("#action-dock .dock-tab-bar").count(),
+            page.locator('#action-dock [data-pane-kind="commands"]').count(),
             0,
-            "exploration renders no root tab bar",
+            "exploration renders no combat root list",
         )
         self.assertEqual(
             page.locator('[data-testid="scene-overview"]').count(),

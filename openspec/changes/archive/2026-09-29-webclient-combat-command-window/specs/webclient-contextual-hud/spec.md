@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Combat details follow the active command frame
-The combat command window SHALL show detail for the currently highlighted root command, category, group or skill, never a stale previously selected skill. Command rows SHALL scroll inside a bounded region above the persistent legend. The Skills count SHALL remain the exact committed descriptor count rendered as neutral secondary text.
+The combat command window SHALL show detail for the currently highlighted root command, category, group or skill, never a stale previously selected skill. Root detail MAY be client-local explanatory copy of what the command opens or does, never a gameplay value; category and group detail SHALL name that row's committed label and descriptor count. Command rows SHALL scroll inside a bounded region above the persistent legend. The Skills count SHALL remain the exact committed descriptor count rendered as neutral secondary text.
 
 #### Scenario: Category does not show an old attack
 - **WHEN** the player backs out of a skill and highlights a category
@@ -18,12 +18,20 @@ Opening basic attack SINGLE targeting SHALL initially focus the first enabled op
 - **WHEN** the server lists an ally before an enabled foe for basic attack
 - **THEN** the foe initially has focus, the ally remains selectable if allowed, and no request is sent before confirmation
 
+#### Scenario: Opening Attack sends nothing
+- **WHEN** the player activates Attack once
+- **THEN** the target frame opens focused on the first enabled foe and no `combat.cast` is emitted until the player confirms a target
+
 #### Scenario: No eligible opposing candidate exists
 - **WHEN** all opposing candidates are disabled or absent
 - **THEN** focus falls back without constructing a candidate or dispatching
 
 ### Requirement: Playback lock is visible without inventing progress
 While combat playback locks mutation controls, the command region SHALL communicate that it is waiting and expose the existing skip interaction clearly. A decorative activity line SHALL NOT imply a server completion percentage and SHALL be static at reduced/off.
+
+#### Scenario: The cue appears only while playback locks the commands
+- **WHEN** a combat round starts playing by itself at `full` motion, and later at `off`
+- **THEN** the command region shows the waiting cue with a skip control while the round plays, and at `off`, where nothing locks, no cue appears
 
 #### Scenario: Skip settles the lock
 - **WHEN** the player skips a locked playing round
@@ -121,9 +129,9 @@ as well as their gold or warm-red emphasis.
 
 #### Scenario: The band's background matches the reference's shadowed gradient
 - **WHEN** the bottom band renders in any mode
-- **THEN** the band element's background gradient, top border, and box-shadow are the same values
-  `docs/design/elosern-redesign/index.html` draws for its dock surface, and the `#action-dock`
-  content column itself paints no background, border, or shadow
+- **THEN** the band element paints a background gradient and a box-shadow, its top edge is the
+  seam's fine gold line drawn by the band's own decoration, and the `#action-dock` content column
+  itself paints no background, border, or shadow
 
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance

@@ -22,7 +22,6 @@
     "Action/OptionCard",
     "Action/RestForm",
     "Action/ChoiceCardRow",
-    "Action/DockTabBar",
     "Action/DockBreadcrumb",
     "Action/SceneOverview",
     "Action/DockVerbPopover",

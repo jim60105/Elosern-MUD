@@ -151,9 +151,9 @@ The combat presenter, Telnet action listing, and combat adapters SHALL consume t
 - **THEN** current domain validation rejects or filters it according to target rules without trusting the earlier descriptor
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
-In combat mode the action root SHALL present Attack, Skills, Items, Defend, and Flee in that stable order, with confirmed Forfeit under a secondary menu. Attack SHALL select targets for innate `basic_attack`; Skills SHALL open the committed skill categories as a bounded master-detail rather than one flat list; Items and Defend SHALL remain focusable but disabled with code `not_implemented`; Flee SHALL invoke the innate flee path; and Forfeit SHALL require an explicit confirmation screen. Arrow keys SHALL navigate, Enter SHALL open or submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
+In combat mode the action root SHALL preserve the root inventory of the client combat-menu resolver (the root list of `web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items, the client-local Bag drawer opener, Defend, Flee, and the confirmed Forfeit entry) and their existing availability/order. Forfeit SHALL retain its explicit confirmation route, and no new root action SHALL be introduced. Attack SHALL select targets for innate `basic_attack`; Skills SHALL open the committed skill categories as a bounded master-detail rather than one flat list; Items and Defend SHALL remain focusable but disabled with code `not_implemented`; Flee SHALL invoke the innate flee path; and Forfeit SHALL require an explicit confirmation screen. Arrow keys SHALL navigate, Enter SHALL open or submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
 
-The root SHALL render as a single row of icon-and-label tabs and SHALL declare a column count equal to its item count — including the recovery state, whose root is the confirmed Forfeit path alone — so the horizontal arrow keys traverse the tabs in their rendered order and the vertical arrow keys are a no-op on the root. The Skills tab SHALL carry a count badge equal to the flattened count of skill descriptors the committed panel actually lists.
+The root SHALL render a single vertical icon-and-label list with one column, including the recovery root. Whenever the list holds more than one row, Up/Down SHALL traverse and wrap in rendered order; Left/Right SHALL be no-ops at root. The Skills row SHALL carry a neutral inline count equal to the committed descriptor count and omit it at zero. Deeper frames SHALL replace the root list and retain one active row container. The category and group frames SHALL render as the same single-column vertical list, each row carrying its own descriptor count, so Up/Down move between categories or groups and Left/Right are no-ops there. The single-target, self, and no-target confirmation frames SHALL render as the same single-column list in the server's candidate order, each target row marked by its side as well as its name; the AREA frame keeps its token grid. The detail beside a root row MAY carry client-local explanatory copy describing what the command opens or does; it SHALL NOT state a gameplay value, and every count it shows SHALL be derived from the committed descriptors.
 
 The skill master-detail SHALL be: a category frame listing one entry per committed category group with its label and its own descriptor count; then, only when that category carries more than one sub-group, a group frame listing its sub-groups; then the skill frame listing that group's descriptors, each row carrying the skill's label and resource cost, beside the detail pane that names the focused skill, its description, its cost, its target requirement, and its server-authored reason when it is unavailable. A category carrying exactly one sub-group SHALL open the skill frame directly, so no level ever offers a single choice. Every level SHALL preserve the committed panel's order exactly and SHALL NOT reorder, filter, merge, or paginate it, and SHALL NOT render a badge or field the descriptor does not carry — in particular no out-of-combat marker, which no presenter serializes. The focused row SHALL be scrolled into view within the dock's bounded row region on every frame render and focus change. Escape SHALL pop exactly one of these levels at a time, and the subsequent scale and target steps SHALL be unchanged in behaviour and in payload.
 
@@ -170,7 +170,7 @@ The Forfeit confirmation SHALL render as an explicit warning panel stating what 
 - **THEN** its `not_implemented` explanation remains readable and no `ui_action` message is emitted
 
 #### Scenario: Forfeit requires confirmation
-- **WHEN** the player opens the secondary Forfeit entry but has not confirmed
+- **WHEN** the player opens the Forfeit entry but has not confirmed
 - **THEN** no mutation is sent, and Escape returns exactly one menu level without ending combat
 
 #### Scenario: Skills opens a bounded master-detail
@@ -190,8 +190,16 @@ The Forfeit confirmation SHALL render as an explicit warning panel stating what 
 - **THEN** the emitted `combat.cast` payload is byte-identical to the payload the same skill, scale, and target produce without the master-detail
 
 #### Scenario: The root tab geometry matches its rendered order
-- **WHEN** the player presses the horizontal arrow keys on the combat root
-- **THEN** focus moves through Attack, Skills, Items, Defend, Flee, and Forfeit in their rendered order, and the vertical arrow keys move focus nowhere
+- **WHEN** the player presses the arrow keys on the combat root
+- **THEN** focus moves through the current resolver's root items in their rendered order with the vertical arrow keys, and the horizontal arrow keys move focus nowhere
+
+#### Scenario: A single-target frame is a vertical list
+- **WHEN** the player opens Attack with an ally and two foes listed as candidates
+- **THEN** the target rows render in one column in the server's order, each marked as ally or foe, ArrowDown moves to the next candidate, and ArrowRight moves focus nowhere
+
+#### Scenario: Categories and groups are vertical lists
+- **WHEN** the player opens Skills with several categories, and later a category with several sub-groups
+- **THEN** each frame renders one row per entry in a single column, ArrowDown moves to the next entry and wraps at the end, and ArrowRight moves focus nowhere
 
 #### Scenario: The participant frame renders the committed session
 - **WHEN** a combat session commits participants on both teams, one of them fled or knocked out

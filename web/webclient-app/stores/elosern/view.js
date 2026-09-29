@@ -21,7 +21,25 @@ import {
 // D3): while one of them is in flight the player is the speaker.
 const DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_scripted", "explore.talk_freeform"]);
 
+// The combat frames that name one opened skill in their descriptor.
+const SKILL_FRAME_SOURCES = new Set(["combat.skill", "combat.target"]);
+
 export function applyView(ctx) {
+  // The skill the current combat frame is about: the opened skill on its
+  // scale / target frames, the focused row on a skill list, else null.
+  function currentFrameSkill(combat, currentItem) {
+    if (ctx.router.depth() === 0) {
+      return null;
+    }
+    const descriptor = ctx.router.currentDescriptor();
+    if (descriptor && SKILL_FRAME_SOURCES.has(descriptor.source)) {
+      const key = descriptor.params && descriptor.params.skillKey;
+      return typeof key === "string" && Object.hasOwn(combat.skillByKey, key) ? combat.skillByKey[key] : null;
+    }
+    const key = currentItem && currentItem.key;
+    return typeof key === "string" && Object.hasOwn(combat.skillByKey, key) ? combat.skillByKey[key] : null;
+  }
+
   ctx.buildView = function buildView(prev, rs) {
     const panels = rs.panels || {};
     const panel = panels.context_actions || null;
@@ -262,10 +280,12 @@ export function applyView(ctx) {
       // H3 (task 6.5): the focused skill model for the master-detail pane —
       // the `SkillDetailPane` renders this committed model, never inventing
       // a `戰鬥外` badge (design D14).
-      focusedSkill:
-        combatNow && combatNow.focusSkillKey && combatNow.skillByKey[combatNow.focusSkillKey]
-          ? combatNow.skillByKey[combatNow.focusSkillKey]
-          : null,
+      // It follows the CURRENT frame (webclient-combat-command-window): the
+      // opened skill on its scale and target frames, the focused row on a
+      // skill list, and nothing on the root, category, and group lists — the
+      // sticky `focusSkillKey` the mutation paths read never leaks a stale
+      // skill into those frames.
+      focusedSkill: combatNow ? currentFrameSkill(combatNow, currentItem) : null,
 
       // The character-creation dock stage (the legacy creation dock port): the
       // keyboard-router menu the overlay mirrors. Null outside creation mode.

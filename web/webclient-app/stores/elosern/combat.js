@@ -20,6 +20,14 @@ export function applyCombat(ctx) {
       if (menu.items.length > 0 && menu.items[0].scaleChoice) {
         // The freeform scale step preselects 威力×1 (the default behavior).
         ctx.router.focusItemByKey("scale-1");
+      } else {
+        // Basic attack opens on the first enabled foe the server listed
+        // (webclient-combat-command-window): focus only, never a selection
+        // beyond the ordinary focus record, never a submission.
+        const initial = CombatMenu.initialTargetKey(combat, skillKey);
+        if (initial) {
+          ctx.router.focusItemByKey(initial);
+        }
       }
     }
     ctx.publishView();

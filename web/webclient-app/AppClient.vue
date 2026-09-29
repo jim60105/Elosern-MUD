@@ -411,14 +411,13 @@ function onFoeLineupGone() {
           v-if="rootItems.length > 0 || !!store.view.degradedRoot || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'exploration'"
           :root-items="rootItems"
-          :tab-bar="contextActionsPanel?.kind === 'combat'"
-          :focused-key="store.view.focus.key"
           :view="store.view"
-            @action="onAction"
-          @tab-click="onTabClick"
+          :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
+          @action="onAction"
           @back="onDockBack"
+          @skip="store.skipBeats"
         >
-          <div class="dock-pane-host">
+          <div class="dock-pane-host" :class="{ 'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' }">
             <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
               <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
                 <h3>等待直到黎明</h3>
