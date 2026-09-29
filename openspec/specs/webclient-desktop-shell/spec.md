@@ -136,7 +136,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 - **WHEN** the `local_map` panel is absent, unavailable, or names a current node that its own nodes do not carry or that carries an empty label
 - **THEN** the place card's location states the committed status panel's actor location label, and states the card's unavailable placeholder only when neither panel supplies a label
 
-#### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
+#### Scenario: The action dock fills the command region with its mode's root and one legend
 - **WHEN** the action dock is mounted in any mode
 - **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
 

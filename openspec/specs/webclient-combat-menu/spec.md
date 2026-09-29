@@ -189,7 +189,7 @@ The Forfeit confirmation SHALL render as an explicit warning panel stating what 
 - **WHEN** the player reaches a target through the category and group frames and confirms a cast
 - **THEN** the emitted `combat.cast` payload is byte-identical to the payload the same skill, scale, and target produce without the master-detail
 
-#### Scenario: The root tab geometry matches its rendered order
+#### Scenario: The root list geometry matches its rendered order
 - **WHEN** the player presses the arrow keys on the combat root
 - **THEN** focus moves through the current resolver's root items in their rendered order with the vertical arrow keys, and the horizontal arrow keys move focus nowhere
 

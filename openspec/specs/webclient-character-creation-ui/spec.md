@@ -402,10 +402,10 @@ suite stays stable under a loaded CI runner.
 - **WHEN** the browser is in creation mode with the `creation` panel available
 - **THEN** exactly one `#action-dock` element is rendered with `data-mode="creation"` (the creation dock is its sole owner), and after activation hands off to exploration no creation-mode dock remains: the shared dock re-renders as `data-mode="exploration"` when `context_actions` is available, so the shared DOM node may persist rather than being fully removed
 
-#### Scenario: The floating dock panel is the persistent node across a mode change
+#### Scenario: The dock panel is the persistent node across a mode change
 - **WHEN** the browser hands off from creation mode to exploration mode after activation
 - **THEN** the same single `#action-dock` panel element persists with its `data-mode` switched from `creation` to `exploration`, and it is not removed and re-created
 
-#### Scenario: Creation mode renders no tab bar and no breadcrumb
+#### Scenario: Creation mode renders no root command list and no breadcrumb
 - **WHEN** the dock is rendered in creation mode
-- **THEN** it renders the creation surface with no root tabs, no count badge, and no breadcrumb line, and the creation form keeps its own key capture exactly as before
+- **THEN** it renders the creation surface with no root command list, no count, and no breadcrumb line, and the creation form keeps its own key capture exactly as before

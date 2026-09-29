@@ -4,7 +4,7 @@
 The full-bleed cinematic stage with its anchored HUD surfaces (scene backdrop, message window,
 HUD islands, action dock, command line), the committed-mode visibility matrix, the truthful scene
 backdrop, the paged message window, drawer/overlay stage recessing, and the action-dock
-re-chrome contract: the fixed bottom band's command region, the root tab bar with truthful count badges,
+re-chrome contract: the fixed bottom band's command region, the combat root's vertical command list with its truthful skills count,
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
 
@@ -811,27 +811,27 @@ existing per-node movement submission SHALL be unchanged.
 ### Requirement: The combat dock root renders as a vertical command window with a truthful skills count
 In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. It SHALL preserve the existing resolver item order, identities, availability and confirmation routes. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. Up/Down SHALL traverse and wrap in rendered order; Left/Right SHALL be no-ops at root. At deeper levels the root list SHALL be replaced by the current frame, with the existing breadcrumb/back path and only one active row container. No other mode SHALL render this combat root. Glyphs SHALL retain the existing concept mapping.
 
-#### Scenario: The combat root renders as tabs and owns the listbox
+#### Scenario: The combat root renders as a vertical list and owns the listbox
 - **WHEN** the dock is at the combat root frame
 - **THEN** each root item renders as a vertical list row with a glyph and its label, the list carries the listbox role with a single tab stop and an active-descendant reference, and each row carries its preserved row identity attribute
 
-#### Scenario: A combat tab glyph matches the reference design's icon for the same concept
+#### Scenario: A combat root glyph matches the reference design's icon for the same concept
 - **WHEN** the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 rows
 - **THEN** each row's glyph is the same pictogram `docs/design/elosern-redesign/index.html` draws for that concept's tab
 
-#### Scenario: The skills badge equals the committed skill count
+#### Scenario: The skills count equals the committed skill count
 - **WHEN** the committed combat panel lists three skill descriptors across its categories, and later a panel with none
 - **THEN** the 技能 row shows the neutral inline count `3`, then no count at all, and no other combat row shows a count or alert badge
 
-#### Scenario: Combat tab focus geometry matches the rendered order
+#### Scenario: Combat root focus geometry matches the rendered order
 - **WHEN** the player presses the arrow keys on the combat root frame
 - **THEN** focus moves through the rows in their rendered order with the vertical arrow keys and wraps at the ends, and the horizontal arrow keys move focus nowhere
 
-#### Scenario: An open deeper combat frame leaves the tab bar inert
+#### Scenario: An open deeper combat frame replaces the root list
 - **WHEN** a deeper combat frame is open
 - **THEN** the root list is replaced by the current frame, the deeper frame's row container is the surface's only listbox and only tab stop, and no root row is reachable by sequential keyboard navigation
 
-#### Scenario: Exploration renders no root tab bar
+#### Scenario: Exploration renders no combat root list
 - **WHEN** the dock renders in exploration or dialogue mode at any depth
 - **THEN** no combat root list is rendered, and no 移動, 查看, 互動, or 建議 root row exists anywhere in the dock
 

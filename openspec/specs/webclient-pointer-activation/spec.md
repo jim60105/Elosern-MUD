@@ -19,7 +19,7 @@ The combat dock SHALL render its root frame as a vertical command list in the ro
 - **WHEN** the player presses Escape from a submenu in any dock
 - **THEN** exactly one level closes and the rendered rows return to the parent frame with the previously focused row marked
 
-#### Scenario: The root frame's tab bar is the root frame's rows
+#### Scenario: The combat root list is the root frame's rows
 - **WHEN** the combat dock is at its root frame
 - **THEN** the list rows are exactly the root frame's items in the router's order with their row identities, and opening one pushes that item's frame through the ordinary confirmation path, which replaces the list with the pushed frame's rows
 
