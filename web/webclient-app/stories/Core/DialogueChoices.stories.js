@@ -75,7 +75,9 @@ export default {
         component:
           "The dialogue choice list: one pick row per committed choice with " +
           "its digit badge, then `⌨ 自由對話`, `↦ 移動…`, and `✕ 結束對話`. " +
-          "The active row carries the muted-gold fill and the leading `▸`. " +
+          "The active row carries the muted-gold fill and the leading `▸`; " +
+          "while the list is unfocused (opened by pointer) it shows a quieter " +
+          "version of both, and it starts on the first enabled row. " +
           "`↦ 移動…` swaps in the committed overview's exits (direction glyph " +
           "and destination; a locked exit keeps its reason) and a back row. " +
           "Emits `pick(row)`, `freeform()`, `move(item)`, and `leave()` after " +
@@ -88,6 +90,14 @@ export default {
 // Four picks and the three trailing rows.
 export const Picks = {
   render: renderList,
+  args: { picks: PICKS, exits: EXITS, localMap: LOCAL_MAP },
+};
+
+// Opened by pointer with focus elsewhere (webclient-message-typesetting):
+// the list does not take focus, and its first choice shows the quiet initial
+// highlight — where the keys will start, not a choice made.
+export const PointerOpened = {
+  render: (args) => ({ render: () => h(DialogueChoices, args) }),
   args: { picks: PICKS, exits: EXITS, localMap: LOCAL_MAP },
 };
 

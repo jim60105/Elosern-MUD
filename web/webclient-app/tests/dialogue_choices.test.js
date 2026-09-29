@@ -257,6 +257,49 @@ describe("DialogueChoices", () => {
     expect(activeRow(w).getAttribute("data-testid")).toBe("dialogue-move");
   });
 
+  // webclient-message-typesetting: the initial highlight.
+  it("opens the exits on the first enabled exit when the first is disabled", async () => {
+    const w = mountList({ exits: [EXITS[1], EXITS[0]] });
+    await rows(w)[4].trigger("click");
+    expect(rows(w)[0].attributes("aria-disabled")).toBe("true");
+    expect(activeRow(w)).toBe(rows(w)[1].element);
+    expect(w.emitted("move")).toBeUndefined();
+  });
+
+  it("with every exit disabled keeps the first exit active with its explanation, not the back row", async () => {
+    const w = mountList({ exits: [EXITS[1]] });
+    await rows(w)[4].trigger("click");
+    const first = rows(w)[0];
+    expect(activeRow(w)).toBe(first.element);
+    expect(first.attributes("aria-describedby")).toBe(first.get('[data-testid="dialogue-exit-reason"]').attributes("id"));
+    await key(w, "Enter");
+    expect(w.emitted("move")).toBeUndefined();
+  });
+
+  it("an unfocused list shows its first row as active without taking focus or activating it", async () => {
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    outside.focus();
+    wrapper = mount(DialogueChoices, {
+      attachTo: document.body,
+      props: { picks: PICKS, exits: EXITS, localMap: LOCAL_MAP },
+    });
+    const w = wrapper;
+    await nextTick();
+    expect(document.activeElement).toBe(outside);
+    expect(activeRow(w)).toBe(rows(w)[0].element);
+    expect(rows(w)[0].classes()).toContain("dialogue-choices__row--active");
+    expect(rows(w)[0].attributes("data-active")).toBe("true");
+    expect(Object.keys(w.emitted()).filter((name) => ["pick", "freeform", "move", "leave"].includes(name))).toEqual([]);
+    // Taking focus later (Tab) continues from that row; only a deliberate
+    // activation dispatches.
+    w.vm.focus();
+    await key(w, "ArrowDown");
+    expect(w.emitted("pick")).toBeUndefined();
+    await key(w, "Enter");
+    expect(w.emitted("pick")).toEqual([[PICKS[1]]]);
+  });
+
   it("a room with no exits shows the back row alone", async () => {
     const w = mountList({ exits: [] });
     await rows(w)[4].trigger("click");

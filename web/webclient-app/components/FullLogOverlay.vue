@@ -164,6 +164,11 @@ export default {
   padding: 2px var(--sp-6);
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  /* The message window's progressive CJK prose spacing
+     (webclient-message-typesetting); maps and echoed commands opt out. */
+  text-autospace: normal;
+  text-spacing-trim: trim-start;
+  line-break: strict;
 }
 
 .fulllog-overlay .narrative-line.map-art {
@@ -171,6 +176,13 @@ export default {
   font-size: var(--text-sm);
   line-height: 1.4;
   white-space: pre;
+}
+
+.fulllog-overlay .narrative-line.map-art,
+.fulllog-overlay .narrative-line.inp {
+  text-autospace: no-autospace;
+  text-spacing-trim: space-all;
+  line-break: auto;
 }
 
 .fulllog-overlay .narrative-line.inp {

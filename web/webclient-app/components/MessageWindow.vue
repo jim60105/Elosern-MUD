@@ -869,14 +869,18 @@ export default {
             () =>
               plated.value
                 ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
-                    h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
-                    props.dialogue.bondStage == null
-                      ? null
-                      : h(
-                          "span",
-                          { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
-                          ` · 羈絆 ${props.dialogue.bondStage}`,
-                        ),
+                    // The underline runs under this line only, from the
+                    // name's own left edge (webclient-message-typesetting).
+                    h("span", { class: "message-window__plate-line" }, [
+                      h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
+                      props.dialogue.bondStage == null
+                        ? null
+                        : h(
+                            "span",
+                            { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
+                            ` · 羈絆 ${props.dialogue.bondStage}`,
+                          ),
+                    ]),
                   ])
                 : null,
           ),
@@ -963,8 +967,8 @@ export default {
 <style>
 /* The message window (design D1). The band behind it is the frame (its
    gradient and top hairline run under both regions), so the window adds no
-   card of its own: only a quiet ink rule at its left edge that turns gold
-   while the page surface holds keyboard focus. Every selector is prefixed
+   card of its own: only a gold reading rule at its left edge while the page
+   surface holds keyboard focus. Every selector is prefixed
    and unscoped: page fragments are render-function vnodes and the measurer
    is filled through Vue's `render()`, neither of which carries scope ids.
    No child combinators: the measurer nests the fragments one level deeper
@@ -980,6 +984,11 @@ export default {
      band's own gradient (HudFrame's `.stage-band`) as it falls behind the
      text area, so the fading page never reads as a card. */
   --message-clear-fill: linear-gradient(180deg, #0e0f15 0%, #13101a 32%, #110e17 64%, #0e0b12 100%);
+  /* The page's type size and the prose column's outer width
+     (webclient-message-typesetting). The page's max-width and the marker's
+     placement both read these, so the marker always tracks the measure. */
+  --message-page-font: calc(var(--message-text) * var(--prose-scale));
+  --message-measure: calc(var(--message-page-font) * 42 + 48px);
 }
 
 .message-window::before {
@@ -988,15 +997,18 @@ export default {
   left: 0;
   top: 12px;
   bottom: calc(var(--message-controls-h) + 4px);
-  width: 1px;
-  background: linear-gradient(180deg, transparent, var(--ink-600) 18%, var(--ink-600) 82%, transparent);
-  transition: background var(--motion-fast) var(--ease-standard);
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--gold-400) 18%, var(--gold-400) 82%, transparent);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-standard);
   pointer-events: none;
 }
 
+/* The reading rule (webclient-message-typesetting) shows only while the
+   page surface holds keyboard focus; at rest the text sits straight on the
+   band's ink with no line of the window's own. */
 .message-window:has(.message-window__page:focus-visible)::before {
-  width: 2px;
-  background: linear-gradient(180deg, transparent, var(--gold-400) 18%, var(--gold-400) 82%, transparent);
+  opacity: 1;
 }
 
 .message-window__text {
@@ -1011,17 +1023,27 @@ export default {
 .message-window__page {
   box-sizing: border-box;
   width: 100%;
-  max-width: calc(42em + 48px);
+  max-width: var(--message-measure);
   height: 100%;
   margin: 0 auto;
   padding: 0 24px;
   overflow: hidden;
   font-family: var(--f-serif);
-  font-size: calc(var(--message-text) * var(--prose-scale));
+  font-size: var(--message-page-font);
   line-height: var(--message-line-height);
   color: var(--paper-100);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   outline: none;
+  /* CJK prose spacing (webclient-message-typesetting), progressive: a
+     browser without a property keeps its default spacing. A small gap
+     between CJK and Latin letters or digits, trimmed opening brackets at a
+     line start, strict line-break rules for small kana and iteration marks.
+     Spacing only — the narrative text is never rewritten, no `halt` is set,
+     and the hidden measurer carries this class too, so paging measures the
+     spacing it shows. Maps opt out below. */
+  text-autospace: normal;
+  text-spacing-trim: trim-start;
+  line-break: strict;
 }
 
 .message-window__page:focus-visible {
@@ -1091,7 +1113,7 @@ export default {
 }
 
 .message-window .narrative-line + .narrative-line {
-  margin-top: 0.2em;
+  margin-top: var(--message-paragraph-gap);
 }
 
 .message-window .narrative-line em,
@@ -1143,10 +1165,16 @@ export default {
   white-space: pre;
   color: var(--paper-300);
   text-shadow: none;
+  /* A map is a grid: no inserted spacing, trimming, or rule-based breaks. */
+  text-autospace: no-autospace;
+  text-spacing-trim: space-all;
+  line-break: auto;
 }
 
-/* The control strip: the marker sits left of the 日誌 / ⌨ controls the
-   shell places at the region's bottom-right. */
+/* The control strip: the marker ends at the prose column's right edge
+   (webclient-message-typesetting) — the centred column in exploration and
+   combat, the left-aligned column in dialogue — and never closer to the
+   region's right edge than the 日誌 / ⌨ controls the shell places there. */
 .message-window__controls {
   position: relative;
   flex: none;
@@ -1155,7 +1183,10 @@ export default {
 
 .message-window__marker {
   position: absolute;
-  right: 104px;
+  right: max(
+    var(--band-strip-actions-w),
+    calc((100% - min(100%, var(--message-measure))) / 2 + 24px)
+  );
   bottom: 12px;
   font-size: var(--text-md);
   line-height: 1;
@@ -1165,7 +1196,7 @@ export default {
 }
 
 .message-window__marker[data-state="more"] {
-  animation: message-window-marker-bob calc(var(--motion-pulse) / 3) var(--ease-standard) infinite;
+  animation: message-window-marker-bob var(--motion-marker-bob) var(--ease-standard) infinite;
 }
 
 .message-window__marker[data-state="end"] {
@@ -1182,8 +1213,8 @@ export default {
     opacity: 1;
   }
   50% {
-    transform: translateY(3px);
-    opacity: 0.45;
+    transform: translateY(calc(var(--motion-marker-travel) * var(--motion-travel)));
+    opacity: 0.55;
   }
 }
 
@@ -1215,22 +1246,24 @@ export default {
 }
 
 .message-window[data-mode="dialogue"] .message-window__page {
-  max-width: calc(42em + var(--dialogue-inset) + 24px);
+  max-width: var(--message-measure);
   margin: 0;
   padding-left: var(--dialogue-inset);
 }
 
-/* The focus rule follows the column: just left of the text, and only while
-   the page holds keyboard focus (the plate's rule already edges the
-   window). */
+.message-window[data-mode="dialogue"] {
+  --message-measure: calc(var(--message-page-font) * 42 + var(--dialogue-inset) + 24px);
+}
+
+.message-window[data-mode="dialogue"] .message-window__marker {
+  right: max(var(--band-strip-actions-w), calc(100% - min(100%, var(--message-measure)) + 24px));
+}
+
+/* The focus rule follows the column: just left of the text, below the
+   plate. */
 .message-window[data-mode="dialogue"]::before {
   left: calc(var(--dialogue-inset) - 14px);
   top: calc(var(--message-text) * 2);
-  visibility: hidden;
-}
-
-.message-window[data-mode="dialogue"]:has(.message-window__page:focus-visible)::before {
-  visibility: visible;
 }
 
 .message-window__plate {
@@ -1239,15 +1272,39 @@ export default {
   align-items: baseline;
   min-width: 0;
   box-sizing: border-box;
-  max-width: calc(42em + var(--dialogue-inset) + 24px);
-  margin: 4px 0 0;
-  padding: 2px 24px 9px var(--dialogue-inset);
-  font-size: calc(var(--message-text) * var(--prose-scale));
+  max-width: var(--message-measure);
+  margin: 4px 0 6px;
+  padding: 2px 24px 3px var(--dialogue-inset);
+  font-size: var(--message-page-font);
   white-space: nowrap;
   overflow: hidden;
+}
+
+/* The name's underline (webclient-message-typesetting): it starts exactly
+   at the name's left edge, where the text column starts, holds gold under
+   the name, and fades out a little past the bond stage, so the rule belongs
+   to the name rather than to the window. A small lozenge seats its start. */
+.message-window__plate-line {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  padding: 0 2.4em 7px 0;
   background:
-    linear-gradient(90deg, transparent, var(--gold-500) calc(var(--dialogue-inset) - 8px), rgba(185, 154, 96, 0.35) 55%, transparent)
+    linear-gradient(90deg, var(--gold-400), var(--gold-500) 45%, rgba(185, 154, 96, 0.3) 78%, transparent)
     left bottom / 100% 1px no-repeat;
+}
+
+.message-window__plate-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 5px;
+  height: 5px;
+  transform: rotate(45deg);
+  background: var(--gold-400);
+  box-shadow: 0 0 6px var(--gold-glow);
 }
 
 /* The plate's entrance (webclient-mode-transitions D4): it takes its row at

@@ -313,9 +313,14 @@ Each response is cut into pages that exactly fit the message window:
    injected `fits(candidateBlocks)` whether a page still fits. Capacity is
    measured pixel height, not a line count, because `sys` and map lines use
    other line heights. Page text is `--message-text: clamp(20px, 2.593vh,
-   38px) × prose scale` (28px at 1080) with a `max-width: 42em` cap: 6 lines at
-   1080, 7 at 720. A 36px control strip under the text holds the marker, 日誌,
-   and ⌨.
+   38px) × prose scale` (28px at 1080) with a `max-width: 42em` cap, a 1.5
+   line height, and a .45em gap between narrative lines (A8,
+   `webclient-message-typesetting`); how many lines a page holds is whatever
+   the measurer finds, never a fixed count. Prose gets progressive CJK
+   spacing (`text-autospace`, `text-spacing-trim`, strict `line-break`) —
+   spacing only, never a rewritten string or a global `halt` — and
+   box-drawing maps opt out. A 36px control strip under the text holds the
+   marker, 日誌, and ⌨.
 3. **Split.** A block taller than the remaining room is cut at a hard break or
    the last sentence end that fits (`。！？…」』` with closing quotes kept;
    ASCII `.!?` followed by whitespace also counts), then at a clause mark
@@ -340,8 +345,12 @@ never mutates the log and never reaches the server.
   repeat, so the document-level bridge never turns the key into a dock
   confirm. If the page is still typing, the press shows it in full; otherwise
   it advances.
-- **Markers:** a blinking `▼` when more pages follow, `■` on the last page,
-  rendered only once the page is fully shown. There is no head row: the mode
+- **Markers:** a slowly bobbing `▼` (1.6s, 2px; still at reduced and off)
+  when more pages follow, `■` on the last page, rendered only once the page
+  is fully shown. The marker ends at the prose column's right edge — the
+  centred column, or the left-aligned dialogue column — but never closer to
+  the region's right end than 日誌 / ⌨ allow. The window's left reading
+  rule shows only while the page holds keyboard focus. There is no head row: the mode
   label and the old `完整日誌` capsule are dropped in favour of the `日誌`
   button in the control strip.
 - **Log:** the `日誌` button, or scrolling up when the page has nothing left to
@@ -477,7 +486,9 @@ when the host is not in the catalog. The client never constructs a catalog key.
   focus home in dialogue is the message window's page surface instead of
   `#action-dock`.
 - **Name plate:** a header row inside the message window: `display_name`, plus
-  ` · 羈絆 <stage>` only when `bond_stage` is non-null. It sits inside the
+  ` · 羈絆 <stage>` only when `bond_stage` is non-null, underlined from the
+  name's own left edge (seated on a small lozenge) and fading out past the
+  bond. It sits inside the
   window because the expanded command-line row would cover a plate straddling
   the edge. The text keeps its 42em cap.
 - **Line:** the session line is paged and typed like any response. It is paged
@@ -488,7 +499,11 @@ when the host is not in the catalog. The client never constructs a catalog key.
   page is fully shown and no dispatch is in flight. Rows: the committed
   `dialogue.choices` with badges 1–N, `⌨ 自由對話`, `↦ 移動…`, `✕ 結束對話`. It
   is one tab stop (a menu with `aria-activedescendant`), takes focus when it
-  appears, and consumes arrows (wrapping), Home/End, Enter/Space, digits, and
+  appears (only from the message window or the body), and opens with its
+  first enabled row active — shown quietly even while the list is unfocused,
+  never activated; `↦ 移動…` opens on the first enabled exit. The card
+  carries small gold corner brackets; 結束對話 is marked by its seal-tinted
+  cross badge alone, not a red row frame. It consumes arrows (wrapping), Home/End, Enter/Space, digits, and
   Escape; `/` passes through. `↦ 移動…` swaps in the exit chips of the
   committed overview; Escape or the back row returns. Each row dispatches the
   same action as before.

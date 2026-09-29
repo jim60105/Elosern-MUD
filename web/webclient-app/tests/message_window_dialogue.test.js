@@ -94,6 +94,8 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
     expect(rule(".message-window__plate-name")).toMatch(/text-overflow: ellipsis/);
     expect(rule(".message-window__plate-name")).toMatch(/min-width: 0/);
     expect(rule(".message-window__plate-bond")).toMatch(/flex: none/);
+    // The underlined line between the plate and its spans shrinks with it.
+    expect(rule(".message-window__plate-line")).toMatch(/min-width: 0/);
     const w = mountWindow();
     const plate = w.get('[data-testid="message-name-plate"]');
     expect(plate.get(".message-window__plate-name").text()).toBe("灰婆婆");
