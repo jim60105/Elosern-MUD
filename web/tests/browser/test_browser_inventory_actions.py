@@ -370,13 +370,15 @@ class CombatBagDrawerJourney(_ItemActionBase, ServicesBrowserTest):
         self._wait_combat_mode(page)
 
         focus_action_dock(page)
-        # Walk the root row ring until the client-local 背包 row is focused.
+        # Walk the vertical root command list (webclient-combat-command-window:
+        # Up/Down wraps the ring, Left/Right inert) until the client-local
+        # 背包 row is focused.
         focused_key = None
         for _ in range(12):
             focused_key = (store_state_or_none(page) or {}).get("focus", {}).get("key")
             if focused_key == "bag":
                 break
-            _press(page, "ArrowRight")
+            _press(page, "ArrowDown")
         self.assertEqual(focused_key, "bag", "the combat dock exposes the 背包 row")
 
         _press(page, "Enter")
