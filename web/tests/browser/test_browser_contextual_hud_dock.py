@@ -286,7 +286,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::a-breadcrumb-derived-from-the-router-names-the-player-s-position-at-depth"
+        "webclient-contextual-hud::a-breadcrumb-derived-from-the-router-names-the-player-s-position-at-depth",
+        "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
     )
     def test_breadcrumb_tracks_router_depth(self):
         """The breadcrumb appears below the root (except over a verb popover) and names parent + current."""
@@ -335,6 +336,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "小販",
             "the popover's single heading names the target",
         )
+
+        # The card isolates the covered chips: a press where the 守門人 chip
+        # sits lands on the popover's layer, never on the chip.
+        covered = page.evaluate(
+            """() => {
+              const chip = document.querySelector('[data-testid="scene-overview"] [data-item-key="target-12"]');
+              const r = chip.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return { chip: chip.contains(hit),
+                       layer: !!hit.closest('[data-testid="verb-popover-layer"]') };
+            }"""
+        )
+        self.assertEqual(covered, {"chip": False, "layer": True}, "covered chips cannot be hit")
 
         # The popover's back row pops exactly one level and dispatches no
         # ui_action.

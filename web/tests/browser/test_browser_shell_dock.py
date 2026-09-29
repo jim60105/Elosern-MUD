@@ -26,6 +26,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
+        "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
     )
     def test_action_dock_renders_the_mockup_command_surface(self):
         for viewport in ((1440, 900), (1280, 720)):
@@ -58,6 +59,21 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertIn("gradient", frame["feather"], "the band draws the seam feather")
             self.assertEqual(frame["edgeEvents"], "none", "the seam edge is pointer-inert")
             self.assertEqual(frame["featherEvents"], "none", "the seam feather is pointer-inert")
+            # The message controls and the shortcut legend share one strip:
+            # their vertical centres agree, and the pane ends above it.
+            strip = page.evaluate(
+                """() => {
+                  const mid = (s) => { const r = document.querySelector(s).getBoundingClientRect();
+                                       return (r.top + r.bottom) / 2; };
+                  const pane = document.querySelector('.action-dock__pane').getBoundingClientRect();
+                  const legend = document.querySelector('.action-dock__legend').getBoundingClientRect();
+                  return { log: mid('[data-testid="message-log-open"]'),
+                           legend: mid('.action-dock__legend'),
+                           paneBottom: pane.bottom, legendTop: legend.top };
+                }"""
+            )
+            self.assertLessEqual(abs(strip["log"] - strip["legend"]), 1.5, f"one baseline {viewport} {strip}")
+            self.assertLessEqual(strip["paneBottom"], strip["legendTop"] + 0.5, "rows end above the legend")
             # The shortcut legend is the dock's own strip carrying the draft's
             # markup (the single `action-dock-description` element), rendered
             # below the scrolling body rather than in a tab bar
