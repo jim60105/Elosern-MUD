@@ -4,6 +4,7 @@ import {
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
+  LOCAL_MAP_ORDINARY_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_TALL_LATTICE_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
@@ -42,6 +43,16 @@ export const FullLattice = {
   render: renderMap,
   args: {
     localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
+  },
+};
+
+// An ordinary town neighbourhood (webclient-map-legibility): nine distinct
+// room names and no gateway, so the island draws at scale 1 and every node
+// label reads at the island's 12px chrome step.
+export const OrdinaryNeighbourhood = {
+  render: renderMap,
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_ORDINARY_SAMPLE),
   },
 };
 

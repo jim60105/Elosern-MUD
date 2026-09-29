@@ -19,6 +19,7 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 ### Modified Capabilities
 
 - `webclient-local-map`: Modify existing contracts and add the observable requirements below.
+- `webclient-vue-application`: Retire the A3 approved deferral — the map island and full-map chrome join the 12px chrome floor; only the drawn SVG map keeps its own fitted label contract.
 
 ## Impact
 

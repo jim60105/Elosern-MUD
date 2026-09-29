@@ -31,7 +31,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
   const ISLAND_PROPS = {
     colPitch: 40,
     rowPitch: 40,
-    labelFont: 9,
+    labelFont: 12,
     canvasSize: 208,
     showAxis: true,
     fogVignette: true,
@@ -262,8 +262,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const islandLabel = wIsland.get(".local-map__node-label");
-      expect(islandLabel.attributes("style")).toContain("font-size: 9px");
-      expect(islandLabel.attributes("y")).toBe("22");
+      expect(islandLabel.attributes("style")).toContain("font-size: 12px");
+      expect(islandLabel.attributes("y")).toBe("25");
 
       const wOverlay = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
@@ -278,7 +278,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(overlayLabel.attributes("y"))).toBeCloseTo(13 * 4.83 + 13, 2);
     });
 
-    it("Task 2.2: derives square pitch 40 on uniform wilderness (repetition suppressed) and 48 on adjacent labelled pair", () => {
+    it("Task 2.2: derives square pitch 40 on uniform wilderness (repetition suppressed) and clears the drawn adjacent labels", () => {
       const uniformWildernessPayload = {
         schema_version: 1,
         available: true,
@@ -297,7 +297,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(uniformWildernessPayload),
         colPitch: 40,
         rowPitch: 40,
-        labelFont: 9,
+        labelFont: 12,
       });
       const visibleLabels = wUniform.findAll(".local-map__node-label").filter((l) => (l.element.lastChild?.textContent || "").trim() !== "");
       expect(visibleLabels).toHaveLength(1);
@@ -321,11 +321,37 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(distinctAdjacentPayload),
         colPitch: 40,
         rowPitch: 40,
-        labelFont: 9,
+        labelFont: 12,
       });
+      // webclient-map-legibility: the label term clears the labels actually
+      // drawn — two 4-glyph names need (4 + 4) / 2 * 12 + 12 / 2 = 54.
       const patternDistinct = wDistinct.find("defs pattern");
-      expect(Number(patternDistinct.attributes("width"))).toBe(48);
-      expect(Number(patternDistinct.attributes("height"))).toBe(48);
+      expect(Number(patternDistinct.attributes("width"))).toBe(54);
+      expect(Number(patternDistinct.attributes("height"))).toBe(54);
+
+      // A short name beside a long one needs less: (2 + 4) / 2 * 12 + 6 = 42.
+      const shortLong = {
+        ...distinctAdjacentPayload,
+        nodes: [
+          { id: "g:0:0", label: "碼頭", x: 0, y: 0, visibility: "current" },
+          { id: "g:1:0", label: "霧骨渡口", x: 1, y: 0, visibility: "visible_unvisited" },
+        ],
+      };
+      const wShortLong = mountLattice({ localMap: localMapModelFor(shortLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
+      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(42);
+
+      // Two truncated names (labelMax 4 + "…" = 5 glyphs) are the worst case,
+      // never looser than the old (labelMax + 1) * labelFont + 3 = 63: 66.
+      const longLong = {
+        ...distinctAdjacentPayload,
+        nodes: [
+          { id: "g:0:0", label: "北岸大道東段", x: 0, y: 0, visibility: "current" },
+          { id: "g:1:0", label: "南岸大道西段", x: 1, y: 0, visibility: "visible_unvisited" },
+        ],
+      };
+      const wLongLong = mountLattice({ localMap: localMapModelFor(longLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
+      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(66);
+      expect(66).toBeGreaterThanOrEqual((4 + 1) * 12 + 3);
 
       const wOverlayDistinct = mountLattice({
         localMap: localMapModelFor(distinctAdjacentPayload),
@@ -374,7 +400,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(pattern2.attributes("width"))).toBe(60);
       expect(Number(pattern2.attributes("height"))).toBe(60);
 
-      // 3. Reported wilderness shape with gateways: pitch 40, side ≈ 222.91, scale ≈ 0.933, label ≈ 8.40 px
+      // 3. Reported wilderness shape with gateways: pitch 40, side ≈ 222.91, scale ≈ 0.933, label ≈ 11.20 px
       const wWild = mountLattice({
         localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
         ...ISLAND_PROPS,
@@ -390,7 +416,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(vbParts[3]).toBeCloseTo(222.91, 1);
       const scale3 = 208 / vbParts[2];
       expect(scale3).toBeCloseTo(0.933, 3);
-      expect(scale3 * 9).toBeCloseTo(8.40, 2);
+      expect(scale3 * 12).toBeCloseTo(11.2, 1);
+      expect(scale3 * 12).toBeGreaterThanOrEqual(11);
 
       // 4. 2x64 lattice: the 2574-unit square would draw at 0.0808, below
       // the island's legibility floor, so it is windowed at scale 0.75

@@ -4,7 +4,7 @@ Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
 the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
 line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
 follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
-content, §5.4)
+content, §5.4; revised 2026-09-30 with the A12 map legibility, §11)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -770,6 +770,19 @@ commit. At `off` nothing is held.
   Remembered rooms stay readable: a visually-hidden list on the island for
   assistive technology, and a visible non-focusable list under the graph
   variant on the full-map overlay.
+- **Map legibility (A12, `webclient-map-legibility`).** The island has one
+  12px chrome step (`--text-xs`: title, `北↑ 東→`, readout) and draws node
+  labels at a 12-unit step, so an ordinary neighbourhood reads at 12 CSS px
+  and the reported gateway wilderness at about 11.2; marker names stay at 10
+  units. The lattice label term clears the labels actually drawn —
+  `(glyphs(a) + glyphs(b)) / 2 × labelFont + labelFont / 2` for each adjacent
+  labelled pair — instead of a worst case, so short names no longer inflate
+  the pitch (and shrink the drawing); a move between rows of different name
+  lengths can still change the pitch. The full map's teardrop pin, which
+  floated over connectors like a second place, is replaced by a thin seal ring
+  concentric with the current marker, and both map frames carry fine gold
+  corner brackets painted outside the drawing. Map chrome joins the 12px
+  chrome floor; only the drawn SVG map keeps its own label contract.
 - **Full map fits the viewport.** The overlay opens at
   `min(1, (vw−24)/W, (vh−24)/H)` so the whole known map (including the
   edge-marker gutter) fits, never magnified. Zoom by `viewBox` (range: fit to

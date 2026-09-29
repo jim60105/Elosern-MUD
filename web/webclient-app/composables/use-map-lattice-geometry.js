@@ -4,7 +4,7 @@
 // wilderness label-suppression rule with the crowding-fix pitch derivation it
 // feeds, the model-sourced placement (rank-compressed lattice vs radial
 // graph), the edge-marker gutter/canvas layout, and every drawing position
-// the template consumes (canvas size, node/edge/pin positions, dot-pattern
+// the template consumes (canvas size, node/edge/axis positions, dot-pattern
 // phase, cap-resolved inline style). Pure computeds over explicit props — no
 // watchers, no emit.
 import { computed } from "vue";
@@ -23,6 +23,11 @@ export const MARKER_DOT_R = 4.5;
 export const MARKER_LANDMARK_R = 5;
 export const MARKER_DIAMOND_HALF = 9;
 export const HALO_R = 10;
+// The full map's current-location ring (webclient-map-legibility): a thin
+// seal ring concentric with the current marker, inside that node's own group,
+// so the one place the player stands carries one footprint. Its radius is the
+// current node's reserved footprint on the overlay (it exceeds HALO_R).
+export const MARKER_CURRENT_RING_R = 10.5;
 
 const LABEL_BAND = 14;
 
@@ -87,37 +92,45 @@ export function useMapLatticeGeometry(props) {
   }
 
   function truncatedLabel(label) {
-    const value = String(label ?? "");
-    return value.length > props.labelMax ? value.slice(0, props.labelMax) + "…" : value;
+    const glyphs = Array.from(String(label ?? ""));
+    return glyphs.length > props.labelMax ? glyphs.slice(0, props.labelMax).join("") + "…" : glyphs.join("");
   }
 
   // Node labels are bounded and truncated (the full label stays reachable
   // through the node's accessible name); a truncated label appends "…"
-  // (labelMax + 1 glyphs at 11px monospace, full-width CJK).
+  // (labelMax + 1 glyphs in the declared label step, full-width CJK).
   function visibleNodeLabel(node) {
     if (labelSuppressed(node)) return "";
     return truncatedLabel(node.label);
   }
 
-  // Effective pitch derivation (design D4): derived from what actually needs
-  // clearing rather than a constant. Two horizontally adjacent drawn nodes both
-  // showing visible labels trigger the label-cleared pitch ((labelMax + 1) * labelFont + 3).
-  const adjacentDrawnLabelPair = computed(() => {
-    const labeled = drawnNodes.value.filter((n) => visibleNodeLabel(n) !== "");
+  // Effective pitch derivation (design D4, webclient-map-legibility): the
+  // label term clears the labels actually drawn, not a worst case. Every
+  // horizontally adjacent pair of drawn nodes that BOTH show label text needs
+  // half of each centred label box plus a half-em word gap, so two names read
+  // as two names rather than one run-on phrase:
+  // `(glyphs(a) + glyphs(b)) / 2 * labelFont + labelFont / 2`, each code point of the
+  // visible (truncated) label counted as one full-width em — the bound for
+  // the full-width CJK labels in the shared monospace token (ASCII is
+  // narrower). Two maximal labels (`labelMax + 1` glyphs) need at least the
+  // old worst-case term `(labelMax + 1) * labelFont + 3`, so the bound never
+  // loosens.
+  const labelClearancePitch = computed(() => {
+    const labeled = drawnNodes.value
+      .map((node) => ({ node, glyphs: Array.from(visibleNodeLabel(node)).length }))
+      .filter((entry) => entry.glyphs > 0);
+    let need = 0;
     for (let i = 0; i < labeled.length; i++) {
       for (let j = i + 1; j < labeled.length; j++) {
         const a = labeled[i];
         const b = labeled[j];
-        if (a.row === b.row && Math.abs(a.col - b.col) === 1) {
-          return true;
+        if (a.node.row === b.node.row && Math.abs(a.node.col - b.node.col) === 1) {
+          need = Math.max(need, ((a.glyphs + b.glyphs) / 2 + 0.5) * props.labelFont);
         }
       }
     }
-    return false;
+    return Math.ceil(need);
   });
-  const labelClearancePitch = computed(() =>
-    adjacentDrawnLabelPair.value ? (props.labelMax + 1) * props.labelFont + 3 : 0,
-  );
   const isSquarePitch = computed(() => props.colPitch === props.rowPitch);
   // Placement sourcing (map-02 D2): the lattice variant draws the model's
   // rank-compressed `col`/`row` grid; the graph variant draws the model's
@@ -473,9 +486,9 @@ export function useMapLatticeGeometry(props) {
     return { x: core.x + gutter + marginX, y: core.y + gutter + marginY };
   }
 
-  // The overlay pin's anchor (design D4): the CURRENT placement's current-node
+  // The axis anchor: the CURRENT placement's current-node
   // position, in the same coordinate system as the node groups' translate.
-  // Null (no pin) when the payload carries no on-canvas current node.
+  // Null (no axis) when the payload carries no on-canvas current node.
   const currentPos = computed(() => {
     const current = nodes.value.find((node) => node.visibility === "current");
     return current ? nodePos(current) : null;

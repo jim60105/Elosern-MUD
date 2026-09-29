@@ -1,16 +1,15 @@
 ## Purpose
 
 Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor. It also preserves the client DOM contract hooks (action-dock target, item keys, `data-testid` hooks) and the stable public façades as browser-bridge shims. It also fixes the C4 flip contract: the view layer is fully reactive and store-bound, no legacy imperative view-plugin code remains in the load path, and every activation emits at most one request.
+
 ## Requirements
 
 ### Requirement: Chrome type is legible and numerals are stable
-At the reference scale chrome text outside the map anchors SHALL render at least 12 CSS pixels using the shared local design faces. Resource values, costs, counts and prices outside those anchors SHALL use proportional sans tabular lining numerals. Monospace SHALL remain reserved for command input, ASCII/box-drawing content and key names outside those anchors; prose SHALL retain its existing reader sizing contract, including viewport-relative sizing and prose-scale preferences.
-
-Approved deferral (2026-09-28): the map island and full-map drawing and chrome, including titles and readouts, remain owned by A12 `webclient-map-legibility`. A3 only replaces their shared token references with local fixed values of identical size, without changing their appearance. Their current type-ladder browser contract remains in force until A12 implements that migration.
+At the reference scale chrome text SHALL render at least 12 CSS pixels using the shared local design faces, including the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list. The only text outside that floor is the drawn map itself — the node labels and edge-marker names inside the island's and the full map's SVG drawing — whose sizes follow the `webclient-local-map` fitted label contract (island node labels at a 12-unit step drawn at 12 × the drawing's scale, island marker names at a 10-unit step). Resource values, costs, counts and prices outside the drawn map SHALL use proportional sans tabular lining numerals. Monospace SHALL remain reserved for command input, ASCII/box-drawing content, key names and the map's own coordinate and label type; prose SHALL retain its existing reader sizing contract, including viewport-relative sizing and prose-scale preferences.
 
 #### Scenario: Dense chrome remains readable
-- **WHEN** exploration, dialogue, combat and reference surfaces render at 1920x1080
-- **THEN** chrome text outside the map anchors meets the 12px floor without clipping controls or losing labels
+- **WHEN** exploration, dialogue, combat and reference surfaces, the minimap island and the full-map overlay render at 1920x1080
+- **THEN** chrome text outside the drawn map meets the 12px floor without clipping controls or losing labels
 
 #### Scenario: Values change without terminal styling
 - **WHEN** resource/count values change digit widths
@@ -215,4 +214,3 @@ chip fallback exists only as direct-render defense in the component.
 - **THEN** every wire validator rejects it; only a direct component render
   with hand-built props exercises the neutral 其他 chip fallback while the
   value line stays correct
-

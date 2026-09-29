@@ -99,7 +99,7 @@ export const IslandScaleRadial = {
 // stories no longer set any width/height caps — after
 // webclient-full-map-fit-view no cap exists to pass; they declare C1's
 // `canvasSize` square instead. The overlay chrome mirrors MapOverlay.vue:
-// it turns on the mapcanvas framing, the pin, and the marker NAME boxes.
+// it turns on the mapcanvas framing, the current-location ring, and the marker NAME boxes.
 const overlayOf = (fixture) => {
   const model = localMapModelFor(fixture);
   return {
@@ -127,7 +127,7 @@ export const OverlayScaleMinimal = {
 };
 
 // Graph variant at the overlay's scale: the interior payload's radial
-// placement with the mapcanvas chrome and the pin over the current node.
+// placement with the mapcanvas chrome and the ring around the current node.
 export const OverlayScaleRadial = {
   render: renderOverlayScale,
   args: overlayOf(LOCAL_MAP_INTERIOR_SAMPLE),

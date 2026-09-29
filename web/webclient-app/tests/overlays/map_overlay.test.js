@@ -110,12 +110,14 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     expect(MapOverlay.emits).toContain("open-map");
   });
 
-  it("renders the draft overlay chrome: mapcanvas framing and the location pin", async () => {
+  it("renders the draft overlay chrome: mapcanvas framing and the current-location ring", async () => {
     wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
-    // webclient-map-01-draft-chrome design D4: the full-map surface is the
-    // only caller with the canvas treatment and the pin.
+    // webclient-map-01-draft-chrome design D4 / webclient-map-legibility: the
+    // full-map surface is the only caller with the canvas treatment and the
+    // ring; the teardrop pin is gone.
     expect(wrapper.get("svg.local-map__lattice").classes()).toContain("local-map__lattice--canvas");
-    expect(wrapper.findAll('[data-testid="local-map__pin"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(1);
+    expect(wrapper.find(".local-map__pin").exists()).toBe(false);
     // The dot-chip legend renders at the overlay's scale too — once its
     // popover is open (webclient-full-map-fit-view D5).
     await wrapper.get('[data-testid="map-overlay-legend-toggle"]').trigger("click");
@@ -125,7 +127,7 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
   it("withholds the overlay chrome from the unavailable branch", () => {
     wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_UNAVAILABLE_SAMPLE) } });
     expect(wrapper.find(".local-map__lattice--canvas").exists()).toBe(false);
-    expect(wrapper.findAll('[data-testid="local-map__pin"]')).toHaveLength(0);
+    expect(wrapper.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
   });
 
   it("renders only the registry-owned reason for the unavailable payload", () => {
