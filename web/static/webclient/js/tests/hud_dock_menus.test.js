@@ -342,13 +342,16 @@ test("suggestions unavailable: no root entry, no menu", () => {
 
 // ---------------------------------------------------------------- geometry
 
-test("root geometry: gridCols equals the item count (single-row tab bar)", () => {
-  // The combat root is the only frame that still renders as a tab bar
-  // (webclient-scene-overview-swap).
+test("root geometry: the combat root, categories, and groups are one column", () => {
+  // webclient-combat-command-window: vertical command lists, so Up/Down
+  // traverse and Left/Right are no-ops in the router's grid geometry.
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   const combatRoot = combat.menus.root;
-  assert.equal(combatRoot.gridCols, combatRoot.items.length);
+  assert.equal(combatRoot.gridCols, 1);
   assert.equal(combatRoot.items.length, 7);
+  assert.ok(combatRoot.items.every((item) => item.command === true));
+  assert.equal(combat.menus.categories.gridCols, 1);
+  assert.ok(combat.menus.categories.items.every((item) => item.command === true));
 
   const recoveryRoot = CombatMenu.rootItems(
     combatPanel({
@@ -431,7 +434,10 @@ test("openCategory: a multi-group category opens the group frame", () => {
   );
   assert.deepEqual(menu.items[0].payload, { categoryIndex: 0, groupIndex: 0 });
   assert.deepEqual(menu.items[1].payload, { categoryIndex: 0, groupIndex: 1 });
-  assert.equal(menu.gridCols, menu.items.length);
+  // A vertical list with each group's own descriptor count.
+  assert.equal(menu.gridCols, 1);
+  assert.ok(menu.items.every((item) => item.command === true));
+  assert.deepEqual(menu.items.map((item) => item.skillCount), [1, 1]);
 
   const groupFrame = CombatMenu.openGroup(combat, 0, 1);
   assert.equal(groupFrame.title, T_GROUP_WATER_LABEL);
@@ -498,4 +504,58 @@ test("exit chip rows expose normalized direction and destination node, with no b
   assert.equal(ExplorationMenu.normalizeDirection("NE"), "northeast");
   assert.equal(ExplorationMenu.normalizeDirection("下"), "down");
   assert.equal(ExplorationMenu.normalizeDirection("大廳門"), null);
+});
+
+// ---------------------------------------------------------------- basic attack initial focus
+
+function attackPanel(participants, overrides) {
+  const skill = Object.assign(
+    {
+      key: CombatMenu.BASIC_ATTACK_KEY,
+      label: "普通攻擊",
+      description: "合成普通攻擊描述。",
+      cost: {},
+      target_spec: "single",
+      element: null,
+      enabled: true,
+      disabled_reason: null,
+      targets: participants.map((participant) => participant.identity),
+      shorthands: [],
+    },
+    overrides || {}
+  );
+  return combatPanel({
+    participants,
+    skills: [{ category: "martial", label: "武技", groups: [{ group: null, label: null, skills: [skill] }] }],
+  });
+}
+
+const ALLY = { identity: 5, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null };
+const FOE = { identity: 2, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null };
+
+test("basic attack focuses the first listed foe even behind an ally, without reordering", () => {
+  const combat = CombatMenu.buildMenus(attackPanel([ALLY, FOE]), {});
+  assert.equal(CombatMenu.initialTargetKey(combat, CombatMenu.BASIC_ATTACK_KEY), "target-2");
+  const frame = CombatMenu.openSkillTargets(combat, CombatMenu.BASIC_ATTACK_KEY);
+  assert.deepEqual(frame.items.map((item) => item.key), ["target-5", "target-2"]);
+  assert.deepEqual(frame.items.map((item) => item.team), ["party", "foes"]);
+  // A single-target frame is the command window's one column.
+  assert.equal(frame.gridCols, 1);
+});
+
+test("basic attack with no opposing candidate falls back to the first candidate", () => {
+  const combat = CombatMenu.buildMenus(attackPanel([ALLY]), {});
+  assert.equal(CombatMenu.initialTargetKey(combat, CombatMenu.BASIC_ATTACK_KEY), "target-5");
+  const none = CombatMenu.buildMenus(attackPanel([ALLY], { targets: [] }), {});
+  assert.equal(CombatMenu.initialTargetKey(none, CombatMenu.BASIC_ATTACK_KEY), null);
+});
+
+test("a disabled basic attack and every other skill keep the default focus", () => {
+  const disabled = CombatMenu.buildMenus(
+    attackPanel([ALLY, FOE], { enabled: false, disabled_reason: { code: "stunned", message: "無法行動。" } }),
+    {}
+  );
+  assert.equal(CombatMenu.initialTargetKey(disabled, CombatMenu.BASIC_ATTACK_KEY), null);
+  const combat = CombatMenu.buildMenus(combatPanel(), {});
+  assert.equal(CombatMenu.initialTargetKey(combat, T_A), null);
 });

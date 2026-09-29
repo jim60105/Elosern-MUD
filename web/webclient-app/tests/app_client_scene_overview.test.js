@@ -91,7 +91,7 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     // The active overview listbox is the dock's row container and single tab
     // stop; the retired tab root's entries are gone.
     expect(overview.find('[data-testid="dock-menu"]').exists()).toBe(true);
-    expect(wrapper.find("#action-dock .dock-tab-bar").exists()).toBe(false);
+    expect(wrapper.find('#action-dock [data-pane-kind="commands"]').exists()).toBe(false);
     for (const gone of ["move", "look", "interact", "character"]) {
       expect(wrapper.find(`#action-dock [data-item-key="${gone}"]`).exists()).toBe(false);
     }
@@ -237,8 +237,14 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     await wrapper.vm.$nextTick();
 
     expect(store.view.dockSource).toBe("combat.root");
-    expect(wrapper.find("#action-dock .dock-tab-bar").exists()).toBe(true);
+    // The combat root is the pane's vertical command list
+    // (webclient-combat-command-window), the only row container.
+    const menus = wrapper.findAll('#action-dock [data-testid="dock-menu"]');
+    expect(menus).toHaveLength(1);
+    expect(menus[0].attributes("data-pane-kind")).toBe("commands");
     expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(false);
-    expect(wrapper.find("#action-dock .dock-tab-bar [data-item-key='attack']").exists()).toBe(true);
+    expect(menus[0].findAll("[data-item-key]").map((row) => row.attributes("data-item-key"))).toEqual([
+      "attack", "skills", "items", "bag", "defend", "flee", "forfeit",
+    ]);
   });
 });

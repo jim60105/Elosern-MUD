@@ -455,10 +455,9 @@
       if (menu.grid && menu.gridCols > 0) {
         var cols = menu.gridCols;
         var rows = Math.max(1, Math.ceil(menu.items.length / cols));
-        // H3 (task 2.7): the combat root is a single-row tab bar
-        // (`gridCols == items.length` → `rows == 1`), so vertical presses are
-        // no-ops; symmetrically, a single-column grid (`cols == 1`) makes
-        // horizontal presses no-ops.
+        // A single-row grid (`rows == 1`) makes vertical presses no-ops;
+        // symmetrically, a single-column grid (`cols == 1`, the combat
+        // root, category, and group lists) makes horizontal presses no-ops.
         if ((direction === ARROW_UP || direction === ARROW_DOWN) && rows === 1) {
           return false;
         }

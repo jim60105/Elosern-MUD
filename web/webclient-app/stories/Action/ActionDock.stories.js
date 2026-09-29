@@ -3,6 +3,7 @@ import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
 import DockVerbPopover from "../../components/DockVerbPopover.vue";
 import SceneOverview from "../../components/SceneOverview.vue";
+import CombatMenu from "../../lib/combat_menu.js";
 import {
   EXPLORATION_AFFORDANCES_SAMPLE,
   SUGGESTIONS_DEGRADED_EMPTY_SAMPLE,
@@ -20,12 +21,12 @@ import {
 
 // ActionDock: the non-closable bottom action surface. Props: mode (the
 // preserved #action-dock data-mode), guidancePrefix (per-surface guidance
-// prefix, rendered on its own line and by the breadcrumb), rootItems and
-// tabBar (the combat root's tab bar; the exploration root is the scene
-// overview, so it passes no bar), view (the committed slice), focusedKey.
-// Slots: default (the active frame's rows — the scene overview, a submenu, or
-// a combat frame) and overlay (a target's verb popover card). Event: action
-// (the exact OOB action intent for a row activation).
+// prefix, rendered on its own line and by the breadcrumb), rootItems, view
+// (the committed slice), and playback (a combat round playing by itself: the
+// waiting cue with its skip). Slots: default (the active frame's rows — the
+// scene overview, a submenu, or a combat frame's command list) and overlay (a
+// target's verb popover card). Events: action (the exact OOB action intent
+// for a row activation), back, skip.
 
 // The exploration root's scene overview, from the shared derived-shape helper
 // (the same `overviewMenu` the live resolver returns).
@@ -121,7 +122,6 @@ export const SceneOverviewRoot = {
     mode: "exploration",
     guidancePrefix: "場景",
     rootItems: [],
-    tabBar: false,
     focusedKey: "exit-0",
   },
 };
@@ -132,27 +132,83 @@ export const VerbPopoverOverOverview = {
     mode: "exploration",
     guidancePrefix: "場景",
     rootItems: [],
-    tabBar: false,
     focusedKey: "talk-scripted",
   },
 };
 
-// The combat root: the tab bar renders (the only mode that has one) and the
-// legend strip shows below the pane, exactly as in exploration.
-export const CombatDock = {
-  render: renderDock,
-  args: {
-    mode: "combat",
-    rootItems: [
-      { key: "attack", label: "攻擊", enabled: true },
-      { key: "skills", label: "技能", enabled: true },
-      { key: "items", label: "物品", enabled: false },
-      { key: "flee", label: "逃亡", enabled: true },
+// The combat command window (webclient-combat-command-window): the real
+// resolver's root and category rows, normalized to the DockMenu contract the
+// live dock passes (`command`, the committed `count`, the local copy, the
+// disabled reason), inside a box the size of the 1920×1080 command region.
+const COMBAT_SKILL_COUNT = 5;
+const commandItems = (items) =>
+  items.map((item) => ({
+    key: item.key,
+    label: item.label,
+    enabled: item.enabled !== false,
+    command: true,
+    ...(item.actionId ? { action_id: item.actionId, params: item.payload || {} } : { navigation: true, surface: item.key }),
+    ...(item.description ? { description: item.description } : {}),
+    ...(item.disabledReason ? { disabled_reason: { ...item.disabledReason } } : {}),
+    ...(item.key === "skills" ? { count: COMBAT_SKILL_COUNT } : {}),
+    ...(item.skillCount ? { count: item.skillCount } : {}),
+  }));
+const COMBAT_ROOT = commandItems(CombatMenu.rootItems({ session: { state: "ready" } }));
+const COMBAT_CATEGORIES = commandItems(
+  CombatMenu.categoryItems({
+    skills: [
+      { label: "武技", groups: [{ skills: [{}, {}] }] },
+      { label: "元素魔法", groups: [{ skills: [{}] }, { skills: [{}] }] },
+      { label: "神聖術", groups: [{ skills: [{}] }] },
     ],
-    tabBar: true,
-    focusedKey: "attack",
-    view: { dockTrail: ["戰鬥"], dockDepth: 1 },
-  },
+  }),
+);
+
+const renderCommandWindow = ({ items, focusedKey, crumb, ...args }) => ({
+  render: () =>
+    h(
+      "div",
+      {
+        style:
+          "width: 640px; height: 300px; box-sizing: border-box; padding: 10px 14px 0; " +
+          "background: linear-gradient(180deg, #16161a, #0c0d10); border-top: 1px solid rgba(185,154,96,.45);",
+      },
+      [
+        h(ActionDock, { mode: "combat", rootItems: COMBAT_ROOT, view: { dockTrail: crumb, dockDepth: crumb.length }, ...args }, {
+          default: () => [
+            h("div", { class: "dock-pane-host dock-pane-host--bounded", style: "display:flex;gap:12px;flex:1;min-height:0;align-items:stretch;" }, [
+              h(DockMenu, { items, focusedKey, idPrefix: "combat-row", detailTestId: "combat-detail", depth: crumb.length }),
+            ]),
+          ],
+        }),
+      ],
+    ),
+});
+
+// The root: one vertical column — glyph, label, the neutral 技能 count — with
+// the highlighted command's local explanation beside it.
+export const CombatDock = {
+  render: renderCommandWindow,
+  args: { items: COMBAT_ROOT, focusedKey: "attack", crumb: ["戰鬥"] },
+};
+
+// A disabled command keeps its focus and shows its reason in the detail.
+export const CombatDisabledCommand = {
+  render: renderCommandWindow,
+  args: { items: COMBAT_ROOT, focusedKey: "defend", crumb: ["戰鬥"] },
+};
+
+// The skill categories replace the root list: each row with its own count.
+export const CombatCategories = {
+  render: renderCommandWindow,
+  args: { items: COMBAT_CATEGORIES, focusedKey: "skill-cat-1", crumb: ["戰鬥", "技能"] },
+};
+
+// A round playing by itself: the waiting cue overlays the list's top edge
+// with the existing skip; the sweep stands still at reduced and off.
+export const CombatPlayback = {
+  render: renderCommandWindow,
+  args: { items: COMBAT_ROOT, focusedKey: "attack", crumb: ["戰鬥"], playback: true },
 };
 
 export const ExplorationDock = {

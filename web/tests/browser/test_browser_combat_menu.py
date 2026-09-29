@@ -102,15 +102,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         The framed grid's column count is client-owned presentation
         (mode/pane-dependent), so the journeys measure the mounted grid
-        instead of hardcoding it. The root tab bar is itself a listbox
-        carrying ``data-item-key`` tabs; the keyboard router walks the
-        committed FRAME's own grid, so the tab bar is excluded from the
-        measurement."""
+        instead of hardcoding it. The combat root renders in the pane as
+        the frame's own vertical list (webclient-combat-command-window), so
+        every mounted row is a cell of the committed frame."""
         cells = page.evaluate(
             """() => Array.from(
                  document.querySelectorAll(
                    '#action-dock [role="listbox"] [data-item-key]'))
-               .filter((el) => !el.closest(".dock-tab-bar"))
                .map((el) => {
                  const r = el.getBoundingClientRect();
                  return { key: el.getAttribute('data-item-key'),
@@ -191,7 +189,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._press(page, key)
 
     def _open_skills(self, page) -> None:
-        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "ArrowDown")  # skills row
         self._press(page, "Enter")  # -> category frame
 
     def _open_category(self, page, category: str) -> None:
@@ -199,7 +197,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         single-group category opens its skill frame directly)."""
         names = [item["category"] for item in self._combat_panel(page)["skills"]]
         self.assertIn(category, names)
-        self._press_to(page, "ArrowRight", names.index(category))
+        self._press_to(page, "ArrowDown", names.index(category))
         self._press(page, "Enter")
 
     def _focus_skill(self, page, category: str, key: str) -> None:
@@ -272,8 +270,8 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the crumb must be hidden at depth 1",
         )
 
-        # Open the skills tab to push the category frame (depth 2).
-        self._press(page, "ArrowRight")  # skills tab
+        # Open the skills row to push the category frame (depth 2).
+        self._press(page, "ArrowDown")  # skills row
         self._press(page, "Enter")  # open skills -> category frame
 
         crumb = page.locator('[data-testid="dock-crumb"]')
@@ -295,31 +293,31 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation")
-    def test_pointer_tab_click_pops_to_root_and_activates_once(self):
+    def test_pointer_root_row_click_activates_once(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
 
         # Navigate to the skills category frame (depth 2).
-        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "ArrowDown")  # skills row
         self._press(page, "Enter")  # open skills -> category frame
         self.assertEqual(store_state(page)["dockDepth"], 2)
 
-        # Pointer click on a non-current tab (the 逃跑 tab) at depth 2: the
-        # store pops the router back to the root frame, focuses the clicked
-        # item, and confirms it with `source="pointer"` — exactly one
-        # deliberate activation, no stray `ui_action`.
-        # Wait for the flee tab to be present before clicking; on a loaded
-        # runner the dock's tab bar can lag behind the committed depth change,
-        # so an immediate click can race the render.
-        page.wait_for_selector("#dock-tab-flee", timeout=30000)
-        page.locator("#dock-tab-flee").click()
+        # A deeper frame replaces the root list (webclient-combat-command-
+        # window): no root row is rendered at depth 2. Escape returns to the
+        # root list, and a pointer click on its 逃跑 row focuses and confirms
+        # it through the ordinary confirmation path — exactly one deliberate
+        # activation, no stray `ui_action`.
+        flee = '#action-dock [data-testid="dock-menu"] [data-item-key="flee"]'
+        self.assertEqual(page.locator(flee).count(), 0, "no root row at depth 2")
+        self._press(page, "Escape")
+        page.wait_for_selector(flee, timeout=30000)
+        page.locator(flee).click()
 
-        # The router returned to the root frame (depth 1) and the clicked tab is
-        # the open/focused tab. The click's `tabToRootAndConfirm` pops to root and
+        # The root frame (depth 1) holds focus on the clicked row. The click
         # focuses `flee` synchronously, but the confirmed `combat.flee` ends the
         # session, so the store reverts to exploration (focus back to `move`) and
-        # the combat dock's flee tab is replaced by the exploration dock. The
+        # the combat dock's flee row is replaced by the exploration dock. The
         # focused-flee state (store focus + depth + DOM selected) is therefore
         # transient: it exists only during the short window before the
         # exploration snapshot arrives. Poll tightly (5ms) in a single evaluate
@@ -332,7 +330,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 """() => {
                   const b = window.__elosernBridge;
                   const v = b && b.store.view;
-                  const t = document.querySelector('#dock-tab-flee');
+                  const t = document.querySelector('#action-dock [data-item-key="flee"]');
                   return {
                     focusKey: v && v.focus && v.focus.key,
                     depth: v && v.dockDepth,
@@ -348,9 +346,9 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ):
                 break
             page.wait_for_timeout(5)
-        self.assertEqual(observed["focusKey"], "flee", "the clicked tab is focused")
+        self.assertEqual(observed["focusKey"], "flee", "the clicked row is focused")
         self.assertEqual(observed["depth"], 1, "the router returned to the root frame")
-        self.assertEqual(observed["selected"], "true", "the clicked tab is marked selected")
+        self.assertEqual(observed["selected"], "true", "the clicked row is marked selected")
         # Exactly one `combat.flee` ui_action was dispatched (no stray actions).
         self.assertEqual(sent_action_count(page, "combat.flee"), 1)
 
@@ -372,12 +370,12 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 self._engage(page)
 
                 # Navigate to the deepest combat frame (the spell's SINGLE
-                # target frame): skills tab -> category -> the spell's element
+                # target frame): skills row -> category -> the spell's element
                 # group (mode-dependent position) -> skill -> target.
                 roles = self._roles()
-                self._press(page, "ArrowRight")  # skills tab
+                self._press(page, "ArrowDown")  # skills row
                 self._press(page, "Enter")  # category frame
-                self._press_to(page, "ArrowRight", roles["spell_group_index"])
+                self._press_to(page, "ArrowDown", roles["spell_group_index"])
                 self._press(page, "Enter")  # the spell's element group
                 self._press(page, "Enter")  # skill frame
                 self._press(page, "Enter")  # target frame (deepest)
@@ -469,8 +467,8 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # lists every participant valid for the skill's scope (the synth party
         # can carry an extra member), so the journey walks the router to the
         # enemy's row instead of assuming a fixed press count past the actor.
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "ArrowLeft")  # back to attack
+        self._press(page, "ArrowDown")  # skills
+        self._press(page, "ArrowUp")  # back to attack
         self._press(page, "Enter")  # open attack
         self._walk_to(page, f"target-{target}")  # the monster target row
         self._press(page, "Enter")  # select the monster target
@@ -490,7 +488,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         target = self._fire_ball_identity(page)
         spell = self._roles()["spell_key"]
 
-        # H3 skill master-detail (design D11): the skills tab opens the
+        # H3 skill master-detail (design D11): the skills row opens the
         # category frame, then the group frame (elemental_magic has two
         # sub-groups), then the skill frame. The mode's deep spell is the
         # first skill of the first element sub-group.
@@ -527,7 +525,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._engage(page)
         spell = self._roles()["spell_key"]
 
-        # skills tab -> category frame -> group frame -> skill frame (the
+        # skills row -> category frame -> group frame -> skill frame (the
         # same geometry as test_single_skill_target_flow; the mode's deep
         # spell is the first skill of the first element group and holds focus).
         self._open_skills(page)
@@ -581,7 +579,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The utility SELF caster is disabled in combat: the session context
         # cannot supply its handler's event-context key, so the menu exposes
         # the disabled explanation instead of a cast. flee is the enabled SELF
-        # skill. H3 (design D11): skills tab -> category frame; martial_arts is
+        # skill. H3 (design D11): skills row -> category frame; martial_arts is
         # single-group and opens the skill frame directly, then focus lands on flee.
         self._open_skills(page)
         self._open_category(page, "martial_arts")

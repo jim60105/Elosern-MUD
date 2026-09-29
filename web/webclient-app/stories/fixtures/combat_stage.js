@@ -51,3 +51,63 @@ export const PARTY_PARTICIPANTS = Object.freeze([
   { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null },
   { identity: 8, token: "a2", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
 ]);
+
+// The combat panel's committed skill categories for the stage stories
+// (webclient-combat-command-window): 武技 (basic attack, whose server-listed
+// candidates put the ally before the foes, and a second strike) and 元素魔法
+// with two sub-groups, so the command window shows its counts and its
+// category → group → skill path.
+export function combatSkills(participants) {
+  const foes = participants.filter((p) => p.team === "foes").map((p) => p.identity);
+  const allies = participants.filter((p) => p.team === "party" && p.identity !== 1).map((p) => p.identity);
+  const skill = (key, label, description, cost, target_spec, targets, extra = {}) => ({
+    key,
+    label,
+    description,
+    cost,
+    target_spec,
+    element: null,
+    enabled: true,
+    disabled_reason: null,
+    targets,
+    shorthands: [],
+    ...extra,
+  });
+  return [
+    {
+      category: "martial_arts",
+      label: "武技",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            skill("basic_attack", "普通攻擊", "以手中武器攻擊一名目標。", {}, "single", [...allies, ...foes]),
+            skill("heavy_slash", "重斬", "蓄力一擊，對單一敵人造成較重的傷害。", { sp: 6 }, "single", foes),
+          ],
+        },
+      ],
+    },
+    {
+      category: "elemental_magic",
+      label: "元素魔法",
+      groups: [
+        {
+          group: "fire",
+          label: "火",
+          skills: [skill("firebolt", "火矢", "射出一道火焰箭矢。", { mp: 10 }, "single", foes)],
+        },
+        {
+          group: "water",
+          label: "水",
+          skills: [
+            skill("mend_glow", "微光治癒", "以柔和的水光治癒自己。", { mp: 11 }, "self", [], {
+              enabled: false,
+              disabled_reason: { code: "insufficient_mp", message: "魔力不足。" },
+            }),
+          ],
+        },
+      ],
+    },
+  ];
+}

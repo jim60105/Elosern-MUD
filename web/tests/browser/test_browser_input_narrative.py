@@ -1037,6 +1037,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "--motion-flash",
         "--motion-stagger",
         "--motion-marker-bob",
+        "--motion-playback-sweep",
     )
 
     def _data_motion(self, page):

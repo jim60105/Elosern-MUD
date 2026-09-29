@@ -667,9 +667,9 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
     def _focus_combat_dock(self, page) -> None:
         """Focus the action dock and wait for the mounted, unlocked router.
 
-        H3: at the combat root (depth 1) the active row container is the tab
-        bar, which carries ``data-testid="dock-menu"`` (the preserved hook that
-        moves between the tab bar and the pane). Waiting for that container
+        At the combat root (depth 1) the active row container is the pane's
+        vertical command list, which carries ``data-testid="dock-menu"`` like
+        every other frame's row container. Waiting for that container
         proves the KeyboardRouter frame is mounted; waiting for
         ``isMutationInFlight()`` false closes the submission gate. Together
         they guarantee a subsequent Enter press reaches the KeyboardRouter and
@@ -753,6 +753,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
     @covers_requirement("webclient-browser-verification::art-panel-portrait-keyboard-journeys-establish-dock-focus-before-key-presses")
+    @covers_requirement("webclient-contextual-hud::basic-attack-starts-focused-on-an-eligible-opposing-candidate")
     def test_keyboard_focus_switches_the_portrait_without_a_packet(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -774,16 +775,19 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # target descriptor resolves to that participant's portrait. The dock
         # is focused and its router frame mounted (and unlocked) first, so the
         # Enter press is never swallowed by the command drawer or an editable
-        # field. The single-target menu lists the actor first (presenter
-        # order), so move past it to the enemy target like the combat-menu
-        # journeys do.
+        # field. Basic attack opens focused on the first enabled foe the
+        # server listed (webclient-combat-command-window), so no key is needed
+        # to reach the enemy target.
         self._focus_combat_dock(page)
         page.keyboard.press("Enter")
         # The basic-attack target menu mounts (its first cell is a target row)
         # before navigating it.
         self._wait_combat_row_key(page, "target-", row_zero=True)
-        page.keyboard.press("ArrowRight")  # past the actor to the enemy target
         self._wait_combat_row_key(page, "target-" + str(monster_id))
+        wait_for_store_state(
+            page,
+            lambda state: state.get("focus", {}).get("key") == "target-" + str(monster_id),
+        )
         # H3: after navigating to the enemy target, the participant frame
         # (ParticipantFrame) shows the monster's name in the 敵方 group.
         wait_for_store_state(
@@ -828,18 +832,18 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # Forfeit the battle deterministically (no dice roll): the terminal
         # settlement clears the session and the catalog entry disappears in the
         # same combat update.
-        # H3: the combat root is a single-row tab bar (the draft's floating
-        # panel), so the forfeit tab is reached with ArrowRight (ArrowDown is
-        # a no-op on a single-row bar). Root order: attack, skills, items,
-        # 背包 (the client-local drawer row), defend, flee, forfeit.
+        # The combat root is one vertical list (webclient-combat-command-
+        # window), so the forfeit row is reached with ArrowDown. Root order:
+        # attack, skills, items, 背包 (the client-local drawer row), defend,
+        # flee, forfeit.
         self._focus_combat_dock(page)
         for _ in range(6):
-            page.keyboard.press("ArrowRight")
+            page.keyboard.press("ArrowDown")
             page.wait_for_timeout(60)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
             "forfeit",
-            "the forfeit tab is the focused root cell",
+            "the forfeit row is the focused root cell",
         )
         page.keyboard.press("Enter")  # open the secondary Forfeit menu
         # The confirmation frame mounts before the confirming Enter.

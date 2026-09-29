@@ -10,11 +10,13 @@
 // `enabled`, `action_id`, `params`, `kind`, `scaleChoice`, `selected`). No
 // DOM, no store access — a pure function of the committed frame.
 //   - `cards`:   the suggestions frame (`.sugs` cards).
+//   - `commands`: the combat root, category, and group lists (one vertical
+//                column of icon-and-label rows with a neutral count).
 //   - `skills`:  the combat skill frame (`.sk` rows beside the detail pane).
 //   - `targets`: the combat target frame (`.tok` tokens).
 //   - `scales`:  the 威力 scale step (`.scales`).
 //   - `confirm`: a confirm/cancel confirmation frame (`.cast` / warning panel).
-//   - `plain`:   anything else (root tab bar, empty frames).
+//   - `plain`:   anything else (single-target rows, empty frames).
 //
 // The retired move frame's `outlet` kind is gone with the frame
 // (webclient-retire-exploration-submenus): exits are the scene overview's
@@ -72,19 +74,26 @@ export function classifyPane(frame) {
   if (items.some((i) => i.action_id === "toggle-target" || i.selected === true)) {
     return "targets";
   }
-  // The skill frame: rows carry the `open-skill` / `open-group` /
-  // `open-category` actions.
-  if (items.some((i) => i.action_id === "open-skill" || i.action_id === "open-group" || i.action_id === "open-category")) {
+  // The combat command lists (webclient-combat-command-window): the root,
+  // category, and group frames, whose every row is a `command` row.
+  if (
+    rows.length > 0 &&
+    rows.every((i) => {
+      return i.command === true;
+    })
+  ) {
+    return "commands";
+  }
+  // The skill frame: rows carry the `open-skill` action.
+  if (items.some((i) => i.action_id === "open-skill")) {
     return "skills";
   }
   return "plain";
 }
 
-// Tab-bar badges (task 4.4): derived from the committed payload only —
-// `技能` = the flattened skill-descriptor count. The combat root is the only
-// frame that renders as a tab bar (webclient-scene-overview-swap), so its
-// `skills` tab is the only badged surface. No badge for an unknowable or
-// zero count.
+// The combat root's counts (task 4.4): derived from the committed payload
+// only — `技能` = the flattened skill-descriptor count, the only counted root
+// row. No count for an unknowable or zero value.
 export function badgeCount(surface, view) {
   const panels = (view && view.panels) || {};
   switch (surface) {
@@ -106,7 +115,7 @@ export function badgeCount(surface, view) {
   }
 }
 
-// The badge shows only for a positive count (no badge for zero/unknowable).
+// The count shows only when positive (none for zero/unknowable).
 export function badgeVisible(count) {
   return typeof count === "number" && count > 0;
 }

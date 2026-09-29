@@ -102,15 +102,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         The framed grid's column count is client-owned presentation
         (mode/pane-dependent), so the journeys measure the mounted grid
-        instead of hardcoding it. The root tab bar is itself a listbox
-        carrying ``data-item-key`` tabs; the keyboard router walks the
-        committed FRAME's own grid, so the tab bar is excluded from the
-        measurement."""
+        instead of hardcoding it. The combat root renders in the pane as
+        the frame's own vertical list (webclient-combat-command-window), so
+        every mounted row is a cell of the committed frame."""
         cells = page.evaluate(
             """() => Array.from(
                  document.querySelectorAll(
                    '#action-dock [role="listbox"] [data-item-key]'))
-               .filter((el) => !el.closest(".dock-tab-bar"))
                .map((el) => {
                  const r = el.getBoundingClientRect();
                  return { key: el.getAttribute('data-item-key'),
@@ -191,7 +189,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._press(page, key)
 
     def _open_skills(self, page) -> None:
-        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "ArrowDown")  # skills row
         self._press(page, "Enter")  # -> category frame
 
     def _open_category(self, page, category: str) -> None:
@@ -199,7 +197,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         single-group category opens its skill frame directly)."""
         names = [item["category"] for item in self._combat_panel(page)["skills"]]
         self.assertIn(category, names)
-        self._press_to(page, "ArrowRight", names.index(category))
+        self._press_to(page, "ArrowDown", names.index(category))
         self._press(page, "Enter")
 
     def _focus_skill(self, page, category: str, key: str) -> None:
@@ -238,16 +236,14 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             install_outbound_recorder(page)
             self._engage(page)
-            # H3 (design D2/D11): the combat root is a single-row tab bar
-            # (depth 1); the pane (DockMenu + SkillDetailPane) renders only at
-            # depth >= 2. Navigate into the skill frame: skills tab -> category
+            # Navigate into the skill frame: skills row -> category
             # -> the mastered ladder's element group (mode-dependent position)
             # -> its skill frame.
             roles = self._roles()
-            self._press(page, "ArrowRight")  # skills tab
+            self._press(page, "ArrowDown")  # skills row
             self._press(page, "Enter")  # open category frame (elemental_magic focused)
             self._press(page, "Enter")  # open elemental_magic -> element group frame
-            self._press_to(page, "ArrowRight", roles["ladder_group_index"])
+            self._press_to(page, "ArrowDown", roles["ladder_group_index"])
             self._press(page, "Enter")  # open the ladder's group -> its skill frame
             # The dock host carries the split: item list left, detail right —
             # as direct children of `.dock-pane-host`, with no anonymous layout
@@ -318,14 +314,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             # Disabled cells are dimmed (dimmer border + dimmer text) but
             # still focusable for their explanation. Pop back to the combat root
             # (three Escapes: skill -> group -> category -> root) and focus the
-            # disabled `items` root tab.
+            # disabled `items` root row.
             self._press(page, "Escape")  # -> group frame
             self._press(page, "Escape")  # -> category frame
-            self._press(page, "Escape")  # -> combat root (depth 1)
-            self._press(page, "ArrowRight")  # skills tab
-            self._press(page, "ArrowRight")  # items tab (disabled)
-            disabled = page.locator("#action-dock .dock-tab-bar__tab[disabled]").first
-            self.assertTrue(disabled.evaluate("el => el.disabled"), "disabled root tab is disabled")
+            self._press(page, "Escape")  # -> combat root, focus on its opener (skills)
+            self._press(page, "ArrowDown")  # items row (disabled)
+            disabled = page.locator('#action-dock [data-item-key="items"]')
+            self.assertEqual(disabled.get_attribute("aria-disabled"), "true", "disabled root row is disabled")
             self.assertEqual(disabled.get_attribute("tabindex"), "-1")
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
@@ -341,7 +336,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
 
         # H3 (design D11): the ladder skill sits in the elemental_magic /
-        # mastery-element group. Skills tab -> category frame -> group frame
+        # mastery-element group. Skills row -> category frame -> group frame
         # -> ladder group -> skill frame -> 威力 scale step (preselected ×1)
         # -> target flow.
         ladder = self._roles()["ladder_key"]
@@ -407,7 +402,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         ).inner_text()
 
         # H3 (design D11): the ladder skill sits in the elemental_magic /
-        # mastery-element group. Skills tab -> category frame -> group frame
+        # mastery-element group. Skills row -> category frame -> group frame
         # -> ladder group -> skill frame -> 威力 scale step (mastery owned);
         # the scale cells are walked by key, not by a fixed press count.
         roles = self._roles()

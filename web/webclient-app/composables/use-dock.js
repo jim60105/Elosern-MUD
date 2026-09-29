@@ -4,7 +4,7 @@
 // derivation, and the dock's pointer-activation handlers. Extracted verbatim
 // from AppClient.vue so the SFC stays a passive renderer.
 import { computed, nextTick, watch } from "vue";
-import { classifyPane } from "../components/dock-panes.js";
+import { badgeCount, badgeVisible, classifyPane } from "../components/dock-panes.js";
 
 export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }) {
   // Normalize the committed top navigation and action-root entries identically.
@@ -39,6 +39,9 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   // (target entries), normalized the same way the store's focus menu does.
   // This is the single source the preserved keyboard router and the visible
   // DockMenu both consume, so pointer and keyboard parity is maintained.
+  // The committed combat skill-descriptor count (the root's 技能 row).
+  const skillsCount = computed(() => badgeCount("skills", store.view));
+
   const dockItems = computed(() => {
     // The degraded exploration root (webclient-declarative-frame-stack): the
     // root frame itself is unresolvable, so the pane presents the router's
@@ -148,6 +151,19 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
         // action, the AREA targets by `selected` / `toggle-target`).
         normalized.scaleChoice = item.scaleChoice === true;
         normalized.kind = item.kind ?? null;
+        // The vertical command lists (webclient-combat-command-window): the
+        // `command` flag selects the list form; the count is the committed
+        // descriptor count (the root's 技能 row, a category, a group).
+        if (item.command === true) {
+          normalized.command = true;
+          const count = item.key === "skills" ? skillsCount.value : item.skillCount;
+          if (badgeVisible(count)) {
+            normalized.count = count;
+          }
+        }
+        if (item.team) {
+          normalized.team = item.team;
+        }
         return normalized;
       });
     }

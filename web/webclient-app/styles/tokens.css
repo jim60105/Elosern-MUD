@@ -167,6 +167,10 @@
   /* The page marker's slow bob (webclient-message-typesetting); a loop, so
      it stops at reduced and off. Its travel is scaled by `--motion-travel`. */
   --motion-marker-bob: 1.6s;
+  /* The combat playback cue's decorative sweep (webclient-combat-command-
+     window): a looping highlight that states no progress; still at reduced
+     and off. */
+  --motion-playback-sweep: 1.6s;
   --motion-marker-travel: 2px;
   /* The combat beat pause (webclient-combat-beat-queue design D2, AVG stage
      design §10.2): the wait between one beat page and the next. Only the
@@ -824,6 +828,7 @@
   --motion-flash: 0ms;
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
+  --motion-playback-sweep: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -852,6 +857,7 @@
   --motion-flash: 0ms;
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
+  --motion-playback-sweep: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -891,6 +897,7 @@
     --motion-flash: 0ms;
     --motion-stagger: 0ms;
     --motion-marker-bob: 0ms;
+    --motion-playback-sweep: 0ms;
     --motion-travel: 0;
     --motion-flash-peak: 0;
   }

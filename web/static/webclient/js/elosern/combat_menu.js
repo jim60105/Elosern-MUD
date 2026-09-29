@@ -100,6 +100,21 @@
   // Root menus.
   // -------------------------------------------------------------------------
 
+  // The root rows' client-local explanatory copy
+  // (webclient-combat-command-window): what each command opens or does, shown
+  // in the detail beside the highlighted row. It states no gameplay value;
+  // the disabled placeholders explain themselves through their reason.
+  var ROOT_COPY = {
+    attack: "選擇一名目標，以普通攻擊出手。",
+    skills: "從已習得的技能中選擇施展。",
+    bag: "開啟背包，查看攜帶的物品。",
+    flee: "嘗試脫離這場戰鬥。",
+    forfeit: "放棄這場戰鬥；送出前需要再次確認。",
+  };
+
+  // Every root, category, and group row carries `command: true`: the dock
+  // renders those frames as one vertical command list (a single column, so
+  // Up/Down wrap and Left/Right are no-ops).
   function rootItems(panel) {
     var recovery = panel && panel.session && panel.session.state === "recovery";
     // Forfeit always opens the secondary confirmation menu first; only
@@ -113,17 +128,19 @@
           enabled: true,
           actionId: null,
           payload: null,
+          command: true,
+          description: ROOT_COPY.forfeit,
         },
       ];
     }
     return [
-      { key: "attack", label: "攻擊", enabled: true, actionId: null, payload: null },
-      { key: "skills", label: "技能", enabled: true, actionId: null, payload: null },
-      { key: "items", label: "道具", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
-      { key: "bag", label: "背包", enabled: true, actionId: null, payload: null, openDrawer: "inventory" },
-      { key: "defend", label: "防禦", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
-      { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" } },
-      { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null },
+      { key: "attack", label: "攻擊", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.attack },
+      { key: "skills", label: "技能", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.skills },
+      { key: "items", label: "道具", enabled: false, actionId: null, payload: null, command: true, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
+      { key: "bag", label: "背包", enabled: true, actionId: null, payload: null, openDrawer: "inventory", command: true, description: ROOT_COPY.bag },
+      { key: "defend", label: "防禦", enabled: false, actionId: null, payload: null, command: true, disabledReason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
+      { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" }, command: true, description: ROOT_COPY.flee },
+      { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.forfeit },
     ];
   }
 
@@ -153,6 +170,7 @@
         actionId: "open-category",
         payload: { categoryIndex: index },
         skillCount: count,
+        command: true,
       });
     });
     return items;
@@ -169,6 +187,8 @@
         enabled: true,
         actionId: "open-group",
         payload: { categoryIndex: categoryIndex, groupIndex: index },
+        skillCount: (group.skills || []).length,
+        command: true,
       });
     });
     return items;
@@ -226,7 +246,7 @@
       items: items,
       focusKey: null,
       grid: true,
-      gridCols: items.length,
+      gridCols: 1,
       title: category.label,
     };
   }
@@ -372,6 +392,7 @@
           key: "target-" + participant.identity,
           label: participant.display_name,
           description: participant.state === "active" ? null : participant.state,
+          team: participant.team || null,
           enabled: true,
           actionId: "combat.cast",
           payload: castPayloadFor(skill, {
@@ -397,6 +418,7 @@
       items.push({
         key: "area-" + participant.identity,
         label: participant.display_name,
+        team: participant.team || null,
         enabled: true,
         actionId: "toggle-target",
         payload: { identity: participant.identity },
@@ -444,21 +466,21 @@
 
     var rootItemsList = rootItems(panel);
     var categoryItemsList = categoryItems(panel);
-    // The combat root is a single-row tab bar (H3 design D12): the column
-    // count equals the item count — 6 in the normal state, 1 in `recovery`.
+    // The combat root and the category frame are vertical command lists
+    // (webclient-combat-command-window): one column, in every state.
     var menus = {
       root: {
         items: rootItemsList,
         focusKey: state.focusKey || null,
         grid: true,
-        gridCols: rootItemsList.length,
+        gridCols: 1,
         title: "戰鬥",
       },
       categories: {
         items: categoryItemsList,
         focusKey: null,
         grid: true,
-        gridCols: categoryItemsList.length,
+        gridCols: 1,
         title: "技能",
       },
       forfeit: {
@@ -519,17 +541,46 @@
     if (!skill) {
       return null;
     }
+    // A SINGLE / self / none frame is one vertical column like the rest of
+    // the command window (webclient-combat-command-window); the AREA frame
+    // keeps its two-column token grid.
     return {
       items: targetItemsFor(skill, combat.participants),
       focusKey: null,
       skillKey: skillKey,
       grid: true,
-      gridCols: 2,
+      gridCols: skill.targetSpec === "area" ? 2 : 1,
       title: "目標",
     };
   }
 
   // Apply one confirmed scale choice to the focused skill.
+  // The initial focus of basic attack's SINGLE target frame
+  // (webclient-combat-command-window): the first enabled opposing candidate
+  // the server listed, else the first enabled candidate, else null (the
+  // frame keeps its default focus). Candidate order is never changed and
+  // nothing is selected or submitted; every other skill returns null.
+  function initialTargetKey(combat, skillKey) {
+    var skill = combat && combat.skillByKey ? combat.skillByKey[skillKey] : null;
+    if (!skill || skillKey !== BASIC_ATTACK_KEY || skill.targetSpec !== "single" || !skill.enabled) {
+      return null;
+    }
+    var items = targetItemsFor(skill, combat.participants || []);
+    var firstEnabled = null;
+    for (var i = 0; i < items.length; i += 1) {
+      if (items[i].enabled === false) {
+        continue;
+      }
+      if (items[i].team === "foes") {
+        return items[i].key;
+      }
+      if (firstEnabled === null) {
+        firstEnabled = items[i].key;
+      }
+    }
+    return firstEnabled;
+  }
+
   function chooseScale(combat, skillKey, scale) {
     var skill = combat.skillByKey[skillKey];
     if (!skill || !skill.freeformScales || skill.freeformScales.length === 0) {
@@ -650,6 +701,7 @@
     openGroup: openGroup,
     openSkill: openSkill,
     openSkillTargets: openSkillTargets,
+    initialTargetKey: initialTargetKey,
     chooseScale: chooseScale,
     scaleLabelFor: scaleLabelFor,
     toggleArea: toggleArea,

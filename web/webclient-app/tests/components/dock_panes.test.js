@@ -15,6 +15,27 @@ import { describe, expect, it } from "vitest";
 import { badgeCount, classifyPane } from "../../components/dock-panes.js";
 
 describe("classifyPane (task 5.1)", () => {
+  it("classifies the combat root, categories, and groups as commands only when every row is a command", async () => {
+    const CombatMenu = (await import("../../lib/combat_menu.js")).default;
+    const root = CombatMenu.rootItems({ session: { state: "ready" } }).map((item) => ({
+      key: item.key,
+      label: item.label,
+      command: item.command,
+      action_id: item.actionId || undefined,
+    }));
+    expect(root).toHaveLength(7);
+    expect(classifyPane({ items: root })).toBe("commands");
+    const recovery = CombatMenu.rootItems({ session: { state: "recovery" } }).map((item) => ({ key: item.key, command: item.command }));
+    expect(classifyPane({ items: recovery })).toBe("commands");
+    const categories = [
+      { key: "skill-cat-0", label: "武技", action_id: "open-category", command: true },
+      { key: "back", label: "返回", navigation: true },
+    ];
+    expect(classifyPane({ items: categories })).toBe("commands");
+    // One row without the flag keeps the frame out of the command form.
+    expect(classifyPane({ items: [...root.slice(0, 2), { key: "stray", label: "x" }] })).toBe("plain");
+  });
+
   it("classifies the retired exploration look/target frames (no producer) as plain", () => {
     // The look and interact frames are not DockMenu frames any more
     // (webclient-talk-open-dock): their rows are the scene overview's chips

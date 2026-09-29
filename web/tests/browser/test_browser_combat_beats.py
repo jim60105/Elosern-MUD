@@ -162,6 +162,8 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(playback["count"], len(self._beats(page)))
         self.assertIsNone(view.get("displayHp"))
         self.assertFalse(view["dispatch"]["beatLocked"])
+        # Nothing locks at `off`, so the command region shows no waiting cue.
+        self.assertEqual(page.locator('[data-testid="action-dock-playback"]').count(), 0)
 
         # The declared revision is accepted and the round is done, so the dock
         # accepts again; the attack is the only ui_action of the round.
@@ -184,6 +186,7 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-combat-menu::a-combat-round-plays-beat-by-beat")
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
     @covers_requirement("webclient-contextual-hud::presentation-timing-never-gates-committed-state-or-input")
+    @covers_requirement("webclient-contextual-hud::playback-lock-is-visible-without-inventing-progress")
     def test_round_plays_and_skips_reduced(self):
         """At `reduced` the round plays itself, holds the dock, and a click ends it."""
         page = self.logged_in_page((1920, 1080), motion_level="reduced")
@@ -216,6 +219,20 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the round never played at the reduced level",
         )
         self.assertTrue(store_state(page)["dispatch"]["beatLocked"])
+        # The command region says it is waiting and offers the existing skip;
+        # its decorative line claims no progress and stands still at reduced.
+        cue = page.locator('[data-testid="action-dock-playback"]')
+        cue.wait_for(state="visible", timeout=5000)
+        self.assertIn("回合演出中", cue.inner_text())
+        self.assertEqual(cue.locator('[data-testid="action-dock-playback-skip"]').count(), 1)
+        self.assertNotRegex(cue.inner_text(), r"\d+\s*%")
+        self.assertEqual(cue.locator('[role="progressbar"]').count(), 0)
+        self.assertEqual(
+            cue.locator(".action-dock__playback-line").evaluate(
+                "el => getComputedStyle(el).animationDuration"
+            ),
+            "0s",
+        )
         # The dock is locked: an Enter on it submits nothing.
         focus_action_dock(page)
         before = sent_action_count(page)
@@ -247,6 +264,9 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             timeout=5000,
         )
         self.assertFalse(view["dispatch"]["beatLocked"], "the playback lock cleared at once")
+        self.assertEqual(
+            page.locator('[data-testid="action-dock-playback"]').count(), 0, "the cue clears with playback"
+        )
         # Every displayed value is the committed value again.
         self.assertIsNone(view["displayHp"])
         resources = view["panels"]["status"]["resources"]["hp"]

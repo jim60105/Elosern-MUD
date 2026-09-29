@@ -315,32 +315,25 @@ describe("store dispatch + focus", () => {
       );
       expect(store.view.focus.key).toBe("attack");
       expect(store.view.focus.label).toBe("攻擊");
-      // H3 (task 2.7): the combat root is now a single-row tab bar (the
-      // column count equals the item count — 7 in the normal state), so the
-      // arrow-key geometry is horizontal. A vertical press is a no-op.
-      expect(store.focusPress("ArrowDown")).toBe(false);
+      // The combat root is one vertical command list
+      // (webclient-combat-command-window): a horizontal press is a no-op,
+      // ArrowDown walks the rendered order — the client-local 背包 row
+      // included — and wraps from the last row to the first.
+      expect(store.focusPress("ArrowRight")).toBe(false);
+      expect(store.focusPress("ArrowLeft")).toBe(false);
       expect(store.view.focus.key).toBe("attack");
-      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.focusPress("ArrowDown")).toBe(true);
       expect(store.view.focus.key).toBe("skills");
       expect(store.view.focus.label).toBe("技能");
-      // Walk the single-row tab bar to the last tab (the secondary
-      // `forfeit` action, the preserved 投降 entry). The client-local 背包
-      // row (inventory-item-actions: the combat dock root adds one
-      // client-local bag drawer row) is a keyboard stop by contract — the
-      // Node gate pins the 7-key root (combat_menu.test.js:124) and
-      // webclient-desktop-shell pins the column-count-equals-item-count
-      // geometry, so the walk includes it.
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("items");
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("bag");
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("defend");
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("flee");
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("forfeit");
+      for (const key of ["items", "bag", "defend", "flee", "forfeit"]) {
+        expect(store.focusPress("ArrowDown")).toBe(true);
+        expect(store.view.focus.key).toBe(key);
+      }
       expect(store.view.focus.label).toBe("投降");
+      expect(store.focusPress("ArrowDown")).toBe(true);
+      expect(store.view.focus.key).toBe("attack");
+      expect(store.focusPress("ArrowUp")).toBe(true);
+      expect(store.view.focus.key).toBe("forfeit");
     });
 
     it("the combat top-navigation 背包 entry opens inventory without any dispatch", () => {

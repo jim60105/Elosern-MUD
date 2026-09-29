@@ -165,7 +165,7 @@ describe("ActionDock (B2 action-dock family)", () => {
 
   it("renders one legend in exploration, dialogue, and combat, and none in creation", () => {
     for (const mode of ["exploration", "dialogue", "combat"]) {
-      const w = mountDock({ mode, rootItems: COMBAT_ROOT_ITEMS, tabBar: true });
+      const w = mountDock({ mode, rootItems: COMBAT_ROOT_ITEMS });
       expect(w.findAll('[data-testid="action-dock-description"]'), mode).toHaveLength(1);
       w.unmount();
     }
@@ -173,25 +173,34 @@ describe("ActionDock (B2 action-dock family)", () => {
     expect(creation.findAll('[data-testid="action-dock-description"]')).toHaveLength(0);
   });
 
-  it("renders the tab bar only for the combat root", () => {
-    // The exploration/dialogue root is the scene overview, which renders in
-    // the pane — never as a tab bar (webclient-scene-overview-swap D3).
-    const exploration = mountDock({ rootItems: ROOT_ITEMS });
-    expect(exploration.find(".dock-tab-bar").exists()).toBe(false);
-    exploration.unmount();
+  it("renders no root chrome of its own: the combat root is the pane's command list", () => {
+    // webclient-combat-command-window: the dock carries no tab bar; the
+    // combat root renders through DockMenu's `commands` form in the pane.
+    const combat = mountDock({ mode: "combat", rootItems: COMBAT_ROOT_ITEMS });
+    // Every row container and row lives in the pane: no chrome row outside.
+    const menus = combat.findAll('[data-testid="dock-menu"]');
+    expect(menus).toHaveLength(1);
+    expect(menus[0].element.closest(".action-dock__pane")).not.toBeNull();
+    for (const row of combat.findAll("[data-item-key]")) {
+      expect(row.element.closest(".action-dock__pane")).not.toBeNull();
+    }
+  });
 
-    const combat = mountDock({ mode: "combat", rootItems: COMBAT_ROOT_ITEMS, tabBar: true });
-    expect(combat.find(".dock-tab-bar").exists()).toBe(true);
-    // The combat tab icon's `<path>` carries the reference's per-key stroke
-    // attributes: `attack`/`flee` have cap only, `skills` (the star) neither.
-    const attackPath = combat.find('.dock-tab-bar__tab[data-item-key="attack"] .dock-tab-bar__icon path');
-    expect(attackPath.attributes("stroke-linecap")).toBe("round");
-    expect(attackPath.attributes("stroke-linejoin")).toBeUndefined();
-    const fleePath = combat.find('.dock-tab-bar__tab[data-item-key="flee"] .dock-tab-bar__icon path');
-    expect(fleePath.attributes("stroke-linecap")).toBe("round");
-    const skillsPath = combat.find('.dock-tab-bar__tab[data-item-key="skills"] .dock-tab-bar__icon path');
-    expect(skillsPath.attributes("stroke-linecap")).toBeUndefined();
-    expect(skillsPath.attributes("stroke-linejoin")).toBeUndefined();
+  it("shows the playback cue only while playback, and its skip emits once", async () => {
+    const w = mountDock({ mode: "combat", rootItems: COMBAT_ROOT_ITEMS });
+    expect(w.find('[data-testid="action-dock-playback"]').exists()).toBe(false);
+    await w.setProps({ playback: true });
+    const cue = w.get('[data-testid="action-dock-playback"]');
+    // The wait is announced; the skip button sits outside the live region.
+    expect(cue.get('[role="status"]').text()).toBe("回合演出中");
+    expect(cue.find('[role="status"] button').exists()).toBe(false);
+    // A decorative line only: no percentage or progress value anywhere.
+    expect(cue.text()).not.toMatch(/\d+\s*%/);
+    expect(cue.find('[role="progressbar"]').exists()).toBe(false);
+    await w.get('[data-testid="action-dock-playback-skip"]').trigger("click");
+    expect(w.emitted("skip")).toHaveLength(1);
+    await w.setProps({ playback: false });
+    expect(w.find('[data-testid="action-dock-playback"]').exists()).toBe(false);
   });
 
   it("renders the overlay slot inside the action-dock body, after the pane", () => {

@@ -102,15 +102,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         The framed grid's column count is client-owned presentation
         (mode/pane-dependent), so the journeys measure the mounted grid
-        instead of hardcoding it. The root tab bar is itself a listbox
-        carrying ``data-item-key`` tabs; the keyboard router walks the
-        committed FRAME's own grid, so the tab bar is excluded from the
-        measurement."""
+        instead of hardcoding it. The combat root renders in the pane as
+        the frame's own vertical list (webclient-combat-command-window), so
+        every mounted row is a cell of the committed frame."""
         cells = page.evaluate(
             """() => Array.from(
                  document.querySelectorAll(
                    '#action-dock [role="listbox"] [data-item-key]'))
-               .filter((el) => !el.closest(".dock-tab-bar"))
                .map((el) => {
                  const r = el.getBoundingClientRect();
                  return { key: el.getAttribute('data-item-key'),
@@ -191,7 +189,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._press(page, key)
 
     def _open_skills(self, page) -> None:
-        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "ArrowDown")  # skills row
         self._press(page, "Enter")  # -> category frame
 
     def _open_category(self, page, category: str) -> None:
@@ -199,7 +197,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         single-group category opens its skill frame directly)."""
         names = [item["category"] for item in self._combat_panel(page)["skills"]]
         self.assertIn(category, names)
-        self._press_to(page, "ArrowRight", names.index(category))
+        self._press_to(page, "ArrowDown", names.index(category))
         self._press(page, "Enter")
 
     def _focus_skill(self, page, category: str, key: str) -> None:
@@ -237,7 +235,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._engage(page)
         # The mode's NONE-shape active lives in a mode-dependent category
         # (enhancement shipped, utility under the kit install). H3 (design
-        # D11): skills tab -> category frame; the category opens the skill
+        # D11): skills row -> category frame; the category opens the skill
         # frame (the carrier row is focused after the intra-frame walk).
         roles = self._roles()
         self._open_skills(page)
@@ -261,7 +259,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         # H3 (design D11): wind_blade is the elemental_magic / wind group.
-        # Skills tab -> category frame (elemental_magic focused) -> group frame
+        # Skills row -> category frame (elemental_magic focused) -> group frame
         # -> select the ladder's element group -> skill frame -> 威力 scale
         # step (preselected ×1) -> all-enemies shorthand.
         ladder = self._roles()["ladder_key"]
@@ -293,16 +291,16 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "ArrowRight")  # items (disabled)
+        self._press(page, "ArrowDown")  # skills
+        self._press(page, "ArrowDown")  # items (disabled)
         self._press(page, "Enter")
-        self._press(page, "ArrowRight")  # 背包 (the client-local drawer row)
-        self._press(page, "ArrowRight")  # defend (disabled)
+        self._press(page, "ArrowDown")  # 背包 (the client-local drawer row)
+        self._press(page, "ArrowDown")  # defend (disabled)
         page.wait_for_timeout(120)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
             "defend",
-            "the disabled defend tab is the focused root cell",
+            "the disabled defend row is the focused root cell",
         )
         self._press(page, "Enter")
         page.wait_for_timeout(300)
@@ -313,15 +311,15 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowRight")  # skills (1)
-        self._press(page, "ArrowRight")  # items (2)
-        self._press(page, "ArrowRight")  # 背包 (3, client-local drawer row)
-        self._press(page, "ArrowRight")  # defend (4)
-        self._press(page, "ArrowRight")  # flee (5)
+        self._press(page, "ArrowDown")  # skills (1)
+        self._press(page, "ArrowDown")  # items (2)
+        self._press(page, "ArrowDown")  # 背包 (3, client-local drawer row)
+        self._press(page, "ArrowDown")  # defend (4)
+        self._press(page, "ArrowDown")  # flee (5)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
             "flee",
-            "the flee tab is the focused root cell",
+            "the flee row is the focused root cell",
         )
         self._press(page, "Enter")
 
@@ -337,21 +335,19 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
-        # H3 (design D2): the combat root is a single-row tab bar (attack,
-        # skills, items, 背包, defend, flee, forfeit — the client-local 背包
-        # row joined it with add-inventory-item-actions) — navigation is
-        # horizontal. Focus reaches `forfeit` (index 6) by pressing
-        # ArrowRight six times.
-        self._press(page, "ArrowRight")  # skills (1)
-        self._press(page, "ArrowRight")  # items (2)
-        self._press(page, "ArrowRight")  # 背包 (3, client-local drawer row)
-        self._press(page, "ArrowRight")  # defend (4)
-        self._press(page, "ArrowRight")  # flee (5)
-        self._press(page, "ArrowRight")  # forfeit (6)
+        # The combat root is one vertical list (attack, skills, items, 背包,
+        # defend, flee, forfeit — webclient-combat-command-window). Focus
+        # reaches `forfeit` (index 6) by pressing ArrowDown six times.
+        self._press(page, "ArrowDown")  # skills (1)
+        self._press(page, "ArrowDown")  # items (2)
+        self._press(page, "ArrowDown")  # 背包 (3, client-local drawer row)
+        self._press(page, "ArrowDown")  # defend (4)
+        self._press(page, "ArrowDown")  # flee (5)
+        self._press(page, "ArrowDown")  # forfeit (6)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
             "forfeit",
-            "the forfeit tab is the focused root cell",
+            "the forfeit row is the focused root cell",
         )
         self._press(page, "Enter")  # open the secondary Forfeit menu
         self.assertEqual(
@@ -463,7 +459,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page((1280, 720))
         install_outbound_recorder(page)
         self._engage(page)
-        self._open_skills(page)  # skills tab -> category frame
+        self._open_skills(page)  # skills row -> category frame
 
         pane_selector = '#action-dock [data-testid="dock-menu"]'
         page.wait_for_selector(pane_selector, timeout=15000)

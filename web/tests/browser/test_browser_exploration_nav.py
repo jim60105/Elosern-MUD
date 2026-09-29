@@ -159,8 +159,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         return page.evaluate("() => window.__elosernBridge.router.depth()")
 
     def _pane_keys(self, page) -> list[str]:
-        """Every rendered row identity inside the dock (tab-bar tabs and
-        pane rows share the `data-item-key` seam; the legacy suggestion
+        """Every rendered row identity inside the dock (the pane's
+        rows carry the `data-item-key` seam; the legacy suggestion
         cards render without one)."""
         return page.evaluate(
             "() => Array.from("

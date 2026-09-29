@@ -110,7 +110,7 @@ WORLD_FAMILY_STORY_IDS = {
 # (design D3): after B5 the frozen manifest carries the complete required
 # set, so this baseline must extend — not restructure. The H1/H2/H3 HUD
 # waves added keys (HudFrame, SceneBackdrop, FullLogOverlay,
-# RestForm, DockTabBar, DockBreadcrumb, SkillDetailPane,
+# RestForm, DockBreadcrumb, SkillDetailPane,
 # VitalsTrack, ConditionChips, ParticipantFrame), which this baseline now
 # carries as well. The Feedback/ToastQueue key from the
 # add-action-feedback-toasts change joins it at the manifest's refreeze
@@ -131,7 +131,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/OptionCard",
     "Action/RestForm",
     "Action/ChoiceCardRow",
-    "Action/DockTabBar",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     "Data/StatusPanel",

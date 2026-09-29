@@ -108,7 +108,7 @@ DEFERRED_TITLE_PATTERNS = (
 # The required-set baseline with the overlays family keys removed: the B1
 # core, B2 action-dock, B3 data, and B4 world + services keys, plus the
 # H1–H3 HUD wave keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
-# DockTabBar, DockBreadcrumb, SkillDetailPane, VitalsTrack, ConditionChips,
+# DockBreadcrumb, SkillDetailPane, VitalsTrack, ConditionChips,
 # ParticipantFrame) and the `World/MapLattice` key the
 # improve-webclient-map-overlay-scale change added to the frozen set. The
 # Feedback/ToastQueue key from the add-action-feedback-toasts change joins
@@ -129,7 +129,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/OptionCard",
     "Action/RestForm",
     "Action/ChoiceCardRow",
-    "Action/DockTabBar",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     "Data/StatusPanel",

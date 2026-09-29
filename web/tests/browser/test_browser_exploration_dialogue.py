@@ -472,9 +472,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(overview_labels, "the scene overview must render while talking")
         self.assertNotIn("對話選項", "".join(overview_labels))
         self.assertEqual(
-            page.locator("#action-dock .dock-tab-bar").count(),
+            page.locator('#action-dock [data-pane-kind="commands"]').count(),
             0,
-            "dialogue mode renders the overview, not a tab bar",
+            "dialogue mode renders the overview, not the combat command list",
         )
 
         # The message window pages the greeting (no reply box, no row); the

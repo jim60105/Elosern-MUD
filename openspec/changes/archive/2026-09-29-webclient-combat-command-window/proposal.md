@@ -20,6 +20,8 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 
 - `webclient-contextual-hud`: Modify existing contracts and add the observable requirements below.
 - `webclient-combat-menu`: Modify existing contracts and add the observable requirements below.
+- `webclient-pointer-activation`: The combat root's persistent-tab-bar allowance becomes a vertical root list that a deeper frame replaces.
+- `webclient-desktop-shell`: The approved command surface and the keyboard-routing geometry name the vertical combat root instead of a tab bar.
 
 ## Impact
 

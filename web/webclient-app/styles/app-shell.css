@@ -203,24 +203,61 @@ body {
    narrow region without horizontal overflow. */
 .elosern-root [data-anchor="band-command"] .dock-detail { flex: 0 1 min(220px, 45%); min-width: 0; }
 .elosern-root [data-anchor="band-command"] .skill-detail-pane { flex: 1 1 min(220px, 45%); min-width: 0; }
-/* The combat root tab bar shares the region's width: every tab stays on the
-   first row (equal shares, centred), so no tab ever wraps into the
-   breadcrumb. */
-.elosern-root [data-anchor="band-command"] .dock-tab-bar { flex-wrap: wrap; row-gap: 2px; }
-.elosern-root [data-anchor="band-command"] .dock-tab-bar__tab { flex: 1 1 0; min-width: 0; justify-content: center; gap: 6px; padding-inline: 6px; white-space: nowrap; }
+/* The combat command window (webclient-combat-command-window): the list
+   fills the pane's height and scrolls on its own, so the focused row scrolls
+   inside the list above the legend strip and the detail never travels with
+   it. */
+.dock-pane-host.dock-pane-host--bounded {
+  align-items: stretch;
+}
+.dock-pane-host--bounded > .dock-menu,
+.dock-pane-host--bounded > .dock-detail,
+.dock-pane-host--bounded > .skill-detail-pane {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.dock-pane-host--bounded > .dock-menu {
+  padding: 1px;
+}
+/* A combat confirmation frame's plain rows (a single target, self, none)
+   stack in the list's one column, each target marked by its side: a warm
+   seal edge for a foe, the mana blue for the party. */
+.dock-pane-host--bounded .dock-menu__plain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dock-pane-host--bounded .dock-menu__plain > .dock-menu-item {
+  justify-content: flex-start;
+  min-height: 34px;
+  padding: 4px 12px;
+  font-family: var(--f-serif);
+  font-size: var(--text-base);
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+.dock-pane-host--bounded .dock-menu__plain > .dock-menu-item[data-team] {
+  border-left-width: 3px;
+}
+.dock-pane-host--bounded .dock-menu__plain > .dock-menu-item[data-team="foes"] {
+  border-left-color: var(--seal-500);
+}
+.dock-pane-host--bounded .dock-menu__plain > .dock-menu-item[data-team="party"] {
+  border-left-color: var(--vit-mp);
+}
+/* The detail keeps its own height (and its own scroll), so a short
+   explanation reads as a card rather than an empty column. */
+.dock-pane-host--bounded > .dock-detail,
+.dock-pane-host--bounded > .skill-detail-pane {
+  align-self: flex-start;
+}
 /* The command-line row sits on the message region's top edge (design D3):
    a tab-like strip that reads as part of the band beneath it — rounded top
    corners, a hairline gold top edge, and no seam against the band. */
 .elosern-root [data-anchor="command-line"] { display: flex; align-items: flex-end; }
 .elosern-root [data-anchor="command-line"] > * { flex: 1; min-width: 0; }
-.elosern-root .dock-tab-bar {
-  height: auto;
-  min-height: 38px;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.elosern-root .dock-tab-bar__tab { border: 1px solid #53504a; border-radius: 5px; padding: 8px 10px; background: linear-gradient(#ffffff05, #0002); font-family: var(--f-serif); }
-.elosern-root .dock-tab-bar__tab--on { background: var(--gold-glow); border-color: var(--gold-400); color: var(--gold-400); box-shadow: inset 0 -2px var(--gold-500); }
 /* The waiting frame renders inside the band's narrow command region: its
    three cards stack in one column (design D5). */
 .waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
@@ -239,29 +276,6 @@ body {
 .elosern-root .action-dock__pane {
   overflow-x: hidden;
   scrollbar-width: thin;
-}
-.elosern-root [data-elosern-mode="combat"] .dock-tab-bar { flex-wrap: nowrap; align-items: stretch; }
-.elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
-  flex: 1;
-  justify-content: center;
-  padding: 13px 10px;
-  font-size: var(--text-base);
-}
-.elosern-root [data-elosern-mode="combat"] .dock-tab-bar__icon { width: 21px; height: 21px; }
-/* In a narrow command region (1440 and 1280 wide viewports) the combat
-   root's seven tabs stack icon over label, so all of them keep one row
-   without touching (webclient-avg-stage-shell design D5). */
-.elosern-root [data-anchor="band-command"] { container: band-command / inline-size; }
-@container band-command (max-width: 560px) {
-  .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
-    flex-direction: column;
-    gap: 3px;
-    height: auto;
-    min-height: 52px;
-    padding: 6px 2px;
-    font-size: var(--text-xs);
-  }
-  .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__icon { width: 17px; height: 17px; }
 }
 .elosern-root .skill-detail-pane { border-radius: 5px; padding: 14px 18px; }
 .elosern-root .skill-detail-pane__name { font: var(--text-xl) var(--f-serif); }
@@ -378,7 +392,6 @@ body {
   .elosern-root .hud-drawer__art { flex-basis: 29%; }
   .elosern-root .inventory-panel { grid-template-columns: 120px minmax(170px, 1fr) minmax(200px, .9fr); gap: 12px; }
   .inventory-panel__details { padding: 12px; }
-  .elosern-root .dock-tab-bar__tab { padding: 6px 8px; font-size: var(--text-xs); }
   .elosern-root .character-status-drawer__section { padding: 12px; }
 }
 @media (max-width: 1000px) {
