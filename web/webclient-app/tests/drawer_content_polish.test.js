@@ -142,20 +142,23 @@ describe("lineage identity", () => {
   const chain = (key, label, meter, nodes) => ({ root_skill_key: key, element_or_style_zh: label, consumed: false, meter, nodes });
 
   it("shows each same-label chain's supplied root name beside its own progress", () => {
+    // File-local synthetic lineage rows (test-data-independence): invented
+    // element prose outside the shipped lore universe, mirroring
+    // overlays/lineage_panel.test.js.
     const w = mount(LineagePanel, {
       props: {
         lineage: {
           schema_version: 1, available: true, kind: "lineage", completed_count: 0, total_count: 4,
           chains: [
-            chain("a_root", "火", 0.4, [node("a_root", "火焰箭")]),
-            chain("b_root", "火", 0.8, [node("b_root", "火球術")]),
-            chain("c_root", "風", 0.1, [node("c_root", "風")]),
-            chain("d_root", "水", 0.2, []),
+            chain("a_root", "焰流", 0.4, [node("a_root", "焰羽箭")]),
+            chain("b_root", "焰流", 0.8, [node("b_root", "焰潮波")]),
+            chain("c_root", "馜流", 0.1, [node("c_root", "馜流")]),
+            chain("d_root", "潮流", 0.2, []),
           ],
         },
       },
     });
-    for (const [key, name, pct] of [["a_root", "火焰箭", "40%"], ["b_root", "火球術", "80%"]]) {
+    for (const [key, name, pct] of [["a_root", "焰羽箭", "40%"], ["b_root", "焰潮波", "80%"]]) {
       const head = w.get(`[data-testid="lineage-chain-toggle-${key}"]`);
       expect(head.get(`[data-testid="lineage-chain-root-${key}"]`).text()).toBe(name);
       // Order inside the row: identity, then the meter, then the figure.
