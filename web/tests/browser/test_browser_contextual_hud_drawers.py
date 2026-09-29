@@ -469,3 +469,93 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 if viewport == (1440, 900):
                     page.screenshot(path=f"tmp/status_drawer_{viewport[0]}x{viewport[1]}.png")
                 page.close()
+
+    # ------------------------------------------------------------------
+    # webclient-drawer-frame-unification: the shared opaque reference frame.
+    # ------------------------------------------------------------------
+
+    _FRAME_PROBE = """(selector) => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const panel = document.querySelector(selector);
+      const nav = document.querySelector('.desktop-navigation').getBoundingClientRect();
+      const line = document.querySelector('[data-testid="anchor-command-line"]').getBoundingClientRect();
+      const r = panel.getBoundingClientRect();
+      const cs = getComputedStyle(panel);
+      // The panel is opaque on its own: a solid colour or a gradient whose
+      // every stop is opaque. No translucent stop may let the stage through.
+      const paint = cs.backgroundImage + ' ' + cs.backgroundColor;
+      const gradientStops = (cs.backgroundImage.match(/rgba?\\([^)]*\\)/g) || []);
+      const translucent = gradientStops.filter((c) => /rgba\\(/.test(c) && !/,\\s*1\\)$/.test(c));
+      const hit = (x, y) => document.elementFromPoint(x, y);
+      const lineHit = hit(line.left + line.width / 2, line.top + line.height / 2);
+      const stripHit = hit(vw / 2, vh - 12);
+      const headers = panel.querySelectorAll(':scope > .drawer-header');
+      return {
+        vw, vh, navBottom: nav.bottom,
+        rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom },
+        lineRect: { top: line.top, bottom: line.bottom },
+        opaqueGradient: gradientStops.length > 0 && translucent.length === 0,
+        paint,
+        lineCovered: panel.contains(lineHit),
+        stripTestid: stripHit && stripHit.getAttribute('data-testid'),
+        headers: headers.length,
+        closes: panel.querySelectorAll('.drawer-header__close').length,
+      };
+    }"""
+
+    def _assert_workspace_frame(self, probe, what, viewport):
+        vw, vh = viewport
+        r = probe["rect"]
+        self.assertAlmostEqual(r["top"], probe["navBottom"] + 12, delta=1, msg=f"{what} top at {viewport}")
+        self.assertAlmostEqual(r["left"], 16, delta=1, msg=f"{what} left at {viewport}")
+        self.assertAlmostEqual(r["right"], vw - 16, delta=1, msg=f"{what} right at {viewport}")
+        self.assertAlmostEqual(r["bottom"], vh - 56, delta=1, msg=f"{what} bottom at {viewport}")
+        self.assertTrue(probe["opaqueGradient"], f"{what} panel is fully opaque at {viewport}: {probe['paint']}")
+        self.assertTrue(probe["lineCovered"], f"{what} covers the expanded command-line row at {viewport}")
+        self.assertEqual(probe["headers"], 1, f"{what} carries exactly one shared header")
+        self.assertEqual(probe["closes"], 1, f"{what} carries exactly one close control")
+
+    @covers_requirement(
+        "webclient-contextual-hud::reference-surfaces-share-an-opaque-accessible-frame",
+        "webclient-contextual-hud::reference-surfaces-render-in-a-right-anchored-drawer-with-one-modal-contract",
+        "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time",
+    )
+    def test_reference_surfaces_share_one_opaque_workspace_frame(self):
+        """Drawers and overlays fill one opaque workspace under the navigation
+        that covers the expanded command-line row and leaves only the band's
+        lowest strip under a scrim; the overlay scrim absorbs pointer input
+        below the navigation while the navigation still switches overlays."""
+        for viewport in ((1280, 720), (1440, 900), (1920, 1080)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+                _wait_mode(page, "exploration")
+                page.locator('[data-testid="command-line-toggle"]').click()
+                page.wait_for_selector('[data-testid="anchor-command-line"][data-expanded="true"]', timeout=15000)
+
+                self._open_status_drawer(page)
+                probe = page.evaluate(self._FRAME_PROBE, '[data-testid="hud-drawer"]')
+                self._assert_workspace_frame(probe, "the status drawer", viewport)
+                self.assertEqual(probe["stripTestid"], "hud-drawer-scrim",
+                                 "the drawer scrim covers the band's exposed strip")
+                page.keyboard.press("Escape")
+                page.wait_for_function(
+                    "() => document.querySelector('[data-testid=\"hud-drawer\"]') === null", timeout=15000)
+
+                page.locator('[data-testid="nav-settings"]').click()
+                page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+                probe = page.evaluate(self._FRAME_PROBE, '[data-testid="overlay-host"]')
+                self._assert_workspace_frame(probe, "the settings overlay", viewport)
+                self.assertEqual(probe["stripTestid"], "overlay-host-scrim",
+                                 "the overlay scrim covers the band's exposed strip")
+                # A pointer press on the scrim never closes the overlay.
+                page.mouse.click(viewport[0] / 2, viewport[1] - 12)
+                self.assertEqual(page.locator('[data-testid="settings-overlay"]').count(), 1,
+                                 "the overlay scrim absorbs the press without closing the overlay")
+                # The navigation stays above the scrim: its 說明 control
+                # replaces the open overlay by pointer.
+                page.locator('[data-testid="nav-tool-help"]').click()
+                page.wait_for_selector('[data-testid="help-overlay"]', timeout=15000)
+                self.assertEqual(page.locator('[data-testid="settings-overlay"]').count(), 0)
+                self.assertEqual(page.locator('[data-testid="overlay-host"]').get_attribute("aria-label"), "說明")
+                page.close()

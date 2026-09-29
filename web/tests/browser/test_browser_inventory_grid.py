@@ -335,7 +335,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
         # thousands-grouped integer), and no sort/filter/search pill exists.
         balance = page.evaluate(
             """() => ({
-                subtitle: (document.querySelector('.hud-drawer__subtitle') || {}).textContent,
+                subtitle: (document.querySelector('.drawer-header__subtitle') || {}).textContent,
                 value: (document.querySelector('[data-testid="inventory-panel__wallet-value"]') || {}).textContent,
                 nodes: document.querySelectorAll('[data-testid="inventory-panel__wallet-value"]').length,
             })"""

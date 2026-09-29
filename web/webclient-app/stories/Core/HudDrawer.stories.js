@@ -1,8 +1,9 @@
 import { h } from "vue";
 import HudDrawer from "../../components/HudDrawer.vue";
 
-// HudDrawer (H4, webclient-hud-04-reference-drawers, design D1): the
-// right-anchored drawer chrome shared by the six reference drawers. The
+// HudDrawer (H4, webclient-hud-04-reference-drawers; framing unified by
+// webclient-drawer-frame-unification): the reference-workspace drawer chrome
+// under the shared DrawerHeader, shared by the reference drawers. The
 // showcase stories are deterministic and offline: closed, open with a short
 // body, open with an overflowing (scrollable) body, and open with a footer.
 

@@ -100,14 +100,13 @@ function selectSubject(subject) {
     <p v-if="!available" class="gallery-note" role="status">{{ model?.reason?.message || '肖像圖庫目前無法使用。' }}</p>
     <template v-else>
       <div class="gallery-panel__workspace">
-        <header class="gallery-panel__heading">
-          <div>
-            <h2>角色肖像圖庫</h2>
-            <p>角色肖像管理</p>
-            <span class="gallery-muted">依裝備狀態管理切換，或手動指定預設圖。</span>
-          </div>
+        <!-- The overlay host's shared header names the gallery and owns its
+             close control; this row carries only the guidance and the
+             primary action. -->
+        <div class="gallery-panel__heading">
+          <span class="gallery-muted">依裝備狀態管理切換，或手動指定預設圖。</span>
           <button class="gallery-primary" :disabled="locked" @click="openEditor('generate')">生成新圖</button>
-        </header>
+        </div>
         <nav class="gallery-panel__subjects" aria-label="肖像圖庫角色">
           <button v-for="subject in model.subjects" :key="subject.subject_key" :aria-pressed="subject.subject_key === model.selected" :disabled="locked" @click="selectSubject(subject)">{{ subject.display_name }}</button>
         </nav>
@@ -155,9 +154,8 @@ function selectSubject(subject) {
 .gallery-panel { display: grid; grid-template-columns: minmax(0, 1fr) 290px; min-height: 100%; background: linear-gradient(115deg, #191a21, #101119 60%); }
 .gallery-panel__workspace { min-width: 0; padding: 22px; }
 .gallery-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
-.gallery-panel__heading h2 { margin: 0; font-size: clamp(25px, 2.4vw, 38px); font-weight: 600; }
-.gallery-panel__heading p { margin: 4px 0; font-size: var(--text-lg); color: #e8d7b0; }
-.gallery-panel__heading > button { min-width: 150px; min-height: 52px; font-size: var(--text-lg); letter-spacing: .06em; }
+.gallery-panel__heading .gallery-muted { font-size: var(--text-md); }
+.gallery-panel__heading > button { min-width: 140px; min-height: 44px; font-size: var(--text-lg); letter-spacing: .06em; }
 .gallery-panel__subjects { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 18px; }
 .gallery-panel__subjects button { padding: 5px 11px; font-size: var(--text-xs); border-radius: 18px; }
 .gallery-panel__toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }

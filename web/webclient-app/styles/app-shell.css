@@ -32,11 +32,6 @@ body {
 
 /* Reference-led desktop composition. Game state and focus remain component-owned. */
 .elosern-root {
-  /* The drawer workspace's bottom inset. Drawers are reference surfaces laid
-     over the stage: they keep their full height and cover the bottom band
-     and the command-line row above it (webclient-avg-stage-shell design D8),
-     leaving only the band's lowest strip visible. */
-  --workspace-bottom: calc(var(--command-line-h) + 12px);
   background: var(--ink-950);
 }
 .elosern-root::before {
@@ -312,17 +307,6 @@ body {
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-band { filter: brightness(.45); }
-.elosern-root .hud-drawer-scrim { background: #080a0c78; backdrop-filter: none; }
-.elosern-root .hud-drawer {
-  inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom) 16px;
-  width: auto;
-  border: 1px solid #bca57966;
-  border-radius: 8px;
-  background: linear-gradient(110deg, #0d1013eb, #111419f5 60%);
-  box-shadow: 0 12px 60px #0009, inset 0 1px 0 #e8d8aa12;
-}
-.elosern-root .hud-drawer__head { min-height: 54px; box-sizing: border-box; padding: 10px 20px; }
-.elosern-root .hud-drawer__title { color: var(--gold-400); font-family: var(--f-serif); font-size: var(--text-2xl); }
 /* Scene-decoration exception: sample-town/forest/guild remain deliberate
    backdrop washes (scene-domain, truthfully labeled by SceneBackdrop), not
    portrait surfaces — the gallery face-rect consumption retired only the
@@ -335,7 +319,6 @@ body {
 .elosern-root .hud-drawer__body { flex: 1; min-width: 0; padding: 20px; scrollbar-color: #55524b transparent; scrollbar-width: thin; }
 .elosern-root .hud-drawer[data-drawer-key="quest"] .hud-drawer__art { order: 2; flex-basis: 24%; background-image: linear-gradient(0deg, #111419, transparent), url("../assets/redesign/sample-guild.webp"); }
 .elosern-root .hud-drawer[data-drawer-key="quest"] .hud-drawer__workspace { background: linear-gradient(#0e1015eb, #0e1015eb), url("../assets/redesign/sample-guild.webp") center / cover; }
-.elosern-root .hud-drawer__close { background: #232529; border-radius: 4px; }
 .elosern-root .character-status-drawer { display: grid; grid-template-columns: 1.15fr 1fr; align-items: start; gap: 16px; }
 .elosern-root .character-status-drawer__title { display: none; }
 .elosern-root .character-status-drawer__section { margin: 0; padding: 16px; border: var(--line); border-radius: 7px; background: linear-gradient(130deg, #22242670, #101215c0); }

@@ -44,9 +44,9 @@
 .gallery-ui .gallery-link { padding: 2px 0; background: none; border: none; color: var(--gold-400); text-decoration: underline; }
 .gallery-ui .gallery-feedback { margin: 12px 0; padding: 12px; border: 1px solid #d2876255; background: #59352225; }
 .gallery-ui .gallery-feedback button { margin-left: 8px; }
-.gallery-ui .hud-drawer__title { color: #efdba6; font-size: var(--text-3xl); }
-.gallery-ui .hud-drawer__head { border-color: #a5967755; }
-.gallery-ui .hud-drawer { border: 1px solid #bca57988; background: linear-gradient(120deg, #1b1c22, #0b1016); }
+/* The nested editors are a right-hand sheet over the gallery workspace: the
+   shared workspace top and bottom, a narrower width, the same opaque ink. */
+.gallery-ui .hud-drawer { left: auto; width: min(600px, calc(100vw - 32px)); border: 1px solid #bca57988; background: linear-gradient(120deg, #1b1c22, #0b1016); }
 .gallery-editor-layout { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 16px; margin: 18px 0; }
 .gallery-editor-reference { min-width: 0; text-align: center; border: 1px solid #bca57977; padding: 6px; background: linear-gradient(145deg, #51402733, #11141c); border-radius: 5px; }
 .gallery-editor-reference .gallery-editor-portrait { height: 260px; border: 0; }

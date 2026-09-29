@@ -75,7 +75,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
         # H4 (task 9.2): the heading is now the open reference drawer's own
         # title (the `#panel-right` reference panels were emptied into drawers).
-        heading = page.locator(".hud-drawer__title")
+        heading = page.locator("[data-testid=\"hud-drawer__title\"]")
         self.assertTrue(heading.is_visible())
 
 

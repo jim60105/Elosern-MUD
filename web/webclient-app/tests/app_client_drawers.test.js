@@ -105,7 +105,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // Location 1 — the shared head subtitle (relocate-inventory-drawer-
     // essentials): thousands-grouped integer copper from the character panel
     // (3,240 — never the services-side 1,200).
-    const subtitles = wrapper.findAll(".hud-drawer__subtitle");
+    const subtitles = wrapper.findAll(".drawer-header__subtitle");
     expect(subtitles).toHaveLength(1);
     expect(subtitles[0].text()).toBe("錢袋 3,240 銅");
     // Location 2 — the single row of the `金錢` body section: the exact same
@@ -188,12 +188,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     // The composed drawer head: the `skills` glyph + the 主動 11 · 被動 3
     // subtitle (the fixture's own row counts, not invented data).
-    const icon = wrapper.find(".hud-drawer__icon");
+    const icon = wrapper.find(".drawer-header__icon");
     expect(icon.exists()).toBe(true);
     expect(icon.find("path").attributes("d")).toBe(
       "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     );
-    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("主動 11 · 被動 3");
+    expect(wrapper.get(".drawer-header__subtitle").text()).toBe("主動 11 · 被動 3");
     // The footer states the client's own `/cast` syntax as static copy.
     expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
       "施放入口：cast <技法>[@威力]=<代號>",
@@ -204,11 +204,11 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // remaining four drawers keep the icon-less / footer-less chrome.
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    const invIcon = wrapper.find(".hud-drawer__icon");
+    const invIcon = wrapper.find(".drawer-header__icon");
     expect(invIcon.exists()).toBe(true);
     expect(invIcon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
-    expect(wrapper.find('[data-testid="hud-drawer__title"].hud-drawer__title').exists()).toBe(true);
-    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("錢袋 3,240 銅");
+    expect(wrapper.find('[data-testid="hud-drawer__title"].drawer-header__title').exists()).toBe(true);
+    expect(wrapper.get(".drawer-header__subtitle").text()).toBe("錢袋 3,240 銅");
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
   });
 
@@ -219,7 +219,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // subtitle is empty (the degrade-without-inventing-data contract).
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
     // A committed `ui_snapshot` (an epoch/mode change) tears down the open
     // drawer, so close it, commit the unavailable panel, then re-open.
     store.closeHudDrawer({});
@@ -248,8 +248,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // Panel unavailable: still no subtitle, but the head icon and the
     // static footer hint are client-local chrome — they render regardless
     // of the panel's availability.
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
-    expect(wrapper.find(".hud-drawer__icon").exists()).toBe(true);
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".drawer-header__icon").exists()).toBe(true);
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(true);
   });
 
@@ -284,10 +284,10 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // (relocate-inventory-drawer-essentials: an unavailable panel renders no
     // balance at all), and the body renders no `金錢` row either
     // (realign-inventory-drawer-layout).
-    const icon = wrapper.find(".hud-drawer__icon");
+    const icon = wrapper.find(".drawer-header__icon");
     expect(icon.exists()).toBe(true);
     expect(icon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
     expect(wrapper.find('[data-testid="inventory-panel__wallet-value"]').exists()).toBe(false);
   });
 
@@ -316,9 +316,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // The bag body renders only the registry-owned reason; the header keeps
     // the bag glyph but renders no wallet subtitle (no balance, no zero).
     expect(wrapper.find('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
-    const icon = wrapper.find(".hud-drawer__icon");
+    const icon = wrapper.find(".drawer-header__icon");
     expect(icon.exists()).toBe(true);
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
   });
 
   it("renders no wallet subtitle when the services inventory section is absent", async () => {
@@ -345,9 +345,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-testid="inventory-panel__absent"]').exists()).toBe(true);
-    const icon = wrapper.find(".hud-drawer__icon");
+    const icon = wrapper.find(".drawer-header__icon");
     expect(icon.exists()).toBe(true);
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
   });
 
   // add-persona-edit-surface: one drawer persona edit submits exactly one
@@ -557,8 +557,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
     expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
-    expect(wrapper.get('.hud-drawer__title').text()).toBe("同伴 · 隊伍");
-    expect(wrapper.get('.hud-drawer__subtitle').text()).toBe("1 / 4");
+    expect(wrapper.get('.drawer-header__title').text()).toBe("同伴 · 隊伍");
+    expect(wrapper.get('.drawer-header__subtitle').text()).toBe("1 / 4");
   });
 
   it("hides the party quickbar in creation mode or when party panel is unavailable", async () => {
