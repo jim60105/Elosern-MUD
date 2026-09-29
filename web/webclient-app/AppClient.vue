@@ -71,7 +71,7 @@ const {
   waitOpen, skipDisabled, activateWait, practiceOpen, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
-  drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose, questServicesPanel,
+  drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, questServicesPanel,
   questGuildAvailable, questServicesUnavailable, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_CAST_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
@@ -502,9 +502,13 @@ function onFoeLineupGone() {
       :drawer-key="store.view.hudDrawer"
       @close="onHudDrawerClose"
     >
-      <template #art>
+      <!-- Only a drawer about the current character stands its portrait
+           beside the content (webclient-drawer-content-polish); the other
+           drawers provide no art slot and take the whole workspace. -->
+      <template v-if="drawerHasArt" #art>
         <ReferenceArtwork
-          :portrait="store.view.hudDrawer === 'quest' ? null : currentPortrait"
+          :portrait="currentPortrait"
+          :initial-of="currentCharacter?.name || ''"
         />
       </template>
       <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />

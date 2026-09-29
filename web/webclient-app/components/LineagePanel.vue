@@ -57,6 +57,15 @@ function formatXp(value) {
   return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
 }
 
+// The chain's disambiguating subtitle (webclient-drawer-content-polish): the
+// supplied root node's display name, so two chains sharing an element/style
+// label stay distinguishable. Omitted when absent or equal to the label; no
+// name is ever derived from a skill key.
+function rootName(chain) {
+  const name = Array.isArray(chain.nodes) ? chain.nodes[0]?.display_name_zh : null;
+  return typeof name === "string" && name && name !== chain.element_or_style_zh ? name : "";
+}
+
 function nodeMeter(node) {
   return `${formatXp(node.xp_into_level)}/${formatXp(node.xp_into_level + node.xp_to_next_level)} → 下一階`;
 }
@@ -106,14 +115,15 @@ function nodeMeter(node) {
           >
             <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          <span class="lineage-chain__label">{{ chain.element_or_style_zh }}</span>
-          <span
-            v-if="chain.consumed"
-            class="lineage-chain__consumed"
-            data-testid="lineage-chain-consumed"
-            >已全數見頂</span
-          >
-          <span v-else class="lineage-chain__percent">{{ chainPercent(chain.meter) }}%</span>
+          <span class="lineage-chain__identity">
+            <span class="lineage-chain__label">{{ chain.element_or_style_zh }}</span>
+            <span
+              v-if="rootName(chain)"
+              class="lineage-chain__root"
+              :data-testid="`lineage-chain-root-${chain.root_skill_key}`"
+              >{{ rootName(chain) }}</span
+            >
+          </span>
           <span
             class="lineage-chain__meter"
             role="img"
@@ -125,6 +135,13 @@ function nodeMeter(node) {
               :style="{ width: `${chainPercent(chain.meter)}%` }"
             ></span>
           </span>
+          <span
+            v-if="chain.consumed"
+            class="lineage-chain__consumed"
+            data-testid="lineage-chain-consumed"
+            >已全數見頂</span
+          >
+          <span v-else class="lineage-chain__percent">{{ chainPercent(chain.meter) }}%</span>
         </button>
         <ul
           v-if="expanded.has(chain.root_skill_key)"
@@ -170,7 +187,7 @@ function nodeMeter(node) {
 .lineage-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 
@@ -183,7 +200,7 @@ function nodeMeter(node) {
 
 .lineage-panel__header {
   margin: 0;
-  padding: 0 0 18px;
+  padding: 0 0 var(--sp-3);
   border-bottom: var(--line);
   font-family: var(--f-serif);
   font-size: var(--text-2xl);
@@ -197,13 +214,20 @@ function nodeMeter(node) {
   overflow: hidden;
 }
 
+/* The collapsed chain row (webclient-drawer-content-polish): a compact
+   ~56px row — chevron, identity (label over its root-node subtitle), then
+   the progress meter right beside it (at most 320px) and its figure — so
+   the eye never travels across an empty row to read a chain's progress.
+   The identity column is shared by every row, so the meters align. */
 .lineage-chain__head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 13em) minmax(96px, 320px) auto;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  column-gap: var(--sp-3);
   width: 100%;
-  padding: 20px;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: var(--sp-2) var(--sp-4);
   color: var(--paper-100);
   background: transparent;
   border: 0;
@@ -233,6 +257,14 @@ function nodeMeter(node) {
   transform: rotate(90deg);
 }
 
+.lineage-chain__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--sp-2);
+  min-width: 0;
+}
+
 .lineage-chain__label {
   overflow-wrap: anywhere;
   font-family: var(--f-serif);
@@ -240,23 +272,29 @@ function nodeMeter(node) {
   color: var(--paper-50);
 }
 
-.lineage-chain__consumed {
-  color: var(--gold-400);
+.lineage-chain__root {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--paper-500);
   font-size: var(--text-sm);
 }
 
+.lineage-chain__consumed {
+  color: var(--gold-400);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
 .lineage-chain__percent {
-  color: var(--paper-500);
+  min-width: 3.5ch;
+  color: var(--paper-300);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums lining-nums;
 }
 
 .lineage-chain__meter {
-  flex: 1;
-  min-width: 100px;
-  max-width: 360px;
-  margin-left: auto;
-  height: 8px;
+  display: block;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -265,27 +303,28 @@ function nodeMeter(node) {
 .lineage-chain__meter-fill {
   display: block;
   height: 100%;
-  background: var(--gold-400);
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
 }
 
 .lineage-chain__nodes {
   margin: 0;
-  padding: 0 20px 20px 46px;
+  padding: 0 var(--sp-4) var(--sp-4) 42px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-2);
 }
 
 .lineage-node {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  padding: 14px;
+  padding: var(--sp-2) var(--sp-3);
   border-left: 2px solid var(--gold-500);
   background: var(--ink-900);
   overflow-wrap: anywhere;
-  gap: 10px;
+  gap: 6px var(--sp-3);
   font-size: var(--text-sm);
 }
 

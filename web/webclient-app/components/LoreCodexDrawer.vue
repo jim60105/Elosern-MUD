@@ -11,6 +11,7 @@
 // denominator, no percentage, no locked/hidden placeholder. The codex is
 // opened from the command line's utility strip (not from the quest drawer).
 import { computed, ref } from "vue";
+import EmptyState from "./EmptyState.vue";
 
 const props = defineProps({
   // The committed `lore_codex` panel payload. Null (never committed) renders
@@ -144,13 +145,16 @@ const selectedEntry = computed(
         </button>
       </div>
 
-      <p
+      <!-- An available codex with nothing discovered yet
+           (webclient-drawer-content-polish): the shared empty guidance. -->
+      <EmptyState
         v-if="isEmpty"
         class="lore-codex-drawer__empty"
         data-testid="lore-codex-drawer__empty"
-      >
-        尚未發現任何條目
-      </p>
+        glyph="lore"
+        headline="尚未發現任何條目"
+        guidance="旅途中發現的條目會依分類收錄於此。"
+      />
 
       <!-- Entry list for the selected category (the aggregate lists every
            discovered entry across categories). No rows are fabricated. -->
@@ -379,7 +383,6 @@ const selectedEntry = computed(
   overflow-wrap: anywhere;
 }
 
-.lore-codex-drawer__empty,
 .lore-codex-drawer__unavailable,
 .lore-codex-drawer__absent {
   margin: 0;

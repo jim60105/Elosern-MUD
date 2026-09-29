@@ -20,6 +20,7 @@
 // The read-model logic lives in the use-status-drawer-* composables (the
 // use-map-lattice / use-creation facade precedent); this SFC is the thin
 // passive renderer that destructures their flat binding set below.
+import { computed } from "vue";
 import { conditionLabel } from "../lib/condition_label.js";
 import { useStatusDrawerCharacter } from "../composables/use-status-drawer-character.js";
 import { useStatusDrawerStatus } from "../composables/use-status-drawer-status.js";
@@ -47,7 +48,7 @@ const emit = defineEmits(["open-skill", "open-party", "persona-edit"]);
 const conditionName = conditionLabel;
 
 // The `character` v5/v7 read-model group (availability gating, traits and the
-// 屬性 allowlist, disguise, guild, persona table, intimate rows, full title).
+// 屬性 allowlist, disguise, guild, persona table, intimate rows).
 const {
   characterAvailable,
   characterReason,
@@ -60,7 +61,6 @@ const {
   guild,
   personaSections,
   intimate,
-  fullTitle,
   INTIMATE_ROWS,
 } = useStatusDrawerCharacter(props);
 
@@ -80,6 +80,23 @@ const {
   conditions,
 } = useStatusDrawerStatus(props, traits);
 
+// The hero identity (webclient-drawer-content-polish): the committed actor
+// name and composed full title from the `status` panel (every mode), and the
+// guild rank from the `character` panel; blank or absent values render
+// nothing.
+const actorName = computed(() => {
+  const name = props.status?.available === false ? null : props.status?.actor?.name;
+  return typeof name === "string" ? name.trim() : "";
+});
+const fullTitle = computed(() => {
+  const title = props.status?.available === false ? null : props.status?.actor?.full_title;
+  return typeof title === "string" ? title.trim() : "";
+});
+const guildRank = computed(() => {
+  const rank = guild.value?.rank;
+  return typeof rank === "string" ? rank.trim() : "";
+});
+
 // The persona inline-editor state machine (watch stays with its state).
 const {
   editingField,
@@ -93,35 +110,51 @@ const {
 
 <template>
   <section class="character-status-drawer" data-testid="character-status-drawer">
-    <h3 class="character-status-drawer__title" data-testid="character-status-drawer__title">角色狀態</h3>
-    <p
-      v-if="fullTitle"
-      class="character-status-drawer__full-title"
-      data-testid="character-status-drawer__full-title"
-    >
-      {{ fullTitle }}
-    </p>
-
-    <!-- The single labelled control that opens the skill drawer (task 5.5). -->
-    <button
-      type="button"
-      class="character-status-drawer__skill-link"
-      data-testid="character-status-drawer__open-skill"
-      @click="$emit('open-skill')"
-    >
-      技能書
-    </button>
-
-    <!-- The single labelled control that opens the party drawer (webclient-retire-redundant-hud design D4). -->
-    <button
-      v-if="partyAvailable"
-      type="button"
-      class="character-status-drawer__skill-link"
-      data-testid="character-status-drawer__open-party"
-      @click="$emit('open-party')"
-    >
-      同伴 · 隊伍
-    </button>
+    <!-- The hero (webclient-drawer-content-polish): the committed
+         character's name, its composed full title and its guild rank, each
+         rendered only when the payload supplies it — never a guessed value —
+         over one wrapping row of the existing secondary drawer openers. The
+         name and title come from the `status` panel, which is available in
+         every mode; the rank belongs to the `character` panel. The drawer
+         title itself lives only in the shared header. -->
+    <header class="character-status-drawer__hero" data-testid="character-status-drawer__hero">
+      <div class="character-status-drawer__heading">
+        <p v-if="actorName" class="character-status-drawer__name" data-testid="character-status-drawer__name">{{ actorName }}</p>
+        <p v-if="fullTitle || guildRank" class="character-status-drawer__standing">
+          <span
+            v-if="fullTitle"
+            class="character-status-drawer__full-title"
+            data-testid="character-status-drawer__full-title"
+          >{{ fullTitle }}</span>
+          <span
+            v-if="guildRank"
+            class="character-status-drawer__rank"
+            data-testid="character-status-drawer__hero-rank"
+          >公會階級 {{ guildRank }}</span>
+        </p>
+      </div>
+      <div class="character-status-drawer__actions" role="group" aria-label="相關頁面">
+        <!-- The single labelled control that opens the skill drawer (task 5.5). -->
+        <button
+          type="button"
+          class="character-status-drawer__action"
+          data-testid="character-status-drawer__open-skill"
+          @click="$emit('open-skill')"
+        >
+          技能書
+        </button>
+        <!-- The single labelled control that opens the party drawer (webclient-retire-redundant-hud design D4). -->
+        <button
+          v-if="partyAvailable"
+          type="button"
+          class="character-status-drawer__action"
+          data-testid="character-status-drawer__open-party"
+          @click="$emit('open-party')"
+        >
+          同伴 · 隊伍
+        </button>
+      </div>
+    </header>
 
     <!-- Vitals: the three gauges, rendered directly from status.resources. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__vitals" aria-label="生命指標">
@@ -131,6 +164,7 @@ const {
           v-for="v in VITALS"
           :key="v.key"
           class="character-status-drawer__statrow"
+          :class="{ 'character-status-drawer__statrow--wide': gaugeLayers(v.key).length > 2 }"
           :data-testid="`character-status-drawer__vital--${v.key}`"
           :data-low="String(v.key === 'hp' && lowHp)"
         >
@@ -178,7 +212,7 @@ const {
          is fabricated. -->
     <p
       v-if="!characterAvailable && characterReason"
-      class="character-status-drawer__unavailable"
+      class="character-status-drawer__unavailable character-status-drawer__section--full"
       data-testid="character-status-drawer__unavailable"
       :data-reason-code="characterReason.code"
     >
@@ -195,6 +229,7 @@ const {
           v-for="row in attributeRows"
           :key="row.key"
           class="character-status-drawer__statrow"
+          :class="{ 'character-status-drawer__statrow--wide': row.layers?.length > 2 }"
           :data-testid="`character-status-drawer__trait--${row.key}`"
         >
           <span class="character-status-drawer__statrow-key">{{ row.label }}</span>
@@ -351,7 +386,7 @@ const {
          or a collapsed-empty widget. -->
     <details
       v-if="intimate"
-      class="character-status-drawer__section character-status-drawer__intimate"
+      class="character-status-drawer__section character-status-drawer__section--full character-status-drawer__intimate"
       data-testid="character-status-drawer__intimate"
       aria-label="親密狀態"
     >
@@ -387,7 +422,7 @@ const {
          ({ field, text }; a blank draft submits null). When the
          `character` panel is unavailable the area stays visible, is marked
          with the registry-owned reason, and offers no edit controls. -->
-    <section class="character-status-drawer__section" data-testid="character-status-drawer__persona" aria-label="設定">
+    <section class="character-status-drawer__section character-status-drawer__section--full character-status-drawer__persona" data-testid="character-status-drawer__persona" aria-label="設定">
       <p
         v-if="!characterAvailable"
         class="character-status-drawer__section-reason"

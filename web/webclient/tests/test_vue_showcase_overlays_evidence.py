@@ -124,6 +124,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/FullLogOverlay",
     "Core/HudDrawer",
     "Core/DrawerHeader",
+    "Core/EmptyState",
     "Action/ActionDock",
     "Action/DockMenu",
     "Action/DockMenuItem",

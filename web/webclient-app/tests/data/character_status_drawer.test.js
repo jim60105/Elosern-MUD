@@ -337,21 +337,23 @@ describe("CharacterStatusDrawer full-title line", () => {
 
   it("omits a blank title row instead of rendering an empty heading", () => {
     const w = mountDrawer({
-      character: { ...CHARACTER_PANEL_TITLED_SAMPLE, full_title: "" },
+      status: { ...STATUS_PANEL_TITLED_SAMPLE, actor: { ...STATUS_PANEL_TITLED_SAMPLE.actor, full_title: "  " } },
     });
     expect(
       w.find('[data-testid="character-status-drawer__full-title"]').exists(),
     ).toBe(false);
   });
 
-  it("renders no title while the character panel is unavailable, even with a titled status panel", () => {
+  it("keeps the status-panel title while the character panel is unavailable (combat)", () => {
     const w = mountDrawer({
       status: STATUS_PANEL_TITLED_SAMPLE,
       character: CHARACTER_UNAVAILABLE,
     });
-    expect(
-      w.find('[data-testid="character-status-drawer__full-title"]').exists(),
-    ).toBe(false);
+    expect(w.get('[data-testid="character-status-drawer__full-title"]').text()).toBe(
+      "F級冒險者　南門新客",
+    );
+    // The rank belongs to the unavailable character panel: omitted, not guessed.
+    expect(w.find('[data-testid="character-status-drawer__hero-rank"]').exists()).toBe(false);
   });
 
   // --- persona sections (add-persona-edit-surface) -------------------------

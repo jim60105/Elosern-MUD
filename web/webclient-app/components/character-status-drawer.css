@@ -1,83 +1,170 @@
+/* The drawer body (webclient-drawer-content-polish): the hero across the
+   top, then the sections as content-sized cards in an auto-fit grid of equal
+   tracks — DOM order is the reading and tab order, and a card's height never
+   depends on a neighbour's. The persona area, the intimate disclosure and a
+   panel-wide reason span the whole row. Rules live here, not under
+   `.elosern-root`, so the story and the live client render alike. */
 .character-status-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  align-items: start;
+  gap: var(--sp-4);
   box-sizing: border-box;
-  padding: var(--sp-2) var(--sp-4);
   font-family: var(--f-sans);
 }
 
-.character-status-drawer__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
+.character-status-drawer__hero,
+.character-status-drawer__section--full {
+  grid-column: 1 / -1;
 }
 
-.character-status-drawer__full-title {
+/* The hero: name, standing line (title + rank chip) and one wrapping row of
+   secondary actions, over a fading gold hairline. */
+.character-status-drawer__hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-6);
+  padding: var(--sp-1) var(--sp-1) var(--sp-4);
+}
+
+.character-status-drawer__hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #cfb37866, #cfb3781f 45%, transparent);
+}
+
+.character-status-drawer__heading {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.character-status-drawer__name {
   margin: 0;
-  color: var(--gold-400);
-  font-family: var(--f-display);
-  font-size: max(var(--text-xs), 0.95em);
+  color: var(--gold-300);
+  font-family: var(--f-serif);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: .06em;
   overflow-wrap: anywhere;
 }
 
-.character-status-drawer__skill-link {
-  align-self: flex-start;
-  padding: 3px var(--sp-3);
-  color: var(--paper-500);
-  background: none;
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  font-size: max(var(--text-xs), 0.85em);
-  cursor: pointer;
-}
-
-.character-status-drawer__skill-link:hover {
-  color: var(--paper-50);
-  border-color: var(--seal-600);
-}
-
-.character-status-drawer__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding-top: 4px;
-  border-top: var(--line);
-}
-
-/* The shared section heading: the same small-caps treatment ConditionChips'
-   `.clab` uses, copied (not imported) per this component's convention. */
-.character-status-drawer__section-label {
-  margin: 0 0 4px;
-  font-size: var(--text-xs);
-  letter-spacing: 0.14em;
-  color: var(--paper-500);
-  text-transform: uppercase;
-}
-
-/* The design's two-column stat-tile grid (`.statgrid`): each stat is its
-   own bordered tile; `minmax(0, 1fr)` keeps the columns shrinkable. */
-.character-status-drawer__statgrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-/* The design's `.statrow` tile: bordered, rounded; content stacks on two
-   lines (label+value, then the full-width fill track) so the halved tile
-   width never squeezes the numeral and the 危險 marker. */
-.character-status-drawer__statrow {
+.character-status-drawer__standing {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 10px;
+  gap: 6px var(--sp-3);
+  margin: 0;
+}
+
+.character-status-drawer__full-title {
+  color: var(--paper-200);
+  font-family: var(--f-serif);
+  font-size: var(--text-md);
+  letter-spacing: .08em;
+  overflow-wrap: anywhere;
+}
+
+.character-status-drawer__rank {
+  padding: 1px var(--sp-2);
+  color: var(--gold-400);
+  font-size: var(--text-xs);
+  letter-spacing: .1em;
+  border: 1px solid #b99a6080;
+  border-radius: var(--radius-sm);
+  background: #b99a6014;
+  white-space: nowrap;
+}
+
+.character-status-drawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.character-status-drawer__action {
+  min-height: 36px;
+  padding: 0 var(--sp-4);
+  color: var(--paper-200);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-md);
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+}
+
+.character-status-drawer__action:hover {
+  color: var(--gold-400);
+  border-color: var(--gold-500);
+}
+
+.character-status-drawer__action:focus-visible {
+  outline: none;
+  color: var(--gold-400);
+  border-color: var(--gold-400);
+  box-shadow: var(--focus);
+}
+
+/* A section card. */
+.character-status-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
   min-width: 0;
-  background: var(--ink-820);
+  margin: 0;
+  padding: 14px var(--sp-4) var(--sp-4);
+  border: var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(130deg, #1d1f23, #111317);
+}
+
+/* The shared section heading: small, tracked, capitalised — the same small-
+   caps treatment ConditionChips' `.clab` uses, copied (not imported) per
+   this component's convention. */
+.character-status-drawer__section-label {
+  margin: 0 0 2px;
+  font-size: var(--text-sm);
+  letter-spacing: 0.16em;
+  color: var(--gold-500);
+  text-transform: uppercase;
+}
+
+/* The stat cards: equal auto-fill tracks, each card only as tall as its
+   content; a card carrying more than two breakdown chips takes the whole row so its chips
+   wrap in a wide line instead of a tall narrow tile. */
+.character-status-drawer__statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  align-items: start;
+  gap: var(--sp-2);
+}
+
+.character-status-drawer__statrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--ink-860);
   border: 1px solid var(--ink-700);
-  border-radius: 9px;
-  padding: 6px 12px;
+  border-radius: var(--radius-sm);
   font-family: var(--f-sans);
+}
+
+.character-status-drawer__statrow--wide {
+  grid-column: 1 / -1;
 }
 
 .character-status-drawer__statrow-key {
@@ -85,14 +172,14 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: var(--text-sm);
-  color: var(--paper-100);
+  font-size: var(--text-md);
+  color: var(--paper-200);
 }
 
 .character-status-drawer__statrow-value {
   margin-left: auto;
   font-family: var(--f-num);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   color: var(--gold-400);
   font-variant-numeric: tabular-nums lining-nums;
 }
@@ -162,7 +249,7 @@
 
 .character-status-drawer__vital-track {
   flex-basis: 100%;
-  height: 4px;
+  height: 6px;
   background: var(--ink-800);
   border-radius: 3px;
   overflow: hidden;
@@ -172,13 +259,17 @@
 .character-status-drawer__vital-fill {
   display: block;
   height: 100%;
-  background: var(--seal-500);
+  border-radius: 3px;
+  background: var(--vit-hp);
 }
+
+[data-testid="character-status-drawer__vital--mp"] .character-status-drawer__vital-fill { background: var(--vit-mp); }
+[data-testid="character-status-drawer__vital--sp"] .character-status-drawer__vital-fill { background: var(--vit-sp); }
 
 .character-status-drawer__vital-danger {
   color: var(--crit);
   font-family: var(--f-sans);
-  font-size: max(var(--text-xs), 0.8em);
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
@@ -237,22 +328,10 @@
 .character-status-drawer__section-reason {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-md);
   padding: var(--sp-1) var(--sp-2);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
-}
-
-.character-status-drawer__equipment-item {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  font-size: max(var(--text-xs), 0.9em);
-}
-
-.character-status-drawer__equipment-slot {
-  color: var(--paper-300);
-  min-width: 3.5em;
 }
 
 /* The five severity tints: copied verbatim from ConditionChips' `.chip--*`
@@ -288,22 +367,17 @@
   color: var(--crit);
 }
 
-.character-status-drawer__equipment-name {
-  color: var(--paper-100);
-  text-align: right;
-}
-
 .character-status-drawer__disguise-description {
   margin: 0 0 var(--sp-1);
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.8em);
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .character-status-drawer__disguise-row {
   display: flex;
   gap: var(--sp-2);
-  font-size: max(var(--text-xs), 0.9em);
+  font-size: var(--text-md);
 }
 
 .character-status-drawer__disguise-key {
@@ -327,21 +401,22 @@
 .character-status-drawer__disguise-note {
   margin: var(--sp-1) 0 0;
   color: var(--paper-300);
-  font-size: max(var(--text-xs), 0.75em);
+  font-size: var(--text-sm);
 }
 
 .character-status-drawer__disguise-inactive {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.8em);
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .character-status-drawer__persona-background {
   margin: 0;
   color: var(--paper-300);
-  font-size: max(var(--text-xs), 0.85em);
-  line-height: 1.6;
+  font-size: var(--text-md);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 /* Persona editing (add-persona-edit-surface D4): the unset placeholder is
@@ -349,15 +424,29 @@
    (`ui-btn` / `ui-btn--primary` from styles/tokens.css) and never relies on
    colour alone (buttons carry text labels). The rules below add layout
    only; they never restate the control chrome. */
+.character-status-drawer__persona {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: start;
+  gap: var(--sp-4) var(--sp-6);
+}
+
 .character-status-drawer__persona-block {
-  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.character-status-drawer__persona-editor {
+  align-self: stretch;
 }
 
 .character-status-drawer__persona-empty {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
-  font-style: italic;
+  font-size: var(--text-md);
 }
 
 .character-status-drawer__persona-edit {
@@ -367,13 +456,14 @@
 .character-status-drawer__persona-editor textarea {
   width: 100%;
   font: inherit;
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-md);
   color: var(--paper-300);
   background: var(--ink-820);
   border: 1px solid var(--ink-600);
-  border-radius: 4px;
-  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2);
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .character-status-drawer__persona-editor-buttons {
@@ -408,5 +498,5 @@
 .character-status-drawer__intimate-hint {
   margin: 0 0 7px;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.8em);
+  font-size: var(--text-sm);
 }

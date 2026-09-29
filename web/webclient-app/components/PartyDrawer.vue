@@ -6,6 +6,7 @@
 // 請其離隊 confirmation flow, an 空位 row with stage-name-word invite rule,
 // and the three fixed 跟隨規則 lines verbatim.
 import { computed, ref, watch } from "vue";
+import EmptyState from "./EmptyState.vue";
 import {
   buildCombatTokenMap,
   hpFillRatio,
@@ -325,6 +326,18 @@ function onInviteCurrentNpc() {
         </div>
       </div>
     </div>
+
+    <!-- An available, empty party (webclient-drawer-content-polish): the
+         shared empty guidance above the 空位 row, which keeps the only
+         (real) invite control. -->
+    <EmptyState
+      v-if="safeSlots.length === 0"
+      class="party-drawer__empty"
+      data-testid="party-drawer__empty"
+      glyph="party"
+      headline="目前沒有同伴"
+      guidance="可從下方空位邀請當地的自由 NPC。"
+    />
 
     <!-- Empty slot row (when party is not full) -->
     <div

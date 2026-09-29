@@ -2,8 +2,8 @@
 // payload projections extracted verbatim from `CharacterStatusDrawer.vue` so
 // the SFC stays a thin, passive renderer. Owns availability/reason gating, the
 // true-trait rows and the 屬性 allowlist filter, the disguise comparison, the
-// guild counters, the persona section table, the intimate disclosure rows, and
-// the composed full title. Consumes the component props explicitly; the status
+// guild counters, the persona section table and the intimate disclosure rows
+// (the hero's full title reads the `status` panel instead). Consumes the component props explicitly; the status
 // group consumes this group's `traits` for its gauge-layer guard.
 import { computed } from "vue";
 
@@ -83,13 +83,6 @@ export function useStatusDrawerCharacter(props) {
 
   const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
 
-  // The composed live full title (character panel v6 optional field); rendered
-  // as a header line only when present — a pre-onboarding character shows no
-  // title line (title-system D6 name fallback applies at the HUD head).
-  const fullTitle = computed(() =>
-    characterAvailable.value ? (props.character?.full_title ?? "") : ""
-  );
-
   // The 親密狀態 (intimate status) section rows: the 設計稿's #dr-status stat
   // grid. The first five rows are level words from the fixed vocabulary, and
   // the last row is the daily climax count.
@@ -114,7 +107,6 @@ export function useStatusDrawerCharacter(props) {
     guild,
     personaSections,
     intimate,
-    fullTitle,
     INTIMATE_ROWS,
   };
 }
