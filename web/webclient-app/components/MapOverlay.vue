@@ -285,8 +285,7 @@ function handleMove(payload) {
 .map-overlay-body {
   height: 100%;
   min-height: 360px;
-  /* A3 defers map typography unchanged to A12 (2026-09-28). */
-  font-size: 15px;
+  font-size: var(--text-md);
   font-variant-numeric: normal;
 }
 
@@ -298,7 +297,7 @@ function handleMove(payload) {
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
   font-family: var(--f-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* The fitted-view body layout (design D7): guide row, the viewport taking
@@ -331,13 +330,13 @@ function handleMove(payload) {
   margin: 0;
   color: var(--paper-100);
   font-family: var(--f-serif);
-  font-size: 15px;
+  font-size: var(--text-base);
   letter-spacing: 0.06em;
 }
 
 .map-overlay__guide span {
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.04em;
 }
 
@@ -354,6 +353,27 @@ function handleMove(payload) {
   box-shadow: inset 0 0 80px #0006;
 }
 
+/* Four fine gold corner brackets inside the frame (webclient-map-legibility):
+   a pointer-inert decoration of the frame, outside the drawing's geometry —
+   it encodes no place, terrain or visibility state. Under the view pill. */
+.map-overlay__viewport::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  z-index: 1;
+  pointer-events: none;
+  --corner: linear-gradient(var(--gold-600), var(--gold-600));
+  background:
+    var(--corner) top left / 12px 1px no-repeat,
+    var(--corner) top left / 1px 12px no-repeat,
+    var(--corner) top right / 12px 1px no-repeat,
+    var(--corner) top right / 1px 12px no-repeat,
+    var(--corner) bottom left / 12px 1px no-repeat,
+    var(--corner) bottom left / 1px 12px no-repeat,
+    var(--corner) bottom right / 12px 1px no-repeat,
+    var(--corner) bottom right / 1px 12px no-repeat;
+}
+
 .map-overlay__viewport :deep(.local-map__lattice--canvas) {
   border: 0;
   border-radius: 0;
@@ -363,8 +383,9 @@ function handleMove(payload) {
    grouped as zoom pair · 置中 · legend with hairline separators. */
 .map-overlay__toolbar {
   position: absolute;
-  top: var(--sp-3);
-  right: var(--sp-3);
+  /* Clear of the frame's 5px + 12px corner bracket. */
+  top: 20px;
+  right: 20px;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -400,7 +421,7 @@ function handleMove(payload) {
   background: transparent;
   color: var(--paper-200);
   font-family: var(--f-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   letter-spacing: 0.08em;
   line-height: 1;
   cursor: pointer;
@@ -442,8 +463,8 @@ function handleMove(payload) {
    layout space. */
 .map-overlay__legend-popover {
   position: absolute;
-  top: calc(var(--sp-3) + 44px);
-  right: var(--sp-3);
+  top: calc(20px + 44px);
+  right: 20px;
   z-index: 2;
   max-width: calc(100% - 2 * var(--sp-3));
   box-sizing: border-box;
@@ -476,7 +497,7 @@ function handleMove(payload) {
   align-items: center;
   gap: var(--sp-2);
   color: var(--paper-300);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .local-map__legend-chip {
@@ -535,7 +556,7 @@ function handleMove(payload) {
   /* Visible lead-in only; the list's aria-label already names it. */
   content: "記得的地點" / "";
   color: var(--paper-500);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.12em;
 }
 
@@ -555,7 +576,7 @@ function handleMove(payload) {
 .map-overlay__remembered-label {
   color: var(--paper-300);
   font-family: var(--f-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   letter-spacing: 0.04em;
 }
 </style>

@@ -272,7 +272,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
   // ---------------------------------------------------------------------
   // webclient-map-01-draft-chrome: the overlay chrome (design D4) — the
-  // mapcanvas framing class and the teardrop pin — plus the shared draft
+  // mapcanvas framing class and the current-location ring — plus the shared draft
   // adornments (gold landmark ring, dot-chip legend).
   // ---------------------------------------------------------------------
 
@@ -284,50 +284,55 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(overlay.get("svg.local-map__lattice").classes()).toContain("local-map__lattice--canvas");
   });
 
-  it("renders the pin only under overlayChrome, anchored to the current node", () => {
+  it("rings the current marker only under overlayChrome, inside the current node's own group", () => {
     const island = mountLattice();
-    expect(island.findAll('[data-testid="local-map__pin"]')).toHaveLength(0);
+    expect(island.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
     island.unmount();
 
     const overlay = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
-    const pins = overlay.findAll('[data-testid="local-map__pin"]');
-    expect(pins).toHaveLength(1);
-    // The pin shares the current node group's coordinate system: same
-    // translate pair, then the marker scale so it tracks the marker ladder.
-    const currentTransform = overlay
-      .get('[data-testid="local-map__node--grid:altoria:1:2"]')
-      .attributes("transform");
-    const pinTransform = pins[0].attributes("transform");
-    expect(pinTransform.startsWith(`${currentTransform} scale(`)).toBe(true);
-    expect(pinTransform).toContain("scale(4.83)");
-    // Pure adornment: it must never intercept node clicks or announce.
-    expect(pins[0].attributes("aria-hidden")).toBe("true");
+    const rings = overlay.findAll('[data-testid="local-map__current-ring"]');
+    expect(rings).toHaveLength(1);
+    // One footprint (webclient-map-legibility): the ring is a child of the
+    // current node's group, so it shares the marker's translate and centre and
+    // cannot float over a connector as the teardrop pin did.
+    const currentGroup = overlay.get('[data-testid="local-map__node--grid:altoria:1:2"]');
+    expect(currentGroup.find('[data-testid="local-map__current-ring"]').exists()).toBe(true);
+    const ring = rings[0];
+    expect(ring.attributes("cx")).toBeUndefined();
+    expect(ring.attributes("cy")).toBeUndefined();
+    expect(Number(ring.attributes("r"))).toBeCloseTo(10.5 * 4.83, 6);
+    // Wider than the marker, narrower than the label's top at this scale.
+    const marker = currentGroup.get('[data-testid="local-map__marker--current"]');
+    expect(Number(ring.attributes("r"))).toBeGreaterThan(Number(marker.attributes("r")));
+    // A decoration of the marker, not a marker: the geometry audit pairs only
+    // `.local-map__marker` boxes, and it never announces.
+    expect(ring.classes()).not.toContain("local-map__marker");
+    expect(ring.attributes("aria-hidden")).toBe("true");
+    expect(overlay.find(".local-map__pin").exists()).toBe(false);
   });
 
-  it("keeps the pin's stroke hairline at any marker scale", () => {
-    // The pin path geometry scales with the ladder via its element
-    // transform; without a non-scaling stroke the overlay's scale(4.83)
-    // would thicken the draft's 1.4px outline to ~6.8px (rubber-duck W1).
+  it("keeps the ring a non-interactive hairline at any marker scale", () => {
     const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
     let rule = null;
     for (const sheet of document.styleSheets) {
       for (const candidate of sheet.cssRules) {
-        if (candidate.selectorText?.includes(".local-map__pin")) rule = candidate.cssText;
+        if (candidate.selectorText?.includes(".local-map__current-ring")) rule = candidate.cssText;
       }
     }
-    expect(rule, "the pin rule is in the component's injected style sheet").toContain(
+    expect(rule, "the ring rule is in the component's injected style sheet").toContain(
       "vector-effect: non-scaling-stroke",
     );
+    expect(rule).toContain("pointer-events: none");
     w.unmount();
   });
 
-  it("renders no pin when the payload carries no current node", () => {
+  it("renders no ring when the payload carries no current node", () => {
     const model = localMapModelFor(LOCAL_MAP_SAMPLE);
     const noCurrent = {
       ...model,
       nodes: model.nodes.map((n) => (n.visibility === "current" ? { ...n, visibility: "visible_visited" } : n)),
     };
     const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true, localMap: noCurrent });
-    expect(w.findAll('[data-testid="local-map__pin"]')).toHaveLength(0);
+    expect(w.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
   });
 });

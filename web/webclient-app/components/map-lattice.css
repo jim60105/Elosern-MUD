@@ -144,16 +144,16 @@
   stroke-width: 2;
 }
 
-/* The draft location pin (D4): the teardrop ornament above the current
-   marker — non-interactive, unlabelled, no activation of its own. The path
-   geometry scales with the marker ladder via the element transform, but
-   `vector-effect: non-scaling-stroke` keeps the draft's 1.4px outline at
-   any `markerScale` (an SVG transform would otherwise thicken the stroke
-   proportionally — the draft pairs a hairline pin with a 2px marker ring). */
-.local-map__pin {
-  fill: var(--map-canvas-lo);
+/* The current-location ring (webclient-map-legibility): one thin seal ring
+   concentric with the current marker, a hairline at any `markerScale`
+   (`non-scaling-stroke`). It replaces the teardrop pin that floated above the
+   marker over the connectors and read as a second place. Decoration only:
+   non-interactive, unlabelled. */
+.local-map__current-ring {
+  fill: none;
   stroke: var(--seal-light);
   stroke-width: 1.4;
+  stroke-opacity: 0.8;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -161,7 +161,7 @@
 /* Edge direction markers (map-02 D3b): a non-interactive decoration layer
    in the gutter. The diamond reuses the remembered-node fill so the off-
    canvas place reads with the same state identity; the landmark ring and
-   the 11px monospace name follow the node-label/pin precedents (glyphs
+   the monospace name follow the node-label precedent (glyphs
    never scale with markerScale). */
 .local-map__edge-marker {
   pointer-events: none;

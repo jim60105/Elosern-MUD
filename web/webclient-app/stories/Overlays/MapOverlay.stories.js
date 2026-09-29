@@ -4,6 +4,7 @@ import {
   LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
+  LOCAL_MAP_ORDINARY_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   localMapModelFor,
@@ -46,6 +47,16 @@ export const FullLattice = {
   },
 };
 
+// Connectors on all four sides of the current square
+// (webclient-map-legibility): the current-location ring sits concentric on
+// the marker and every connector stays visible outside it.
+export const OrdinaryNeighbourhood = {
+  render: renderOverlay,
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_ORDINARY_SAMPLE),
+  },
+};
+
 export const InteriorWithRemembered = {
   render: renderOverlay,
   args: {
@@ -78,7 +89,7 @@ export const Unavailable = {
 
 // Graph variant (webclient-map-02): the overlay passes the model's resolved
 // `layoutVariant` through to the shared renderer — the interior payload's
-// radial placement fills the mapcanvas, with the pin over the current node
+// radial placement fills the mapcanvas, with the ring around the current node
 // and no lattice axis legend.
 export const RadialGraph = {
   render: renderOverlay,

@@ -488,3 +488,55 @@ export const LOCAL_MAP_INTERIOR_SAMPLE = {
   ],
   legend: ["你目前所在的位置"],
 };
+// An ordinary town neighbourhood (webclient-map-legibility): a full
+// three-by-three grid of distinct two- and four-glyph room names around the
+// current square, connectors on all four sides, and no remembered gateway —
+// the named fixture on which the island's node labels read at its 12px step
+// (scale 1, pitch 59).
+const ORDINARY_ROOMS = [
+  [0, 2, "鐘樓", "visible_visited"],
+  [1, 2, "北岸大道", "visible_unvisited"],
+  [2, 2, "神殿", "visible_unvisited"],
+  [0, 1, "西市", "visible_visited"],
+  [1, 1, "石板廣場", "current"],
+  [2, 1, "東門", "visible_unvisited"],
+  [0, 0, "染坊", "visible_unvisited"],
+  [1, 0, "西風酒館", "visible_visited"],
+  [2, 0, "馬廄", "visible_unvisited"],
+];
+
+export const LOCAL_MAP_ORDINARY_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:1:1",
+  title: "石板廣場街道圖",
+  nodes: ORDINARY_ROOMS.map(([x, y, label, visibility]) => {
+    const adjacent = Math.abs(x - 1) + Math.abs(y - 1) === 1;
+    return {
+      id: `grid:altoria:${x}:${y}`,
+      label,
+      x,
+      y,
+      visibility,
+      current: visibility === "current",
+      anchor: visibility === "current",
+      landmark: label === "神殿",
+      action: adjacent
+        ? { kind: "move", exit_ref: `e_altoria_1_1_${x}_${y}`, destination: `grid:altoria:${x}:${y}` }
+        : null,
+    };
+  }),
+  edges: ORDINARY_ROOMS.filter(([x, y]) => Math.abs(x - 1) + Math.abs(y - 1) === 1).map(([x, y, label]) => ({
+    source: "grid:altoria:1:1",
+    destination: `grid:altoria:${x}:${y}`,
+    label,
+    known: true,
+    traversable: true,
+  })),
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+  ],
+};

@@ -272,7 +272,7 @@ describe("MapLattice pan", () => {
     });
   });
 
-  const ISLAND = { canvasSize: 208, colPitch: 40, rowPitch: 40, labelFont: 9, showAxis: true };
+  const ISLAND = { canvasSize: 208, colPitch: 40, rowPitch: 40, labelFont: 12, showAxis: true };
   const groups = (w) => w.findAll(".map-lattice__pan").map((g) => g.element);
 
   // Every `--pan-*` / `--glide-*` write, with the declaration it went to

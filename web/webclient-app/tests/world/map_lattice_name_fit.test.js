@@ -74,19 +74,20 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     const svgWidth = Number(svg.attributes("width"));
     const svgHeight = Number(svg.attributes("height"));
 
-    // Core lattice with adjacent labels: effective pitch is (4 + 1) * 11 + 3 = 58.
-    // 3 cols × 58 = 174; 3 rows × 58 = 174 + 14 = 188.
+    // Core lattice: the label term clears the drawn 3-glyph labels ("0,0"),
+    // (3 + 3) / 2 * 11 + 11 / 2 = 38.5 < 40, so the pitch stays 40.
+    // 3 cols × 40 = 120; 3 rows × 40 = 120 + 14 = 134.
     // Gutter for island with nameHeight: 16 -> namePad: 18 -> gutter: 2 * sqrt(2) * 9 + 1 + 18 ≈ 44.4558
     const expectedGutter = 2 * Math.SQRT2 * 9 + 1 + 18;
     expect(svgWidth).toBe(208);
     expect(svgHeight).toBe(208);
     const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(188 + 2 * expectedGutter, 5);
-    expect(vb[3]).toBeCloseTo(188 + 2 * expectedGutter, 5);
+    expect(vb[2]).toBeCloseTo(134 + 2 * expectedGutter, 5);
+    expect(vb[3]).toBeCloseTo(134 + 2 * expectedGutter, 5);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
-    // Span on left edge: 188. budget = floor(188 / 10) = 18. Label is 11 chars -> fits whole!
+    // Span on left edge: 134. budget = floor(134 / 10) = 13. Label is 11 chars -> fits whole!
     expect(westText.text()).toBe("西部丘陵與谷地（南門）");
     const tspans = westText.findAll("tspan");
     expect(tspans).toHaveLength(11);
@@ -220,8 +221,9 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
       },
     });
     const islandLeftText = wIslandLeft.get('[data-testid="local-map__edge-marker--r:west_long"] text');
-    // Span 188, budget 18: fits 14 chars whole
-    expect(islandLeftText.text()).toBe("灰鬮荒原第一南關隘道前哨站營");
+    // Span 134, budget 13: the 14-glyph name keeps its head and tail
+    expect(islandLeftText.text()).toBe("灰…原第一南關隘道前哨站營");
+    expect(Array.from(islandLeftText.text())).toHaveLength(13);
   });
 
   it("Task 4.4: anti-ambiguity pass covers overlay when differing 14-glyph labels collide on budget 11", () => {
@@ -317,13 +319,13 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
       overlayBudgets.set(m.id, Math.min(Math.floor(m.span / 11), maxBox));
     }
 
-    // Top markers: island span = 174 / 3 = 58 -> budget = 5. Overlay span = 840 / 3 = 280 -> budget = 25.
-    expect(islandBudgets.get("r:top_1")).toBe(5);
+    // Top markers: island span = 120 / 3 = 40 -> budget = 4. Overlay span = 840 / 3 = 280 -> budget = 25.
+    expect(islandBudgets.get("r:top_1")).toBe(4);
     expect(overlayBudgets.get("r:top_1")).toBe(25);
     expect(overlayBudgets.get("r:top_1")).toBeGreaterThan(islandBudgets.get("r:top_1"));
 
-    // Left markers: island span = 188 / 2 = 94 -> budget = 9. Overlay outwardBox bound = 11.
-    expect(islandBudgets.get("r:left_1")).toBe(9);
+    // Left markers: island span = 134 / 2 = 67 -> budget = 6. Overlay outwardBox bound = 11.
+    expect(islandBudgets.get("r:left_1")).toBe(6);
     expect(overlayBudgets.get("r:left_1")).toBe(11);
     expect(overlayBudgets.get("r:left_1")).toBeGreaterThan(islandBudgets.get("r:left_1"));
 

@@ -50,6 +50,10 @@ class VueTypographyBrowserTest(unittest.TestCase):
             ("core-appshell--dialogue-selector", ".dialogue-choices__row"),
             ("data-characterstatusdrawer--full", ".character-status-drawer"),
             ("overlays-creationoverlay--custom-draft", ".creation-overlay"),
+            # The map chrome joined the floor with webclient-map-legibility;
+            # only the drawn SVG map (node labels, marker names) stays outside.
+            ("world-localmap--wilderness", ".local-map__detail"),
+            ("overlays-mapoverlay--interior-with-remembered", ".map-overlay__remembered"),
         )
         for width, height in ((1920, 1080), (1440, 900), (1280, 720)):
             self.page.set_viewport_size({"width": width, "height": height})
@@ -57,7 +61,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
                 with self.subTest(viewport=(width, height), story=story):
                     self.story(story, selector)
                     result = self.page.evaluate("""() => {
-                      const exempt = 'svg,.local-map,.map-overlay-body,.narrative-line,.cmdfield__prompt-html,.sr-only,.visually-hidden,[aria-hidden="true"]';
+                      const exempt = 'svg,.narrative-line,.cmdfield__prompt-html,.sr-only,.visually-hidden,[aria-hidden="true"]';
                       const small = [...document.querySelectorAll('#storybook-root *')].filter(e =>
                         e.checkVisibility() && !e.closest(exempt) && e.getBoundingClientRect().width > 1 &&
                         [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) &&

@@ -421,13 +421,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         """No text the island draws outweighs the island's own chrome step.
 
         The spec bounds the node label at "the surface's own smallest chrome
-        type step" and states the readout and the marker names at that same
-        step. Because the island's coordinate margin resolves the uniform scale
-        to ~1, a lattice user unit IS a drawn CSS pixel, so this is a single
-        measurable ladder: header 10, readout 10, marker name 10, node label 9.
-        It shipped inverted — the readout at 11 and the marker names at
-        --text-sm (13), which drew the largest text on the card over the map it
-        annotates.
+        type step" and states the readout at that same step. Since
+        webclient-map-legibility the island has one 12px chrome step (title,
+        orientation marks and readout at `--text-xs`), node labels at a
+        12-unit step and marker names at 10 units, each drawn at the
+        drawing's uniform scale (≤ 1).
         """
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
@@ -475,20 +473,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                       };
                     }"""
                 )
-                # The desktop redesign re-budgeted the draft's `.mini .mt`
-                # header row for authored payload titles (LocalMap.vue
-                # `.local-map__meta` at 12px), while the readout keeps the
-                # spec's "island's smallest type step" (10px, the
-                # token-driven closing-readout rule). The ladder is now
-                # header 12 > chrome step 10 (webclient-local-map spec:
-                # readout at the island's smallest type step; node labels at
-                # most 9-unit type size, below the island's own 10px chrome
-                # step).
+                # One chrome step (webclient-map-legibility): the title,
+                # orientation marks and readout all compute to 12px.
                 self.assertEqual(ladder["header"], 12, "the island's header type step is 12px")
                 chrome_step = ladder["readout"]
                 self.assertEqual(
                     chrome_step,
-                    10,
+                    12,
                     "the readout states its figure at the island's smallest type step",
                 )
                 self.assertLessEqual(

@@ -191,7 +191,7 @@ function onIslandClick(event) {
         :canvas-size="208"
         :col-pitch="40"
         :row-pitch="40"
-        :label-font="9"
+        :label-font="12"
         :marker-name-font="10"
         :show-axis="true"
         :fog-vignette="true"
@@ -275,8 +275,7 @@ function onIslandClick(event) {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   font-family: var(--f-sans);
-  /* A3 defers map typography unchanged to A12 (2026-09-28). */
-  font-size: 15px;
+  font-size: var(--text-md);
   font-variant-numeric: normal;
   /* Draft `.mini` affordance (webclient-map-01-draft-chrome D5): the whole
      island reads as clickable because the body click opens the full map;
@@ -341,7 +340,7 @@ function onIslandClick(event) {
   align-items: center;
   gap: var(--sp-2);
   font-family: var(--f-serif);
-  font-size: 12px;
+  font-size: var(--text-xs);
   letter-spacing: 0.04em;
   color: var(--paper-500);
   margin-bottom: 4px;
@@ -377,7 +376,7 @@ function onIslandClick(event) {
   flex: none;
   white-space: nowrap;
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0;
   color: var(--gold-400);
 }
@@ -389,7 +388,7 @@ function onIslandClick(event) {
   background: var(--panel-hi);
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  font-size: var(--text-sm);
 }
 
 /* The draft `.mini .compass` readout treatment (design D7): the island's
@@ -405,8 +404,9 @@ function onIslandClick(event) {
   padding-top: var(--sp-1);
   color: var(--paper-500);
   font-family: var(--f-mono);
-  /* Coordinates remain secondary to the map and its larger title. */
-  font-size: 10px;
+  /* The island's one chrome step (webclient-map-legibility): title,
+     orientation marks and readout all read at the shared 12px step. */
+  font-size: var(--text-xs);
   line-height: 1.45;
   min-height: 1.45em;
   text-align: center;
@@ -439,6 +439,20 @@ function onIslandClick(event) {
   z-index: 1;
   pointer-events: none;
   border: 0;
+  /* Four fine gold corner brackets framing the canvas (webclient-map-
+     legibility): painted as backgrounds under the drawing, so they encode no
+     place, terrain or visibility and never cover a marker or name. */
+  --corner: linear-gradient(var(--gold-600), var(--gold-600));
+  background:
+    var(--corner) top left / 10px 1px no-repeat,
+    var(--corner) top left / 1px 10px no-repeat,
+    var(--corner) top right / 10px 1px no-repeat,
+    var(--corner) top right / 1px 10px no-repeat,
+    var(--corner) bottom left / 10px 1px no-repeat,
+    var(--corner) bottom left / 1px 10px no-repeat,
+    var(--corner) bottom right / 10px 1px no-repeat,
+    var(--corner) bottom right / 1px 10px no-repeat,
+    var(--ink-860);
   /* A drawing larger than the legibility floor is windowed around the
      current node (ISLAND_MIN_SCALE); clip it to the fixed square so the
      rest of the street never paints over the stage. */

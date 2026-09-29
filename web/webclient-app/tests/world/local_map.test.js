@@ -497,10 +497,10 @@ describe("LocalMap (B4 world family)", () => {
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
     }
 
-    // Label baseline at labelFont 9: 22 units
+    // Label baseline at labelFont 12: 11 + 2 + 12 = 25 units
     for (const id of Object.keys(centers)) {
       const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
-      expect(label.attributes("y")).toBe("22");
+      expect(label.attributes("y")).toBe("25");
     }
 
     const markerBoxes = {
@@ -510,12 +510,12 @@ describe("LocalMap (B4 world family)", () => {
       "grid:altoria:0:1": { x1: 38.5, y1: 121.5, x2: 49.5, y2: 132.5 },
     };
 
-    // Label boxes: font 9, 5 full-width glyphs (45 wide), ascent 8.55, descent 4.05 around y=22
+    // Label boxes: font 12, 5 full-width glyphs (60 wide), ascent 11.4, descent 5.4 around y=25
     const labelBoxes = {
-      "grid:altoria:1:1": { x1: 81.5, y1: 140.45, x2: 126.5, y2: 153.05 },
-      "grid:altoria:2:1": { x1: 141.5, y1: 140.45, x2: 186.5, y2: 153.05 },
-      "grid:altoria:1:2": { x1: 81.5, y1: 80.45, x2: 126.5, y2: 93.05 },
-      "grid:altoria:0:1": { x1: 21.5, y1: 140.45, x2: 66.5, y2: 153.05 },
+      "grid:altoria:1:1": { x1: 74, y1: 140.6, x2: 134, y2: 157.4 },
+      "grid:altoria:2:1": { x1: 134, y1: 140.6, x2: 194, y2: 157.4 },
+      "grid:altoria:1:2": { x1: 74, y1: 80.6, x2: 134, y2: 97.4 },
+      "grid:altoria:0:1": { x1: 14, y1: 140.6, x2: 74, y2: 157.4 },
     };
 
     function separated(a, b) {
@@ -588,19 +588,19 @@ describe("LocalMap (B4 world family)", () => {
     overlay.unmount();
   });
 
-  it("Task 2.5: declares island geometry on MapLattice mount and renders node label at <= 9 CSS px", () => {
+  it("Task 2.5: declares island geometry on MapLattice mount and renders node labels at its 12-unit step", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     const lattice = w.findComponent({ name: "MapLattice" });
     expect(lattice.exists()).toBe(true);
     expect(lattice.props("colPitch")).toBe(40);
     expect(lattice.props("rowPitch")).toBe(40);
-    expect(lattice.props("labelFont")).toBe(9);
+    expect(lattice.props("labelFont")).toBe(12);
     expect(lattice.props("canvasSize")).toBe(208);
     expect(lattice.props("showAxis")).toBe(true);
     expect(lattice.props("fogVignette")).toBe(true);
     expect(lattice.props("maxUpscale")).toBeUndefined();
     const label = lattice.find(".local-map__node-label");
-    expect(label.attributes("style")).toContain("font-size: 9px");
+    expect(label.attributes("style")).toContain("font-size: 12px");
   });
 
   // ---------------------------------------------------------------------
@@ -629,10 +629,14 @@ describe("LocalMap (B4 world family)", () => {
     // Declared by the surface, not inherited from the renderer's default —
     // the island owns every type size it draws (the `labelFont` precedent).
     expect(ISLAND_SOURCE).toContain(':marker-name-font="10"');
-    // Every type size the island declares is at or below its 10px chrome step:
-    // the node label (9), the marker name (10), the readout and the header
-    // (10). A marker name drawn at --text-sm (13) used to out-shout both.
-    const chromeStep = 10;
+    // Every type size the island declares is at or below its 12px chrome step
+    // (webclient-map-legibility): the node label (12), the marker name (10),
+    // and the title, orientation marks and readout at `--text-xs` (12). A
+    // marker name drawn at --text-sm (13) used to out-shout them all.
+    const chromeStep = 12;
+    for (const selector of [".local-map__meta", ".local-map__orientation", ".local-map__detail"]) {
+      expect(ruleBody(ISLAND_SOURCE, selector)).toContain("font-size: var(--text-xs)");
+    }
     expect(lattice.props("labelFont")).toBeLessThanOrEqual(chromeStep);
     expect(lattice.props("markerNameFont")).toBeLessThanOrEqual(chromeStep);
   });

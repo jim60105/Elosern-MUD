@@ -65,7 +65,7 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(w2.findAll('[data-testid="local-map__actionable"]')).toHaveLength(1);
   });
 
-  it("renders exactly one pin anchored above the current marker in both layouts", () => {
+  it("rings exactly the current marker in both layouts", () => {
     for (const sample of [LOCAL_MAP_SAMPLE, LOCAL_MAP_INTERIOR_SAMPLE]) {
       const model = localMapModelFor(sample);
       const w = mountLattice({
@@ -74,25 +74,12 @@ describe("map layout variants (B4 world family, map-02)", () => {
         overlayChrome: true,
         ...(model.layoutVariant === "graph" ? {} : OVERLAY_PROPS),
       });
-      const pins = w.findAll('[data-testid="local-map__pin"]');
-      expect(pins, model.layer).toHaveLength(1);
+      const rings = w.findAll('[data-testid="local-map__current-ring"]');
+      expect(rings, model.layer).toHaveLength(1);
+      // The ring lives in the current node's own group: one position claim.
       const current = model.nodes.find((node) => node.visibility === "current");
-      const nodeTransform = w.get(`[data-testid="local-map__node--${current.id}"]`)
-        .attributes("transform");
-      const [nx, ny] = nodeTransform
-        .match(/translate\(([^,]+),\s*([^)]+)\)/)
-        .slice(1, 3)
-        .map(Number);
-      // The wave-1 pin ownership contract: the pin shares the current
-      // marker's translate pair (same coordinate system, it tracks the
-      // marker ladder through the element scale).
-      const pinTransform = pins[0].attributes("transform");
-      const [px, py] = pinTransform
-        .match(/translate\(([^,]+),\s*([^)]+)\)/)
-        .slice(1, 3)
-        .map(Number);
-      expect(px).toBe(nx);
-      expect(py).toBe(ny);
+      const group = w.get(`[data-testid="local-map__node--${current.id}"]`);
+      expect(group.find('[data-testid="local-map__current-ring"]').exists(), model.layer).toBe(true);
       w.unmount();
       wrapper = null;
     }

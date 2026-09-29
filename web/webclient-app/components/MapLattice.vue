@@ -19,7 +19,7 @@
 // a move of the current node starts the drawing translated so the node the
 // player left sits where it stood on screen, then eases it to the committed
 // placement (a FLIP offset; `lib/map_pan.js`). Only the drawing's two pan
-// groups move — edges, pin, and axis; the node groups — as one rigid shape,
+// groups move — edges and axis; the node groups — as one rigid shape,
 // and they carry the `.map-lattice__pan` transform only with `panOnMove`, so
 // the full map's drawing has no CSS transform at all. Nodes, names, and click
 // targets carry the new placement from the commit on. The dot field, the fog, and the gutter's
@@ -33,6 +33,7 @@ import {
   MARKER_DOT_R,
   MARKER_LANDMARK_R,
   MARKER_DIAMOND_HALF,
+  MARKER_CURRENT_RING_R,
   HALO_R,
 } from "../composables/use-map-lattice-geometry.js";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
@@ -55,16 +56,17 @@ const props = defineProps({
   // Fitted view (webclient-full-map-fit-view design D1): when set, the SVG fills
   // a clipped viewport box and its viewBox becomes a window over the unchanged drawing.
   fitView: { type: Boolean, default: false },
-  // Type size for node labels (SVG user units). Defaults to 11 for the overlay
-  // and bare mounts; the island passes 9 to respect the type proportion and
-  // stay below the island's own 10px chrome step.
+  // Type size for node labels (SVG user units). Defaults to 11 for bare
+  // mounts; the overlay passes 14 and the island 12 — its own 12px chrome
+  // step (webclient-map-legibility), so a label never out-weighs the island's
+  // title yet reads at 11 CSS px or more on ordinary neighbourhoods.
   labelFont: { type: Number, default: 11 },
   // Type size for the island's edge-marker names (SVG user units). Declared
   // by the surface for the same reason `labelFont` is: the island's coordinate
   // margin now resolves the uniform scale to ~1, so a user-unit size IS the
-  // drawn CSS px size. The island's smallest chrome type step is 10px (its
-  // header row), and a marker name annotates the drawing rather than titling
-  // it, so it renders AT that step and never above it. The number also drives
+  // drawn CSS px size. A marker name annotates the drawing's rim rather than
+  // naming a drawn place, so the island keeps it at 10 units, below its 12px
+  // chrome step and its 12-unit node labels. The number also drives
   // the along-edge fit budget and the stacked-column line step below: the
   // labels are full-width CJK in the shared monospace token, so one glyph
   // advances exactly one type step on either axis, and a divisor that
@@ -81,8 +83,8 @@ const props = defineProps({
   showAxis: { type: Boolean, default: false },
   // Draft overlay chrome (webclient-map-01-draft-chrome design D4): the
   // full-map surface paints its canvas in the `mapcanvas` treatment and
-  // draws the teardrop location pin above the current marker. Off on the
-  // minimap island; only the overlay passes it.
+  // rings the current marker (webclient-map-legibility). Off on the minimap
+  // island; only the overlay passes it.
   overlayChrome: { type: Boolean, default: false },
   markerNames: { type: Boolean, default: false },
   edgeMarkers: { type: Object, default: null },
@@ -381,20 +383,6 @@ defineExpose({
       :y2="edge.y2"
       :aria-label="edges[edge.i].label"
     />
-    <!-- The draft location pin (webclient-map-01-draft-chrome design D4):
-         rendered inside this SVG (not positioned by the overlay wrapper) so
-         it shares the current marker's coordinate system. Anchored to the
-         CURRENT placement's current-node position and scaled with the
-         markers, its tip sits directly above the current circle. A pure
-         adornment: fixed path, non-interactive, aria-hidden, no label. -->
-    <path
-      v-if="overlayChrome && currentPos"
-      class="local-map__pin"
-      data-testid="local-map__pin"
-      :transform="`translate(${currentPos.x}, ${currentPos.y}) scale(${markerScale})`"
-      d="M0 -18 C-2 -21 -7 -26 -7 -30 a7 7 0 0 1 14 0 C7 -26 2 -21 0 -18 Z"
-      aria-hidden="true"
-    />
     <g
       v-if="showAxis && !isGraph && currentPos"
       class="local-map__axis"
@@ -500,6 +488,19 @@ defineExpose({
            ink-filled circle; unvisited is a small hollow circle (keeps the
            未探索 rule); remembered keeps the rotated diamond. Shape/size
            distinguish the states without colour. -->
+      <!-- The current-location ring (webclient-map-legibility): the full
+           map's one ornament of the player's place, concentric with the real
+           marker inside the node's own group, so it can never read as a second
+           location or float over a connector. Decoration only: not a
+           `local-map__marker` (the geometry audit pairs marker boxes), no
+           label, no activation. -->
+      <circle
+        v-if="overlayChrome && node.visibility === 'current'"
+        class="local-map__current-ring"
+        data-testid="local-map__current-ring"
+        :r="MARKER_CURRENT_RING_R * markerScale"
+        aria-hidden="true"
+      />
       <circle
         v-if="node.visibility === 'current'"
         class="local-map__marker local-map__marker--current"
