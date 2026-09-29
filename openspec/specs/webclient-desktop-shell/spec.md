@@ -45,8 +45,8 @@ line SHALL NOT be permanently closable either: it is collapsed by default, and i
 reachable in exactly one action — `/` outside an editable control, or the ⌨ toggle — in every mode that
 renders it; every other surface MAY be opened on demand and closed. The reference
 surfaces — the skill book, the bag and equipment, the shop, the quest board, the lore reference, and
-the character status — SHALL NOT be permanently visible: each SHALL render in a drawer anchored to the
-right edge of the stage, SHALL be absent from the layout and from the tab order while that drawer is
+the character status — SHALL NOT be permanently visible: each SHALL render in a drawer laid over the
+stage in the shared reference workspace, SHALL be absent from the layout and from the tab order while that drawer is
 closed, SHALL be reachable in at most two actions from the top navigation bar or from the action dock's
 scene overview, and SHALL be closable in one action that returns focus to the control that opened it. The shell SHALL render a top navigation bar carrying
 a labelled control for each navigation-presented entry of the current mode's home surface - the character

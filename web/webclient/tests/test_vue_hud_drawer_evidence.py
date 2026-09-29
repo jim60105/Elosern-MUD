@@ -43,7 +43,7 @@ def _assert_vitest_passes(result, label):
 
 class VueHudDrawerEvidenceTest(unittest.TestCase):
     @covers_requirement(
-        "webclient-contextual-hud::reference-surfaces-render-in-a-right-anchored-drawer-with-one-modal-contract"
+        "webclient-contextual-hud::reference-surfaces-render-in-a-bounded-workspace-drawer-with-one-modal-contract"
     )
     def test_reference_drawer_modal_contract(self):
         # The drawer chrome (right-anchored, single-open, focus trap, Escape /

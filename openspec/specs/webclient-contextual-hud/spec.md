@@ -1255,7 +1255,7 @@ without ending the session.
 - **WHEN** the player activates the confirm row
 - **THEN** exactly one forfeit action is emitted carrying the current session identifier
 
-### Requirement: Reference surfaces render in a right-anchored drawer with one modal contract
+### Requirement: Reference surfaces render in a bounded workspace drawer with one modal contract
 The client's reference surfaces SHALL render in a wide workspace 12px below the top navigation's
 bottom edge, 16px inside each side of the viewport, and one command-line row height plus 12px above the
 viewport bottom, so the workspace covers the stage, the bottom band, and the command-line row whether or
@@ -1923,7 +1923,7 @@ the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachab
 - **THEN** the 同伴 · 隊伍 drawer opens with its 空位 row and follow rules, and no `ui_action` or text command is sent
 
 ### Requirement: The party drawer presents compbig rows and the fixed follow rules
-The 同伴 · 隊伍 drawer SHALL render on the shared right-anchored drawer contract with the sub-count
+The 同伴 · 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count
 `N / 4`, one compbig row per committed party slot (initial-letter/gold avatar with the same
 portrait fallback, display name, bond stage line, HP bar with numerals, the joined 參戰 token
 when the companion fights, and a 請其離隊 control), and one 空位 row stating the invite rule in

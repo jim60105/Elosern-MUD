@@ -517,7 +517,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::reference-surfaces-share-an-opaque-accessible-frame",
-        "webclient-contextual-hud::reference-surfaces-render-in-a-right-anchored-drawer-with-one-modal-contract",
+        "webclient-contextual-hud::reference-surfaces-render-in-a-bounded-workspace-drawer-with-one-modal-contract",
         "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time",
     )
     def test_reference_surfaces_share_one_opaque_workspace_frame(self):
