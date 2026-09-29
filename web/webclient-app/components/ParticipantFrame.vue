@@ -1,7 +1,7 @@
 <script setup>
 // Display-only, server-ordered combat identities. Playback substitutes only
 // the HP numerator addressed by the participant's catalog reference.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { faceObjectPosition } from "./face-rect.js";
 import { portraitGlyph } from "./character-identity.js";
 import { gaugeRatio } from "./vitals.js";
@@ -11,6 +11,7 @@ const props = defineProps({
   artPanel: { type: Object, default: null },
   displayHp: { type: Object, default: null },
 });
+const failedPortraitUrls = ref(new Set());
 const groups = computed(() => [
   { team: "party", label: "我方", rows: props.participants.filter((p) => p.team === "party") },
   { team: "foes", label: "敵方", rows: props.participants.filter((p) => p.team === "foes") },
@@ -20,7 +21,8 @@ function hpCurrent(p) {
   return typeof displayed === "number" ? displayed : p.hp_current;
 }
 function hpWidth(p) {
-  return `${gaugeRatio({ current: hpCurrent(p), maximum: p.hp_maximum })}%`;
+  const ratio = gaugeRatio({ current: hpCurrent(p), maximum: p.hp_maximum }) ?? 0;
+  return `${Math.min(100, Math.max(0, ratio))}%`;
 }
 const STATE_MARKERS = { fled: "已逃離", knocked_out: "倒地", defeated: "已敗退" };
 function portraitFor(p) {
@@ -29,13 +31,23 @@ function portraitFor(p) {
 }
 function portraitLabel(p) {
   const portrait = portraitFor(p);
-  const state = { pending: "肖像生成中", failed: "肖像生成失敗", missing: "無肖像" }[portrait?.status];
+  const state = portrait?.url && failedPortraitUrls.value.has(portrait.url)
+    ? "肖像載入失敗"
+    : { pending: "肖像生成中", failed: "肖像生成失敗", missing: "無肖像" }[portrait?.status];
   return `${p.display_name}，${state || portrait?.placeholder?.label || "無肖像"}`;
+}
+function portraitSrc(portrait) {
+  return portrait?.url && !failedPortraitUrls.value.has(portrait.url) ? portrait.url : "";
+}
+function onPortraitError(url) {
+  if (url && !failedPortraitUrls.value.has(url)) {
+    failedPortraitUrls.value = new Set(failedPortraitUrls.value).add(url);
+  }
 }
 </script>
 
 <template>
-  <div class="participant-frame" data-testid="participant-frame">
+  <div class="participant-frame" data-testid="participant-frame" tabindex="-1">
     <template v-for="group in groups" :key="group.team">
       <div v-if="group.rows.length" class="participant-frame__group">
         <div class="participant-frame__group-label">{{ group.label }}</div>
@@ -47,9 +59,10 @@ function portraitLabel(p) {
           <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
           <span v-if="p.state !== 'active'" class="participant-frame__state">{{ STATE_MARKERS[p.state] || "未知狀態" }}</span>
           <template v-if="portraitFor(p)">
-            <img v-if="portraitFor(p).url" class="participant-frame__portrait"
-              :src="portraitFor(p).url" :alt="p.display_name"
-              :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }" />
+            <img v-if="portraitSrc(portraitFor(p))" class="participant-frame__portrait"
+              :src="portraitSrc(portraitFor(p))" :alt="p.display_name"
+              :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
+              @error="onPortraitError(portraitFor(p).url)" />
             <span v-else class="participant-frame__portrait-placeholder" data-testid="participant-portrait-placeholder"
               role="img" :aria-label="portraitLabel(p)" :title="portraitLabel(p)">{{ portraitGlyph(p.display_name) }}</span>
           </template>

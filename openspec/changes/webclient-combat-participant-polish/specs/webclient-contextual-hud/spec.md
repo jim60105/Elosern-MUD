@@ -34,7 +34,7 @@ that a frame of six participants ends above the foe line-up's gauges at 1920x108
 
 Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
 up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
-entry that resolves to a placeholder SHALL render a compact initial with its truthful availability state accessible outside the bitmap, and a null reference or an
+entry that resolves to a placeholder SHALL render a compact initial with its truthful availability state accessible outside the bitmap; an entry whose image URL fails to load SHALL render a compact initial with a localized load-failure state accessible outside the bitmap; and a null reference or an
 unavailable art panel SHALL render no portrait at all. The client SHALL NOT construct a portrait
 subject key or URL. While the participant frame is mounted, the frame and the stage actors SHALL be the
 only presenters of the portrait catalog, so no separate portrait strip is rendered alongside them.
@@ -54,6 +54,10 @@ dock's target frame.
 #### Scenario: A portrait comes only from the catalog
 - **WHEN** a participant carries a portrait reference present in the committed portrait catalog
 - **THEN** the frame renders that catalog entry, and when the reference is null or the art panel is unavailable it renders no portrait and constructs no URL
+
+#### Scenario: A catalog portrait fails to load
+- **WHEN** a catalog entry has an image URL that fails to load
+- **THEN** the frame replaces the bitmap with the participant's initial and an accessible `肖像載入失敗` state, without changing its token or numeric HP
 
 #### Scenario: The frame does not compete for focus
 - **WHEN** the participant frame is mounted during combat

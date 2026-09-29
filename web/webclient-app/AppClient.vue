@@ -134,7 +134,7 @@ const beatStage = computed(() => store.view.beatStage || null);
 const focusedCombatTarget = computed(() => {
   if (store.view.dispatch.beatLocked) return null;
   const item = store.view.combatMenu?.items?.find((row) => row.key === store.view.focus.key);
-  if (item?.actionId === "toggle-target") return item.payload.identity;
+  if (item?.actionId === "toggle-target") return item.payload?.identity ?? null;
   return item?.actionId === "combat.cast" && item.payload?.target_ids?.length === 1
     ? item.payload.target_ids[0] : null;
 });

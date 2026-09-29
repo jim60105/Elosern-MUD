@@ -117,6 +117,42 @@ describe("ParticipantFrame (task 6.9)", () => {
     expect(w.findAll(".participant-frame__hp").map((row) => row.text())).toEqual(["80/100", "0/90", "45/45", "120/120"]);
   });
 
+  it("replaces a failed catalog image with its localized accessible state", async () => {
+    const w = mountFrame(participants, artPanel);
+    await w.get('img[src="/static/art/mei.png"]').trigger("error");
+    const placeholder = w.findAll('[data-testid="participant-portrait-placeholder"]')[0];
+    expect(placeholder.text()).toBe("小");
+    expect(placeholder.attributes("aria-label")).toBe("小美，肖像載入失敗");
+    await w.setProps({
+      artPanel: {
+        portrait_catalog: {
+          ...artPanel.portrait_catalog,
+          portrait_mei: { ...artPanel.portrait_catalog.portrait_mei, url: "/static/art/mei-v2.png" },
+        },
+      },
+    });
+    expect(w.get('img[src="/static/art/mei-v2.png"]').exists()).toBe(true);
+  });
+
+  it("keeps its scrollable frame out of sequential keyboard navigation", () => {
+    const w = mountFrame(participants, artPanel);
+    const frame = w.get('[data-testid="participant-frame"]');
+    expect(frame.attributes("tabindex")).toBe("-1");
+    expect(frame.element.tabIndex).toBe(-1);
+    expect(frame.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
+  });
+
+  it("caps the decorative hairline while keeping displayed HP numerals exact", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(ParticipantFrame, {
+      attachTo: host,
+      props: { participants: [participants[1]], artPanel, displayHp: { portrait_mei: 120 } },
+    });
+    expect(wrapper.get(".participant-frame__hp").text()).toBe("120/90");
+    expect(wrapper.get(".participant-frame__hairline > span").element.style.width).toBe("100%");
+  });
+
   it("keeps placeholder and null-reference HP synchronized through playback and settlement", async () => {
     const foes = participants.filter((p) => p.team === "foes");
     wrapper = mount({
