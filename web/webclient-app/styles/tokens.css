@@ -208,16 +208,16 @@
   --actor-h: min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h)));
   --actor-left-inset: max(6vw, calc(var(--left-column) + 8px - var(--actor-h) / 3));
   --actor-right-inset: max(6vw, calc(280px - var(--actor-h) / 3));
-  /* In combat the right-hand island is the participant frame, which spans
-     the `map` anchor's whole `--right-column - 28px` width (its left edge
+  /* In combat the right-hand island is the compact participant frame, within
+     the `map` anchor's `--right-column - 28px` column (the column's left edge
      `--right-column - 12px` from the stage's right edge) — much wider than
      the minimap card. The foe line-up (webclient-combat-foes-on-stage) steps
-     in until its front foe's face (the slot's centre) stands 24px clear of
-     that edge: its inset is
+     in until its front foe's face clears that column; at short viewports the
+     token also keeps the floor name/gauge clear of the frame. Its inset is
      `max(var(--actor-right-inset), var(--foe-face-clear) - <front slot width> / 2)`,
      written where the front foe's scale is known (FoeLineup.vue and the
      scene caption's rule in app-shell.css). */
-  --foe-face-clear: calc(var(--right-column) + 12px);
+  --foe-face-clear: calc(var(--right-column) + 24px);
 
   /* ---- shape & chrome ---- */
   --radius: 7px;

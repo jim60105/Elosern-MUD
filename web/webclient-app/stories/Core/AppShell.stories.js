@@ -4,6 +4,7 @@ import AppShell from "../../components/AppShell.vue";
 import AppClient from "../../AppClient.vue";
 import { useElosernStore } from "../../stores/elosern.js";
 import { createWindowBridge } from "../../bridge.js";
+import CombatMenu from "../../lib/combat_menu.js";
 import * as protocolFixtures from "../../tests/store/protocol_fixtures.js";
 import {
   ART_PANEL_PENDING_SAMPLE,
@@ -301,9 +302,57 @@ const renderPlayer = (args) => ({
           } } : {}),
         },
       });
+      if (args.participantPolish) {
+        const participants = [...PARTY_PARTICIPANTS, ...foeParticipants(4, {
+          31: { display_name: "灰袍盜賊與北境巡防隊長的漫長稱號" },
+          34: { state: "defeated", hp_current: 0 },
+        })];
+        snapshot.panels.context_actions = protocolFixtures.combatActions({
+          participants, session: { round: 0 },
+          skills: [{ category: "martial_arts", label: "武技", groups: [{ group: "basic", label: "基本", skills: [{
+            key: CombatMenu.BASIC_ATTACK_KEY, label: "基本攻擊", description: "選擇一名敵人。",
+            cost: {}, target_spec: "single", element: null, enabled: true, disabled_reason: null,
+            targets: [31, 32, 33], shorthands: [],
+          }] }] }],
+        });
+        snapshot.panels.status = protocolFixtures.statusPanel({ combat: { mode: "hostile", round: 0 } });
+        snapshot.panels.art.portrait_catalog["32"] = {
+          ...FOE_PORTRAIT_CATALOG["32"], url: null, status: "pending", face_rect: null, aspect_ratio: null,
+          placeholder: { kind: "missing", label: "肖像生成中" },
+        };
+      }
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      if (args.participantPolish) {
+        let revision = 1;
+        const sender = protocolFixtures.createFakeSender();
+        store.setSender(sender);
+        const round = (terminal = false) => {
+          const request = store.dispatchAction("combat.cast", { skill_key: CombatMenu.BASIC_ATTACK_KEY, target_ids: [31] });
+          const beats = [
+            { seq: 0, action: 0, kind: "roll", actor: "32", target: "31", amount: null, hp_after: null, text: "敵人舉起武器。" },
+            { seq: 1, action: 1, kind: "damage", actor: "32", target: "31", amount: 20, hp_after: 10, text: "武器命中，生命值下降。" },
+          ];
+          beats.forEach((beat) => store.appendText("out", beat.text));
+          const panels = {
+            context_actions: terminal ? protocolFixtures.explorationActions() : protocolFixtures.combatActions({
+              skills: snapshot.panels.context_actions.skills,
+              session: { round: revision },
+              participants: snapshot.panels.context_actions.participants.map((p) => p.identity === 31 ? { ...p, hp_current: 10 } : p),
+            }),
+            status: protocolFixtures.statusPanel({ combat: terminal ? null : { mode: "hostile", round: revision } }),
+            combat_beats: { schema_version: 1, available: true, round: `polish/${revision}`, beats },
+          };
+          const received = store.receive(1, "ui_update", [protocolFixtures.update({
+            revision: ++revision, mode: terminal ? "exploration" : "combat", panels,
+          })], {});
+          if (!received.accepted || store.lastPanelRejection) throw new Error(JSON.stringify(store.lastPanelRejection || received));
+          store.receive(1, "ui_action_result", [protocolFixtures.actionResult({ request_id: request, presentation_revision: revision })], {});
+        };
+        window.__participantPolish = { store, sent: sender.sent, round };
+        host.value.__participantPolish = window.__participantPolish;
+      }
       // The session line as the narrative delivers it (webclient-dialogue-
       // choices-overlay D2): paged verbatim under the name plate. On mount
       // the window shows the last page complete, so the choice list shows at
@@ -421,6 +470,7 @@ const renderPlayer = (args) => ({
       if (journeyTimer !== null) clearInterval(journeyTimer);
       if (window.__stageJourney && host.value?.__stageJourney === window.__stageJourney) delete window.__stageJourney;
       if (window.__modeJourney && host.value?.__modeJourney === window.__modeJourney) delete window.__modeJourney;
+      if (window.__participantPolish && host.value?.__participantPolish === window.__participantPolish) delete window.__participantPolish;
       bridge?.uninstall();
       app?.unmount();
       disposePinia(pinia);
@@ -462,6 +512,9 @@ export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
 // Combat: the minimap and the objective line are hidden, and the participant
 // frame takes the `map` anchor.
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
+// Six rows, three standing foes, long identity and pending thumbnail. The
+// offline journey exposes round()/round(true) for normal/terminal playback.
+export const CombatParticipantPolish = { render: renderPlayer, args: { combat: 4, participantPolish: true } };
 // The foe line-up (webclient-combat-foes-on-stage) with one foe, and with
 // five, of whom three stand on the stage while the frame lists all five.
 export const CombatOneFoe = { render: renderPlayer, args: { combat: 1 } };

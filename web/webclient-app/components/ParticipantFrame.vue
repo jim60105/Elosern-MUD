@@ -1,160 +1,75 @@
 <script setup>
-// ParticipantFrame (H3 webclient-hud-03-action-dock, tasks 6.1/6.2): the
-// combat participant frame mounted in the stage's `map` anchor (the minimap is
-// hidden in combat; webclient-avg-stage-hud-anchors design D4) —
-// 我方 / 敵方 groups from the committed `participants[]` slice. Each row
-// carries the `token`, `display_name`, the `hp_current / hp_maximum`
-// numerals, and the state as an explicit text marker (`已逃離` / `倒地` /
-// `已敗退`) alongside any colour (the state is never colour-only).
-//
-// Portraits resolve through `art.portrait_catalog[portrait_ref]` (task 6.2):
-// a missing catalog entry renders the catalog's placeholder card, a `null`
-// ref renders no card. No subject key or URL is constructed (the truthful
-// data scope: no surface without a backing model).
-import { computed } from "vue";
+// Display-only, server-ordered combat identities. Playback substitutes only
+// the HP numerator addressed by the participant's catalog reference.
+import { computed, ref } from "vue";
 import { faceObjectPosition } from "./face-rect.js";
+import { portraitGlyph } from "./character-identity.js";
+import { gaugeRatio } from "./vitals.js";
 
 const props = defineProps({
-  // The committed `context_actions` combat participants slice.
   participants: { type: Array, default: () => [] },
-  // The committed `art` panel (the portrait catalog source).
   artPanel: { type: Object, default: null },
-  // The hit points a playing combat round displays (`store.view.displayHp`,
-  // webclient-combat-beat-queue D7): a map from catalog key to a Number, or
-  // null when nothing plays. A row whose `portrait_ref` is a key of the map
-  // shows that value in place of its committed `hp_current`; every other row,
-  // and every other field, keeps the committed value.
   displayHp: { type: Object, default: null },
 });
-
-// The current hit points one row states: the displayed value while a round
-// plays, else the committed one.
-function hpCurrent(participant) {
-  const displayed = props.displayHp;
-  const key = participant.portrait_ref;
-  if (displayed && key != null && typeof displayed[key] === "number") {
-    return displayed[key];
-  }
-  return participant.hp_current;
+const failedPortraitUrls = ref(new Set());
+const groups = computed(() => [
+  { team: "party", label: "我方", rows: props.participants.filter((p) => p.team === "party") },
+  { team: "foes", label: "敵方", rows: props.participants.filter((p) => p.team === "foes") },
+]);
+function hpCurrent(p) {
+  const displayed = p.portrait_ref == null ? undefined : props.displayHp?.[p.portrait_ref];
+  return typeof displayed === "number" ? displayed : p.hp_current;
 }
-
-// Split the participants into the 我方 (party) and 敵方 (foes) groups,
-// preserving the server's order within each group. The combat panel's
-// `team` values are `party` and `foes` (see combat_panel TEAMS).
-const allies = computed(() => props.participants.filter((p) => p.team === "party"));
-const foes = computed(() => props.participants.filter((p) => p.team === "foes"));
-
-// The explicit state marker (task 6.1): the text label rendered beside the
-// HP numerals — a non-active participant's state is never conveyed by
-// colour alone.
-const STATE_MARKERS = {
-  fled: "已逃離",
-  knocked_out: "倒地",
-  defeated: "已敗退",
-  active: null,
-};
-
-function stateMarker(state) {
-  return STATE_MARKERS[state] || "未知狀態";
+function hpWidth(p) {
+  const ratio = gaugeRatio({ current: hpCurrent(p), maximum: p.hp_maximum }) ?? 0;
+  return `${Math.min(100, Math.max(0, ratio))}%`;
 }
-
-// The portrait for one participant (task 6.2): the catalog entry by
-// `portrait_ref`; a missing catalog entry renders the catalog's placeholder
-// card, a `null` ref renders no card. No subject key or URL is constructed
-// (the truthful-data scope).
-function portraitFor(participant) {
-  if (participant.portrait_ref === null || participant.portrait_ref === undefined) {
-    return null;
-  }
-  const catalog = (props.artPanel && props.artPanel.portrait_catalog) || {};
-  const entry = catalog[participant.portrait_ref];
-  // A missing catalog entry renders the catalog's placeholder card.
-  return entry || { placeholder: true };
+const STATE_MARKERS = { fled: "已逃離", knocked_out: "倒地", defeated: "已敗退" };
+function portraitFor(p) {
+  if (p.portrait_ref == null || !props.artPanel || props.artPanel.available === false) return null;
+  return props.artPanel.portrait_catalog?.[p.portrait_ref] || { placeholder: true };
 }
-
-// The portrait source: the catalog entry's `url`; a pending/missing entry
-// renders the placeholder card (the truthful placeholder label).
+function portraitLabel(p) {
+  const portrait = portraitFor(p);
+  const state = portrait?.url && failedPortraitUrls.value.has(portrait.url)
+    ? "肖像載入失敗"
+    : { pending: "肖像生成中", failed: "肖像生成失敗", missing: "無肖像" }[portrait?.status];
+  return `${p.display_name}，${state || portrait?.placeholder?.label || "無肖像"}`;
+}
 function portraitSrc(portrait) {
-  if (!portrait) {
-    return "";
+  return portrait?.url && !failedPortraitUrls.value.has(portrait.url) ? portrait.url : "";
+}
+function onPortraitError(url) {
+  if (url && !failedPortraitUrls.value.has(url)) {
+    failedPortraitUrls.value = new Set(failedPortraitUrls.value).add(url);
   }
-  if (portrait.url) {
-    return portrait.url;
-  }
-  return "";
 }
 </script>
 
 <template>
-  <div class="participant-frame" data-testid="participant-frame">
-    <div v-if="allies.length" class="participant-frame__group">
-      <div class="participant-frame__group-label">我方</div>
-      <div
-        v-for="p in allies"
-        :key="p.identity"
-        class="participant-frame__row"
-        :class="{ 'participant-frame__row--muted': p.state !== 'active' }"
-      >
-        <span class="participant-frame__token" :class="{ 'participant-frame__token--ally': true }">
-          {{ p.token }}
-        </span>
-        <span class="participant-frame__name">{{ p.display_name }}</span>
-        <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
-        <span v-if="p.state !== 'active'" class="participant-frame__state">
-          {{ stateMarker(p.state) }}
-        </span>
-        <template v-if="portraitFor(p)">
-          <img
-            v-if="portraitSrc(portraitFor(p))"
-            class="participant-frame__portrait"
-            :src="portraitSrc(portraitFor(p))"
-            :alt="p.display_name"
-            :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
-          />
-          <div
-            v-else
-            class="participant-frame__portrait-placeholder"
-            data-testid="participant-portrait-placeholder"
-          >
-            {{ (portraitFor(p).placeholder && portraitFor(p).placeholder.label) || "肖像圖像尚未生成" }}
-          </div>
-        </template>
+  <div class="participant-frame" data-testid="participant-frame" tabindex="-1">
+    <template v-for="group in groups" :key="group.team">
+      <div v-if="group.rows.length" class="participant-frame__group">
+        <div class="participant-frame__group-label">{{ group.label }}</div>
+        <div v-for="p in group.rows" :key="p.identity" class="participant-frame__row"
+          :class="{ 'participant-frame__row--muted': p.state !== 'active' }">
+          <span class="participant-frame__token"
+            :class="group.team === 'party' ? 'participant-frame__token--ally' : 'participant-frame__token--foe'">{{ p.token }}</span>
+          <span class="participant-frame__name" :title="p.display_name">{{ p.display_name }}</span>
+          <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
+          <span v-if="p.state !== 'active'" class="participant-frame__state">{{ STATE_MARKERS[p.state] || "未知狀態" }}</span>
+          <template v-if="portraitFor(p)">
+            <img v-if="portraitSrc(portraitFor(p))" class="participant-frame__portrait"
+              :src="portraitSrc(portraitFor(p))" :alt="p.display_name"
+              :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
+              @error="onPortraitError(portraitFor(p).url)" />
+            <span v-else class="participant-frame__portrait-placeholder" data-testid="participant-portrait-placeholder"
+              role="img" :aria-label="portraitLabel(p)" :title="portraitLabel(p)">{{ portraitGlyph(p.display_name) }}</span>
+          </template>
+          <span class="participant-frame__hairline" aria-hidden="true"><span :style="{ width: hpWidth(p) }"></span></span>
+        </div>
       </div>
-    </div>
-    <div v-if="foes.length" class="participant-frame__group">
-      <div class="participant-frame__group-label">敵方</div>
-      <div
-        v-for="p in foes"
-        :key="p.identity"
-        class="participant-frame__row"
-        :class="{ 'participant-frame__row--muted': p.state !== 'active' }"
-      >
-        <span class="participant-frame__token" :class="{ 'participant-frame__token--foe': true }">
-          {{ p.token }}
-        </span>
-        <span class="participant-frame__name">{{ p.display_name }}</span>
-        <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
-        <span v-if="p.state !== 'active'" class="participant-frame__state">
-          {{ stateMarker(p.state) }}
-        </span>
-        <template v-if="portraitFor(p)">
-          <img
-            v-if="portraitSrc(portraitFor(p))"
-            class="participant-frame__portrait"
-            :src="portraitSrc(portraitFor(p))"
-            :alt="p.display_name"
-            :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
-          />
-          <div
-            v-else
-            class="participant-frame__portrait-placeholder"
-            data-testid="participant-portrait-placeholder"
-          >
-            {{ (portraitFor(p).placeholder && portraitFor(p).placeholder.label) || "肖像圖像尚未生成" }}
-          </div>
-        </template>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -162,107 +77,60 @@ function portraitSrc(portrait) {
 .participant-frame {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: 6px;
+  padding: 8px;
   background: var(--panel);
   border: var(--line);
   border-radius: var(--radius);
-  padding: var(--sp-3);
   font-family: var(--f-sans);
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
-
-.participant-frame__group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.participant-frame__group-label {
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  color: var(--paper-500);
-  margin-bottom: 2px;
-}
-
+.participant-frame__group { display: flex; flex-direction: column; gap: 3px; }
+.participant-frame__group-label { color: var(--gold-400); font-size: var(--text-xs); }
 .participant-frame__row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
-}
-
-.participant-frame__row--muted {
-  opacity: 0.6;
-}
-
-/* The participant token: the draft's `.tok` style — party vs foes colour
-   (the state marker text is the non-colour signal, task 6.1). */
-.participant-frame__token {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
+  position: relative;
   display: grid;
-  place-items: center;
-  font-family: var(--f-mono);
-  font-size: var(--text-sm);
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  color: var(--paper-100);
-  flex: none;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  gap: 0 6px;
+  align-items: center;
+  padding: 3px 4px 5px;
+  border-radius: var(--radius-sm);
+  background: #1b1d2150;
 }
-
-.participant-frame__token--ally {
-  color: var(--vit-mp);
+.participant-frame__row--muted { opacity: 0.7; }
+.participant-frame__token {
+  grid-column: 1; grid-row: 1 / 3;
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  font: var(--text-xs) var(--f-mono);
+  border: 1px solid var(--ink-600); border-radius: 5px;
+  box-sizing: border-box;
 }
-
-.participant-frame__token--foe {
-  color: var(--seal-400);
-}
-
+.participant-frame__token--ally { color: var(--vit-mp); }
+.participant-frame__token--foe { color: var(--seal-400); }
 .participant-frame__name {
-  font-size: var(--text-sm);
-  color: var(--paper-50);
-  font-weight: 500;
+  grid-column: 2; grid-row: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: var(--text-sm)/1.2 var(--f-serif); color: var(--paper-50);
 }
-
 .participant-frame__hp {
-  font-family: var(--f-num);
-  font-size: var(--text-xs);
-  color: var(--paper-500);
-  margin-left: auto;
+  grid-column: 2; grid-row: 2;
+  font: var(--text-xs)/1.2 var(--f-num); color: var(--paper-300);
   font-variant-numeric: tabular-nums lining-nums;
 }
-
-.participant-frame__state {
-  font-size: var(--text-xs);
-  color: var(--warn);
-  white-space: nowrap;
-}
-
-.participant-frame__portrait {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
+.participant-frame__state { grid-column: 2 / 4; color: var(--warn); font-size: var(--text-xs); }
+.participant-frame__portrait, .participant-frame__portrait-placeholder {
+  grid-column: 3; grid-row: 1 / 3;
+  width: 28px; height: 28px; box-sizing: border-box;
+  border: 1px solid var(--ink-600); border-radius: 5px;
   object-fit: cover;
-  flex: none;
-  border: 1px solid var(--ink-600);
 }
-
-/* A missing/pending portrait renders the catalog's placeholder card (task
-   6.2): the truthful placeholder label, no invented bitmap. */
 .participant-frame__portrait-placeholder {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  background: var(--ink-780);
-  border: 1px dashed var(--ink-600);
-  color: var(--paper-500);
-  font-size: var(--text-xs);
-  padding: 4px;
-  text-align: center;
-  line-height: 1.2;
+  display: grid; place-items: center;
+  background: var(--ink-780); color: var(--paper-300); font-size: var(--text-sm);
 }
+.participant-frame__hairline { position: absolute; bottom: 1px; left: 38px; right: 4px; height: 2px; background: var(--ink-600); }
+.participant-frame__hairline > span { display: block; height: 100%; background: var(--vit-hp); }
 </style>

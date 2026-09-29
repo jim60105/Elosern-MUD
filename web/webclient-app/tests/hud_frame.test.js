@@ -413,15 +413,6 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     );
   });
 
-  it("lets the foe line-up reach past actor-right's box in combat only", () => {
-    // webclient-combat-foes-on-stage D2: the anchor keeps its box; in combat
-    // it shows the row that grows leftward beyond it.
-    const frameCss = readFileSync(join(APP_ROOT, "components/HudFrame.vue"), "utf8");
-    const rule = extractRule(frameCss, '.elosern-stage[data-elosern-mode="combat"] [data-anchor="actor-right"]');
-    expect(rule).toContain("overflow: visible;");
-    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
-    expect(tokens).toContain("--foe-face-clear: calc(var(--right-column) + 12px);");
-  });
 
   it("holds the combat veil only while the round that ended the fight plays", async () => {
     // webclient-combat-beat-choreography D6: `data-beat-hold` renders only

@@ -306,24 +306,13 @@ body {
    encounter's frame ends above the stage floor, where the foe line-up's
    gauges and the scene caption stand (webclient-combat-foes-on-stage), and
    a long name ends in an ellipsis on its one line instead of wrapping. */
-.elosern-root .participant-frame { border: 1px solid #92816a70; background: var(--panel); border-radius: 7px; padding: 12px; }
-.elosern-root .participant-frame__group-label { color: var(--gold-400); font: var(--text-base) var(--f-serif); margin-bottom: 8px; }
-.elosern-root .participant-frame__row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 36px; gap: 2px 8px; align-items: center; padding: 6px 8px; border: 1px solid #66605a80; border-radius: 5px; margin-bottom: 6px; background: #1b1d2150; }
-.elosern-root .participant-frame .participant-frame__token { grid-column: 1; grid-row: 1 / 3; width: 32px; height: 32px; box-sizing: border-box; }
-.elosern-root .participant-frame__name { grid-column: 2; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-base) var(--f-serif); }
-.elosern-root .participant-frame__hp { grid-column: 2; grid-row: 2; font-size: var(--text-sm); color: var(--paper-100); }
-.elosern-root .participant-frame .participant-frame__portrait,
-.elosern-root .participant-frame .participant-frame__portrait-placeholder { grid-column: 3; grid-row: 1 / 3; width: 36px; height: 36px; box-sizing: border-box; }
-.elosern-root .participant-frame__state { grid-column: 2 / 4; }
-@media (max-height: 820px) {
-  .elosern-root .participant-frame { padding: 10px; }
-  .elosern-root .participant-frame__group-label { font-size: var(--text-sm); margin-bottom: 5px; }
-  .elosern-root .participant-frame__row { grid-template-columns: 28px minmax(0, 1fr) 32px; gap: 0 8px; padding: 4px 8px; margin-bottom: 4px; }
-  .elosern-root .participant-frame .participant-frame__token { width: 28px; height: 28px; }
-  .elosern-root .participant-frame .participant-frame__portrait,
-  .elosern-root .participant-frame .participant-frame__portrait-placeholder { width: 32px; height: 32px; }
-  .elosern-root .participant-frame__name { font-size: var(--text-md); }
-  .elosern-root .participant-frame__hp { font-size: var(--text-xs); }
+.elosern-root [data-anchor="map"] > .participant-frame {
+  flex-shrink: 1;
+  max-height: 100%;
+  width: min(100%, clamp(218px, 16vw, 288px));
+  box-sizing: border-box;
+  align-self: flex-end;
+  border-color: #92816a70;
 }
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }

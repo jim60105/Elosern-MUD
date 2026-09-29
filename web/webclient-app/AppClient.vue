@@ -127,6 +127,17 @@ const combatFoes = computed(() =>
 // defeat beat; the round that ended the fight keeps them on the stage
 // (`beatHold`, inert) after the committed mode has already left combat.
 const beatStage = computed(() => store.view.beatStage || null);
+// Direct target choices live in `combat.skill`; staged choices live in
+// `combat.target`. Resolve the focused item's action payload instead of
+// parsing its key or assuming either source. AREA submit/shorthands carry no
+// single target.
+const focusedCombatTarget = computed(() => {
+  if (store.view.dispatch.beatLocked) return null;
+  const item = store.view.combatMenu?.items?.find((row) => row.key === store.view.focus.key);
+  if (item?.actionId === "toggle-target") return item.payload?.identity ?? null;
+  return item?.actionId === "combat.cast" && item.payload?.target_ids?.length === 1
+    ? item.payload.target_ids[0] : null;
+});
 const beatHold = computed(() => !!store.view.beatHold);
 const lineupFoes = computed(() => (beatStage.value ? beatStage.value.foes : combatFoes.value));
 const foesOnStage = computed(
@@ -305,6 +316,7 @@ function onFoeLineupGone() {
               :foes="combatFoes"
               :stage="beatStage"
               :display-hp="store.view.displayHp"
+              :focused-target="focusedCombatTarget"
               :inert="beatHold || null"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"

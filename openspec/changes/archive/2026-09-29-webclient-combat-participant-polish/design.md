@@ -18,6 +18,16 @@ Show the foe display name above each decorative HP gauge; acting/target focus ge
 
 Replace the dashed combat status border with a solid subdued ribbon. Do not blindly add one to session.round: it is the canonical completed-round count. At zero show a localized preparation label rather than 'round 0'; positive values retain their actual count.
 
+Implementation clarifications from the pre-implementation review: both the frame
+and foe gauges retain the existing portrait-reference display-HP join; a null or
+unmapped reference uses committed HP on both surfaces. The new frame hairline is
+decorative and follows the same numerator. The stage artwork's existing caption
+is screen-reader-only; the lineup's visible name belongs above its gauge, while
+placeholder chest identity and truthful state remain intact. Focus cues resolve
+the current combat target item payload (single-target IDs or AREA identity),
+never parse a focus key or infer an exploration target. Preserve the existing
+24px minimum face clearance and depth ratios; verify the entire head visually.
+
 ## Risks / Trade-offs
 
 - Longer localized strings and raised type sizes can exceed fixed boxes. Use bounded internal scrolling and preserve keyboard focus/complete text; exercise 1280x720, 1440x900 and 1920x1080 instead of shrinking text until it disappears.
