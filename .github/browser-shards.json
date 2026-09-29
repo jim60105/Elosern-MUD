@@ -44,7 +44,7 @@
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_tab_click_pops_to_root_and_activates_once",
+        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
         "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity"
       ],
       "files_b": [
@@ -181,7 +181,8 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_talk_open_enters_the_dialogue_in_one_step",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
-        "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest"
+        "web.tests.browser.test_browser_local_map_layout_variants.LayoutVariantsBrowserTest",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_pointer_opened_choices_highlight_the_first_choice_without_answering"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_out_of_range_apparent_age_rejected_independently",
@@ -294,7 +295,7 @@
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
-        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_tab_bar_truthful_skills_badge",
+        "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_vertical_list_truthful_skills_count",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_verb_popover_card_lies_inside_the_command_region",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
@@ -304,7 +305,8 @@
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_full_log_opens_at_latest_line",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_top_bar_tool_group_fits_and_opens_with_line_collapsed",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable"
+        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_prose_typesetting_follows_the_measured_column"
       ]
     },
     {
@@ -339,7 +341,9 @@
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_quest_drawer_offers_no_codex_control",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap"
+        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap",
+        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_command_window_scrolls_its_rows_and_details_the_current_frame",
+        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_surfaces_share_one_opaque_workspace_frame"
       ]
     },
     {
@@ -384,7 +388,8 @@
         "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_vitals_reveal_and_inert",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_reduced_motion_fades_only",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant"
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant",
+        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_same_label_lineage_rows_carry_their_root_names_beside_progress"
       ]
     },
     {
@@ -394,7 +399,8 @@
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_escape_from_preset_confirm_returns_to_list_without_mutation",
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_preset_selection_confirm_activate_reaches_exploration",
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_rejected_preset_save_stays_on_the_list_without_confirmation",
-        "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest"
+        "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest",
+        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_only_character_drawers_stand_a_bounded_portrait_beside_the_hero"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",
@@ -403,7 +409,8 @@
         "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_enter_and_leave_full",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade"
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade",
+        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_empty_quest_guidance_gives_way_to_the_unavailable_reason"
       ]
     },
     {
@@ -415,7 +422,10 @@
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
-        "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest"
+        "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest",
+        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
+        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_full_map_marks_the_current_place_once",
+        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step"
       ]
     }
   ]
