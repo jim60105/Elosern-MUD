@@ -724,6 +724,72 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ],
         )
 
+    @covers_requirement(
+        "webclient-contextual-hud::pointer-open-dialogue-choices-expose-a-local-initial-highlight"
+    )
+    def test_pointer_opened_choices_highlight_the_first_choice_without_answering(self):
+        """webclient-message-typesetting: a conversation opened and read by
+        pointer shows its choice list with the first choice highlighted
+        through the list's active descendant, and nothing is answered. While
+        focus sits elsewhere (the expanded command line) the highlight stays
+        visible and still answers nothing; only a deliberate click does."""
+        page = self.logged_in_page((1920, 1080))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        page.click('#action-dock [data-item-key="target-%s"]' % host["identity"])
+        page.wait_for_selector('[data-testid="verb-popover"] [data-item-key="talk-open"]', timeout=15000)
+        page.click('[data-testid="verb-popover"] [data-item-key="talk-open"]')
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
+
+        # Read the greeting by pointer: each click on the page shows a typing
+        # page in full or advances.
+        list_selector = '[data-anchor="choices"] [data-testid="dialogue-choices"]'
+        for _ in range(60):
+            if page.locator(list_selector).count():
+                break
+            page.click('[data-testid="message-page"]')
+            page.wait_for_timeout(150)
+        page.wait_for_selector(list_selector, timeout=5000)
+
+        probe = """() => {
+          const list = document.querySelector('%s');
+          const active = document.getElementById(list.getAttribute('aria-activedescendant'));
+          const rows = Array.from(list.querySelectorAll('[role="menuitem"]'));
+          const bg = (el) => getComputedStyle(el).backgroundImage + '|' + getComputedStyle(el).borderTopColor;
+          return {
+            activeIsFirstPick: active === list.querySelector('[data-testid="dialogue-pick"]'),
+            activeFlag: active && active.getAttribute('data-active'),
+            distinct: rows.length > 1 && bg(active) !== bg(rows[1]),
+            listFocused: document.activeElement === list,
+          };
+        }""" % list_selector
+        opened = page.evaluate(probe)
+        # Reading by clicks leaves focus on the message page, so the shell's
+        # unchanged focus rule hands it to the list; the highlight itself
+        # moves no focus (the unfocused case follows below).
+        self.assertTrue(opened["listFocused"])
+        self.assertTrue(opened["activeIsFirstPick"])
+        self.assertEqual(opened["activeFlag"], "true")
+        self.assertTrue(opened["distinct"], "the initial highlight must be visible")
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
+
+        # Focus elsewhere: the list keeps its quiet highlight and answers
+        # nothing.
+        page.click('[data-testid="command-line-toggle"]')
+        page.wait_for_function("() => document.activeElement && document.activeElement.id === 'inputfield'")
+        away = page.evaluate(probe)
+        self.assertFalse(away["listFocused"])
+        self.assertTrue(away["activeIsFirstPick"])
+        self.assertTrue(away["distinct"], "the unfocused list must still show where the keys start")
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
+
+        # A deliberate click answers exactly once.
+        page.click('%s [data-testid="dialogue-pick"]' % list_selector)
+        wait_for_store_state(page, lambda s: sent_action_count(page, "explore.talk_scripted") == 1, timeout=15000)
+
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_freeform_dialogue_degrades_offline_through_the_command_line(self):
         page = self.logged_in_page()

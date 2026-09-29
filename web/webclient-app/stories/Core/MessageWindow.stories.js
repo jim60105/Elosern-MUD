@@ -264,6 +264,42 @@ export const OversizeMap = {
   },
 };
 
+// CJK prose typesetting (webclient-message-typesetting): mixed scripts get
+// a small CJK–Latin gap from `text-autospace` (spacing only, the text is
+// unchanged), punctuation keeps strict line-break rules, and a box-drawing
+// map between two prose lines keeps its grid — no inserted spacing. At full
+// motion the `▼` bobs slowly; reduced and off keep it still.
+const SMALL_MAP = ["┌───┬───┬───┐", "│ · │ @ │ # │", "├───┼───┼───┤", "│ ~ │ · │ · │", "└───┴───┴───┘"].join("<br>");
+
+const MIXED_REPLY = [
+  [
+    "out",
+    "告示寫著：「徵求3名冒險者護送商隊前往Rivermouth，酬勞120枚銀幣，限E級以上。」" +
+      "下方有人用炭筆補了一行小字：「小心North Gate附近的狼群（已有2人受傷）。」",
+  ],
+  ["out", SMALL_MAP],
+  ["sys", "你記下了委託編號Q-042。"],
+  ["out", "書記抬頭看了你一眼，推了推單片眼鏡：「要接的話，先到櫃檯登記。」"],
+];
+
+// The reply arrives live, as in MorePages, so the window opens on page 1.
+export const MixedScripts = {
+  render: (args) => ({
+    setup() {
+      const lines = ref(args.lines);
+      onMounted(() => {
+        setTimeout(() => {
+          const echo = seqLines(lines.value.length + 1, [["in", "look board"]]);
+          const reply = seqLines(lines.value.length + 2, MIXED_REPLY);
+          lines.value = [...lines.value, ...echo, ...reply];
+        }, 60);
+      });
+      return () => h(MessageWindow, { ...args, lines: lines.value });
+    },
+  }),
+  args: { lines: ARRIVAL, marks: [], textSpeed: "instant" },
+};
+
 // A silent action is out and its reply has not arrived (the last mark is
 // newer than the last line): the previous response stays, flushed to its
 // last page.

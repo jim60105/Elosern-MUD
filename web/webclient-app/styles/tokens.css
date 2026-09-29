@@ -102,7 +102,12 @@
       window multiplies it by `--prose-scale`. The control strip under the
       text holds the page marker, 日誌, and ⌨. */
    --message-text: clamp(20px, 2.593vh, 38px);
-   --message-line-height: 1.4;
+   /* The page's CJK leading and the gap between two narrative lines
+      (webclient-message-typesetting): one and a half lines, and a little
+      under half a line between paragraphs. Paging measures the rendered
+      page, so capacity follows these values rather than a line count. */
+   --message-line-height: 1.5;
+   --message-paragraph-gap: 0.45em;
    --message-controls-h: 36px;
    /* The bottom band's shared control strip (webclient-band-material-pass):
       the message window's marker / 日誌 / ⌨ row and the dock's shortcut
@@ -110,6 +115,10 @@
       padding, so both read on one baseline. */
    --band-strip-h: var(--message-controls-h);
    --band-pad-bottom: 12px;
+   /* The strip's right-end controls (AppShell's 日誌 at right 58px, 44px
+      wide, and ⌨ at right 22px), plus a small gap: the page marker never
+      sits closer than this to the message region's right edge. */
+   --band-strip-actions-w: 104px;
    /* The stage seam over the band's top edge: a pointer-inert feather that
       darkens the lowest strip of art into the band. Kept below the scene
       caption row and the foe floor plates. */
@@ -155,6 +164,10 @@
   --motion-clear: 150ms; /* message clear */
   --motion-flash: 120ms; /* combat flash */
   --motion-stagger: 40ms; /* choice-row stagger */
+  /* The page marker's slow bob (webclient-message-typesetting); a loop, so
+     it stops at reduced and off. Its travel is scaled by `--motion-travel`. */
+  --motion-marker-bob: 1.6s;
+  --motion-marker-travel: 2px;
   /* The combat beat pause (webclient-combat-beat-queue design D2, AVG stage
      design §10.2): the wait between one beat page and the next. Only the
      script reads it (`lib/motion_tokens.js`), so it drives no transition and
@@ -810,6 +823,7 @@
   --motion-clear: 150ms;
   --motion-flash: 0ms;
   --motion-stagger: 0ms;
+  --motion-marker-bob: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -837,6 +851,7 @@
   --motion-clear: 0ms;
   --motion-flash: 0ms;
   --motion-stagger: 0ms;
+  --motion-marker-bob: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -875,6 +890,7 @@
     --motion-clear: 150ms;
     --motion-flash: 0ms;
     --motion-stagger: 0ms;
+    --motion-marker-bob: 0ms;
     --motion-travel: 0;
     --motion-flash-peak: 0;
   }

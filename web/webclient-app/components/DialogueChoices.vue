@@ -25,6 +25,13 @@
 // are removed at once. A list mounted in the frame a reconnect renders
 // (`entrance` false) shows at rest.
 //
+// The initial highlight (webclient-message-typesetting): the list opens
+// with its first enabled row active — and the exits view with its first
+// enabled exit — shown quietly even while the list does not hold focus (a
+// conversation opened by pointer), so the row keyboard navigation starts on
+// is visible. It is the same `aria-activedescendant` state the keys move;
+// showing it activates nothing and takes no focus.
+//
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
@@ -55,7 +62,6 @@ const listRef = ref(null);
 const scrollRef = ref(null);
 const idPrefix = useId();
 const view = ref("choices");
-const activeIndex = ref(0);
 // The entrance is decided once, at mount (a later prop change must never
 // re-apply the animation and replay it). The rows' stillness ends at the
 // first view swap, whose new rows stagger in.
@@ -99,6 +105,16 @@ const rows = computed(() => {
   ];
 });
 
+// The first enabled choice, or the first row when no choice is enabled —
+// the exits' back row is a way out, not a choice — so a disabled exit stays
+// reachable with its explanation, as before.
+function firstEnabled(list) {
+  const index = list.findIndex((row) => row.enabled && row.kind !== "back");
+  return index < 0 ? 0 : index;
+}
+
+const activeIndex = ref(firstEnabled(rows.value));
+
 // The trailing rows of the choice view open with a divider after the picks.
 const firstTrailing = computed(() => (view.value === "choices" ? props.picks.length : props.exits.length));
 
@@ -128,10 +144,11 @@ function setActive(index) {
   });
 }
 
-function showView(next, index) {
+// Swaps the rows; with no index, the new view's first enabled row is active.
+function showView(next, index = null) {
   rowsStill.value = false;
   view.value = next;
-  setActive(index);
+  setActive(index ?? firstEnabled(rows.value));
 }
 
 function activate(index) {
@@ -141,7 +158,7 @@ function activate(index) {
   }
   // The exits swap and the way back are local: they dispatch nothing.
   if (row.kind === "move") {
-    showView("exits", 0);
+    showView("exits");
     return;
   }
   if (row.kind === "back") {
@@ -243,6 +260,7 @@ defineExpose({ focus });
     :aria-activedescendant="rows.length ? rowId(activeIndex) : null"
     @keydown="onKeydown"
   >
+    <span class="dialogue-choices__corners" aria-hidden="true"></span>
     <div v-if="view === 'exits'" class="dialogue-choices__caption" aria-hidden="true">移動</div>
     <div :key="view" ref="scrollRef" class="dialogue-choices__rows" :style="{ '--row-count': rows.length }">
     <div
@@ -280,6 +298,19 @@ defineExpose({ focus });
         >
           <rect x="2.5" y="6" width="19" height="12" rx="2.2" />
           <path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8" stroke-width="2" />
+        </svg>
+        <!-- The leave badge's ✕ is drawn too: two fine strokes in the seal
+             tint, where the text glyph read as a heavy Latin X. -->
+        <svg
+          v-else-if="row.kind === 'leave'"
+          class="dialogue-choices__badge-icon dialogue-choices__badge-icon--leave"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+        >
+          <path d="M7 7l10 10M17 7L7 17" />
         </svg>
         <template v-else>{{ row.badge }}</template>
       </span>
@@ -437,6 +468,33 @@ defineExpose({ focus });
   pointer-events: none;
 }
 
+/* The card's corner ornaments (webclient-message-typesetting): four small
+   gold brackets just inside the frame, the dock's focus-frame vocabulary
+   (webclient-band-material-pass) at rest strength. They brighten with the
+   frame while the list holds keyboard focus. Decorative and pointer-inert. */
+.dialogue-choices__corners {
+  position: absolute;
+  inset: 3px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.55;
+  --corner: rgba(185, 154, 96, 0.9);
+  background:
+    linear-gradient(var(--corner), var(--corner)) top left / 8px 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top left / 1px 8px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top right / 8px 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top right / 1px 8px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom left / 8px 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom left / 1px 8px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom right / 8px 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom right / 1px 8px no-repeat;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.dialogue-choices:focus-visible .dialogue-choices__corners {
+  opacity: 1;
+}
+
 .dialogue-choices__row {
   position: relative;
   flex: none;
@@ -537,10 +595,17 @@ defineExpose({ focus });
   color: var(--seal-400);
 }
 
+/* Leaving is marked on its icon only (webclient-message-typesetting): a
+   seal-tinted badge and cross, never a red frame around the whole row. */
 .dialogue-choices__row--leave .dialogue-choices__badge {
   border-color: rgba(169, 50, 42, 0.8);
   background: rgba(169, 50, 42, 0.1);
   color: var(--seal-400);
+}
+
+.dialogue-choices__badge-icon--leave {
+  width: 14px;
+  height: 14px;
 }
 
 .dialogue-choices__row[aria-disabled="true"] {
@@ -555,6 +620,30 @@ defineExpose({ focus });
   border-style: dashed;
   border-color: var(--ink-600);
   background: transparent;
+  color: var(--paper-500);
+}
+
+/* The initial highlight while the list does not hold focus
+   (webclient-message-typesetting): the active row carries a quiet version
+   of the focused treatment — a faint fill, a hairline frame, and a dim
+   caret — so it reads as where the keys will start, not as a choice made. */
+.dialogue-choices:not(:focus) .dialogue-choices__row--active:not([aria-disabled="true"]) {
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.12), rgba(185, 154, 96, 0.02));
+  border-color: rgba(185, 154, 96, 0.32);
+}
+
+.dialogue-choices:not(:focus) .dialogue-choices__row--active::before {
+  content: "▸";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold-500);
+  font-size: var(--text-sm);
+  opacity: 0.7;
+}
+
+.dialogue-choices:not(:focus) .dialogue-choices__row--active[aria-disabled="true"]::before {
   color: var(--paper-500);
 }
 
@@ -601,15 +690,6 @@ defineExpose({ focus });
 
 .dialogue-choices:focus .dialogue-choices__row--active[aria-disabled="true"] .dialogue-choices__label {
   color: var(--paper-300);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--leave.dialogue-choices__row--active {
-  background: linear-gradient(90deg, rgba(169, 50, 42, 0.32), rgba(169, 50, 42, 0.08));
-  border-color: rgba(207, 68, 68, 0.7);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--leave.dialogue-choices__row--active::before {
-  color: var(--seal-400);
 }
 
 .dialogue-choices:focus .dialogue-choices__row--leave.dialogue-choices__row--active .dialogue-choices__badge {

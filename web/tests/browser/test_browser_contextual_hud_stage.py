@@ -794,6 +794,183 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page.close()
 
     @covers_requirement(
+        "webclient-contextual-hud::cjk-reading-furniture-follows-the-measured-prose-column"
+    )
+    def test_prose_typesetting_follows_the_measured_column(self):
+        """webclient-message-typesetting: at every acceptance viewport and
+        prose scale a mixed CJK / Latin response with a box-drawing map pages
+        with 1.5 leading, never clips a line, keeps the map's grid (no
+        inserted spacing, exact text), and shows its marker inside the control
+        strip clear of 日誌; in dialogue the marker ends at the left-aligned
+        prose column's edge; reduced motion keeps the marker still."""
+        prose = "".join(
+            f"告示第{i}條寫著：「徵求3名冒險者護送商隊前往Rivermouth，酬勞120枚銀幣，限E級以上。」"
+            for i in range(1, 9)
+        )
+        map_rows = ["┌───┬───┐", "│ @ │ # │", "└───┴───┘"]
+        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            exploration = _exploration_panel([_interact_target(11, "小販")])
+            panels = {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            }
+            _inject_snapshot(page, panels, mode="exploration")
+            _wait_mode(page, "exploration")
+            page.evaluate(
+                """([prose, map]) => {
+                  const store = window.__elosernBridge.store;
+                  store.setTextSpeed('instant');
+                  store.appendText('out', '初始段落。');
+                  store.appendText('in', 'look board');
+                  store.appendText('out', prose);
+                  store.appendText('out', map);
+                  store.appendText('out', '書記推了推眼鏡：「要接的話，先到櫃檯登記。」');
+                }""",
+                [prose, "<br>".join(map_rows)],
+            )
+            for scale in (1, 1.12):
+                page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
+                page.wait_for_timeout(250)
+                # Read every page from the first: Enter on the focused page
+                # surface advances one page at a time.
+                page.evaluate(
+                    "() => document.querySelector('[data-testid=\"message-page\"]').focus()"
+                )
+                seen_map = False
+                for _ in range(24):
+                    geo = page.evaluate(
+                        """() => {
+                          const p = document.querySelector('[data-testid="message-page"]');
+                          const cs = getComputedStyle(p);
+                          const r = (el) => el && el.getBoundingClientRect();
+                          const pr = r(p);
+                          const lines = Array.from(p.querySelectorAll('.message-window__content .narrative-line'));
+                          const clipped = p.getAttribute('data-oversize') !== 'true' && lines.some((l) => {
+                            const rects = l.getClientRects();
+                            return rects.length && rects[rects.length - 1].bottom > pr.bottom + 0.5;
+                          });
+                          const map = p.querySelector('.message-window__content .narrative-line.map-art');
+                          const mapCs = map && getComputedStyle(map);
+                          const markerEl = document.querySelector('[data-testid="message-page-marker"]');
+                          const marker = r(markerEl);
+                          const strip = r(document.querySelector('.message-window__controls'));
+                          const log = r(document.querySelector('.message-log-open'));
+                          return {
+                            page: +p.getAttribute('data-page'), pages: +p.getAttribute('data-pages'),
+                            ratio: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize),
+                            autospace: cs.textAutospace,
+                            clipped,
+                            map: map ? { text: map.innerText, autospace: mapCs.textAutospace, ws: mapCs.whiteSpace } : null,
+                            marker: marker && { left: marker.left, right: marker.right, top: marker.top, bottom: marker.bottom },
+                            strip: { left: strip.left, right: strip.right, top: strip.top, bottom: strip.bottom },
+                            logLeft: log ? log.left : null,
+                            columnRight: pr.right - parseFloat(cs.paddingRight),
+                            markerState: markerEl && markerEl.getAttribute('data-state'),
+                          };
+                        }"""
+                    )
+                    where = f"{viewport} @ {scale} page {geo['page']}/{geo['pages']}"
+                    self.assertAlmostEqual(geo["ratio"], 1.5, delta=0.01, msg=where)
+                    self.assertFalse(geo["clipped"], f"a page line is clipped at {where}")
+                    if geo["autospace"] != "":
+                        # Progressive: where the browser knows the property,
+                        # prose gets it and the map opts out.
+                        self.assertEqual(geo["autospace"], "normal", where)
+                    if geo["map"]:
+                        seen_map = True
+                        self.assertEqual(geo["map"]["ws"], "pre", where)
+                        self.assertEqual(geo["map"]["text"].split("\n"), map_rows, where)
+                        if geo["autospace"] != "":
+                            self.assertEqual(geo["map"]["autospace"], "no-autospace", where)
+                    m, strip = geo["marker"], geo["strip"]
+                    self.assertIsNotNone(m, f"marker missing at {where}")
+                    self.assertGreaterEqual(m["top"], strip["top"] - 0.5, where)
+                    self.assertLessEqual(m["bottom"], strip["bottom"] + 0.5, where)
+                    self.assertGreaterEqual(m["left"], strip["left"], where)
+                    self.assertLessEqual(m["right"], geo["logLeft"] - 4, f"marker touches 日誌 at {where}")
+                    # The marker ends at the centred column's edge, or at the
+                    # controls' clamp when the column runs under them.
+                    self.assertAlmostEqual(
+                        m["right"], min(geo["columnRight"], strip["right"] - 104), delta=3,
+                        msg=f"marker edge at {where}",
+                    )
+                    if scale == 1 and geo["page"] == 1:
+                        # A `more` marker: it bobs at full motion and is still
+                        # at reduced and off (the `end` marker never bobs).
+                        self.assertEqual(geo["markerState"], "more", where)
+                        for level, expected in (("full", "1.6s"), ("reduced", "0s"), ("off", "0s")):
+                            page.evaluate("(l) => window.__elosernBridge.store.setMotionLevel(l)", level)
+                            still = page.evaluate(
+                                """() => {
+                                  const c = getComputedStyle(document.querySelector('[data-testid="message-page-marker"]'));
+                                  return { duration: c.animationDuration, transform: c.transform, opacity: c.opacity };
+                                }"""
+                            )
+                            self.assertEqual(still["duration"], expected, f"{level} at {where}")
+                            if level != "full":
+                                self.assertEqual(still["transform"], "none", f"{level} at {where}")
+                                self.assertEqual(still["opacity"], "1", f"{level} at {where}")
+                    if geo["page"] >= geo["pages"]:
+                        break
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(120)
+                self.assertTrue(seen_map, f"the map page was never shown at {viewport} @ {scale}")
+                # Re-page from the start for the next scale.
+                page.evaluate(
+                    """([prose, map]) => {
+                      const store = window.__elosernBridge.store;
+                      store.appendText('in', 'look board');
+                      store.appendText('out', prose);
+                      store.appendText('out', map);
+                    }""",
+                    [prose, "<br>".join(map_rows)],
+                )
+                page.wait_for_timeout(250)
+            page.evaluate("() => window.__elosernBridge.store.setFontScale(1)")
+
+            # Dialogue: the marker ends at the left-aligned column's edge.
+            panels["dialogue"] = {
+                "schema_version": 2,
+                "available": True,
+                "kind": "dialogue",
+                "host": {"identity": 11, "display_name": "小販", "portrait_ref": None},
+                "bond_stage": None,
+                "line": "歡迎光臨。",
+                "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
+            }
+            _inject_snapshot(page, panels, mode="dialogue")
+            _wait_mode(page, "dialogue")
+            page.evaluate(
+                "() => { const s = window.__elosernBridge.store;"
+                " s.appendText('in', 'talk 小販'); s.appendText('out', '小販說：「歡迎光臨，看看Gold Leaf茶葉吧。」'); }"
+            )
+            page.wait_for_selector('[data-testid="message-page-marker"]', timeout=15000)
+            talk = page.evaluate(
+                """() => {
+                  const p = document.querySelector('[data-testid="message-page"]');
+                  const pr = p.getBoundingClientRect();
+                  const pad = parseFloat(getComputedStyle(p).paddingRight);
+                  const m = document.querySelector('[data-testid="message-page-marker"]').getBoundingClientRect();
+                  const log = document.querySelector('.message-log-open').getBoundingClientRect();
+                  const name = document.querySelector('.message-window__plate-name').getBoundingClientRect();
+                  const line = document.querySelector('.message-window__plate-line').getBoundingClientRect();
+                  return { columnRight: pr.right - pad, markerRight: m.right, logLeft: log.left,
+                           nameLeft: name.left, lineLeft: line.left };
+                }"""
+            )
+            self.assertLessEqual(talk["markerRight"], talk["logLeft"] - 4, f"dialogue marker touches 日誌 at {viewport}")
+            if talk["logLeft"] - talk["columnRight"] > 110:
+                self.assertAlmostEqual(
+                    talk["markerRight"], talk["columnRight"], delta=3,
+                    msg=f"the dialogue marker ends at the prose column at {viewport}",
+                )
+            self.assertAlmostEqual(talk["lineLeft"], talk["nameLeft"], delta=0.5, msg=f"underline starts at the name at {viewport}")
+
+            page.close()
+
+    @covers_requirement(
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces"
     )
     def test_band_height_is_fixed_across_frames_and_modes(self):
