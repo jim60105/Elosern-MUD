@@ -111,10 +111,16 @@ function onLayerPress(event) {
 </template>
 
 <style scoped>
+/* The layer recesses the inert overview behind the card
+   (webclient-band-material-pass): an ink scrim, so the chips beneath read as
+   background and never as live controls. It also takes every pointer press
+   on the pane, so no covered chip can activate. */
 .verb-popover-layer {
   position: absolute;
   inset: 0;
   z-index: 2;
+  background: rgba(9, 8, 11, 0.72);
+  border-radius: var(--radius-sm);
 }
 
 .verb-popover {
@@ -126,10 +132,12 @@ function onLayerPress(event) {
   box-sizing: border-box;
   overflow-y: auto;
   padding: 10px 12px 12px;
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
-  border: 1px solid var(--gold-500);
+  /* Fully opaque (webclient-band-material-pass): no chip text shows through. */
+  background: linear-gradient(180deg, #1d1b1a, var(--panel-solid) 70%);
+  border: 1px solid var(--gold-600);
+  border-top-color: var(--gold-500);
   border-radius: var(--radius);
-  box-shadow: 0 -10px 28px -12px #000;
+  box-shadow: 0 -12px 30px -14px #000, inset 0 1px 0 rgba(228, 200, 142, 0.08);
   scrollbar-width: thin;
   scrollbar-color: var(--ink-600) transparent;
 }

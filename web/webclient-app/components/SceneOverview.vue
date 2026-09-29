@@ -221,17 +221,13 @@ watch(
   max-width: 100%;
 }
 
-/* The footer: no label, a top rule, and `·` separators between entries. */
+/* The footer: no label, a top rule, and the existing footer actions as
+   quiet secondary buttons (webclient-band-material-pass) — outlined, never
+   filled, so they read as room-level actions below the scene's chips. */
 .scene-overview__row--footer {
   grid-template-columns: minmax(0, 1fr);
-  padding-top: 8px;
-  border-top: 1px solid var(--ink-700);
-}
-
-.scene-overview__row--footer .scene-overview__slot + .scene-overview__slot::before {
-  content: "·";
-  margin: 0 4px 0 -2px;
-  color: var(--paper-500);
+  padding-top: 10px;
+  border-top: 1px solid rgba(85, 82, 75, 0.55);
 }
 
 /* Compact chips: the shared row renderer's look at chip density. */
@@ -245,8 +241,16 @@ watch(
 
 .scene-overview__row--footer .scene-chip {
   background: transparent;
-  border-color: transparent;
+  /* A rule of at least 3:1 against the band ground, so each reads as a control. */
+  border-color: #736b5c;
   color: var(--paper-300);
+  font-family: var(--f-sans);
+  letter-spacing: 0.04em;
+}
+
+.scene-overview__row--footer .scene-chip:hover {
+  border-color: var(--gold-600);
+  color: var(--paper-100);
 }
 
 .scene-overview__row--footer .scene-chip.dock-menu-item--focused {

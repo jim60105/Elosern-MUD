@@ -113,6 +113,28 @@ describe("ActionDock (B2 action-dock family)", () => {
     ).toBe(true);
   });
 
+  it("states a verb popover's target once: no breadcrumb on that frame only", () => {
+    // webclient-band-material-pass: the popover's own heading names the
+    // target, so the breadcrumb stays out of the `exploration.target` frame;
+    // any other frame below the root keeps it.
+    const trail = ["場景", "店長"];
+    const popover = mountDock({
+      rootItems: ROOT_ITEMS,
+      view: { dockDepth: 2, dockTrail: trail, dockSource: "exploration.target" },
+    });
+    expect(popover.find('[data-testid="dock-crumb"]').exists()).toBe(false);
+    popover.unmount();
+    document.body.innerHTML = "";
+
+    const submenu = mountDock({
+      rootItems: ROOT_ITEMS,
+      view: { dockDepth: 2, dockTrail: ["場景", "建議"], dockSource: "suggestions" },
+    });
+    const crumb = submenu.get('[data-testid="dock-crumb"]');
+    expect(crumb.attributes("hidden")).toBeUndefined();
+    expect(crumb.text()).toContain("場景 › 建議");
+  });
+
   it("renders the draft shortcut legend as the single hook-bearing element", () => {
     // webclient-scene-overview-swap D3: the legend is the dock's own strip
     // below the scrolling body (the draft's `.dock .hint`), the ONLY element

@@ -32,41 +32,32 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())
-            # webclient-avg-stage-shell (design D1): the painted band (the
-            # draft's `.dockwrap` chrome) lives on the full-width bottom band
-            # (`.stage-band`) — the `--line` top border
-            # (`1px solid var(--ink-700)`) is drawn there.
-            # The obsidian-gold wave re-pointed the ink tokens (tokens.css:
-            # --ink-700 = #363638); assert against the resolved token instead
-            # of a pinned rgb literal so the pin follows the token, not a
-            # color value.
-            tokens = page.evaluate(
-                """() => {
-                  const rgb = (name) => {
-                    const raw = getComputedStyle(document.documentElement)
-                      .getPropertyValue(name).trim();
-                    const n = parseInt(raw.slice(1), 16);
-                    return 'rgb(' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(', ') + ')';
-                  };
-                  return { line: rgb('--ink-700'), ground: rgb('--ink-780') };
-                }"""
-            )
+            # webclient-avg-stage-shell (design D1): the painted band lives
+            # on the full-width bottom band (`.stage-band`). Its stage seam
+            # (webclient-band-material-pass) is decoration drawn by the
+            # band's pseudo layers: a gold edge on `::after` and a feather on
+            # `::before`, both inert to the pointer.
             frame = page.locator('[data-testid="stage-band"]').evaluate(
                 """el => {
                   const style = getComputedStyle(el);
-                  return { borderTop: style.borderTopColor,
-                           backgroundImage: style.backgroundImage };
+                  const edge = getComputedStyle(el, '::after');
+                  const feather = getComputedStyle(el, '::before');
+                  return { backgroundImage: style.backgroundImage,
+                           edge: edge.backgroundImage,
+                           edgeEvents: edge.pointerEvents,
+                           feather: feather.backgroundImage,
+                           featherEvents: feather.pointerEvents };
                 }"""
-            )
-            self.assertEqual(
-                frame["borderTop"], tokens["line"],
-                "the dock band's top border is the shared --ink-700 token",
             )
             self.assertIn(
                 "gradient",
                 frame["backgroundImage"],
-                "the full-width band paints the draft's upward gradient",
+                "the full-width band paints its ink ground",
             )
+            self.assertIn("gradient", frame["edge"], "the band draws its gold seam edge")
+            self.assertIn("gradient", frame["feather"], "the band draws the seam feather")
+            self.assertEqual(frame["edgeEvents"], "none", "the seam edge is pointer-inert")
+            self.assertEqual(frame["featherEvents"], "none", "the seam feather is pointer-inert")
             # The shortcut legend is the dock's own strip carrying the draft's
             # markup (the single `action-dock-description` element), rendered
             # below the scrolling body rather than in a tab bar

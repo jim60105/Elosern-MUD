@@ -20,6 +20,15 @@ Make the verb popover fully opaque, with its one title. Suppress only the duplic
 
 Replace rotateY(72deg) with a token-timed opacity/short horizontal wipe for full motion; reduced is fade-only and off is immediate. Do not change dispatch gates or keyboard routing.
 
+## Implementation notes
+
+- The breadcrumb exemption is a MODIFIED requirement in `webclient-contextual-hud` (the breadcrumb requirement) and `webclient-desktop-shell` (required desktop surfaces): only the `exploration.target` frame drops it; its back paths are the popover's back row, Escape and an outside press.
+- `AppShell.vue` is touched beyond the named owners because it positions 日誌 / ⌨; both now centre in the shared `--band-strip-h` strip above `--band-pad-bottom`, and 日誌 joins ⌨'s control family (same ground, rule, radius).
+- The dock pane now uses `box-sizing: border-box`: its padding previously pushed it 14px past the body so the waiting frame's cards painted over the legend at 1280x720 (a pre-existing defect the new requirement forbids).
+- The animation names `elosern-panel-flip-in/out` and the `data-flip` one-shot key are kept (HudFrame clears the key on their `animationend`); only the keyframes change. The wipe's clip keeps a 24px negative inset on the other sides and uses no fill mode, so badges and focus rings are never cut and nothing stays clipped.
+- The dock container's focus mark is full strength on `:focus-visible` and a fainter copy on pointer focus, so an empty or disabled-only frame still shows where focus is. The legend's one text run ellipsizes instead of clipping silently; outlined footer buttons keep a rule of at least 3:1 against the band.
+- The ornament yields to the expanded command-line row (a `:has()` rule), so no half lozenge peeks out below it.
+
 ## Risks / Trade-offs
 
 - Longer localized strings and raised type sizes can exceed fixed boxes. Use bounded internal scrolling and preserve keyboard focus/complete text; exercise 1280x720, 1440x900 and 1920x1080 instead of shrinking text until it disappears.
