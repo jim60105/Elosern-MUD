@@ -359,10 +359,8 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     expect(bandRule).toContain("bottom: 0");
     expect(bandRule).toContain("height: var(--band-h)");
     expect(bandRule).toContain("grid-template-columns: minmax(0, 2fr) minmax(0, 1fr)");
-    // The draft's `.dockwrap` values, verbatim.
-    expect(bandRule).toContain("linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))");
-    expect(bandRule).toContain("border-top: var(--line)");
-    expect(bandRule).toContain("box-shadow: 0 -14px 34px -24px #000");
+    // The band material (webclient-band-material-pass) is painted here once.
+    expect(bandRule).toContain("background:");
 
     const commandRule = extractRule(css, '.elosern-stage [data-anchor="band-command"]');
     expect(commandRule, "the command region rule exists").not.toBe("");

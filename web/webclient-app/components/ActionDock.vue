@@ -64,6 +64,12 @@ const showChrome = computed(
 );
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
+// A target's verb popover states its target in its own heading
+// (webclient-band-material-pass), so the breadcrumb stays out of that one
+// frame; every other submenu keeps it.
+const showCrumb = computed(
+  () => showChrome.value && props.view?.dockSource !== "exploration.target",
+);
 
 
 function onTabClick(key) {
@@ -111,7 +117,7 @@ function onPaneActivate(payload) {
       @tab-click="onTabClick"
     />
     <DockBreadcrumb
-      v-if="showChrome"
+      v-if="showCrumb"
       :trail="trail"
       :depth="depth"
       :guidance-prefix="guidancePrefix"
@@ -140,7 +146,7 @@ function onPaneActivate(payload) {
       class="action-dock__legend"
       data-testid="action-dock-description"
     >
-      數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
+      <span class="action-dock__legend-text">數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回</span>
     </p>
     <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
          and ✕ 清除建議 from ActionDock.vue source text). The active suggestions
@@ -158,6 +164,7 @@ function onPaneActivate(payload) {
    on HudFrame's `.stage-band`, which spans the whole stage; this column
    fills the band's command region and paints nothing. */
 .action-dock {
+  position: relative;
   max-width: 1180px;
   margin: 0 auto;
   height: 100%;
@@ -167,9 +174,41 @@ function onPaneActivate(payload) {
   font-family: var(--f-sans);
 }
 
-.action-dock:focus {
-  outline: 2px solid var(--gold-400);
-  outline-offset: 2px;
+/* The container's focus (webclient-band-material-pass): the dock keeps DOM
+   focus while the router moves a row's focused state, so the strong
+   treatment belongs to that row. The container itself carries a quiet but
+   clearly visible mark — a thin gold frame with brighter corner brackets —
+   drawn by a pseudo layer so the base rule paints nothing. */
+.action-dock:focus,
+.action-dock:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.action-dock::after {
+  content: "";
+  position: absolute;
+  inset: -4px -6px -4px -2px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  opacity: 0;
+  border: 1px solid var(--dock-focus-rule);
+  background:
+    linear-gradient(var(--gold-400), var(--gold-400)) top left / 12px 2px no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) top left / 2px 12px no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / 12px 2px no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / 2px 12px no-repeat;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+/* A pointer focus keeps a fainter mark, so the container never loses its
+   indication when no row carries the focused state. */
+.action-dock:focus::after {
+  opacity: 0.45;
+}
+
+.action-dock:focus-visible::after {
+  opacity: 1;
 }
 
 /* The body (task 4.1): the dock's one remaining region, holding the scrolling
@@ -182,8 +221,11 @@ function onPaneActivate(payload) {
   min-height: 0;
 }
 
-/* The scrolling pane (task 4.1): bounded height with internal scroll. */
+/* The scrolling pane (task 4.1): bounded height with internal scroll. Its
+   padding counts inside that height (webclient-band-material-pass), so the
+   pane ends exactly at the legend strip and no row ever paints over it. */
 .action-dock__pane {
+  box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
   padding: 6px 8px 8px;
@@ -202,15 +244,32 @@ function onPaneActivate(payload) {
 }
 
 /* The shortcut-legend strip: one line pinned below the scrolling body, so it
-   stays visible while the frame's rows scroll. */
+   stays visible while the frame's rows scroll. It is exactly the band's
+   shared strip height (`--band-strip-h`), so its text shares one baseline
+   with the message window's marker and 日誌 / ⌨ controls. */
 .action-dock__legend {
   flex: none;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--band-strip-h);
   margin: 0;
-  padding: 2px 8px 6px;
+  padding: 0 8px;
+  border-top: 1px solid rgba(85, 82, 75, 0.45);
   font-size: var(--text-xs);
-  color: var(--paper-700);
+  color: var(--paper-500);
   font-family: var(--f-sans);
   white-space: nowrap;
+  overflow: hidden;
+}
+
+/* The legend's one inline run, centred in the strip by the flex parent. */
+.action-dock__legend-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.6;
 }
 
 /* The legend's `<kbd>` treatment, verbatim from the reference draft's

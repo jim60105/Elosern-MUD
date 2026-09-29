@@ -183,6 +183,13 @@ the name in the switcher.
 - The band height is `--band-h: clamp(260px, 27.8vh, 400px)` (300px at the
   reference size). It never depends on content, frame, or mode. `--dock-h`,
   `--stage-content-bottom`, and every frame-adaptive band rule are deleted.
+- The band's material (A7, `webclient-band-material-pass`): a deep ink ground
+  under a fine gold edge with a small central lozenge, a pointer-inert 28px
+  feather that settles the art into the seam (it overlays the art and never
+  shrinks the stage box), and a subdued vertical divider between the two
+  regions. The message controls (marker, 日誌, ⌨) and the dock's shortcut
+  legend share one 36px control strip on the band's common bottom padding, so
+  they read on one baseline; the dock's scrolling pane ends at that strip.
 - The message window is `66.667%` of the band width; the command panel takes
   the rest. In creation mode the command region spans the whole band. In
   dialogue mode the command panel collapses and the message window takes the
@@ -563,8 +570,8 @@ Combat beats have their own queue beside the reader state (§10.2).
 | Every new response | the previous content leaves as an opaque inert layer fading over 150ms while the new page mounts and types at once |
 | Exploration → dialogue | message window widens at once (animating the grid would re-page every frame); command panel slides and fades out over it in 250ms, then goes `visibility:hidden`; NPC portrait slides in from the right and fades in (350ms); name plate fades in |
 | Dialogue → exploration | reverse of the above |
-| Exploration → combat | 120ms white flash (dropped under reduced), veil fades in, command panel flips to the combat root; foes enter per §10.2 |
-| Combat → exploration | veil fades out, command panel flips back, foes leave |
+| Exploration → combat | 120ms white flash (dropped under reduced), veil fades in, command panel turns over to the combat root with a short horizontal wipe and fade (fade only under reduced; no 3D rotation); foes enter per §10.2 |
+| Combat → exploration | veil fades out, command panel wipes back from the other side, foes leave |
 | Player appearance change | portrait crossfade 400ms; the speaking dim eases |
 | Vitals appear / disappear | fade and a 12px slide |
 | Dialogue choices appear | 40ms stagger per row; keys work from the first frame; leaving rows are removed at once |

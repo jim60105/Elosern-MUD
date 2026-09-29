@@ -71,7 +71,8 @@ fill, and whose remaining region renders the current frame's rows or chips. The 
 shortcut legend the contextual-HUD legend requirement defines. The focused row or chip SHALL be marked
 by a muted-gold fill plus a leading glyph, unfocused rows bordered, and disabled rows dimmed
 but focusable for their explanation. Below the root frame the
-dock SHALL render a breadcrumb naming the parent and current frames with a back control, and SHALL
+dock SHALL render a breadcrumb naming the parent and current frames with a back control (except
+over a target's verb popover, whose own heading names the target once), and SHALL
 render each frame's rows in the form that frame calls for — a target's verb popover over the inert
 overview, navigation rows, the waiting cards, suggestion cards, or the combat forms — beside a detail
 pane that names the focused item, its availability, and the next key action wherever the frame
@@ -137,7 +138,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a tab bar with the open tab in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame
+- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a tab bar with the open tab in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
 
 #### Scenario: A tall frame grows the band without touching the narrative
 - **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1440x900 or 1280x720

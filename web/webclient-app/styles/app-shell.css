@@ -240,40 +240,6 @@ body {
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-/* The `[日誌] [⌨]` control strip at the bottom-right of the message region
-   (webclient-message-window-swap design D1; MessageWindow reserves its own
-   36px strip and places the page marker at right: 104px). */
-.elosern-root .message-log-open {
-  position: absolute;
-  right: 58px;
-  bottom: 18px;
-  height: 30px;
-  z-index: 1;
-  box-sizing: border-box;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  border-radius: 99px;
-  color: var(--paper-300);
-  font: var(--text-xs)/1 var(--f-sans);
-  letter-spacing: 0;
-  cursor: pointer;
-}
-.elosern-root .message-log-open:hover {
-  border-color: var(--gold-500);
-  color: var(--paper-50);
-}
-.elosern-root .command-line-toggle {
-  position: absolute;
-  right: 22px;
-  bottom: 18px;
-  width: 30px;
-  height: 30px;
-  z-index: 1;
-}
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar { flex-wrap: nowrap; align-items: stretch; }
 .elosern-root [data-elosern-mode="combat"] .dock-tab-bar__tab {
   flex: 1;

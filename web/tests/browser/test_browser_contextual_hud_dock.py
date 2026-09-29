@@ -286,10 +286,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::a-breadcrumb-derived-from-the-router-names-the-player-s-position-at-depth"
+        "webclient-contextual-hud::a-breadcrumb-derived-from-the-router-names-the-player-s-position-at-depth",
+        "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
     )
     def test_breadcrumb_tracks_router_depth(self):
-        """The breadcrumb appears only below the root and names parent + current frames."""
+        """The breadcrumb appears below the root (except over a verb popover) and names parent + current."""
         page = self.logged_in_page()
         exploration = _exploration_panel(
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
@@ -315,9 +316,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "no breadcrumb is rendered at the root frame",
         )
 
-        # Open a person chip's verb popover: the breadcrumb appears naming
-        # parent + current (webclient-scene-overview-swap: the popover is the
-        # overview's one child frame).
+        # Open a person chip's verb popover (webclient-band-material-pass):
+        # the popover's own heading names the target once, so no breadcrumb
+        # renders on that one frame.
         activate_overview_chip(page, "target-11")
         page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
         self.assertEqual(
@@ -325,16 +326,49 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             2,
             "opening the popover puts the router at depth 2",
         )
+        self.assertEqual(
+            page.locator('[data-testid="dock-crumb"]').count(),
+            0,
+            "the verb popover renders no breadcrumb",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="verb-popover"] h3').inner_text().strip(),
+            "小販",
+            "the popover's single heading names the target",
+        )
+
+        # The card isolates the covered chips: a press where the 守門人 chip
+        # sits lands on the popover's layer, never on the chip.
+        covered = page.evaluate(
+            """() => {
+              const chip = document.querySelector('[data-testid="scene-overview"] [data-item-key="target-12"]');
+              const r = chip.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return { chip: chip.contains(hit),
+                       layer: !!hit.closest('[data-testid="verb-popover-layer"]') };
+            }"""
+        )
+        self.assertEqual(covered, {"chip": False, "layer": True}, "covered chips cannot be hit")
+
+        # The popover's back row pops exactly one level and dispatches no
+        # ui_action.
+        install_outbound_recorder(page)
+        page.locator('[data-testid="verb-popover"]').get_by_text("返回上一層").click()
+        page.wait_for_timeout(150)
+        self.assertEqual(_dock_depth(page), 1, "the back row pops exactly one router level")
+        self.assertEqual(sent_action_count(page), 0, "the back row dispatches no ui_action")
+
+        # Any other submenu keeps the breadcrumb naming parent + current.
+        activate_overview_chip(page, "suggestions")
+        page.wait_for_timeout(150)
+        self.assertEqual(_dock_depth(page), 2, "the suggestions frame is depth 2")
         self.assertFalse(
             crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
             "the breadcrumb is visible at depth >= 2",
         )
-        crumb_text = crumb.inner_text()
-        self.assertIn("場景", crumb_text, "the breadcrumb names the parent frame")
-        self.assertIn("小販", crumb_text, "the breadcrumb names the current frame")
+        self.assertIn("場景", crumb.inner_text(), "the breadcrumb names the parent frame")
 
         # The back control pops exactly one level and dispatches no ui_action.
-        install_outbound_recorder(page)
         crumb.locator(".dock-crumb__back").click()
         page.wait_for_timeout(150)
         self.assertEqual(

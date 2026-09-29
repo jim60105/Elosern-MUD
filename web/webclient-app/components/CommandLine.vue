@@ -405,7 +405,8 @@ defineExpose({ focusField });
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  background: var(--panel);
+  background: linear-gradient(0deg, rgba(11, 9, 13, 0.96), rgba(18, 15, 22, 0.9));
+  border-top: 1px solid rgba(143, 113, 60, 0.4);
 }
 
 .cmdfield {
@@ -421,9 +422,12 @@ defineExpose({ focusField });
   height: 34px;
 }
 
+/* One focus frame (webclient-band-material-pass): the field's own border
+   brightens and gains a soft gold ring while anything inside it has focus;
+   the textarea and the send button draw no second ring of their own. */
 .cmdfield:focus-within {
   border-color: var(--gold-400);
-  box-shadow: 0 0 0 1px var(--gold-400);
+  box-shadow: 0 0 0 1px var(--gold-400), 0 0 14px -4px var(--gold-glow);
 }
 
 /* The prompt chevron and the prompt line are prose-scale targets (design
@@ -456,13 +460,27 @@ defineExpose({ focusField });
   resize: none;
   height: 34px;
   max-height: 34px;
-  padding: 0 8px;
+  /* A 20px line centred in the 34px field. */
+  padding: 7px 8px;
+  line-height: 20px;
   font-family: var(--f-mono);
   font-size: var(--text-sm);
   color: var(--paper-50);
+  caret-color: var(--gold-400);
   background: transparent;
   border: 0;
   outline: none;
+  overflow: hidden;
+}
+
+.inputfield:focus-visible,
+.inputsend:focus-visible {
+  box-shadow: none;
+}
+
+.inputsend:focus-visible {
+  background: var(--seal-500);
+  border-color: var(--paper-50);
 }
 
 .inputsend {

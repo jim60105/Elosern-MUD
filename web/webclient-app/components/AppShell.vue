@@ -565,11 +565,15 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
 /* Control-strip layout coupling in #band-message (design §5.1 / C6c D1):
    - .command-line-toggle (⌨): right: 22px, width: 30px (occupies 22..52px)
    - .message-log-open (日誌): right: 58px, height: 30px (occupies 58..102px)
-   - .message-window__marker: right: 104px (MessageWindow.vue) */
+   - .message-window__marker: right: 104px (MessageWindow.vue)
+   Both buttons are centred in the band's shared control strip
+   (`--band-strip-h` above `--band-pad-bottom`), the strip the dock's legend
+   also fills, so the two regions' controls share one baseline
+   (webclient-band-material-pass). */
 .elosern-app-shell .message-log-open {
   position: absolute;
   right: 58px;
-  bottom: 18px;
+  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - 30px) / 2);
   height: 30px;
   z-index: 1;
   box-sizing: border-box;
@@ -577,24 +581,27 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink-780);
-  border: 1px solid var(--ink-600);
-  border-radius: 99px;
+  /* One control family with ⌨ (webclient-band-material-pass): the same
+     ground, rule, and corner radius. */
+  background: var(--panel-solid);
+  border: var(--line);
+  border-radius: var(--radius-sm);
   color: var(--paper-300);
   font: var(--text-xs)/1 var(--f-sans);
-  letter-spacing: 0;
+  letter-spacing: 0.08em;
   cursor: pointer;
 }
 
 .elosern-app-shell .message-log-open:hover {
   border-color: var(--gold-500);
+  background: var(--ink-780);
   color: var(--paper-50);
 }
 
 .elosern-app-shell .command-line-toggle {
   position: absolute;
   right: 22px;
-  bottom: 18px;
+  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - 30px) / 2);
   width: 30px;
   height: 30px;
   z-index: 1;

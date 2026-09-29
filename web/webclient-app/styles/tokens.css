@@ -104,6 +104,22 @@
    --message-text: clamp(20px, 2.593vh, 38px);
    --message-line-height: 1.4;
    --message-controls-h: 36px;
+   /* The bottom band's shared control strip (webclient-band-material-pass):
+      the message window's marker / 日誌 / ⌨ row and the dock's shortcut
+      legend sit in strips of this one height on the band's common bottom
+      padding, so both read on one baseline. */
+   --band-strip-h: var(--message-controls-h);
+   --band-pad-bottom: 12px;
+   /* The stage seam over the band's top edge: a pointer-inert feather that
+      darkens the lowest strip of art into the band. Kept below the scene
+      caption row and the foe floor plates. */
+   --band-seam-feather: 28px;
+   /* The band's fine gold edge and its central lozenge ornament. */
+   --band-edge: rgba(185, 154, 96, 0.72);
+   --band-edge-dim: rgba(143, 113, 60, 0.35);
+   --band-ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='11' viewBox='0 0 30 11'%3E%3Cpath d='M0 5.5h8M22 5.5h8' stroke='%23b99a60' stroke-width='1'/%3E%3Cpath d='M15 .8 19.7 5.5 15 10.2 10.3 5.5Z' fill='%230f0c12' stroke='%23e4c88e' stroke-width='1'/%3E%3Ccircle cx='15' cy='5.5' r='1.3' fill='%23e4c88e'/%3E%3C/svg%3E");
+   /* The dock container's quiet focus frame (its corner brackets are gold-400). */
+   --dock-focus-rule: rgba(185, 154, 96, 0.7);
 
   /* ---- spacing ---- */
   --sp-1: 4px;
@@ -132,7 +148,9 @@
   --motion-scene: 500ms; /* backdrop crossfade */
   --motion-portrait: 400ms; /* portrait crossfade */
   --motion-actor: 350ms; /* NPC enter and leave, combat veil fade */
-  --motion-panel: 250ms; /* command-panel slide and flip */
+  --motion-panel: 250ms; /* command-panel slide and turn-over wipe */
+  /* The turn-over's horizontal travel, scaled by `--motion-travel`. */
+  --motion-panel-shift: 14px;
   --motion-reveal: 250ms; /* vitals, place card, name plate, choice rows */
   --motion-clear: 150ms; /* message clear */
   --motion-flash: 120ms; /* combat flash */
@@ -339,29 +357,37 @@
   }
 }
 
-/* The command-panel flip: the committed menu turns in from edge-on about its
-   vertical axis (entering combat from the right-hand side, leaving it from
-   the left), fading up as it faces the player. The angle is multiplied by
-   the travel token, so the reduced level is a plain fade. */
+/* The command-panel turn-over (webclient-band-material-pass): the committed
+   menu wipes in from one side over a short horizontal travel while it fades
+   up (entering combat it wipes in left to right, leaving it right to left).
+   Both the travel and the wipe are multiplied by the travel token, so the
+   reduced level is a plain fade and `off` (a 0ms panel token) commits at
+   once. The clip keeps a generous negative inset on the non-wiping sides so
+   overhanging badges and focus rings are never cut while the wipe plays;
+   no fill mode, so nothing stays clipped once it ends. */
 @keyframes elosern-panel-flip-in {
   from {
     opacity: 0;
-    transform: perspective(1400px) rotateY(calc(-72deg * var(--motion-travel)));
+    transform: translateX(calc(-1 * var(--motion-panel-shift) * var(--motion-travel)));
+    clip-path: inset(-24px calc(100% * var(--motion-travel) - 24px) -24px -24px);
   }
   to {
     opacity: 1;
-    transform: perspective(1400px) rotateY(0deg);
+    transform: none;
+    clip-path: inset(-24px);
   }
 }
 
 @keyframes elosern-panel-flip-out {
   from {
     opacity: 0;
-    transform: perspective(1400px) rotateY(calc(72deg * var(--motion-travel)));
+    transform: translateX(calc(var(--motion-panel-shift) * var(--motion-travel)));
+    clip-path: inset(-24px -24px -24px calc(100% * var(--motion-travel) - 24px));
   }
   to {
     opacity: 1;
-    transform: perspective(1400px) rotateY(0deg);
+    transform: none;
+    clip-path: inset(-24px);
   }
 }
 

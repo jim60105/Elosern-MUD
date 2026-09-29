@@ -47,8 +47,9 @@
 //   the window would re-page every frame). The region is inert from the
 //   commit and `visibility: hidden` once its slide ends (design D1);
 // - entering combat plays the white flash once, fades the veil in, and
-//   flips the command region's content to the combat root; leaving combat
-//   fades the veil out and flips the content back (design D2).
+//   turns the command region's content over to the combat root (a short
+//   horizontal wipe and fade, webclient-band-material-pass); leaving combat
+//   fades the veil out and turns the content back (design D2).
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -380,11 +381,11 @@ defineExpose({ menuOpen });
 }
 
 /* The bottom band (design D1): one fixed-height container spanning the
-   stage bottom. It carries the reference draft's band chrome (the upward
-   gradient, the `--line` hairline top border, the upward shadow —
-   `docs/design/elosern-redesign/index.html`'s `.dockwrap`) once across both
-   regions, so no seam and no stage background ever shows inside it. Its
-   height is the `--band-h` token alone. */
+   stage bottom. It carries the band material once across both regions, so
+   no seam and no stage background ever shows inside it: a deep ink ground
+   (never lighter than the narrative's contrast reference) under a fine gold
+   edge (webclient-band-material-pass). Its height is the `--band-h` token
+   alone; the seam decoration overhangs its top edge and never takes space. */
 .elosern-stage .stage-band {
   position: absolute;
   left: 0;
@@ -395,15 +396,48 @@ defineExpose({ menuOpen });
   box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
-  border-top: var(--line);
-  box-shadow: 0 -14px 34px -24px #000;
+  background:
+    radial-gradient(60% 120% at 50% 0%, rgba(185, 154, 96, 0.07), transparent 70%),
+    linear-gradient(0deg, #0b090d, #120f16 62%, #16131b);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.6);
   /* The command region's dialogue slide travels past the band's right edge
      (webclient-mode-transitions D1). Clip it horizontally here so it never
      adds to the stage's scrollable width; `clip` (unlike `hidden`) leaves
      the vertical axis `visible`, so whatever overhangs the band's top edge
-     (the name plate, the dock's popovers) still shows. */
+     (the seam, the name plate, the dock's popovers) still shows. */
   overflow-x: clip;
+}
+/* The stage seam (webclient-band-material-pass): decoration only, inert to
+   the pointer and absent from the accessibility tree. `::before` is the
+   feather that settles the lowest strip of the art into the band (it
+   overlays the art; the stage box keeps its full height). `::after` is the
+   fine gold edge — brightest at the centre, fading out towards both sides —
+   with a small lozenge ornament at its centre. */
+.elosern-stage .stage-band {
+  --band-edge-line: linear-gradient(90deg, transparent 0%, var(--band-edge-dim) 12%, var(--band-edge) 38%, var(--band-edge) calc(50% - 22px), transparent calc(50% - 16px), transparent calc(50% + 16px), var(--band-edge) calc(50% + 22px), var(--band-edge) 62%, var(--band-edge-dim) 88%, transparent 100%) center / 100% 1px no-repeat;
+}
+.elosern-stage .stage-band::before,
+.elosern-stage .stage-band::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.elosern-stage .stage-band::before {
+  bottom: 100%;
+  height: var(--band-seam-feather);
+  background: linear-gradient(0deg, rgba(11, 9, 13, 0.62), rgba(11, 9, 13, 0.22) 55%, transparent);
+}
+.elosern-stage .stage-band::after {
+  top: -5px;
+  height: 11px;
+  background: var(--band-ornament) center / 30px 11px no-repeat, var(--band-edge-line);
+}
+/* The expanded command-line row stands on the seam's centre; the ornament
+   steps aside so no half of it peeks out below the row. */
+.elosern-stage:has([data-anchor="command-line"][data-expanded="true"]) .stage-band::after {
+  background: var(--band-edge-line);
 }
 /* The two band regions are in-flow grid cells (overriding the anchors'
    absolute default): they share the band's top edge and height by
@@ -415,10 +449,24 @@ defineExpose({ menuOpen });
   height: 100%;
 }
 .elosern-stage [data-anchor="band-message"] {
-  padding: 10px 12px 12px 18px;
+  padding: 10px 12px var(--band-pad-bottom) 18px;
 }
 .elosern-stage [data-anchor="band-command"] {
-  padding: 10px 18px 12px 6px;
+  padding: 10px 18px var(--band-pad-bottom) 6px;
+}
+/* The region divider (webclient-band-material-pass): one subdued vertical
+   rule between the message and command regions, fading out at both ends.
+   It belongs to the command region, so it leaves with it in dialogue and
+   never shows in creation (where the region spans the band). */
+.elosern-stage:not([data-elosern-mode="creation"]) [data-anchor="band-command"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--ink-600) 22%, rgba(143, 113, 60, 0.55) 50%, var(--ink-600) 78%, transparent);
+  pointer-events: none;
 }
 
 /* command-line: one row docked on the message region's top edge (design
@@ -512,7 +560,7 @@ defineExpose({ menuOpen });
   transition: opacity var(--motion-actor) var(--ease-standard);
 }
 /* The command region's content turns over to the committed menu: the combat
-   root swings in from one side on entering combat and the exploration
+   root wipes in from one side on entering combat and the exploration
    overview from the other on leaving it. The dock switched its content at
    the commit and keeps focus throughout; the flip only reveals it. Keyed on
    the one-shot `data-flip` (see the script), so a dock remounted later in
