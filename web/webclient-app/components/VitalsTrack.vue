@@ -108,7 +108,7 @@ watch(
       data-testid="status-panel__combat"
       :data-mode="combat.mode"
     >
-      戰鬥中（{{ combatLabel(combat.mode) }}）· 第 {{ combat.round }} 回合
+      <span>戰鬥中（{{ combatLabel(combat.mode) }}）</span>· <span>{{ combat.round === 0 ? "準備中" : `第 ${combat.round} 回合` }}</span>
     </p>
     <div
       v-for="g in GAUGES"
@@ -195,11 +195,14 @@ watch(
 .combat {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
-  color: var(--seal-400);
-  border: 1px dashed var(--seal-600);
+  color: var(--paper-300);
+  border: 1px solid var(--ink-600);
+  border-left: 3px solid var(--seal-600);
+  background: var(--ink-780);
   border-radius: var(--radius-sm);
   font-size: max(var(--text-xs), 0.85em);
 }
+.combat > span { white-space: nowrap; }
 
 .vital .vh {
   display: flex;

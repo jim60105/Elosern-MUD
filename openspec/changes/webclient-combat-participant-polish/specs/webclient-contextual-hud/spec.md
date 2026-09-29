@@ -4,8 +4,8 @@
 The combat presentation SHALL show each standing foe name with its decorative gauge, preserve every participant identity and numeric HP with a decorative HP hairline in the participant frame, and distinguish the acting or focused-target foe by a non-colour cue without making it interactive. The compact frame SHALL NOT obscure a standing foe head. A zero canonical round SHALL be described as preparation rather than incremented.
 
 #### Scenario: Playback HP agrees
-- **WHEN** a beat changes the displayed HP before final settlement
-- **THEN** the participant numerator and foe gauge use the same display HP and settle to committed HP together
+- **WHEN** a beat changes display HP for a participant whose portrait reference names a displayed value
+- **THEN** its participant numerator and hairline, and its foe gauge when it stands on stage, use that value and settle to committed HP together; a null or unmapped reference keeps committed HP on both participant and stage surfaces
 
 #### Scenario: First round is not fabricated
 - **WHEN** session round is zero and then one
@@ -78,7 +78,7 @@ or 80%, 70%, and 61% of the player's stage actor's height, and every later foe S
 past the foe in front of it. The front foe SHALL stand on the band's upper edge, and each foe behind SHALL
 stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
 be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
-lies at least 24px left of the participant frame's column, which spans the `map` anchor's width in combat.
+lies at least 24px left of the participant frame's column, within the `map` anchor in combat.
 At 1920x1080, 1440x900, and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or
 intersect the player's stage actor.
 

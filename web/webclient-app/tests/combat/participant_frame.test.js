@@ -6,6 +6,9 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import ParticipantFrame from "../../components/ParticipantFrame.vue";
+import FoeLineup from "../../components/FoeLineup.vue";
+import VitalsTrack from "../../components/VitalsTrack.vue";
+import { h } from "vue";
 import CombatMenu from "../../../static/webclient/js/elosern/combat_menu.js";
 
 describe("ParticipantFrame (task 6.9)", () => {
@@ -102,13 +105,47 @@ describe("ParticipantFrame (task 6.9)", () => {
     expect(states).toEqual(["倒地", "已敗退"]);
   });
 
-  it("resolves portraits through the catalog (task 6.2)", () => {
+  it("keeps placeholder identity compact and its truthful state accessible", async () => {
     const w = mountFrame(participants, artPanel);
-    // portrait_mei has a `url` → an `<img>` renders.
-    const imgs = w.findAll("img.participant-frame__portrait");
-    // portrait_gob has no url (placeholder only) → the placeholder card renders.
-    const placeholders = w.findAll('[data-testid="participant-portrait-placeholder"]');
-    expect(imgs.length + placeholders.length).toBeGreaterThan(0);
+    expect(w.get("img.participant-frame__portrait").attributes("src")).toBe("/static/art/mei.png");
+    const placeholder = w.get('[data-testid="participant-portrait-placeholder"]');
+    expect(placeholder.text()).toBe("哥");
+    expect(placeholder.attributes("aria-label")).toBe("哥布林，肖像圖像尚未生成");
+    expect(w.findAll(".participant-frame__token")[2].text()).toBe("哥布林");
+    await w.setProps({ artPanel: { available: false, portrait_catalog: artPanel.portrait_catalog } });
+    expect(w.findAll("img, [data-testid='participant-portrait-placeholder']")).toHaveLength(0);
+    expect(w.findAll(".participant-frame__hp").map((row) => row.text())).toEqual(["80/100", "0/90", "45/45", "120/120"]);
+  });
+
+  it("keeps placeholder and null-reference HP synchronized through playback and settlement", async () => {
+    const foes = participants.filter((p) => p.team === "foes");
+    wrapper = mount({
+      props: ["displayHp"],
+      render() {
+        return h("div", [
+          h(ParticipantFrame, { participants: foes, artPanel, displayHp: this.displayHp }),
+          h(FoeLineup, { foes, artPanel, displayHp: this.displayHp }),
+        ]);
+      },
+    }, { props: { displayHp: { portrait_gob: 18, f2: 0 } } });
+    expect(wrapper.findAll(".participant-frame__hp").map((row) => row.text())).toEqual(["18/45", "120/120"]);
+    expect(wrapper.findAll(".participant-frame__hairline > span").map((row) => row.element.style.width)).toEqual(["40%", "100%"]);
+    expect(wrapper.findAll(".foe-lineup__fill").map((row) => row.element.style.width)).toEqual(["40%", "100%"]);
+    await wrapper.setProps({ displayHp: null });
+    expect(wrapper.findAll(".participant-frame__hp").map((row) => row.text())).toEqual(["45/45", "120/120"]);
+    expect(wrapper.findAll(".foe-lineup__fill").map((row) => row.element.style.width)).toEqual(["100%", "100%"]);
+  });
+
+  it("describes zero as preparation without incrementing canonical positive counts", async () => {
+    wrapper = mount(VitalsTrack, { props: { status: { combat: { mode: "hostile", round: 0 } } } });
+    const ribbon = () => wrapper.get('[data-testid="status-panel__combat"]').text();
+    expect(ribbon()).toContain("準備中");
+    expect(ribbon()).not.toMatch(/第\\s*\\d/);
+    for (const round of [1, 3, 12]) {
+      await wrapper.setProps({ status: { combat: { mode: "hostile", round } } });
+      expect(ribbon()).toContain(`第 ${round} 回合`);
+      expect(ribbon()).not.toContain("準備中");
+    }
   });
 
   it("offsets the resolved portrait crop by the catalog face rect", () => {

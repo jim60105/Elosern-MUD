@@ -211,6 +211,7 @@ the name in the switcher.
 | `ObjectiveTracker` | One 32px line: the first objective plus a `+N` count; exploration only. Details stay in the quest drawer. |
 | `ReferenceArtwork` | Kept for the drawer art slot; wrapped by the new `StageActor`. |
 | `StageActor` (new) | The standing portrait in `actor-left` / `actor-right`, with a truthful placeholder and a static speaking dim. |
+| `ParticipantFrame` (A6) | Compact, display-only combat island in `map`: all participant tokens and numeric HP stay here, with state text, catalog-resolved thumbnails, and decorative HP hairlines. |
 | `LocalMap` | Fixed square island (§11). |
 | `MessageWindow` (new) | Replaces `NarrativeFeed` in `band-message` (§6). |
 | `SceneOverview`, `DockVerbPopover` (new) | The exploration root of the command panel (§7). |
@@ -650,8 +651,18 @@ appear only in the participant frame, which stays the complete numbers panel
 (no "+N" plate). Foes slide in on a live change into combat and fade out on
 leaving it; a reload plays nothing. Each slot carries
 `data-portrait-ref` so beats can address it. During a round, a committed
-defeated foe stays on stage until its own defeat beat, and each foe shows a
-decorative HP gauge with a trailing bar (hidden from assistive technology).
+defeated foe stays on stage until its own defeat beat. Each foe shows its
+display name, a non-colour acting/target cue, and a decorative HP gauge with a
+trailing bar (hidden from assistive technology); the existing StageActor
+caption remains screen-reader-only so the visible name appears once. The A6
+participant frame keeps every party and foe token, state, and numeric HP, with
+a compact decorative hairline driven by the same displayed HP as its numerator.
+Display HP remains joined by `portrait_ref`: rows with a null or unmapped
+reference retain committed HP on both frame and stage surfaces. The frame
+stays in the `map` anchor and scrolls internally only when its bounded height
+requires it, never scrolling the stage or covering a standing foe's head.
+The combat ribbon uses a solid subdued border; session round zero reads
+`準備中`, while positive values retain their canonical round number.
 
 **Beat queue (C13b).** `lib/motion_tokens.js` (`readMotionMs`) is the
 script-side token reader; `--motion-beat` is 400ms at full and reduced, 0 at

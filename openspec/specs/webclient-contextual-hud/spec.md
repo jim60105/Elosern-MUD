@@ -1051,14 +1051,14 @@ value that `webclient-combat-menu` "A combat round plays beat by beat" defines â
 text marker in addition to any colour. The frame SHALL NOT invent a field the participant descriptor
 does not carry. The frame SHALL list every participant of both sides, including the foes the foe line-up
 does not stand on the stage, and it SHALL remain the only surface that states participant tokens, hit
-points, and states: the foe line-up in `actor-right` carries decorative portraits and decorative
-hit-point gauges without numerals only. A display name longer than the frame's width SHALL end in an
+points, and states: the foe line-up in `actor-right` carries decorative portraits, names, non-colour
+acting/target cues and hit-point gauges without numerals. A display name longer than the frame's width SHALL end in an
 ellipsis on screen while its full text stays in the DOM, and the frame's rows SHALL be compact enough
-that a frame of six participants ends above the foe line-up's gauges at 1920x1080 and 1440x900.
+that a frame of six participants ends above the foe line-up's gauges at 1920x1080 and 1440x900; at all three acceptance sizes its visible content SHALL NOT cover a standing foe head.
 
 Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
 up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
-entry that resolves to a placeholder SHALL render the placeholder card, and a null reference or an
+entry that resolves to a placeholder SHALL render a compact initial with its truthful availability state accessible outside the bitmap, and a null reference or an
 unavailable art panel SHALL render no portrait at all. The client SHALL NOT construct a portrait
 subject key or URL. While the participant frame is mounted, the frame and the stage actors SHALL be the
 only presenters of the portrait catalog, so no separate portrait strip is rendered alongside them.
@@ -1102,17 +1102,19 @@ or 80%, 70%, and 61% of the player's stage actor's height, and every later foe S
 past the foe in front of it. The front foe SHALL stand on the band's upper edge, and each foe behind SHALL
 stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
 be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
-lies at least 24px left of the participant frame's column, which spans the `map` anchor's width in combat.
+lies at least 24px left of the participant frame's column, within the `map` anchor in combat.
 At 1920x1080, 1440x900, and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or
 intersect the player's stage actor.
 
 Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
-and for the beat presentation. Each foe SHALL carry a decorative hit-point gauge: a slim track centred
+and for the beat presentation. Each foe SHALL show its display name above its decorative hit-point gauge
+and distinguish acting or focused-target presentation with a non-colour cue. Names SHALL ellipsize within
+their plate while retaining full DOM text. Each gauge SHALL be a slim track centred
 under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current
 hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so
 the damage shows as a gap. The line-up is decorative art: it SHALL be hidden from assistive technology,
 SHALL carry no focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point
-numerals, or states, which remain the participant frame's.
+numerals, or participant states, which remain the participant frame's.
 
 While a combat round plays by itself, the line-up SHALL stand the foes that were active before the round,
 in the presenter's order, and a foe SHALL leave it only when its own defeat beat plays; when the round
@@ -1133,7 +1135,7 @@ element that contains it.
 - **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1920x1080
 - **THEN** `actor-right` renders one foe stage actor with that image, its bottom edge on the band's top
   edge, its height equal to the player's stage actor's height (Â±1px), its horizontal centre at least 24px
-  left of the participant frame's left edge, a gauge under it, and no focusable element
+  left of the participant frame's left edge, a gauge and name under it, and no focusable element
 
 #### Scenario: Three foes stand in depth toward the centre
 - **WHEN** a combat snapshot commits three active foes at 1920x1080, 1440x900, and 1280x720
@@ -1149,7 +1151,7 @@ element that contains it.
 #### Scenario: The gauge follows the committed hit points
 - **WHEN** a committed update lowers an active foe's `hp_current`
 - **THEN** that foe's gauge fill shrinks to the new ratio, its trailing bar follows after the trail delay,
-  and neither the gauge nor the line-up states a numeral
+  and neither the gauge nor the line-up states an HP numeral
 
 #### Scenario: Only active foes stand on the stage
 - **WHEN** a committed update that carries no playable round changes the first of two foes to defeated,
@@ -1178,6 +1180,21 @@ element that contains it.
 - **WHEN** the effective level is `reduced`, and later `off`, and the mode enters and leaves combat
 - **THEN** at `reduced` the line-up only fades within 150ms and never moves, and at `off` it is present
   or absent in the commit's frame
+
+### Requirement: Combat identity and status remain legible without changing authority
+The combat presentation SHALL show each standing foe name with its decorative gauge, preserve every participant identity and numeric HP with a decorative HP hairline in the participant frame, and distinguish the acting or focused-target foe by a non-colour cue without making it interactive. The compact frame SHALL NOT obscure a standing foe head. A zero canonical round SHALL be described as preparation rather than incremented.
+
+#### Scenario: Playback HP agrees
+- **WHEN** a beat changes display HP for a participant whose portrait reference names a displayed value
+- **THEN** its participant numerator and hairline, and its foe gauge when it stands on stage, use that value and settle to committed HP together; a null or unmapped reference keeps committed HP on both participant and stage surfaces
+
+#### Scenario: First round is not fabricated
+- **WHEN** session round is zero and then one
+- **THEN** the ribbon shows preparation and then canonical round one, never adding one
+
+#### Scenario: Portrait is missing
+- **WHEN** a participant catalog entry is a placeholder
+- **THEN** the thumbnail has one initial with accessible state, not clipped multiline microcopy; its visible session token remains
 
 ### Requirement: Combat skills are chosen through a bounded master-detail
 In combat, opening Skills SHALL present the committed skill categories as a bounded frame of category

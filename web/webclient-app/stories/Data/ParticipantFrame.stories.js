@@ -66,8 +66,7 @@ export const NullPortraitRef = {
   },
 };
 
-// An unavailable art panel: the portrait catalog is absent, so a non-null
-// portrait ref renders the catalog's placeholder card (task 6.2/6.8).
+// An unavailable art panel renders no thumbnail, even with a non-null ref.
 export const UnavailableArtPanel = {
   render: renderFrame,
   args: {

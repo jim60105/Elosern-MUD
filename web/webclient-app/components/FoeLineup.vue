@@ -12,7 +12,8 @@
 //   (`--foe-face-clear`).
 // - Each foe carries a decorative hit-point gauge on the stage floor (the
 //   same baseline as the scene caption) with a trailing bar that makes damage
-//   visible; no numerals, tokens, names, or states — those are the frame's.
+//   visible; names and non-colour cues sit above it, while HP numerals,
+//   tokens and participant states remain in the frame.
 // - Each slot exposes `data-portrait-ref`, the art-catalog key the combat
 //   beats name, so the beat presentation can address a foe.
 // - A foe joining or leaving the active set inside combat enters or fades
@@ -45,6 +46,7 @@ const props = defineProps({
   // The hit points the playing round displays (`view.displayHp`), keyed by
   // portrait reference, or null.
   displayHp: { type: Object, default: null },
+  focusedTarget: { type: [Number, String], default: null },
 });
 
 // `settled` fires when a foe that left the row has finished fading (at `off`,
@@ -118,6 +120,8 @@ function gestureFor(participant) {
         data-testid="foe-slot"
         :data-portrait-ref="p.portrait_ref ?? ''"
         :data-beat="gestureFor(p)?.gesture ?? null"
+        :data-acting="gestureFor(p)?.gesture === 'lunge' ? 'true' : null"
+        :data-target="focusedTarget != null && String(focusedTarget) === String(p.identity) ? 'true' : null"
         :style="slotStyle(i)"
       >
         <StageActor
@@ -130,6 +134,7 @@ function gestureFor(participant) {
           :gesture-key="stage?.key ?? null"
           :float-amount="gestureFor(p)?.amount ?? null"
         />
+        <div class="foe-lineup__name" :title="p.display_name">{{ p.display_name }}</div>
         <div class="foe-lineup__gauge" data-testid="foe-gauge">
           <span class="foe-lineup__ghost" :style="{ width: gaugeWidth(p) }"></span>
           <span class="foe-lineup__fill" :style="{ width: gaugeWidth(p) }"></span>
@@ -198,11 +203,34 @@ function gestureFor(participant) {
    caption plate's gold hairline keeps it legible over light and dark art; the
    fill is the vitals' hit-point red, and the pale trailing bar lags behind a
    drop so the damage shows as a gap (the vitals' own trail tokens). */
+.foe-lineup__name,
 .foe-lineup__gauge {
   position: absolute;
   left: 50%;
   bottom: calc(var(--command-line-h, 44px) + 12px + (var(--scene-caption-h, 34px) - 8px) / 2 - var(--actor-h) * var(--foe-lift, 0));
   width: clamp(72px, 44%, 168px);
+}
+.foe-lineup__name {
+  transform: translateX(-50%);
+  margin-bottom: 13px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  background: rgba(8, 7, 10, 0.88);
+  color: var(--paper-50);
+  font: var(--text-sm)/1.3 var(--f-serif);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 2px solid transparent;
+}
+.foe-lineup__slot[data-target="true"] .foe-lineup__name {
+  border-inline: 3px solid var(--paper-50);
+}
+.foe-lineup__slot[data-acting="true"] .foe-lineup__name {
+  border-bottom: 3px double var(--paper-50);
+}
+.foe-lineup__gauge {
   height: 8px;
   box-sizing: border-box;
   transform: translateX(-50%);
@@ -237,7 +265,8 @@ function gestureFor(participant) {
 /* A defeated foe's gauge thins away with its figure
    (webclient-combat-beat-choreography D5), so the slot that leaves after
    the defeat beat is already empty. */
-.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__gauge {
+.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__gauge,
+.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__name {
   opacity: 0;
   transition: opacity var(--motion-beat-defeat) var(--ease-exit);
 }

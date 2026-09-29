@@ -135,6 +135,28 @@ describe("FoeLineup", () => {
     }
   });
 
+  it("moves non-colour acting and target cues by identity without activating the stage", async () => {
+    const foes = [foe(1), foe(2)];
+    wrapper = mount(FoeLineup, { props: {
+      foes, artPanel: ART, focusedTarget: "2",
+      stage: { key: "round:1", foes, gestures: { 1: { gesture: "lunge" } } },
+    } });
+    expect(slots()[0].attributes("data-acting")).toBe("true");
+    expect(slots()[1].attributes("data-target")).toBe("true");
+    expect(slots()[1].get(".foe-lineup__name").text()).toBe(foes[1].display_name);
+    expect(wrapper.attributes("aria-hidden")).toBe("true");
+    expect(wrapper.findAll("button, a, input, [tabindex]")).toHaveLength(0);
+    await slots()[1].get(".foe-lineup__name").trigger("click");
+    await slots()[1].trigger("keydown", { key: "Enter" });
+    await slots()[1].trigger("keydown", { key: " " });
+    expect(wrapper.emitted("action")).toBeUndefined();
+    expect(wrapper.emitted("select")).toBeUndefined();
+    await wrapper.setProps({ focusedTarget: 1, stage: null });
+    expect(slots()[0].attributes("data-target")).toBe("true");
+    expect(slots()[1].attributes("data-target")).toBeUndefined();
+    expect(slots()[0].attributes("data-acting")).toBeUndefined();
+  });
+
   it("carries a gauge per foe from the committed hit points, with no numerals", async () => {
     wrapper = mount(FoeLineup, {
       props: { foes: [foe(1, { hp_current: 15, hp_maximum: 60 }), foe(2, { hp_current: 0, hp_maximum: 0 })], artPanel: ART },

@@ -65,6 +65,21 @@ DATA_FAMILY_STORY_IDS = {
 }
 
 
+class CombatParticipantPolishEvidenceTest(unittest.TestCase):
+    """Run the bounded combat identity/HP/round behavior checks, without a build."""
+
+    @covers_requirement(
+        "webclient-contextual-hud::combat-identity-and-status-remain-legible-without-changing-authority"
+    )
+    def test_participant_identity_hp_round_and_noninteractive_cues(self):
+        result = run_npm([
+            "test", "--",
+            "web/webclient-app/tests/combat/participant_frame.test.js",
+            "web/webclient-app/tests/core/foe_lineup.test.js",
+        ], timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
 class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     """Execute the B3 data-family gates and assert each one passes."""
 
