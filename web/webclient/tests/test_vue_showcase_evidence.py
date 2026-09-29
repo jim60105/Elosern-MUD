@@ -90,12 +90,13 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             self.assertTrue(path.is_file(), f"missing stable dist entry {path}")
             self.assertGreater(path.stat().st_size, 100, f"{path} looks empty")
             content = path.read_text(encoding="utf-8")
-            if entry == "index.js":
-                # String constants that are XML namespace identifiers or a
-                # docs reference, never runtime requests: stripping them keeps
-                # the assertion meaningful instead of matching constants.
-                for constant in KNOWN_NON_REQUEST_URL_CONSTANTS:
-                    content = content.replace(constant, "")
+            # String constants that are XML namespace identifiers or a docs
+            # reference, never runtime requests: the JS bundle carries them as
+            # literals and the CSS carries the svg namespace inside inline
+            # ``data:image/svg+xml`` URIs (the band ornament). Stripping them
+            # keeps the assertion meaningful instead of matching constants.
+            for constant in KNOWN_NON_REQUEST_URL_CONSTANTS:
+                content = content.replace(constant, "")
             self.assertNotIn(
                 "http://", content, f"{path} references a remote http URL"
             )
@@ -105,6 +106,11 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         css = (DIST_ROOT / "index.css").read_text(encoding="utf-8")
         # The built stylesheet must stay offline and self-hosted: forbid external
         # stylesheet imports or remote asset references (fonts, cdns, http/https).
+        # Same allowance as the JS entry above: the w3.org XML namespaces ride
+        # inline ``data:image/svg+xml`` URIs (the band ornament), which are
+        # inline content, never runtime requests.
+        for constant in KNOWN_NON_REQUEST_URL_CONSTANTS:
+            css = css.replace(constant, "")
         for token in ("@import", "url(//", "//fonts.", "url(http", "http://", "https://"):
             self.assertNotIn(
                 token,
