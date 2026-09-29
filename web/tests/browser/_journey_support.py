@@ -24,6 +24,14 @@ from .browser_helpers import (
     wait_for_store_state,
 )
 
+# A 1x1 transparent PNG (base64): the body journey route stubs use to make an
+# injected art URL genuinely load, so image-load-failure degradation never
+# fires on journeys that assert the catalog-image rendering path.
+_TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4"
+    "2mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
+
 
 def _interact_target(identity: int, name: str) -> dict:
     """One schema-valid exploration interact target."""

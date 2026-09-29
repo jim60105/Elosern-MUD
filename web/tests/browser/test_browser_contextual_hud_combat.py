@@ -21,6 +21,7 @@ from .browser_helpers import (
 from ._journey_support import (
     _combat_panel,
     _art_panel,
+    _TINY_PNG,
     _inject_snapshot,
     _wait_mode,
     _press,
@@ -36,6 +37,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def test_combat_participant_frame_presents_participants_and_portraits(self):
         """The combat participant frame presents the session's participants and portraits."""
         page = self.logged_in_page()
+        # The injected catalog's fake URLs must actually load: since
+        # webclient-combat-participant-polish a failed portrait load swaps the
+        # image for an accessible placeholder, so an unresolvable URL would
+        # assert placeholder behavior instead of the catalog-image behavior
+        # this journey owns (same route-stub technique as test_browser_art's
+        # degradation journey, here fulfilling instead of aborting).
+        page.route(
+            "**/art/portrait_*.png",
+            lambda route: route.fulfill(
+                status=200, content_type="image/png", body=_TINY_PNG
+            ),
+        )
         _inject_snapshot(
             page,
             {
