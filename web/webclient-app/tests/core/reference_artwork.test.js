@@ -17,7 +17,6 @@ describe("reference artwork gallery consumption", () => {
     expect(img.attributes("src")).toBe("/art/portraits/actor.webp");
     expect(img.element.style.objectPosition).toBe("50% 31%");
     expect(wrapper.get("figcaption").text()).toBe("艾琳的肖像");
-    expect(wrapper.get("figcaption").attributes("data-sample")).toBe("false");
     expect(wrapper.find('[data-testid="reference-artwork__placeholder"]').exists()).toBe(false);
     wrapper.unmount();
   });
@@ -30,9 +29,25 @@ describe("reference artwork gallery consumption", () => {
     });
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get('[data-testid="reference-artwork__placeholder"]').text()).toContain("肖像生成中");
-    expect(wrapper.get("figcaption").text()).toBe("肖像生成中");
-    expect(wrapper.get("figcaption").attributes("data-sample")).toBe("true");
+    // One state line: the placeholder's label is not repeated as a caption.
+    expect(wrapper.find("figcaption").exists()).toBe(false);
+    expect(wrapper.text().split("肖像生成中")).toHaveLength(2);
     wrapper.unmount();
+  });
+
+  it("never claims a pending portrait the payload does not carry", () => {
+    const cases = [
+      [null, "無肖像"],
+      [{ url: null, status: null, placeholder: null }, "無肖像"],
+      [{ url: null, status: "pending", placeholder: null }, "肖像生成中"],
+      [{ url: null, status: "failed", placeholder: null }, "肖像生成失敗"],
+    ];
+    for (const [portrait, label] of cases) {
+      const wrapper = mount(ReferenceArtwork, { props: { portrait, initialOf: "艾莉亞" } });
+      expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe(label);
+      expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("艾");
+      wrapper.unmount();
+    }
   });
 
   it("falls back to a truthful placeholder on load failure and accepts a new URL afterwards", async () => {

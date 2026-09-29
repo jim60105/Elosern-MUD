@@ -31,6 +31,13 @@ export function useDrawers(store, { panel, panelAvailable }) {
     party: "party",
   };
   const drawerIcon = computed(() => DRAWER_ICONS[store.view.hudDrawer] || null);
+  // The drawer art column (webclient-drawer-content-polish): only a drawer
+  // whose subject is the current character stands its portrait beside the
+  // content. The codex, the quest log, the skill book and the shop are not
+  // the player, so they take the whole workspace width instead of borrowing
+  // an unrelated portrait or a stand-in illustration.
+  const DRAWER_ART_KEYS = new Set(["status", "inventory", "party"]);
+  const drawerHasArt = computed(() => DRAWER_ART_KEYS.has(store.view.hudDrawer));
 
   // The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
   // opens the codex reference drawer through the store's single open-drawer
@@ -144,6 +151,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
     SKILL_CAST_HINT,
     drawerTitle,
     drawerIcon,
+    drawerHasArt,
     inventoryWalletCopper,
     inventoryWalletSubtitle,
     onHudDrawerClose,

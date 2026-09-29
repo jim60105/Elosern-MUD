@@ -3,7 +3,8 @@
 Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
 the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
 line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
-follow-up series, §16)
+follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
+content, §5.4)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -228,6 +229,7 @@ the name in the switcher.
 | `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
 | `CommandLine` | Collapsible (§5.5). |
 | `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay and gallery editor: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
+| `EmptyState` (new, A11 `webclient-drawer-content-polish`) | The one presentational body of an available but empty drawer list (quest book, codex, bag items, party): decorative registry glyph, headline, one guidance line in a solid ink frame; no control of its own. An unavailable panel keeps its registry reason instead. |
 
 This series is a governed redesign wave: every component added or deleted
 updates `component-manifest.json`, its Storybook story, and the
@@ -272,6 +274,19 @@ decoration). A drawer's scrim covers the whole viewport and closes it; an
 overlay's scrim starts under the top bar and only absorbs pointer input, so
 the navigation still switches overlays. The gallery's own title is gone; its
 nested editors are narrower right-hand sheets in the same workspace.
+
+Content (A11, `webclient-drawer-content-polish`): only the drawers about
+the current character — 角色狀態, 背包 · 裝備, 同伴 · 隊伍 — stand its
+portrait in a `min(360px, 28%)` column on plain ink; the skill book, shop,
+quest and codex drawers use the whole workspace, with no stand-in
+illustration. The portrait frame shows one state line and never calls a
+missing portrait pending. The status drawer opens on a hero (the `status`
+actor name and full title, the `character` guild rank, each only when
+supplied) with one row of secondary openers, over content-sized section
+cards whose stat tiles share equal tracks. Available-empty lists share
+`EmptyState`; lineage rows are ~56px with the meter right after the name
+and the root node's name as a subtitle; bag tiles draw their committed
+rarity as a visible border pattern.
 
 ### 5.5 Command line
 

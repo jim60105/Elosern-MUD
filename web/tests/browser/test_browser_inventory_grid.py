@@ -82,6 +82,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
         "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully",
         "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
+        "webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields",
     )
     def test_grid_renders_only_committed_rows_without_invented_total_or_rarity(self):
         page = self.logged_in_page()
@@ -127,6 +128,26 @@ class InventoryGridJourneys(ServicesBrowserTest):
             sorted(rarities),
             sorted([STORE["potion_rarity"], STORE["staple_rarity"]]),
         )
+        # webclient-drawer-content-polish: each committed rarity draws its
+        # own border pattern at a width where the pattern is visible, so the
+        # frame is never colour-only; common stays a neutral 1px solid line.
+        frame_patterns = {
+            "common": ("solid", "1px"),
+            "uncommon": ("dotted", "2px"),
+            "rare": ("dashed", "2px"),
+            "epic": ("double", "3px"),
+            "legendary": ("ridge", "3px"),
+        }
+        frames = page.evaluate(
+            """() => Array.from(
+                document.querySelectorAll('[data-testid^="inventory-panel__tile--"]')
+            ).map((t) => {
+                const cs = getComputedStyle(t);
+                return [t.getAttribute("data-rarity"), cs.borderTopStyle, cs.borderTopWidth];
+            })"""
+        )
+        for rarity, style, width in frames:
+            self.assertEqual((style, width), frame_patterns[rarity], rarity)
 
         # The lower-corner held count is the committed ``held`` value, never
         # a fabricated total.

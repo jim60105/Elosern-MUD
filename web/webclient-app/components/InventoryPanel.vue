@@ -10,6 +10,7 @@
 // every intent is emitted to the parent, which owns the single dispatch.
 import { computed, nextTick, ref, watch } from "vue";
 import EquipmentDoll from "./EquipmentDoll.vue";
+import EmptyState from "./EmptyState.vue";
 import { formatCopper } from "./character-identity.js";
 import { itemIconPath, unknownItemPath, kindLabel, rarityLabel } from "./item-icons.js";
 
@@ -315,7 +316,17 @@ watch(confirming, (open) => {
           class="inventory-panel__heading-tag"
           data-testid="inventory-panel__items-count"
         >{{ rows.length }}</span></h4>
-        <div class="inventory-panel__grid" data-testid="inventory-panel__grid">
+        <!-- An available, empty bag (webclient-drawer-content-polish): the
+             shared empty guidance instead of an empty grid. -->
+        <EmptyState
+          v-if="rows.length === 0"
+          class="inventory-panel__empty"
+          data-testid="inventory-panel__empty"
+          glyph="inventory"
+          headline="背包裡沒有物品"
+          guidance="取得的物品會列在這裡。"
+        />
+        <div v-else class="inventory-panel__grid" data-testid="inventory-panel__grid">
           <button
             v-for="row in rows"
             :key="row.item_key"
@@ -543,7 +554,7 @@ watch(confirming, (open) => {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-md);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
@@ -551,26 +562,33 @@ watch(confirming, (open) => {
 .inventory-panel__absent {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-md);
 }
 
 /* The responsive held-item grid (the reference's `.itgrid`): auto-fill
-   columns with a 58px cell minimum and an 8px gap. */
+   square cells of at least 70px on a recessed well. */
 .inventory-panel__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  background: #080a0c50;
 }
 
 /* The item tile (the reference's `.it`): a bounded native button with a
    square aspect, a local SVG icon, a stable lower-corner held count, a
-   non-colour equipped check marker, and a per-rarity border treatment. */
+   non-colour equipped check marker, and a per-rarity frame. */
 .inventory-panel__tile {
+  --rarity-tint: transparent;
   aspect-ratio: 1;
-  border-radius: 9px;
-  border: 1px solid var(--ink-600);
-  background: var(--ink-820);
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+  border: 1px solid #666055;
+  background: radial-gradient(ellipse at 50% 80%, #60523a40, #121519 80%);
+  box-shadow: inset 0 0 14px var(--rarity-tint);
   display: grid;
   place-items: center;
   position: relative;
@@ -586,20 +604,22 @@ watch(confirming, (open) => {
 }
 
 .inventory-panel__tile:focus-visible {
-  outline: 2px solid var(--gold-500);
+  outline: 2px solid var(--gold-400);
   outline-offset: 2px;
+  box-shadow: inset 0 0 14px var(--rarity-tint), 0 0 12px var(--gold-glow);
 }
 
 .inventory-panel__icon {
-  width: 26px;
-  height: 26px;
-  color: var(--paper-300);
+  width: 36px;
+  height: 36px;
+  color: #e5d2a4;
+  filter: drop-shadow(0 2px 5px #000);
 }
 
 .inventory-panel__count {
   position: absolute;
   bottom: 2px;
-  right: 4px;
+  right: 5px;
   font-family: var(--f-num);
   font-size: var(--text-xs);
   color: var(--paper-300);
@@ -609,66 +629,84 @@ watch(confirming, (open) => {
 /* The non-colour equipped state: a check glyph, not a colour cue. */
 .inventory-panel__equipped {
   position: absolute;
-  top: 2px;
-  left: 4px;
+  top: 3px;
+  left: 5px;
   width: 10px;
   height: 10px;
   color: var(--gold-400);
 }
 
-/* The labelled neutral unknown-item marker and its real name (wrapping for
-   long localised labels; the button's accessible name stays complete). */
+/* The neutral unknown item (null presentation): a smaller raised glyph so
+   the labelled unknown marker and its real name (wrapping for long
+   localised labels, two lines at most; the button's accessible name stays
+   complete) never sit on top of it. */
+.inventory-panel__tile[data-unknown="true"] {
+  place-items: start center;
+  padding-top: 18px;
+}
+
+.inventory-panel__tile[data-unknown="true"] .inventory-panel__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--paper-500);
+  filter: none;
+}
+
 .inventory-panel__unknown {
   position: absolute;
   top: 2px;
-  right: 4px;
+  right: 5px;
   font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
 .inventory-panel__name {
   position: absolute;
-  bottom: 2px;
-  left: 4px;
-  right: 20px;
+  bottom: 3px;
+  left: 5px;
+  right: 18px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: var(--text-xs);
   line-height: 1.15;
+  text-align: left;
   color: var(--paper-300);
   word-break: break-word;
 }
 
-/* Per-rarity border treatment: a distinct border pattern as well as a
-   distinct colour, so rarity is never colour-only (the inspector spells
-   the rarity word). */
-.inventory-panel__tile[data-rarity="common"] {
-  border-color: var(--ink-600);
-  border-style: solid;
+/* Per-rarity frame (webclient-drawer-content-polish): every committed rarity
+   draws a distinct border PATTERN at a width where the pattern is actually
+   visible (dotted and dashed at 2px, double and ridge at 3px), plus a faint
+   inner glow of its tint — so rarity is never colour-only, and the
+   inspector still spells the rarity word. Common and unknown stay neutral
+   1px solid. */
+.inventory-panel__tile[data-rarity="common"],
+.inventory-panel__tile[data-rarity="unknown"] {
+  border: 1px solid #666055;
 }
 .inventory-panel__tile[data-rarity="uncommon"] {
-  border-color: #7a9a6a;
-  border-style: dotted;
+  --rarity-tint: #7a9a6a33;
+  border: 2px dotted #8fb07c;
 }
 .inventory-panel__tile[data-rarity="rare"] {
-  border-color: #5c86dd;
-  border-style: dashed;
+  --rarity-tint: #5c86dd38;
+  border: 2px dashed #6f95e6;
 }
 .inventory-panel__tile[data-rarity="epic"] {
-  border-color: #a46ad0;
-  border-style: double;
+  --rarity-tint: #a46ad03d;
+  border: 3px double #b27fdb;
 }
 .inventory-panel__tile[data-rarity="legendary"] {
-  border-color: var(--gold-500);
-  border-style: ridge;
-}
-.inventory-panel__tile[data-rarity="unknown"] {
-  border-color: var(--ink-600);
-  border-style: solid;
+  --rarity-tint: #cfa45c47;
+  border: 3px ridge var(--gold-500);
 }
 
 .inventory-panel__ceiling {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.8em);
+  font-size: var(--text-sm);
 }
 
 /* Item details remain non-interactive and follow the same hover/focus state. */

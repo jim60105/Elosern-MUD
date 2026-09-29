@@ -8,7 +8,7 @@ export default {
 };
 
 const renderLineage = (args) => ({
-  render: () => h(OverlayHost, { open: "lineage" }, {
+  render: () => h(OverlayHost, { overlay: "lineage" }, {
     default: () => h(LineagePanel, args),
   }),
 });
@@ -42,3 +42,28 @@ export const Unavailable = {
   render: renderLineage,
   args: { lineage: { available: false, reason: { message: "技能系譜目前無法顯示" } } },
 };
+
+// Two chains sharing one element label (webclient-drawer-content-polish):
+// each row carries its supplied root-node name beside the label, and its
+// progress sits right after that identity.
+const sameElement = {
+  ...lineage,
+  completed_count: 1,
+  total_count: 4,
+  chains: [
+    ...lineage.chains,
+    {
+      root_skill_key: "fire_bolt", element_or_style_zh: "火", consumed: false, meter: 0.8,
+      nodes: [
+        { skill_key: "fire_bolt", display_name_zh: "火球術", owned: true, usable: true, level: 3, xp_into_level: 40, xp_to_next_level: 10, capped: false, prereq_text_zh: "" },
+      ],
+    },
+    {
+      root_skill_key: "blade_dance", element_or_style_zh: "劍舞流", consumed: true, meter: 1,
+      nodes: [
+        { skill_key: "blade_dance", display_name_zh: "迴旋斬", owned: true, usable: true, level: 5, xp_into_level: 0, xp_to_next_level: 0, capped: true, prereq_text_zh: "" },
+      ],
+    },
+  ],
+};
+export const SameElementChains = { render: renderLineage, args: { lineage: sameElement } };

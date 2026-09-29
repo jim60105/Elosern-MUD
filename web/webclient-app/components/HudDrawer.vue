@@ -184,14 +184,46 @@ function onScrimClick() {
   font-size: max(var(--text-xs), 0.85em);
 }
 
+/* The workspace row under the header: an optional art column beside the
+   content body. */
+.hud-drawer__workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The art column (webclient-drawer-content-polish): only drawers about the
+   current character provide it. It is bounded to min(360px, 28%) of the
+   workspace, so the content keeps the larger share at every desktop width,
+   and it sits on plain ink — no stand-in scene illustration behind the
+   portrait. */
+.hud-drawer__art {
+  flex: 0 0 min(360px, 28%);
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #15171b, #0c0e11);
+  border-right: 1px solid #bca57926;
+}
+.hud-drawer__art .reference-artwork { height: 100%; }
+.hud-drawer__art .reference-artwork img { object-fit: cover; object-position: center top; }
+
 /* The body is the drawer's only scrolling region; the head and foot are
    fixed, so a long reference surface scrolls inside the body only. */
 .hud-drawer__body {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--sp-4);
-  font-family: var(--f-sans);
+  min-width: 0;
   min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-5);
+  font-family: var(--f-sans);
+  scrollbar-color: var(--ink-600) transparent;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 1350px) {
+  .hud-drawer__body { padding: 14px; }
 }
 
 .hud-drawer__foot {

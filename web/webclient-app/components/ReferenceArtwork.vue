@@ -22,7 +22,16 @@ const portraitUrl = computed(() => {
   const url = props.portrait?.url;
   return url && url !== failedUrl.value ? url : null;
 });
-const placeholderLabel = computed(() => props.portrait?.placeholder?.label || "肖像生成中");
+// The drawer frame's one state label (webclient-drawer-content-polish): the
+// entry's own placeholder label, else a word derived from what the payload
+// says — pending only for a pending entry, never by default.
+const placeholderLabel = computed(() => {
+  if (props.portrait?.placeholder?.label) return props.portrait.placeholder.label;
+  if (props.portrait?.url && props.portrait.url === failedUrl.value) return "肖像載入失敗";
+  if (props.portrait?.status === "pending") return "肖像生成中";
+  if (props.portrait?.status === "failed") return "肖像生成失敗";
+  return "無肖像";
+});
 const placeholderGlyph = computed(() => portraitGlyph(props.initialOf || placeholderLabel.value));
 const stageState = computed(() => {
   if (portraitUrl.value) return "done";
@@ -68,7 +77,9 @@ function onImageError() {
       <span class="reference-artwork__placeholder-label">{{ placeholderLabel }}</span>
     </div>
     <figcaption v-if="stage" class="reference-artwork__stage-caption">{{ stageName }}{{ stageName && stageLabel ? "，" : "" }}{{ stageLabel }}</figcaption>
-    <figcaption v-else :data-sample="String(!portraitUrl)">{{ portraitUrl ? (portrait.alt || "角色肖像") : placeholderLabel }}</figcaption>
+    <!-- The drawer frame captions only a shown image; a placeholder's label
+         is already its one visible state line. -->
+    <figcaption v-else-if="portraitUrl">{{ portrait.alt || "角色肖像" }}</figcaption>
   </figure>
 </template>
 

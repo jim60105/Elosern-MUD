@@ -16,6 +16,7 @@
 //   descriptor and never enables one the counter disabled. Abandon keeps the
 //   explicit two-step confirmation the counter path already required.
 import { computed, ref } from "vue";
+import EmptyState from "./EmptyState.vue";
 
 const props = defineProps({
   // The committed `quest_log` v1 panel payload (or null before first commit).
@@ -151,9 +152,16 @@ function confirmAbandonNow() {
       尚未取得任務簿資料
     </p>
 
-    <p v-else-if="rows.length === 0" class="quest-log__empty" data-testid="quest-log__empty">
-      目前沒有任何任務紀錄。
-    </p>
+    <!-- An available, empty book (webclient-drawer-content-polish): the
+         shared empty guidance; the unavailable reason above stays distinct. -->
+    <EmptyState
+      v-else-if="rows.length === 0"
+      class="quest-log__empty"
+      data-testid="quest-log__empty"
+      glyph="quests"
+      headline="目前沒有任務紀錄"
+      guidance="接取的任務會列在這裡。"
+    />
 
     <template v-else>
       <section
@@ -331,12 +339,11 @@ function confirmAbandonNow() {
 }
 
 .quest-log__absent,
-.quest-log__unavailable,
-.quest-log__empty {
+.quest-log__unavailable {
   margin: 0;
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-md);
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
 }
