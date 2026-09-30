@@ -8,7 +8,8 @@ See proposal.md (Why) for the motivation. Current state that shapes the approach
   content-hashes each slice into `web/static/webclient/app/dist/assets/` and rewrites the URLs to
   `/static/webclient/app/dist/assets/<name>-<hash>.woff2`. Assets smaller than Vite's default 4 KB
   `assetsInlineLimit` are base64-inlined into `index.css` instead (321 source slices produce 313
-  emitted files today).
+  emitted files before this change; every Hack slice is above the limit, so all ten are emitted as
+  files).
 - `fonts.css` is imported by `web/webclient-app/main.js` and `.storybook/preview.js`.
   `tests/test_design_draft_contract.py` guards the design draft's own copy under `docs/design/`, not
   the app copy.
@@ -173,8 +174,7 @@ reach it.
 `brotli==1.2.0`, and runs with `uv run --script tools/gen_hack_font_slices.py`. The pins stay out of
 `pyproject.toml` and `uv.lock`, and the game runtime never imports fontTools. The script:
 
-1. **Download.** Fetches the archive and the license (D1) into a temporary directory and verifies both
-   checksums.
+1. **Download.** Fetches the archive and the license (D1) into memory and verifies both checksums.
 2. **Slice.** Cuts each slice with `fontTools.subset` (`layout_features=['*']`,
    `notdef_outline`, hinting stripped per D3). It sets `font.flavor = "woff2"` before saving; in the research run the subsetter
    option alone did not produce woff2.
@@ -184,7 +184,8 @@ reach it.
 4. **Self-test.** Slices twice in memory and exits non-zero if the two byte streams differ.
 5. **Write.** Writes the slices, `web/webclient-app/fonts/hack/LICENSE.md`, and `fonts-hack.css`, whose
    runs come from each slice's claimed set.
-6. **Report.** Prints a size table and exits non-zero if any slice exceeds 40 KB.
+6. **Report.** Prints a size table before writing anything, and exits non-zero without writing if
+   any slice exceeds 40 KB or is under 4096 bytes.
 
 The script follows the shape of `tools/gen_ansi_palette.py`. Its pure helpers (slice assignment, run
 collapsing, CSS rendering) sit apart from the I/O entry point, and fontTools is imported only inside

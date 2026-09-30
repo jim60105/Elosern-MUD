@@ -121,7 +121,21 @@ class VueTypographyBrowserTest(unittest.TestCase):
         DIV and that DIV's text child do. A missing CDP method raises, so the
         check fails rather than skipping (the suite is Chromium-only).
         """
-        self.page.evaluate("document.fonts.ready")
+        # Force layout of freshly typed text, then load the faces it needs
+        # before `fonts.ready`: a slice requested only by that layout could
+        # otherwise still be in flight and draw with a fallback face.
+        self.page.evaluate(
+            """(selector) => {
+              const e = document.querySelector(selector);
+              e.getBoundingClientRect();
+              const text = e.value ?? e.textContent;
+              return Promise.all([
+                document.fonts.load('16px "Hack"', text),
+                document.fonts.load('16px "Noto Sans TC"', text),
+              ]).then(() => document.fonts.ready);
+            }""",
+            selector,
+        )
         cdp = self.page.context.new_cdp_session(self.page)
         cdp.send("DOM.enable")
         cdp.send("CSS.enable")
@@ -166,6 +180,8 @@ class VueTypographyBrowserTest(unittest.TestCase):
         field.wait_for(state="visible")
         self.assertIn("monospace", field.evaluate("e => getComputedStyle(e).fontFamily"))
         self.assertTrue(field.evaluate("e => e === document.activeElement"))
+        # CDP resolves this selector itself (not a `.locator()` hook), so it
+        # stays outside the frozen managed-browser target list on purpose.
         self.assertBundledFace(self.rendered_fonts(".cmdfield__prompt"), "Hack")
         # Latin draws in the bundled Hack slices and CJK in the bundled Noto
         # Sans TC slices; no machine-installed monospace family is used.
@@ -173,6 +189,6 @@ class VueTypographyBrowserTest(unittest.TestCase):
         typed = self.rendered_fonts("#inputfield")
         self.assertBundledFace(typed, "Hack")
         self.assertBundledFace(typed, "Noto Sans TC")
-        self.assertEqual({name for name, custom in typed if not custom}, set())
+        self.assertEqual({name for name, custom in typed if not custom}, set(), sorted(typed))
         self.page.keyboard.press("Escape")
         self.assertTrue(self.page.locator("#action-dock").evaluate("e => e === document.activeElement"))

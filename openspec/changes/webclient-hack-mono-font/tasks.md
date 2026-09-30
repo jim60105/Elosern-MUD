@@ -4,7 +4,7 @@
 
 ## 2. Slice generator and vendored assets
 
-- [x] 2.1 Add `tools/gen_hack_font_slices.py` as described in D6. Verify: `uv run --script tools/gen_hack_font_slices.py` exits 0 and prints 10 slices, each ≤ 40960 bytes.
+- [x] 2.1 Add `tools/gen_hack_font_slices.py` as described in D6. Verify: `uv run --script tools/gen_hack_font_slices.py` exits 0 and prints 10 slices, each between 4096 and 40960 bytes.
   - PEP 723 inline metadata pinning `fonttools==4.66.1` and `brotli==1.2.0`.
   - Pure helpers, importable without fontTools:
     - the D2 claim-window table;

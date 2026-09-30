@@ -20,9 +20,10 @@ produce them (openspec change ``webclient-hack-mono-font``, design D1-D6):
 3. subset each (weight, slice) with fontTools, without TrueType hinting,
    into woff2 with the upstream ``head.modified`` timestamp kept, twice, and
    fail if the two byte streams differ;
-4. write the slices, the license, a per-weight code-point manifest, and the
-   generated ``styles/fonts-hack.css``;
-5. print a size table and fail if a slice leaves the 4-40 KB band.
+4. print a size table and fail, writing nothing, if a slice leaves the
+   4-40 KB band;
+5. write the slices, the license, a per-weight code-point manifest, and the
+   generated ``styles/fonts-hack.css``.
 
 Run it with ``uv run --script tools/gen_hack_font_slices.py``. The pinned
 fontTools / brotli live in the inline metadata above, not in the project lock:
@@ -205,7 +206,12 @@ def main() -> int:
     archive = _fetch(ARCHIVE_URL, ARCHIVE_SHA256)
     license_text = _fetch(LICENSE_URL, LICENSE_SHA256)
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:xz") as tar:
-        ttfs = {weight: tar.extractfile(member).read() for weight, _c, member in WEIGHTS}
+        ttfs = {}
+        for weight, _css_weight, member in WEIGHTS:
+            handle = tar.extractfile(member)
+            if handle is None:
+                raise SystemExit(f"{member} is not a regular file in {ARCHIVE_URL}")
+            ttfs[weight] = handle.read()
 
     manifest: dict[str, list[int]] = {}
     claimed_by_weight: dict[str, dict[str, list[int]]] = {}
@@ -226,6 +232,16 @@ def main() -> int:
                 raise SystemExit(f"{weight}.{name} is not byte-reproducible")
             slices[slice_filename(weight, name)] = first
 
+    failed = False
+    for filename, data in slices.items():
+        ok = MIN_SLICE_BYTES <= len(data) <= MAX_SLICE_BYTES
+        failed |= not ok
+        print(f"{filename:36} {len(data):7} bytes{'' if ok else '  OUT OF BAND'}")
+    print(f"{'total':36} {sum(map(len, slices.values())):7} bytes")
+    if failed:
+        # Leave the committed outputs untouched when a slice leaves the band.
+        return 1
+
     css = render_css(claimed_by_weight)
     FONT_DIR.mkdir(parents=True, exist_ok=True)
     for filename, data in slices.items():
@@ -233,14 +249,7 @@ def main() -> int:
     (FONT_DIR / "LICENSE.md").write_bytes(license_text)
     MANIFEST_PATH.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
     CSS_PATH.write_text(css, encoding="utf-8")
-
-    failed = False
-    for filename, data in slices.items():
-        ok = MIN_SLICE_BYTES <= len(data) <= MAX_SLICE_BYTES
-        failed |= not ok
-        print(f"{filename:36} {len(data):7} bytes{'' if ok else '  OUT OF BAND'}")
-    print(f"{'total':36} {sum(map(len, slices.values())):7} bytes")
-    return 1 if failed else 0
+    return 0
 
 
 if __name__ == "__main__":

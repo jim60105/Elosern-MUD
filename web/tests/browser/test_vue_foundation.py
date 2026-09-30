@@ -174,7 +174,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             page.locator("#inputfield").wait_for(state="visible")
         page.wait_for_function(
             "() => document.fonts.ready.then(() => [...document.fonts].some("
-            "f => f.family.replace(/[\"']/g, '') === 'Hack' && f.status === 'loaded'))",
+            "f => f.family.replace(/[\"']/g, '') === 'Hack' && f.weight === '400'"
+            " && f.status === 'loaded'))",
             timeout=15000,
         )
         # Vite names a slice `<source stem>-<8-char hash>.woff2`; strip the
