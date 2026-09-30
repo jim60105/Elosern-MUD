@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { faceObjectPosition } from "./face-rect.js";
-import { galleryTimestamp } from "./gallery-copy.js";
+import { galleryCardName, galleryDate } from "./gallery-copy.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -9,10 +9,13 @@ const props = defineProps({
   capabilities: { type: Object, default: () => ({}) },
   warnings: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
+  // The host gallery's minute clock (epoch ms) for the relative date.
+  now: { type: Number, default: () => Date.now() },
 });
 const emit = defineEmits(["default", "delete", "generate", "binding", "face"]);
 const confirming = ref(false);
 const conditions = computed(() => props.warnings.find((row) => row.image_id === props.card?.image_id)?.conditions);
+const date = computed(() => galleryDate(props.card?.created_at, props.now));
 watch(() => props.card?.image_id, () => { confirming.value = false; });
 function confirmDelete() {
   if (!props.disabled && confirming.value) {
@@ -26,10 +29,10 @@ function confirmDelete() {
   <aside class="gallery-ui gallery-detail" data-testid="gallery-detail">
     <h3>肖像詳情</h3>
     <template v-if="card">
-      <img v-if="card.status === 'card' && card.url" class="gallery-detail__image" :src="card.url" :alt="card.label" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
+      <img v-if="card.status === 'card' && card.url" class="gallery-detail__image" :src="card.url" :alt="galleryCardName(card)" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
       <p v-else class="gallery-note">{{ card.label }}</p>
       <h4>{{ card.label }}</h4>
-      <p class="gallery-muted">{{ galleryTimestamp(card.created_at) }}</p>
+      <p class="gallery-detail__date"><time :datetime="date.iso">{{ date.relative }}</time><span v-if="date.exact" class="gallery-muted">{{ date.exact }}</span></p>
       <div class="gallery-chips"><span v-for="chip in card.chips" :key="chip" class="gallery-chip">{{ chip }}</span></div>
       <template v-if="card.status === 'card'">
         <section class="gallery-section">

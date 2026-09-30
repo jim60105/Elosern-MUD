@@ -29,7 +29,9 @@ from world.tests.synthetic_data import (
 # File-local synthetic race: the card/never-leak fixtures carry this file's
 # own invented prose, so assertions establish mechanics without echoing the
 # shared kit or any shipped row.
-_HIDDEN_RACE = make_race("t_hidden_folk", description="不願被圖鑑記錄的合成族。")
+_HIDDEN_RACE = make_race(
+    "t_hidden_folk", description="不願被圖鑑記錄的合成族。", display_name_zh="隱匿族"
+)
 _HIDDEN_RACE_KEY = _HIDDEN_RACE.key
 _HIDDEN_RACE_DESCRIPTION = _HIDDEN_RACE.description
 
@@ -59,6 +61,8 @@ class LoreCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("── 知識圖鑑 ──", output)
         self.assertIn("◆ 種族", output)
         self.assertIn(_KIT_RACE_KEY, output)
+        # The row names the entry and keeps the key the show form takes.
+        self.assertIn(f"（{_KIT_RACE_KEY}）", output)
         self.assertIn("◆ 地域", output)
         self.assertIn(_KIT_REGION_KEY, output)
         # A registry race the player never revealed stays out of the listing.
@@ -73,7 +77,7 @@ class LoreCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_viewing_a_discovered_entry_renders_its_card(self):
         self._reveal("race", _HIDDEN_RACE_KEY)
         output = self.call(CmdLore(), f"race {_HIDDEN_RACE_KEY}")
-        self.assertIn(f"◆ {_HIDDEN_RACE_KEY} ◆", output)
+        self.assertIn(f"◆ {_HIDDEN_RACE.display_name_zh} ◆", output)
         self.assertIn(_HIDDEN_RACE_DESCRIPTION, output)
 
     @covers_requirement("lore-knowledge::the-lore-command-shows-discovered-knowledge-only")

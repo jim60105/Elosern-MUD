@@ -76,7 +76,7 @@ def _valid_category_group(key: str, label: str, entries: list[dict] | None = Non
     }
 
 
-def _valid_entry(key: str = "elf", title: str = "精靈", card: list[dict] | None = None) -> dict:
+def _valid_entry(key: str = "elf", title: str = "合成長壽族", card: list[dict] | None = None) -> dict:
     card = card or [
         {"name": "key", "value": "elf"},
         {"name": "description", "value": "長壽種族"},
@@ -383,7 +383,8 @@ class LoreCodexPresenterTests(unittest.TestCase):
             self.assertEqual(cat["entries"], [])
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel",
+        "webclient-lore-codex-panel::codex-entry-titles-are-the-registry-s-display-names",
     )
     def test_two_discoveries_serialize_exactly(self):
         player = _mock_player(lore_discovered={f"race:{T_RACE}", f"anchor:{T_ANCHOR}"})
@@ -403,9 +404,9 @@ class LoreCodexPresenterTests(unittest.TestCase):
         self.assertEqual(len(race_group["entries"]), 1)
         elf_entry = race_group["entries"][0]
         self.assertEqual(elf_entry["key"], T_RACE)
-        # The races card defines no display_name_zh: the title falls back to
-        # the key, whatever the synthetic row is.
-        self.assertEqual(elf_entry["title"], T_RACE)
+        # The race title is the registry's display name; the entry key stays
+        # the opaque registry key.
+        self.assertEqual(elf_entry["title"], SYNTH_RACES[T_RACE].display_name_zh)
 
         # Anchor group has 1 entry
         anchor_group = next(c for c in payload["categories"] if c["key"] == "anchor")

@@ -28,7 +28,7 @@ function validLoreCodexPayload(overrides) {
     validLoreCodexCategory("race", "種族", [
       {
         key: "elf",
-        title: "精靈",
+        title: "林語族",
         card: [
           { name: "key", value: "elf" },
           { name: "description", value: "長壽種族" },
@@ -75,7 +75,7 @@ test("lore_codex pins bounds and validates available and empty payloads", () => 
   assert.equal(normalized.available, true);
   assert.equal(normalized.discovered_total, 2);
   assert.equal(normalized.categories.length, 8);
-  assert.equal(normalized.categories[0].entries[0].title, "精靈");
+  assert.equal(normalized.categories[0].entries[0].title, "林語族");
 
   // Empty codex
   const emptyCategories = [

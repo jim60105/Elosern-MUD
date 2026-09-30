@@ -29,6 +29,7 @@ SYNTH_RACES: dict[str, RaceProfile] = {
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="壽命略長於人族、習慣在暮色中行動的合成種族。",
+        display_name_zh="暮裔",
     ),
 }
 

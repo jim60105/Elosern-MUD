@@ -38,6 +38,9 @@ class RaceProfile:
     learning_multiplier: float
     can_use_divine_arts: bool
     description: str
+    # The player-facing race name (the codex title and every display surface
+    # that names a race); the ``key`` stays the opaque identifier.
+    display_name_zh: str
 
 
 @dataclass(frozen=True)
@@ -109,6 +112,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="壽命短暫而繁衍迅速的人類，適應力強，是這片大陸最常見的種族。",
+        display_name_zh="人類",
     ),
     "beastfolk": RaceProfile(
         key="beastfolk",
@@ -118,6 +122,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="獸耳與尾巴的獸人族，體魄強健、感官敏銳，以部族文化與野性力量聞名。",
+        display_name_zh="獸人",
     ),
     "elf": RaceProfile(
         key="elf",
@@ -129,6 +134,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         learning_multiplier=10.0,
         can_use_divine_arts=True,
         description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法息息相關。",
+        display_name_zh="精靈",
     ),
 }
 

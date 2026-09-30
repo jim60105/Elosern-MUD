@@ -91,6 +91,7 @@ def _synthetic_veil_profile(
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="synthetic veil-band row",
+        display_name_zh="合成種族",
     )
 
 

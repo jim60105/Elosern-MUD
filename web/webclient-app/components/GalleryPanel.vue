@@ -1,10 +1,10 @@
 <script setup>
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import GalleryDetailRail from "./GalleryDetailRail.vue";
 import GalleryGenerateDrawer from "./GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "./GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "./GalleryFaceRectModal.vue";
-import { GALLERY_FILTERS, galleryTimestamp } from "./gallery-copy.js";
+import { GALLERY_FILTERS, galleryCardName, galleryDate } from "./gallery-copy.js";
 import { faceObjectPosition } from "./face-rect.js";
 import "./gallery.css";
 
@@ -24,10 +24,20 @@ const editor = ref(null);
 const pending = ref(null);
 const rejected = ref(false);
 let opener = null;
+// The minute clock for the cards' relative dates: it ticks only while the
+// gallery is mounted (open) and stops with it.
+const now = ref(Date.now());
+let clock = null;
+onMounted(() => {
+  now.value = Date.now();
+  clock = setInterval(() => { now.value = Date.now(); }, 60_000);
+});
+onBeforeUnmount(() => clearInterval(clock));
 const available = computed(() => props.model?.available === true);
 const locked = computed(() => props.disabled || !available.value);
 const cards = computed(() => available.value ? props.model.cards || [] : []);
 const selectedCard = computed(() => cards.value.find((row) => row.image_id === selected.value) || null);
+const cardDates = computed(() => new Map(cards.value.map((card) => [card.image_id, galleryDate(card.created_at, now.value)])));
 const visibleCards = computed(() => cards.value.filter((card) => {
   if (filter.value === "all") return true;
   if (filter.value === "defaults") return card.is_default;
@@ -123,19 +133,22 @@ function selectSubject(subject) {
         <div class="gallery-panel__cards" :class="{ 'gallery-panel__cards--list': layout === 'list' }">
           <button v-for="card in visibleCards" :key="card.image_id" class="gallery-card" :class="`gallery-card--${card.status}`" :aria-pressed="selected === card.image_id" :data-image-id="card.image_id" @click="selectCard(card.image_id)">
             <div class="gallery-card__visual">
-              <img v-if="card.status === 'card' && card.url" :src="card.url" :alt="card.label" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
+              <img v-if="card.status === 'card' && card.url" :src="card.url" :alt="galleryCardName(card)" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
               <span v-else-if="card.status === 'pending'" class="gallery-card__spinner" aria-hidden="true"></span>
               <span v-else-if="card.status === 'failed'" class="gallery-card__failure" aria-hidden="true">△</span>
               <span v-if="card.is_default" class="gallery-card__crown">♛ 目前預設</span>
               <div class="gallery-chips"><span v-for="chip in card.chips" :key="chip" class="gallery-chip">{{ chip }}</span></div>
             </div>
-            <div class="gallery-card__caption"><strong>{{ card.label }}</strong><span class="gallery-muted">{{ galleryTimestamp(card.created_at) }}</span></div>
+            <div class="gallery-card__caption">
+              <strong>{{ card.label }}</strong>
+              <time class="gallery-muted gallery-card__date" :datetime="cardDates.get(card.image_id)?.iso" :title="cardDates.get(card.image_id)?.exact">{{ cardDates.get(card.image_id)?.relative }}<span v-if="cardDates.get(card.image_id)?.exact" class="gallery-visually-hidden">（{{ cardDates.get(card.image_id).exact }}）</span></time>
+            </div>
           </button>
         </div>
         <p v-if="!visibleCards.length" class="gallery-panel__empty">此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。</p>
         <p v-if="rejected && !editor" class="gallery-feedback" role="status">操作未完成。<button @click="emit('log')">查看伺服器訊息</button></p>
       </div>
-      <GalleryDetailRail :card="selectedCard" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
+      <GalleryDetailRail :card="selectedCard" :now="now" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
         @default="send('gallery.default.set')" @delete="send('gallery.card.delete')"
         @generate="openEditor('generate')" @binding="openEditor('binding')" @face="openEditor('face')" />
       <Teleport to="body">
@@ -171,7 +184,8 @@ function selectSubject(subject) {
 .gallery-card__visual > img { width: 100%; height: 100%; object-fit: cover; position: absolute; }
 .gallery-card__visual .gallery-chips { position: absolute; bottom: 6px; left: 5px; right: 5px; }
 .gallery-card__crown { position: absolute; top: 5px; left: 5px; padding: 3px 7px; background: #221c0fe8; border: 1px solid #cfb16b; color: #e5c982; border-radius: 12px; font-size: var(--text-xs); }
-.gallery-card__caption { display: flex; flex-direction: column; gap: 5px; padding: 9px 6px; overflow-wrap: anywhere; }
+.gallery-card__caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; padding: 9px 6px; overflow-wrap: anywhere; }
+.gallery-card__date { white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
 .gallery-card__caption strong { font-size: var(--text-sm); font-weight: 500; }
 .gallery-card__caption .gallery-muted { font-size: var(--text-xs); }
 .gallery-card__spinner { width: 42px; height: 42px; border: 4px solid #596fd82b; border-top-color: #8499ef; border-radius: 50%; animation: gallery-spin var(--motion-spin) linear infinite; }

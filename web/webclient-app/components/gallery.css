@@ -54,3 +54,6 @@
 .gallery-editor-layout .gallery-choice { padding: 10px; gap: 8px; }
 .gallery-editor-layout .gallery-choice__glyph { width: 22px; font-size: var(--text-xl); }
 .gallery-editor-layout .gallery-muted { font-size: var(--text-xs); }
+/* Accessible-only text (the exact instant beside a relative card date). */
+.gallery-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.gallery-detail__date { display: flex; flex-direction: column; gap: 2px; margin: 0; color: var(--paper-300); font-size: var(--text-sm); }

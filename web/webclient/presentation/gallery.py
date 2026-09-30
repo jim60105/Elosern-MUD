@@ -1,6 +1,5 @@
 """Version-one gallery projection and exact wire schema; no mutation or service probe."""
 
-from datetime import datetime, timezone
 import math
 import re
 import uuid
@@ -306,11 +305,11 @@ def _equipment(snapshot):
     return result
 
 
-def _timestamp_label(timestamp):
-    try:
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    except (ValueError, OverflowError, OSError):  # observability: ignore R2: finite out-of-calendar epochs keep truthful numeric labels
-        return str(timestamp)
+# Stored cards carry no name: every card row reads 肖像 and the client tells
+# rows apart by their structured `created_at` (local relative and exact date),
+# never by a timestamp baked into this label.
+CARD_LABEL = "肖像"
+PENDING_LABEL = "肖像（生成中）"
 
 
 def _synthetic(image_id, timestamp, status, label):
@@ -350,7 +349,7 @@ def gallery_presenter(context: PresentationContext):
         is_default = card["image_id"] == default
         if is_default:
             chips.append("目前預設")
-        label = f"肖像 {_timestamp_label(card['created_at'])}"
+        label = CARD_LABEL
         rows.append({
             "image_id": card["image_id"], "status": "card", "label": label,
             "url": media_url_for(identity), "face_rect": card["face_rect"],
@@ -369,7 +368,7 @@ def gallery_presenter(context: PresentationContext):
             warnings.append({"image_id": card["image_id"], "label": label, "conditions": conditions})
     for job in pending:
         if job["image_id"] not in seen:
-            rows.append(_synthetic(job["image_id"], job["enqueued_at"], "pending", f"肖像 {_timestamp_label(job['enqueued_at'])}（生成中）"))
+            rows.append(_synthetic(job["image_id"], job["enqueued_at"], "pending", PENDING_LABEL))
     if error:
         image_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{subject.full()}:{error['at']}:{error['code']}"))
         rows.append(_synthetic(image_id, error["at"], "failed", f"暫時無法生成，稍後再試（{error['code']}）"))

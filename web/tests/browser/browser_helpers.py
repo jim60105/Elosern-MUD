@@ -921,10 +921,10 @@ def valid_lore_codex_panel(**overrides) -> dict:
                 [
                     {
                         "key": "human",
-                        "title": "人類",
+                        "title": "平原族",
                         "card": [
-                            {"name": "代號", "value": "human"},
-                            {"name": "描述", "value": "適應力最強的短命種，遍布灰河沿岸。"},
+                            {"name": "display_name_zh", "value": "平原族"},
+                            {"name": "description", "value": "適應力最強的短命種，遍布灰河沿岸。"},
                         ],
                     }
                 ],
@@ -942,8 +942,8 @@ def valid_lore_codex_panel(**overrides) -> dict:
                         "key": "misty_ford",
                         "title": "霧骨渡口",
                         "card": [
-                            {"name": "名稱", "value": "霧骨渡口"},
-                            {"name": "描述", "value": "灰河上的主要渡口，旅人與貨物的集散地。"},
+                            {"name": "display_name_zh", "value": "霧骨渡口"},
+                            {"name": "description", "value": "灰河上的主要渡口，旅人與貨物的集散地。"},
                         ],
                     }
                 ],

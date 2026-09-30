@@ -2,7 +2,7 @@
 export const GALLERY_IDS = Array.from({ length: 8 }, (_, index) => `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`);
 const card = (index, changes = {}) => ({
   image_id: GALLERY_IDS[index], status: "card",
-  label: ["夜色旅人", "月下的誓言", "血色薔薇", "聖堂的餘暉", "深林低語", "戰痕"][index],
+  label: "肖像",
   url: `/art/gallery/character/7001/${GALLERY_IDS[index]}.webp`,
   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
   is_default: false, chips: ["預設臉框"], requested_fields: ["appearance"],
@@ -24,7 +24,7 @@ export const GALLERY_SAMPLE = {
     card(1, { binding_present: true, chips: ["飾品", "預設臉框"] }),
     card(2, { binding_present: true, chips: ["防具", "預設臉框"] }),
     card(3), card(4), card(5),
-    { image_id: GALLERY_IDS[6], status: "pending", label: "風之歌（生成中）", url: null, face_rect: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000200 },
+    { image_id: GALLERY_IDS[6], status: "pending", label: "肖像（生成中）", url: null, face_rect: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000200 },
     { image_id: GALLERY_IDS[7], status: "failed", label: "暫時無法生成，稍後再試（sd_connection_error）", url: null, face_rect: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000100 },
   ],
   equipment_summary: {
@@ -34,8 +34,8 @@ export const GALLERY_SAMPLE = {
     accessories: { value: ["synthetic_brooch", "synthetic_ring"], display_names: ["銀月髮飾", "暮光耳環"], equipped_count: 2 },
   },
   binding_warnings: [
-    { image_id: GALLERY_IDS[0], label: "夜色旅人", conditions: ["主手：暗影劍刃", "防具：黑夜長袍"] },
-    { image_id: GALLERY_IDS[1], label: "月下的誓言", conditions: ["飾品：銀月髮飾、暮光耳環（任一）"] },
+    { image_id: GALLERY_IDS[0], label: "肖像", conditions: ["主手：暗影劍刃", "防具：黑夜長袍"] },
+    { image_id: GALLERY_IDS[1], label: "肖像", conditions: ["飾品：銀月髮飾、暮光耳環（任一）"] },
   ],
   error_state: { code: "sd_connection_error", at: 1700000100 },
 };

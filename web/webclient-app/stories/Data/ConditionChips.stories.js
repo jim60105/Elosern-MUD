@@ -80,3 +80,22 @@ export const ThirtyTwo = {
   render: renderChips,
   args: { conditions: MANY_CONDITIONS },
 };
+
+// Long server labels (webclient-zh-tw-copy-and-labels): six readable names,
+// the longest ellipsised at the island width, plus one in the overflow; the
+// full names and localized modifiers stay in each chip's accessible name and
+// focus detail.
+export const LongNames = {
+  render: renderChips,
+  args: {
+    conditions: [
+      condition("long_arousal", "harmful", "高度興奮敏捷與準度減損", null, { agility: "-20%", accuracy: -15 }),
+      condition("long_mana", "beneficial", "精準魔力控制魔力消耗降低", null, { mp_cost: "-10%" }),
+      condition("long_stun", "critical", "靜電麻痺微階鎖定行動", 12, { actions_per_turn: 0, chance: 15 }),
+      condition("long_focus", "beneficial", "專注", 60, { accuracy: 10 }),
+      condition("long_fear", "warning", "恐懼", 30, { agility: "-15%" }),
+      condition("long_poison", "harmful", "中毒", 120),
+      condition("long_more", "informational", "轉生祝福·悠花敏捷提升", null, { agility_flat: 3 }),
+    ],
+  },
+};

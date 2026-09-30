@@ -1,15 +1,17 @@
 <script setup>
 // ConditionChips (H2, webclient-hud-02-status-islands, design D6/D7/D8):
-// the left stack's conditions island. One 34×34 icon chip per committed
-// condition, pairing a per-severity shape glyph with an accessible name
-// carrying the label, the remaining duration (only when the payload
-// supplies `remaining_seconds`, shown verbatim — never decremented between
-// revisions) and every derived modifier. Visible chips are capped at 6;
+// the left stack's conditions island. One chip per committed condition,
+// pairing a per-severity shape glyph with the condition's readable name
+// (bounded by the island width, ellipsised; webclient-zh-tw-copy-and-labels)
+// and the remaining duration as a small secondary badge (only when the
+// payload supplies `remaining_seconds`, shown verbatim — never decremented
+// between revisions). The accessible name carries the label, the duration
+// and every derived modifier in readable words. Visible chips are capped at 6;
 // the remainder stays reachable in one action through a bounded,
 // scrollable in-island disclosure that collapses on re-activation or
 // Escape (H4 re-points this control at the character-status drawer).
 import { computed, ref } from "vue";
-import { conditionLabel } from "../lib/condition_label.js";
+import { conditionLabel, conditionModifiers } from "../lib/condition_label.js";
 
 const props = defineProps({
   // The committed `status.conditions[]` array (icon-only chips).
@@ -42,10 +44,11 @@ function toggleOverflow() {
   overflowOpen.value = !overflowOpen.value;
 }
 
-// The focus/hover detail line: because the chip is icon-only, the label,
-// duration, and modifier text are presented visibly when a chip is focused
-// or hovered, so the information moved into the accessible name stays
-// reachable by pointer and by keyboard.
+// The focus/hover detail line: the chip shows only the (possibly
+// ellipsised) name and the duration, so the full label, duration, and
+// modifier text are presented visibly when a chip is focused or hovered,
+// and the information in the accessible name stays reachable by pointer and
+// by keyboard.
 const activeCode = ref(null);
 
 // The accessible chip name is the shared condition label rule (the same
@@ -71,6 +74,7 @@ function onChipKeydown(event) {
   >
     <p class="clab">狀態</p>
       <div class="chips">
+        <div class="chip-rows">
         <button
           v-for="condition in visible"
           :key="condition.code"
@@ -89,6 +93,7 @@ function onChipKeydown(event) {
           <span class="glyph" aria-hidden="true">
             {{ SEVERITY_GLYPHS[condition.severity] ?? "◆" }}
           </span>
+          <span class="name" aria-hidden="true">{{ condition.label ?? condition.code }}</span>
           <span
             v-if="typeof condition.remaining_seconds === 'number'"
             class="badge"
@@ -97,6 +102,7 @@ function onChipKeydown(event) {
             {{ condition.remaining_seconds }}
           </span>
         </button>
+        </div>
         <button
           v-if="overflowCount > 0"
           type="button"
@@ -109,7 +115,10 @@ function onChipKeydown(event) {
         >
           +{{ overflowCount }}
         </button>
-        <div
+      </div>
+      <!-- The disclosure sits outside the chip rows so the rows' own bounded
+           scroll (short viewports) never hides it. -->
+      <div
           v-if="overflowOpen && overflowCount > 0"
           class="disclosure"
           data-testid="status-panel__condition-disclosure"
@@ -126,15 +135,14 @@ function onChipKeydown(event) {
               剩 {{ condition.remaining_seconds }} 秒
             </span>
             <span
-              v-for="(value, key) in (condition.modifiers || {})"
-              :key="key"
+              v-for="modifier in conditionModifiers(condition)"
+              :key="modifier.key"
               class="disclosure-mod"
-              :data-testid="`status-panel__condition-mod--${key}`"
+              :data-testid="`status-panel__condition-mod--${modifier.key}`"
             >
-              {{ key }} {{ value }}
+              {{ modifier.text }}
             </span>
           </div>
-        </div>
       </div>
       <p
         v-if="activeCode"
@@ -182,23 +190,45 @@ function onChipKeydown(event) {
   gap: 6px;
 }
 
+/* The named chips; one flow with the `+N` chip except at short viewports. */
+.chip-rows {
+  display: contents;
+}
+
+/* A chip is a pill: severity glyph, the readable name (bounded by the
+   island width and ellipsised; the full text is in the detail line and the
+   accessible name), then the duration badge. The name keeps paper ink so a
+   long label stays legible on every severity tint. */
 .chip {
   position: relative;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px 0 7px;
+  border-radius: 7px;
   border: 1px solid var(--ink-600);
-  padding: 0;
   background: transparent;
   cursor: default;
   font-family: var(--f-sans);
 }
 
 .chip .glyph {
-  font-size: var(--text-lg);
+  flex: none;
+  font-size: var(--text-md);
   line-height: 1;
+}
+
+.chip .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  color: var(--paper-100);
 }
 
 .chip--beneficial {
@@ -235,25 +265,33 @@ function onChipKeydown(event) {
    `remaining_seconds`; it shows the integer verbatim and is never counted
    down client-side between revisions. */
 .chip .badge {
-  position: absolute;
-  bottom: -3px;
-  right: -3px;
+  flex: none;
   font-family: var(--f-num);
   font-size: var(--text-xs);
-  font-weight: 700;
+  line-height: 1;
   background: var(--ink-900);
   border: 1px solid var(--ink-600);
   border-radius: 99px;
-  padding: 0 4px;
+  padding: 2px 6px;
   color: var(--paper-300);
   font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* The unit is decoration on the verbatim integer (the chip's accessible
+   name already says 剩 N 秒). */
+.chip .badge::after {
+  content: "秒";
+  margin-left: 1px;
+  font-family: var(--f-sans);
+  font-size: 10px;
+  color: var(--paper-500);
 }
 
 /* The `+N` overflow chip opens a bounded, scrollable disclosure inside the
    island (design D7); re-activation or Escape collapses it. */
 .chip.more {
-  width: auto;
   min-width: 34px;
+  justify-content: center;
   background: var(--ink-780);
   color: var(--paper-300);
   font-size: var(--text-xs);
@@ -268,7 +306,7 @@ function onChipKeydown(event) {
 }
 
 .disclosure {
-  flex-basis: 100%;
+  margin-top: 6px;
   max-height: 96px;
   overflow-y: auto;
   border: var(--line);
@@ -328,18 +366,41 @@ function onChipKeydown(event) {
     line-height: 1.2;
   }
 
+  /* At the short viewport the named chips can wrap to more rows than the
+     vitals anchor holds (at 1280x720 the island is ~160px wide), so the
+     named rows scroll inside a two-row box instead of shrinking the names
+     away (a focused chip scrolls itself into view), and the `+N` chip stays
+     outside that box, beside it, always in sight. */
   .chips {
+    flex-wrap: nowrap;
+    align-items: flex-start;
     gap: 5px;
   }
 
+  .chip-rows {
+    display: flex;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+    gap: 5px;
+    max-height: 57px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #55524b transparent;
+  }
+
   .chip {
-    width: 26px;
     height: 26px;
-    border-radius: 7px;
+    gap: 5px;
+    padding: 0 7px 0 6px;
   }
 
   .chip .glyph {
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
+  }
+
+  .chip .name {
+    font-size: var(--text-xs);
   }
 
   .chip.more {

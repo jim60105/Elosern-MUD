@@ -16,6 +16,18 @@ class Nation:
     military_notes: str
     notes: str
 
+    @property
+    def capital_name_zh(self) -> str:
+        """The capital's player-facing name, resolved through the anchor registry.
+
+        Read at call time so a swapped registry is honoured; the load-time
+        nation check guarantees every shipped capital key resolves.
+        """
+        from world.lore import anchors
+
+        anchor = anchors.ANCHOR_REGISTRY.get(self.capital_anchor_key)
+        return anchor.display_name_zh if anchor is not None else self.capital_anchor_key
+
 
 NATION_REGISTRY: dict[str, Nation] = {
     "grandia": Nation(

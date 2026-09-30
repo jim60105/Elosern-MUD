@@ -34,9 +34,9 @@ const T_SR_ROYAL_COMMON_ZH = "冠族與大貴族";
 const T_SR_COMMONER_ZH = "竈生民";
 const T_SR_COMMONER_COMMON_ZH = "尋常竈生";
 const T_SR_LEAF_ZH = "影葉族";
-const T_SR_LEAF_COMMON_ZH = "林影精靈";
+const T_SR_LEAF_COMMON_ZH = "林影林語族";
 const T_SR_GALE_ZH = "巒族";
-const T_SR_GALE_COMMON_ZH = "暮窟精靈";
+const T_SR_GALE_COMMON_ZH = "暮窟林語族";
 const T_DRAFT_NAME_A = "苔娜";
 const T_DRAFT_NAME_B = "蕾語者";
 
@@ -63,7 +63,7 @@ function validPanel(overrides) {
         key: SYNTH_PRESET.id,
         display_name: SYNTH_PRESET.display,
         race: "human",
-        race_description: "人類",
+        race_description: "平原族",
         subrace: T_SR_COMMONER,
         emphasis: "均衡",
         background: "來自南境的旅人",
@@ -72,7 +72,7 @@ function validPanel(overrides) {
         key: T_PRESET_B.key,
         display_name: T_PRESET_B.display,
         race: "elf",
-        race_description: "精靈",
+        race_description: "林語族",
         subrace: T_SR_LEAF,
         emphasis: "守護",
         background: "斐歐恩護衛",
@@ -87,8 +87,8 @@ function validPanel(overrides) {
         apparent_age_maximum: 10000,
       },
       races: [
-        { key: "human", description: "人類", subraces: [T_SR_ROYAL, T_SR_COMMONER] },
-        { key: "elf", description: "精靈", subraces: [T_SR_LEAF, T_SR_GALE] },
+        { key: "human", description: "平原族", subraces: [T_SR_ROYAL, T_SR_COMMONER] },
+        { key: "elf", description: "林語族", subraces: [T_SR_LEAF, T_SR_GALE] },
       ],
       subraces: {
         [T_SR_ROYAL]: { display_name_zh: T_SR_ROYAL_ZH, common_name_zh: T_SR_ROYAL_COMMON_ZH, specialty: "教育" },

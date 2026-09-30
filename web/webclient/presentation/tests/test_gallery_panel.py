@@ -268,6 +268,30 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(value["equipment_summary"]["accessories"]["value"], ["t_ring_a", "t_ring_b"])
         self.assertEqual(value["filters"], {"all": 3, "defaults": 1, "bound": 3, "pending": 0, "failed": 0})
 
+    @covers_requirement(
+        "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media"
+    )
+    def test_card_labels_carry_no_timestamp_and_rows_keep_their_created_at(self):
+        # Two cards and one pending job minted at different instants share
+        # the fixed labels; only the structured created_at tells them apart,
+        # and no stored record is renamed.
+        self.card(1, timestamp=1_700_000_000.5)
+        self.card(2, timestamp=1_700_086_400)
+        self.job(3)
+        before = repr(api.record_for(self.subject).attributes.all())
+        value = gallery_presenter(self.context)
+        rows = {row["image_id"]: row for row in value["cards"]}
+        self.assertEqual(rows[image_id(1)]["label"], "肖像")
+        self.assertEqual(rows[image_id(2)]["label"], "肖像")
+        self.assertEqual(rows[image_id(3)]["label"], "肖像（生成中）")
+        self.assertEqual(rows[image_id(1)]["created_at"], 1_700_000_000.5)
+        self.assertEqual(rows[image_id(2)]["created_at"], 1_700_086_400)
+        self.assertEqual(rows[image_id(3)]["created_at"], 303)
+        for row in value["cards"]:
+            self.assertNotIn("UTC", row["label"])
+            self.assertNotRegex(row["label"], r"\d")
+        self.assertEqual(repr(api.record_for(self.subject).attributes.all()), before)
+
     @covers_requirement("webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only")
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"

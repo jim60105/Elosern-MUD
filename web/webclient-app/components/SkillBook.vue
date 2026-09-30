@@ -10,6 +10,7 @@
 // UI state.
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import RestForm from "./RestForm.vue";
+import { targetSpecLabel } from "../lib/skill_labels.js";
 
 const props = defineProps({
   // The character's skill data: { actives, passives } in the character
@@ -31,13 +32,6 @@ const practiceSkills = computed(() => (props.skills.actives ?? []).flatMap(
   (category) => (category.groups ?? []).flatMap((group) => group.skills ?? []),
 ));
 const practiceSkill = computed(() => practiceSkills.value.find((row) => row.key === practice.value));
-
-const TARGET_LABELS = {
-  none: "無目標",
-  self: "自身",
-  single: "單一目標",
-  area: "範圍",
-};
 
 // The design reference colour-codes exactly three elemental groups (fire,
 // water, wind); the dot colours reuse existing tokens rather than inventing
@@ -151,7 +145,7 @@ function costColorClass(row) {
 
 function targetText(row) {
   if (!row.target_spec) return null;
-  return TARGET_LABELS[row.target_spec] ?? row.target_spec;
+  return targetSpecLabel(row.target_spec);
 }
 
 // Cast cell: power scales (with their per-scale mp costs) and the target

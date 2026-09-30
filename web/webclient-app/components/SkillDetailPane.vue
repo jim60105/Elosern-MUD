@@ -9,6 +9,7 @@
 // The pane is passive: it renders the committed focused-skill model and the
 // client-local selection (the `✓` AREA marker) — it never mutates state.
 import { computed } from "vue";
+import { elementLabel, targetSpecLabel } from "../lib/skill_labels.js";
 
 const props = defineProps({
   // The focused skill model (the store's `combat.skillByKey[focusSkillKey]`):
@@ -27,7 +28,11 @@ const props = defineProps({
 const emit = defineEmits(["choose-scale", "choose-shorthand"]);
 
 const costText = computed(() => props.skill ? props.skill.costText || "" : "");
+// The raw `targetSpec` / `element` identifiers stay the routing keys; the
+// pane shows their readable names (webclient-zh-tw-copy-and-labels).
 const targetSpec = computed(() => (props.skill && props.skill.targetSpec) || "");
+const targetText = computed(() => (targetSpec.value ? targetSpecLabel(targetSpec.value) : ""));
+const elementText = computed(() => (props.skill && props.skill.element ? elementLabel(props.skill.element) : ""));
 const reason = computed(
   () =>
     (props.skill && props.skill.disabledReason && props.skill.disabledReason.message) || null,
@@ -47,7 +52,7 @@ function onScale(entry) {
   >
     <div class="skill-detail-pane__name">
       <span>{{ skill.label }}</span>
-      <span v-if="skill.element" class="skill-detail-pane__rank">{{ skill.element }}</span>
+      <span v-if="elementText" class="skill-detail-pane__rank" :data-element="skill.element">{{ elementText }}</span>
     </div>
     <p v-if="skill.description" class="skill-detail-pane__desc">{{ skill.description }}</p>
     <div v-if="costText" class="skill-detail-pane__cost">
@@ -56,7 +61,7 @@ function onScale(entry) {
     </div>
     <div v-if="targetSpec" class="skill-detail-pane__target">
       <span class="skill-detail-pane__label">目標類型</span>
-      {{ targetSpec }}
+      {{ targetText }}
     </div>
     <p v-if="reason" class="skill-detail-pane__disabled">{{ reason }}</p>
 

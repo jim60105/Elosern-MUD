@@ -70,7 +70,8 @@ function subtitleFor(name) {
   if (name === "lineage") return "熟練度 · 見頂 · 前置";
   if (name === "codex") return "稱號 · 異名 · 提名中";
   if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
-  return "分類 → 條目 → 子主題";
+  if (name === "help") return "按鍵、指令列與閱讀操作";
+  return "";
 }
 
 function initTrap() {

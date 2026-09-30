@@ -43,7 +43,9 @@ import LayoutStore from "./lib/layout_store.js";
 // The digits are claimed exactly when the router consumes them as dock row
 // picks (webclient-align-01-dock-chrome): an unclaimed digit (no such row)
 // still falls through to the text / command-history path.
-const CLAIMED_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", " ", "/", "1", "2", "3", "4"];
+// Digits 1–9 are the dock's positional picks (stores/elosern/interaction.js
+// focusPress); a digit the router consumed has its default prevented.
+const CLAIMED_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", " ", "/", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 function isEditable(target) {
   if (!target || !target.tagName) {

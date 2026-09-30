@@ -87,7 +87,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
           key: "traveler",
           display_name: "旅人",
           race: "human",
-          race_description: "穩健的人類",
+          race_description: "穩健的平原族",
           subrace: null,
           emphasis: "均衡",
           background: "出身霧骨渡口的旅人",
@@ -102,9 +102,9 @@ describe("H1 preserved DOM contract (design D6)", () => {
           apparent_age_maximum: 10000,
         },
         races: [
-          { key: "human", description: "人類", subraces: null },
+          { key: "human", description: "平原族", subraces: null },
           { key: T_RACE_BEAST, description: "獸族", subraces: null },
-          { key: "elf", description: "精靈", subraces: null },
+          { key: "elf", description: "林語族", subraces: null },
         ],
         subraces: {},
         profiles: [

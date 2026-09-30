@@ -7,7 +7,8 @@ follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
 content, §5.4; revised 2026-09-30 with the A12 map legibility, §11, and the
 A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4;
 revised 2026-09-30 with the A14 settings reading preview and switches, §6.4,
-and the A15 full-log frame and return-to-latest control, §6.3)
+and the A15 full-log frame and return-to-latest control, §6.3; revised 2026-09-30
+with the A16 zh-TW copy and labels, §5.3 and §5.4)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -257,6 +258,11 @@ damage gap. Hiding the island while it holds focus rescues focus to the
 command panel first. The low-HP vignette rule is unchanged. The island fades
 and slides through the motion layer (§9.3).
 
+Condition chips (A16, `webclient-zh-tw-copy-and-labels`) are named pills:
+severity glyph, the server label ellipsised at the island width, and a
+`N秒` badge; modifiers read in the stat vocabulary (敏捷 -10%, 準度 -15)
+with verbatim values in the accessible name and the focus detail.
+
 ### 5.4 Top bar and reference drawers
 
 The top bar keeps 角色 / 任務 / 背包 / 地圖 / 設定 and the character switcher,
@@ -291,6 +297,14 @@ cards whose stat tiles share equal tracks. Available-empty lists share
 `EmptyState`; lineage rows are ~56px with the meter right after the name
 and the root node's name as a subtitle; bag tiles draw their committed
 rarity as a visible border pattern.
+
+Copy (A16, `webclient-zh-tw-copy-and-labels`): the help overlay lists the
+real bindings in three groups (指令列, 指令面板, 閱讀與對話) as key caps, in
+Traditional Chinese; the combat detail names target types and elements; the
+codex titles races and guild ranks by name and labels card fields in words;
+gallery cards read 「肖像」 with a local relative date and the exact instant
+(from `created_at`, refreshed once a minute while open) instead of a UTC
+stamp in the label.
 
 ### 5.5 Command line
 

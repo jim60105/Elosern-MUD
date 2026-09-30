@@ -55,14 +55,14 @@ def _expected_registries():
 
 
 EXPECTED_CARD_FIELDS = {
-    "race": ("key", "description"),
-    "nation": ("display_name_zh", "capital_anchor_key"),
+    "race": ("display_name_zh", "description"),
+    "nation": ("display_name_zh", "capital_name_zh"),
     "region": ("display_name_zh", "terrain_flavor_zh"),
     "monster": ("display_name_zh", "description", "example_monsters_zh"),
     "element": ("display_name_zh", "description"),
     "magic": ("display_name_zh", "description"),
     "anchor": ("display_name_zh", "description"),
-    "guild": ("key", "description"),
+    "guild": ("display_name_zh", "description"),
 }
 
 
@@ -250,12 +250,16 @@ class ListingTests(unittest.TestCase):
 @synthetic_registries(*_LORE_LOGICALS)
 class CardRenderingTests(unittest.TestCase):
     @covers_requirement("lore-knowledge::each-category-renders-its-own-player-facing-card")
-    def test_race_card_renders_key_and_description(self):
-        race = _first_key(live_race_registry())
+    def test_race_card_renders_display_name_and_description(self):
+        races = live_race_registry()
+        race = _first_key(races)
         card = lore_card("race", race)
         self.assertEqual(
             card,
-            {"key": race, "description": live_race_registry()[race].description},
+            {
+                "display_name_zh": races[race].display_name_zh,
+                "description": races[race].description,
+            },
         )
 
     @covers_requirement("lore-knowledge::each-category-renders-its-own-player-facing-card")
@@ -277,8 +281,10 @@ class CardRenderingTests(unittest.TestCase):
         nation = _first_key(nations)
         card = lore_card("nation", nation)
         self.assertEqual(card["display_name_zh"], nations[nation].display_name_zh)
+        anchors = live_anchor_registry()
         self.assertEqual(
-            card["capital_anchor_key"], nations[nation].capital_anchor_key
+            card["capital_name_zh"],
+            anchors[nations[nation].capital_anchor_key].display_name_zh,
         )
 
     def test_monster_card_renders_examples_as_entries(self):
@@ -288,11 +294,11 @@ class CardRenderingTests(unittest.TestCase):
         self.assertEqual(card["display_name_zh"], tiers[tier].display_name_zh)
         self.assertIn(tiers[tier].example_monsters_zh[0], card["example_monsters_zh"])
 
-    def test_guild_card_renders_key_and_description(self):
+    def test_guild_card_renders_rank_name_and_description(self):
         ranks = live_guild_rank_registry()
         rank = _first_key(ranks)
         card = lore_card("guild", rank)
-        self.assertEqual(card["key"], rank)
+        self.assertEqual(card["display_name_zh"], f"{rank} 級")
         self.assertEqual(card["description"], ranks[rank].description)
 
     def test_every_category_card_renders_exactly_its_declared_fields(self):

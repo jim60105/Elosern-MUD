@@ -242,6 +242,15 @@ describe("window.Elosern bridge", () => {
     expect(escape.defaultPrevented).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.focus.key).toBe("wait");
+
+    // Positional picks reach past four (the help reference advertises 1–9):
+    // `5` picks the overview's fifth entry and is claimed; a digit past the
+    // entry count stays unclaimed.
+    const nine = press("9");
+    expect(nine.defaultPrevented).toBe(false);
+    const five = press("5");
+    expect(five.defaultPrevented).toBe(true);
+    expect(store.view.focus.key).toBe("look-room");
   });
 
   it("lets editable controls keep their keys", () => {
