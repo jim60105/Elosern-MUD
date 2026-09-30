@@ -11,6 +11,14 @@
  */
 
 :root {
+  /* The desktop chrome factor (webclient-proportional-ui-scale; lib/ui_scale.js
+     writes the live value on <html>): 1 at and below a 1080px viewport height,
+     the height over 1080 above it, capped at 1.4. Every fixed CSS-pixel chrome
+     literal is written `calc(<n>px * var(--ui-scale))`; viewport-relative
+     (vh/vw) prose, band and stage-art terms are never multiplied by it. This
+     fallback serves Storybook frames and the frames before the owner runs. */
+  --ui-scale: 1;
+
   /* ---- ink night palette ---- */
   --ink-950: #0b0d10;
   --ink-900: #101216;
@@ -78,16 +86,16 @@
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
   --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
   --f-num: var(--f-sans);
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-md: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --text-xl: 20px;
-  --text-2xl: 24px;
-  --text-3xl: 28px;
-  --text-4xl: 32px;
-  --text-initial: 44px;
+  --text-xs: calc(12px * var(--ui-scale));
+  --text-sm: calc(13px * var(--ui-scale));
+  --text-md: calc(14px * var(--ui-scale));
+  --text-base: calc(16px * var(--ui-scale));
+  --text-lg: calc(18px * var(--ui-scale));
+  --text-xl: calc(20px * var(--ui-scale));
+  --text-2xl: calc(24px * var(--ui-scale));
+  --text-3xl: calc(28px * var(--ui-scale));
+  --text-4xl: calc(32px * var(--ui-scale));
+  --text-initial: calc(44px * var(--ui-scale));
    --lh-narrative: 1.82;
    --lh-dialog: 1.78;
    /* H5 (webclient-hud-05-overlays-and-command-line, design D13): the
@@ -102,7 +110,7 @@
       42em column, so a page line holds at most 42 CJK characters. The
       window multiplies it by `--prose-scale`. The control strip under the
       text holds the page marker, 日誌, and ⌨. */
-   --message-text: clamp(20px, 2.593vh, 38px);
+   --message-text: clamp(20px * var(--ui-scale), 2.593vh, 38px * var(--ui-scale));
    /* The page's CJK leading and the gap between two narrative lines
       (webclient-message-typesetting): one and a half lines, and a little
       under half a line between paragraphs. Paging measures the rendered
@@ -113,22 +121,22 @@
       surface read at 20px at 1080, below the 28px page, on the same 42em
       measure. The log multiplies it by `--prose-scale`; its header, footer
       and 回到最新 control are chrome and never scale. */
-   --log-text: clamp(17px, 1.852vh, 26px);
-   --message-controls-h: 36px;
+   --log-text: clamp(17px * var(--ui-scale), 1.852vh, 26px * var(--ui-scale));
+   --message-controls-h: calc(36px * var(--ui-scale));
    /* The bottom band's shared control strip (webclient-band-material-pass):
       the message window's marker / 日誌 / ⌨ row and the dock's shortcut
       legend sit in strips of this one height on the band's common bottom
       padding, so both read on one baseline. */
    --band-strip-h: var(--message-controls-h);
-   --band-pad-bottom: 12px;
+   --band-pad-bottom: calc(12px * var(--ui-scale));
    /* The strip's right-end controls (AppShell's 日誌 at right 58px, 44px
       wide, and ⌨ at right 22px), plus a small gap: the page marker never
       sits closer than this to the message region's right edge. */
-   --band-strip-actions-w: 104px;
+   --band-strip-actions-w: calc(104px * var(--ui-scale));
    /* The stage seam over the band's top edge: a pointer-inert feather that
       darkens the lowest strip of art into the band. Kept below the scene
       caption row and the foe floor plates. */
-   --band-seam-feather: 28px;
+   --band-seam-feather: calc(28px * var(--ui-scale));
    /* The band's fine gold edge and its central lozenge ornament. */
    --band-edge: rgba(185, 154, 96, 0.72);
    --band-edge-dim: rgba(143, 113, 60, 0.35);
@@ -137,13 +145,13 @@
    --dock-focus-rule: rgba(185, 154, 96, 0.7);
 
   /* ---- spacing ---- */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 20px;
-  --sp-6: 24px;
-  --sp-8: 32px;
+  --sp-1: calc(4px * var(--ui-scale));
+  --sp-2: calc(8px * var(--ui-scale));
+  --sp-3: calc(12px * var(--ui-scale));
+  --sp-4: calc(16px * var(--ui-scale));
+  --sp-5: calc(20px * var(--ui-scale));
+  --sp-6: calc(24px * var(--ui-scale));
+  --sp-8: calc(32px * var(--ui-scale));
 
   /* ---- motion (webclient-motion-level, design D3) ----
      The whole motion vocabulary. Every component duration, delay, and travel
@@ -246,9 +254,9 @@
      place card column on the left, the 218px minimap card 16px from the
      right edge (+ ~46px of air) on the right. At 1920x1080 both are 6%. The
      dialogue text column aligns to the left inset. */
-  --actor-h: min(62vh, 680px, calc(100vh - var(--header-h) - var(--band-h)));
-  --actor-left-inset: max(6vw, calc(var(--left-column) + 8px - var(--actor-h) / 3));
-  --actor-right-inset: max(6vw, calc(280px - var(--actor-h) / 3));
+  --actor-h: min(62vh, 680px * var(--ui-scale), calc(100vh - var(--header-h) - var(--band-h)));
+  --actor-left-inset: max(6vw, calc(var(--left-column) + 8px * var(--ui-scale) - var(--actor-h) / 3));
+  --actor-right-inset: max(6vw, calc(280px * var(--ui-scale) - var(--actor-h) / 3));
   /* In combat the right-hand island is the compact participant frame, within
      the `map` anchor's `--right-column - 28px` column (the column's left edge
      `--right-column - 12px` from the stage's right edge) — much wider than
@@ -258,41 +266,45 @@
      `max(var(--actor-right-inset), var(--foe-face-clear) - <front slot width> / 2)`,
      written where the front foe's scale is known (FoeLineup.vue and the
      scene caption's rule in app-shell.css). */
-  --foe-face-clear: calc(var(--right-column) + 24px);
+  --foe-face-clear: calc(var(--right-column) + 24px * var(--ui-scale));
 
   /* ---- shape & chrome ---- */
-  --radius: 7px;
-  --radius-sm: 5px;
+  /* The radius ladder (webclient-proportional-ui-scale): every ordinary
+     rectangular corner reads one of these three steps; circles (50%),
+     1–2px bar caps and derived inner radii stay geometry. */
+  --radius: calc(8px * var(--ui-scale));
+  --radius-sm: calc(5px * var(--ui-scale));
+  --radius-pill: 999px;
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
   --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
     /* The slim top bar (webclient-avg-place-card-top-bar design D1): one
        48px row at every supported viewport. */
-    --header-h: 48px;
+    --header-h: calc(48px * var(--ui-scale));
     /* The place card's fixed height (design D3/D4): a 20px serif heading and
        a 12px time line inside the island padding. */
-    --place-h: 68px;
+    --place-h: calc(68px * var(--ui-scale));
     /* The stage's vertical gutter above the top islands and below the
        island stacks (webclient-avg-stage-hud-anchors design D6); short
        viewports tighten it. */
-    --stage-inset-y: 16px;
-    --left-column: clamp(220px, 20vw, 330px);
-    --right-column: clamp(230px, 22vw, 360px);
+    --stage-inset-y: calc(16px * var(--ui-scale));
+    --left-column: clamp(220px * var(--ui-scale), 20vw, 330px * var(--ui-scale));
+    --right-column: clamp(230px * var(--ui-scale), 22vw, 360px * var(--ui-scale));
     /* The AVG stage's bottom band (design §5.1): the message region and the
        command region share this one fixed height. It scales with the
        viewport height only and never depends on content, frame, or mode. */
-    --band-h: clamp(260px, 27.8vh, 400px);
+    --band-h: clamp(260px * var(--ui-scale), 27.8vh, 400px * var(--ui-scale));
     /* The collapsible command line's expanded height (AVG stage design §5.5;
        webclient-collapsible-command-line design D4). HudFrame's
        [data-anchor="command-line"] rule and the stage clearance consume it. */
-    --command-line-h: 44px;
+    --command-line-h: calc(44px * var(--ui-scale));
     /* The reference workspace's bottom inset (drawers and utility overlays,
        webclient-drawer-frame-unification): one command-line row plus 12px
        above the viewport bottom. The workspace covers the stage, the band
        and the command-line row, leaving only the band's lowest control
        strip exposed under the scrim. */
-    --workspace-bottom: calc(var(--command-line-h) + 12px);
+    --workspace-bottom: calc(var(--command-line-h) + 12px * var(--ui-scale));
     /* The reference surfaces' scrim and opaque ink panel. The scrim's fill
        alone recesses what lies behind; blur is optional decoration. The
        panel has no alpha anywhere, so nothing shows through it. */
@@ -307,8 +319,8 @@
        alt text, and the full-view control on one line) sits 12px above the
        command-line row, centred between the portraits. `--stage-caption-top`
        is its upper edge, which the dialogue choice list stops above. */
-    --scene-caption-h: 34px;
-    --stage-caption-top: calc(var(--stage-content-bottom) + 12px + var(--scene-caption-h));
+    --scene-caption-h: calc(34px * var(--ui-scale));
+    --stage-caption-top: calc(var(--stage-content-bottom) + 12px * var(--ui-scale) + var(--scene-caption-h));
    /* ---- z-index scale ----
       Every full-screen surface consumes --z-surface-modal (or a value derived
       from it); nothing but the offline overlay may exceed --z-offline.
@@ -326,7 +338,7 @@
    face — clears the frame (webclient-combat-foes-on-stage). */
 @media (max-height: 820px) {
   :root {
-    --foe-face-clear: calc(var(--right-column) + 48px);
+    --foe-face-clear: calc(var(--right-column) + 48px * var(--ui-scale));
   }
 }
 
@@ -606,12 +618,12 @@
   justify-content: center;
   gap: var(--sp-2);
   box-sizing: border-box;
-  min-height: 36px;
+  min-height: calc(36px * var(--ui-scale));
   padding: var(--sp-2) var(--sp-4);
   color: var(--paper-100);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
-  border-radius: 9px;
+  border-radius: var(--radius);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   line-height: 1.25;
@@ -670,7 +682,7 @@
 }
 
 .ui-btn--sm {
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
 }
 
@@ -694,13 +706,13 @@
   place-items: center;
   flex: none;
   box-sizing: border-box;
-  width: 34px;
-  height: 34px;
+  width: calc(34px * var(--ui-scale));
+  height: calc(34px * var(--ui-scale));
   padding: 0;
   color: var(--paper-300);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
-  border-radius: 9px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition:
     color var(--motion-fast) var(--ease-standard),
@@ -733,7 +745,7 @@
   padding: var(--sp-1);
   background: var(--ink-820);
   border: 1px solid var(--ink-600);
-  border-radius: 9px;
+  border-radius: var(--radius);
 }
 
 .ui-tabs__tab {
@@ -742,12 +754,12 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-1);
-  min-height: 30px;
+  min-height: calc(30px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-4);
   color: var(--paper-500);
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -775,7 +787,7 @@
   content: "";
   position: absolute;
   right: var(--sp-3);
-  bottom: 3px;
+  bottom: calc(3px * var(--ui-scale));
   left: var(--sp-3);
   height: 2px;
   border-radius: 2px;

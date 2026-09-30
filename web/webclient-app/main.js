@@ -5,6 +5,7 @@ import { useElosernStore } from "./stores/elosern.js";
 import { createWindowBridge } from "./bridge.js";
 import { wireTransport } from "./transport.js";
 import LayoutStore from "./lib/layout_store.js";
+import { installUiScale } from "./lib/ui_scale.js";
 import "./styles/tokens.css";
 import "./styles/fonts.css";
 import "./styles/app-shell.css";
@@ -27,10 +28,16 @@ function resolveMountPoint() {
   return point;
 }
 
+// The desktop chrome factor (webclient-proportional-ui-scale): written to the
+// root before the first render so no frame lays out at the wrong scale; the
+// app's teardown removes the resize listener.
+const disposeUiScale = installUiScale();
+
 const pinia = createPinia();
 setActivePinia(pinia);
 const app = createApp(AppClient);
 app.use(pinia);
+app.onUnmount(disposeUiScale);
 
 // The bridge handle MUST exist before `app.mount()`: AppClient's onMounted
 // callback (which registers the SceneBackdrop handle) runs during mount, so

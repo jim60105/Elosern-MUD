@@ -376,7 +376,7 @@ function sellNow(row) {
 }
 
 .shop-row__qty {
-  width: 4.5rem;
+  width: calc(72px * var(--ui-scale));
   padding: var(--sp-1);
   color: var(--paper-50);
   background: var(--ink-820);
@@ -395,7 +395,7 @@ function sellNow(row) {
   grid-row: 2;
   grid-column: 4;
   justify-self: end;
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
   color: var(--gold-400);
   background: linear-gradient(rgba(185, 154, 96, 0.16), rgba(185, 154, 96, 0.06));

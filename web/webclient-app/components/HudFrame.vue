@@ -295,8 +295,8 @@ defineExpose({ menuOpen });
    D4), aligned to the brand column above it. */
 .elosern-stage [data-anchor="place"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
-  left: 16px;
-  width: calc(var(--left-column) - 32px);
+  left: calc(16px * var(--ui-scale));
+  width: calc(var(--left-column) - 32px * var(--ui-scale));
   height: var(--place-h);
   z-index: 4;
 }
@@ -307,25 +307,25 @@ defineExpose({ menuOpen });
    `.elosern-root` override in app-shell.css repeats these offsets (it sets
    the column widths); keep the two in step. */
 .elosern-stage [data-anchor="vitals"] {
-  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px);
-  left: 16px;
-  width: 262px;
+  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px * var(--ui-scale));
+  left: calc(16px * var(--ui-scale));
+  width: calc(262px * var(--ui-scale));
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px - 2 * var(--stage-inset-y));
+  gap: calc(9px * var(--ui-scale));
+  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px * var(--ui-scale) - 2 * var(--stage-inset-y));
   overflow-y: auto;
   overflow-x: hidden;
 }
 .elosern-stage [data-anchor="map"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
-  right: 16px;
-  width: 230px;
+  right: calc(16px * var(--ui-scale));
+  width: calc(230px * var(--ui-scale));
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: calc(9px * var(--ui-scale));
   align-items: flex-end;
   max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   overflow-y: auto;
@@ -338,7 +338,7 @@ defineExpose({ menuOpen });
 .elosern-stage [data-anchor="actor-left"],
 .elosern-stage [data-anchor="actor-right"] {
   bottom: var(--band-h);
-  height: min(62vh, 680px, calc(100% - var(--header-h) - var(--band-h)));
+  height: min(62vh, 680px * var(--ui-scale), calc(100% - var(--header-h) - var(--band-h)));
   aspect-ratio: 2 / 3;
   z-index: 2;
   pointer-events: none;
@@ -367,9 +367,9 @@ defineExpose({ menuOpen });
    the span. No transform, so the text never lands on half pixels. */
 .elosern-stage [data-anchor="choices"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
-  bottom: calc(var(--stage-caption-top) + 8px);
-  left: calc(50% - min(280px, 20%));
-  width: min(560px, 40%);
+  bottom: calc(var(--stage-caption-top) + 8px * var(--ui-scale));
+  left: calc(50% - min(280px * var(--ui-scale), 20%));
+  width: min(560px * var(--ui-scale), 40%);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -414,7 +414,7 @@ defineExpose({ menuOpen });
    fine gold edge — brightest at the centre, fading out towards both sides —
    with a small lozenge ornament at its centre. */
 .elosern-stage .stage-band {
-  --band-edge-line: linear-gradient(90deg, transparent 0%, var(--band-edge-dim) 12%, var(--band-edge) 38%, var(--band-edge) calc(50% - 22px), transparent calc(50% - 16px), transparent calc(50% + 16px), var(--band-edge) calc(50% + 22px), var(--band-edge) 62%, var(--band-edge-dim) 88%, transparent 100%) center / 100% 1px no-repeat;
+  --band-edge-line: linear-gradient(90deg, transparent 0%, var(--band-edge-dim) 12%, var(--band-edge) 38%, var(--band-edge) calc(50% - 22px * var(--ui-scale)), transparent calc(50% - 16px * var(--ui-scale)), transparent calc(50% + 16px * var(--ui-scale)), var(--band-edge) calc(50% + 22px * var(--ui-scale)), var(--band-edge) 62%, var(--band-edge-dim) 88%, transparent 100%) center / 100% 1px no-repeat;
 }
 .elosern-stage .stage-band::before,
 .elosern-stage .stage-band::after {
@@ -430,9 +430,9 @@ defineExpose({ menuOpen });
   background: linear-gradient(0deg, rgba(11, 9, 13, 0.62), rgba(11, 9, 13, 0.22) 55%, transparent);
 }
 .elosern-stage .stage-band::after {
-  top: -5px;
-  height: 11px;
-  background: var(--band-ornament) center / 30px 11px no-repeat, var(--band-edge-line);
+  top: calc(-5px * var(--ui-scale));
+  height: calc(11px * var(--ui-scale));
+  background: var(--band-ornament) center / calc(30px * var(--ui-scale)) calc(11px * var(--ui-scale)) no-repeat, var(--band-edge-line);
 }
 /* The expanded command-line row stands on the seam's centre; the ornament
    steps aside so no half of it peeks out below the row. */
@@ -449,10 +449,10 @@ defineExpose({ menuOpen });
   height: 100%;
 }
 .elosern-stage [data-anchor="band-message"] {
-  padding: 10px 12px var(--band-pad-bottom) 18px;
+  padding: calc(10px * var(--ui-scale)) calc(12px * var(--ui-scale)) var(--band-pad-bottom) calc(18px * var(--ui-scale));
 }
 .elosern-stage [data-anchor="band-command"] {
-  padding: 10px 18px var(--band-pad-bottom) 6px;
+  padding: calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale)) var(--band-pad-bottom) calc(6px * var(--ui-scale));
 }
 /* The region divider (webclient-band-material-pass): one subdued vertical
    rule between the message and command regions, fading out at both ends.
@@ -462,8 +462,8 @@ defineExpose({ menuOpen });
   content: "";
   position: absolute;
   left: 0;
-  top: 18px;
-  bottom: 18px;
+  top: calc(18px * var(--ui-scale));
+  bottom: calc(18px * var(--ui-scale));
   width: 1px;
   background: linear-gradient(180deg, transparent, var(--ink-600) 22%, rgba(143, 113, 60, 0.55) 50%, var(--ink-600) 78%, transparent);
   pointer-events: none;

@@ -316,18 +316,18 @@ onUnmounted(() => {
 .character-switcher__pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   background: var(--panel);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
-  border-radius: 999px;
-  padding: 4px 10px 4px 5px;
+  border-radius: var(--radius-pill);
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(5px * var(--ui-scale));
   box-shadow: var(--shadow);
   font-size: var(--text-xs);
   color: var(--paper-200);
   cursor: pointer;
-  max-width: 170px;
-  height: 32px;
+  max-width: calc(170px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
   transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
@@ -342,15 +342,15 @@ onUnmounted(() => {
 
 .character-switcher__pill.is-expanded {
   border-color: var(--gold-400);
-  box-shadow: 0 0 8px rgba(217, 119, 6, 0.25);
+  box-shadow: 0 0 calc(8px * var(--ui-scale)) rgba(217, 119, 6, 0.25);
 }
 
 .character-switcher__thumb-wrapper {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
   border-radius: 50%;
   overflow: hidden;
   background: var(--paper-800);
@@ -372,7 +372,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__name {
-  max-width: 90px;
+  max-width: calc(90px * var(--ui-scale));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -388,14 +388,14 @@ onUnmounted(() => {
 
 .character-switcher__popover {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 6px * var(--ui-scale));
   right: 0;
   z-index: 20;
-  width: 240px;
-  max-height: 320px;
+  width: calc(240px * var(--ui-scale));
+  max-height: calc(320px * var(--ui-scale));
   overflow-y: auto;
   background: var(--panel);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(calc(12px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
@@ -425,9 +425,9 @@ onUnmounted(() => {
 .character-switcher__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   width: 100%;
-  padding: 6px 8px;
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
@@ -458,8 +458,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: calc(24px * var(--ui-scale));
+  height: calc(24px * var(--ui-scale));
   border-radius: 50%;
   overflow: hidden;
   background: var(--paper-800);
@@ -488,7 +488,7 @@ onUnmounted(() => {
 
 .character-switcher__pending-badge {
   font-size: var(--text-xs);
-  padding: 1px 5px;
+  padding: 1px calc(5px * var(--ui-scale));
   border-radius: var(--radius-sm);
   background: rgba(59, 130, 246, 0.15);
   color: #93c5fd;
@@ -507,8 +507,8 @@ onUnmounted(() => {
 
 .character-switcher__create-wrapper {
   border-top: 1px solid var(--paper-800);
-  margin-top: 4px;
-  padding-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
+  padding-top: calc(4px * var(--ui-scale));
 }
 
 .character-switcher__create-btn {
@@ -516,7 +516,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 6px 8px;
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -567,7 +567,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__confirm-cancel {
-  padding: 4px 10px;
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale));
   font-size: var(--text-xs);
   border: var(--line);
   border-radius: var(--radius-sm);
@@ -577,7 +577,7 @@ onUnmounted(() => {
 }
 
 .character-switcher__confirm-submit {
-  padding: 4px 10px;
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale));
   font-size: var(--text-xs);
   border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);

@@ -101,16 +101,16 @@ function activate() {
 .option-card {
   display: flex;
   align-items: flex-start;
-  gap: 11px;
+  gap: calc(11px * var(--ui-scale));
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  padding: 14px;
+  padding: calc(14px * var(--ui-scale));
   overflow-wrap: anywhere;
   color: var(--paper-100);
   background: linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid var(--ink-600);
-  border-radius: 11px;
+  border-radius: var(--radius);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   line-height: 1.5;
@@ -127,11 +127,11 @@ function activate() {
 
 .option-card-glyph {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: calc(30px * var(--ui-scale));
+  height: calc(30px * var(--ui-scale));
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--gold-glow);
   border: 1px solid var(--gold-500);
   color: var(--gold-400);
@@ -159,12 +159,12 @@ function activate() {
   display: block;
   font-size: var(--text-xs);
   color: var(--paper-300);
-  margin-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
   line-height: 1.6;
 }
 
 .option-card:focus-visible {
   outline: 2px solid var(--gold-400);
-  outline-offset: -3px;
+  outline-offset: calc(-3px * var(--ui-scale));
 }
 </style>

@@ -775,7 +775,7 @@ function onFoeLineupGone() {
    two-column grid, adapted to a flex row that fits the bounded pane). */
 .dock-pane-host {
   display: flex;
-  gap: 12px;
+  gap: calc(12px * var(--ui-scale));
   flex: 1;
   min-height: 0;
   align-items: flex-start;

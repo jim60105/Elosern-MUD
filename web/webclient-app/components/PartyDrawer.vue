@@ -425,8 +425,8 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .av {
-  width: 52px;
-  height: 52px;
+  width: calc(52px * var(--ui-scale));
+  height: calc(52px * var(--ui-scale));
   flex: none;
   border-radius: var(--radius);
   background: radial-gradient(60% 70% at 50% 38%, #4a3a2a, #1a150e 82%);
@@ -473,7 +473,7 @@ function onInviteCurrentNpc() {
 .compbig .bondrow {
   font-size: var(--text-xs);
   color: var(--gold-500);
-  margin: var(--sp-1) 0 6px;
+  margin: var(--sp-1) 0 calc(6px * var(--ui-scale));
 }
 
 .compbig .bondrow i {
@@ -482,8 +482,8 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .cbar {
-  height: 6px;
-  border-radius: 99px;
+  height: calc(6px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   background: var(--ink-780);
   border: 1px solid var(--ink-700);
   overflow: hidden;
@@ -492,7 +492,7 @@ function onInviteCurrentNpc() {
 .compbig .cbar .f {
   height: 100%;
   background: var(--vit-hp);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   transition: width var(--motion-base) var(--ease-standard);
 }
 
@@ -518,13 +518,13 @@ function onInviteCurrentNpc() {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
-  margin-top: 10px;
+  margin-top: calc(10px * var(--ui-scale));
 }
 
 .compbig .acts button {
   font-family: var(--f-sans);
   font-size: var(--text-xs);
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
   background: var(--ink-780);
@@ -612,7 +612,7 @@ function onInviteCurrentNpc() {
   color: var(--gold-400);
   font-family: var(--f-sans);
   font-size: var(--text-xs);
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -627,7 +627,7 @@ function onInviteCurrentNpc() {
   background: linear-gradient(rgba(185, 154, 96, 0.16), rgba(185, 154, 96, 0.06));
   border: 1px solid var(--gold-500);
   color: var(--gold-400);
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -649,8 +649,8 @@ function onInviteCurrentNpc() {
    for long names. */
 @media (max-width: 400px) {
   .compbig .av {
-    width: 42px;
-    height: 42px;
+    width: calc(42px * var(--ui-scale));
+    height: calc(42px * var(--ui-scale));
     font-size: var(--text-xl);
   }
 }

@@ -173,14 +173,14 @@ watch(
      (webclient-desktop-shell: the scene overview is the direct-child rule's
      one exception for row regions). */
   flex: 1;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   min-width: 0;
 }
 
 .scene-overview__list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
   min-width: 0;
   outline: none;
 }
@@ -194,12 +194,12 @@ watch(
   display: grid;
   grid-template-columns: 3.2em minmax(0, 1fr);
   align-items: start;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   min-width: 0;
 }
 
 .scene-overview__label {
-  padding-top: 7px;
+  padding-top: calc(7px * var(--ui-scale));
   color: var(--gold-400);
   font-family: var(--f-serif);
   font-size: var(--text-sm);
@@ -210,7 +210,7 @@ watch(
 .scene-overview__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   min-width: 0;
 }
 
@@ -226,15 +226,15 @@ watch(
    filled, so they read as room-level actions below the scene's chips. */
 .scene-overview__row--footer {
   grid-template-columns: minmax(0, 1fr);
-  padding-top: 10px;
+  padding-top: calc(10px * var(--ui-scale));
   border-top: 1px solid rgba(85, 82, 75, 0.55);
 }
 
 /* Compact chips: the shared row renderer's look at chip density. */
 .scene-overview .scene-chip {
-  min-height: 32px;
+  min-height: calc(32px * var(--ui-scale));
   max-width: 100%;
-  padding: 4px 10px;
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale));
   font-size: var(--text-sm);
   line-height: 1.35;
 }
@@ -261,7 +261,7 @@ watch(
 
 .scene-overview__reason {
   margin: 0;
-  padding: 6px 10px;
+  padding: calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale));
   color: var(--paper-300);
   font-size: var(--text-xs);
   line-height: 1.5;

@@ -177,8 +177,8 @@ watch(
    design tokens only. */
 .hud {
   background: var(--panel);
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(9px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -187,8 +187,8 @@ watch(
 .vitals {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 10px 12px 12px;
+  gap: calc(9px * var(--ui-scale));
+  padding: calc(10px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(12px * var(--ui-scale));
   font-family: var(--f-sans);
 }
 
@@ -197,7 +197,7 @@ watch(
   padding: var(--sp-1) var(--sp-2);
   color: var(--paper-300);
   border: 1px solid var(--ink-600);
-  border-left: 3px solid var(--seal-600);
+  border-left: calc(3px * var(--ui-scale)) solid var(--seal-600);
   background: var(--ink-780);
   border-radius: var(--radius-sm);
   font-size: max(var(--text-xs), 0.85em);
@@ -207,15 +207,15 @@ watch(
 .vital .vh {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   font-size: var(--text-xs);
-  margin-bottom: 4px;
+  margin-bottom: calc(4px * var(--ui-scale));
 }
 
 .vital .vh .lbl {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(5px * var(--ui-scale));
   color: var(--paper-100);
   font-weight: 500;
 }
@@ -243,8 +243,8 @@ watch(
    damage visible as the gap) behind the fill; the ghost is decorative. */
 .track {
   position: relative;
-  height: 10px;
-  border-radius: 99px;
+  height: calc(10px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   background: var(--ink-780);
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.45);
@@ -265,7 +265,7 @@ watch(
 .track .fill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   transition: width var(--motion-slow) var(--ease-standard);
 }
 
@@ -274,7 +274,7 @@ watch(
   position: absolute;
   inset: 0 0 50% 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
-  border-radius: 99px 99px 0 0;
+  border-radius: var(--radius-pill) var(--radius-pill) 0 0;
 }
 
 .vital.hp .fill {
@@ -288,7 +288,7 @@ watch(
 /* The sp fill carries a diagonal stripe texture, so it is distinguishable
    from the hp and mp fills without colour (design D1). */
 .vital.sp .fill {
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.22) 0 4px, transparent 4px 9px),
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.22) 0 calc(4px * var(--ui-scale)), transparent calc(4px * var(--ui-scale)) calc(9px * var(--ui-scale))),
     linear-gradient(90deg, #9a7516, var(--vit-sp));
 }
 
@@ -312,15 +312,15 @@ watch(
    each gauge collapses to one row — label, bar, numerals. */
 @media (max-height: 820px) {
   .vitals {
-    gap: 5px;
-    padding: 7px 12px;
+    gap: calc(5px * var(--ui-scale));
+    padding: calc(7px * var(--ui-scale)) calc(12px * var(--ui-scale));
   }
 
   .vital {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
-    column-gap: 8px;
+    column-gap: calc(8px * var(--ui-scale));
   }
 
   .vital .vh {
@@ -336,7 +336,7 @@ watch(
   .vital .track {
     grid-column: 2;
     grid-row: 1;
-    height: 7px;
+    height: calc(7px * var(--ui-scale));
   }
 
   .vital .vh .num {
@@ -349,5 +349,12 @@ watch(
     grid-column: 4;
     grid-row: 1;
   }
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.vital .vh .lbl .ic {
+  width: calc(12px * var(--ui-scale));
+  height: calc(12px * var(--ui-scale));
 }
 </style>

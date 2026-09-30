@@ -71,10 +71,10 @@ defineExpose({ closeButton });
   flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 60px;
+  gap: calc(12px * var(--ui-scale));
+  min-height: calc(60px * var(--ui-scale));
   box-sizing: border-box;
-  padding: 10px 14px 10px 20px;
+  padding: calc(10px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(10px * var(--ui-scale)) calc(20px * var(--ui-scale));
   background: linear-gradient(180deg, #1a1c20, #121418);
 }
 
@@ -93,12 +93,12 @@ defineExpose({ closeButton });
   flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
   border-radius: 50%;
   color: var(--gold-400);
   background: radial-gradient(circle at 50% 35%, #2a261e, #15161a 70%);
-  box-shadow: inset 0 0 0 1px #cfb37855, 0 0 10px -4px var(--gold-glow);
+  box-shadow: inset 0 0 0 1px #cfb37855, 0 0 calc(10px * var(--ui-scale)) calc(-4px * var(--ui-scale)) var(--gold-glow);
 }
 
 .drawer-header .drawer-header__title {
@@ -116,7 +116,7 @@ defineExpose({ closeButton });
 .drawer-header .drawer-header__subtitle {
   margin: 0;
   min-width: 0;
-  padding-left: 12px;
+  padding-left: calc(12px * var(--ui-scale));
   border-left: 1px solid var(--ink-700);
   color: var(--paper-500);
   font-family: var(--f-sans);
@@ -132,8 +132,8 @@ defineExpose({ closeButton });
   margin-left: auto;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
   padding: 0;
   color: var(--paper-300);
   background: var(--ink-780);
@@ -153,5 +153,17 @@ defineExpose({ closeButton });
   color: var(--gold-400);
   border-color: var(--gold-400);
   box-shadow: var(--focus);
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.drawer-header__icon svg {
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+}
+
+.drawer-header__close svg {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
 }
 </style>

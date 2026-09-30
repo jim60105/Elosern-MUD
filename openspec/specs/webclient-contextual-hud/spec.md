@@ -11,6 +11,7 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 ## Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
+Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 1080px tall or 1920px wide. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
@@ -29,7 +30,7 @@ objective line, then any other island this capability places there) SHALL be rig
 stage's right gutter and bounded above the bottom band.
 
 The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
-`clamp(260px, 27.8vh, 400px)` (300px at the 1920x1080 reference viewport), taken from a single
+`clamp(260px, 27.8vh, 400px)` with its two px bounds multiplied once by the desktop chrome factor (300px at the 1920x1080 reference viewport, 400px at 2560x1440), taken from a single
 shared band-height token. The band's height SHALL NOT depend on its content, on the dock frame, on
 the committed mode, or on any measurement: no frame, pane, line count, dialogue exchange, or mode
 change SHALL grow or shrink it. The band SHALL be divided into the message region `band-message`,

@@ -27,7 +27,7 @@ const renderOverlay = (args) => ({
       "div",
       {
         style:
-          "position: relative; width: 900px; height: 600px; overflow: hidden; " +
+          "position: relative; width: calc(900px * var(--ui-scale)); height: calc(600px * var(--ui-scale)); overflow: hidden; " +
           "border: 1px solid var(--ink-700); border-radius: 12px; " +
           "background: var(--ink-950);",
       },

@@ -122,26 +122,26 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
     "head head"
     "page replay";
   align-items: end;
-  column-gap: 24px;
-  row-gap: 10px;
+  column-gap: calc(24px * var(--ui-scale));
+  row-gap: calc(10px * var(--ui-scale));
   margin: 0;
-  padding: 18px 24px 16px;
+  padding: calc(18px * var(--ui-scale)) calc(24px * var(--ui-scale)) calc(16px * var(--ui-scale));
   border: 1px solid var(--band-edge-dim);
   border-top-color: var(--band-edge);
   border-radius: var(--radius);
   background:
     radial-gradient(120% 140% at 50% -40%, rgba(185, 154, 96, 0.08), transparent 60%),
     linear-gradient(180deg, #0e0f15 0%, #13101a 45%, #0e0b12 100%);
-  box-shadow: inset 0 1px 0 rgba(228, 200, 142, 0.08), 0 10px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 0 rgba(228, 200, 142, 0.08), 0 calc(10px * var(--ui-scale)) calc(24px * var(--ui-scale)) rgba(0, 0, 0, 0.28);
 }
 
 .reading-sample::before {
   content: "";
   position: absolute;
-  top: -6px;
+  top: calc(-6px * var(--ui-scale));
   left: 50%;
-  width: 30px;
-  height: 11px;
+  width: calc(30px * var(--ui-scale));
+  height: calc(11px * var(--ui-scale));
   transform: translateX(-50%);
   background: var(--band-ornament) center / contain no-repeat;
   pointer-events: none;
@@ -151,7 +151,7 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
   grid-area: head;
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: calc(12px * var(--ui-scale));
   font-family: var(--f-sans);
 }
 
@@ -215,9 +215,9 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
   grid-area: replay;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
+  gap: calc(6px * var(--ui-scale));
+  min-height: calc(36px * var(--ui-scale));
+  padding: 0 calc(14px * var(--ui-scale));
   color: var(--paper-300);
   background: transparent;
   border: var(--line);
@@ -236,5 +236,12 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
 .reading-sample__replay:focus-visible {
   outline: 2px solid var(--gold-400);
   outline-offset: 2px;
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.reading-sample__replay svg {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
 }
 </style>

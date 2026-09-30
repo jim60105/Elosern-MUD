@@ -984,15 +984,15 @@ export default {
      (webclient-message-typesetting). The page's max-width and the marker's
      placement both read these, so the marker always tracks the measure. */
   --message-page-font: calc(var(--message-text) * var(--prose-scale));
-  --message-measure: calc(var(--message-page-font) * 42 + 48px);
+  --message-measure: calc(var(--message-page-font) * 42 + 48px * var(--ui-scale));
 }
 
 .message-window::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 12px;
-  bottom: calc(var(--message-controls-h) + 4px);
+  top: calc(12px * var(--ui-scale));
+  bottom: calc(var(--message-controls-h) + 4px * var(--ui-scale));
   width: 2px;
   background: linear-gradient(180deg, transparent, var(--gold-400) 18%, var(--gold-400) 82%, transparent);
   opacity: 0;
@@ -1022,7 +1022,7 @@ export default {
   max-width: var(--message-measure);
   height: 100%;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 calc(24px * var(--ui-scale));
   overflow: hidden;
   font-family: var(--f-serif);
   font-size: var(--message-page-font);
@@ -1061,8 +1061,8 @@ export default {
   pointer-events: none;
   background: var(--message-clear-fill);
   /* Feathered side edges, inside the page's text-free side padding. */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 calc(16px * var(--ui-scale)), #000 calc(100% - 16px * var(--ui-scale)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 calc(16px * var(--ui-scale)), #000 calc(100% - 16px * var(--ui-scale)), transparent);
   transition: opacity var(--motion-clear) var(--ease-standard);
 }
 
@@ -1181,13 +1181,13 @@ export default {
   position: absolute;
   right: max(
     var(--band-strip-actions-w),
-    calc((100% - min(100%, var(--message-measure))) / 2 + 24px)
+    calc((100% - min(100%, var(--message-measure))) / 2 + 24px * var(--ui-scale))
   );
-  bottom: 12px;
+  bottom: calc(12px * var(--ui-scale));
   font-size: var(--text-md);
   line-height: 1;
   color: var(--gold-400);
-  text-shadow: 0 0 8px var(--gold-glow);
+  text-shadow: 0 0 calc(8px * var(--ui-scale)) var(--gold-glow);
   pointer-events: none;
 }
 
@@ -1197,7 +1197,7 @@ export default {
 
 .message-window__marker[data-state="end"] {
   font-size: var(--text-xs);
-  bottom: 14px;
+  bottom: calc(14px * var(--ui-scale));
   color: var(--gold-500);
   text-shadow: none;
 }
@@ -1238,7 +1238,7 @@ export default {
    in every mode, so a name plate leaving after the commit back to
    exploration keeps its geometry while it fades. */
 .message-window {
-  --dialogue-inset: max(24px, calc(var(--actor-left-inset, 6vw) - 18px));
+  --dialogue-inset: max(24px * var(--ui-scale), calc(var(--actor-left-inset, 6vw) - 18px * var(--ui-scale)));
 }
 
 .message-window[data-mode="dialogue"] .message-window__page {
@@ -1248,17 +1248,17 @@ export default {
 }
 
 .message-window[data-mode="dialogue"] {
-  --message-measure: calc(var(--message-page-font) * 42 + var(--dialogue-inset) + 24px);
+  --message-measure: calc(var(--message-page-font) * 42 + var(--dialogue-inset) + 24px * var(--ui-scale));
 }
 
 .message-window[data-mode="dialogue"] .message-window__marker {
-  right: max(var(--band-strip-actions-w), calc(100% - min(100%, var(--message-measure)) + 24px));
+  right: max(var(--band-strip-actions-w), calc(100% - min(100%, var(--message-measure)) + 24px * var(--ui-scale)));
 }
 
 /* The focus rule follows the column: just left of the text, below the
    plate. */
 .message-window[data-mode="dialogue"]::before {
-  left: calc(var(--dialogue-inset) - 14px);
+  left: calc(var(--dialogue-inset) - 14px * var(--ui-scale));
   top: calc(var(--message-text) * 2);
 }
 
@@ -1269,8 +1269,8 @@ export default {
   min-width: 0;
   box-sizing: border-box;
   max-width: var(--message-measure);
-  margin: 4px 0 6px;
-  padding: 2px 24px 3px var(--dialogue-inset);
+  margin: calc(4px * var(--ui-scale)) 0 calc(6px * var(--ui-scale));
+  padding: 2px calc(24px * var(--ui-scale)) calc(3px * var(--ui-scale)) var(--dialogue-inset);
   font-size: var(--message-page-font);
   white-space: nowrap;
   overflow: hidden;
@@ -1285,7 +1285,7 @@ export default {
   display: flex;
   align-items: baseline;
   min-width: 0;
-  padding: 0 2.4em 7px 0;
+  padding: 0 2.4em calc(7px * var(--ui-scale)) 0;
   background:
     linear-gradient(90deg, var(--gold-400), var(--gold-500) 45%, rgba(185, 154, 96, 0.3) 78%, transparent)
     left bottom / 100% 1px no-repeat;
@@ -1296,11 +1296,11 @@ export default {
   position: absolute;
   left: 0;
   bottom: -2px;
-  width: 5px;
-  height: 5px;
+  width: calc(5px * var(--ui-scale));
+  height: calc(5px * var(--ui-scale));
   transform: rotate(45deg);
   background: var(--gold-400);
-  box-shadow: 0 0 6px var(--gold-glow);
+  box-shadow: 0 0 calc(6px * var(--ui-scale)) var(--gold-glow);
 }
 
 /* The plate's entrance (webclient-mode-transitions D4): it takes its row at
@@ -1340,7 +1340,7 @@ export default {
   font-family: var(--f-display);
   font-size: 0.86em;
   letter-spacing: 0.14em;
-  text-shadow: 0 0 14px var(--gold-glow), 0 1px 2px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 0 calc(14px * var(--ui-scale)) var(--gold-glow), 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .message-window__plate-bond {

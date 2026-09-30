@@ -379,8 +379,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(svg1.attributes("width"))).toBe(208);
       expect(Number(svg1.attributes("height"))).toBe(208);
       expect(svg1.attributes("viewBox")).toBe("0 0 208 208");
-      expect(svg1.attributes("style")).toContain("width: 208px");
-      expect(svg1.attributes("style")).toContain("height: 208px");
+      expect(svg1.attributes("style")).toContain("width: calc(208px * var(--ui-scale, 1))");
+      expect(svg1.attributes("style")).toContain("height: calc(208px * var(--ui-scale, 1))");
       const pattern1 = wNoGateways.find("defs pattern");
       expect(Number(pattern1.attributes("width"))).toBe(59);
       expect(Number(pattern1.attributes("height"))).toBe(59);
@@ -394,8 +394,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(svg2.attributes("width"))).toBe(208);
       expect(Number(svg2.attributes("height"))).toBe(208);
       expect(svg2.attributes("viewBox")).toBe("0 0 208 208");
-      expect(svg2.attributes("style")).toContain("width: 208px");
-      expect(svg2.attributes("style")).toContain("height: 208px");
+      expect(svg2.attributes("style")).toContain("width: calc(208px * var(--ui-scale, 1))");
+      expect(svg2.attributes("style")).toContain("height: calc(208px * var(--ui-scale, 1))");
       const pattern2 = wSingle.find("defs pattern");
       expect(Number(pattern2.attributes("width"))).toBe(60);
       expect(Number(pattern2.attributes("height"))).toBe(60);

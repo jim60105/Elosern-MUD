@@ -6,7 +6,7 @@
    `.elosern-root`, so the story and the live client render alike. */
 .character-status-drawer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px * var(--ui-scale), 100%), 1fr));
   align-items: start;
   gap: var(--sp-4);
   box-sizing: border-box;
@@ -42,7 +42,7 @@
 
 .character-status-drawer__heading {
   display: grid;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   min-width: 0;
 }
 
@@ -61,7 +61,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px var(--sp-3);
+  gap: calc(6px * var(--ui-scale)) var(--sp-3);
   margin: 0;
 }
 
@@ -91,7 +91,7 @@
 }
 
 .character-status-drawer__action {
-  min-height: 36px;
+  min-height: calc(36px * var(--ui-scale));
   padding: 0 var(--sp-4);
   color: var(--paper-200);
   background: var(--ink-780);
@@ -123,7 +123,7 @@
   gap: var(--sp-2);
   min-width: 0;
   margin: 0;
-  padding: 14px var(--sp-4) var(--sp-4);
+  padding: calc(14px * var(--ui-scale)) var(--sp-4) var(--sp-4);
   border: var(--line);
   border-radius: var(--radius);
   background: linear-gradient(130deg, #1d1f23, #111317);
@@ -145,7 +145,7 @@
    wrap in a wide line instead of a tall narrow tile. */
 .character-status-drawer__statgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(150px * var(--ui-scale)), 1fr));
   align-items: start;
   gap: var(--sp-2);
 }
@@ -154,7 +154,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 10px;
+  gap: calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale));
   min-width: 0;
   padding: var(--sp-2) var(--sp-3);
   background: var(--ink-860);
@@ -170,7 +170,7 @@
 .character-status-drawer__statrow-key {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   min-width: 0;
   font-size: var(--text-md);
   color: var(--paper-200);
@@ -193,19 +193,19 @@
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
   min-width: 0;
 }
 
 .character-status-drawer__layer {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
   min-width: 0;
   max-width: 100%;
   font-size: var(--text-xs);
-  padding: 1px 8px;
-  border-radius: 99px;
+  padding: 1px calc(8px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   border: 1px solid var(--ink-600);
   background: var(--ink-780);
   color: var(--paper-300);
@@ -249,9 +249,9 @@
 
 .character-status-drawer__vital-track {
   flex-basis: 100%;
-  height: 6px;
+  height: calc(6px * var(--ui-scale));
   background: var(--ink-800);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   display: block;
 }
@@ -259,7 +259,7 @@
 .character-status-drawer__vital-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--vit-hp);
 }
 
@@ -279,19 +279,19 @@
 .character-status-drawer__pillrow {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: calc(7px * var(--ui-scale));
 }
 
 .character-status-drawer__pill {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0 5px;
+  gap: 0 calc(5px * var(--ui-scale));
   min-width: 0;
   max-width: 100%;
   font-size: var(--text-xs);
-  padding: 3px 11px;
-  border-radius: 99px;
+  padding: calc(3px * var(--ui-scale)) calc(11px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   border: 1px solid var(--ink-600);
   background: var(--ink-780);
   color: var(--paper-300);
@@ -306,8 +306,8 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0 5px;
-  margin-left: 5px;
+  gap: 0 calc(5px * var(--ui-scale));
+  margin-left: calc(5px * var(--ui-scale));
   font-family: var(--f-num);
   font-size: var(--text-xs);
   color: var(--paper-500);
@@ -426,7 +426,7 @@
    only; they never restate the control chrome. */
 .character-status-drawer__persona {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px * var(--ui-scale), 100%), 1fr));
   align-items: start;
   gap: var(--sp-4) var(--sp-6);
 }
@@ -450,7 +450,7 @@
 }
 
 .character-status-drawer__persona-edit {
-  margin-top: 0.25rem;
+  margin-top: calc(4px * var(--ui-scale));
 }
 
 .character-status-drawer__persona-editor textarea {
@@ -468,8 +468,8 @@
 
 .character-status-drawer__persona-editor-buttons {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
+  gap: calc(8px * var(--ui-scale));
+  margin-top: calc(4px * var(--ui-scale));
 }
 
 /* The design's 親密狀態 disclosure: the native `<details>` header carries the
@@ -480,7 +480,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-  margin-bottom: 7px;
+  margin-bottom: calc(7px * var(--ui-scale));
   color: var(--paper-100);
   cursor: pointer;
   list-style: none;
@@ -496,7 +496,7 @@
 }
 
 .character-status-drawer__intimate-hint {
-  margin: 0 0 7px;
+  margin: 0 0 calc(7px * var(--ui-scale));
   color: var(--paper-500);
   font-size: var(--text-sm);
 }

@@ -3,6 +3,11 @@ import "../web/webclient-app/styles/tokens.css";
 import "../web/webclient-app/styles/fonts.css";
 import "../web/webclient-app/styles/app-shell.css";
 import "../web/static/webclient/css/ansi_palette.css";
+import { installUiScale } from "../web/webclient-app/lib/ui_scale.js";
+
+// The live client's chrome factor, so a story viewed above 1080px height
+// renders at the same proportional scale (webclient-proportional-ui-scale).
+installUiScale();
 
 export const decorators = [
   (story, context) => ({

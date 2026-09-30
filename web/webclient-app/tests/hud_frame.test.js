@@ -318,9 +318,9 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
   it("gates the choices anchor to dialogue mode and bounds it above the scene caption row", () => {
     const css = styleBlock("components/HudFrame.vue");
     const anchor = extractRule(css, '.elosern-stage [data-anchor="choices"]');
-    expect(anchor).toMatch(/width: min\(560px, 40%\)/);
-    expect(anchor).toMatch(/left: calc\(50% - min\(280px, 20%\)\)/);
-    expect(anchor).toMatch(/bottom: calc\(var\(--stage-caption-top\) \+ 8px\)/);
+    expect(anchor).toMatch(/width: min\(560px \* var\(--ui-scale\), 40%\)/);
+    expect(anchor).toMatch(/left: calc\(50% - min\(280px \* var\(--ui-scale\), 20%\)\)/);
+    expect(anchor).toMatch(/bottom: calc\(var\(--stage-caption-top\) \+ 8px \* var\(--ui-scale\)\)/);
     expect(anchor).toMatch(/z-index: 4/);
     expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
     const frame = mount(HudFrame, { props: { mode: "dialogue" }, slots: { choices: () => h("div", { class: "probe" }) } });
@@ -383,7 +383,7 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     const css = styleBlock("components/HudFrame.vue");
     expect(css).not.toContain("--dock-h");
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
-    expect(tokens).toContain("--band-h: clamp(260px, 27.8vh, 400px);");
+    expect(tokens).toContain("--band-h: clamp(260px * var(--ui-scale), 27.8vh, 400px * var(--ui-scale));");
     expect(tokens).toContain("--stage-content-bottom: calc(var(--band-h) + var(--command-line-h));");
     expect(tokens).not.toContain("--dock-h");
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
@@ -396,18 +396,18 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     // clears only the command-line row: no band-sized offset on top.
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
     const rule = extractRule(shellCss, ".elosern-root .scene-backdrop .scene-backdrop__caption");
-    expect(rule).toContain("bottom: calc(var(--command-line-h) + 12px);");
-    expect(rule).toContain("left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px);");
+    expect(rule).toContain("bottom: calc(var(--command-line-h) + 12px * var(--ui-scale));");
+    expect(rule).toContain("left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale));");
     // The right side clears the right anchor box, or, while the foe line-up
     // stands (webclient-combat-foes-on-stage), its leftmost foe.
-    expect(rule).toContain("calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px),");
-    expect(rule).toContain("var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px");
+    expect(rule).toContain("calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)),");
+    expect(rule).toContain("var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px * var(--ui-scale)");
     expect(rule).toContain("var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3");
     expect(rule).toContain("transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);");
     expect(shellCss).not.toMatch(/scene-backdrop[^{]*\{[^}]*\d+vh/);
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
     expect(tokens).toContain(
-      "--stage-caption-top: calc(var(--stage-content-bottom) + 12px + var(--scene-caption-h));",
+      "--stage-caption-top: calc(var(--stage-content-bottom) + 12px * var(--ui-scale) + var(--scene-caption-h));",
     );
   });
 

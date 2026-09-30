@@ -36,8 +36,8 @@ const emit = defineEmits(["action"]);
    renderer (one card renderer, no divergence). */
 .choice-card-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(210px * var(--ui-scale), 100%), 1fr));
+  gap: calc(12px * var(--ui-scale));
   min-width: 0;
 }
 </style>

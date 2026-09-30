@@ -345,7 +345,7 @@ defineExpose({ focus });
     var(--shadow-lg),
     inset 0 0 0 1px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 1px rgba(238, 221, 180, 0.06);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(calc(6px * var(--ui-scale)));
   outline: none;
   pointer-events: auto;
 }
@@ -403,7 +403,7 @@ defineExpose({ focus });
 /* The exits view's quiet caption: it names what the rows now are. */
 .dialogue-choices__caption {
   flex: none;
-  padding: 12px 20px 0;
+  padding: calc(12px * var(--ui-scale)) calc(20px * var(--ui-scale)) 0;
   font: var(--text-xs)/1.4 var(--f-sans);
   letter-spacing: 0.3em;
   color: var(--gold-500);
@@ -411,7 +411,7 @@ defineExpose({ focus });
 }
 
 .dialogue-choices__caption + .dialogue-choices__rows {
-  padding-top: 8px;
+  padding-top: calc(8px * var(--ui-scale));
 }
 
 /* Keyboard focus on the one tab stop: the card keeps its drop shadow (the
@@ -422,7 +422,7 @@ defineExpose({ focus });
   box-shadow:
     var(--shadow-lg),
     0 0 0 1px rgba(228, 200, 142, 0.18),
-    0 0 22px -6px var(--gold-glow),
+    0 0 calc(22px * var(--ui-scale)) calc(-6px * var(--ui-scale)) var(--gold-glow),
     inset 0 0 0 1px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 1px rgba(238, 221, 180, 0.06);
 }
@@ -433,10 +433,10 @@ defineExpose({ focus });
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: clamp(8px, 1.3vh, 14px) 10px clamp(6px, 0.93vh, 10px);
+  padding: clamp(8px * var(--ui-scale), 1.3vh, 14px * var(--ui-scale)) calc(10px * var(--ui-scale)) clamp(6px * var(--ui-scale), 0.93vh, 10px * var(--ui-scale));
   display: flex;
   flex-direction: column;
-  gap: clamp(2px, 0.37vh, 4px);
+  gap: clamp(2px, 0.37vh, 4px * var(--ui-scale));
   scrollbar-color: var(--ink-600) transparent;
   scrollbar-width: thin;
 }
@@ -458,13 +458,13 @@ defineExpose({ focus });
   content: "";
   position: absolute;
   left: 50%;
-  top: -3px;
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
+  top: calc(-3px * var(--ui-scale));
+  width: calc(6px * var(--ui-scale));
+  height: calc(6px * var(--ui-scale));
+  margin-left: calc(-3px * var(--ui-scale));
   transform: rotate(45deg);
   background: var(--gold-400);
-  box-shadow: 0 0 8px var(--gold-glow);
+  box-shadow: 0 0 calc(8px * var(--ui-scale)) var(--gold-glow);
   pointer-events: none;
 }
 
@@ -474,20 +474,20 @@ defineExpose({ focus });
    frame while the list holds keyboard focus. Decorative and pointer-inert. */
 .dialogue-choices__corners {
   position: absolute;
-  inset: 3px;
+  inset: calc(3px * var(--ui-scale));
   z-index: 1;
   pointer-events: none;
   opacity: 0.55;
   --corner: rgba(185, 154, 96, 0.9);
   background:
-    linear-gradient(var(--corner), var(--corner)) top left / 8px 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top left / 1px 8px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top right / 8px 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top right / 1px 8px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom left / 8px 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom left / 1px 8px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom right / 8px 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom right / 1px 8px no-repeat;
+    linear-gradient(var(--corner), var(--corner)) top left / calc(8px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top left / 1px calc(8px * var(--ui-scale)) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top right / calc(8px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) top right / 1px calc(8px * var(--ui-scale)) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom left / calc(8px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom left / 1px calc(8px * var(--ui-scale)) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom right / calc(8px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) bottom right / 1px calc(8px * var(--ui-scale)) no-repeat;
   transition: opacity var(--motion-fast) var(--ease-standard);
 }
 
@@ -500,12 +500,12 @@ defineExpose({ focus });
   flex: none;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: calc(14px * var(--ui-scale));
   box-sizing: border-box;
   /* 44px at the 1080px reference height, 36px at 720px, so the seven rows
      of a four-pick conversation fit the shortest stage unscrolled. */
-  min-height: clamp(36px, 4.075vh, 44px);
-  padding: 4px 14px 4px 26px;
+  min-height: clamp(36px * var(--ui-scale), 4.075vh, 44px * var(--ui-scale));
+  padding: calc(4px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(26px * var(--ui-scale));
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--paper-100);
@@ -521,15 +521,15 @@ defineExpose({ focus });
 
 /* The trailing rows (or the exits' back row) open under a hairline. */
 .dialogue-choices__row--trailing:not(:first-child) {
-  margin-top: 7px;
+  margin-top: calc(7px * var(--ui-scale));
 }
 
 .dialogue-choices__row--trailing:not(:first-child)::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  top: -6px;
+  left: calc(12px * var(--ui-scale));
+  right: calc(12px * var(--ui-scale));
+  top: calc(-6px * var(--ui-scale));
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(185, 154, 96, 0.34), transparent);
   pointer-events: none;
@@ -540,10 +540,10 @@ defineExpose({ focus });
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  width: clamp(24px, 2.593vh, 28px);
-  height: clamp(24px, 2.593vh, 28px);
+  width: clamp(24px * var(--ui-scale), 2.593vh, 28px * var(--ui-scale));
+  height: clamp(24px * var(--ui-scale), 2.593vh, 28px * var(--ui-scale));
   border: 1px solid rgba(185, 154, 96, 0.7);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: rgba(185, 154, 96, 0.08);
   color: var(--gold-400);
   font: var(--text-md)/1 var(--f-mono);
@@ -555,8 +555,8 @@ defineExpose({ focus });
 }
 
 .dialogue-choices__badge-icon {
-  width: 17px;
-  height: 17px;
+  width: calc(17px * var(--ui-scale));
+  height: calc(17px * var(--ui-scale));
 }
 
 .dialogue-choices__text {
@@ -570,7 +570,7 @@ defineExpose({ focus });
    trailing rows are commands, set quieter in the sans face. */
 .dialogue-choices__label {
   font-family: var(--f-serif);
-  font-size: clamp(17px, 1.852vh, 20px);
+  font-size: clamp(17px * var(--ui-scale), 1.852vh, 20px * var(--ui-scale));
   line-height: 1.4;
   color: var(--paper-50);
   overflow-wrap: anywhere;
@@ -579,7 +579,7 @@ defineExpose({ focus });
 
 .dialogue-choices__row:not(.dialogue-choices__row--pick) .dialogue-choices__label {
   font-family: var(--f-sans);
-  font-size: clamp(15px, 1.574vh, 17px);
+  font-size: clamp(15px * var(--ui-scale), 1.574vh, 17px * var(--ui-scale));
   letter-spacing: 0.04em;
   color: var(--paper-300);
 }
@@ -604,8 +604,8 @@ defineExpose({ focus });
 }
 
 .dialogue-choices__badge-icon--leave {
-  width: 14px;
-  height: 14px;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
 }
 
 .dialogue-choices__row[aria-disabled="true"] {
@@ -635,7 +635,7 @@ defineExpose({ focus });
 .dialogue-choices:not(:focus) .dialogue-choices__row--active::before {
   content: "▸";
   position: absolute;
-  left: 9px;
+  left: calc(9px * var(--ui-scale));
   top: 50%;
   transform: translateY(-50%);
   color: var(--gold-500);
@@ -658,7 +658,7 @@ defineExpose({ focus });
 .dialogue-choices:focus .dialogue-choices__row--active::before {
   content: "▸";
   position: absolute;
-  left: 9px;
+  left: calc(9px * var(--ui-scale));
   top: 50%;
   transform: translateY(-50%);
   color: var(--gold-400);

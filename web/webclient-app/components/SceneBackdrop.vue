@@ -510,7 +510,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__placeholder {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--stage-content-bottom) + 12px);
+  bottom: calc(var(--stage-content-bottom) + 12px * var(--ui-scale));
   transform: translateX(-50%);
   z-index: 2;
   display: flex;
@@ -518,7 +518,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-4);
   background: var(--panel);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: 1px solid rgba(202, 183, 138, 0.25);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -539,14 +539,14 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
    events, so it never blocks the stage beside them. */
 .scene-backdrop .scene-backdrop__caption {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--stage-content-bottom) + 12px);
+  left: calc(16px * var(--ui-scale));
+  right: calc(16px * var(--ui-scale));
+  bottom: calc(var(--stage-content-bottom) + 12px * var(--ui-scale));
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   pointer-events: none;
 }
 .scene-backdrop .scene-backdrop__caption > * {
@@ -559,7 +559,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   flex: none;
   margin: 0;
   white-space: nowrap;
-  padding-right: 12px;
+  padding-right: calc(12px * var(--ui-scale));
   border-right: 1px solid rgba(202, 183, 138, 0.3);
   color: var(--warn);
   font-size: var(--text-xs);
@@ -577,13 +577,13 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  column-gap: 12px;
+  column-gap: calc(12px * var(--ui-scale));
   max-width: 100%;
   box-sizing: border-box;
   min-height: var(--scene-caption-h);
-  padding: 5px 6px 5px 14px;
+  padding: calc(5px * var(--ui-scale)) calc(6px * var(--ui-scale)) calc(5px * var(--ui-scale)) calc(14px * var(--ui-scale));
   background: rgba(11, 13, 16, 0.74);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: 1px solid rgba(202, 183, 138, 0.22);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
@@ -609,7 +609,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 
 .scene-backdrop .scene-backdrop__scene-alt {
   flex: 0 1 auto;
-  padding-left: 12px;
+  padding-left: calc(12px * var(--ui-scale));
   border-left: 1px solid rgba(202, 183, 138, 0.3);
   color: var(--paper-500);
   font-size: var(--text-xs);
@@ -636,7 +636,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   line-height: 1.25;
   font-family: var(--f-sans);
   letter-spacing: 0.08em;
-  padding: 2px 9px;
+  padding: 2px calc(9px * var(--ui-scale));
   cursor: pointer;
 }
 
@@ -667,7 +667,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 }
 
 .scene-backdrop .scene-backdrop__fullview-gradient {
-  width: min(960px, 92vw);
+  width: min(960px * var(--ui-scale), 92vw);
   aspect-ratio: 16 / 9;
   background: inherit;
   border-radius: var(--radius);

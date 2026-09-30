@@ -88,19 +88,19 @@ function isDone(row) {
    warms the edge the line hangs from. */
 .obj {
   box-sizing: border-box;
-  height: 32px;
+  height: calc(32px * var(--ui-scale));
   align-self: flex-end;
   max-width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 11px 0 12px;
+  gap: calc(8px * var(--ui-scale));
+  padding: 0 calc(11px * var(--ui-scale)) 0 calc(12px * var(--ui-scale));
   white-space: nowrap;
   overflow: hidden;
   background: linear-gradient(270deg, #bda47714, transparent 60%), var(--panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: inset 0 1px 0 #ffffff06, var(--shadow);
@@ -110,7 +110,7 @@ function isDone(row) {
 
 .obj__label {
   flex: none;
-  padding-right: 9px;
+  padding-right: calc(9px * var(--ui-scale));
   border-right: 1px solid #bda47740;
   font-size: var(--text-xs);
   line-height: 1.2;
@@ -120,10 +120,10 @@ function isDone(row) {
 
 .bx {
   flex: none;
-  width: 13px;
-  height: 13px;
+  width: calc(13px * var(--ui-scale));
+  height: calc(13px * var(--ui-scale));
   box-sizing: border-box;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--ink-600);
   display: grid;
   place-items: center;
@@ -136,8 +136,8 @@ function isDone(row) {
 }
 
 .bx svg {
-  width: 9px;
-  height: 9px;
+  width: calc(9px * var(--ui-scale));
+  height: calc(9px * var(--ui-scale));
   color: var(--buff);
 }
 
@@ -161,9 +161,9 @@ function isDone(row) {
 
 .n {
   flex: none;
-  padding: 2px 6px;
+  padding: 2px calc(6px * var(--ui-scale));
   border: 1px solid #bda47738;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   font-family: var(--f-num);
   font-size: var(--text-xs);
   line-height: 1.2;

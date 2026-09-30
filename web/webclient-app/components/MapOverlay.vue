@@ -284,7 +284,7 @@ function handleMove(payload) {
 <style scoped>
 .map-overlay-body {
   height: 100%;
-  min-height: 360px;
+  min-height: calc(360px * var(--ui-scale));
   font-size: var(--text-md);
   font-variant-numeric: normal;
 }
@@ -306,7 +306,7 @@ function handleMove(payload) {
    below the fold. */
 .map-overlay__content {
   display: grid;
-  grid-template-rows: auto minmax(240px, 1fr);
+  grid-template-rows: auto minmax(calc(240px * var(--ui-scale)), 1fr);
   /* The remembered list is an implicit third row, so a payload without it
      leaves no trailing gap under the viewport. */
   grid-auto-rows: auto;
@@ -350,7 +350,7 @@ function handleMove(payload) {
   border: var(--line);
   border-radius: var(--radius);
   background: var(--map-canvas-lo);
-  box-shadow: inset 0 0 80px #0006;
+  box-shadow: inset 0 0 calc(80px * var(--ui-scale)) #0006;
 }
 
 /* Four fine gold corner brackets inside the frame (webclient-map-legibility):
@@ -359,19 +359,19 @@ function handleMove(payload) {
 .map-overlay__viewport::after {
   content: "";
   position: absolute;
-  inset: 5px;
+  inset: calc(5px * var(--ui-scale));
   z-index: 1;
   pointer-events: none;
   --corner: linear-gradient(var(--gold-600), var(--gold-600));
   background:
-    var(--corner) top left / 12px 1px no-repeat,
-    var(--corner) top left / 1px 12px no-repeat,
-    var(--corner) top right / 12px 1px no-repeat,
-    var(--corner) top right / 1px 12px no-repeat,
-    var(--corner) bottom left / 12px 1px no-repeat,
-    var(--corner) bottom left / 1px 12px no-repeat,
-    var(--corner) bottom right / 12px 1px no-repeat,
-    var(--corner) bottom right / 1px 12px no-repeat;
+    var(--corner) top left / calc(12px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) top left / 1px calc(12px * var(--ui-scale)) no-repeat,
+    var(--corner) top right / calc(12px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) top right / 1px calc(12px * var(--ui-scale)) no-repeat,
+    var(--corner) bottom left / calc(12px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) bottom left / 1px calc(12px * var(--ui-scale)) no-repeat,
+    var(--corner) bottom right / calc(12px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) bottom right / 1px calc(12px * var(--ui-scale)) no-repeat;
 }
 
 .map-overlay__viewport :deep(.local-map__lattice--canvas) {
@@ -384,25 +384,25 @@ function handleMove(payload) {
 .map-overlay__toolbar {
   position: absolute;
   /* Clear of the frame's 5px + 12px corner bracket. */
-  top: 20px;
-  right: 20px;
+  top: calc(20px * var(--ui-scale));
+  right: calc(20px * var(--ui-scale));
   z-index: 2;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
+  padding: calc(3px * var(--ui-scale));
   border: var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(8px * var(--ui-scale)));
   box-shadow: var(--shadow);
 }
 
 .map-overlay__toolbar-sep {
   width: 1px;
-  height: 16px;
-  margin: 0 3px;
+  height: calc(16px * var(--ui-scale));
+  margin: 0 calc(3px * var(--ui-scale));
   background: var(--ink-700);
 }
 
@@ -413,11 +413,11 @@ function handleMove(payload) {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  min-width: 30px;
-  height: 30px;
+  min-width: calc(30px * var(--ui-scale));
+  height: calc(30px * var(--ui-scale));
   padding: 0 var(--sp-2);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--paper-200);
   font-family: var(--f-sans);
@@ -434,7 +434,7 @@ function handleMove(payload) {
    pair reads as symbols rather than punctuation. */
 .map-overlay__view-button[data-testid="map-overlay-zoom-out"],
 .map-overlay__view-button[data-testid="map-overlay-zoom-in"] {
-  font-size: 17px;
+  font-size: calc(17px * var(--ui-scale));
   letter-spacing: 0;
 }
 
@@ -463,8 +463,8 @@ function handleMove(payload) {
    layout space. */
 .map-overlay__legend-popover {
   position: absolute;
-  top: calc(20px + 44px);
-  right: 20px;
+  top: calc(20px * var(--ui-scale) + 44px * var(--ui-scale));
+  right: calc(20px * var(--ui-scale));
   z-index: 2;
   max-width: calc(100% - 2 * var(--sp-3));
   box-sizing: border-box;
@@ -472,8 +472,8 @@ function handleMove(payload) {
   border: var(--line);
   border-radius: var(--radius);
   background: var(--panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(8px * var(--ui-scale)));
   box-shadow: var(--shadow-lg);
 }
 
@@ -502,9 +502,9 @@ function handleMove(payload) {
 
 .local-map__legend-chip {
   flex: none;
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
+  width: calc(11px * var(--ui-scale));
+  height: calc(11px * var(--ui-scale));
+  border-radius: var(--radius-sm);
 }
 
 .local-map__legend-chip--current {
@@ -563,7 +563,7 @@ function handleMove(payload) {
 .map-overlay__remembered-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 
 .map-overlay__remembered-marker rect {
@@ -578,5 +578,12 @@ function handleMove(payload) {
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   letter-spacing: 0.04em;
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.map-overlay__remembered-marker {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
 }
 </style>

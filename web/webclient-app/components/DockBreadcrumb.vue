@@ -66,7 +66,7 @@ function onBack() {
   flex-wrap: wrap;
   min-width: 0;
   overflow-wrap: anywhere;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   flex: none;
   font-size: var(--text-xs);
   color: var(--paper-500);
@@ -82,9 +82,9 @@ function onBack() {
   color: var(--paper-300);
   font-size: var(--text-lg);
   line-height: 1;
-  min-width: 36px;
-  min-height: 36px;
-  padding: 6px;
+  min-width: calc(36px * var(--ui-scale));
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale));
   border-radius: var(--radius-sm);
   cursor: pointer;
 }

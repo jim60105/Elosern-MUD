@@ -341,7 +341,7 @@ function castText(row) {
 
 .skill-book__tab {
   flex: 1;
-  min-height: 30px;
+  min-height: calc(30px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-3);
   text-align: center;
   color: var(--paper-500);
@@ -371,11 +371,11 @@ function castText(row) {
 .skill-book__search-wrap {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
+  gap: calc(9px * var(--ui-scale));
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
   background: var(--ink-820);
   border: 1px solid var(--ink-600);
-  border-radius: 9px;
+  border-radius: var(--radius);
 }
 
 .skill-book__search-wrap svg {
@@ -481,8 +481,8 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
 
 .skill-book__group-dot {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: calc(7px * var(--ui-scale));
+  height: calc(7px * var(--ui-scale));
   border-radius: 2px;
   border: 1px solid var(--ink-700);
 }
@@ -553,8 +553,8 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   letter-spacing: .04em;
   color: var(--ok);
   border: 1px solid rgba(112, 150, 122, 0.5);
-  border-radius: 4px;
-  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  padding: 0 calc(4px * var(--ui-scale));
 }
 
 /* The reference's `.srow .prf`: passive-tab rows carry a visible 被動 badge
@@ -573,5 +573,12 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   line-height: 1.6;
   color: var(--paper-500);
   margin-bottom: var(--sp-1);
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.skill-book__search-wrap svg {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
 }
 </style>

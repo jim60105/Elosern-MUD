@@ -55,7 +55,7 @@ const controlSection = controlsReferenceSection();
 .help-overlay-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: calc(20px * var(--ui-scale));
   font-family: var(--f-sans);
 }
 
@@ -63,8 +63,8 @@ const controlSection = controlsReferenceSection();
    rows; narrower workspaces fold them. */
 .help-controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
-  gap: 20px 28px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px * var(--ui-scale)), 1fr));
+  gap: calc(20px * var(--ui-scale)) calc(28px * var(--ui-scale));
   align-items: start;
 }
 
@@ -76,8 +76,8 @@ const controlSection = controlsReferenceSection();
    use, fading out to the right. */
 .help-controls__title {
   position: relative;
-  margin: 0 0 10px;
-  padding: 0 0 10px 18px;
+  margin: 0 0 calc(10px * var(--ui-scale));
+  padding: 0 0 calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale));
   font-family: var(--f-serif);
   font-size: var(--text-xl);
   font-weight: 600;
@@ -90,8 +90,8 @@ const controlSection = controlsReferenceSection();
   position: absolute;
   left: 2px;
   top: 0.62em;
-  width: 7px;
-  height: 7px;
+  width: calc(7px * var(--ui-scale));
+  height: calc(7px * var(--ui-scale));
   border: 1px solid var(--gold-500);
   transform: rotate(45deg);
 }
@@ -114,7 +114,7 @@ const controlSection = controlsReferenceSection();
 }
 
 .help-controls__row {
-  padding: 12px 4px 13px;
+  padding: calc(12px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(13px * var(--ui-scale));
   border-bottom: 1px solid var(--ink-700);
 }
 
@@ -126,26 +126,26 @@ const controlSection = controlsReferenceSection();
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
+  gap: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale));
 }
 
 .help-controls__keys {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
 }
 
 /* A key cap: an ink key with a gold legend and a heavier bottom edge. */
 .help-controls__key {
-  min-width: 26px;
-  padding: 2px 7px 3px;
+  min-width: calc(26px * var(--ui-scale));
+  padding: 2px calc(7px * var(--ui-scale)) calc(3px * var(--ui-scale));
   text-align: center;
   color: var(--gold-300);
   background: var(--ink-860);
   border: 1px solid var(--ink-600);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-family: var(--f-mono);
   font-size: var(--text-sm);
   line-height: 1.4;
@@ -172,7 +172,7 @@ const controlSection = controlsReferenceSection();
 }
 
 .help-controls__detail {
-  margin: 6px 0 0;
+  margin: calc(6px * var(--ui-scale)) 0 0;
   font-size: var(--text-md);
   line-height: 1.75;
   color: var(--paper-300);
@@ -180,7 +180,7 @@ const controlSection = controlsReferenceSection();
 
 .help-controls__gamehelp {
   margin: 0;
-  padding: 14px 18px;
+  padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale));
   color: var(--paper-300);
   border: 1px solid var(--ink-700);
   border-left: 2px solid var(--gold-500);
@@ -191,11 +191,11 @@ const controlSection = controlsReferenceSection();
 }
 
 .help-controls__command {
-  padding: 1px 6px;
+  padding: 1px calc(6px * var(--ui-scale));
   color: var(--gold-400);
   background: var(--ink-900);
   border: 1px solid var(--ink-600);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--f-mono);
   font-size: var(--text-sm);
 }

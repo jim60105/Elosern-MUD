@@ -183,15 +183,15 @@ function gestureFor(participant) {
 /* Depth: a foe that stands in front of another casts a soft shadow onto it,
    so overlapping figures separate even when their art shares a backdrop. */
 .foe-lineup__slot--before .reference-artwork {
-  filter: drop-shadow(-14px 0 18px rgba(4, 3, 6, 0.55));
+  filter: drop-shadow(calc(-14px * var(--ui-scale)) 0 calc(18px * var(--ui-scale)) rgba(4, 3, 6, 0.55));
 }
 
 
 /* The placeholder at the slot's scale: the ring and the initial shrink with
    the figure, so a back foe's placeholder never looks larger than its body. */
 .foe-lineup .stage-actor .reference-artwork__placeholder-glyph {
-  width: calc(clamp(88px, 11vh, 132px) * var(--foe-scale, 1));
-  font-size: calc(clamp(44px, 5.6vh, 66px) * var(--foe-scale, 1));
+  width: calc(clamp(88px * var(--ui-scale), 11vh, 132px * var(--ui-scale)) * var(--foe-scale, 1));
+  font-size: calc(clamp(44px * var(--ui-scale), 5.6vh, 66px * var(--ui-scale)) * var(--foe-scale, 1));
 }
 .foe-lineup .stage-actor .reference-artwork__placeholder-label {
   font-size: calc(var(--text-md) * max(0.86, var(--foe-scale, 1)));
@@ -207,13 +207,13 @@ function gestureFor(participant) {
 .foe-lineup__gauge {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--command-line-h, 44px) + 12px + (var(--scene-caption-h, 34px) - 8px) / 2 - var(--actor-h) * var(--foe-lift, 0));
-  width: clamp(72px, 44%, 168px);
+  bottom: calc(var(--command-line-h, calc(44px * var(--ui-scale))) + 12px * var(--ui-scale) + (var(--scene-caption-h, calc(34px * var(--ui-scale))) - calc(8px * var(--ui-scale))) / 2 - var(--actor-h) * var(--foe-lift, 0));
+  width: clamp(72px * var(--ui-scale), 44%, 168px * var(--ui-scale));
 }
 .foe-lineup__name {
   transform: translateX(-50%);
-  margin-bottom: 13px;
-  padding: 2px 4px;
+  margin-bottom: calc(13px * var(--ui-scale));
+  padding: 2px calc(4px * var(--ui-scale));
   box-sizing: border-box;
   background: rgba(8, 7, 10, 0.88);
   color: var(--paper-50);
@@ -225,22 +225,22 @@ function gestureFor(participant) {
   border-bottom: 2px solid transparent;
 }
 .foe-lineup__slot[data-target="true"] .foe-lineup__name {
-  border-inline: 3px solid var(--paper-50);
+  border-inline: calc(3px * var(--ui-scale)) solid var(--paper-50);
 }
 .foe-lineup__slot[data-acting="true"] .foe-lineup__name {
-  border-bottom: 3px double var(--paper-50);
+  border-bottom: calc(3px * var(--ui-scale)) double var(--paper-50);
 }
 .foe-lineup__gauge {
-  height: 8px;
+  height: calc(8px * var(--ui-scale));
   box-sizing: border-box;
   transform: translateX(-50%);
   padding: 1px;
   border: 1px solid rgba(202, 183, 138, 0.42);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: rgba(8, 7, 10, 0.82);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 3px 10px rgba(0, 0, 0, 0.65);
+    0 calc(3px * var(--ui-scale)) calc(10px * var(--ui-scale)) rgba(0, 0, 0, 0.65);
   overflow: hidden;
 }
 .foe-lineup__ghost,
@@ -250,7 +250,7 @@ function gestureFor(participant) {
   bottom: 1px;
   left: 1px;
   max-width: calc(100% - 2px);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
 }
 .foe-lineup__ghost {
   background: rgba(244, 226, 200, 0.55);

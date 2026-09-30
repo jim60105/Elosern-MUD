@@ -403,8 +403,8 @@ defineExpose({ focusField });
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  gap: calc(10px * var(--ui-scale));
+  padding: 0 calc(14px * var(--ui-scale));
   background: linear-gradient(0deg, rgba(11, 9, 13, 0.96), rgba(18, 15, 22, 0.9));
   border-top: 1px solid rgba(143, 113, 60, 0.4);
 }
@@ -414,12 +414,12 @@ defineExpose({ focusField });
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
   background: var(--panel-solid);
   border: var(--line);
   border-radius: var(--radius-sm);
-  padding: 0 10px;
-  height: 34px;
+  padding: 0 calc(10px * var(--ui-scale));
+  height: calc(34px * var(--ui-scale));
 }
 
 /* One focus frame (webclient-band-material-pass): the field's own border
@@ -427,7 +427,7 @@ defineExpose({ focusField });
    the textarea and the send button draw no second ring of their own. */
 .cmdfield:focus-within {
   border-color: var(--gold-400);
-  box-shadow: 0 0 0 1px var(--gold-400), 0 0 14px -4px var(--gold-glow);
+  box-shadow: 0 0 0 1px var(--gold-400), 0 0 calc(14px * var(--ui-scale)) calc(-4px * var(--ui-scale)) var(--gold-glow);
 }
 
 /* The prompt chevron and the prompt line are prose-scale targets (design
@@ -458,11 +458,11 @@ defineExpose({ focusField });
   box-sizing: border-box;
   flex: 1 1 auto;
   resize: none;
-  height: 34px;
-  max-height: 34px;
+  height: calc(34px * var(--ui-scale));
+  max-height: calc(34px * var(--ui-scale));
   /* A 20px line centred in the 34px field. */
-  padding: 7px 8px;
-  line-height: 20px;
+  padding: calc(7px * var(--ui-scale)) calc(8px * var(--ui-scale));
+  line-height: calc(20px * var(--ui-scale));
   font-family: var(--f-mono);
   font-size: var(--text-sm);
   color: var(--paper-50);
@@ -486,8 +486,8 @@ defineExpose({ focusField });
 .inputsend {
   box-sizing: border-box;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: calc(34px * var(--ui-scale));
+  height: calc(34px * var(--ui-scale));
   margin: 0;
   display: grid;
   place-items: center;
@@ -529,8 +529,8 @@ defineExpose({ focusField });
 }
 
 .hist button {
-  width: 26px;
-  height: 26px;
+  width: calc(26px * var(--ui-scale));
+  height: calc(26px * var(--ui-scale));
   display: grid;
   place-items: center;
   color: var(--paper-500);
@@ -546,7 +546,7 @@ defineExpose({ focusField });
 }
 
 .hist .ic {
-  width: 16px;
-  height: 16px;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
 }
 </style>

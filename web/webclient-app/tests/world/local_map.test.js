@@ -380,8 +380,8 @@ describe("LocalMap (B4 world family)", () => {
     expect(cx).toBeCloseTo(vb[0] + vb[2] / 2, 6);
     expect(cy).toBeCloseTo(vb[1] + vb[3] / 2, 6);
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: 208px");
-    expect(style).toContain("height: 208px");
+    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
   });
 
   // ---------------------------------------------------------------------
@@ -393,8 +393,8 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap();
     const svg = w.get("svg.local-map__lattice");
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: 208px");
-    expect(style).toContain("height: 208px");
+    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
     expect(Number(svg.attributes("width"))).toBe(208);
     expect(Number(svg.attributes("height"))).toBe(208);
   });
@@ -403,8 +403,8 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE) });
     const svg = w.get("svg.local-map__lattice");
     const style = w.get("svg.local-map__lattice").attributes("style") ?? "";
-    expect(style).toContain("width: 208px");
-    expect(style).toContain("height: 208px");
+    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
     expect(Number(svg.attributes("width"))).toBe(208);
     expect(Number(svg.attributes("height"))).toBe(208);
     const pattern = w.find("defs pattern");

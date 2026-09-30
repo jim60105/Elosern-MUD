@@ -392,8 +392,8 @@ watch(
 }
 
 .dock-menu__card-nav {
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
   color: var(--paper-300);
   background: var(--panel-hi);
   border: var(--line);
@@ -416,12 +416,12 @@ watch(
 .dock-menu__command {
   position: relative;
   display: grid;
-  grid-template-columns: 18px auto minmax(0, 1fr);
+  grid-template-columns: calc(18px * var(--ui-scale)) auto minmax(0, 1fr);
   align-items: center;
-  column-gap: 12px;
+  column-gap: calc(12px * var(--ui-scale));
   box-sizing: border-box;
-  min-height: 32px;
-  padding: 2px 12px 2px 24px;
+  min-height: calc(32px * var(--ui-scale));
+  padding: 2px calc(12px * var(--ui-scale)) 2px calc(24px * var(--ui-scale));
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -449,7 +449,7 @@ watch(
 .dock-menu__command--on::before {
   content: "▸";
   position: absolute;
-  left: 8px;
+  left: calc(8px * var(--ui-scale));
   top: 50%;
   transform: translateY(-50%);
   color: var(--gold-400);
@@ -457,8 +457,8 @@ watch(
   font-size: var(--text-sm);
 }
 .dock-menu__command-icon {
-  width: 18px;
-  height: 18px;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
   color: var(--gold-500);
 }
 .dock-menu__command--on .dock-menu__command-icon {
@@ -468,8 +468,8 @@ watch(
    column with a small lozenge, so every label starts on one edge. */
 .dock-menu__command-mark {
   justify-self: center;
-  width: 5px;
-  height: 5px;
+  width: calc(5px * var(--ui-scale));
+  height: calc(5px * var(--ui-scale));
   border: 1px solid var(--gold-600);
   transform: rotate(45deg);
 }
@@ -525,28 +525,28 @@ watch(
 /* CARDS (task 5.7): the `.sug` card in row mode (OptionCard). */
 .dock-menu__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(210px * var(--ui-scale), 100%), 1fr));
+  gap: calc(10px * var(--ui-scale));
 }
 
 /* SKILLS (task 6.4): the draft's `.sk` rows beside the detail pane. */
 .dock-menu__skills {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: calc(5px * var(--ui-scale));
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: calc(4px * var(--ui-scale));
 }
 .dock-menu__skill {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   overflow-wrap: anywhere;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   background: var(--ink-780);
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 7px 10px;
+  border-radius: var(--radius);
+  padding: calc(7px * var(--ui-scale)) calc(10px * var(--ui-scale));
   font-size: var(--text-sm);
   color: var(--paper-100);
   cursor: pointer;
@@ -574,12 +574,12 @@ watch(
 .dock-menu__targets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 .dock-menu__token {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
+  width: calc(38px * var(--ui-scale));
+  height: calc(38px * var(--ui-scale));
+  border-radius: var(--radius);
   display: grid;
   place-items: center;
   font-family: var(--f-mono);
@@ -604,14 +604,14 @@ watch(
    `mp_cost`, ascending, `1` preselected. */
 .dock-menu__scales {
   display: flex;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 .dock-menu__scale {
   flex: 1;
   font-family: var(--f-num);
   font-size: var(--text-xs);
-  padding: 7px;
-  border-radius: 8px;
+  padding: calc(7px * var(--ui-scale));
+  border-radius: var(--radius);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   color: var(--paper-300);
@@ -637,11 +637,11 @@ watch(
 .dock-menu__confirm-warn {
   background: var(--panel);
   border: var(--line);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: var(--radius);
+  padding: calc(12px * var(--ui-scale));
 }
 .dock-menu__confirm-title {
-  margin: 0 0 6px;
+  margin: 0 0 calc(6px * var(--ui-scale));
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--seal-400);
@@ -654,14 +654,14 @@ watch(
 .dock-menu__confirm-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: calc(8px * var(--ui-scale));
+  margin-top: calc(10px * var(--ui-scale));
 }
 .dock-menu__confirm-btn {
-  padding: 8px 16px;
+  padding: calc(8px * var(--ui-scale)) calc(16px * var(--ui-scale));
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--paper-300);
   cursor: pointer;
   font-size: var(--text-sm);
@@ -682,7 +682,7 @@ watch(
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 38px;
+  min-height: calc(38px * var(--ui-scale));
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-3);
   color: var(--paper-100);
@@ -736,7 +736,7 @@ watch(
 /* The detail pane keeps the preserved testid (exploration-detail /
    combat-detail). */
 .dock-detail {
-  flex: 0 0 220px;
+  flex: 0 0 calc(220px * var(--ui-scale));
   padding: var(--sp-2) var(--sp-3);
   background: var(--panel);
   border: var(--line);
@@ -770,15 +770,15 @@ watch(
 .dock-detail--command {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: calc(8px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) calc(14px * var(--ui-scale));
   background: linear-gradient(180deg, rgba(24, 25, 29, 0.78), rgba(12, 13, 16, 0.55));
   border: 1px solid rgba(185, 154, 96, 0.22);
 }
 .dock-detail__label--command {
   position: relative;
   margin: 0;
-  padding-bottom: 8px;
+  padding-bottom: calc(8px * var(--ui-scale));
   font-family: var(--f-serif);
   font-size: var(--text-lg);
   font-weight: 500;
@@ -790,7 +790,7 @@ watch(
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 28px;
+  width: calc(28px * var(--ui-scale));
   height: 1px;
   background: linear-gradient(90deg, var(--gold-400), transparent);
 }
@@ -822,8 +822,8 @@ watch(
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  padding: 0 calc(4px * var(--ui-scale));
   color: var(--paper-300);
 }
 </style>

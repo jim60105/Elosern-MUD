@@ -516,16 +516,18 @@ export function useMapLatticeGeometry(props) {
       .filter(Boolean),
   );
 
-  // Canvas cap: the caps come from the caller — the island passes its
-  // dynamically measured height budget down, the overlay passes `null` for no
-  // height cap and fills the body width — bound as inline styles so the
-  // caller controls the layout variant.
-  //
+  // Canvas box: the island passes its fixed reference square (`canvasSize`,
+  // CSS px at the 1080p reference), the overlay passes `null` and fills its
+  // body — bound as inline styles so the caller controls the layout variant.
+  // The square's outward box is multiplied once by the desktop chrome factor
+  // (webclient-proportional-ui-scale); the viewBox and every user-unit
+  // coordinate stay as computed, so the drawing only magnifies uniformly.
   const latticeStyle = computed(() => {
     if (props.canvasSize != null) {
+      const side = `calc(${Number(props.canvasSize)}px * var(--ui-scale, 1))`;
       return {
-        width: props.canvasSize + "px",
-        height: props.canvasSize + "px",
+        width: side,
+        height: side,
       };
     }
     if (props.fitView) {

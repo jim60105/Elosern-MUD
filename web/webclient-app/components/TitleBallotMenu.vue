@@ -93,7 +93,7 @@ function declineBallot() {
   gap: var(--sp-3);
   box-sizing: border-box;
   min-width: 0;
-  padding: 18px;
+  padding: calc(18px * var(--ui-scale));
   background: var(--panel);
   border: var(--line);
   border-radius: var(--radius);
@@ -120,7 +120,7 @@ function declineBallot() {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  padding: 14px;
+  padding: calc(14px * var(--ui-scale));
   overflow-wrap: anywhere;
   border: var(--line);
   border-radius: var(--radius-sm);
@@ -149,8 +149,8 @@ function declineBallot() {
 
 .title-ballot__accept {
   align-self: auto;
-  min-height: 36px;
-  padding: 6px 14px;
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(14px * var(--ui-scale));
   color: var(--paper-50);
   background: transparent;
   border: 1px solid var(--gold-500);
@@ -166,8 +166,8 @@ function declineBallot() {
 
 .title-ballot__decline {
   align-self: flex-start;
-  min-height: 36px;
-  padding: 6px 14px;
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(14px * var(--ui-scale));
   color: var(--paper-500);
   background: transparent;
   border: 1px dashed var(--ink-700);
@@ -179,6 +179,6 @@ function declineBallot() {
 
 .title-ballot button:focus-visible {
   outline: 2px solid var(--gold-400);
-  outline-offset: 3px;
+  outline-offset: calc(3px * var(--ui-scale));
 }
 </style>

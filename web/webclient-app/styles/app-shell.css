@@ -42,7 +42,7 @@ body {
   z-index: 7;
   background: linear-gradient(110deg, #131518f5, #0c0e11fa);
   border-bottom: 1px solid #bda47740;
-  box-shadow: 0 5px 24px #0006;
+  box-shadow: 0 calc(5px * var(--ui-scale)) calc(24px * var(--ui-scale)) #0006;
   pointer-events: none;
 }
 .elosern-root .topbar-brand {
@@ -60,8 +60,8 @@ body {
   flex-wrap: wrap;
   align-content: center;
   align-items: baseline;
-  gap: 12px;
-  padding: 0 24px;
+  gap: calc(12px * var(--ui-scale));
+  padding: 0 calc(24px * var(--ui-scale));
   background: none;
   border: 0;
   border-radius: 0;
@@ -88,10 +88,10 @@ body {
 .elosern-root .topbar-right {
   top: 0;
   height: var(--header-h);
-  right: 18px;
-  max-width: calc(var(--right-column) + 50px);
+  right: calc(18px * var(--ui-scale));
+  max-width: calc(var(--right-column) + 50px * var(--ui-scale));
   z-index: 8;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
 }
 .elosern-root .topbar-meta {
   border: 0;
@@ -104,7 +104,7 @@ body {
 }
 .elosern-root .topbar-meta .meta-conn { font: var(--text-xs) var(--f-sans); }
 .elosern-root .topbar-right > :has(.character-switcher) { min-width: 0; }
-.elosern-root .stage-vignette { box-shadow: inset 0 -150px 160px #0b0d10, inset 0 0 100px #0008; }
+.elosern-root .stage-vignette { box-shadow: inset 0 calc(-150px * var(--ui-scale)) calc(160px * var(--ui-scale)) #0b0d10, inset 0 0 calc(100px * var(--ui-scale)) #0008; }
 /* The backdrop's box is the stage box: from the top band's lower edge to
    the bottom band's upper edge, so the cover crop never hides scene art
    behind the band (webclient-avg-stage-shell design D8). */
@@ -127,12 +127,12 @@ body {
   mask-image: linear-gradient(#000 55%, transparent);
 }
 .elosern-root .scene-backdrop .scene-backdrop__placeholder {
-  top: 14px;
+  top: calc(14px * var(--ui-scale));
   bottom: auto;
   left: auto;
-  right: calc(var(--right-column) + 12px);
+  right: calc(var(--right-column) + 12px * var(--ui-scale));
   transform: none;
-  padding: 4px 9px;
+  padding: calc(4px * var(--ui-scale)) calc(9px * var(--ui-scale));
   border: 1px solid #baa98440;
   font-size: var(--text-xs);
 }
@@ -155,15 +155,15 @@ body {
    a leaving row has faded, and the side glides with the row when a foe drops
    out (instant below `full`). */
 .elosern-root .scene-backdrop .scene-backdrop__caption {
-  left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px);
+  left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale));
   right: max(
-    calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px),
+    calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)),
     calc(
       max(var(--actor-right-inset), var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3) +
-        var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px
+        var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px * var(--ui-scale)
     )
   );
-  bottom: calc(var(--command-line-h) + 12px);
+  bottom: calc(var(--command-line-h) + 12px * var(--ui-scale));
   align-items: center;
   transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
 }
@@ -179,19 +179,19 @@ body {
    HudFrame.vue's own rules, which govern where no `.elosern-root` wraps the
    stage — keep the two in step. */
 .elosern-root .elosern-stage [data-anchor="vitals"] {
-  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px);
-  left: 16px;
-  width: calc(var(--left-column) - 32px);
-  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px - 2 * var(--stage-inset-y));
-  gap: 12px;
+  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px * var(--ui-scale));
+  left: calc(16px * var(--ui-scale));
+  width: calc(var(--left-column) - 32px * var(--ui-scale));
+  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px * var(--ui-scale) - 2 * var(--stage-inset-y));
+  gap: calc(12px * var(--ui-scale));
 }
 .elosern-root .elosern-stage [data-anchor="map"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
-  right: 16px;
-  width: calc(var(--right-column) - 28px);
+  right: calc(16px * var(--ui-scale));
+  width: calc(var(--right-column) - 28px * var(--ui-scale));
   max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   align-items: stretch;
-  gap: 14px;
+  gap: calc(14px * var(--ui-scale));
 }
 .elosern-root [data-anchor="vitals"] > *,
 .elosern-root [data-anchor="map"] > * { flex-shrink: 0; }
@@ -201,14 +201,14 @@ body {
    vitals anchor has about 300px, so the place card and the island gaps
    tighten; the islands compact themselves under the same query. */
 @media (max-height: 820px) {
-  :root { --place-h: 56px; --stage-inset-y: 10px; }
-  .elosern-root .elosern-stage [data-anchor="vitals"] { gap: 8px; }
+  :root { --place-h: calc(56px * var(--ui-scale)); --stage-inset-y: calc(10px * var(--ui-scale)); }
+  .elosern-root .elosern-stage [data-anchor="vitals"] { gap: calc(8px * var(--ui-scale)); }
 }
 /* The command region (design D5): the dock fills it at a fixed size, and
    every master-detail frame keeps list and detail side by side inside the
    narrow region without horizontal overflow. */
-.elosern-root [data-anchor="band-command"] .dock-detail { flex: 0 1 min(220px, 45%); min-width: 0; }
-.elosern-root [data-anchor="band-command"] .skill-detail-pane { flex: 1 1 min(220px, 45%); min-width: 0; }
+.elosern-root [data-anchor="band-command"] .dock-detail { flex: 0 1 min(220px * var(--ui-scale), 45%); min-width: 0; }
+.elosern-root [data-anchor="band-command"] .skill-detail-pane { flex: 1 1 min(220px * var(--ui-scale), 45%); min-width: 0; }
 /* The combat command window (webclient-combat-command-window): the list
    fills the pane's height and scrolls on its own, so the focused row scrolls
    inside the list above the legend strip and the detail never travels with
@@ -233,19 +233,19 @@ body {
 .dock-pane-host--bounded .dock-menu__plain {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
 }
 .dock-pane-host--bounded .dock-menu__plain > .dock-menu-item {
   justify-content: flex-start;
-  min-height: 34px;
-  padding: 4px 12px;
+  min-height: calc(34px * var(--ui-scale));
+  padding: calc(4px * var(--ui-scale)) calc(12px * var(--ui-scale));
   font-family: var(--f-serif);
   font-size: var(--text-base);
   letter-spacing: 0.06em;
   text-align: left;
 }
 .dock-pane-host--bounded .dock-menu__plain > .dock-menu-item[data-team] {
-  border-left-width: 3px;
+  border-left-width: calc(3px * var(--ui-scale));
 }
 .dock-pane-host--bounded .dock-menu__plain > .dock-menu-item[data-team="foes"] {
   border-left-color: var(--seal-500);
@@ -266,24 +266,24 @@ body {
 .elosern-root [data-anchor="command-line"] > * { flex: 1; min-width: 0; }
 /* The waiting frame renders inside the band's narrow command region: its
    three cards stack in one column (design D5). */
-.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
-.waiting-card { min-width: 0; padding: 14px; background: #141719; border: 1px solid #746342; border-radius: 5px; display: flex; flex-direction: column; gap: 12px; }
+.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(10px * var(--ui-scale)); align-content: start; }
+.waiting-card { min-width: 0; padding: calc(14px * var(--ui-scale)); background: #141719; border: 1px solid #746342; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: calc(12px * var(--ui-scale)); }
 .waiting-card--focused { border-color: var(--gold-400); }
 .waiting-card h3, .practice-screen h2 { margin: 0; color: var(--gold-400); font-family: var(--f-serif); }
 .waiting-card p, .practice-screen p { margin: 0; color: var(--paper-300); font-size: var(--text-sm); line-height: 1.6; }
 .waiting-card > button { margin-top: auto; }
-.waiting-screen button, .practice-screen select { padding: 9px; border: 1px solid var(--gold-600); border-radius: 4px; background: var(--gold-glow); color: var(--gold-400); }
+.waiting-screen button, .practice-screen select { padding: calc(9px * var(--ui-scale)); border: 1px solid var(--gold-600); border-radius: var(--radius-sm); background: var(--gold-glow); color: var(--gold-400); }
 .waiting-screen button:focus-visible, .practice-screen select:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
 .waiting-screen button:disabled { opacity: .5; }
 .waiting-back { grid-column: 1 / -1; }
 .elosern-root .waiting-card .exploration-rest-form { padding: 0; border: 0; background: transparent; }
-.practice-screen { display: grid; gap: 12px; max-width: 640px; margin: auto; }
-.practice-screen label { display: grid; gap: 10px; color: var(--gold-400); }
+.practice-screen { display: grid; gap: calc(12px * var(--ui-scale)); max-width: calc(640px * var(--ui-scale)); margin: auto; }
+.practice-screen label { display: grid; gap: calc(10px * var(--ui-scale)); color: var(--gold-400); }
 .elosern-root .action-dock__pane {
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-.elosern-root .skill-detail-pane { border-radius: 5px; padding: 14px 18px; }
+.elosern-root .skill-detail-pane { border-radius: var(--radius-sm); padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale)); }
 .elosern-root .skill-detail-pane__name { font: var(--text-xl) var(--f-serif); }
 .elosern-root .skill-detail-pane__desc { font: var(--text-md)/1.8 var(--f-serif); color: var(--paper-300); }
 .elosern-root .skill-detail-pane__cost,
@@ -295,70 +295,70 @@ body {
 .elosern-root [data-anchor="map"] > .participant-frame {
   flex-shrink: 1;
   max-height: 100%;
-  width: min(100%, clamp(218px, 16vw, 288px));
+  width: min(100%, clamp(218px * var(--ui-scale), 16vw, 288px * var(--ui-scale)));
   box-sizing: border-box;
   align-self: flex-end;
   border-color: #92816a70;
 }
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }
-.elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 4px 10px #0003; }
+.elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) #0003; }
 .elosern-root .cmdline {
   height: var(--command-line-h);
-  padding: 5px 14px;
-  gap: 12px;
+  padding: calc(5px * var(--ui-scale)) calc(14px * var(--ui-scale));
+  gap: calc(12px * var(--ui-scale));
   background: linear-gradient(180deg, #121419e8, #141019f5);
   border: 1px solid #bda47733;
   border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 -10px 24px -18px #000;
-  backdrop-filter: blur(6px);
+  border-radius: var(--radius) var(--radius) 0 0;
+  box-shadow: 0 calc(-10px * var(--ui-scale)) calc(24px * var(--ui-scale)) calc(-18px * var(--ui-scale)) #000;
+  backdrop-filter: blur(calc(6px * var(--ui-scale)));
 }
-.elosern-root .cmdfield { border: 1px solid #c5a76f; border-radius: 6px; box-shadow: 0 0 8px #cfa45c25, inset 0 0 8px #cfa45c10; }
+.elosern-root .cmdfield { border: 1px solid #c5a76f; border-radius: var(--radius); box-shadow: 0 0 calc(8px * var(--ui-scale)) #cfa45c25, inset 0 0 calc(8px * var(--ui-scale)) #cfa45c10; }
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-band { filter: brightness(.45); }
-.elosern-root .inventory-panel { display: grid; grid-template-columns: 140px minmax(180px, 1fr) minmax(220px, .85fr); gap: 20px; min-height: 100%; align-content: start; }
+.elosern-root .inventory-panel { display: grid; grid-template-columns: calc(140px * var(--ui-scale)) minmax(calc(180px * var(--ui-scale)), 1fr) minmax(calc(220px * var(--ui-scale)), .85fr); gap: calc(20px * var(--ui-scale)); min-height: 100%; align-content: start; }
 .elosern-root .inventory-panel__block { margin: 0; min-width: 0; }
 .elosern-root .inventory-panel__heading,
-.elosern-root .equipment-doll__title { font: var(--text-lg) var(--f-serif); color: var(--gold-400); margin-bottom: 18px; }
-.inventory-panel__details { grid-column: 3; grid-row: 1 / 3; min-width: 0; padding: 16px; border: var(--line); border-radius: 6px; background: #0e1015b8; min-height: 360px; }
+.elosern-root .equipment-doll__title { font: var(--text-lg) var(--f-serif); color: var(--gold-400); margin-bottom: calc(18px * var(--ui-scale)); }
+.inventory-panel__details { grid-column: 3; grid-row: 1 / 3; min-width: 0; padding: calc(16px * var(--ui-scale)); border: var(--line); border-radius: var(--radius); background: #0e1015b8; min-height: calc(360px * var(--ui-scale)); }
 .inventory-panel__details-empty { font: var(--text-md)/1.9 var(--f-serif); color: var(--paper-300); }
-.inventory-panel__detail-icon { display: block; width: 100px; height: 100px; margin: 0 auto 20px; padding: 16px; border: 1px solid #c7ad7380; border-radius: 6px; color: var(--gold-400); background: radial-gradient(#9f815438, transparent); }
+.inventory-panel__detail-icon { display: block; width: calc(100px * var(--ui-scale)); height: calc(100px * var(--ui-scale)); margin: 0 auto calc(20px * var(--ui-scale)); padding: calc(16px * var(--ui-scale)); border: 1px solid #c7ad7380; border-radius: var(--radius); color: var(--gold-400); background: radial-gradient(#9f815438, transparent); }
 .elosern-root .inventory-panel__inspector { border: 0; box-shadow: none; background: none; padding: 0; }
 .elosern-root .inventory-panel__inspector-name { font: var(--text-xl) var(--f-serif); color: var(--gold-400); }
-.elosern-root .inventory-panel__inspector-summary { font: var(--text-base)/1.9 var(--f-serif); margin: 18px 0; }
-.elosern-root .equipment-doll__doll { flex-direction: column; gap: 18px; }
-.elosern-root .equipment-doll__slots { grid-template-columns: repeat(2, minmax(60px, 1fr)); width: 100%; }
-.elosern-root .equipment-doll__box { width: 100%; border-radius: 5px; }
-.elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1 / 3; padding: 14px; border: var(--line); border-radius: 5px; }
-.elosern-root .quest-drawer { gap: 20px; }
+.elosern-root .inventory-panel__inspector-summary { font: var(--text-base)/1.9 var(--f-serif); margin: calc(18px * var(--ui-scale)) 0; }
+.elosern-root .equipment-doll__doll { flex-direction: column; gap: calc(18px * var(--ui-scale)); }
+.elosern-root .equipment-doll__slots { grid-template-columns: repeat(2, minmax(calc(60px * var(--ui-scale)), 1fr)); width: 100%; }
+.elosern-root .equipment-doll__box { width: 100%; border-radius: var(--radius-sm); }
+.elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1 / 3; padding: calc(14px * var(--ui-scale)); border: var(--line); border-radius: var(--radius-sm); }
+.elosern-root .quest-drawer { gap: calc(20px * var(--ui-scale)); }
 .elosern-root .quest-log,
-.elosern-root .guild-counter { border: 1px solid #88765380; border-radius: 7px; padding: 20px; background: #17191ee8; }
+.elosern-root .guild-counter { border: 1px solid #88765380; border-radius: var(--radius); padding: calc(20px * var(--ui-scale)); background: #17191ee8; }
 .elosern-root .quest-log__title,
-.elosern-root .guild-counter__title { font: var(--text-2xl) var(--f-serif); color: var(--gold-400); padding-bottom: 15px; border-bottom: var(--line); }
-.elosern-root .quest-log__row { padding: 16px 18px; border: 1px solid #73706870; border-radius: 5px; background: linear-gradient(110deg, #28272a70, #121419b0); }
+.elosern-root .guild-counter__title { font: var(--text-2xl) var(--f-serif); color: var(--gold-400); padding-bottom: calc(15px * var(--ui-scale)); border-bottom: var(--line); }
+.elosern-root .quest-log__row { padding: calc(16px * var(--ui-scale)) calc(18px * var(--ui-scale)); border: 1px solid #73706870; border-radius: var(--radius-sm); background: linear-gradient(110deg, #28272a70, #121419b0); }
 .elosern-root .quest-log__row-name,
 .elosern-root .guild-counter__row-name { font: var(--text-lg) var(--f-serif); }
 .elosern-root .quest-log__row-objective,
 .elosern-root .guild-counter__row-objective { font-size: var(--text-md); }
-.elosern-root .guild-counter__row { padding: 14px 16px; border: var(--line); border-radius: 5px; background: #14161ac0; margin-bottom: 10px; }
+.elosern-root .guild-counter__row { padding: calc(14px * var(--ui-scale)) calc(16px * var(--ui-scale)); border: var(--line); border-radius: var(--radius-sm); background: #14161ac0; margin-bottom: calc(10px * var(--ui-scale)); }
 .elosern-root .guild-counter__action,
-.elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: 8px 20px; border-radius: 5px; }
+.elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale)); border-radius: var(--radius-sm); }
 
 @media (max-width: 1350px) {
   /* 246px keeps the map anchor (right column - 28px) exactly as wide as the
      218px minimap card (webclient-avg-stage-hud-anchors design D1). */
-  :root { --left-column: 216px; --right-column: 246px; }
+  :root { --left-column: calc(216px * var(--ui-scale)); --right-column: calc(246px * var(--ui-scale)); }
   /* The brand row fits the 216px column (design D1). */
   .topbar-wordmark { font-size: var(--text-base); letter-spacing: .14em; margin-right: -.14em; }
-  .elosern-root .topbar-brand { padding-inline: 16px; gap: 10px; }
-  .elosern-root .inventory-panel { grid-template-columns: 120px minmax(170px, 1fr) minmax(200px, .9fr); gap: 12px; }
-  .inventory-panel__details { padding: 12px; }
+  .elosern-root .topbar-brand { padding-inline: calc(16px * var(--ui-scale)); gap: calc(10px * var(--ui-scale)); }
+  .elosern-root .inventory-panel { grid-template-columns: calc(120px * var(--ui-scale)) minmax(calc(170px * var(--ui-scale)), 1fr) minmax(calc(200px * var(--ui-scale)), .9fr); gap: calc(12px * var(--ui-scale)); }
+  .inventory-panel__details { padding: calc(12px * var(--ui-scale)); }
 }
 @media (max-width: 1000px) {
-  :root { --left-column: 190px; --right-column: 200px; }
-  .elosern-root .topbar-right { right: 8px; max-width: 160px; }
+  :root { --left-column: calc(190px * var(--ui-scale)); --right-column: calc(200px * var(--ui-scale)); }
+  .elosern-root .topbar-right { right: calc(8px * var(--ui-scale)); max-width: calc(160px * var(--ui-scale)); }
   .elosern-root .inventory-panel { grid-template-columns: 1fr; }
   .inventory-panel__details { grid-column: 1; grid-row: auto; }
   .elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1; }

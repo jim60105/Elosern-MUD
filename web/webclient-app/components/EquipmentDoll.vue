@@ -312,7 +312,7 @@ const duplicateRows = computed(() => {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   color: var(--paper-500);
   font-size: var(--text-xs);
   font-weight: 500;
@@ -340,7 +340,7 @@ const duplicateRows = computed(() => {
 /* The binding design's `.doll`: the slot grid beside the 裝備描述 column. */
 .equipment-doll__doll {
   display: flex;
-  gap: 12px;
+  gap: calc(12px * var(--ui-scale));
   align-items: flex-start;
 }
 
@@ -367,23 +367,23 @@ const duplicateRows = computed(() => {
    grid present. */
 .equipment-doll__slots {
   display: grid;
-  grid-template-columns: repeat(2, 74px);
-  gap: 9px;
+  grid-template-columns: repeat(2, calc(74px * var(--ui-scale)));
+  gap: calc(9px * var(--ui-scale));
 }
 
 .equipment-doll__slot {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  width: 74px;
+  gap: calc(5px * var(--ui-scale));
+  width: calc(74px * var(--ui-scale));
 }
 
 /* The binding design's `.dslot .box`: a square cell with the fixed slot-role
    symbol; the `.empty` variant uses a dashed outline for the explicit
    empty state. */
 .equipment-doll__box {
-  width: 74px;
-  height: 74px;
+  width: calc(74px * var(--ui-scale));
+  height: calc(74px * var(--ui-scale));
   border: 1px solid var(--ink-600);
   border-radius: var(--radius-sm);
   background: var(--ink-820);
@@ -400,8 +400,8 @@ const duplicateRows = computed(() => {
 /* The binding design's `.dslot .box .ic`: a 32px gold slot-role symbol,
    selected by slot identity (never by the item in the slot). */
 .equipment-doll__icon {
-  width: 32px;
-  height: 32px;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
   color: var(--gold-400);
 }
 

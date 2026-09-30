@@ -158,17 +158,17 @@ function onScrimClick() {
    the right edge through the motion tokens. */
 .hud-drawer {
   position: fixed;
-  inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom) 16px;
+  inset: calc(var(--header-h) + 12px * var(--ui-scale)) calc(16px * var(--ui-scale)) var(--workspace-bottom) calc(16px * var(--ui-scale));
   z-index: var(--z-surface-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--surface-panel);
   border: 1px solid #bca57966;
-  border-radius: 8px;
-  box-shadow: 0 16px 64px #000a, inset 0 1px 0 #e8d8aa14;
+  border-radius: var(--radius);
+  box-shadow: 0 calc(16px * var(--ui-scale)) calc(64px * var(--ui-scale)) #000a, inset 0 1px 0 #e8d8aa14;
   /* Fully off-screen while closed, shadow included. */
-  transform: translateX(calc(100% + 96px));
+  transform: translateX(calc(100% + 96px * var(--ui-scale)));
   transition: transform var(--motion-base) var(--ease-standard);
   outline: none;
 }
@@ -198,7 +198,7 @@ function onScrimClick() {
    and it sits on plain ink — no stand-in scene illustration behind the
    portrait. */
 .hud-drawer__art {
-  flex: 0 0 min(360px, 28%);
+  flex: 0 0 min(360px * var(--ui-scale), 28%);
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -223,7 +223,7 @@ function onScrimClick() {
 }
 
 @media (max-width: 1350px) {
-  .hud-drawer__body { padding: 14px; }
+  .hud-drawer__body { padding: calc(14px * var(--ui-scale)); }
 }
 
 .hud-drawer__foot {

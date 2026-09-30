@@ -66,7 +66,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 .island-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: calc(12px * var(--ui-scale));
   min-width: 0;
   width: 100%;
   color: var(--paper-100);

@@ -255,7 +255,7 @@ function onAutoAdvanceChange(event) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 24px;
+  gap: calc(24px * var(--ui-scale));
 }
 
 .settings-intro,
@@ -265,7 +265,7 @@ function onAutoAdvanceChange(event) {
 }
 
 .settings-intro h4 {
-  margin: 0 0 8px;
+  margin: 0 0 calc(8px * var(--ui-scale));
   color: var(--paper-50);
   font: var(--text-3xl)/1.4 var(--f-serif);
 }
@@ -280,7 +280,7 @@ function onAutoAdvanceChange(event) {
 
 .settings-section {
   min-width: 0;
-  padding: 8px 24px 12px;
+  padding: calc(8px * var(--ui-scale)) calc(24px * var(--ui-scale)) calc(12px * var(--ui-scale));
   border: var(--line);
   border-radius: var(--radius);
   background: linear-gradient(140deg, #242629a0, #101215d0);
@@ -289,9 +289,9 @@ function onAutoAdvanceChange(event) {
 .settings-section__title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
   margin: 0;
-  padding: 16px 0 14px;
+  padding: calc(16px * var(--ui-scale)) 0 calc(14px * var(--ui-scale));
   border-bottom: var(--line);
   color: var(--gold-400);
   font: var(--text-xl) var(--f-serif);
@@ -302,8 +302,8 @@ function onAutoAdvanceChange(event) {
 .settings-section__title::before {
   content: "";
   flex: none;
-  width: 6px;
-  height: 6px;
+  width: calc(6px * var(--ui-scale));
+  height: calc(6px * var(--ui-scale));
   transform: rotate(45deg);
   border: 1px solid var(--gold-400);
   background: #0f0c12;
@@ -315,7 +315,7 @@ function onAutoAdvanceChange(event) {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-3);
-  padding: 18px 0;
+  padding: calc(18px * var(--ui-scale)) 0;
   font-family: var(--f-sans);
   font-size: var(--text-base);
   color: var(--paper-100);
@@ -332,13 +332,13 @@ function onAutoAdvanceChange(event) {
 
 .settings-row__copy {
   flex: 1;
-  min-width: 180px;
+  min-width: calc(180px * var(--ui-scale));
 }
 
 /* Help copy sits one step above the 12px chrome floor, at a readable tier. */
 .settings-row__description {
   display: block;
-  margin: 6px 0 0;
+  margin: calc(6px * var(--ui-scale)) 0 0;
   color: var(--paper-300);
   font-size: var(--text-md);
   line-height: 1.7;
@@ -355,17 +355,17 @@ function onAutoAdvanceChange(event) {
 .settings-row__control {
   display: inline-flex;
   flex: none;
-  padding: 3px;
-  gap: 3px;
+  padding: calc(3px * var(--ui-scale));
+  gap: calc(3px * var(--ui-scale));
   border: var(--line);
   border-radius: var(--radius-sm);
   background: #0c0d11b0;
 }
 
 .affbtn {
-  min-width: 48px;
-  min-height: 36px;
-  padding: 6px 12px;
+  min-width: calc(48px * var(--ui-scale));
+  min-height: calc(36px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale));
   color: var(--paper-300);
   background: transparent;
   border: 1px solid transparent;
@@ -405,11 +405,11 @@ function onAutoAdvanceChange(event) {
   appearance: none;
   position: relative;
   flex: none;
-  width: 46px;
-  height: 26px;
+  width: calc(46px * var(--ui-scale));
+  height: calc(26px * var(--ui-scale));
   margin: 0;
   border: 1px solid var(--paper-700);
-  border-radius: 13px;
+  border-radius: var(--radius);
   background: #0c0d11;
   cursor: pointer;
   transition:
@@ -420,10 +420,10 @@ function onAutoAdvanceChange(event) {
 .settings-toggle::before {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
+  top: calc(3px * var(--ui-scale));
+  left: calc(3px * var(--ui-scale));
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
   border-radius: 50%;
   background: var(--paper-300);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -438,7 +438,7 @@ function onAutoAdvanceChange(event) {
 }
 
 .settings-toggle:checked::before {
-  transform: translateX(20px);
+  transform: translateX(calc(20px * var(--ui-scale)));
   background: var(--paper-50);
 }
 
@@ -448,7 +448,7 @@ function onAutoAdvanceChange(event) {
 
 .settings-toggle:focus-visible {
   outline: 2px solid var(--gold-400);
-  outline-offset: 3px;
+  outline-offset: calc(3px * var(--ui-scale));
 }
 
 @media (forced-colors: active) {
@@ -464,8 +464,8 @@ function onAutoAdvanceChange(event) {
 }
 
 @media (max-width: 850px) {
-  .settings-overlay-body { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .settings-section { padding: 6px 18px 10px; }
+  .settings-overlay-body { grid-template-columns: minmax(0, 1fr); gap: calc(18px * var(--ui-scale)); }
+  .settings-section { padding: calc(6px * var(--ui-scale)) calc(18px * var(--ui-scale)) calc(10px * var(--ui-scale)); }
   .settings-intro h4 { font-size: var(--text-xl); }
 }
 </style>
