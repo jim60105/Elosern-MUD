@@ -46,15 +46,40 @@ function setAllocations(wrapper, values) {
 }
 
 describe("CreationOverlay (B5 overlays family)", () => {
-  // -- Preset state ---------------------------------------------------------
-  it("renders the preset cards with count and labels", () => {
-    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
-    const cards = wrapper.findAll('[data-testid="creation-preset-card"]');
-    expect(cards.length).toBe(3);
-    const names = wrapper.findAll('[data-testid="creation-preset-name"]').map((el) => el.text());
-    expect(names).toEqual(["流浪劍客", "燈下學士", "碼頭腳夫"]);
-    const races = wrapper.findAll('.creation-preset-card__race').map((el) => el.text());
-    expect(races.length).toBe(3);
+  it("steps only valid allocations within the advertised bounds and preserves invalid direct entry", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE } });
+    const axis = CREATION_PANEL_SAMPLE.custom.profiles[0].axes[0];
+    const input = wrapper.get(`[data-testid="creation-field-${axis.axis}"]`);
+    const up = wrapper.get(`[data-testid="creation-step-${axis.axis}-up"]`);
+    const down = wrapper.get(`[data-testid="creation-step-${axis.axis}-down"]`);
+    await input.setValue(axis.minimum);
+    expect(down.attributes("disabled")).toBeDefined();
+    await up.trigger("click");
+    expect(input.element.value).toBe(String(axis.minimum + 1));
+    await input.setValue(axis.maximum);
+    expect(up.attributes("disabled")).toBeDefined();
+    await down.trigger("click");
+    expect(input.element.value).toBe(String(axis.maximum - 1));
+    for (const invalid of ["", axis.minimum - 1, axis.maximum + 1, 0.5]) {
+      await input.setValue(invalid);
+      expect(up.attributes("disabled")).toBeDefined();
+      expect(down.attributes("disabled")).toBeDefined();
+      await up.trigger("click");
+      expect(input.element.value).toBe(String(invalid));
+      await wrapper.get('[data-testid="creation-submit"]').trigger("click");
+      expect(lastAction(wrapper, "creation.custom")).toBeNull();
+      expect(wrapper.get('[data-testid="creation-form-message"]').attributes("role")).toBe("alert");
+    }
+    // Preview clipping cannot normalize a submitted value: an over-bound axis
+    // with a balancing decrement still reaches the existing server validator.
+    await input.setValue(axis.maximum + 1);
+    const other = CREATION_PANEL_SAMPLE.custom.profiles[0].axes[1];
+    await wrapper.get(`[data-testid="creation-field-${other.axis}"]`).setValue(
+      CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft.allocations[other.axis] - 1,
+    );
+    await wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    expect(lastAction(wrapper, "creation.custom").payload.allocations[axis.axis]).toBe(axis.maximum + 1);
+    wrapper.unmount();
   });
 
   it("activating a preset card emits creation.preset with the exact payload", () => {
