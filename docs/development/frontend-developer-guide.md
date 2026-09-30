@@ -37,10 +37,10 @@ web/webclient-app/
   lib/*.js                                      封裝 js/elosern/* 的 ESM 包裝器 (CJS 互通)
   styles/tokens.css                             設計系統 tokens (D6)
   styles/fonts.css                              自我代管的 @font-face (D6)
-  styles/fonts-hack.css                         Hack 等寬字體的 @font-face（由產生器輸出，勿手動編輯）
+  styles/fonts-mono.css                         Jim Mono TC 等寬字體的 @font-face（由匯入工具輸出，勿手動編輯）
   styles/app-shell.css                          存根頁面外觀樣式
   fonts/{iansui,notosans,notoserif}/*.woff2     擷取自設計稿的子集化字型
-  fonts/hack/*.woff2 + LICENSE.md               Hack 等寬字體的 unicode-range 切片與授權
+  fonts/jimmonotc/*.woff2 + licenses/           Jim Mono TC 等寬字體的 unicode-range 切片、碼位清單與授權
   component-manifest.json                       必要 Story 清單 (B1 植入初始值，B5 凍結)
   tests/*.test.js                               Vitest 元件閘門
   stories/**                                    Storybook stories (自 B 波次起)
@@ -64,17 +64,27 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 4. **執行瀏覽器測試前必須先建置 dist。** 受管瀏覽器套件會直接從工作樹提供靜態檔案；未執行 `pnpm run build` 會導致 Vue 分支檢查失敗（CI 會在兩個工作區中自動建置）。
 5. **XOR 旗標採互斥載入。** 每個頁面只啟用一種檢視堆疊，`webclient_vue_enabled`（脈絡變數）會挑選 Vue 組合包**或**舊版復原分支（D10 原生文字主控台，無檢視程式碼）。正式環境預設為 **Vue 組合包**（於 C4 切換）；舊版分支僅能透過復原機制進入。`?__vue=1` 可強制切換至 Vue 分支以供審查或離線載入檢查；`ELOSERN_BROWSER_VUE_CLIENT=1`（瀏覽器測試設定）為 C3 使用的測試設定開關。
 
-## 等寬字體（Hack）
+## 等寬字體（Jim Mono TC）
 
-`--f-mono` 為 `"Hack", "Noto Sans TC", monospace`：拉丁字母、數字、箭頭與框線字元由自我代管的 Hack 繪製，CJK 由自我代管的 Noto Sans TC 繪製，不依賴玩家電腦安裝的字型。Hack v3.003 以常規與粗體各五個 unicode-range `.woff2` 切片（`latin`、`latin-ext`、`greek-cyrillic`、`box`、`symbols`，每個介於 4 KB 與 40 KB 之間）提供，頁面只下載實際繪製到的切片。
+`--f-mono` 為 `"Jim Mono TC", "Noto Sans TC", monospace`。拉丁字母、數字、箭頭、框線字元與 CJK 都由自我代管的 [Jim Mono TC](https://github.com/jim60105/JimMonoTC)（SIL OFL 1.1）繪製，不依賴玩家電腦安裝的字型。Jim Mono TC 合併了 Hack 3.003 的拉丁字形與 Noto Sans CJK TC 的 CJK 字形，每個 CJK 字元的寬度剛好是兩個拉丁字元，因此含中文的框線地圖能逐欄對齊。Noto Sans TC 只負責 Jim Mono TC 未收錄的罕用 CJK（寬 1em）。
 
-切片、`LICENSE.md`、`codepoints.json` 與 `styles/fonts-hack.css` 皆由產生器輸出並提交至版本庫，請勿手動編輯。需要重新產生時執行：
+字型保留程式設計連字（例如 `->`、`==`），連字的寬度與原本的字元數相同，不會改變欄位。
+
+切片來自上游 release 的 `-web.zip`，本專案只匯入、不自行切字型。常規（400）與粗體（700）各保留：
+
+- 單格群組 `latin`、`latin-ext`、`greek-cyrillic`、`box`、`symbols`；
+- 依 Noto Sans TC 使用頻率分段的 `cjk-<N>` 群組。
+
+Nerd Fonts 圖示（`icons-<N>`）、罕用 CJK（`cjk-x<N>`）與斜體不匯入。每個切片不超過 64 KB，頁面只下載實際繪製到的切片。
+
+切片、`licenses/`、`codepoints.json` 與 `styles/fonts-mono.css` 皆由匯入工具輸出並提交至版本庫，請勿手動編輯。升級字型時，先更新 `tools/import_mono_font.py` 中釘選的 release 與 SHA-256，再執行：
 
 ```sh
-uv run --script tools/gen_hack_font_slices.py
+uv run --locked python -m tools.import_mono_font
+uv run --locked python tools/gen_mono_cells.py
 ```
 
-產生器會下載上游 release 並驗證釘選的 SHA-256，輸出的位元組可重現（重新執行後 `git status` 應保持乾淨）。`tests/test_hack_font_slices_contract.py` 檢查切片大小、範圍互不重疊且涵蓋 Hack 全部字元。
+匯入工具會下載 release 並驗證 SHA-256（也可以把已下載的 zip 路徑當作唯一參數），輸出的位元組可重現（重新執行後 `git status` 應保持乾淨）。第二個指令依新的碼位清單重新產生地圖使用的單格表 `lib/mono_cells.js`。`tests/test_mono_font_contract.py` 檢查切片大小、範圍互不重疊、兩種字重的 CJK 相同，以及授權檔案。
 
 ## 瀏覽器（受管執行期）測試
 
