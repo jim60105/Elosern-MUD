@@ -1483,7 +1483,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             ["nav-tool-lineage", "nav-tool-lore", "nav-tool-codex", "gallery-opener", "nav-tool-help"],
         )
         for tool in fit["tools"]:
-            self.assertEqual(tool["aria"], tool["title"])
+            # The visible shared tooltip replaced the native title tooltip.
+            self.assertIsNone(tool["title"])
+            self.assertTrue(tool["aria"])
             self.assertGreaterEqual(tool["top"], -1)
             self.assertLessEqual(tool["bottom"], 48 + 1, f"{tool['testid']} extends below the 48px bar")
         for btn in fit["navButtons"]:
@@ -1506,6 +1508,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 testid,
                 f"Tab did not reach {testid}",
             )
+            # Tab focus discloses the label in the visible tooltip.
+            self.assertEqual(
+                page.locator('[data-testid="nav-tooltip"]').inner_text(),
+                page.locator(f'[data-testid="{testid}"]').get_attribute("aria-label"),
+            )
             page.keyboard.press("Enter")
             page.wait_for_selector(surface_sel, timeout=15000)
             page.keyboard.press("Escape")
@@ -1519,6 +1526,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 testid,
                 f"Escape did not restore focus to {testid}",
             )
+            # A restored opener stays quiet: no tooltip until the next Tab.
+            self.assertEqual(page.locator('[data-testid="nav-tooltip"]').count(), 0)
 
         # Pointer-activation scenario: with the line collapsed, ArrowUp on the
         # dock is claimed by the router and does not walk history; `/` then

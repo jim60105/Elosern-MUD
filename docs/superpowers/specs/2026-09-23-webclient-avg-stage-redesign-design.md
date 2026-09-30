@@ -4,7 +4,8 @@ Date: 2026-09-23 (revised 2026-09-25 with the decisions taken while writing
 the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
 line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
 follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
-content, §5.4; revised 2026-09-30 with the A12 map legibility, §11)
+content, §5.4; revised 2026-09-30 with the A12 map legibility, §11, and the
+A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -308,6 +309,20 @@ survive a collapse.
   `connected && !mutationsLocked && phase === "active" && !inFlight`. A
   refused borrowed dialogue send keeps its dialogue target (§8.2).
 - History and Tab completion are unchanged.
+
+Chrome and navigation (A13, `webclient-chrome-navigation-polish`): the
+labelled primary controls (角色狀態, 任務, 背包, 地圖, 設定) sit in one
+fixed-width region — the five controls' widths together, each sized by its
+label — packed against its trailing edge, so 設定 and the 工具 group never
+move when combat or an unavailable panel drops an entry; the freed space
+gathers beside the brand and a missing entry is simply absent, never a
+disabled stand-in. The 工具 icons share one visible tooltip (their label
+from `nav-tools.js`, the model that also titles the opened surface's
+header) on hover and on Tab focus; Escape hides it in place, and only a
+second Escape reaches the dock. The bilingual brand sits on one baseline,
+centred in the band, with trimmed tracking. The place card sets the name
+over a quiet gold rule and the world time in tabular lining numerals,
+with no leading dash.
 
 ## 6. Message window and the message sequencer
 

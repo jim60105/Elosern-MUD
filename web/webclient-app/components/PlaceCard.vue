@@ -46,6 +46,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
         :title="location"
       >{{ location }}</h1>
     </Transition>
+    <span class="place-card__rule" data-testid="place-card__rule" aria-hidden="true"></span>
     <p class="place-card__time" data-testid="place-card__time">{{ time }}</p>
   </section>
 </template>
@@ -54,18 +55,21 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 /* The HUD island chrome from the shared tokens (the translucent panel fill,
    the backdrop blur, the hairline border, the shared radius and shadow),
    declared here so the card carries it wherever it is mounted. A faint
-   warm wash from the left edge and a short gold rule before the time line
-   echo the band's hairline vocabulary. */
+   warm wash from the left edge and a quiet gold rule between the heading
+   and the time line echo the band's hairline vocabulary and set the two
+   rows on two levels (webclient-chrome-navigation-polish): the place is the
+   title, the time a subordinate line in the numeral face. */
 .place-card {
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-  /* Two rows centred in the fixed anchor: the heading, then the time. The
-     heading row is one grid cell that an entering and a leaving heading
-     share during a location change, so neither moves the time line. */
+  /* Three rows centred in the fixed anchor: the heading, the rule, then the
+     time. The heading row is one grid cell that an entering and a leaving
+     heading share during a location change, so neither moves the time
+     line. */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   align-content: center;
   row-gap: 5px;
   padding: 0 16px;
@@ -92,21 +96,23 @@ const transitionCss = computed(() => props.motionLevel !== "off");
   color: #ead8b9;
   text-shadow: 0 1px 6px #000c;
 }
-.place-card__time {
+.place-card__rule {
   grid-area: 2 / 1;
-  font: var(--text-xs)/1.4 var(--f-serif);
-  letter-spacing: 0.08em;
-  color: var(--paper-300);
-}
-.place-card__time::before {
-  content: "";
-  display: inline-block;
-  vertical-align: middle;
-  margin: -2px 8px 0 0;
-  width: 14px;
+  display: block;
+  width: 64px;
   height: 1px;
-  background: var(--gold-400);
-  opacity: 0.7;
+  background: linear-gradient(90deg, var(--gold-400), #d8bb7800);
+  opacity: 0.75;
+}
+/* The time line starts at its first value (no leading glyph or rule) and
+   sets its figures in the numeral face as tabular lining numerals, so the
+   clock never jitters as the minutes turn. */
+.place-card__time {
+  grid-area: 3 / 1;
+  font: var(--text-sm)/1.35 var(--f-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.06em;
+  color: var(--paper-300);
 }
 
 /* The location change (webclient-scene-transitions, design D3). The two

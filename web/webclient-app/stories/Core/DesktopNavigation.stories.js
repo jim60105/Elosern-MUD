@@ -12,6 +12,8 @@ const renderNavigation = (args) => ({
   template: '<div style="position:relative;height:100px;--left-column:16px;--header-h:48px"><DesktopNavigation v-bind="args" /></div>',
 });
 
+// Exploration carries the five primary controls; Combat keeps only the
+// combat root's 背包 beside 設定 in the same fixed-width region.
 export const Exploration = {
   render: renderNavigation,
   args: {
@@ -38,6 +40,20 @@ export const WithGallery = {
       { key: "character", label: "角色狀態", enabled: true },
       { key: "inventory", label: "背包", enabled: true },
       { key: "quests", label: "任務", enabled: true },
+    ],
+  },
+};
+
+// The quest panel is unavailable: the quest entry is absent (no
+// placeholder), and 設定 and the tool group keep their places because the
+// primary region keeps its width (webclient-chrome-navigation-polish).
+export const QuestsUnavailable = {
+  render: renderNavigation,
+  args: {
+    mode: "exploration",
+    items: [
+      { key: "character", label: "角色狀態", enabled: true },
+      { key: "inventory", label: "背包", enabled: true },
     ],
   },
 };

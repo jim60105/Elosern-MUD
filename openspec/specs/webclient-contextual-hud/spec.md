@@ -2136,6 +2136,15 @@ height whatever the label lengths, and SHALL truncate a label that exceeds its w
 indicator while keeping the full label as its accessible text. It SHALL be display-only: no control,
 no tab stop, and no dispatch.
 
+The card SHALL set its two values on two levels: the location heading in the serif face, then a
+quiet decorative gold rule, hidden from assistive technology, then the world-time line. The
+world-time line SHALL carry no leading separator glyph or rule before its first value, SHALL use the
+numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 12px chrome
+floor), and SHALL render the committed world-time label (or its placeholder) verbatim, with every
+date and time value intact: all time values SHALL remain server-authored, and the card SHALL NOT
+reformat, abbreviate, or derive them. The heading, the rule, and the time line SHALL fit the card's
+fixed height.
+
 #### Scenario: The card names the location and the time
 - **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 · 12:00`, and no `local_map` panel
 - **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 · 12:00`, and no other stage or top-band element states either string
@@ -2151,6 +2160,14 @@ no tab stop, and no dispatch.
 #### Scenario: The card keeps its size and is absent in creation
 - **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation
 - **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode the place card is not rendered and holds no tab stop
+
+#### Scenario: No prefix exists
+- **WHEN** a time line has no preceding qualifier
+- **THEN** it renders without a leading dash and retains every actual date/time value
+
+#### Scenario: The heading and the time read as two levels
+- **WHEN** the place card renders a location and a committed world time
+- **THEN** a decorative gold rule lies between the heading and the time line, the time line's numerals are tabular lining figures in the numeral face, and the card keeps its fixed height
 
 ### Requirement: Text speed and auto-advance are client-local reading preferences the settings surface owns
 The settings surface's reading section SHALL offer a text-speed control with the four steps `慢`
